@@ -1,6 +1,6 @@
 /**
  * InputManager — centralized keyboard and mouse input handler.
- * Tracks key states, mouse grid position, and click events.
+ * Tracks key states, mouse position, click, mousedown/mouseup for drag-and-drop.
  */
 
 export class InputManager {
@@ -10,10 +10,13 @@ export class InputManager {
     public mouseScreenX: number = 0;
     public mouseScreenY: number = 0;
     public mouseClicked: boolean = false;
+    public mouseJustDown: boolean = false;
+    public mouseJustUp: boolean = false;
+    public mouseIsDown: boolean = false;
 
     constructor(canvas: HTMLCanvasElement) {
         window.addEventListener('keydown', (e) => {
-            if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyW','KeyA','KeyS','KeyD'].includes(e.code)) {
+            if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyW','KeyA','KeyS','KeyD','Tab','KeyI'].includes(e.code)) {
                 e.preventDefault();
             }
             if (!this.keysDown.has(e.code)) {
@@ -32,24 +35,38 @@ export class InputManager {
             this.mouseScreenY = e.clientY - rect.top;
         });
 
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 0) {
+                this.mouseJustDown = true;
+                this.mouseIsDown = true;
+            }
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (e.button === 0) {
+                this.mouseJustUp = true;
+                this.mouseIsDown = false;
+            }
+        });
+
         canvas.addEventListener('click', () => {
             this.mouseClicked = true;
         });
     }
 
-    /** Check if a key is currently held */
     public isDown(code: string): boolean {
         return this.keysDown.has(code);
     }
 
-    /** Check if a key was just pressed this frame (single fire) */
     public justPressed(code: string): boolean {
         return this.keysJustPressed.has(code);
     }
 
-    /** Clear per-frame states (call at end of each update) */
     public endFrame(): void {
         this.keysJustPressed.clear();
         this.mouseClicked = false;
+        this.mouseJustDown = false;
+        this.mouseJustUp = false;
     }
 }
+

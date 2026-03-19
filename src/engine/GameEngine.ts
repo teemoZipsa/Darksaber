@@ -199,8 +199,11 @@ export class GameEngine {
         // If inventory is open, route input to inventory UI
         if (this.inventoryUI.isVisible()) {
             this.inventoryUI.onMouseMove(this.input.mouseScreenX, this.input.mouseScreenY);
-            if (this.input.mouseClicked) {
-                this.inventoryUI.onClick(this.input.mouseScreenX, this.input.mouseScreenY);
+            if (this.input.mouseJustDown) {
+                this.inventoryUI.onMouseDown(this.input.mouseScreenX, this.input.mouseScreenY);
+            }
+            if (this.input.mouseJustUp) {
+                this.inventoryUI.onMouseUp(this.input.mouseScreenX, this.input.mouseScreenY);
             }
             return; // don't process game input while inventory is open
         }
