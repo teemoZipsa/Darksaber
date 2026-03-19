@@ -1,18 +1,16 @@
 {
-  "name": "grid-rpg-prototype",
-  "version": "1.0.0",
-  "description": "",
-  "main": "game.js",
-  "directories": {
-    "doc": "docs"
-  },
+  "name": "darksaber",
+  "version": "0.1.0",
+  "description": "Dark Saver style grid-based SRPG engine",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "keywords": ["srpg", "grid", "rpg", "darksaver"],
+  "author": "teemoZipsa",
+  "license": "MIT",
   "devDependencies": {
     "typescript": "^5.9.3",
     "vite": "^8.0.1"
