@@ -8,6 +8,7 @@ export class Entity {
     public gridY: number;
     public color: string;
     public label: string;
+    public actionGauge: number = 0; // ATB System: 0 to 100
 
     constructor(id: string, gridX: number, gridY: number, color: string, label: string = '') {
         this.id = id;

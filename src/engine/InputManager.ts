@@ -29,13 +29,16 @@ export class InputManager {
             this.keysDown.delete(e.code);
         });
 
-        canvas.addEventListener('mousemove', (e) => {
+        const updateMousePos = (e: MouseEvent) => {
             const rect = canvas.getBoundingClientRect();
             this.mouseScreenX = e.clientX - rect.left;
             this.mouseScreenY = e.clientY - rect.top;
-        });
+        };
+
+        canvas.addEventListener('mousemove', updateMousePos);
 
         canvas.addEventListener('mousedown', (e) => {
+            updateMousePos(e);
             if (e.button === 0) {
                 this.mouseJustDown = true;
                 this.mouseIsDown = true;
@@ -43,6 +46,7 @@ export class InputManager {
         });
 
         canvas.addEventListener('mouseup', (e) => {
+            updateMousePos(e);
             if (e.button === 0) {
                 this.mouseJustUp = true;
                 this.mouseIsDown = false;

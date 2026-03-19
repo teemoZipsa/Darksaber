@@ -7,6 +7,8 @@
 
 import { GridInventory, PlacedItem } from './GridInventory';
 import { ItemDef, ItemSlot } from '../data/ItemDB';
+import { Character } from '../character/Character';
+import { t, i18n } from '../i18n/LanguageManager';
 
 const CELL = 48;
 const PAD = 16;
@@ -19,7 +21,7 @@ const INVALID_DROP = 'rgba(200, 50, 50, 0.3)';
 
 interface EquipSlotDef {
     slot: ItemSlot;
-    label: string;
+    labelKey: string;
     bodyX: number;   // relative to body silhouette center
     bodyY: number;
     w: number;
@@ -28,15 +30,17 @@ interface EquipSlotDef {
 
 // Equipment slot positions on the body silhouette
 const EQUIP_SLOTS: EquipSlotDef[] = [
-    { slot: 'head',      label: '🪖',  bodyX: -CELL/2,  bodyY: -110,  w: CELL, h: CELL },
-    { slot: 'body',      label: '🦺',  bodyX: -CELL/2,  bodyY: -45,   w: CELL, h: CELL*1.4 },
-    { slot: 'weapon',    label: '🗡️',  bodyX: -CELL-22, bodyY: -25,   w: CELL, h: CELL*1.4 },
-    { slot: 'shield',    label: '🛡️',  bodyX: 22,       bodyY: -25,   w: CELL, h: CELL*1.4 },
-    { slot: 'accessory', label: '💍',  bodyX: -CELL/2,  bodyY: 35,    w: CELL, h: CELL },
+    { slot: 'head',      labelKey: 'inv.head',  bodyX: -CELL/2,  bodyY: -110,  w: CELL, h: CELL },
+    { slot: 'body',      labelKey: 'inv.body',  bodyX: -CELL/2,  bodyY: -45,   w: CELL, h: CELL*1.4 },
+    { slot: 'weapon',    labelKey: 'inv.weapon',bodyX: -CELL-22, bodyY: -25,   w: CELL, h: CELL*1.4 },
+    { slot: 'shield',    labelKey: 'inv.shield',bodyX: 22,       bodyY: -25,   w: CELL, h: CELL*1.4 },
+    { slot: 'accessory', labelKey: 'inv.accessory',bodyX: -CELL/2, bodyY: 35,  w: CELL, h: CELL },
 ];
 
 export class InventoryUI {
     private inventory: GridInventory;
+    private externalGrid: GridInventory | null = null;
+    private externalTitle: string = 'Loot';
     private visible: boolean = false;
 
     // Drag state
@@ -46,10 +50,9 @@ export class InventoryUI {
     private dragOffsetY: number = 0;
     private mouseX: number = 0;
     private mouseY: number = 0;
-    private mouseDown: boolean = false;
 
-    // Equipment state
-    private equipped: Map<ItemSlot, PlacedItem> = new Map();
+    // The character whose equipment we are managing.
+    private activeChar: Character | null = null;
 
     // Layout coords (recalculated on render)
     private panelX = 0;
@@ -59,11 +62,24 @@ export class InventoryUI {
     private bodyCenter = { x: 0, y: 0 };
 
     // Hover
-    private hoverCell: { x: number; y: number } | null = null;
+    private hoverCell: { x: number; y: number; isExt: boolean } | null = null;
     private hoverEquip: ItemSlot | null = null;
+
+    // External Grid Layout coordinates
+    private extGridStartX = 0;
+    private extGridStartY = 0;
 
     constructor(inventory: GridInventory) {
         this.inventory = inventory;
+    }
+
+    public setActiveCharacter(char: Character): void {
+        this.activeChar = char;
+    }
+
+    public setExternalGrid(grid: GridInventory | null, title: string = 'Loot'): void {
+        this.externalGrid = grid;
+        this.externalTitle = title;
     }
 
     public toggle(): void {
@@ -83,14 +99,31 @@ export class InventoryUI {
         this.mouseX = sx;
         this.mouseY = sy;
 
-        // Update hover cell
+        // Update hover cell - Internal Grid
         const relX = sx - this.gridStartX;
         const relY = sy - this.gridStartY;
         const cx = Math.floor(relX / CELL);
         const cy = Math.floor(relY / CELL);
+        
+        let foundCell = false;
         if (cx >= 0 && cx < this.inventory.width && cy >= 0 && cy < this.inventory.height && relX >= 0 && relY >= 0) {
-            this.hoverCell = { x: cx, y: cy };
-        } else {
+            this.hoverCell = { x: cx, y: cy, isExt: false };
+            foundCell = true;
+        } 
+        
+        // Update hover cell - External Grid
+        if (!foundCell && this.externalGrid) {
+            const extRelX = sx - this.extGridStartX;
+            const extRelY = sy - this.extGridStartY;
+            const ecx = Math.floor(extRelX / CELL);
+            const ecy = Math.floor(extRelY / CELL);
+            if (ecx >= 0 && ecx < this.externalGrid.width && ecy >= 0 && ecy < this.externalGrid.height && extRelX >= 0 && extRelY >= 0) {
+                this.hoverCell = { x: ecx, y: ecy, isExt: true };
+                foundCell = true;
+            }
+        }
+
+        if (!foundCell) {
             this.hoverCell = null;
         }
 
@@ -100,38 +133,39 @@ export class InventoryUI {
 
     public onMouseDown(sx: number, sy: number): void {
         if (!this.visible) return;
-        this.mouseDown = true;
         this.mouseX = sx;
         this.mouseY = sy;
 
         // Check if clicking on a grid item → start drag
         if (this.hoverCell) {
-            const placed = this.inventory.getAt(this.hoverCell.x, this.hoverCell.y);
+            const grid = this.hoverCell.isExt ? this.externalGrid! : this.inventory;
+            const placed = grid.getAt(this.hoverCell.x, this.hoverCell.y);
             if (placed) {
                 this.dragging = placed;
                 this.dragFromEquip = null;
-                this.dragOffsetX = sx - (this.gridStartX + placed.gridX * CELL);
-                this.dragOffsetY = sy - (this.gridStartY + placed.gridY * CELL);
-                this.inventory.remove(placed);
+                const originX = this.hoverCell.isExt ? this.extGridStartX : this.gridStartX;
+                const originY = this.hoverCell.isExt ? this.extGridStartY : this.gridStartY;
+                this.dragOffsetX = sx - (originX + placed.gridX * CELL);
+                this.dragOffsetY = sy - (originY + placed.gridY * CELL);
+                grid.remove(placed);
                 return;
             }
         }
 
         // Check if clicking on an equipped item → start drag
         const eqSlot = this.getEquipSlotAt(sx, sy);
-        if (eqSlot && this.equipped.has(eqSlot)) {
-            const placed = this.equipped.get(eqSlot)!;
+        if (eqSlot && this.activeChar && this.activeChar.equipment.has(eqSlot)) {
+            const placed = this.activeChar.equipment.get(eqSlot)!;
             this.dragging = placed;
             this.dragFromEquip = eqSlot;
             this.dragOffsetX = placed.item.gridW * CELL / 2;
             this.dragOffsetY = placed.item.gridH * CELL / 2;
-            this.equipped.delete(eqSlot);
+            this.activeChar.unequip(eqSlot);
         }
     }
 
     public onMouseUp(sx: number, sy: number): void {
         if (!this.visible || !this.dragging) {
-            this.mouseDown = false;
             return;
         }
 
@@ -140,21 +174,22 @@ export class InventoryUI {
 
         // Try dropping on equipment slot
         const eqSlot = this.getEquipSlotAt(sx, sy);
-        if (eqSlot && item.item.slot === eqSlot) {
+        if (eqSlot && item.item.slot === eqSlot && this.activeChar) {
             // Swap: if something already there, put it back in grid
-            const existing = this.equipped.get(eqSlot);
+            const existing = this.activeChar.equipment.get(eqSlot);
             if (existing) {
-                this.inventory.autoPlace(existing.item);
+                this.inventory.autoPlace(existing.item); // or external grid if possible? Fallback to internal.
             }
-            this.equipped.set(eqSlot, item);
+            this.activeChar.equip(item);
             placed = true;
         }
 
         // Try dropping on grid
         if (!placed && this.hoverCell) {
+            const targetGrid = this.hoverCell.isExt ? this.externalGrid! : this.inventory;
             const dropX = this.hoverCell.x;
             const dropY = this.hoverCell.y;
-            const result = this.inventory.place(item.item, dropX, dropY);
+            const result = targetGrid.place(item.item, dropX, dropY);
             if (result) {
                 result.durability = item.durability;
                 placed = true;
@@ -163,8 +198,8 @@ export class InventoryUI {
 
         // If couldn't place, return to origin
         if (!placed) {
-            if (this.dragFromEquip) {
-                this.equipped.set(this.dragFromEquip, item);
+            if (this.dragFromEquip && this.activeChar) {
+                this.activeChar.equip(item);
             } else {
                 // Try to place back somewhere in grid
                 const result = this.inventory.autoPlace(item.item);
@@ -174,7 +209,6 @@ export class InventoryUI {
 
         this.dragging = null;
         this.dragFromEquip = null;
-        this.mouseDown = false;
     }
 
     // ─── Helpers ─────────────────────────────────────────────────
@@ -191,7 +225,7 @@ export class InventoryUI {
     }
 
     public getEquipped(slot: ItemSlot): PlacedItem | undefined {
-        return this.equipped.get(slot);
+        return this.activeChar ? this.activeChar.equipment.get(slot) : undefined;
     }
 
     // ─── Render ──────────────────────────────────────────────────
@@ -201,9 +235,12 @@ export class InventoryUI {
 
         const gridPixelW = this.inventory.width * CELL;
         const gridPixelH = this.inventory.height * CELL;
+        const extGridPixelW = this.externalGrid ? this.externalGrid.width * CELL : 0;
+        const extGridPixelH = this.externalGrid ? this.externalGrid.height * CELL : 0;
         const bodyAreaW = 200;
-        const totalW = bodyAreaW + gridPixelW + PAD * 4;
-        const totalH = Math.max(gridPixelH, 300) + PAD * 3 + 40;
+        
+        const totalW = bodyAreaW + gridPixelW + (this.externalGrid ? extGridPixelW + PAD * 2 : 0) + PAD * 4;
+        const totalH = Math.max(gridPixelH, extGridPixelH, 300) + PAD * 3 + 40;
 
         this.panelX = Math.floor((canvasW - totalW) / 2);
         this.panelY = Math.floor((canvasH - totalH) / 2);
@@ -214,32 +251,49 @@ export class InventoryUI {
 
         // Panel
         ctx.fillStyle = PANEL_BG;
-        ctx.strokeStyle = 'rgba(0, 229, 255, 0.4)';
-        ctx.lineWidth = 2;
-        this.roundRect(ctx, this.panelX, this.panelY, totalW, totalH, 12);
-
-        // Title
+        // Left Panel (Equipment & Backpack)
+        const eqW = bodyAreaW + PAD * 2;
+        const bpW = gridPixelW + PAD * 2;
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(this.panelX, this.panelY, eqW + bpW, totalH);
+        
         ctx.fillStyle = '#00e5ff';
-        ctx.font = 'bold 18px Inter, sans-serif';
+        ctx.font = 'bold 16px Inter, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('⚔️ Equipment & Inventory', this.panelX + totalW / 2, this.panelY + 28);
+        ctx.fillText(t('inv.title'), this.panelX + totalW / 2, this.panelY + 28);
         ctx.textAlign = 'start';
 
-        // ─── Body Silhouette (left) ────
-        this.bodyCenter.x = this.panelX + PAD + bodyAreaW / 2;
+        // ─── External Grid (far left, if present) ───
+        let currentDrawX = this.panelX + PAD;
+        
+        if (this.externalGrid) {
+            this.extGridStartX = currentDrawX;
+            this.extGridStartY = this.panelY + 50;
+            
+            ctx.fillStyle = '#ffaa33';
+            ctx.font = 'bold 12px Inter, sans-serif';
+            ctx.fillText(this.externalTitle, this.extGridStartX, this.extGridStartY - 6);
+            
+            this.renderGridBase(ctx, this.externalGrid, this.extGridStartX, this.extGridStartY, true);
+            currentDrawX += this.externalGrid.width * CELL + PAD * 2;
+        }
+
+        // ─── Body Silhouette (middle/left) ────
+        this.bodyCenter.x = currentDrawX + bodyAreaW / 2;
         this.bodyCenter.y = this.panelY + 50 + 150;
         this.renderBodySilhouette(ctx);
+        currentDrawX += bodyAreaW + PAD * 2;
 
         // ─── Grid Backpack (right) ──────
-        this.gridStartX = this.panelX + bodyAreaW + PAD * 2;
+        this.gridStartX = currentDrawX;
         this.gridStartY = this.panelY + 50;
 
         // Grid label
         ctx.fillStyle = '#aaa';
         ctx.font = '12px Inter, sans-serif';
-        ctx.fillText('배낭 (Backpack)', this.gridStartX, this.gridStartY - 4);
+        ctx.fillText(t('inv.backpack'), this.gridStartX, this.gridStartY - 6);
 
-        this.renderGrid(ctx);
+        this.renderGridBase(ctx, this.inventory, this.gridStartX, this.gridStartY, false);
 
         // ─── Tooltip ────────────────────
         this.renderTooltip(ctx);
@@ -331,7 +385,7 @@ export class InventoryUI {
             ctx.strokeRect(slotX, slotY, def.w, def.h);
 
             // Equipped item or slot label
-            const equipped = this.equipped.get(def.slot);
+            const equipped = this.activeChar ? this.activeChar.equipment.get(def.slot) : undefined;
             if (equipped) {
                 ctx.fillStyle = equipped.item.color + '99';
                 ctx.fillRect(slotX + 2, slotY + 2, def.w - 4, def.h - 4);
@@ -340,11 +394,11 @@ export class InventoryUI {
                 ctx.fillText(equipped.item.icon, slotX + def.w / 2, slotY + def.h / 2 + 7);
                 ctx.textAlign = 'start';
             } else {
-                ctx.font = '18px serif';
+                ctx.font = '14px Inter, sans-serif';
                 ctx.textAlign = 'center';
                 ctx.globalAlpha = 0.4;
                 ctx.fillStyle = '#aaa';
-                ctx.fillText(def.label, slotX + def.w / 2, slotY + def.h / 2 + 6);
+                ctx.fillText(t(def.labelKey), slotX + def.w / 2, slotY + def.h / 2 + 5);
                 ctx.globalAlpha = 1;
                 ctx.textAlign = 'start';
             }
@@ -354,17 +408,14 @@ export class InventoryUI {
         ctx.fillStyle = '#666';
         ctx.font = '11px Inter, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('장비 착용', cx, cy + 85);
+        ctx.fillText(t('inv.equipment'), cx, cy + 85);
         ctx.textAlign = 'start';
     }
 
-    private renderGrid(ctx: CanvasRenderingContext2D): void {
-        const gx = this.gridStartX;
-        const gy = this.gridStartY;
-
+    private renderGridBase(ctx: CanvasRenderingContext2D, grid: GridInventory, gx: number, gy: number, isExt: boolean): void {
         // Empty cells
-        for (let y = 0; y < this.inventory.height; y++) {
-            for (let x = 0; x < this.inventory.width; x++) {
+        for (let y = 0; y < grid.height; y++) {
+            for (let x = 0; x < grid.width; x++) {
                 const cx = gx + x * CELL;
                 const cy = gy + y * CELL;
                 ctx.fillStyle = CELL_BG;
@@ -377,23 +428,23 @@ export class InventoryUI {
 
         // Placed items
         const rendered = new Set<PlacedItem>();
-        for (const placed of this.inventory.items) {
+        for (const placed of grid.items) {
             if (rendered.has(placed)) continue;
             rendered.add(placed);
             this.renderItemInGrid(ctx, placed, gx, gy, false);
         }
 
         // Drop preview when dragging
-        if (this.dragging && this.hoverCell) {
+        if (this.dragging && this.hoverCell && this.hoverCell.isExt === isExt) {
             const dropX = this.hoverCell.x;
             const dropY = this.hoverCell.y;
-            const canDrop = this.inventory.canPlace(this.dragging.item, dropX, dropY);
+            const canDrop = grid.canPlace(this.dragging.item, dropX, dropY);
 
             for (let dy = 0; dy < this.dragging.item.gridH; dy++) {
                 for (let dx = 0; dx < this.dragging.item.gridW; dx++) {
                     const cx = gx + (dropX + dx) * CELL;
                     const cy = gy + (dropY + dy) * CELL;
-                    if (dropX + dx < this.inventory.width && dropY + dy < this.inventory.height) {
+                    if (dropX + dx < grid.width && dropY + dy < grid.height) {
                         ctx.fillStyle = canDrop ? VALID_DROP : INVALID_DROP;
                         ctx.fillRect(cx, cy, CELL, CELL);
                     }
@@ -402,7 +453,7 @@ export class InventoryUI {
         }
 
         // Hover highlight (when not dragging)
-        if (!this.dragging && this.hoverCell) {
+        if (!this.dragging && this.hoverCell && this.hoverCell.isExt === isExt) {
             const hx = gx + this.hoverCell.x * CELL;
             const hy = gy + this.hoverCell.y * CELL;
             ctx.fillStyle = HIGHLIGHT;
@@ -471,13 +522,14 @@ export class InventoryUI {
         
         // Check grid hover
         if (this.hoverCell) {
-            const placed = this.inventory.getAt(this.hoverCell.x, this.hoverCell.y);
+            const targetGrid = this.hoverCell.isExt ? this.externalGrid! : this.inventory;
+            const placed = targetGrid.getAt(this.hoverCell.x, this.hoverCell.y);
             if (placed) item = placed.item;
         }
 
         // Check equip slot hover
-        if (!item && this.hoverEquip) {
-            const eq = this.equipped.get(this.hoverEquip);
+        if (!item && this.hoverEquip && this.activeChar) {
+            const eq = this.activeChar.equipment.get(this.hoverEquip);
             if (eq) item = eq.item;
         }
 
@@ -494,34 +546,21 @@ export class InventoryUI {
         ctx.fillRect(tx, ty, tw, th);
         ctx.strokeRect(tx, ty, tw, th);
 
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 13px Inter, sans-serif';
-        ctx.fillText(`${item.icon} ${item.nameKr}`, tx + 8, ty + 20);
+        // Text
+        ctx.fillStyle = item.color || '#fff';
+        ctx.font = 'bold 14px Inter, sans-serif';
+        const itemName = i18n.lang === 'ko' ? item.nameKr : item.name;
+        ctx.fillText(`${item.icon} ${itemName}`, tx + 8, ty + 20);
 
         ctx.fillStyle = '#aaa';
         ctx.font = '11px Inter, sans-serif';
-        ctx.fillText(item.description, tx + 8, ty + 38);
+        const itemDesc = (i18n.lang === 'ko' && item.descriptionKr) ? item.descriptionKr : item.description;
+        ctx.fillText(itemDesc, tx + 8, ty + 38);
 
         let sy = 54;
         ctx.fillStyle = '#88ff88';
         if (item.stats?.atk) { ctx.fillText(`ATK +${item.stats.atk}`, tx + 8, ty + sy); sy += 14; }
         if (item.stats?.def) { ctx.fillText(`DEF +${item.stats.def}`, tx + 8, ty + sy); sy += 14; }
         if (item.stats?.magAtk) { ctx.fillText(`MAG +${item.stats.magAtk}`, tx + 8, ty + sy); sy += 14; }
-    }
-
-    private roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + w - r, y);
-        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-        ctx.lineTo(x + w, y + h - r);
-        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-        ctx.lineTo(x + r, y + h);
-        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-        ctx.lineTo(x, y + r);
-        ctx.quadraticCurveTo(x, y, x + r, y);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
     }
 }

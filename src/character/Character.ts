@@ -4,6 +4,8 @@
 
 import { CharacterStats, createBaseStats, GrowthRates } from '../data/Stats';
 import { ClassLine, getClassLine } from '../data/ClassTree';
+import { ItemSlot } from '../data/ItemDB';
+import { PlacedItem } from '../inventory/GridInventory';
 
 export class Character {
     public id: string;
@@ -15,6 +17,11 @@ export class Character {
     public expToNext: number;
     public stats: CharacterStats;
     public hasEmblem: boolean;     // needed for fusion
+
+    // Current active buffs/debuffs could go here
+    
+    // Equipment specific to this character
+    public equipment: Map<ItemSlot, PlacedItem> = new Map();
 
     private classLine: ClassLine | undefined;
 
@@ -47,6 +54,27 @@ export class Character {
         if (!this.classLine) return 'Unknown';
         const tier = this.classLine.tiers[this.currentTier - 1];
         return tier ? tier.nameEn : 'Unknown';
+    }
+
+    /** Equip an item. Returns the previously equipped item (if any), or null. */
+    public equip(placed: PlacedItem): PlacedItem | null {
+        const old = this.equipment.get(placed.item.slot);
+        this.equipment.set(placed.item.slot, placed);
+        // TODO: Recalculate stats based on new equipment
+        // this.recalculateStats();
+        return old || null;
+    }
+
+    /** Unequip an item from a slot. Returns the item, or null if empty. */
+    public unequip(slot: ItemSlot): PlacedItem | null {
+        const old = this.equipment.get(slot);
+        if (old) {
+            this.equipment.delete(slot);
+            // TODO: Recalculate stats based on removed equipment
+            // this.recalculateStats();
+            return old;
+        }
+        return null;
     }
 
     /** Add experience and handle level-ups */

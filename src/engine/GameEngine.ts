@@ -11,16 +11,21 @@ import { WorldMap } from '../map/WorldMap';
 import { GridRenderer } from '../map/GridRenderer';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
+import { LootObject } from '../entity/LootObject';
+import { ExtractionZone } from '../entity/ExtractionZone';
 import { TILE_SIZE } from '../map/Chunk';
 import { TILE_PROPERTIES } from '../map/Tile';
 import { GridInventory } from '../inventory/GridInventory';
 import { InventoryUI } from '../inventory/InventoryUI';
-import { ITEMS } from '../data/ItemDB';
+import { ITEMS, getItemDef } from '../data/ItemDB';
 import { CombatFormulas } from '../combat/CombatFormulas';
 import { createBaseStats } from '../data/Stats';
 import { PartyManager } from '../character/PartyManager';
 import { CharacterPanelUI } from '../character/CharacterPanelUI';
 import { Character } from '../character/Character';
+import { GameState } from './GameState';
+import { LobbyUI } from '../ui/LobbyUI';
+import { t } from '../i18n/LanguageManager';
 
 export class GameEngine {
     private canvas: HTMLCanvasElement;
@@ -33,6 +38,7 @@ export class GameEngine {
     private worldMap: WorldMap;
     private gridRenderer: GridRenderer;
     private player: Player;
+    // private turnManager: TurnManager; // Temporarily unused in extraction MVP
 
     // Phase 3: Inventory
     private inventory: GridInventory;
@@ -45,6 +51,10 @@ export class GameEngine {
     // Party System
     private party: PartyManager;
     private charUI: CharacterPanelUI;
+
+    // Game State
+    private state: GameState = GameState.LOBBY;
+    private lobbyUI: LobbyUI;
 
     // Player combat stats
     private playerStats = createBaseStats({ mov: 4 });
@@ -60,8 +70,19 @@ export class GameEngine {
     // Performance
     private lastTime: number = 0;
     private fps: number = 0;
+
+    // Raid Extraction
+    private raidTimeRemaining: number = 0;
+    private raidResult: 'WIN' | 'MIA' | 'DEAD' = 'WIN';
+    private playerTurnActive: boolean = false;
+
+    // Analytics
     private frameCount: number = 0;
     private fpsTimer: number = 0;
+
+    // Canvas dimensions (for convenience, though local vars are used in render)
+    private canvasW: number;
+    private canvasH: number;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -69,9 +90,12 @@ export class GameEngine {
         if (!context) throw new Error('Could not get 2D context');
         this.ctx = context;
 
+        this.canvasW = canvas.width;
+        this.canvasH = canvas.height;
+
         // Initialize subsystems
         this.resize();
-        this.camera = new Camera(canvas.width, canvas.height);
+        this.camera = new Camera(this.canvas.width, this.canvas.height);
         this.input = new InputManager(canvas);
         this.worldMap = new WorldMap();
         this.gridRenderer = new GridRenderer();
@@ -93,10 +117,52 @@ export class GameEngine {
         
         // Add main character
         const mainChar = new Character('char_main', '다크마스터', 'infantry');
-        this.party.addCharacter(mainChar);
-        // Add a secondary character to show party UI works
+        this.party.addToRoster(mainChar);
+        this.party.deployCharacter(mainChar);
+        // Add a secondary character
         const subChar = new Character('char_sub', '셔먼걸', 'cultist');
-        this.party.addCharacter(subChar);
+        this.party.addToRoster(subChar);
+        this.party.deployCharacter(subChar);
+
+        // Link active character to inventory UI
+        this.inventoryUI.setActiveCharacter(this.party.getActive()!);
+
+        // Lobby UI
+        this.lobbyUI = new LobbyUI(this.party, this.inventory);
+        this.lobbyUI.toggle(); // Turn on initially
+        this.lobbyUI.onDeploy(() => {
+            this.state = GameState.RAID;
+            this.lobbyUI.toggle(); // hide lobby
+            this.addCombatLog('Deployed into the Raid!');
+
+            // Spawn some test loot
+            this.worldMap.loot = [
+                new LootObject('loot_1', this.player.gridX + 2, this.player.gridY + 1, getItemDef('hp_potion')!),
+                new LootObject('loot_2', this.player.gridX + 4, this.player.gridY + 2, getItemDef('short_sword')!),
+                new LootObject('loot_3', this.player.gridX + 3, this.player.gridY + 3, getItemDef('leather_armor')!),
+            ];
+
+            // Spawn an Extraction Zone randomly between 15-25 tiles away
+            const signX = Math.random() > 0.5 ? 1 : -1;
+            const signY = Math.random() > 0.5 ? 1 : -1;
+            const extX = this.player.gridX + signX * Math.floor(15 + Math.random() * 10);
+            const extY = this.player.gridY + signY * Math.floor(15 + Math.random() * 10);
+            this.worldMap.extractionZones = [
+                new ExtractionZone(extX, extY, 2)
+            ];
+
+            // Spawn a Boss Monster
+            const boss = new Enemy(
+                'boss_1', extX - 2, extY - 2, t('enemy.boss'), 15, '#990000'
+            );
+            boss.stats.maxHp = 200;
+            boss.stats.hp = 200;
+            boss.stats.atk = 25;
+            boss.stats.def = 20;
+            this.enemies.push(boss);
+
+            this.raidTimeRemaining = 10 * 60; // 10 minutes
+        });
 
         // Spawn player near world center
         this.player = new Player(0, 0);
@@ -171,6 +237,8 @@ export class GameEngine {
     private resize(): void {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
+        this.canvasW = this.canvas.width; // Added
+        this.canvasH = this.canvas.height; // Added
         if (this.camera) {
             this.camera.setViewSize(this.canvas.width, this.canvas.height);
         }
@@ -209,10 +277,68 @@ export class GameEngine {
             this.fpsTimer = 0;
         }
 
+        // ─── LOBBY LOGIC ──────────────────────────────────────────
+        if (this.state === GameState.LOBBY) {
+            this.lobbyUI.updateInput(this.input);
+            return; // Halt raid simulation while in lobby
+        }
+
+        // ─── RESULTS LOGIC ──────────────────────────────────────────
+        if (this.state === GameState.RESULTS) {
+            // Wait for input to return to lobby
+            if (this.input.justPressed('Enter') || this.input.mouseJustDown) {
+                this.returnToLobby();
+            }
+            return;
+        }
+
+        // ─── RAID LOGIC ───────────────────────────────────────────
+
+        // Update loaded chunks based on camera position (assuming camera follows player)
+        this.worldMap.updateLoadedChunks(this.camera.x + this.canvasW / 2, this.camera.y + this.canvasH / 2);
+
+        this.raidTimeRemaining -= dt;
+        if (this.raidTimeRemaining <= 0) {
+            this.addCombatLog('MIA: Time limits exceeded!');
+            this.processDeathPenalty();
+            this.raidResult = 'MIA';
+            this.state = GameState.RESULTS;
+            return;
+        }
+
         // Toggle inventory with Tab or I
         if (this.input.justPressed('Tab') || this.input.justPressed('KeyI')) {
             this.inventoryUI.toggle();
             if (this.inventoryUI.isVisible() && this.charUI.isVisible()) this.charUI.toggle(); // mutually exclusive
+        }
+
+        // ─── ATB SYSTEM ───────────────────────────────────────────
+        if (!this.playerTurnActive && !this.inventoryUI.isVisible()) {
+            // Speed defines how fast ATB fills. E.g. spd 5 means 5 * 10 = 50 gauge/sec.
+            const timeScale = 10; 
+            
+            // Fill player gauge
+            this.player.actionGauge = Math.min(100, this.player.actionGauge + this.playerStats.spd * dt * timeScale);
+            if (this.player.actionGauge >= 100) {
+                this.playerTurnActive = true;
+                this.player.actionGauge = 100;
+            }
+            
+            // Fill enemy gauges
+            for (const enemy of this.enemies) {
+                if (enemy.checkAggro(this.player.gridX, this.player.gridY)) {
+                    enemy.actionGauge = Math.min(100, enemy.actionGauge + enemy.stats.spd * dt * timeScale);
+                    if (enemy.actionGauge >= 100 && !this.playerTurnActive) {
+                        enemy.actionGauge = 0;
+                        this.processSingleEnemyTurn(enemy);
+                    }
+                }
+            }
+        }
+
+        // ─── PLAYER INPUT (Only if ATB is full) ───────────────────
+        if (this.playerTurnActive && !this.inventoryUI.isVisible()) {
+            this.processPlayerMovement();
         }
 
         // Toggle character panel with C
@@ -238,9 +364,12 @@ export class GameEngine {
             this.charUI.onMouseMove(this.input.mouseScreenX, this.input.mouseScreenY);
             if (this.input.mouseClicked) {
                 if (this.charUI.onClick(this.input.mouseScreenX, this.input.mouseScreenY)) {
-                    // Switched character! Could update avatar/stats here
+                    // Switched character!
                     const active = this.party.getActive();
-                    if (active) this.addCombatLog(`Switched to ${active.name}`);
+                    if (active) {
+                        this.addCombatLog(`Switched to ${active.name}`);
+                        this.inventoryUI.setActiveCharacter(active);
+                    }
                 }
             }
             return;
@@ -269,8 +398,8 @@ export class GameEngine {
             const worldY = this.player.gridY * TILE_SIZE + TILE_SIZE / 2;
             this.worldMap.updateLoadedChunks(worldX, worldY);
 
-            // Enemy AI turn after player moves
-            this.processEnemyTurns();
+            // Check for loot/extraction
+            this.checkLootAndExtraction(); // Added
         }
 
         // Camera follow
@@ -284,6 +413,47 @@ export class GameEngine {
 
         // Update UI
         this.updateUI();
+    }
+
+    private processPlayerMovement(): void {
+        let moved = false;
+        let targetX = 0;
+        let targetY = 0;
+
+        if (this.input.justPressed('ArrowUp') || this.input.justPressed('KeyW')) {
+            targetY = -1;
+        } else if (this.input.justPressed('ArrowDown') || this.input.justPressed('KeyS')) {
+            targetY = 1;
+        } else if (this.input.justPressed('ArrowLeft') || this.input.justPressed('KeyA')) {
+            targetX = -1;
+        } else if (this.input.justPressed('ArrowRight') || this.input.justPressed('KeyD')) {
+            targetX = 1;
+        }
+
+        if (targetX !== 0 || targetY !== 0) {
+            moved = this.player.tryMove(this.player.gridX + targetX, this.player.gridY + targetY, (x, y) => this.worldMap.getTileAt(x, y));
+        }
+
+        // Attack with Space
+        if (this.input.justPressed('Space')) {
+            this.attackAdjacentEnemy();
+            moved = true; // Attacking also consumes a turn
+        }
+
+        if (moved) {
+            this.playerStats.mp = Math.min(this.playerStats.mp + 1, this.playerStats.maxMp);
+
+            // Reset ATB gauge after moving
+            this.player.actionGauge = 0;
+            this.playerTurnActive = false;
+
+            const worldX = this.player.gridX * TILE_SIZE + TILE_SIZE / 2;
+            const worldY = this.player.gridY * TILE_SIZE + TILE_SIZE / 2;
+            this.worldMap.updateLoadedChunks(worldX, worldY);
+
+            // Check for loot/extraction
+            this.checkLootAndExtraction();
+        }
     }
 
     private attackAdjacentEnemy(): void {
@@ -311,21 +481,64 @@ export class GameEngine {
         this.addCombatLog('No enemy adjacent to attack.');
     }
 
-    private processEnemyTurns(): void {
-        for (const enemy of this.enemies) {
-            if (enemy.checkAggro(this.player.gridX, this.player.gridY)) {
-                if (enemy.isAdjacentTo(this.player.gridX, this.player.gridY)) {
-                    // Attack player
-                    const defTile = this.worldMap.getTileAt(this.player.gridX, this.player.gridY);
-                    const result = CombatFormulas.calcPhysicalDamage(enemy.stats, this.playerStats, defTile);
-                    if (!result.isMiss) {
-                        this.playerStats.hp = Math.max(0, this.playerStats.hp - result.damage);
-                        this.addCombatLog(`${enemy.label} hits you for ${result.damage}!`);
-                    }
-                } else {
-                    // Move toward player
-                    enemy.moveToward(this.player.gridX, this.player.gridY, (x, y) => this.worldMap.getTileAt(x, y));
+    private processSingleEnemyTurn(enemy: Enemy): void {
+        if (enemy.isAdjacentTo(this.player.gridX, this.player.gridY)) {
+            // Attack player
+            const defTile = this.worldMap.getTileAt(this.player.gridX, this.player.gridY);
+            const result = CombatFormulas.calcPhysicalDamage(enemy.stats, this.playerStats, defTile);
+            if (!result.isMiss) {
+                this.playerStats.hp = Math.max(0, this.playerStats.hp - result.damage);
+                this.addCombatLog(`${enemy.label} hits you for ${result.damage}!`);
+                if (this.playerStats.hp <= 0) {
+                    this.addCombatLog('You have died.');
+                    this.processDeathPenalty();
+                    this.raidResult = 'DEAD';
+                    this.state = GameState.RESULTS;
                 }
+            } else {
+                this.addCombatLog(`${enemy.label} missed you!`);
+            }
+        } else {
+            // Move toward player
+            enemy.moveToward(this.player.gridX, this.player.gridY, (x, y) => this.worldMap.getTileAt(x, y));
+        }
+    }
+
+    private checkLootAndExtraction(): void {
+        // Check for loot
+        for (let i = this.worldMap.loot.length - 1; i >= 0; i--) {
+            const loot = this.worldMap.loot[i];
+            if (loot.x === this.player.gridX && loot.y === this.player.gridY && !loot.opened) {
+                // ... auto pickup logic later
+            }
+        }
+
+        // Check for extraction zone
+        for (const zone of this.worldMap.extractionZones) {
+            if (zone.contains(this.player.gridX, this.player.gridY)) {
+                this.addCombatLog('Entered Extraction Zone!');
+                this.raidResult = 'WIN';
+                this.state = GameState.RESULTS;
+                return;
+            }
+        }
+    }
+
+    private processDeathPenalty(): void {
+        // Lose entire shared backpack
+        const items = [...this.inventory.items];
+        for (const item of items) {
+            this.inventory.remove(item);
+        }
+
+        // Lose 1 random equipped item from EVERY active character
+        const charList = this.party.getCharacters();
+        for (const char of charList) {
+            const equippedSlots = Array.from(char.equipment.keys());
+            if (equippedSlots.length > 0) {
+                const randomSlot = equippedSlots[Math.floor(Math.random() * equippedSlots.length)];
+                char.unequip(randomSlot);
+                this.addCombatLog(`${char.name} lost their ${randomSlot}.`);
             }
         }
     }
@@ -336,7 +549,21 @@ export class GameEngine {
     }
 
     private render(): void {
-        const { width, height } = this.canvas;
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        this.ctx.clearRect(0, 0, width, height);
+
+        if (this.state === GameState.LOBBY) {
+            this.lobbyUI.render(this.ctx, this.canvasW, this.canvasH);
+            return; // only render lobby
+        }
+
+        if (this.state === GameState.RESULTS) {
+            this.renderResults();
+            return;
+        }
+
+        // ─── RAID RENDER ──────────────────────────────────────────
         const camX = this.camera.x;
         const camY = this.camera.y;
 
@@ -360,7 +587,20 @@ export class GameEngine {
         // 3. Render hover highlight
         this.gridRenderer.renderHoverTile(this.ctx, this.hoverTileX, this.hoverTileY, camX, camY);
 
-        // 4. Render enemies
+        // 4. Render loot objects
+        for (const loot of this.worldMap.loot) {
+            loot.render(this.ctx, loot.x * TILE_SIZE - camX, loot.y * TILE_SIZE - camY, TILE_SIZE);
+        }
+
+        // 5. Render extraction zones
+        for (const zone of this.worldMap.extractionZones) {
+            zone.render(this.ctx, (gx, gy) => ({
+                x: gx * TILE_SIZE - camX,
+                y: gy * TILE_SIZE - camY
+            }), TILE_SIZE);
+        }
+
+        // 6. Render enemies
         for (const enemy of this.enemies) {
             const eColor = enemy.isAggro ? '#ff1744' : enemy.color;
             this.gridRenderer.renderEntity(this.ctx, enemy.gridX, enemy.gridY, camX, camY, eColor, enemy.label);
@@ -376,26 +616,37 @@ export class GameEngine {
             this.ctx.fillRect(sx + 4, sy, barW * hpRatio, 4);
         }
 
-        // 5. Render player entity
+        // 7. Render player entity
         this.gridRenderer.renderEntity(
             this.ctx, this.player.gridX, this.player.gridY,
             camX, camY, this.player.color, this.player.label
         );
 
-        // 6. Player HP/MP bars
+        // 7.5 Render Raid Timer
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(width / 2 - 60, 10, 120, 30);
+        this.ctx.fillStyle = this.raidTimeRemaining < 60 ? '#ff4444' : '#ffffff';
+        this.ctx.font = 'bold 20px monospace';
+        this.ctx.textAlign = 'center';
+        const m = Math.floor(this.raidTimeRemaining / 60).toString().padStart(2, '0');
+        const s = Math.floor(this.raidTimeRemaining % 60).toString().padStart(2, '0');
+        this.ctx.fillText(`${m}:${s}`, width / 2, 32);
+        this.ctx.textAlign = 'start';
+
+        // 8. Player HP/MP bars
         this.renderPlayerBars();
 
-        // 7. Combat log
-        this.renderCombatLog(width, height);
-
-        // 8. FPS counter
+        // 9. Combat log
+        this.renderCombatLog(height);
+    
+        // 10. FPS counter
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         this.ctx.fillRect(width - 80, 10, 70, 25);
         this.ctx.fillStyle = '#00ff88';
-        this.ctx.font = '12px monospace';
+        this.ctx.font = '14px monospace';
         this.ctx.fillText(`FPS: ${this.fps}`, width - 75, 27);
 
-        // 9. Hover tile info
+        // 11. Hover tile info
         const hoverTile = this.worldMap.getTileAt(this.hoverTileX, this.hoverTileY);
         const hoverProps = TILE_PROPERTIES[hoverTile];
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -404,9 +655,38 @@ export class GameEngine {
         this.ctx.font = '11px monospace';
         this.ctx.fillText(`Tile: ${hoverProps.label} (${this.hoverTileX},${this.hoverTileY})`, width - 175, 57);
 
-        // 10. UIs (Inventory, Character)
+        // 12. UIs (Inventory, Character)
         this.inventoryUI.render(this.ctx, width, height);
         this.charUI.render(this.ctx, width, height);
+    }
+
+    private renderResults(): void {
+        const w = this.canvasW;
+        const h = this.canvasH;
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        this.ctx.fillRect(0, 0, w, h);
+
+        this.ctx.font = 'bold 48px Inter, sans-serif';
+        this.ctx.textAlign = 'center';
+
+        if (this.raidResult === 'WIN') {
+            this.ctx.fillStyle = '#00ff88';
+            this.ctx.fillText(t('raid.success'), w / 2, h / 2 - 40);
+            this.ctx.fillStyle = '#fff';
+            this.ctx.font = '18px Inter, sans-serif';
+            this.ctx.fillText(t('raid.successDesc'), w / 2, h / 2 + 10);
+        } else {
+            this.ctx.fillStyle = '#ff3333';
+            this.ctx.fillText(this.raidResult === 'MIA' ? t('raid.mia') : t('raid.died'), w / 2, h / 2 - 40);
+            this.ctx.fillStyle = '#ff8888';
+            this.ctx.font = '18px Inter, sans-serif';
+            this.ctx.fillText(t('raid.failDesc'), w / 2, h / 2 + 10);
+        }
+
+        this.ctx.fillStyle = '#aaa';
+        this.ctx.fillText(t('raid.return'), w / 2, h / 2 + 70);
+        
+        this.ctx.textAlign = 'start';
     }
 
     private renderPlayerBars(): void {
@@ -436,7 +716,7 @@ export class GameEngine {
         this.ctx.fillText(`MP ${this.playerStats.mp}/${this.playerStats.maxMp}`, barX + 4, barY + 26);
     }
 
-    private renderCombatLog(canvasW: number, canvasH: number): void {
+    private renderCombatLog(canvasH: number): void {
         if (this.combatLog.length === 0) return;
         const logX = 16;
         const logY = canvasH - 20;
@@ -445,8 +725,21 @@ export class GameEngine {
             const alpha = 1 - (i * 0.2);
             this.ctx.fillStyle = `rgba(255,255,255,${alpha})`;
             this.ctx.font = '12px Inter, sans-serif';
-            this.ctx.fillText(this.combatLog[i], logX, logY - i * 18);
+            this.ctx.fillText(this.combatLog[this.combatLog.length - 1 - i], logX, logY - (i * 16)); // Adjusted indexing and spacing
         }
+    }
+
+    private returnToLobby(): void {
+        this.state = GameState.LOBBY;
+        this.lobbyUI.toggle();
+        this.addCombatLog('Returned to Lobby.');
+        // Heal active party fully on return
+        for (const char of this.party.getCharacters()) {
+            char.stats.hp = char.stats.maxHp;
+            char.stats.mp = char.stats.maxMp;
+        }
+        this.playerStats.hp = this.playerStats.maxHp;
+        this.playerStats.mp = this.playerStats.maxMp;
     }
 
     private updateUI(): void {

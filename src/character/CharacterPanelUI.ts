@@ -7,6 +7,7 @@
 
 import { PartyManager } from '../character/PartyManager';
 import { Character } from '../character/Character';
+import { t } from '../i18n/LanguageManager';
 
 const CARD_W = 280;
 const CARD_H = 90;
@@ -63,7 +64,7 @@ export class CharacterPanelUI {
         if (!this.visible) return;
         this.slotRects = [];
 
-        const chars = this.party.getAll();
+        const chars = this.party.getCharacters();
         const activeIdx = this.party.getActiveIndex();
 
         // Calculate panel size
@@ -89,7 +90,7 @@ export class CharacterPanelUI {
         ctx.fillStyle = ACCENT;
         ctx.font = 'bold 18px Inter, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('👤 Character Party', this.panelX + this.panelW / 2, this.panelY + 30);
+        ctx.fillText(t('char.partyTitle'), this.panelX + this.panelW / 2, this.panelY + 30);
         ctx.textAlign = 'start';
 
         // ─── Active Character Card (top) ───
@@ -106,7 +107,7 @@ export class CharacterPanelUI {
 
             ctx.fillStyle = '#666';
             ctx.font = '11px Inter, sans-serif';
-            ctx.fillText('파티원 (클릭으로 전환)', this.panelX + PAD, gridY);
+            ctx.fillText(t('char.partyList'), this.panelX + PAD, gridY);
 
             let col = 0;
             let row = 0;
@@ -122,11 +123,11 @@ export class CharacterPanelUI {
         }
 
         // Empty slot hints
-        if (chars.length < 9) {
+        if (chars.length < this.party.MAX_ACTIVE_PARTY_SIZE) {
             ctx.fillStyle = 'rgba(100,100,100,0.3)';
             ctx.font = '11px Inter, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(`${chars.length}/9 슬롯 사용 중`, this.panelX + this.panelW / 2, this.panelY + this.panelH - 12);
+            ctx.fillText(`${chars.length}/${this.party.MAX_ACTIVE_PARTY_SIZE} ${t('char.slotsUsed')}`, this.panelX + this.panelW / 2, this.panelY + this.panelH - 12);
             ctx.textAlign = 'start';
         }
     }
@@ -141,7 +142,7 @@ export class CharacterPanelUI {
         // "ACTIVE" badge
         ctx.fillStyle = ACCENT;
         ctx.font = 'bold 10px Inter, sans-serif';
-        ctx.fillText('★ ACTIVE', x + 8, y + 14);
+        ctx.fillText(t('char.active'), x + 8, y + 14);
 
         // Character avatar circle
         const avX = x + 40;
@@ -219,7 +220,7 @@ export class CharacterPanelUI {
         if (isHover) {
             ctx.fillStyle = ACCENT;
             ctx.font = '9px Inter, sans-serif';
-            ctx.fillText('▶ SWITCH', x + 40, y + 56);
+            ctx.fillText(t('char.switch'), x + 40, y + 56);
         }
 
         this.slotRects.push({ x, y, w: MINI_W, h: MINI_H, idx });

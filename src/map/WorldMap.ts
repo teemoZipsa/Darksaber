@@ -6,10 +6,15 @@
 
 import { Chunk, CHUNK_SIZE, TILE_SIZE } from './Chunk';
 import { TileType } from './Tile';
+import { LootObject } from '../entity/LootObject';
+import { ExtractionZone } from '../entity/ExtractionZone';
 
 export class WorldMap {
     private chunks: Map<string, Chunk> = new Map();
     private loadRadius: number = 3; // chunks around center to keep loaded
+
+    public loot: LootObject[] = [];
+    public extractionZones: ExtractionZone[] = [];
 
     /** Simple hash-based pseudo-random noise for procedural generation */
     private hash(x: number, y: number): number {
@@ -132,6 +137,19 @@ export class WorldMap {
 
             chunk.render(ctx, screenX, screenY);
         }
+
+        // Render Extraction Zones
+        for (const zone of this.extractionZones) {
+            zone.render(ctx, (gx, gy) => ({
+                x: gx * TILE_SIZE - cameraX,
+                y: gy * TILE_SIZE - cameraY
+            }), TILE_SIZE);
+        }
+
+        // Render Loot
+        for (const obj of this.loot) {
+            obj.render(ctx, obj.x * TILE_SIZE - cameraX, obj.y * TILE_SIZE - cameraY, TILE_SIZE);
+        }
     }
 
     /** Get tile type at world tile coordinates */
@@ -148,5 +166,11 @@ export class WorldMap {
         if (localY < 0) localY += CHUNK_SIZE;
 
         return chunk.getTile(localX, localY);
+    }
+
+    public updateEntities(dt: number): void {
+        for (const zone of this.extractionZones) {
+            zone.update(dt);
+        }
     }
 }
