@@ -18,6 +18,9 @@ import { InventoryUI } from '../inventory/InventoryUI';
 import { ITEMS } from '../data/ItemDB';
 import { CombatFormulas } from '../combat/CombatFormulas';
 import { createBaseStats } from '../data/Stats';
+import { PartyManager } from '../character/PartyManager';
+import { CharacterPanelUI } from '../character/CharacterPanelUI';
+import { Character } from '../character/Character';
 
 export class GameEngine {
     private canvas: HTMLCanvasElement;
@@ -38,6 +41,10 @@ export class GameEngine {
     // Phase 3: Enemies
     private enemies: Enemy[] = [];
     private combatLog: string[] = [];
+
+    // Party System
+    private party: PartyManager;
+    private charUI: CharacterPanelUI;
 
     // Player combat stats
     private playerStats = createBaseStats({ mov: 4 });
@@ -79,6 +86,17 @@ export class GameEngine {
         this.inventory.autoPlace(ITEMS.find(i => i.id === 'hp_potion')!);
         this.inventory.autoPlace(ITEMS.find(i => i.id === 'hp_potion')!);
         this.inventory.autoPlace(ITEMS.find(i => i.id === 'mp_potion')!);
+
+        // Party System
+        this.party = new PartyManager();
+        this.charUI = new CharacterPanelUI(this.party);
+        
+        // Add main character
+        const mainChar = new Character('char_main', '다크마스터', 'infantry');
+        this.party.addCharacter(mainChar);
+        // Add a secondary character to show party UI works
+        const subChar = new Character('char_sub', '셔먼걸', 'cultist');
+        this.party.addCharacter(subChar);
 
         // Spawn player near world center
         this.player = new Player(0, 0);
@@ -194,6 +212,13 @@ export class GameEngine {
         // Toggle inventory with Tab or I
         if (this.input.justPressed('Tab') || this.input.justPressed('KeyI')) {
             this.inventoryUI.toggle();
+            if (this.inventoryUI.isVisible() && this.charUI.isVisible()) this.charUI.toggle(); // mutually exclusive
+        }
+
+        // Toggle character panel with C
+        if (this.input.justPressed('KeyC')) {
+            this.charUI.toggle();
+            if (this.charUI.isVisible() && this.inventoryUI.isVisible()) this.inventoryUI.toggle();
         }
 
         // If inventory is open, route input to inventory UI
@@ -206,6 +231,19 @@ export class GameEngine {
                 this.inventoryUI.onMouseUp(this.input.mouseScreenX, this.input.mouseScreenY);
             }
             return; // don't process game input while inventory is open
+        }
+
+        // If character UI is open, route input
+        if (this.charUI.isVisible()) {
+            this.charUI.onMouseMove(this.input.mouseScreenX, this.input.mouseScreenY);
+            if (this.input.mouseClicked) {
+                if (this.charUI.onClick(this.input.mouseScreenX, this.input.mouseScreenY)) {
+                    // Switched character! Could update avatar/stats here
+                    const active = this.party.getActive();
+                    if (active) this.addCombatLog(`Switched to ${active.name}`);
+                }
+            }
+            return;
         }
 
         // Player movement (grid-based, one tile per keypress)
@@ -345,7 +383,7 @@ export class GameEngine {
         );
 
         // 6. Player HP/MP bars
-        this.renderPlayerBars(width);
+        this.renderPlayerBars();
 
         // 7. Combat log
         this.renderCombatLog(width, height);
@@ -366,12 +404,14 @@ export class GameEngine {
         this.ctx.font = '11px monospace';
         this.ctx.fillText(`Tile: ${hoverProps.label} (${this.hoverTileX},${this.hoverTileY})`, width - 175, 57);
 
-        // 10. Inventory overlay (last, on top of everything)
+        // 10. UIs (Inventory, Character)
         this.inventoryUI.render(this.ctx, width, height);
+        this.charUI.render(this.ctx, width, height);
     }
 
-    private renderPlayerBars(canvasW: number): void {
-        const barX = canvasW - 180;
+    private renderPlayerBars(): void {
+        const { width } = this.canvas;
+        const barX = width - 180;
         const barY = 75;
         const barW = 160;
         const barH = 12;

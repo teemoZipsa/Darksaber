@@ -13,7 +13,7 @@ import {
     GrowthRates,
     GROWTH_MELEE, GROWTH_CAVALRY, GROWTH_FLYING,
     GROWTH_NAVAL, GROWTH_LANCE, GROWTH_ARCHER,
-    GROWTH_CLERIC, GROWTH_PRIEST, GROWTH_MAGE
+    GROWTH_CLERIC, GROWTH_PRIEST, GROWTH_MAGE, GROWTH_CULTIST
 } from './Stats';
 
 export type MasterBranch = 'battle' | 'tactics' | 'magic';
@@ -198,6 +198,23 @@ const MAGE: ClassLine = {
     skillUnlocks: {}
 };
 
+const CULTIST: ClassLine = {
+    id: 'cultist', branch: 'magic',
+    nameKr: '사교', nameEn: 'Cultist',
+    growth: GROWTH_CULTIST, baseMovRange: 3, attackRange: 3,
+    ignoresTerrain: false, waterBonus: false,
+    tiers: [
+        { tier: 1, nameKr: '셔먼', nameEn: 'Shaman' },
+        { tier: 2, nameKr: '서머너', nameEn: 'Summoner' },
+        { tier: 3, nameKr: '워록', nameEn: 'Warlock' },
+        { tier: 4, nameKr: '네크로맨서', nameEn: 'Necromancer' },
+        { tier: 5, nameKr: '일루저니스트', nameEn: 'Illusionist' },
+        { tier: 6, nameKr: '자버러', nameEn: 'Jabberer' },
+        { tier: 7, nameKr: '다크로드', nameEn: 'Dark Lord' },
+    ],
+    skillUnlocks: {}
+};
+
 // ─── Master Class Definitions ───────────────────────────────────
 
 export interface MasterClass {
@@ -236,11 +253,11 @@ export const MASTER_CLASSES: MasterClass[] = [
     }
 ];
 
-/** All 9 base class lines */
+/** All 10 base class lines */
 export const ALL_CLASS_LINES: ClassLine[] = [
     INFANTRY, CAVALRY, FLYING,
     NAVAL, LANCER, ARCHER,
-    CLERIC, PRIEST, MAGE
+    CLERIC, PRIEST, MAGE, CULTIST
 ];
 
 /** Lookup a class line by ID */

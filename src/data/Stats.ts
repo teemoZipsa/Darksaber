@@ -50,3 +50,4 @@ export const GROWTH_ARCHER: GrowthRates  = { hp: 9,  mp: 2,  atk: 2, def: 1.5, m
 export const GROWTH_CLERIC: GrowthRates  = { hp: 8,  mp: 6,  atk: 1, def: 1, magAtk: 2.5, magDef: 2.5, spd: 1 };
 export const GROWTH_PRIEST: GrowthRates  = { hp: 8,  mp: 5,  atk: 1.5, def: 1.5, magAtk: 2, magDef: 2, spd: 1.5 };
 export const GROWTH_MAGE: GrowthRates    = { hp: 7,  mp: 7,  atk: 0.5, def: 0.5, magAtk: 3.5, magDef: 2, spd: 1 };
+export const GROWTH_CULTIST: GrowthRates = { hp: 7.5, mp: 6.5, atk: 1, def: 1, magAtk: 3, magDef: 2.5, spd: 1.5 };
