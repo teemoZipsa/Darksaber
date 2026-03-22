@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "npx tsx server/index.ts"
   },
   "keywords": ["srpg", "grid", "rpg", "darksaver"],
   "author": "teemoZipsa",

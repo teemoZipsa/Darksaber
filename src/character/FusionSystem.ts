@@ -8,7 +8,7 @@
  */
 
 import { Character } from './Character';
-import { MASTER_CLASSES, MasterBranch, getMasterClass, getClassLine } from '../data/ClassTree';
+import { getMasterClass, getClassLine } from '../data/ClassTree';
 import { createBaseStats } from '../data/Stats';
 
 export interface FusionResult {

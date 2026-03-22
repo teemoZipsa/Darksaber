@@ -4,8 +4,27 @@
  */
 
 import { GameEngine } from './engine/GameEngine';
+import { SettingsManager } from './engine/SettingsManager';
+import { TileAssetManager } from './map/TileAssetManager';
 
-function init(): void {
+async function init(): Promise<void> {
+    SettingsManager.init();
+
+    // Explicitly preload DOSMyungjo for Canvas (Canvas doesn't trigger @font-face)
+    const dosFont = new FontFace(
+        'DOSMyungjo',
+        "url('/fonts/DOSMyungjo.ttf') format('truetype')"
+    );
+    try {
+        const loaded = await dosFont.load();
+        document.fonts.add(loaded);
+        console.log('✅ DOSMyungjo font loaded');
+    } catch (e) {
+        console.warn('⚠️ DOSMyungjo font load failed, using fallback', e);
+    }
+
+    await TileAssetManager.init();
+
     const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
     if (!canvas) {
         console.error('Canvas element #gameCanvas not found!');

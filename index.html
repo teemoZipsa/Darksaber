@@ -4,25 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Darksaber — Grid SRPG Engine</title>
+    <style>
+        @font-face {
+            font-family: 'DOSMyungjo';
+            src: url('/fonts/DOSMyungjo.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+    </style>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <div id="game-container">
         <canvas id="gameCanvas"></canvas>
-        <div id="ui-layer">
-            <div id="title-box">
-                <h2>⚔️ Darksaber</h2>
-                <p class="subtitle">Grid SRPG Engine v0.1</p>
-            </div>
-            <div id="controls-box">
-                <p>↑↓←→ / WASD: Move</p>
-                <p>Mouse: Hover Tile Info</p>
-            </div>
-            <div id="info-panel">
-                <span id="player-pos">Pos: (0, 0)</span>
-                <span id="turn-info">Loading...</span>
-            </div>
-        </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
 </body>

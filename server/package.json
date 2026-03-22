@@ -1,0 +1,17 @@
+{
+  "name": "darksaber-server",
+  "version": "0.1.0",
+  "description": "Darksaber Multiplayer WebSocket Server",
+  "type": "module",
+  "scripts": {
+    "start": "npx tsx index.ts"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
+  }
+}

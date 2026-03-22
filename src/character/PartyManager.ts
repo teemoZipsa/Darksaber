@@ -9,9 +9,9 @@ import { Character } from './Character';
 export const MAX_PARTY_SIZE = 9;
 
 export class PartyManager {
-    // The active characters deployed in the raid (Max 4)
+    // The active characters deployed in the raid (Max 3)
     private activeParty: Character[] = [];
-    public readonly MAX_ACTIVE_PARTY_SIZE = 4;
+    public readonly MAX_ACTIVE_PARTY_SIZE = 3;
 
     // The full roster of all owned characters (Pokemon PC style)
     private roster: Character[] = [];
@@ -49,11 +49,84 @@ export class PartyManager {
         return true;
     }
 
+    /** Swap two active slots during drag and drop */
+    public swapActiveSlots(indexA: number, indexB: number): boolean {
+        if (indexA < 0 || indexA >= this.activeParty.length || 
+            indexB < 0 || indexB >= this.activeParty.length) return false;
+        
+        const temp = this.activeParty[indexA];
+        this.activeParty[indexA] = this.activeParty[indexB];
+        this.activeParty[indexB] = temp;
+        return true;
+    }
+
+    /** Replaces a target slot with a new character. If already active, it swaps them */
+    public replaceActiveSlot(targetIndex: number, newChar: Character): void {
+        const existingIndex = this.activeParty.indexOf(newChar);
+        
+        if (existingIndex !== -1) {
+            // It's a swap inside active
+            this.swapActiveSlots(existingIndex, targetIndex);
+            return;
+        }
+
+        if (targetIndex >= this.activeParty.length) {
+            this.deployCharacter(newChar);
+            return;
+        }
+
+        // It is replacing someone from roster into an occupied slot
+        // Just overwrite the slot. The old character returns to roster natively because they are no longer in activeParty.
+        this.activeParty[targetIndex] = newChar;
+    }
+
     /** Switch active character by index */
     public switchTo(index: number): boolean {
         if (index < 0 || index >= this.activeParty.length) return false;
+        // In raid, don't allow switching to dead characters
+        if (this.activeParty[index].isDead) return false;
         this.activeIndex = index;
         return true;
+    }
+
+    /** Mark the active character as dead and try to switch to next alive */
+    public markActiveDead(): Character | null {
+        const active = this.activeParty[this.activeIndex];
+        if (active) {
+            active.isDead = true;
+            active.exp = 0; // Reset EXP on death
+        }
+
+        // Find next alive character in the squad
+        const next = this.getNextAlive();
+        if (next !== null) {
+            this.activeIndex = next;
+            return this.activeParty[next];
+        }
+        return null; // squad wiped
+    }
+
+    /** Get index of next alive character in active party, or null */
+    public getNextAlive(): number | null {
+        for (let i = 0; i < this.activeParty.length; i++) {
+            if (!this.activeParty[i].isDead) return i;
+        }
+        return null;
+    }
+
+    /** Are all active party members dead? */
+    public isSquadWiped(): boolean {
+        return this.activeParty.every(c => c.isDead);
+    }
+
+    /** Reset death states for all roster characters (after returning to shelter) */
+    public resetForNewRaid(): void {
+        for (const c of this.roster) {
+            c.isDead = false;
+            c.stats.hp = c.stats.maxHp;
+            c.stats.mp = c.stats.maxMp;
+        }
+        this.activeIndex = 0;
     }
 
     /** Get the currently active character */
@@ -71,6 +144,16 @@ export class PartyManager {
 
     public getRoster(): Character[] {
         return this.roster;
+    }
+
+    /** Swap two roster positions during drag and drop reorder */
+    public swapRoster(indexA: number, indexB: number): boolean {
+        if (indexA < 0 || indexA >= this.roster.length ||
+            indexB < 0 || indexB >= this.roster.length) return false;
+        const temp = this.roster[indexA];
+        this.roster[indexA] = this.roster[indexB];
+        this.roster[indexB] = temp;
+        return true;
     }
 
     public isFull(): boolean {

@@ -6,6 +6,8 @@
  */
 
 import { TileType, TILE_PROPERTIES } from './Tile';
+import { SettingsManager } from '../engine/SettingsManager';
+import { TileAssetManager } from './TileAssetManager';
 
 export const CHUNK_SIZE = 32; // tiles per chunk side
 export const TILE_SIZE = 32;  // pixels per tile
@@ -45,38 +47,90 @@ export class Chunk {
     }
 
     /** Render chunk to its offscreen buffer if dirty, then blit to main canvas */
-    public render(ctx: CanvasRenderingContext2D, screenX: number, screenY: number): void {
+    public render(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, getGlobalTile: (x: number, y: number) => TileType): void {
         if (this.dirty) {
-            this.renderToBuffer();
+            this.renderToBuffer(getGlobalTile);
             this.dirty = false;
         }
         ctx.drawImage(this.buffer, screenX, screenY);
     }
 
-    private renderToBuffer(): void {
+    private renderToBuffer(getGlobalTile: (x: number, y: number) => TileType): void {
         for (let y = 0; y < CHUNK_SIZE; y++) {
             for (let x = 0; x < CHUNK_SIZE; x++) {
                 const tileType = this.tiles[y][x];
                 const props = TILE_PROPERTIES[tileType];
-                this.bufferCtx.fillStyle = props.color;
-                this.bufferCtx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                
+                const img = TileAssetManager.getImage(tileType);
+                if (img) {
+                    this.bufferCtx.drawImage(img, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                } else {
+                    this.bufferCtx.fillStyle = props.color;
+                    this.bufferCtx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                }
+
+                // Auto-blending with higher priority neighbors
+                const worldX = this.chunkX * CHUNK_SIZE + x;
+                const worldY = this.chunkY * CHUNK_SIZE + y;
+                
+                const neighbors = [
+                    { dx: 0, dy: -1, pos: 'N' },
+                    { dx: 0, dy: 1, pos: 'S' },
+                    { dx: -1, dy: 0, pos: 'W' },
+                    { dx: 1, dy: 0, pos: 'E' }
+                ];
+
+                for (const n of neighbors) {
+                    const nType = getGlobalTile(worldX + n.dx, worldY + n.dy);
+                    const nProps = TILE_PROPERTIES[nType];
+                    
+                    if (nProps && nProps.blendPriority > props.blendPriority) {
+                        const nImg = TileAssetManager.getImage(nType);
+                        if (nImg) {
+                            this.bufferCtx.save();
+                            this.bufferCtx.globalAlpha = 0.6; // fade the overlapping edge
+                            
+                            const edgeSize = 8;
+                            let sx, sy, sw, sh, dx, dy, dw, dh;
+                            
+                            if (n.pos === 'E') {
+                                sx = 0; sy = 0; sw = edgeSize; sh = TILE_SIZE;
+                                dx = x * TILE_SIZE + TILE_SIZE - edgeSize; dy = y * TILE_SIZE; dw = edgeSize; dh = TILE_SIZE;
+                            } else if (n.pos === 'W') {
+                                sx = TILE_SIZE - edgeSize; sy = 0; sw = edgeSize; sh = TILE_SIZE;
+                                dx = x * TILE_SIZE; dy = y * TILE_SIZE; dw = edgeSize; dh = TILE_SIZE;
+                            } else if (n.pos === 'S') {
+                                sx = 0; sy = 0; sw = TILE_SIZE; sh = edgeSize;
+                                dx = x * TILE_SIZE; dy = y * TILE_SIZE + TILE_SIZE - edgeSize; dw = TILE_SIZE; dh = edgeSize;
+                            } else { // 'N'
+                                sx = 0; sy = TILE_SIZE - edgeSize; sw = TILE_SIZE; sh = edgeSize;
+                                dx = x * TILE_SIZE; dy = y * TILE_SIZE; dw = TILE_SIZE; dh = edgeSize;
+                            }
+                            
+                            this.bufferCtx.drawImage(nImg, sx, sy, sw, sh, dx, dy, dw, dh);
+                            this.bufferCtx.restore();
+                        }
+                    }
+                }
             }
         }
 
         // Draw subtle grid lines on buffer
-        this.bufferCtx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
-        this.bufferCtx.lineWidth = 0.5;
-        for (let y = 0; y <= CHUNK_SIZE; y++) {
-            this.bufferCtx.beginPath();
-            this.bufferCtx.moveTo(0, y * TILE_SIZE);
-            this.bufferCtx.lineTo(CHUNK_SIZE * TILE_SIZE, y * TILE_SIZE);
-            this.bufferCtx.stroke();
-        }
-        for (let x = 0; x <= CHUNK_SIZE; x++) {
-            this.bufferCtx.beginPath();
-            this.bufferCtx.moveTo(x * TILE_SIZE, 0);
-            this.bufferCtx.lineTo(x * TILE_SIZE, CHUNK_SIZE * TILE_SIZE);
-            this.bufferCtx.stroke();
+        if (SettingsManager.getGrid()) {
+            this.bufferCtx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+            this.bufferCtx.lineWidth = 0.5;
+            for (let y = 0; y <= CHUNK_SIZE; y++) {
+                this.bufferCtx.beginPath();
+                this.bufferCtx.moveTo(0, y * TILE_SIZE);
+                this.bufferCtx.lineTo(CHUNK_SIZE * TILE_SIZE, y * TILE_SIZE);
+                this.bufferCtx.stroke();
+            }
+            for (let x = 0; x <= CHUNK_SIZE; x++) {
+                this.bufferCtx.beginPath();
+                this.bufferCtx.moveTo(x * TILE_SIZE, 0);
+                this.bufferCtx.lineTo(x * TILE_SIZE, CHUNK_SIZE * TILE_SIZE);
+                this.bufferCtx.stroke();
+            }
         }
     }
 }

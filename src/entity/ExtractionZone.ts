@@ -49,10 +49,10 @@ export class ExtractionZone {
 
         // Draw icon in center
         const center = getScreenPos(this.x, this.y);
-        ctx.font = `${tileSize * 0.4}px Inter, sans-serif`;
+        ctx.font = `${tileSize * 0.4}px DOSMyungjo, sans-serif`;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'white';
-        ctx.fillText('EXIT', center.x + tileSize/2, center.y + tileSize/2);
+        ctx.fillText('탈출', center.x + tileSize/2, center.y + tileSize/2);
         ctx.textAlign = 'start';
     }
 }

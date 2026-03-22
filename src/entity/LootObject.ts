@@ -1,4 +1,5 @@
 import { ItemDef } from '../data/ItemDB';
+import { GridInventory } from '../inventory/GridInventory';
 
 /**
  * Loot on the ground or in a chest in the Raid map.
@@ -7,14 +8,17 @@ export class LootObject {
     public id: string;
     public x: number;
     public y: number;
-    public item: ItemDef;
+    public inventory: GridInventory;
     public opened: boolean = false;
 
-    constructor(id: string, x: number, y: number, item: ItemDef) {
+    constructor(id: string, x: number, y: number, items: ItemDef[]) {
         this.id = id;
         this.x = x;
         this.y = y;
-        this.item = item;
+        this.inventory = new GridInventory(5, 5); // Default 5x5 wrapper
+        for (const item of items) {
+            this.inventory.autoPlace(item);
+        }
     }
 
     public render(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, size: number): void {

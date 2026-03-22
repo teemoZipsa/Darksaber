@@ -124,6 +124,12 @@ export class WorldMap {
         }
     }
 
+    public markAllDirty(): void {
+        for (const chunk of this.chunks.values()) {
+            chunk.markDirty();
+        }
+    }
+
     /** Render all loaded chunks visible in the viewport */
     public render(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number, viewWidth: number, viewHeight: number): void {
         for (const chunk of this.chunks.values()) {
@@ -135,7 +141,7 @@ export class WorldMap {
             if (screenX + chunkPixelSize < 0 || screenX > viewWidth) continue;
             if (screenY + chunkPixelSize < 0 || screenY > viewHeight) continue;
 
-            chunk.render(ctx, screenX, screenY);
+            chunk.render(ctx, screenX, screenY, (nx, ny) => this.getTileAt(nx, ny));
         }
 
         // Render Extraction Zones

@@ -26,6 +26,7 @@
 
 ### 3.6 Integration
 - [x] GameEngine integration (inventory toggle, enemy spawn, combat, HP/MP bars, combat log)
+- [x] Comprehensive UI/UX Polish (Backdrops, Key Help Panels, Navigation, Shop Tabs)
 - [x] Browser verification passed
 - [ ] Git commit & push Phase 3
 
@@ -34,17 +35,28 @@
 - [x] `StashInventory.ts` — Huge grid inventory for safe storage
 - [x] PC Roster System (Store unlimited characters)
 - [x] Raid Party System (Max 4 active characters)
+- [x] Integrate buff UI icons correctly
+- [x] Support multiple characters and skill types
+- [x] Connect buff skill metadata (`SkillDB.ts`) to player buff list
+- [x] Dynamically scale combat damage calculations matching active buffsell items)
 - [x] i18n Language Toggle (EN/KO) throughout UI
 - [ ] Lobby Shop (Merchant to buy/sell items)
 
 ### 4.2 The Raid (Open World)
-- [/] `GameModeManager.ts` — State machine (Lobby ↔ Raid)
+- [x] `GameModeManager.ts` — State machine (Lobby ↔ Raid)
 - [x] Lootable objects (Chests, ground items) on the grid
 - [x] Extraction Zones — Randomly placed tiles for escaping
-- [ ] Raid Time Limit — Clock ticking down to death
-- [ ] Boss Monsters — Rare, powerful enemies spawning alongside normal AI
+- [x] Raid Time Limit — 20 min clock ticking down to MIA
+- [x] Boss Monsters — 3 tiers (Corrupted Giant, Shadow Drake, Void Warden) spawning independently
 
 ### 4.3 Progression & Loss
-- [ ] Successful Extraction logic (keep stash and backpack, return to lobby)
-- [ ] Death logic (lose entire Shared Backpack, lose 1 random equipped item from EVERY party member, return to lobby)
+- [x] Successful Extraction logic (keep stash and backpack, return to lobby)
+- [x] Death logic (lose entire Shared Backpack, lose 1 random equipped item from EVERY party member, return to lobby)
 - [ ] Implement Fog of War / Vision radius (optional, for tension)
+
+### 4.4 Multiplayer
+- [x] WebSocket server (`server/index.ts`)
+- [x] NetworkManager client (`src/network/NetworkManager.ts`)
+- [x] Remote player rendering with interpolation
+- [x] Multiplayer lobby connection UI
+- [x] Boss kill sync between players

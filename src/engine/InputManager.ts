@@ -1,7 +1,4 @@
-/**
- * InputManager — centralized keyboard and mouse input handler.
- * Tracks key states, mouse position, click, mousedown/mouseup for drag-and-drop.
- */
+import { SettingsManager } from './SettingsManager';
 
 export class InputManager {
     private keysDown: Set<string> = new Set();
@@ -13,6 +10,12 @@ export class InputManager {
     public mouseJustDown: boolean = false;
     public mouseJustUp: boolean = false;
     public mouseIsDown: boolean = false;
+    public mouseWheelDelta: number = 0;
+
+    /** Mouse X in UI-scaled virtual coordinates */
+    public get uiMouseX(): number { return this.mouseScreenX / SettingsManager.getUIScale(); }
+    /** Mouse Y in UI-scaled virtual coordinates */
+    public get uiMouseY(): number { return this.mouseScreenY / SettingsManager.getUIScale(); }
 
     constructor(canvas: HTMLCanvasElement) {
         window.addEventListener('keydown', (e) => {
@@ -45,9 +48,12 @@ export class InputManager {
             }
         });
 
-        canvas.addEventListener('mouseup', (e) => {
-            updateMousePos(e);
+        window.addEventListener('mouseup', (e) => {
             if (e.button === 0) {
+                const rect = canvas.getBoundingClientRect();
+                this.mouseScreenX = e.clientX - rect.left;
+                this.mouseScreenY = e.clientY - rect.top;
+                
                 this.mouseJustUp = true;
                 this.mouseIsDown = false;
             }
@@ -56,6 +62,11 @@ export class InputManager {
         canvas.addEventListener('click', () => {
             this.mouseClicked = true;
         });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            this.mouseWheelDelta += e.deltaY > 0 ? 1 : -1;
+        }, { passive: false });
     }
 
     public isDown(code: string): boolean {
@@ -71,6 +82,7 @@ export class InputManager {
         this.mouseClicked = false;
         this.mouseJustDown = false;
         this.mouseJustUp = false;
+        this.mouseWheelDelta = 0;
     }
 }
 
