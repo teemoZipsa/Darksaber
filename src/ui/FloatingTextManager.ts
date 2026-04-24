@@ -1,0 +1,146 @@
+/**
+ * FloatingTextManager — Classic RPG-style floating combat text.
+ *
+ * Spawns text (damage, heal, miss, critical) at entity positions
+ * that floats upward and fades out over ~1.2 seconds.
+ */
+
+import { TILE_SIZE } from '../map/Chunk';
+
+export type FloatingTextType = 'damage' | 'heal' | 'miss' | 'crit';
+
+interface FloatingText {
+    text: string;
+    gridX: number;
+    gridY: number;
+    type: FloatingTextType;
+    /** Remaining lifetime in seconds */
+    timer: number;
+    /** Current vertical offset (pixels, grows upward as negative) */
+    offsetY: number;
+    /** Small random horizontal jitter so overlapping texts don't stack */
+    offsetX: number;
+}
+
+/** Style configuration per text type */
+const STYLE: Record<FloatingTextType, { color: string; outline: string; fontSize: number }> = {
+    damage: { color: '#ff3333', outline: '#440000', fontSize: 16 },
+    crit:   { color: '#ff8800', outline: '#441800', fontSize: 22 },
+    heal:   { color: '#ffdd00', outline: '#443300', fontSize: 16 },
+    miss:   { color: '#ffffff', outline: '#333333', fontSize: 14 },
+};
+
+const LIFETIME = 1.2;       // total duration in seconds
+const FADE_START = 0.3;     // start fading when this much time remains
+const FLOAT_SPEED = 35;     // pixels per second upward
+
+export class FloatingTextManager {
+    private texts: FloatingText[] = [];
+
+    /**
+     * Spawn a new floating text at the given grid position.
+     */
+    public spawn(text: string, gridX: number, gridY: number, type: FloatingTextType): void {
+        this.texts.push({
+            text,
+            gridX,
+            gridY,
+            type,
+            timer: LIFETIME,
+            offsetY: 0,
+            offsetX: (Math.random() - 0.5) * 16, // ±8px jitter
+        });
+    }
+
+    /**
+     * Convenience: spawn damage text. Shows "-N" for damage, "-N!" for crit, "MISS" for miss.
+     */
+    public spawnDamage(gridX: number, gridY: number, damage: number, isCrit: boolean, isMiss: boolean): void {
+        if (isMiss) {
+            this.spawn('MISS', gridX, gridY, 'miss');
+        } else if (isCrit) {
+            this.spawn(`-${damage}!`, gridX, gridY, 'crit');
+        } else {
+            this.spawn(`-${damage}`, gridX, gridY, 'damage');
+        }
+    }
+
+    /**
+     * Convenience: spawn heal text. Shows "+N".
+     */
+    public spawnHeal(gridX: number, gridY: number, amount: number): void {
+        this.spawn(`+${amount}`, gridX, gridY, 'heal');
+    }
+
+    /**
+     * Update all floating texts — float upward and tick timers.
+     */
+    public update(dt: number): void {
+        for (let i = this.texts.length - 1; i >= 0; i--) {
+            const ft = this.texts[i];
+            ft.timer -= dt;
+            ft.offsetY -= FLOAT_SPEED * dt; // float upward
+
+            if (ft.timer <= 0) {
+                this.texts.splice(i, 1);
+            }
+        }
+    }
+
+    /**
+     * Render all active floating texts.
+     * Call after entities / fog-of-war, before HUD.
+     */
+    public render(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
+        if (this.texts.length === 0) return;
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        for (const ft of this.texts) {
+            const style = STYLE[ft.type];
+
+            // World position → screen position
+            const screenX = ft.gridX * TILE_SIZE - camX + TILE_SIZE / 2 + ft.offsetX;
+            const screenY = ft.gridY * TILE_SIZE - camY + ft.offsetY;
+
+            // Fade out near end of life
+            let alpha = 1.0;
+            if (ft.timer < FADE_START) {
+                alpha = Math.max(0, ft.timer / FADE_START);
+            }
+
+            // Scale: crit pops in slightly then settles
+            let scale = 1.0;
+            if (ft.type === 'crit') {
+                const age = LIFETIME - ft.timer;
+                if (age < 0.15) {
+                    scale = 1.0 + 0.4 * (1 - age / 0.15); // 1.4 → 1.0 over 0.15s
+                }
+            }
+
+            const fontSize = Math.round(style.fontSize * scale);
+            ctx.font = `bold ${fontSize}px "DOSMyungjo", sans-serif`;
+            ctx.globalAlpha = alpha;
+
+            // Outline (stroke) for readability
+            ctx.strokeStyle = style.outline;
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            ctx.strokeText(ft.text, screenX, screenY);
+
+            // Fill
+            ctx.fillStyle = style.color;
+            ctx.fillText(ft.text, screenX, screenY);
+        }
+
+        ctx.globalAlpha = 1.0;
+        ctx.restore();
+    }
+
+    /** Clear all floating texts (e.g. on state change) */
+    public clear(): void {
+        this.texts.length = 0;
+    }
+}

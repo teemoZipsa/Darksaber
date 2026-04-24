@@ -5,8 +5,7 @@
 
 import { MasterBranch } from './ClassTree';
 
-export type ItemSlot = 'weapon' | 'shield' | 'head' | 'body' | 'boots' | 'accessory' | 'accessory2' | 'consumable' | 'material';
-
+export type ItemSlot = 'weapon' | 'shield' | 'head' | 'body' | 'boots' | 'accessory' | 'accessory2' | 'consumable' | 'material' | 'sin_core' | 'rune' | 'gem';
 export interface ItemDef {
     id: string;
     name: string;
@@ -30,8 +29,12 @@ export interface ItemDef {
     buyPrice?: number;     // gold cost to buy from shop
     requiredTier?: number; // minimum tier to equip (1-7)
     branch?: MasterBranch; // which branch can equip (battle/tactics/healer/magic)
+    
+    // -- Sin Eater New Fields --
+    itemCategory?: 'divine_weapon' | 'normal_weapon' | 'armor' | 'accessory' | 'consumable' | 'material' | 'sin_core' | 'rune' | 'gem';
+    maxSockets?: number;
+    socketTypes?: Array<'sin_core' | 'rune' | 'gem'>;
 }
-
 // ─── Armor Generation ─────────────────────────────────────────
 // 4 branches × 7 tiers × 3 slots = 84 armor pieces
 
@@ -153,14 +156,30 @@ const BRANCH_ARMOR = generateBranchArmor();
 
 /** Item database — starting items */
 export const ITEMS: ItemDef[] = [
-    // ─── Weapons ─────────────────────
+    // ─── Divine Weapon ─────────────────────
+    {
+        id: 'absolution_edge', name: 'Absolution Edge', nameKr: '속죄의 검',
+        slot: 'weapon', gridW: 1, gridH: 3, color: '#ffd700', icon: '✨',
+        maxDurability: 9999,
+        stats: { atk: 25, magAtk: 25 },
+        description: 'A divine blade that absorbs the sins of the fallen. Only accepts Sin Cores.',
+        descriptionKr: '타락한 자들의 죄악을 흡수하는 신성한 검입니다. 오직 Sin Core만 장착할 수 있습니다.',
+        itemCategory: 'divine_weapon',
+        maxSockets: 3,
+        socketTypes: ['sin_core']
+    },
+
+    // ─── Normal Weapons ─────────────────────
     {
         id: 'short_sword', name: 'Short Sword', nameKr: '단검',
         slot: 'weapon', gridW: 1, gridH: 3, color: '#8899aa', icon: '🗡️',
         maxDurability: 100,
         stats: { atk: 8 },
         description: 'A basic iron short sword.',
-        descriptionKr: '기본적인 철제 단검입니다.'
+        descriptionKr: '기본적인 철제 단검입니다.',
+        itemCategory: 'normal_weapon',
+        maxSockets: 1,
+        socketTypes: ['rune', 'gem']
     },
     {
         id: 'long_sword', name: 'Long Sword', nameKr: '장검',
@@ -296,7 +315,7 @@ export const ITEMS: ItemDef[] = [
         slot: 'accessory', gridW: 1, gridH: 1, color: '#00ff88', icon: '💚',
         maxDurability: 999,
         stats: { hp: 10 },  // special: 10% HP regen per action (handled in engine)
-        description: 'The legendary Heal Ring. Restores 10% HP on every action. The most broken item in Darksaber history.',
+        description: 'The legendary Heal Ring. Restores 10% HP on every action. The most broken item in Sin Eater history.',
         descriptionKr: '온라인게임 역사상 최강의 사기템. 이동·공격·스킬 사용시 전체 HP의 10% 회복.',
         buyPrice: 5000
     },

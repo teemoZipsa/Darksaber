@@ -1,25 +1,24 @@
 /**
- * FogOfWar — Cloud-tile fog with smooth border transition EVERYWHERE.
+ * FogOfWar — Cloud-tile fog at camera edges only.
  *
- * 2-state: SEEN (permanently clear) vs UNSEEN (cloud fog).
- * Smooth gradient at ALL borders between seen and unseen tiles,
- * not just at the current vision circle.
+ * Instead of tile-based seen/unseen tracking, cloud tiles are rendered
+ * only at the screen borders with a smooth fade-in towards the edges.
+ * The center of the screen is always fully clear.
  */
 
 import { TILE_SIZE } from './Chunk';
 
 const CLOUD_VARIANTS = 4;
-const TRANSITION_WIDTH = 4; // tiles of gradient at every seen/unseen border
+
+/** How many tiles from the screen edge the clouds extend inward */
+const EDGE_DEPTH = 4;
 
 export class FogOfWar {
-    /** Vision radius in tiles */
+    /** Vision radius in tiles (kept for API compat, unused now) */
     public visionRadius: number = 8;
 
     /** Whether fog is enabled */
     public enabled: boolean = true;
-
-    /** Tiles that have been seen (permanently clear) */
-    private seenTiles: Set<string> = new Set();
 
     /** Cloud tile sprites */
     private cloudTiles: OffscreenCanvas[] = [];
@@ -80,42 +79,14 @@ export class FogOfWar {
         }
     }
 
-    /**
-     * For an unseen tile, find the minimum Manhattan distance to any seen tile
-     * within the transition width. Returns a large number if none found.
-     */
-    private distToSeenBorder(tx: number, ty: number): number {
-        let minDist = TRANSITION_WIDTH + 1;
-        for (let dy = -TRANSITION_WIDTH; dy <= TRANSITION_WIDTH; dy++) {
-            for (let dx = -TRANSITION_WIDTH; dx <= TRANSITION_WIDTH; dx++) {
-                const d = Math.abs(dx) + Math.abs(dy);
-                if (d >= minDist) continue; // prune: can't beat current best
-                if (this.seenTiles.has(`${tx + dx},${ty + dy}`)) {
-                    minDist = d;
-                    if (minDist === 1) return 1; // can't get closer, early exit
-                }
-            }
-        }
-        return minDist;
-    }
+    /** No-op in edge-only mode */
+    public update(_playerGX: number, _playerGY: number): void {}
 
-    /** Mark all tiles within vision as permanently seen */
-    public update(playerGX: number, playerGY: number): void {
-        if (!this.enabled) return;
-        const r = this.visionRadius;
-        for (let dy = -r; dy <= r; dy++) {
-            for (let dx = -r; dx <= r; dx++) {
-                if (Math.abs(dx) + Math.abs(dy) > r) continue;
-                this.seenTiles.add(`${playerGX + dx},${playerGY + dy}`);
-            }
-        }
-    }
-
-    /** Render fog. Call AFTER entities, BEFORE HUD. */
+    /** Render cloud fog at camera edges. Call AFTER entities, BEFORE HUD. */
     public render(
         ctx: CanvasRenderingContext2D,
-        playerGX: number,
-        playerGY: number,
+        _playerGX: number,
+        _playerGY: number,
         camX: number,
         camY: number,
         viewW: number,
@@ -123,42 +94,43 @@ export class FogOfWar {
     ): void {
         if (!this.enabled) return;
         this.init();
-        this.update(playerGX, playerGY);
 
         const startTX = Math.floor(camX / TILE_SIZE) - 1;
         const startTY = Math.floor(camY / TILE_SIZE) - 1;
         const endTX = Math.ceil((camX + viewW) / TILE_SIZE) + 1;
         const endTY = Math.ceil((camY + viewH) / TILE_SIZE) + 1;
 
+
         for (let ty = startTY; ty <= endTY; ty++) {
             for (let tx = startTX; tx <= endTX; tx++) {
-                // Seen tiles → fully visible, skip
-                if (this.seenTiles.has(`${tx},${ty}`)) continue;
+                // Distance from each edge in tile units
+                const fromLeft = tx - startTX;
+                const fromRight = endTX - tx;
+                const fromTop = ty - startTY;
+                const fromBottom = endTY - ty;
+
+                // Minimum distance to any edge
+                const edgeDist = Math.min(fromLeft, fromRight, fromTop, fromBottom);
+
+                // Only render clouds within EDGE_DEPTH tiles of the edge
+                if (edgeDist >= EDGE_DEPTH) continue;
 
                 const screenX = tx * TILE_SIZE - camX;
                 const screenY = ty * TILE_SIZE - camY;
                 const variant = this.tileHash(tx, ty) % CLOUD_VARIANTS;
 
-                // How close is this unseen tile to any seen tile?
-                const borderDist = this.distToSeenBorder(tx, ty);
+                // Alpha: full at edge (1.0), fades to 0 at EDGE_DEPTH
+                // smoothstep for nice transition
+                const t = edgeDist / EDGE_DEPTH;
+                const alpha = 1 - t * t * (3 - 2 * t);
 
-                if (borderDist <= TRANSITION_WIDTH) {
-                    // Near the seen/unseen border → smooth gradient
-                    const t = borderDist / (TRANSITION_WIDTH + 1);
-                    const alpha = t * t * (3 - 2 * t); // smoothstep
-                    ctx.globalAlpha = alpha;
-                    ctx.drawImage(this.cloudTiles[variant], screenX, screenY);
-                    ctx.globalAlpha = 1.0;
-                } else {
-                    // Deep unseen → full cloud
-                    ctx.drawImage(this.cloudTiles[variant], screenX, screenY);
-                }
+                ctx.globalAlpha = alpha;
+                ctx.drawImage(this.cloudTiles[variant], screenX, screenY);
             }
         }
+        ctx.globalAlpha = 1.0;
     }
 
-    /** Reset for new raid */
-    public reset(): void {
-        this.seenTiles.clear();
-    }
+    /** Reset for new raid — no state to reset in edge mode */
+    public reset(): void {}
 }

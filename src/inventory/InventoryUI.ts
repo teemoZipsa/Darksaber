@@ -32,7 +32,7 @@ interface EquipSlotDef {
 }
 
 // Equipment slot positions arranged around the LARGE pixel character
-// Layout matches original Darksaber: head top-center, accessories left/right, weapon/shield sides
+// Layout matches original Sin Eater: head top-center, accessories left/right, weapon/shield sides
 const EQUIP_SLOTS: EquipSlotDef[] = [
     { slot: 'head',       labelKey: 'inv.head',      bodyX: -EQUIP_CELL/2,       bodyY: -210,  w: EQUIP_CELL, h: EQUIP_CELL },
     { slot: 'accessory',  labelKey: 'inv.accessory',  bodyX: -EQUIP_CELL - 56,   bodyY: -210,  w: EQUIP_CELL, h: EQUIP_CELL },
@@ -334,22 +334,56 @@ export class InventoryUI {
 
         if (!placed) {
             const eqSlot = this.getEquipSlotAt(sx, sy);
-            if (eqSlot && slotAcceptsItem(eqSlot, item.item.slot) && this.activeChar) {
-                const existing = this.activeChar.equipment.get(eqSlot);
-                if (existing) {
-                    this.inventory.autoPlace(existing.item);
+            if (eqSlot && this.activeChar) {
+                const targetEq = this.activeChar.equipment.get(eqSlot);
+                
+                // 1) Socketing into already-equipped item
+                if (targetEq && targetEq.item.maxSockets) {
+                    const draggedCategory = item.item.itemCategory || item.item.slot;
+                    if (targetEq.item.socketTypes?.includes(draggedCategory as any)) {
+                        if (!targetEq.sockets) targetEq.sockets = [];
+                        if (targetEq.sockets.length < targetEq.item.maxSockets) {
+                            targetEq.sockets.push(item.item);
+                            placed = true;
+                        }
+                    }
                 }
-                this.activeChar.equipment.set(eqSlot, item);
-                placed = true;
+                
+                // 2) Swapping equipment (if not socketed)
+                if (!placed && slotAcceptsItem(eqSlot, item.item.slot)) {
+                    if (targetEq) {
+                        this.inventory.autoPlace(targetEq.item);
+                    }
+                    this.activeChar.equipment.set(eqSlot, item);
+                    placed = true;
+                }
             }
         }
 
         if (!placed && this.hoverCell) {
             const targetGrid = this.hoverCell.isExt ? this.externalGrid! : this.inventory;
-            const result = targetGrid.place(item.item, this.hoverCell.x, this.hoverCell.y);
-            if (result) {
-                result.durability = item.durability;
-                placed = true;
+            const targetPlaced = targetGrid.getAt(this.hoverCell.x, this.hoverCell.y);
+
+            // 1) Socketing into item existing in grid
+            if (targetPlaced && targetPlaced.item.maxSockets) {
+                const draggedCategory = item.item.itemCategory || item.item.slot;
+                if (targetPlaced.item.socketTypes?.includes(draggedCategory as any)) {
+                    if (!targetPlaced.sockets) targetPlaced.sockets = [];
+                    if (targetPlaced.sockets.length < targetPlaced.item.maxSockets) {
+                        targetPlaced.sockets.push(item.item);
+                        placed = true;
+                    }
+                }
+            }
+
+            // 2) Placing into empty grid space
+            if (!placed && !targetPlaced) {
+                const result = targetGrid.place(item.item, this.hoverCell.x, this.hoverCell.y);
+                if (result) {
+                    result.durability = item.durability;
+                    result.sockets = item.sockets;
+                    placed = true;
+                }
             }
         }
 
@@ -714,6 +748,34 @@ export class InventoryUI {
                 ctx.font = '22px serif';
                 ctx.textAlign = 'center';
                 ctx.fillText(equipped.item.icon, slotX + def.w / 2, slotY + def.h / 2 + 7);
+
+                // Render Sockets on Equipped items
+                if (equipped.item.maxSockets) {
+                    const sc = 4;
+                    const sw = equipped.item.maxSockets * (sc*2 + 4);
+                    let cx = slotX + def.w/2 - sw/2 + sc*2 - 2;
+                    let cy = slotY + def.h - 10;
+                    for (let i = 0; i < equipped.item.maxSockets; i++) {
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, sc, 0, Math.PI*2);
+                        const socketed = equipped.sockets && equipped.sockets[i];
+                        if (socketed) {
+                            ctx.fillStyle = socketed.color || '#fff';
+                            ctx.fill();
+                            ctx.strokeStyle = '#222';
+                            ctx.lineWidth = 1;
+                            ctx.stroke();
+                        } else {
+                            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                            ctx.fill();
+                            ctx.strokeStyle = '#555';
+                            ctx.lineWidth = 1;
+                            ctx.stroke();
+                        }
+                        cx += (sc*2 + 4);
+                    }
+                }
+
                 ctx.textAlign = 'start';
             } else {
                 ctx.font = '9px DOSMyungjo, sans-serif';
@@ -879,6 +941,35 @@ export class InventoryUI {
             ctx.fillRect(ix + 4, iy + ih - 10, barW, 4);
             ctx.fillStyle = durRatio > 0.5 ? '#44cc44' : durRatio > 0.2 ? '#ccaa00' : '#cc4444';
             ctx.fillRect(ix + 4, iy + ih - 10, barW * durRatio, 4);
+        }
+
+        // Draw Sockets
+        if (placed.item.maxSockets) {
+            const sc = 5; // radius
+            const sw = placed.item.maxSockets * (sc*2 + 4);
+            let cx = ix + iw/2 - sw/2 + sc*2 - 2;
+            let cy = iy + ih - 20;
+            if (placed.item.maxDurability > 1) { cy -= 6; } // push up if durability bar exists
+            
+            for (let i = 0; i < placed.item.maxSockets; i++) {
+                ctx.beginPath();
+                ctx.arc(cx, cy, sc, 0, Math.PI*2);
+                const socketed = placed.sockets && placed.sockets[i];
+                if (socketed) {
+                    ctx.fillStyle = socketed.color || '#fff';
+                    ctx.fill();
+                    ctx.strokeStyle = '#222';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                    ctx.fill();
+                    ctx.strokeStyle = '#555';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+                cx += (sc*2 + 4);
+            }
         }
     }
 

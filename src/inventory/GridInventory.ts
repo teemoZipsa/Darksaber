@@ -11,6 +11,7 @@ export interface PlacedItem {
     gridY: number;      // top-left cell Y
     durability: number;
     quantity: number;
+    sockets?: ItemDef[]; // Inserted runes/gems
 }
 
 export class GridInventory {

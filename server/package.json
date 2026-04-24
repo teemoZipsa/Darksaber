@@ -1,7 +1,7 @@
 {
-  "name": "darksaber-server",
+  "name": "sin-eater-server",
   "version": "0.1.0",
-  "description": "Darksaber Multiplayer WebSocket Server",
+  "description": "Sin Eater Multiplayer WebSocket Server",
   "type": "module",
   "scripts": {
     "start": "npx tsx index.ts"

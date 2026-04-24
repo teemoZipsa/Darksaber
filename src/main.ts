@@ -1,9 +1,9 @@
 /**
  * main.ts — Application entry point.
- * Initializes the GameEngine and starts the game loop.
+ * Initializes the GameManager and starts the game loop.
  */
 
-import { GameEngine } from './engine/GameEngine';
+import { GameManager } from './engine/GameManager';
 import { SettingsManager } from './engine/SettingsManager';
 import { TileAssetManager } from './map/TileAssetManager';
 
@@ -31,10 +31,10 @@ async function init(): Promise<void> {
         return;
     }
 
-    const engine = new GameEngine(canvas);
-    engine.start();
+    const manager = new GameManager(canvas);
+    manager.start();
 
-    console.log('🎮 Darksaber Engine started');
+    console.log('🎮 Sin Eater Engine started (v2 — SRPG Mode)');
 }
 
 // Wait for DOM

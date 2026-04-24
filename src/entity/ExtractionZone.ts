@@ -5,11 +5,13 @@ export class ExtractionZone {
     public x: number;
     public y: number;
     public radius: number; // typically 1 or 2 tiles radius
+    public stageId: string;
     private pulseTimer: number = 0;
 
-    constructor(x: number, y: number, radius = 1) {
+    constructor(x: number, y: number, stageId: string = 'escape', radius = 1) {
         this.x = x;
         this.y = y;
+        this.stageId = stageId;
         this.radius = radius;
     }
 
@@ -47,12 +49,6 @@ export class ExtractionZone {
             }
         }
 
-        // Draw icon in center
-        const center = getScreenPos(this.x, this.y);
-        ctx.font = `${tileSize * 0.4}px DOSMyungjo, sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.fillStyle = 'white';
-        ctx.fillText('탈출', center.x + tileSize/2, center.y + tileSize/2);
         ctx.textAlign = 'start';
     }
 }

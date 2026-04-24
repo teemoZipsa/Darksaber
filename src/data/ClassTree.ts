@@ -56,7 +56,15 @@ const INFANTRY: ClassLine = {
         { tier: 6, nameKr: '엠퍼러', nameEn: 'Emperor' },
         { tier: 7, nameKr: '그레이트 엠퍼러', nameEn: 'Great Emperor' },
     ],
-    skillUnlocks: { 1: ['inf_t1'], 2: ['inf_t2'], 3: ['inf_t3'], 4: ['inf_t4'], 5: ['inf_t5'], 6: ['inf_t6'], 7: ['inf_t7'] }
+    skillUnlocks: {
+        1: ['inf_t1', 'og_fireball'],
+        2: ['inf_t2', 'og_heal'],
+        3: ['inf_t3', 'og_freeze'],
+        4: ['inf_t4', 'og_attack'],
+        5: ['inf_t5', 'og_protection', 'og_fire'],
+        6: ['inf_t6', 'og_tornado', 'og_windcutter'],
+        7: ['inf_t7', 'og_hpdrain', 'og_earthquake']
+    }
 };
 
 const CAVALRY: ClassLine = {
@@ -73,7 +81,15 @@ const CAVALRY: ClassLine = {
         { tier: 6, nameKr: '로얄나이트', nameEn: 'Royal Knight' },
         { tier: 7, nameKr: '로얄가드', nameEn: 'Royal Guard' },
     ],
-    skillUnlocks: { 1: ['cav_t1'], 2: ['cav_t2'], 3: ['cav_t3'], 4: ['cav_t4'], 5: ['cav_t5'], 6: ['cav_t6'], 7: ['cav_t7'] }
+    skillUnlocks: {
+        1: ['cav_t1', 'og_freeze'],
+        2: ['cav_t2', 'og_poison'],
+        3: ['cav_t3', 'og_fireball', 'og_mpdrain'],
+        4: ['cav_t4', 'og_thunder', 'og_blizzard'],
+        5: ['cav_t5', 'og_protection', 'og_fire'],
+        6: ['cav_t6', 'og_attack', 'og_thunderstorm'],
+        7: ['cav_t7', 'og_cure']
+    }
 };
 
 const FLYING: ClassLine = {
@@ -89,7 +105,14 @@ const FLYING: ClassLine = {
         { tier: 6, nameKr: '드래곤로드', nameEn: 'Dragon Lord' },
         { tier: 7, nameKr: '드래곤마스터', nameEn: 'Dragon Master' },
     ],
-    skillUnlocks: { 2: ['fly_t1'], 3: ['fly_t2'], 4: ['fly_t3'], 5: ['fly_t4'], 6: ['fly_t5'], 7: ['fly_t6'] }
+    skillUnlocks: {
+        2: ['fly_t1', 'og_thunder'],
+        3: ['fly_t2', 'og_windcutter', 'og_cure'],
+        4: ['fly_t3', 'og_thunderstorm'],
+        5: ['fly_t4', 'og_tornado'],
+        6: ['fly_t5', 'og_antiresist'],
+        7: ['fly_t6', 'og_protection']
+    }
 };
 
 // ─── 택틱스마스터 Branch ────────────────────────────────────────
@@ -107,7 +130,14 @@ const NAVAL: ClassLine = {
         { tier: 6, nameKr: '크라켄나이트', nameEn: 'Kraken Knight' },
         { tier: 7, nameKr: '크라켄마스터', nameEn: 'Kraken Master' },
     ],
-    skillUnlocks: { 2: ['nav_t1'], 3: ['nav_t2'], 4: ['nav_t3'], 5: ['nav_t4'], 6: ['nav_t5'], 7: ['nav_t6'] }
+    skillUnlocks: {
+        2: ['nav_t1', 'og_freeze', 'og_windcutter'],
+        3: ['nav_t2', 'og_blizzard'],
+        4: ['nav_t3', 'og_protection'],
+        5: ['nav_t4', 'og_quick'],
+        6: ['nav_t5', 'og_tornado', 'og_heal'],
+        7: ['nav_t6', 'og_attack']
+    }
 };
 
 const LANCER: ClassLine = {
@@ -123,7 +153,14 @@ const LANCER: ClassLine = {
         { tier: 6, nameKr: '카운트', nameEn: 'Count' },
         { tier: 7, nameKr: '듀크', nameEn: 'Duke' },
     ],
-    skillUnlocks: { 2: ['lan_t1'], 3: ['lan_t2'], 4: ['lan_t3'], 5: ['lan_t4'], 6: ['lan_t5'], 7: ['lan_t6'] }
+    skillUnlocks: {
+        2: ['lan_t1', 'og_heal', 'og_thunder'],
+        3: ['lan_t2', 'og_fireball'],
+        4: ['lan_t3', 'og_fire', 'og_mpdrain'],
+        5: ['lan_t4', 'og_demove'],
+        6: ['lan_t5', 'og_thunderstorm'],
+        7: ['lan_t6', 'og_resist']
+    }
 };
 
 const ARCHER: ClassLine = {
@@ -139,7 +176,14 @@ const ARCHER: ClassLine = {
         { tier: 6, nameKr: '보우마스터', nameEn: 'Bow Master' },
         { tier: 7, nameKr: '닌자마스터', nameEn: 'Ninja Master' },
     ],
-    skillUnlocks: { 2: ['arc_t1'], 3: ['arc_t2'], 4: ['arc_t3'], 5: ['arc_t4'], 6: ['arc_t5'], 7: ['arc_t6'] }
+    skillUnlocks: {
+        2: ['arc_t1', 'og_fireball'],
+        3: ['arc_t2', 'og_attack', 'og_protection'],
+        4: ['arc_t3', 'og_heal', 'og_fire'],
+        5: ['arc_t4', 'og_poison'],
+        6: ['arc_t5', 'og_quick'],
+        7: ['arc_t6', 'og_forceheal']
+    }
 };
 
 // ─── 힐러마스터 Branch ──────────────────────────────────────────
@@ -158,7 +202,15 @@ const CLERIC: ClassLine = {
         { tier: 6, nameKr: '프린세스', nameEn: 'Princess' },
         { tier: 7, nameKr: '퀸', nameEn: 'Queen' },
     ],
-    skillUnlocks: { 1: ['cle_t1'], 2: ['cle_t2'], 3: ['cle_t3'], 4: ['cle_t4'], 5: ['cle_t5'], 6: ['cle_t6'], 7: ['cle_t7'] }
+    skillUnlocks: {
+        1: ['cle_t1', 'og_heal'],
+        2: ['cle_t2', 'og_attack', 'og_protection'],
+        3: ['cle_t3', 'og_fireball', 'og_forceheal'],
+        4: ['cle_t4', 'og_freeze', 'og_fire', 'og_antiresist', 'og_cure'],
+        5: ['cle_t5', 'og_resist'],
+        6: ['cle_t6', 'og_mute', 'og_hpdrain', 'og_earthquake'],
+        7: ['cle_t7', 'og_blizzard', 'og_mpdrain', 'og_meteor']
+    }
 };
 
 const PRIEST: ClassLine = {
@@ -174,7 +226,14 @@ const PRIEST: ClassLine = {
         { tier: 6, nameKr: '세인트', nameEn: 'Saint' },
         { tier: 7, nameKr: '홀리마스터', nameEn: 'Holy Master' },
     ],
-    skillUnlocks: { 2: ['pri_t1'], 3: ['pri_t2'], 4: ['pri_t3'], 5: ['pri_t4'], 6: ['pri_t5'], 7: ['pri_t6'] }
+    skillUnlocks: {
+        2: ['pri_t1', 'og_fireball', 'og_heal'],
+        3: ['pri_t2', 'og_fire', 'og_attack'],
+        4: ['pri_t3', 'og_quick', 'og_demove'],
+        5: ['pri_t4', 'og_cure', 'og_mute'],
+        6: ['pri_t5', 'og_resist'],
+        7: ['pri_t6', 'og_antiresist']
+    }
 };
 
 // ─── 매직마스터 Branch ─────────────────────────────────────────
@@ -193,7 +252,15 @@ const MAGE: ClassLine = {
         { tier: 6, nameKr: '소서러', nameEn: 'Sorcerer' },
         { tier: 7, nameKr: '로열위저드', nameEn: 'Royal Wizard' },
     ],
-    skillUnlocks: { 1: ['mag_t1'], 2: ['mag_t2'], 3: ['mag_t3'], 4: ['mag_t4'], 5: ['mag_t5'], 6: ['mag_t6'], 7: ['mag_t7'] }
+    skillUnlocks: {
+        1: ['mag_t1', 'og_fireball', 'og_freeze'],
+        2: ['mag_t2', 'og_fire', 'og_thunder'],
+        3: ['mag_t3', 'og_blizzard', 'og_mpdrain'],
+        4: ['mag_t4', 'og_slow'],
+        5: ['mag_t5', 'og_heal', 'og_earthquake', 'og_resist', 'og_thunderstorm'],
+        6: ['mag_t6', 'og_tornado', 'og_hpdrain'],
+        7: ['mag_t7', 'og_meteor', 'og_poison']
+    }
 };
 
 const CULTIST: ClassLine = {
@@ -209,7 +276,14 @@ const CULTIST: ClassLine = {
         { tier: 6, nameKr: '일루저니스트', nameEn: 'Illusionist' },
         { tier: 7, nameKr: '자버러', nameEn: 'Jabberer' },
     ],
-    skillUnlocks: { 2: ['cul_t1'], 3: ['cul_t2'], 4: ['cul_t3'], 5: ['cul_t4'], 6: ['cul_t5'], 7: ['cul_t6'] }
+    skillUnlocks: {
+        2: ['cul_t1', 'og_freeze', 'og_poison', 'og_deattack'],
+        3: ['cul_t2', 'og_blizzard', 'og_cure', 'og_heal'],
+        4: ['cul_t3', 'og_slow'],
+        5: ['cul_t4', 'og_forceheal'],
+        6: ['cul_t5', 'og_hpdrain', 'og_earthquake'],
+        7: ['cul_t6', 'og_mute']
+    }
 };
 
 const SHRINE: ClassLine = {
@@ -225,7 +299,14 @@ const SHRINE: ClassLine = {
         { tier: 6, nameKr: '대신관', nameEn: 'Grand Oracle' },
         { tier: 7, nameKr: '신녀', nameEn: 'Holy Maiden' },
     ],
-    skillUnlocks: { 2: ['shr_t1'], 3: ['shr_t2'], 4: ['shr_t3'], 5: ['shr_t4'], 6: ['shr_t5'], 7: ['shr_t6'] }
+    skillUnlocks: {
+        2: ['shr_t1'],
+        3: ['shr_t2'],
+        4: ['shr_t3'],
+        5: ['shr_t4'],
+        6: ['shr_t5'],
+        7: ['shr_t6']
+    }
 };
 
 const ALCHEMIST: ClassLine = {

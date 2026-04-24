@@ -1,7 +1,7 @@
 /**
  * EntityInfoUI — Retro-warm info window with modern bar polish.
  * Parchment-tinted glass panel with dark grid portrait area,
- * preserving the classic Darksaber feel while using modern animations.
+ * preserving the classic Sin Eater feel while using modern animations.
  */
 
 import { UI, isCloseButtonHit, Parchment, drawParchmentPanel } from './UITheme';

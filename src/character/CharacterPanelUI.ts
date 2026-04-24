@@ -1,5 +1,5 @@
 /**
- * CharacterPanelUI — Classic Darksaber '자기 정보' (Self Info) UI.
+ * CharacterPanelUI — Classic Sin Eater '자기 정보' (Self Info) UI.
  * Renders the character portrait, basic info, and the detailed 16-stat grid.
  */
 

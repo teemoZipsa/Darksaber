@@ -16,7 +16,7 @@ interface KeyBind {
     code: string;
 }
 
-const STORAGE_KEY = 'darksaber_keybinds';
+const STORAGE_KEY = 'sin_eater_keybinds';
 
 const DEFAULT_BINDS: Omit<KeyBind, 'code'>[] = [
     { action: 'moveUp',    label: 'Move Up',       labelKo: '위로 이동',    defaultCode: 'KeyW' },

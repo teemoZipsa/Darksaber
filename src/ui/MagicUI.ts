@@ -36,8 +36,8 @@ export class MagicUI {
     // Callback
     public onSkillSelect: ((skill: Skill) => void) | null = null;
 
-    public show(classId: string, characterTier: number, mp: number, maxMp: number): void {
-        this.skills = getLearnedSkills(classId, characterTier);
+    public show(classId: string, characterTier: number, mp: number, maxMp: number, unlockedSkillIds?: string[]): void {
+        this.skills = getLearnedSkills(classId, characterTier, unlockedSkillIds);
         this.currentMp = mp;
         this.maxMp = maxMp;
         this.hoveredIndex = -1;

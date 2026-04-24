@@ -1,6 +1,6 @@
 /**
  * UITheme — Centralized design tokens and shared drawing helpers
- * for the Darksaber Modern Vibe UI system.
+ * for the Sin Eater Modern Vibe UI system.
  *
  * All UI components should import from here instead of hardcoding colors.
  */
@@ -318,7 +318,7 @@ function roundRect(
 }
 
 // ─── DARK PARCHMENT PALETTE ─────────────────────────────────
-// Unified dark-RPG / parchment theme for all Darksaber panels.
+// Unified dark-RPG / parchment theme for all Sin Eater panels.
 
 export const DarkParchment = {
     // Panel backgrounds
@@ -343,7 +343,7 @@ export const DarkParchment = {
 } as const;
 
 /**
- * Draw a dark-parchment panel — the unified container style for Darksaber.
+ * Draw a dark-parchment panel — the unified container style for Sin Eater.
  * Double border (dark outer + light inner), rounded corners, subtle shadow.
  */
 export function drawDarkPanel(
@@ -410,7 +410,7 @@ export function drawDarkPanel(
 }
 
 // ─── LIGHT PARCHMENT PALETTE ────────────────────────────────
-// Original Darksaber warm beige style — classic SRPG feel.
+// Original Sin Eater warm beige style — classic SRPG feel.
 
 export const Parchment = {
     // Panel backgrounds
@@ -434,7 +434,7 @@ export const Parchment = {
 } as const;
 
 /**
- * Draw a light-parchment panel — the classic Darksaber container.
+ * Draw a light-parchment panel — the classic Sin Eater container.
  * Warm beige fill, double retro border (dark outer + light inner).
  */
 export function drawParchmentPanel(
@@ -497,7 +497,7 @@ export function drawParchmentPanel(
 }
 
 /**
- * Render the "DARKSABER" game title in an epic medieval dark-fantasy style.
+ * Render the "SIN EATER" game title in an epic medieval dark-fantasy style.
  * Gold gradient text + dark outline + metallic glow + decorative details.
  *
  * @returns The total height consumed (for stacking below).
@@ -516,8 +516,8 @@ export function renderGameTitle(
 
     ctx.save();
 
-    // ─── Main title: "DARKSABER" ─────────────────────
-    const titleText = 'DARKSABER';
+    // ─── Main title: "SIN EATER" ─────────────────────
+    const titleText = 'SIN EATER';
 
     // Gold gradient fill
     const grad = ctx.createLinearGradient(x, y, x, y + fontSize);

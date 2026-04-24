@@ -54,6 +54,14 @@ export class Camera {
         this.targetY = (tileY * TILE_SIZE) + (TILE_SIZE / 2) - (scaledH / 2);
     }
 
+    /** Follow a sub-tile pixel position for smooth movement */
+    public followPixel(pixelX: number, pixelY: number): void {
+        const scaledW = this.viewWidth / this.zoom;
+        const scaledH = this.viewHeight / this.zoom;
+        this.targetX = (pixelX * TILE_SIZE) + (TILE_SIZE / 2) - (scaledW / 2);
+        this.targetY = (pixelY * TILE_SIZE) + (TILE_SIZE / 2) - (scaledH / 2);
+    }
+
     /** Snap camera immediately to target (no lerp) */
     public snapToTarget(): void {
         this.x = this.targetX;

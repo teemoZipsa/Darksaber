@@ -6,8 +6,10 @@ export const i18n = {
     strings: {
         ko: {
             // General UI
-            'ui.title': '⚔️ Darksaber',
+            'ui.title': '⚔️ Sin Eater',
             'ui.subtitle': '그리드 SRPG 엔진 v0.1',
+            'title.pressEnter': '— Enter 키를 눌러 시작 —',
+            'title.terms': '이용약관 | 개인정보처리방침',
             'ui.ctrlMove': '↑↓←→ / WASD: 이동',
             'ui.ctrlMouse': '마우스: 정보 확인 / 공격',
             'ui.ctrlInv': 'Tab / I: 인벤토리',
@@ -185,8 +187,10 @@ export const i18n = {
         },
         en: {
             // General UI
-            'ui.title': '⚔️ Darksaber',
+            'ui.title': '⚔️ Sin Eater',
             'ui.subtitle': 'Grid SRPG Engine v0.1',
+            'title.pressEnter': '— Press Enter to Start —',
+            'title.terms': 'Terms | Privacy',
             'ui.ctrlMove': '↑↓←→ / WASD: Move',
             'ui.ctrlMouse': 'Mouse: Hover / Attack',
             'ui.ctrlInv': 'Tab / I: Inventory',

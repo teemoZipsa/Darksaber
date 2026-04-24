@@ -87,4 +87,32 @@ export class CombatFormulas {
         const base = 20 + diff * 5;
         return Math.max(5, Math.min(100, base));
     }
+
+    /**
+     * Calculate directional attack multiplier.
+     * Backstab (behind defender) = 1.5x, Side = 1.25x, Front = 1.0x
+     */
+    public static getDirectionalMultiplier(
+        attackerX: number, attackerY: number,
+        defenderX: number, defenderY: number,
+        defenderFacing: 'up' | 'down' | 'left' | 'right'
+    ): { multiplier: number; label: string } {
+        const dx = attackerX - defenderX;
+        const dy = attackerY - defenderY;
+
+        // Determine attack direction relative to defender facing
+        let isBehind = false;
+        let isSide = false;
+
+        switch (defenderFacing) {
+            case 'up':    isBehind = dy > 0; isSide = dx !== 0 && dy === 0; break;
+            case 'down':  isBehind = dy < 0; isSide = dx !== 0 && dy === 0; break;
+            case 'left':  isBehind = dx > 0; isSide = dy !== 0 && dx === 0; break;
+            case 'right': isBehind = dx < 0; isSide = dy !== 0 && dx === 0; break;
+        }
+
+        if (isBehind) return { multiplier: 1.5, label: 'BACK!' };
+        if (isSide)   return { multiplier: 1.25, label: 'SIDE' };
+        return { multiplier: 1.0, label: '' };
+    }
 }

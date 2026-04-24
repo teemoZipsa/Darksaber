@@ -1,5 +1,5 @@
 /**
- * Darksaber Multiplayer WebSocket Server
+ * Sin Eater Multiplayer WebSocket Server
  * Simple room-based server: all connected clients share the same world.
  * Broadcasts player movements, combat events, and boss kills.
  *
@@ -21,7 +21,7 @@ const wss = new WebSocketServer({ port: PORT });
 const players: Map<string, PlayerData> = new Map();
 let nextId = 1;
 
-console.log(`🌐 Darksaber Multiplayer Server started on ws://localhost:${PORT}`);
+console.log(`🌐 Sin Eater Multiplayer Server started on ws://localhost:${PORT}`);
 
 wss.on('connection', (ws: WebSocket) => {
     const playerId = `player_${nextId++}`;

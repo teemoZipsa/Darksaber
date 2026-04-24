@@ -1,7 +1,7 @@
 {
-  "name": "darksaber",
+  "name": "sin-eater",
   "version": "0.1.0",
-  "description": "Dark Saver style grid-based SRPG engine",
+  "description": "Sin Eater — Grid-based SRPG with growth weapon system",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "server": "npx tsx server/index.ts"
   },
-  "keywords": ["srpg", "grid", "rpg", "darksaver"],
+  "keywords": ["srpg", "grid", "rpg", "sin-eater"],
   "author": "teemoZipsa",
   "license": "MIT",
   "devDependencies": {

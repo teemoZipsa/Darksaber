@@ -9,6 +9,7 @@ import { Camera } from './Camera';
 import { InputManager } from './InputManager';
 import { SettingsManager } from './SettingsManager';
 import { WorldMap } from '../map/WorldMap';
+import { BiomeMask, TownInfo } from '../map/BiomeMask';
 import { GridRenderer } from '../map/GridRenderer';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
@@ -17,7 +18,7 @@ import { ExtractionZone } from '../entity/ExtractionZone';
 import { BossSpawner } from '../entity/BossSpawner';
 import { RemotePlayer } from '../entity/RemotePlayer';
 import { TILE_SIZE } from '../map/Chunk';
-import { TILE_PROPERTIES } from '../map/Tile';
+import { TileType, TILE_PROPERTIES } from '../map/Tile';
 import { GridInventory } from '../inventory/GridInventory';
 import { InventoryUI } from '../inventory/InventoryUI';
 import { PartyUI } from '../ui/PartyUI'; // Added
@@ -34,6 +35,7 @@ import { CharacterPanelUI } from '../character/CharacterPanelUI';
 import { Character } from '../character/Character';
 import { GameState } from './GameState';
 import { LobbyUI } from '../ui/LobbyUI';
+import { TownUI } from '../ui/TownUI';
 import { NetworkManager } from '../network/NetworkManager';
 import { t, i18n } from '../i18n/LanguageManager';
 import { UI, drawGlassPanel, drawBar, renderGameTitle, Parchment, drawParchmentPanel } from '../ui/UITheme';
@@ -43,6 +45,10 @@ import { MinimapUI } from '../ui/MinimapUI';
 import { MagicUI } from '../ui/MagicUI';
 import { Skill } from '../data/SkillDB';
 import { FogOfWar } from '../map/FogOfWar';
+import { FloatingTextManager } from '../ui/FloatingTextManager';
+import { getClassLine } from '../data/ClassTree';
+import { EffectManager } from '../ui/EffectManager';
+import { sfxHit, sfxCritical, sfxMiss, sfxHeal, sfxLevelUp, sfxKill, sfxPromotion, sfxByElement, sfxBuff, sfxDebuff, sfxDrain, sfxMeteor } from '../audio/CombatSFX';
 
 export class GameEngine {
     private canvas: HTMLCanvasElement;
@@ -53,6 +59,7 @@ export class GameEngine {
     private camera: Camera;
     private input: InputManager;
     private worldMap: WorldMap;
+    private biomeMask: BiomeMask;
     private gridRenderer: GridRenderer;
     private player: Player;
     private partyPlayers: Player[] = [];
@@ -67,6 +74,8 @@ export class GameEngine {
     private isHoveringPlayer: boolean = false;
     private actionMenuOpen: boolean = false;
     private fogOfWar: FogOfWar = new FogOfWar();
+    private floatingText: FloatingTextManager = new FloatingTextManager();
+    private effectManager: EffectManager = new EffectManager();
     private minimapUI!: MinimapUI;
 
     // Click-to-move system
@@ -113,6 +122,7 @@ export class GameEngine {
     private state: GameState = GameState.CHARACTER_CREATION;
     private charCreateUI!: CharacterCreationUI;
     private lobbyUI: LobbyUI;
+    private townUI: TownUI;
     private selectedTarget: Entity | null = null;
 
     // Selection & Gameover images
@@ -149,6 +159,9 @@ export class GameEngine {
     // Gold currency
     private gold: number = 500;
 
+    // Raid tracking
+    private departureTownId: string = '';  // Town the player left from (cannot return to)
+
     // Analytics
     private frameCount: number = 0;
     private fpsTimer: number = 0;
@@ -176,7 +189,8 @@ export class GameEngine {
         this.resize();
         this.camera = new Camera(this.canvas.width, this.canvas.height);
         this.input = new InputManager(canvas);
-        this.worldMap = new WorldMap();
+        this.biomeMask = new BiomeMask();
+        this.worldMap = new WorldMap(this.biomeMask);
         this.gridRenderer = new GridRenderer();
 
         // Apply custom sword cursor
@@ -245,11 +259,26 @@ export class GameEngine {
 
         // Lobby UI
         this.lobbyUI = new LobbyUI(this.party, this.inventory);
+
+        // Town visit UI (shares stash with lobby)
+        this.townUI = new TownUI(this.inventory, this.lobbyUI.stash);
+        this.townUI.onDeploy(() => this.deployFromTown());
         this.lobbyUI.onDeploy(() => {
             this.state = GameState.RAID;
             this.lobbyUI.toggle(); // hide lobby
             this.partyUI.isRaidMode = true;
             this.addCombatLog(t('log.deployed'));
+
+            // Record departure town for no-return rule
+            const playerChunkX = Math.floor(this.player.gridX / 32);
+            const playerChunkY = Math.floor(this.player.gridY / 32);
+            const towns = this.worldMap.getTowns();
+            const departureTown = towns.find(town => {
+                const dx = playerChunkX - town.chunkX;
+                const dy = playerChunkY - town.chunkY;
+                return Math.sqrt(dx * dx + dy * dy) <= town.radius;
+            });
+            this.departureTownId = departureTown?.id || '';
 
             const members = this.party.getCharacters();
             this.partyPlayers = [];
@@ -280,9 +309,14 @@ export class GameEngine {
                 const p = new Player(px, py);
                 p.label = members[i].name;
                 p.color = colors[i % colors.length];
-                // Set character sprite from Character's tier-based portrait
-                const charPortrait = members[i].portraitImage?.src || '/Image/Character/fighter.png';
-                p.setImage(charPortrait);
+                // Directly reuse Character's already-loaded portrait image
+                // (avoids re-creating Image objects which caused sprite-loss on re-deploy)
+                if (members[i].portraitImage && members[i].portraitLoaded) {
+                    p.image = members[i].portraitImage;
+                    p.imageLoaded = true;
+                } else {
+                    p.setImage(members[i].portraitImage?.src || '/Image/Character/fighter.png');
+                }
                 this.partyPlayers.push(p);
             }
             if (this.partyPlayers.length > 0) {
@@ -359,14 +393,19 @@ export class GameEngine {
             return true;
         };
 
-        // Spawn player near world center
-        this.player = new Player(0, 0);
+        // Spawn player at the central castle town on the biome map
+        const startTown = this.biomeMask.getTowns().find(t => t.id === 'central_castle')!;
+        const spawnTileX = startTown.chunkX * 32 + 16; // center of town chunk
+        const spawnTileY = startTown.chunkY * 32 + 16;
+        this.player = new Player(spawnTileX, spawnTileY);
         this.partyPlayers = [this.player];
 
-        // Load initial chunks FIRST so terrain data exists for spawn search
-        this.worldMap.updateLoadedChunks(0, 0);
+        // Load initial chunks around spawn
+        const spawnWorldX = spawnTileX * TILE_SIZE + TILE_SIZE / 2;
+        const spawnWorldY = spawnTileY * TILE_SIZE + TILE_SIZE / 2;
+        this.worldMap.updateLoadedChunks(spawnWorldX, spawnWorldY);
 
-        // Now find a walkable tile
+        // Find walkable tile near spawn
         this.findWalkableSpawn();
 
         // Snap camera to player's actual spawn position
@@ -461,14 +500,19 @@ export class GameEngine {
     }
 
     private findWalkableSpawn(): void {
+        const startX = this.player.gridX;
+        const startY = this.player.gridY;
         for (let radius = 0; radius < 50; radius++) {
             for (let dy = -radius; dy <= radius; dy++) {
                 for (let dx = -radius; dx <= radius; dx++) {
                     if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
-                    const tile = this.worldMap.getTileAt(dx, dy);
+                    const tx = startX + dx;
+                    const ty = startY + dy;
+                    if (tx < 0 || ty < 0) continue;
+                    const tile = this.worldMap.getTileAt(tx, ty);
                     if (TILE_PROPERTIES[tile].walkable) {
-                        this.player.gridX = dx;
-                        this.player.gridY = dy;
+                        this.player.gridX = tx;
+                        this.player.gridY = ty;
                         return;
                     }
                 }
@@ -510,6 +554,10 @@ export class GameEngine {
     }
 
     private update(dt: number): void {
+        // Update floating combat text (always, regardless of state)
+        this.floatingText.update(dt);
+        this.effectManager.update(dt);
+
         if (this.lastSettingsVersion !== SettingsManager.lastUpdated) {
             this.lastSettingsVersion = SettingsManager.lastUpdated;
             this.worldMap.markAllDirty();
@@ -563,7 +611,7 @@ export class GameEngine {
             return; // Halt raid simulation while in lobby
         }
 
-        // ─── RESULTS LOGIC ──────────────────────────────────────────
+        // ─── RESULTS LOGIC ────────────────────────────────────────────
         if (this.state === GameState.RESULTS) {
             // Wait for input to return to lobby
             if (this.input.justPressed('Enter') || this.input.mouseJustDown) {
@@ -755,8 +803,9 @@ export class GameEngine {
             }
 
             enemy.isAggro = inAggro;
-            // Always fill ATB gauge so enemy can act autonomously 
-            enemy.actionGauge = Math.min(100, enemy.actionGauge + enemy.stats.spd * dt * timeScale);
+            // ATB scales by level: Lv.1 = 50% speed, gradually → 100% at Lv.70
+            const atbScale = 0.5 + 0.5 * (Math.min(enemy.level, 70) / 70);
+            enemy.actionGauge = Math.min(100, enemy.actionGauge + enemy.stats.spd * dt * timeScale * atbScale);
             
             if (enemy.actionGauge >= 100) {
                 enemy.actionGauge = 0;
@@ -779,6 +828,11 @@ export class GameEngine {
                         };
 
                         if (TILE_PROPERTIES[tile] && TILE_PROPERTIES[tile].walkable && !isOccupied(targetX, targetY)) {
+                            // Update enemy facing on roam
+                            if (targetX > enemy.gridX) enemy.facing = 'right';
+                            else if (targetX < enemy.gridX) enemy.facing = 'left';
+                            else if (targetY > enemy.gridY) enemy.facing = 'down';
+                            else if (targetY < enemy.gridY) enemy.facing = 'up';
                             enemy.gridX = targetX;
                             enemy.gridY = targetY;
                         }
@@ -947,7 +1001,13 @@ export class GameEngine {
             if (!hitUI && this.moveMode) {
                 const tileKey = `${this.hoverTileX},${this.hoverTileY}`;
                 if (this.walkableTiles.has(tileKey)) {
-                    // Move player to clicked tile
+                    // Update player facing based on movement direction
+                    const moveDir = { dx: this.hoverTileX - this.player.gridX, dy: this.hoverTileY - this.player.gridY };
+                    if (Math.abs(moveDir.dx) >= Math.abs(moveDir.dy)) {
+                        this.player.facing = moveDir.dx > 0 ? 'right' : 'left';
+                    } else {
+                        this.player.facing = moveDir.dy > 0 ? 'down' : 'up';
+                    }
                     this.player.gridX = this.hoverTileX;
                     this.player.gridY = this.hoverTileY;
                     this.selectedTarget = this.player;
@@ -967,6 +1027,7 @@ export class GameEngine {
                     const worldY = this.player.gridY * TILE_SIZE + TILE_SIZE / 2;
                     this.worldMap.updateLoadedChunks(worldX, worldY);
                     this.checkLootAndExtraction();
+                    this.checkHazardTile(); // poison swamp etc.
                     this.network.sendMove(this.player.gridX, this.player.gridY);
                     this.addCombatLog(`이동 완료 (${this.player.gridX}, ${this.player.gridY})`);
 
@@ -992,18 +1053,30 @@ export class GameEngine {
                         this.selectedTarget = target;
                         const defTile = this.worldMap.getTileAt(target.gridX, target.gridY);
                         const result = CombatFormulas.calcPhysicalDamage(combatStats, target.stats, defTile);
+                        // Directional attack bonus (backstab/side)
+                        const dirBonus = CombatFormulas.getDirectionalMultiplier(
+                            this.player.gridX, this.player.gridY,
+                            target.gridX, target.gridY, target.facing
+                        );
+                        if (!result.isMiss) result.damage = Math.max(1, Math.floor(result.damage * dirBonus.multiplier));
                         if (result.isMiss) {
                             this.addCombatLog(`빗나감! ${target.name} 공격 실패`);
+                            this.floatingText.spawnDamage(target.gridX, target.gridY, 0, false, true);
+                            sfxMiss();
                         } else {
                             const dead = target.takeDamage(result.damage);
                             const critText = result.isCrit ? ' CRIT!' : '';
-                            this.addCombatLog(`${target.name}에게 ${result.damage} 데미지!${critText} (HP: ${target.stats.hp}/${target.stats.maxHp})`);
+                            const dirText = dirBonus.label ? ` [${dirBonus.label}]` : '';
+                            this.addCombatLog(`${target.name}에게 ${result.damage} 데미지!${critText}${dirText} (HP: ${target.stats.hp}/${target.stats.maxHp})`);
+                            this.floatingText.spawnDamage(target.gridX, target.gridY, result.damage, result.isCrit, false);
+                            if (result.isCrit) sfxCritical(); else sfxHit();
                             if (dead) {
                                 this.addCombatLog(`${target.name} 처치! +${target.expReward} EXP`);
                                 if (activeChar) {
                                     const expResult = activeChar.gainExp(target.expReward);
                                     if (expResult.leveledUp) {
                                         this.addCombatLog(`Level Up! ${activeChar.name} Lv.${activeChar.level}`);
+                                        sfxLevelUp();
                                         this.playerStats = activeChar.stats;
                                     }
                                     if (expResult.promoted) {
@@ -1163,11 +1236,21 @@ export class GameEngine {
             case 'magic': {
                 const active = this.party.getActive();
                 if (!active) { this.addCombatLog('활성 캐릭터 없음'); break; }
+                // Collect all unlocked skill IDs up to current tier from ClassTree
+                const cl = getClassLine(active.classLineId);
+                const unlocked: string[] = [];
+                if (cl) {
+                    for (let t = 1; t <= active.currentTier; t++) {
+                        const ids = cl.skillUnlocks[t];
+                        if (ids) unlocked.push(...ids);
+                    }
+                }
                 this.magicUI.show(
                     active.classLineId,
                     active.currentTier,
                     this.playerStats.mp,
-                    this.playerStats.maxMp
+                    this.playerStats.maxMp,
+                    unlocked
                 );
                 break;
             }
@@ -1210,6 +1293,9 @@ export class GameEngine {
                     const healAmt = Math.floor(cbStats.magAtk * skill.power);
                     this.playerStats.hp = Math.min(this.playerStats.maxHp, this.playerStats.hp + healAmt);
                     this.addCombatLog(`${skill.icon} ${skill.nameKr}: HP +${healAmt} 회복`);
+                    this.floatingText.spawnHeal(this.player.gridX, this.player.gridY, healAmt);
+                    sfxHeal();
+                    this.effectManager.spawnHealEffect(this.player.gridX, this.player.gridY);
                 }
                 break;
             }
@@ -1217,6 +1303,8 @@ export class GameEngine {
                 if (activeChar) {
                     activeChar.applyBuff(skill);
                     this.addCombatLog(`${skill.icon} ${skill.nameKr}: 버프/보호 발동!`);
+                    sfxBuff();
+                    this.effectManager.spawnBuffEffect(this.player.gridX, this.player.gridY);
                 }
                 break;
             }
@@ -1229,7 +1317,10 @@ export class GameEngine {
                 // Also deal minor damage
                 const dmg = Math.floor(cbStats.magAtk * 0.5);
                 const dead = targetEnemy.takeDamage(dmg);
+                this.floatingText.spawnDamage(targetEnemy.gridX, targetEnemy.gridY, dmg, false, false);
                 this.addCombatLog(`${targetEnemy.name}에게 ${dmg} 추가 피해`);
+                sfxDebuff();
+                this.effectManager.spawnDebuffEffect(targetEnemy.gridX, targetEnemy.gridY);
                 if (dead) this.handleEnemyKill(targetEnemy);
                 break;
             }
@@ -1241,7 +1332,11 @@ export class GameEngine {
                 const rawDmg = Math.floor(baseAtk * skill.power - baseDef * 0.5);
                 const dmg = Math.max(1, rawDmg);
                 const dead = targetEnemy.takeDamage(dmg);
+                this.floatingText.spawnDamage(targetEnemy.gridX, targetEnemy.gridY, dmg, false, false);
                 this.addCombatLog(`${skill.icon} ${skill.nameKr}: ${targetEnemy.name}에게 ${dmg} 피해! (HP: ${targetEnemy.stats.hp}/${targetEnemy.stats.maxHp})`);
+                // SFX + visual effect by element
+                if (skill.id === 'og_hpdrain' || skill.id === 'og_mpdrain') { sfxDrain(); this.effectManager.spawnDarkEffect(targetEnemy.gridX, targetEnemy.gridY); }
+                else { sfxByElement(skill.element); this.effectManager.spawnByElement(skill.element, targetEnemy.gridX, targetEnemy.gridY); }
                 if (dead) this.handleEnemyKill(targetEnemy);
                 break;
             }
@@ -1259,12 +1354,16 @@ export class GameEngine {
                     }
                 }
                 this.addCombatLog(`${skill.icon} ${skill.nameKr}: ${targets.length}체 대상!`);
+                // AoE SFX + visual effect
+                if (skill.id === 'og_meteor') sfxMeteor(); else sfxByElement(skill.element);
+                this.effectManager.spawnByElement(skill.element, targetEnemy.gridX, targetEnemy.gridY);
                 const killList: Enemy[] = [];
                 for (const t of targets) {
                     const tDef = isPhys ? t.stats.def : t.stats.magDef;
                     const rawD = Math.floor(atkStat * skill.power - tDef * 0.5);
                     const d = Math.max(1, rawD);
                     const dead = t.takeDamage(d);
+                    this.floatingText.spawnDamage(t.gridX, t.gridY, d, false, false);
                     this.addCombatLog(`  ${t.name}: ${d} 피해 (HP: ${t.stats.hp}/${t.stats.maxHp})`);
                     if (dead) killList.push(t);
                 }
@@ -1285,8 +1384,10 @@ export class GameEngine {
         this.autoSwitchToReady();
     }
 
-    /** Handle enemy kill — grant EXP, loot, remove from list */
+    /** Handle enemy kill — grant EXP, loot, remove from list, play kill SFX + fadeout */
     private handleEnemyKill(enemy: Enemy): void {
+        sfxKill();
+        this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
         this.addCombatLog(`${enemy.name} 처치! +${enemy.expReward} EXP`);
         const active = this.party.getActive();
         if (active) {
@@ -1294,10 +1395,12 @@ export class GameEngine {
             if (expResult.leveledUp) {
                 this.addCombatLog(`${active.name} 레벨 업! Lv.${active.level}`);
                 this.playerStats = active.stats; // refresh
+                sfxLevelUp();
             }
             if (expResult.promoted) {
                 this.addCombatLog(`⚡ ${active.name} 승급! → ${expResult.newTierName}`);
                 this.triggerPromotionFlash();
+                sfxPromotion();
             }
         }
         if (enemy.isBoss && enemy.lootTableId) {
@@ -1378,10 +1481,12 @@ export class GameEngine {
 
                 if (result.isMiss) {
                     this.addCombatLog(`Miss! Attack on ${enemy.label} missed.`);
+                    this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, 0, false, true);
                 } else {
                     const dead = enemy.takeDamage(result.damage);
                     const critText = result.isCrit ? ' CRIT!' : '';
                     this.addCombatLog(`Hit ${enemy.label} for ${result.damage} dmg!${critText}`);
+                    this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, result.damage, result.isCrit, false);
 
                     if (dead) {
                         this.addCombatLog(`${enemy.label} defeated! +${enemy.expReward} EXP`);
@@ -1434,9 +1539,17 @@ export class GameEngine {
             this.selectedTarget = targetPlayer;
             const defTile = this.worldMap.getTileAt(targetPlayer.gridX, targetPlayer.gridY);
             const result = CombatFormulas.calcPhysicalDamage(enemy.stats, targetChar.stats, defTile);
+            // Directional attack bonus for enemies too
+            const dirBonus = CombatFormulas.getDirectionalMultiplier(
+                enemy.gridX, enemy.gridY,
+                targetPlayer.gridX, targetPlayer.gridY, targetPlayer.facing
+            );
+            if (!result.isMiss) result.damage = Math.max(1, Math.floor(result.damage * dirBonus.multiplier));
             if (!result.isMiss) {
                 targetChar.stats.hp = Math.max(0, targetChar.stats.hp - result.damage);
                 this.addCombatLog(`${enemy.name} ${t('log.hitYou').replace('{dmg}', String(result.damage))} [${targetChar.name}]`);
+                this.floatingText.spawnDamage(targetPlayer.gridX, targetPlayer.gridY, result.damage, result.isCrit, false);
+                if (result.isCrit) sfxCritical(); else sfxHit();
                 if (targetChar.stats.hp <= 0) {
                     targetChar.isDead = true;
                     targetChar.exp = 0; // EXP reset on death
@@ -1464,6 +1577,8 @@ export class GameEngine {
                 }
             } else {
                 this.addCombatLog(`${enemy.name} ${t('log.missedYou')}`);
+                this.floatingText.spawnDamage(targetPlayer.gridX, targetPlayer.gridY, 0, false, true);
+                sfxMiss();
             }
         } else {
             // Move toward player
@@ -1545,6 +1660,7 @@ export class GameEngine {
                 active.stats.hp = Math.min(active.stats.maxHp, active.stats.hp + healAmt);
                 this.playerStats = active.stats;
                 this.addCombatLog(`💚 힐 링: HP +${healAmt} 회복`);
+                this.floatingText.spawnHeal(this.player.gridX, this.player.gridY, healAmt);
             }
         }
     }
@@ -1565,6 +1681,49 @@ export class GameEngine {
                 this.raidResult = 'WIN';
                 this.state = GameState.RESULTS;
                 return;
+            }
+        }
+
+        // Check for town tile (extraction via town)
+        const currentTile = this.worldMap.getTileAt(this.player.gridX, this.player.gridY);
+        if (currentTile === TileType.TOWN && this.state === GameState.RAID) {
+            // Determine which town the player entered
+            const towns = this.worldMap.getTowns();
+            const playerChunkX = Math.floor(this.player.gridX / 32);
+            const playerChunkY = Math.floor(this.player.gridY / 32);
+            const enteredTown = towns.find(t => {
+                const dx = playerChunkX - t.chunkX;
+                const dy = playerChunkY - t.chunkY;
+                return Math.sqrt(dx * dx + dy * dy) <= t.radius;
+            });
+
+            if (enteredTown) {
+                if (enteredTown.id === this.departureTownId) {
+                    // Cannot return to the departure town!
+                    this.addCombatLog(`⚠️ ${enteredTown.nameKr}: 출격한 마을로는 귀환 불가!`);
+                } else {
+                    // Enter the town (M&B style)
+                    this.addCombatLog(`🏰 ${enteredTown.nameKr}에 도착!`);
+                    this.enterTown(enteredTown);
+                    return;
+                }
+            }
+        }
+    }
+
+    /** Check for environmental hazards on the current tile */
+    private checkHazardTile(): void {
+        const tile = this.worldMap.getTileAt(this.player.gridX, this.player.gridY);
+        const props = TILE_PROPERTIES[tile];
+
+        if (props.hazard === 'poison') {
+            const poisonDmg = Math.max(5, Math.floor(this.playerStats.maxHp * 0.05));
+            this.playerStats.hp = Math.max(1, this.playerStats.hp - poisonDmg);
+            this.addCombatLog(`☠️ 독 늪지대! HP -${poisonDmg}`);
+
+            // Check if dead from poison
+            if (this.playerStats.hp <= 1) {
+                this.addCombatLog('독에 의해 쓰러질 뻔했다...');
             }
         }
     }
@@ -1653,6 +1812,12 @@ export class GameEngine {
 
         if (this.state === GameState.RESULTS) {
             this.renderResults();
+            this.ctx.restore();
+            return;
+        }
+
+        if (this.state === GameState.TOWN_VISIT) {
+            this.townUI.render(this.ctx, vw, vh);
             this.ctx.restore();
             return;
         }
@@ -1794,6 +1959,10 @@ export class GameEngine {
             camX, camY,
             renderW, renderH
         );
+
+        // 7.56 Floating combat text (above fog, below HUD)
+        this.effectManager.render(this.ctx, this.camera);
+        this.floatingText.render(this.ctx, camX, camY);
 
         // 7.6 Render action menu (if open) or shoe indicator (if ATB ready)
         const playerSX = this.player.gridX * TILE_SIZE - camX;
@@ -2112,7 +2281,8 @@ export class GameEngine {
         this.charUI.render(this.ctx, width, height);
         this.magicUI.render(this.ctx, width, height);
 
-        // 15. Entity Info tracking pop-up
+        // 15. Entity Info tracking pop-up — gather display info (render later in scaled context)
+        let entityDisplayInfo: EntityDisplayInfo | null = null;
         if (this.selectedTarget) {
             let displayInfo: EntityDisplayInfo;
             // Check if selectedTarget is a party member (Player entity)
@@ -2190,7 +2360,7 @@ export class GameEngine {
                     spriteColor: enemy.color
                 };
             }
-            this.entityInfoUI.render(this.ctx, displayInfo);
+            entityDisplayInfo = displayInfo;
         }
         // === UI OVERLAYS (scaled) ===
         this.ctx.save();
@@ -2229,6 +2399,11 @@ export class GameEngine {
 
         // Update EntityInfoUI position to stack below
         this.entityInfoUI.setPosition(panelX, curY);
+
+        // Render Entity Info (now properly positioned in scaled context)
+        if (entityDisplayInfo) {
+            this.entityInfoUI.render(this.ctx, entityDisplayInfo);
+        }
 
         this.ctx.textAlign = 'start';
         this.ctx.textBaseline = 'alphabetic';
@@ -2415,6 +2590,33 @@ export class GameEngine {
         // Disconnect from server when returning to lobby
         this.network.disconnect();
         this.remotePlayers.clear();
+    }
+
+    /** Enter a town during a raid (M&B / Uncharted Waters style) */
+    private enterTown(town: TownInfo): void {
+        this.state = GameState.TOWN_VISIT;
+        this.townUI.show(town);
+    }
+
+    /** Deploy from a visited town back to the raid field */
+    private deployFromTown(): void {
+        // Record this town as new departure (can't come back)
+        const towns = this.worldMap.getTowns();
+        const playerChunkX = Math.floor(this.player.gridX / 32);
+        const playerChunkY = Math.floor(this.player.gridY / 32);
+        const currentTown = towns.find(town => {
+            const dx = playerChunkX - town.chunkX;
+            const dy = playerChunkY - town.chunkY;
+            return Math.sqrt(dx * dx + dy * dy) <= town.radius;
+        });
+        this.departureTownId = currentTown?.id || '';
+
+        // Heal at town (partial heal like inn)
+        this.playerStats.hp = Math.min(this.playerStats.maxHp, this.playerStats.hp + Math.floor(this.playerStats.maxHp * 0.3));
+        this.addCombatLog(`🏨 마을에서 휴식: HP 30% 회복`);
+
+        this.state = GameState.RAID;
+        this.addCombatLog(`⚔️ ${currentTown?.nameKr || '마을'}에서 출격!`);
     }
 
     private setupNetworkCallbacks(): void {

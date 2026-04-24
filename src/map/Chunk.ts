@@ -10,7 +10,7 @@ import { SettingsManager } from '../engine/SettingsManager';
 import { TileAssetManager } from './TileAssetManager';
 
 export const CHUNK_SIZE = 32; // tiles per chunk side
-export const TILE_SIZE = 32;  // pixels per tile
+export const TILE_SIZE = 48;  // pixels per tile (Upgraded to MV/MZ standard)
 
 export class Chunk {
     public readonly chunkX: number; // chunk coordinate (not pixel)
@@ -52,65 +52,139 @@ export class Chunk {
             this.renderToBuffer(getGlobalTile);
             this.dirty = false;
         }
-        ctx.drawImage(this.buffer, screenX, screenY);
+        ctx.drawImage(this.buffer, Math.round(screenX), Math.round(screenY));
     }
 
     private renderToBuffer(getGlobalTile: (x: number, y: number) => TileType): void {
+        // Helper: is this a water-family tile?
+        const isWaterType = (t: TileType) => t === TileType.WATER || t === TileType.DEEP_WATER;
+
+        // ── Pass 1: Base fill for every tile ──
+        for (let y = 0; y < CHUNK_SIZE; y++) {
+            for (let x = 0; x < CHUNK_SIZE; x++) {
+                const tileType = this.tiles[y][x];
+                if (tileType === TileType.DEEP_WATER) {
+                    // Far from coast → Deep Sea #0 (dark blue ocean)
+                    TileAssetManager.drawTile(this.bufferCtx, TileType.DEEP_WATER, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE);
+                } else if (tileType === TileType.WATER) {
+                    // Near coast → Sea #0 (lighter blue)
+                    TileAssetManager.drawTile(this.bufferCtx, TileType.WATER, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE);
+                } else {
+                    // Land tiles get grass base
+                    TileAssetManager.drawTile(this.bufferCtx, TileType.GRASS, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE);
+                }
+            }
+        }
+
+        // ── Pass 2: Alpha-blend transition at Sea/Deep Sea boundary ──
+        // Draw the neighboring water type at reduced opacity for smooth gradient
+        const prevAlpha = this.bufferCtx.globalAlpha;
+        for (let y = 0; y < CHUNK_SIZE; y++) {
+            for (let x = 0; x < CHUNK_SIZE; x++) {
+                const tileType = this.tiles[y][x];
+                if (!isWaterType(tileType)) continue;
+
+                const worldX = this.chunkX * CHUNK_SIZE + x;
+                const worldY = this.chunkY * CHUNK_SIZE + y;
+                const px = x * TILE_SIZE;
+                const py = y * TILE_SIZE;
+
+                // Check 4 cardinal neighbors for a different water type
+                let hasOtherWater = false;
+                for (const [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0]]) {
+                    const nt = getGlobalTile(worldX + dx, worldY + dy);
+                    if (isWaterType(nt) && nt !== tileType) {
+                        hasOtherWater = true;
+                        break;
+                    }
+                }
+                if (!hasOtherWater) continue;
+
+                // Blend: overlay the OTHER water type at reduced opacity
+                if (tileType === TileType.DEEP_WATER) {
+                    this.bufferCtx.globalAlpha = 0.4;
+                    TileAssetManager.drawTile(this.bufferCtx, TileType.WATER, px, py, TILE_SIZE);
+                } else {
+                    this.bufferCtx.globalAlpha = 0.35;
+                    TileAssetManager.drawTile(this.bufferCtx, TileType.DEEP_WATER, px, py, TILE_SIZE);
+                }
+            }
+        }
+        this.bufferCtx.globalAlpha = prevAlpha;
+
+        // ── Pass 3: Sea autotile on COASTLINE tiles only ──
+        // Sea autotile has beach edges — only on WATER tiles bordering land
+        for (let y = 0; y < CHUNK_SIZE; y++) {
+            for (let x = 0; x < CHUNK_SIZE; x++) {
+                const tileType = this.tiles[y][x];
+                if (tileType !== TileType.WATER) continue;
+
+                const px = x * TILE_SIZE;
+                const py = y * TILE_SIZE;
+                const worldX = this.chunkX * CHUNK_SIZE + x;
+                const worldY = this.chunkY * CHUNK_SIZE + y;
+
+                // Check if this water tile borders any non-water tile
+                const isWaterNeighbor = (nx: number, ny: number) => isWaterType(getGlobalTile(nx, ny));
+                const n_w  = isWaterNeighbor(worldX,     worldY - 1);
+                const ne_w = isWaterNeighbor(worldX + 1, worldY - 1);
+                const e_w  = isWaterNeighbor(worldX + 1, worldY);
+                const se_w = isWaterNeighbor(worldX + 1, worldY + 1);
+                const s_w  = isWaterNeighbor(worldX,     worldY + 1);
+                const sw_w = isWaterNeighbor(worldX - 1, worldY + 1);
+                const w_w  = isWaterNeighbor(worldX - 1, worldY);
+                const nw_w = isWaterNeighbor(worldX - 1, worldY - 1);
+
+                // If ALL 8 neighbors are water → interior tile → skip
+                if (n_w && ne_w && e_w && se_w && s_w && sw_w && w_w && nw_w) continue;
+
+                // Coastline tile: draw Sea autotile with proper neighbor detection
+                TileAssetManager.drawAutotile(
+                    this.bufferCtx, TileType.WATER, px, py, TILE_SIZE,
+                    n_w, ne_w, e_w, se_w, s_w, sw_w, w_w, nw_w
+                );
+            }
+        }
+
+        // ── Pass 4: Land tile autotile (ALL tiles, proper bitmasking) ──
+        // Every land tile gets the correct autotile shape via 8-direction neighbor check
+        for (let y = 0; y < CHUNK_SIZE; y++) {
+            for (let x = 0; x < CHUNK_SIZE; x++) {
+                const tileType = this.tiles[y][x];
+                if (isWaterType(tileType)) continue; // Skip water (already rendered)
+
+                const px = x * TILE_SIZE;
+                const py = y * TILE_SIZE;
+                const worldX = this.chunkX * CHUNK_SIZE + x;
+                const worldY = this.chunkY * CHUNK_SIZE + y;
+
+                const isSame = (nx: number, ny: number) => getGlobalTile(nx, ny) === tileType;
+                const n  = isSame(worldX,     worldY - 1);
+                const ne = isSame(worldX + 1, worldY - 1);
+                const e  = isSame(worldX + 1, worldY);
+                const se = isSame(worldX + 1, worldY + 1);
+                const s  = isSame(worldX,     worldY + 1);
+                const sw = isSame(worldX - 1, worldY + 1);
+                const w  = isSame(worldX - 1, worldY);
+                const nw = isSame(worldX - 1, worldY - 1);
+
+                TileAssetManager.drawAutotile(
+                    this.bufferCtx, tileType, px, py, TILE_SIZE,
+                    n, ne, e, se, s, sw, w, nw
+                );
+            }
+        }
+
+        // ── Pass 3: World_B sprite overlay (objects) ──
         for (let y = 0; y < CHUNK_SIZE; y++) {
             for (let x = 0; x < CHUNK_SIZE; x++) {
                 const tileType = this.tiles[y][x];
                 const props = TILE_PROPERTIES[tileType];
-                
-                const img = TileAssetManager.getImage(tileType);
-                if (img) {
-                    this.bufferCtx.drawImage(img, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                } else {
-                    this.bufferCtx.fillStyle = props.color;
-                    this.bufferCtx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-                }
-
-                // Auto-blending with higher priority neighbors
-                const worldX = this.chunkX * CHUNK_SIZE + x;
-                const worldY = this.chunkY * CHUNK_SIZE + y;
-                
-                const neighbors = [
-                    { dx: 0, dy: -1, pos: 'N' },
-                    { dx: 0, dy: 1, pos: 'S' },
-                    { dx: -1, dy: 0, pos: 'W' },
-                    { dx: 1, dy: 0, pos: 'E' }
-                ];
-
-                for (const n of neighbors) {
-                    const nType = getGlobalTile(worldX + n.dx, worldY + n.dy);
-                    const nProps = TILE_PROPERTIES[nType];
-                    
-                    if (nProps && nProps.blendPriority > props.blendPriority) {
-                        const nImg = TileAssetManager.getImage(nType);
-                        if (nImg) {
-                            this.bufferCtx.save();
-                            this.bufferCtx.globalAlpha = 0.6; // fade the overlapping edge
-                            
-                            const edgeSize = 8;
-                            let sx, sy, sw, sh, dx, dy, dw, dh;
-                            
-                            if (n.pos === 'E') {
-                                sx = 0; sy = 0; sw = edgeSize; sh = TILE_SIZE;
-                                dx = x * TILE_SIZE + TILE_SIZE - edgeSize; dy = y * TILE_SIZE; dw = edgeSize; dh = TILE_SIZE;
-                            } else if (n.pos === 'W') {
-                                sx = TILE_SIZE - edgeSize; sy = 0; sw = edgeSize; sh = TILE_SIZE;
-                                dx = x * TILE_SIZE; dy = y * TILE_SIZE; dw = edgeSize; dh = TILE_SIZE;
-                            } else if (n.pos === 'S') {
-                                sx = 0; sy = 0; sw = TILE_SIZE; sh = edgeSize;
-                                dx = x * TILE_SIZE; dy = y * TILE_SIZE + TILE_SIZE - edgeSize; dw = TILE_SIZE; dh = edgeSize;
-                            } else { // 'N'
-                                sx = 0; sy = TILE_SIZE - edgeSize; sw = TILE_SIZE; sh = edgeSize;
-                                dx = x * TILE_SIZE; dy = y * TILE_SIZE; dw = TILE_SIZE; dh = edgeSize;
-                            }
-                            
-                            this.bufferCtx.drawImage(nImg, sx, sy, sw, sh, dx, dy, dw, dh);
-                            this.bufferCtx.restore();
-                        }
-                    }
+                if (props.worldBIndex !== undefined) {
+                    TileAssetManager.drawWorldBSprite(
+                        this.bufferCtx, props.worldBIndex,
+                        x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE
+                    );
                 }
             }
         }

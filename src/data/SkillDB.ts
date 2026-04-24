@@ -775,6 +775,229 @@ const ALCHEMIST_SKILLS: Skill[] = [
 ];
 
 // ═══════════════════════════════════════════════════════════
+//  원작 닥세월드 공용 마법 (Original Sin Eater Shared Magic)
+//  classId = 'shared' — 클래스별 습득은 ClassTree.skillUnlocks로 관리
+// ═══════════════════════════════════════════════════════════
+
+const ORIGINAL_MAGIC: Skill[] = [
+    // ── 공격 마법 (Damage) ──
+    {
+        id: 'og_fireball', nameKr: '파이어볼', nameEn: 'Fireball',
+        classId: 'shared', tier: 1, mpCost: 4,
+        type: 'damage', element: 'fire', power: 1.3,
+        range: 3, aoeRadius: 0, icon: '🔥',
+        descKr: '화염 구체를 발사하여 적에게 화속성 피해',
+        descEn: 'Launch a fireball dealing fire damage',
+    },
+    {
+        id: 'og_fire', nameKr: '파이어', nameEn: 'Fire',
+        classId: 'shared', tier: 4, mpCost: 12,
+        type: 'damage', element: 'fire', power: 2.0,
+        range: 3, aoeRadius: 0, icon: '🔥',
+        descKr: '강력한 화염 마법으로 적에게 큰 피해',
+        descEn: 'Powerful fire magic dealing heavy damage',
+    },
+    {
+        id: 'og_freeze', nameKr: '프리즈', nameEn: 'Freeze',
+        classId: 'shared', tier: 1, mpCost: 5,
+        type: 'damage', element: 'ice', power: 1.3,
+        range: 3, aoeRadius: 0, icon: '❄️',
+        descKr: '적을 얼려 빙속성 피해 + 속도 감소',
+        descEn: 'Freeze enemy: ice damage + speed down',
+    },
+    {
+        id: 'og_thunder', nameKr: '썬더', nameEn: 'Thunder',
+        classId: 'shared', tier: 2, mpCost: 7,
+        type: 'damage', element: 'lightning', power: 1.6,
+        range: 3, aoeRadius: 0, icon: '⚡',
+        descKr: '번개를 떨어뜨려 뇌속성 피해',
+        descEn: 'Call lightning bolt dealing thunder damage',
+    },
+    {
+        id: 'og_windcutter', nameKr: '윈드커터', nameEn: 'Wind Cutter',
+        classId: 'shared', tier: 2, mpCost: 6,
+        type: 'damage', element: 'wind', power: 1.5,
+        range: 3, aoeRadius: 0, icon: '🌀',
+        descKr: '진공의 칼날로 풍속성 피해',
+        descEn: 'Wind blade dealing wind damage',
+    },
+    {
+        id: 'og_poison', nameKr: '포이즌', nameEn: 'Poison',
+        classId: 'shared', tier: 2, mpCost: 6,
+        type: 'debuff', element: 'earth', power: 0.7,
+        range: 3, aoeRadius: 0, icon: '☠️',
+        descKr: '독을 주입하여 매턴 피해 + 공격력 감소',
+        descEn: 'Poison: DoT + ATK reduction',
+    },
+
+    // ── 범위 공격 마법 (AoE) ──
+    {
+        id: 'og_blizzard', nameKr: '블리자드', nameEn: 'Blizzard',
+        classId: 'shared', tier: 3, mpCost: 14,
+        type: 'aoe', element: 'ice', power: 1.6,
+        range: 3, aoeRadius: 1, icon: '🌨️',
+        descKr: '눈보라를 일으켜 범위 빙속성 피해',
+        descEn: 'Blizzard: AoE ice damage',
+    },
+    {
+        id: 'og_thunderstorm', nameKr: '썬더스톰', nameEn: 'Thunderstorm',
+        classId: 'shared', tier: 4, mpCost: 18,
+        type: 'aoe', element: 'lightning', power: 1.8,
+        range: 3, aoeRadius: 1, icon: '⛈️',
+        descKr: '뇌폭풍을 일으켜 범위 뇌속성 피해',
+        descEn: 'Thunderstorm: AoE lightning damage',
+    },
+    {
+        id: 'og_tornado', nameKr: '토네이도', nameEn: 'Tornado',
+        classId: 'shared', tier: 5, mpCost: 20,
+        type: 'aoe', element: 'wind', power: 2.0,
+        range: 3, aoeRadius: 1, icon: '🌪️',
+        descKr: '거대한 회오리바람으로 범위 풍속성 피해',
+        descEn: 'Tornado: AoE wind damage',
+    },
+    {
+        id: 'og_earthquake', nameKr: '어스퀘이크', nameEn: 'Earthquake',
+        classId: 'shared', tier: 5, mpCost: 22,
+        type: 'aoe', element: 'earth', power: 2.2,
+        range: 3, aoeRadius: 2, icon: '🌋',
+        descKr: '대지를 흔들어 넓은 범위 지속성 피해',
+        descEn: 'Earthquake: wide AoE earth damage',
+    },
+    {
+        id: 'og_meteor', nameKr: '메테오', nameEn: 'Meteor',
+        classId: 'shared', tier: 7, mpCost: 35,
+        type: 'aoe', element: 'fire', power: 3.5,
+        range: 4, aoeRadius: 2, icon: '☄️',
+        descKr: '메테오! 광범위 최강 화속성 마법',
+        descEn: 'Meteor! Ultimate wide AoE fire magic',
+    },
+
+    // ── 회복 마법 (Heal) ──
+    {
+        id: 'og_heal', nameKr: '힐', nameEn: 'Heal',
+        classId: 'shared', tier: 1, mpCost: 5,
+        type: 'heal', element: 'holy', power: 1.5,
+        range: 0, aoeRadius: 0, icon: '💚',
+        descKr: 'HP를 마공의 1.5배만큼 회복',
+        descEn: 'Restore HP by 1.5x magic attack',
+    },
+    {
+        id: 'og_forceheal', nameKr: '포스힐', nameEn: 'Force Heal',
+        classId: 'shared', tier: 5, mpCost: 18,
+        type: 'heal', element: 'holy', power: 3.0,
+        range: 0, aoeRadius: 0, icon: '💛',
+        descKr: 'HP를 마공의 3배만큼 대량 회복',
+        descEn: 'Restore HP by 3x magic attack',
+    },
+    {
+        id: 'og_cure', nameKr: '큐어', nameEn: 'Cure',
+        classId: 'shared', tier: 3, mpCost: 10,
+        type: 'heal', element: 'holy', power: 2.0,
+        range: 0, aoeRadius: 0, icon: '✨',
+        descKr: 'HP 회복 + 상태이상 해제',
+        descEn: 'Restore HP + cleanse debuffs',
+    },
+
+    // ── 버프 마법 (Buff) ──
+    {
+        id: 'og_attack', nameKr: '어택', nameEn: 'Attack Up',
+        classId: 'shared', tier: 2, mpCost: 7,
+        type: 'buff', element: 'none', power: 1.3,
+        range: 0, aoeRadius: 0, icon: '⚔️',
+        descKr: '공격력 30% 증가 (4턴)',
+        descEn: 'ATK +30% for 4 turns',
+        buffStat: 'atk', buffDuration: 4
+    },
+    {
+        id: 'og_protection', nameKr: '프로텍션', nameEn: 'Protection',
+        classId: 'shared', tier: 2, mpCost: 7,
+        type: 'buff', element: 'none', power: 1.3,
+        range: 0, aoeRadius: 0, icon: '🛡️',
+        descKr: '방어력 30% 증가 (4턴)',
+        descEn: 'DEF +30% for 4 turns',
+        buffStat: 'def', buffDuration: 4
+    },
+    {
+        id: 'og_quick', nameKr: '퀵', nameEn: 'Quick',
+        classId: 'shared', tier: 4, mpCost: 10,
+        type: 'buff', element: 'none', power: 1.4,
+        range: 0, aoeRadius: 0, icon: '💨',
+        descKr: '속도 40% 증가 (4턴)',
+        descEn: 'SPD +40% for 4 turns',
+        buffStat: 'spd', buffDuration: 4
+    },
+    {
+        id: 'og_resist', nameKr: '레지스트', nameEn: 'Resist',
+        classId: 'shared', tier: 5, mpCost: 12,
+        type: 'buff', element: 'none', power: 1.4,
+        range: 0, aoeRadius: 0, icon: '🔰',
+        descKr: '마법 방어 40% 증가 (4턴)',
+        descEn: 'MDEF +40% for 4 turns',
+        buffStat: 'mdef', buffDuration: 4
+    },
+
+    // ── 디버프/특수 마법 ──
+    {
+        id: 'og_slow', nameKr: '슬로우', nameEn: 'Slow',
+        classId: 'shared', tier: 4, mpCost: 8,
+        type: 'debuff', element: 'none', power: 0.6,
+        range: 3, aoeRadius: 0, icon: '🐌',
+        descKr: '적의 속도를 40% 감소시킨다',
+        descEn: 'Reduce enemy SPD by 40%',
+    },
+    {
+        id: 'og_demove', nameKr: '디무브', nameEn: 'De-Move',
+        classId: 'shared', tier: 4, mpCost: 8,
+        type: 'debuff', element: 'none', power: 0.5,
+        range: 3, aoeRadius: 0, icon: '🚫',
+        descKr: '적의 이동력을 대폭 감소',
+        descEn: 'Greatly reduce enemy movement',
+    },
+    {
+        id: 'og_deattack', nameKr: '디어택', nameEn: 'De-Attack',
+        classId: 'shared', tier: 2, mpCost: 7,
+        type: 'debuff', element: 'none', power: 0.7,
+        range: 3, aoeRadius: 0, icon: '⬇️',
+        descKr: '적의 공격력을 30% 감소',
+        descEn: 'Reduce enemy ATK by 30%',
+    },
+    {
+        id: 'og_mute', nameKr: '뮤트', nameEn: 'Mute',
+        classId: 'shared', tier: 5, mpCost: 14,
+        type: 'debuff', element: 'none', power: 0.0,
+        range: 3, aoeRadius: 0, icon: '🔇',
+        descKr: '적의 마법 사용을 봉인 (3턴간 마공 0)',
+        descEn: 'Seal enemy magic for 3 turns',
+    },
+    {
+        id: 'og_antiresist', nameKr: '앤티레지스트', nameEn: 'Anti-Resist',
+        classId: 'shared', tier: 4, mpCost: 10,
+        type: 'debuff', element: 'none', power: 0.5,
+        range: 3, aoeRadius: 0, icon: '💔',
+        descKr: '적의 마법 방어를 50% 감소',
+        descEn: 'Reduce enemy MDEF by 50%',
+    },
+
+    // ── 드레인 마법 ──
+    {
+        id: 'og_hpdrain', nameKr: 'HP드레인', nameEn: 'HP Drain',
+        classId: 'shared', tier: 6, mpCost: 16,
+        type: 'damage', element: 'dark', power: 1.8,
+        range: 3, aoeRadius: 0, icon: '🧛',
+        descKr: '적의 HP를 빨아들여 자신의 HP로 전환',
+        descEn: 'Drain enemy HP and restore own HP',
+    },
+    {
+        id: 'og_mpdrain', nameKr: 'MP드레인', nameEn: 'MP Drain',
+        classId: 'shared', tier: 3, mpCost: 0,
+        type: 'damage', element: 'dark', power: 1.0,
+        range: 3, aoeRadius: 0, icon: '💜',
+        descKr: '적의 MP를 빨아들여 자신의 MP로 전환',
+        descEn: 'Drain enemy MP and restore own MP',
+    },
+];
+
+// ═══════════════════════════════════════════════════════════
 //  All Skills Combined
 // ═══════════════════════════════════════════════════════════
 
@@ -791,6 +1014,7 @@ export const ALL_SKILLS: Skill[] = [
     ...MAGE_SKILLS,
     ...CULTIST_SKILLS,
     ...ALCHEMIST_SKILLS,
+    ...ORIGINAL_MAGIC,
 ];
 
 /** Get all skills for a specific class */
@@ -798,9 +1022,23 @@ export function getSkillsForClass(classId: string): Skill[] {
     return ALL_SKILLS.filter(s => s.classId === classId);
 }
 
-/** Get skills that a character has learned (tier <= characterTier) */
-export function getLearnedSkills(classId: string, characterTier: number): Skill[] {
-    return ALL_SKILLS.filter(s => s.classId === classId && s.tier <= characterTier);
+/**
+ * Get skills that a character has learned (class-specific + shared original magic).
+ * Shared magic is resolved via ClassTree.skillUnlocks.
+ */
+export function getLearnedSkills(classId: string, characterTier: number, unlockedSkillIds?: string[]): Skill[] {
+    // Class-specific skills (filtered by classId and tier)
+    const classSkills = ALL_SKILLS.filter(s => s.classId === classId && s.tier <= characterTier);
+
+    // Shared original magic (resolved from ClassTree.skillUnlocks)
+    if (unlockedSkillIds && unlockedSkillIds.length > 0) {
+        const sharedSkills = ALL_SKILLS.filter(
+            s => s.classId === 'shared' && unlockedSkillIds.includes(s.id)
+        );
+        return [...classSkills, ...sharedSkills];
+    }
+
+    return classSkills;
 }
 
 /** Lookup a single skill by ID */

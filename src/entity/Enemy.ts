@@ -75,6 +75,11 @@ export class Enemy extends Entity {
         const tile = getTile(newX, newY);
         const walkable = TILE_PROPERTIES[tile] && TILE_PROPERTIES[tile].walkable;
         if (walkable && (!isOccupied || !isOccupied(newX, newY))) {
+            // Update facing BEFORE changing position
+            if (newX > this.gridX) this.facing = 'right';
+            else if (newX < this.gridX) this.facing = 'left';
+            else if (newY > this.gridY) this.facing = 'down';
+            else if (newY < this.gridY) this.facing = 'up';
             this.gridX = newX;
             this.gridY = newY;
             return true;
@@ -93,6 +98,11 @@ export class Enemy extends Entity {
             const tile2 = getTile(newX, newY);
             const walk2 = TILE_PROPERTIES[tile2] && TILE_PROPERTIES[tile2].walkable;
             if (walk2 && (!isOccupied || !isOccupied(newX, newY))) {
+                // Update facing BEFORE changing position
+                if (newX > this.gridX) this.facing = 'right';
+                else if (newX < this.gridX) this.facing = 'left';
+                else if (newY > this.gridY) this.facing = 'down';
+                else if (newY < this.gridY) this.facing = 'up';
                 this.gridX = newX;
                 this.gridY = newY;
                 return true;

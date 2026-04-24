@@ -33,12 +33,16 @@ const MINI_TILE_COLORS: Record<TileType, string> = {
     [TileType.GRASS]:  '#5a9a5a',
     [TileType.STONE]:  '#7a7a7a',
     [TileType.WATER]:  '#3498db',
+    [TileType.DEEP_WATER]: '#1a5276',
     [TileType.WALL]:   '#1a1a1a',
     [TileType.LAVA]:   '#e74c3c',
     [TileType.SAND]:   '#e8c882',
     [TileType.FOREST]: '#2d6b2d',
     [TileType.ROAD]:   '#a08868',
     [TileType.SNOW]:   '#ffffff',
+    [TileType.POISON_SWAMP]: '#6a3d7c',
+    [TileType.TOWN]:   '#dab050',
+    [TileType.DUNGEON_ENTRANCE]: '#8c3d6a',
 };
 
 export class MinimapUI {
