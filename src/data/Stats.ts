@@ -17,7 +17,7 @@ export interface CharacterStats {
     critRate: number; // base crit% (0-100)
     
     // Extended Stats for Classic UI
-    actionLimit: number; // 행동제한
+    actionLimit: number; // 행동제한: per-turn AP budget
     evasion: number;     // 회피율
     magHit: number;      // 마법명중
     magEva: number;      // 마법회피

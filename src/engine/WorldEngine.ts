@@ -19,17 +19,22 @@ import { getItemDef } from '../data/ItemDB';
 import { getClassLine } from '../data/ClassTree';
 import { CombatFormulas } from '../combat/CombatFormulas';
 import { UI, renderGameTitle, Parchment, drawParchmentPanel, drawGlassPanel } from '../ui/UITheme';
+import { ActionMenuUI, ActionType } from '../ui/ActionMenuUI';
+import { EntityDisplayInfo, EntityInfoUI } from '../ui/EntityInfoUI';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { FieldPassableQuery, TilePoint, findPath, findPathToAny, isInRange, manhattan, tilesInRange } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
-import { advanceAtb, resolveAggroState, shouldAssistTarget } from '../field/FieldCombat';
+import { advanceAtb, resolveAggroState } from '../field/FieldCombat';
+import { ATTACK_AP_COST, INTERACT_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getMoveApCost, hasExecutableFieldAction } from '../field/FieldActionEconomy';
 
 interface FieldIntent {
-    kind: 'move' | 'attack' | 'interact';
+    kind: 'move' | 'attack' | 'interact' | 'rest' | 'wait';
     tile?: TilePoint;
+    path?: TilePoint[];
     enemyId?: string;
     lootId?: string;
+    apCost?: number;
 }
 
 interface FieldActor {
@@ -58,7 +63,6 @@ const FIELD_ATB_SCALE = 10;
 const ENEMY_AGGRO_RANGE = 6;
 const ENEMY_EXIT_RANGE = 10;
 const ENEMY_LEASH_RANGE = 16;
-const ASSIST_LEASH = 7;
 const MOVEMENT_REPATH_INTERVAL = 0.35;
 
 export class WorldEngine {
@@ -69,8 +73,18 @@ export class WorldEngine {
     private player: Player;
     private partyActors: FieldActor[] = [];
     private fieldEnemies: FieldEnemy[] = [];
+    private selectedActorId: string | null = null;
     private selectedEnemyId: string | null = null;
     private selectedLootId: string | null = null;
+    private actionMenuOpen = false;
+    private actionMenuUI = new ActionMenuUI();
+    private entityInfoUI = new EntityInfoUI();
+    private actionMode: 'move' | 'attack' | 'interact' | null = null;
+    private actionTiles: Set<string> = new Set();
+    private activeTurnActorId: string | null = null;
+    private readyQueue: string[] = [];
+    private remainingActionPoints = 0;
+    private reservedAction: FieldIntent | null = null;
     private hoverTile: TilePoint = { x: -1, y: -1 };
     private combatLog: string[] = [];
     private followRepathTimer: number = 0;
@@ -92,6 +106,7 @@ export class WorldEngine {
 
         this.spawnPartyAtCentralTown();
         this.player = this.getControlledActor()?.entity ?? new Player(0, 0);
+        this.selectedActorId = this.getControlledActor()?.id ?? null;
         this.spawnStarterFieldContent();
 
         camera.followTile(this.player.gridX, this.player.gridY);
@@ -107,15 +122,20 @@ export class WorldEngine {
 
         const screenTile = camera.screenToTile(input.mouseScreenX, input.mouseScreenY);
         this.hoverTile = { x: screenTile.tileX, y: screenTile.tileY };
+        this.entityInfoUI.onMouseMove(input.mouseScreenX, input.mouseScreenY);
+        this.actionMenuUI.onMouseMove(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
 
-        if (input.justPressed('Tab')) this.switchToNextAliveActor();
-        if (input.justPressed('Escape')) this.clearIntent();
-        if (input.mouseJustDown) this.handleFieldClick(this.hoverTile);
+        if (!this.isInputLockedByReservation()) {
+            if (input.justPressed('Tab')) this.switchToNextAliveActor();
+            if (input.justPressed('Escape')) this.clearIntent();
+            if (input.mouseJustDown) this.handleFieldClick(this.hoverTile, input, camera);
+        }
 
         this.updatePartyActors(dt);
         this.updateEnemies(dt);
         this.processQueuedIntents();
         this.refreshLootState();
+        this.startNextReadyTurn();
 
         const controlled = this.getControlledActor();
         if (controlled) this.player = controlled.entity;
@@ -139,11 +159,13 @@ export class WorldEngine {
         this.worldMap.updateLoadedChunks(this.player.pixelX * TILE_SIZE, this.player.pixelY * TILE_SIZE);
         this.worldMap.render(ctx, camX, camY, viewW, viewH);
 
+        this.renderActionTiles(ctx, camX, camY);
         this.renderPathPreview(ctx, camX, camY);
         this.renderSelectedLoot(ctx, camX, camY);
         this.renderEnemies(ctx, camX, camY);
         this.renderPartyActors(ctx, camX, camY);
         this.renderHoverTile(ctx, camX, camY);
+        this.renderActionMenu(ctx, camX, camY);
 
         ctx.restore();
 
@@ -220,7 +242,7 @@ export class WorldEngine {
         });
     }
 
-    private handleFieldClick(tile: TilePoint): void {
+    private handleFieldClick(tile: TilePoint, input: InputManager, camera: Camera): void {
         const partyTargets: FieldHitParty[] = this.partyActors.map((actor) => ({
             ...actor,
             gridX: actor.entity.gridX,
@@ -233,26 +255,48 @@ export class WorldEngine {
             isGroundWalkable: (x, y) => this.worldMap.isWalkable(x, y),
         });
 
+        if (this.hasSelection() && this.entityInfoUI.onClick(input.mouseScreenX, input.mouseScreenY)) {
+            this.clearSelection();
+            return;
+        }
+
+        if (this.actionMenuOpen) {
+            const action = this.actionMenuUI.onClick(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
+            if (action) {
+                this.executeFieldAction(action);
+                return;
+            }
+            this.closeActionMenu();
+            return;
+        }
+
+        if (this.actionMode) {
+            this.handleActionTargetClick(tile, hit);
+            return;
+        }
+
         switch (hit.kind) {
             case 'enemy':
                 this.selectedEnemyId = hit.enemy.id;
+                this.selectedActorId = null;
                 this.selectedLootId = null;
-                this.queueAttackIntent(this.requireControlledActor(), hit.enemy);
+                this.addCombatLog(`${hit.enemy.name} 선택`);
                 break;
             case 'party': {
                 const index = this.partyActors.findIndex((actor) => actor.id === hit.party.id);
                 if (index >= 0) this.switchToPartyMember(index);
+                const actor = this.partyActors[index];
+                if (actor && actor.id === this.activeTurnActorId) this.toggleActionMenuForControlled();
                 break;
             }
             case 'loot':
+                this.selectedActorId = null;
                 this.selectedEnemyId = null;
                 this.selectedLootId = hit.loot.id;
-                this.queueInteractIntent(this.requireControlledActor(), hit.loot);
+                this.addCombatLog(`${hit.loot.sourceLabel} 선택`);
                 break;
             case 'ground':
-                this.selectedEnemyId = null;
-                this.selectedLootId = null;
-                this.queueMoveIntent(this.requireControlledActor(), hit.tile);
+                this.closeActionMenu();
                 break;
             case 'blocked':
                 this.clearIntent();
@@ -261,7 +305,128 @@ export class WorldEngine {
         }
     }
 
-    private queueMoveIntent(actor: FieldActor, tile: TilePoint): void {
+    private executeFieldAction(action: ActionType): void {
+        const actor = this.getActivePartyTurnActor();
+        if (!actor) return;
+
+        if (actor.entity.actionGauge < 100 || this.activeTurnActorId !== actor.id) {
+            this.addCombatLog('행동 게이지가 차지 않았습니다.');
+            this.closeActionMenu();
+            return;
+        }
+
+        this.closeActionMenu();
+        this.clearActionMode();
+
+        switch (action) {
+            case 'move':
+                if (this.remainingActionPoints < MOVE_AP_PER_TILE || !this.hasExecutableMove(actor)) {
+                    this.addCombatLog('이동할 행동력이 부족합니다.');
+                    break;
+                }
+                this.actionMode = 'move';
+                this.actionTiles = this.computeWalkableTiles(actor);
+                this.addCombatLog('이동할 타일을 클릭하세요.');
+                break;
+            case 'attack':
+                if (this.remainingActionPoints < ATTACK_AP_COST || !this.hasExecutableAttack(actor)) {
+                    this.addCombatLog('공격할 수 있는 대상이 없습니다.');
+                    break;
+                }
+                this.actionMode = 'attack';
+                this.actionTiles = this.computeAttackableTiles(actor);
+                this.addCombatLog('공격할 적을 클릭하세요.');
+                break;
+            case 'open':
+                if (this.remainingActionPoints < INTERACT_AP_COST || !this.hasExecutableInteract(actor)) {
+                    this.addCombatLog('조사할 수 있는 대상이 없습니다.');
+                    break;
+                }
+                this.actionMode = 'interact';
+                this.actionTiles = this.computeInteractTiles(actor);
+                this.addCombatLog('조사할 상자나 전리품을 클릭하세요.');
+                break;
+            case 'rest':
+                actor.character.stats.hp = Math.min(actor.character.stats.maxHp, actor.character.stats.hp + 5);
+                actor.character.stats.mp = Math.min(actor.character.stats.maxMp, actor.character.stats.mp + 3);
+                this.addCombatLog('휴식: HP +5, MP +3 회복');
+                this.endActorTurn(actor, '휴식');
+                break;
+            case 'wait':
+                this.addCombatLog('대기');
+                this.endActorTurn(actor, '대기');
+                break;
+            default:
+                this.addCombatLog('아직 필드에서 사용할 수 없는 행동입니다.');
+                break;
+        }
+    }
+
+    private handleActionTargetClick(tile: TilePoint, hit: ReturnType<typeof resolveFieldHit>): void {
+        const actor = this.getActivePartyTurnActor();
+        if (!actor) return;
+
+        const tileKey = `${tile.x},${tile.y}`;
+        if (!this.actionTiles.has(tileKey)) {
+            this.addCombatLog('선택할 수 없는 위치입니다.');
+            this.clearActionMode();
+            return;
+        }
+
+        if (this.actionMode === 'move') {
+            const queued = this.queueMoveIntent(actor, tile);
+            if (queued) {
+                this.addCombatLog(`이동 시작 (${tile.x}, ${tile.y})`);
+            }
+            this.clearActionMode();
+            return;
+        }
+
+        if (this.actionMode === 'attack') {
+            if (hit.kind !== 'enemy') {
+                this.addCombatLog('공격할 적이 없습니다.');
+            } else {
+                const enemy = this.getEnemyById(hit.enemy.id);
+                if (!enemy) {
+                    this.addCombatLog('공격할 적이 없습니다.');
+                    this.clearActionMode();
+                    return;
+                }
+                this.selectedEnemyId = enemy.id;
+                this.selectedActorId = null;
+                this.selectedLootId = null;
+                if (this.spendAp(ATTACK_AP_COST) && this.tryActorAttack(actor, enemy)) {
+                    this.resumeOrEndActiveTurn(actor);
+                }
+            }
+            this.clearActionMode();
+            return;
+        }
+
+        if (this.actionMode === 'interact') {
+            if (hit.kind !== 'loot') {
+                this.addCombatLog('조사할 대상이 없습니다.');
+            } else {
+                const loot = this.worldMap.loot.find((candidate) => candidate.id === hit.loot.id);
+                if (!loot) {
+                    this.addCombatLog('조사할 대상이 없습니다.');
+                    this.clearActionMode();
+                    return;
+                }
+                this.selectedLootId = loot.id;
+                if (!this.spendAp(INTERACT_AP_COST)) {
+                    this.addCombatLog('조사할 행동력이 부족합니다.');
+                    this.clearActionMode();
+                    return;
+                }
+                this.openLoot(loot);
+                this.resumeOrEndActiveTurn(actor);
+            }
+            this.clearActionMode();
+        }
+    }
+
+    private queueMoveIntent(actor: FieldActor, tile: TilePoint): boolean {
         const path = findPath(this.actorTile(actor), tile, (query) => this.isFieldPassable(query), {
             actorId: actor.id,
             intent: 'move',
@@ -270,68 +435,20 @@ export class WorldEngine {
         if (path.length === 0 && !this.isActorAt(actor, tile)) {
             this.clearActorIntent(actor);
             this.addCombatLog('이동 경로를 찾지 못했습니다.');
-            return;
+            return false;
+        }
+
+        const apCost = getMoveApCost(path.length);
+        if (!this.spendAp(apCost)) {
+            this.addCombatLog('이동할 행동력이 부족합니다.');
+            return false;
         }
 
         actor.path = path;
-        actor.queuedIntent = { kind: 'move', tile };
-    }
-
-    private queueAttackIntent(actor: FieldActor, enemy: Enemy): void {
-        const range = this.getAttackRange(actor.character);
-        const enemyTile = this.enemyTile(enemy);
-        actor.queuedIntent = { kind: 'attack', enemyId: enemy.id };
-
-        if (isInRange(this.actorTile(actor), enemyTile, range)) {
-            this.tryActorAttack(actor, enemy);
-            return;
-        }
-
-        const goals = tilesInRange(enemyTile, range)
-            .filter((tile) => this.isFieldPassable({
-                ...tile,
-                actorId: actor.id,
-                intent: 'attack',
-                goal: enemyTile,
-            }));
-        actor.path = findPathToAny(this.actorTile(actor), goals, (query) => this.isFieldPassable(query), {
-            actorId: actor.id,
-            intent: 'attack',
-            maxNodes: 8000,
-        });
-
-        if (actor.path.length === 0) {
-            this.addCombatLog(`${enemy.name}에게 접근할 경로가 없습니다.`);
-        } else {
-            this.addCombatLog(`${enemy.name} 공격 위치로 이동합니다.`);
-        }
-    }
-
-    private queueInteractIntent(actor: FieldActor, loot: LootObject): void {
-        actor.queuedIntent = { kind: 'interact', lootId: loot.id };
-        if (manhattan(this.actorTile(actor), { x: loot.x, y: loot.y }) <= 1) {
-            this.openLoot(loot);
-            return;
-        }
-
-        const goals = tilesInRange({ x: loot.x, y: loot.y }, 1)
-            .filter((tile) => this.isFieldPassable({
-                ...tile,
-                actorId: actor.id,
-                intent: 'interact',
-                goal: { x: loot.x, y: loot.y },
-            }));
-        actor.path = findPathToAny(this.actorTile(actor), goals, (query) => this.isFieldPassable(query), {
-            actorId: actor.id,
-            intent: 'interact',
-            maxNodes: 8000,
-        });
-
-        if (actor.path.length === 0) {
-            this.addCombatLog(`${loot.sourceLabel}에 접근할 수 없습니다.`);
-        } else {
-            this.addCombatLog(`${loot.sourceLabel} 쪽으로 이동합니다.`);
-        }
+        actor.queuedIntent = { kind: 'move', tile, path, apCost };
+        this.reservedAction = actor.queuedIntent;
+        this.closeActionMenu();
+        return true;
     }
 
     private updatePartyActors(dt: number): void {
@@ -340,12 +457,17 @@ export class WorldEngine {
 
         for (const actor of this.partyActors) {
             if (actor.character.isDead) continue;
-            actor.entity.actionGauge = advanceAtb(actor.entity.actionGauge, actor.character.getCombatStats().spd, dt, FIELD_ATB_SCALE);
+            if (actor.id !== this.activeTurnActorId) {
+                actor.entity.actionGauge = advanceAtb(actor.entity.actionGauge, actor.character.getCombatStats().spd, dt, FIELD_ATB_SCALE);
+                if (actor.entity.actionGauge >= 100) {
+                    actor.entity.actionGauge = 100;
+                    enqueueReadyActor(this.readyQueue, actor.id);
+                }
+            }
             this.stepActorAlongPath(actor);
             actor.entity.update(dt);
         }
 
-        this.updateAssistAI();
         if (controlled && this.followRepathTimer <= 0) {
             this.followRepathTimer = MOVEMENT_REPATH_INTERVAL;
             this.updateFollowerPaths(controlled);
@@ -381,45 +503,6 @@ export class WorldEngine {
         }
     }
 
-    private updateAssistAI(): void {
-        const controlled = this.getControlledActor();
-        const target = this.selectedEnemyId ? this.getEnemyById(this.selectedEnemyId) : null;
-        if (!controlled || !target || target.stats.hp <= 0) return;
-        const targetTile = this.enemyTile(target);
-
-        for (const actor of this.partyActors) {
-            if (actor === controlled || actor.character.isDead) continue;
-            if (!shouldAssistTarget({
-                isControlledTarget: true,
-                targetIsAggro: target.isAggro,
-                targetDistanceToControlled: manhattan(targetTile, this.actorTile(controlled)),
-                actorDistanceToControlled: manhattan(this.actorTile(actor), this.actorTile(controlled)),
-                assistLeash: ASSIST_LEASH,
-            })) continue;
-
-            const range = this.getAttackRange(actor.character);
-            actor.queuedIntent = { kind: 'attack', enemyId: target.id };
-            if (isInRange(this.actorTile(actor), targetTile, range)) {
-                this.tryActorAttack(actor, target);
-                continue;
-            }
-            if (actor.path.length === 0) {
-                const goals = tilesInRange(targetTile, range)
-                    .filter((tile) => this.isFieldPassable({
-                        ...tile,
-                        actorId: actor.id,
-                        intent: 'attack',
-                        goal: targetTile,
-                    }));
-                actor.path = findPathToAny(this.actorTile(actor), goals, (query) => this.isFieldPassable(query), {
-                    actorId: actor.id,
-                    intent: 'attack',
-                    maxNodes: 3000,
-                });
-            }
-        }
-    }
-
     private updateEnemies(dt: number): void {
         const aliveActors = this.partyActors.filter((actor) => !actor.character.isDead);
 
@@ -436,14 +519,12 @@ export class WorldEngine {
             const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
             enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
 
-            enemy.actionGauge = advanceAtb(enemy.actionGauge, enemy.stats.spd, dt, FIELD_ATB_SCALE * 0.7);
-            if (!enemy.isAggro || enemy.actionGauge < 100 || this.isEntityMoving(enemy)) continue;
-
-            if (distanceToTarget <= 1) {
-                this.enemyAttack(entry, closest);
-            } else {
-                this.enemyStepToward(entry, closest);
-                enemy.actionGauge = 0;
+            if (enemy.id !== this.activeTurnActorId) {
+                enemy.actionGauge = advanceAtb(enemy.actionGauge, enemy.stats.spd, dt, FIELD_ATB_SCALE * 0.7);
+                if (enemy.actionGauge >= 100) {
+                    enemy.actionGauge = 100;
+                    enqueueReadyActor(this.readyQueue, enemy.id);
+                }
             }
         }
     }
@@ -454,6 +535,10 @@ export class WorldEngine {
 
             if (actor.queuedIntent.kind === 'move') {
                 actor.queuedIntent = null;
+                if (this.reservedAction?.kind === 'move' && this.activeTurnActorId === actor.id) {
+                    this.reservedAction = null;
+                    this.resumeOrEndActiveTurn(actor);
+                }
                 continue;
             }
 
@@ -473,11 +558,11 @@ export class WorldEngine {
         }
     }
 
-    private tryActorAttack(actor: FieldActor, enemy: Enemy): void {
+    private tryActorAttack(actor: FieldActor, enemy: Enemy): boolean {
         const range = this.getAttackRange(actor.character);
         const enemyTile = this.enemyTile(enemy);
-        if (!isInRange(this.actorTile(actor), enemyTile, range)) return;
-        if (actor.entity.actionGauge < 100) return;
+        if (!isInRange(this.actorTile(actor), enemyTile, range)) return false;
+        if (actor.entity.actionGauge < 100) return false;
 
         const result = CombatFormulas.calcPhysicalDamage(
             actor.character.getCombatStats(),
@@ -493,12 +578,11 @@ export class WorldEngine {
         );
         if (!result.isMiss) result.damage = Math.max(1, Math.floor(result.damage * dirBonus.multiplier));
 
-        actor.entity.actionGauge = 0;
         actor.entity.facing = this.directionFromTo(this.actorTile(actor), enemyTile);
 
         if (result.isMiss) {
             this.addCombatLog(`${actor.character.name} 공격 빗나감: ${enemy.name}`);
-            return;
+            return true;
         }
 
         const dead = enemy.takeDamage(result.damage);
@@ -506,6 +590,7 @@ export class WorldEngine {
         this.addCombatLog(`${actor.character.name} → ${enemy.name} ${result.damage} 피해${critText}`);
 
         if (dead) this.handleEnemyDefeated(actor, enemy);
+        return true;
     }
 
     private enemyAttack(entry: FieldEnemy, actor: FieldActor): void {
@@ -666,6 +751,11 @@ export class WorldEngine {
         return this.partyActors[this.party.getActiveIndex()] ?? this.partyActors.find((actor) => !actor.character.isDead) ?? null;
     }
 
+    private getActivePartyTurnActor(): FieldActor | null {
+        if (!this.activeTurnActorId) return null;
+        return this.partyActors.find((actor) => actor.id === this.activeTurnActorId && !actor.character.isDead) ?? null;
+    }
+
     private requireControlledActor(): FieldActor {
         const actor = this.getControlledActor();
         if (!actor) throw new Error('No active field actor');
@@ -685,10 +775,151 @@ export class WorldEngine {
         if (!actor || actor.character.isDead) return false;
         if (!this.party.switchTo(index)) return false;
         this.player = actor.entity;
+        this.selectedActorId = actor.id;
         this.selectedEnemyId = null;
         this.selectedLootId = null;
+        this.clearActionMode();
+        this.closeActionMenu();
         this.addCombatLog(`${actor.character.name} 조작`);
         return true;
+    }
+
+    private toggleActionMenuForControlled(): void {
+        const actor = this.getControlledActor();
+        if (!actor) return;
+        this.selectedActorId = actor.id;
+        this.selectedEnemyId = null;
+        this.selectedLootId = null;
+
+        if (actor.id !== this.activeTurnActorId) {
+            this.addCombatLog('아직 행동 순서가 아닙니다.');
+            return;
+        }
+
+        if (this.actionMenuOpen) {
+            this.closeActionMenu();
+            return;
+        }
+
+        const available = this.getAvailableTurnActions(actor);
+        this.actionMenuOpen = true;
+        this.actionMenuUI.open(available);
+    }
+
+    private closeActionMenu(): void {
+        this.actionMenuOpen = false;
+        this.actionMenuUI.close();
+    }
+
+    private clearActionMode(): void {
+        this.actionMode = null;
+        this.actionTiles.clear();
+    }
+
+    private getAvailableTurnActions(actor: FieldActor): ActionType[] {
+        const available: ActionType[] = [];
+        if (this.hasExecutableMove(actor)) available.push('move');
+        if (this.hasExecutableAttack(actor)) available.push('attack');
+        if (this.hasExecutableInteract(actor)) available.push('open');
+        available.push('rest', 'wait');
+        return available;
+    }
+
+    private spendAp(cost: number): boolean {
+        if (cost < 0 || this.remainingActionPoints < cost) return false;
+        this.remainingActionPoints -= cost;
+        return true;
+    }
+
+    private resumeOrEndActiveTurn(actor: FieldActor): void {
+        if (actor.id !== this.activeTurnActorId) return;
+        if (this.hasExecutableAction(actor)) {
+            this.selectedActorId = actor.id;
+            this.selectedEnemyId = null;
+            this.selectedLootId = null;
+            this.actionMenuOpen = true;
+            this.actionMenuUI.open(this.getAvailableTurnActions(actor));
+            return;
+        }
+        this.endActorTurn(actor, '행동력 소진');
+    }
+
+    private endActorTurn(actor: FieldActor, reason: string): void {
+        actor.entity.actionGauge = 0;
+        actor.character.tickBuffs();
+        this.activeTurnActorId = null;
+        this.remainingActionPoints = 0;
+        this.reservedAction = null;
+        this.clearActorIntent(actor);
+        this.closeActionMenu();
+        this.clearActionMode();
+        this.addCombatLog(`${actor.character.name} 턴 종료: ${reason}`);
+    }
+
+    private endEnemyTurn(enemy: Enemy): void {
+        enemy.actionGauge = 0;
+        this.activeTurnActorId = null;
+        this.remainingActionPoints = 0;
+        this.reservedAction = null;
+    }
+
+    private startNextReadyTurn(): void {
+        if (this.activeTurnActorId || this.reservedAction) return;
+
+        while (this.readyQueue.length > 0) {
+            const actorId = this.readyQueue.shift()!;
+            const actor = this.partyActors.find((candidate) => candidate.id === actorId);
+            if (actor) {
+                if (actor.character.isDead) continue;
+                this.beginActorTurn(actor);
+                return;
+            }
+
+            const enemyEntry = this.fieldEnemies.find((entry) => entry.enemy.id === actorId);
+            if (!enemyEntry || enemyEntry.enemy.stats.hp <= 0) continue;
+            this.beginEnemyTurn(enemyEntry);
+            if (this.activeTurnActorId) return;
+        }
+    }
+
+    private beginActorTurn(actor: FieldActor): void {
+        const index = this.partyActors.indexOf(actor);
+        if (index >= 0) this.switchToPartyMember(index);
+        this.activeTurnActorId = actor.id;
+        this.remainingActionPoints = Math.max(1, Math.floor(actor.character.stats.actionLimit || 15));
+        actor.entity.actionGauge = 100;
+        this.selectedActorId = actor.id;
+        this.addCombatLog(`${actor.character.name} 턴 시작: 행동 ${this.remainingActionPoints}`);
+        if (!this.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
+        else {
+            this.actionMenuOpen = true;
+            this.actionMenuUI.open(this.getAvailableTurnActions(actor));
+        }
+    }
+
+    private beginEnemyTurn(entry: FieldEnemy): void {
+        const enemy = entry.enemy;
+        this.activeTurnActorId = enemy.id;
+
+        const aliveActors = this.partyActors.filter((actor) => !actor.character.isDead);
+        const closest = this.findClosestActor(this.enemyTile(enemy), aliveActors);
+        if (!closest) {
+            this.endEnemyTurn(enemy);
+            return;
+        }
+
+        const enemyTile = this.enemyTile(enemy);
+        const distanceToTarget = manhattan(enemyTile, this.actorTile(closest));
+        const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
+        enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
+        if (!enemy.isAggro || this.isEntityMoving(enemy)) {
+            this.endEnemyTurn(enemy);
+            return;
+        }
+
+        if (distanceToTarget <= 1) this.enemyAttack(entry, closest);
+        else this.enemyStepToward(entry, closest);
+        this.endEnemyTurn(enemy);
     }
 
     private findClosestActor(point: TilePoint, actors: FieldActor[]): FieldActor | null {
@@ -728,6 +959,11 @@ export class WorldEngine {
         return Math.abs(entity.pixelX - entity.gridX) > 0.01 || Math.abs(entity.pixelY - entity.gridY) > 0.01;
     }
 
+    private isInputLockedByReservation(): boolean {
+        const actor = this.getActivePartyTurnActor();
+        return Boolean(this.reservedAction && actor && (actor.path.length > 0 || this.isEntityMoving(actor.entity)));
+    }
+
     private directionFromTo(from: TilePoint, to: TilePoint): 'up' | 'down' | 'left' | 'right' {
         const dx = to.x - from.x;
         const dy = to.y - from.y;
@@ -736,10 +972,14 @@ export class WorldEngine {
     }
 
     private clearIntent(): void {
+        if (this.reservedAction) return;
         const actor = this.getControlledActor();
         if (actor) this.clearActorIntent(actor);
+        this.selectedActorId = actor?.id ?? null;
         this.selectedEnemyId = null;
         this.selectedLootId = null;
+        this.closeActionMenu();
+        this.clearActionMode();
     }
 
     private clearActorIntent(actor: FieldActor): void {
@@ -750,6 +990,100 @@ export class WorldEngine {
     private clearControlledPath(): void {
         const actor = this.getControlledActor();
         if (actor) actor.path = [];
+    }
+
+    private clearSelection(): void {
+        this.selectedActorId = null;
+        this.selectedEnemyId = null;
+        this.selectedLootId = null;
+    }
+
+    private hasSelection(): boolean {
+        return Boolean(this.selectedActorId || this.selectedEnemyId || this.selectedLootId);
+    }
+
+    private hasExecutableAction(actor: FieldActor): boolean {
+        return hasExecutableFieldAction({
+            remainingAp: this.remainingActionPoints,
+            hasReachableMove: this.hasExecutableMove(actor),
+            hasAttackTarget: this.hasExecutableAttack(actor),
+            hasInteractTarget: this.hasExecutableInteract(actor),
+        });
+    }
+
+    private hasExecutableMove(actor: FieldActor): boolean {
+        return this.remainingActionPoints >= MOVE_AP_PER_TILE && this.computeWalkableTiles(actor).size > 0;
+    }
+
+    private hasExecutableAttack(actor: FieldActor): boolean {
+        if (this.remainingActionPoints < ATTACK_AP_COST) return false;
+        const start = this.actorTile(actor);
+        const range = this.getAttackRange(actor.character);
+        return this.fieldEnemies.some((entry) =>
+            entry.enemy.stats.hp > 0 && isInRange(start, this.enemyTile(entry.enemy), range)
+        );
+    }
+
+    private hasExecutableInteract(actor: FieldActor): boolean {
+        return this.remainingActionPoints >= INTERACT_AP_COST && this.hasAdjacentLoot(actor);
+    }
+
+    private computeWalkableTiles(actor: FieldActor): Set<string> {
+        const result = new Set<string>();
+        const start = this.actorTile(actor);
+        const range = Math.min(
+            Math.max(1, actor.character.stats.mov || actor.entity.moveRange),
+            Math.floor(this.remainingActionPoints / MOVE_AP_PER_TILE)
+        );
+        if (range <= 0) return result;
+        const queue: { x: number; y: number; dist: number }[] = [{ ...start, dist: 0 }];
+        const visited = new Set<string>([`${start.x},${start.y}`]);
+
+        while (queue.length > 0) {
+            const current = queue.shift()!;
+            if (current.dist > 0) result.add(`${current.x},${current.y}`);
+            if (current.dist >= range) continue;
+
+            for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                const next = { x: current.x + dx, y: current.y + dy };
+                const key = `${next.x},${next.y}`;
+                if (visited.has(key)) continue;
+                visited.add(key);
+                if (this.isFieldPassable({ ...next, actorId: actor.id, intent: 'move' })) {
+                    queue.push({ ...next, dist: current.dist + 1 });
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private computeAttackableTiles(actor: FieldActor): Set<string> {
+        const result = new Set<string>();
+        const start = this.actorTile(actor);
+        const range = this.getAttackRange(actor.character);
+        for (const tile of tilesInRange(start, range)) {
+            if (tile.x === start.x && tile.y === start.y) continue;
+            result.add(`${tile.x},${tile.y}`);
+        }
+        return result;
+    }
+
+    private computeInteractTiles(actor: FieldActor): Set<string> {
+        const result = new Set<string>();
+        const start = this.actorTile(actor);
+        for (const tile of tilesInRange(start, 1)) {
+            if (tile.x === start.x && tile.y === start.y) continue;
+            result.add(`${tile.x},${tile.y}`);
+        }
+        return result;
+    }
+
+    private hasAdjacentLoot(actor: FieldActor): boolean {
+        const actorTile = this.actorTile(actor);
+        return this.worldMap.loot.some((loot) =>
+            !loot.opened && manhattan(actorTile, { x: loot.x, y: loot.y }) <= 1
+        );
     }
 
     private addCombatLog(message: string): void {
@@ -764,6 +1098,33 @@ export class WorldEngine {
         ctx.fillStyle = 'rgba(55, 220, 255, 0.22)';
         for (const tile of actor.path) {
             ctx.fillRect(tile.x * TILE_SIZE - camX + 8, tile.y * TILE_SIZE - camY + 8, TILE_SIZE - 16, TILE_SIZE - 16);
+        }
+    }
+
+    private renderActionTiles(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
+        if (!this.actionMode || this.actionTiles.size === 0) return;
+
+        const colors = {
+            move: ['rgba(255, 204, 66, 0.18)', 'rgba(255, 204, 66, 0.68)'],
+            attack: ['rgba(255, 70, 70, 0.24)', 'rgba(255, 70, 70, 0.78)'],
+            interact: ['rgba(88, 210, 255, 0.20)', 'rgba(88, 210, 255, 0.72)'],
+        } as const;
+        const [fill, stroke] = colors[this.actionMode];
+
+        for (const key of this.actionTiles) {
+            const [x, y] = key.split(',').map(Number);
+            const sx = x * TILE_SIZE - camX;
+            const sy = y * TILE_SIZE - camY;
+            ctx.fillStyle = fill;
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+
+            const edge = [[0, -1], [0, 1], [-1, 0], [1, 0]]
+                .some(([dx, dy]) => !this.actionTiles.has(`${x + dx},${y + dy}`));
+            if (edge) {
+                ctx.strokeStyle = stroke;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(sx + 1, sy + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+            }
         }
     }
 
@@ -798,8 +1159,28 @@ export class WorldEngine {
                 ctx.strokeRect(px + 3, py + 3, TILE_SIZE - 6, TILE_SIZE - 6);
             }
 
+            if (this.selectedActorId === actor.id) {
+                ctx.strokeStyle = '#ffdd55';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(px + 1, py + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+            }
+
             this.renderGauge(ctx, px + 4, py - 7, TILE_SIZE - 8, actor.entity.actionGauge / 100, '#39ff88');
             this.renderHpBar(ctx, px + 4, py + TILE_SIZE + 3, TILE_SIZE - 8, actor.character.stats.hp, actor.character.stats.maxHp);
+        }
+    }
+
+    private renderActionMenu(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
+        const actor = this.getControlledActor();
+        if (!actor || actor.character.isDead) return;
+
+        const px = actor.entity.pixelX * TILE_SIZE - camX;
+        const py = actor.entity.pixelY * TILE_SIZE - camY;
+        const ready = actor.entity.actionGauge >= 100;
+        if (this.actionMenuOpen) {
+            this.actionMenuUI.render(ctx, px, py, ready);
+        } else if (ready) {
+            this.actionMenuUI.renderReadyIndicator(ctx, px, py);
         }
     }
 
@@ -856,7 +1237,7 @@ export class WorldEngine {
 
         const active = this.party.getActive();
         if (active) {
-            drawParchmentPanel(ctx, 16, 56, 210, 66);
+            drawParchmentPanel(ctx, 16, 56, 210, 80);
             ctx.fillStyle = Parchment.textDark;
             ctx.font = `bold 11px ${UI.fontMono}`;
             ctx.textAlign = 'left';
@@ -866,30 +1247,111 @@ export class WorldEngine {
             ctx.font = `10px ${UI.fontMono}`;
             ctx.fillText(`HP ${active.stats.hp}/${active.stats.maxHp}  MP ${active.stats.mp}/${active.stats.maxMp}`, 28, 84);
             ctx.fillText(`ATB ${Math.floor(this.player.actionGauge)}%`, 28, 100);
+            const activeActor = this.getControlledActor();
+            const apText = activeActor?.id === this.activeTurnActorId
+                ? `${this.remainingActionPoints}/${active.stats.actionLimit}`
+                : `-/${active.stats.actionLimit}`;
+            ctx.fillText(`AP ${apText}`, 28, 116);
         }
 
-        drawParchmentPanel(ctx, 16, 132, 130, 28);
+        drawParchmentPanel(ctx, 16, 146, 130, 28);
         ctx.fillStyle = '#ffcc00';
         ctx.font = `bold 11px ${UI.fontMono}`;
         ctx.textAlign = 'left';
-        ctx.fillText(`${this.playerData.gold} G`, 28, 140);
+        ctx.fillText(`${this.playerData.gold} G`, 28, 154);
 
         ctx.fillStyle = 'rgba(255,255,255,0.45)';
         ctx.font = `9px ${UI.fontMono}`;
-        ctx.fillText(`(${this.player.gridX}, ${this.player.gridY})`, 16, 170);
+        ctx.fillText(`(${this.player.gridX}, ${this.player.gridY})`, 16, 184);
 
+        const selectedInfo = this.getSelectedDisplayInfo();
+        if (selectedInfo) {
+            this.entityInfoUI.setPosition(16, 202);
+            this.entityInfoUI.render(ctx, selectedInfo);
+        }
+
+        this.renderActionModeHint(ctx, vw, vh);
         this.renderCombatLog(ctx, vw, vh);
 
         ctx.fillStyle = 'rgba(255,255,255,0.32)';
         ctx.font = `9px ${UI.fontMono}`;
         ctx.textAlign = 'right';
-        ctx.fillText('클릭 이동 | 적 클릭 공격 | Tab 교체 | I 인벤토리', vw - 16, vh - 16);
+        ctx.fillText('캐릭터 클릭 행동 메뉴 | Tab 교체 | ESC 취소 | I 인벤토리', vw - 16, vh - 16);
         ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
     }
 
+    private getSelectedDisplayInfo(): EntityDisplayInfo | null {
+        if (this.selectedActorId) {
+            const actor = this.partyActors.find((candidate) => candidate.id === this.selectedActorId);
+            if (!actor) return null;
+            const stats = actor.character.stats;
+            return {
+                name: actor.character.name,
+                className: actor.character.getTierName(),
+                level: actor.character.level,
+                hp: stats.hp,
+                maxHp: stats.maxHp,
+                mp: stats.mp,
+                maxMp: stats.maxMp,
+                actionGauge: actor.entity.actionGauge,
+                exp: actor.character.exp,
+                maxExp: actor.character.expToNext,
+                buffs: actor.character.buffs.map((buff) => buff.icon),
+                atk: stats.atk,
+                def: stats.def,
+                magAtk: stats.magAtk,
+                magDef: stats.magDef,
+                spriteColor: actor.entity.color,
+                spriteImage: actor.character.portraitImage,
+            };
+        }
+
+        if (this.selectedEnemyId) {
+            const enemy = this.getEnemyById(this.selectedEnemyId);
+            if (!enemy) return null;
+            return {
+                name: enemy.name || enemy.label,
+                level: enemy.level,
+                hp: enemy.stats.hp,
+                maxHp: enemy.stats.maxHp,
+                mp: enemy.stats.mp,
+                maxMp: enemy.stats.maxMp,
+                actionGauge: enemy.actionGauge,
+                buffs: [],
+                atk: enemy.stats.atk,
+                def: enemy.stats.def,
+                magAtk: enemy.stats.magAtk,
+                magDef: enemy.stats.magDef,
+                spriteColor: enemy.color,
+                spriteImage: enemy.image,
+            };
+        }
+
+        return null;
+    }
+
+    private renderActionModeHint(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
+        if (!this.actionMode) return;
+
+        const text = this.actionMode === 'move'
+            ? '이동할 타일을 클릭 (ESC 취소)'
+            : this.actionMode === 'attack'
+                ? '공격할 적을 클릭 (ESC 취소)'
+                : '조사할 대상을 클릭 (ESC 취소)';
+        ctx.fillStyle = this.actionMode === 'attack'
+            ? 'rgba(255, 80, 80, 0.88)'
+            : this.actionMode === 'interact'
+                ? 'rgba(88, 210, 255, 0.88)'
+                : 'rgba(255, 204, 66, 0.9)';
+        ctx.font = `bold 12px ${UI.fontMono}`;
+        ctx.textAlign = 'center';
+        ctx.fillText(text, vw / 2, vh - 50);
+        ctx.textAlign = 'start';
+    }
+
     private renderCombatLog(ctx: CanvasRenderingContext2D, _vw: number, vh: number): void {
-        const x = 16;
+        const x = this.hasSelection() ? 240 : 16;
         const y = Math.max(188, vh - 150);
         const w = 360;
         const h = 112;

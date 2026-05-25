@@ -6,6 +6,7 @@ import { WorldMap } from '../../src/map/WorldMap';
 import { resolveFieldHit } from '../../src/field/FieldInteraction';
 import { findPath, findPathToAny, manhattan, tilesInRange, FieldPassableQuery } from '../../src/field/FieldPathing';
 import { resolveAggroState, shouldAssistTarget } from '../../src/field/FieldCombat';
+import { ATTACK_AP_COST, INTERACT_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getMoveApCost, hasExecutableFieldAction } from '../../src/field/FieldActionEconomy';
 
 class ImageStub {
     public src = '';
@@ -125,5 +126,50 @@ test('assist AI only helps controlled targets inside leash', () => {
         targetDistanceToControlled: 12,
         actorDistanceToControlled: 4,
         assistLeash: 7,
+    }), false);
+});
+
+test('field AP movement cost excludes the starting tile', () => {
+    assert.equal(MOVE_AP_PER_TILE, 2);
+    assert.equal(getMoveApCost(0), 0);
+    assert.equal(getMoveApCost(3), 6);
+    assert.equal(getMoveApCost(5), 10);
+});
+
+test('ready queue is FIFO and rejects duplicate actors', () => {
+    const queue: string[] = [];
+    assert.equal(enqueueReadyActor(queue, 'p1'), true);
+    assert.equal(enqueueReadyActor(queue, 'e1'), true);
+    assert.equal(enqueueReadyActor(queue, 'p1'), false);
+    assert.deepEqual(queue, ['p1', 'e1']);
+});
+
+test('field AP continuation requires affordable and executable actions', () => {
+    assert.equal(hasExecutableFieldAction({
+        remainingAp: ATTACK_AP_COST,
+        hasReachableMove: false,
+        hasAttackTarget: false,
+        hasInteractTarget: false,
+    }), false);
+
+    assert.equal(hasExecutableFieldAction({
+        remainingAp: ATTACK_AP_COST,
+        hasReachableMove: false,
+        hasAttackTarget: true,
+        hasInteractTarget: false,
+    }), true);
+
+    assert.equal(hasExecutableFieldAction({
+        remainingAp: INTERACT_AP_COST,
+        hasReachableMove: false,
+        hasAttackTarget: true,
+        hasInteractTarget: true,
+    }), true);
+
+    assert.equal(hasExecutableFieldAction({
+        remainingAp: MOVE_AP_PER_TILE - 1,
+        hasReachableMove: true,
+        hasAttackTarget: true,
+        hasInteractTarget: true,
     }), false);
 });

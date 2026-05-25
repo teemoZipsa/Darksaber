@@ -7,7 +7,7 @@
 import { TILE_SIZE } from '../map/Chunk';
 import { UI } from './UITheme';
 
-export type ActionType = 'tool' | 'attack' | 'emote' | 'rest' | 'magic' | 'move' | 'open';
+export type ActionType = 'tool' | 'attack' | 'emote' | 'rest' | 'wait' | 'magic' | 'move' | 'open';
 
 interface ActionSlot {
     type: ActionType;
@@ -34,6 +34,7 @@ export class ActionMenuUI {
             { type: 'attack', label: '공격', angle: TAU / 6,     iconDraw: this.drawAttackIcon },
             { type: 'emote',  label: '감정', angle: TAU * 2 / 6, iconDraw: this.drawEmoteIcon },
             { type: 'rest',   label: '휴식', angle: TAU * 3 / 6, iconDraw: this.drawRestIcon },
+            { type: 'wait',   label: '대기', angle: TAU * 3 / 6, iconDraw: this.drawWaitIcon },
             { type: 'magic',  label: '마법', angle: TAU * 4 / 6, iconDraw: this.drawMagicIcon },
             { type: 'move',   label: '이동', angle: TAU * 5 / 6, iconDraw: this.drawMoveIcon },
             { type: 'open',   label: '조사', angle: 0,           iconDraw: this.drawOpenIcon },
@@ -230,6 +231,20 @@ export class ActionMenuUI {
         ctx.fillText('z', cx - s * 0.2, cy + s * 0.4);
         ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
+    }
+
+    private drawWaitIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
+        ctx.strokeStyle = ready ? '#f0c080' : 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = Math.max(1, s * 0.16);
+        ctx.beginPath();
+        ctx.arc(cx, cy, s * 0.65, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx, cy - s * 0.42);
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + s * 0.34, cy + s * 0.22);
+        ctx.stroke();
     }
 
     private drawMagicIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
