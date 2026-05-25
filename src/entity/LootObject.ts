@@ -1,6 +1,13 @@
 import { ItemDef } from '../data/ItemDB';
 import { GridInventory } from '../inventory/GridInventory';
 
+export interface LootObjectOptions {
+    sourceLabel?: string;
+    kind?: 'chest' | 'corpse';
+    gridW?: number;
+    gridH?: number;
+}
+
 /**
  * Loot on the ground or in a chest in the Raid map.
  */
@@ -10,12 +17,16 @@ export class LootObject {
     public y: number;
     public inventory: GridInventory;
     public opened: boolean = false;
+    public sourceLabel: string;
+    public kind: 'chest' | 'corpse';
 
-    constructor(id: string, x: number, y: number, items: ItemDef[]) {
+    constructor(id: string, x: number, y: number, items: ItemDef[], options: LootObjectOptions = {}) {
         this.id = id;
         this.x = x;
         this.y = y;
-        this.inventory = new GridInventory(5, 5); // Default 5x5 wrapper
+        this.sourceLabel = options.sourceLabel || '전리품';
+        this.kind = options.kind || 'chest';
+        this.inventory = new GridInventory(options.gridW || 5, options.gridH || 5);
         for (const item of items) {
             this.inventory.autoPlace(item);
         }
@@ -45,7 +56,7 @@ export class LootObject {
         ctx.font = `${size * 0.4}px serif`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#fff';
-        ctx.fillText('📦', cx, cy + size * 0.15);
+        ctx.fillText(this.kind === 'corpse' ? '☠' : '▣', cx, cy + size * 0.15);
         ctx.textAlign = 'start';
     }
 }

@@ -9,17 +9,16 @@ import { Camera } from './Camera';
 import { InputManager } from './InputManager';
 import { SettingsManager } from './SettingsManager';
 import { WorldMap } from '../map/WorldMap';
-import { BiomeMask, TownInfo } from '../map/BiomeMask';
+import { TownInfo } from '../map/BiomeMask';
 import { GridRenderer } from '../map/GridRenderer';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
 import { LootObject } from '../entity/LootObject';
-import { ExtractionZone } from '../entity/ExtractionZone';
 import { BossSpawner } from '../entity/BossSpawner';
 import { RemotePlayer } from '../entity/RemotePlayer';
 import { TILE_SIZE } from '../map/Chunk';
-import { TileType, TILE_PROPERTIES } from '../map/Tile';
-import { GridInventory } from '../inventory/GridInventory';
+import { TILE_PROPERTIES } from '../map/Tile';
+import { GridInventory, PlacedItem } from '../inventory/GridInventory';
 import { InventoryUI } from '../inventory/InventoryUI';
 import { PartyUI } from '../ui/PartyUI'; // Added
 import { EntityInfoUI, EntityDisplayInfo } from '../ui/EntityInfoUI';
@@ -49,6 +48,15 @@ import { FloatingTextManager } from '../ui/FloatingTextManager';
 import { getClassLine } from '../data/ClassTree';
 import { EffectManager } from '../ui/EffectManager';
 import { sfxHit, sfxCritical, sfxMiss, sfxHeal, sfxLevelUp, sfxKill, sfxPromotion, sfxByElement, sfxBuff, sfxDebuff, sfxDrain, sfxMeteor } from '../audio/CombatSFX';
+import {
+    computeRaidFailureLoss,
+    ItemSnapshot,
+    mergeSnapshots,
+    RaidLossPlan,
+    RaidOutcome,
+    RaidResultType,
+    snapshotPlacedItem,
+} from '../raid/RaidOutcome';
 
 export class GameEngine {
     private canvas: HTMLCanvasElement;
@@ -59,7 +67,6 @@ export class GameEngine {
     private camera: Camera;
     private input: InputManager;
     private worldMap: WorldMap;
-    private biomeMask: BiomeMask;
     private gridRenderer: GridRenderer;
     private player: Player;
     private partyPlayers: Player[] = [];
@@ -146,6 +153,13 @@ export class GameEngine {
     private raidTimeRemaining: number = 0;
     private raidResult: 'WIN' | 'MIA' | 'DEAD' = 'WIN';
     private playerTurnActive: boolean = false;
+    private readonly raidDurationSeconds: number = 20 * 60;
+    private readonly extractionHoldRequired: number = 3;
+    private extractionHoldTown: TownInfo | null = null;
+    private extractionHoldTimer: number = 0;
+    private raidKills: number = 0;
+    private raidLooted: ItemSnapshot[] = [];
+    private raidOutcome: RaidOutcome | null = null;
 
     // Boss System
     private bossSpawner: BossSpawner;
@@ -189,8 +203,7 @@ export class GameEngine {
         this.resize();
         this.camera = new Camera(this.canvas.width, this.canvas.height);
         this.input = new InputManager(canvas);
-        this.biomeMask = new BiomeMask();
-        this.worldMap = new WorldMap(this.biomeMask);
+        this.worldMap = new WorldMap();
         this.gridRenderer = new GridRenderer();
 
         // Apply custom sword cursor
@@ -199,6 +212,7 @@ export class GameEngine {
         // Inventory
         this.inventory = new GridInventory(10, 6);
         this.inventoryUI = new InventoryUI(this.inventory);
+        this.inventoryUI.onRaidLootSecured = (placed) => this.recordRaidLoot(placed);
 
         // Give player some starter items
         this.inventory.autoPlace(ITEMS.find(i => i.id === 'short_sword')!);
@@ -226,9 +240,7 @@ export class GameEngine {
                 gridX: e.gridX, gridY: e.gridY,
                 color: e.color, isBoss: e.isBoss
             })),
-            getExtractionZones: () => this.worldMap.extractionZones.map(z => ({
-                centerX: z.x, centerY: z.y, radius: z.radius
-            })),
+            getExtractionZones: () => this.getDestinationTownMarkers(),
             getLoot: () => this.worldMap.loot.map(l => ({
                 gridX: l.x, gridY: l.y
             })),
@@ -267,17 +279,15 @@ export class GameEngine {
             this.state = GameState.RAID;
             this.lobbyUI.toggle(); // hide lobby
             this.partyUI.isRaidMode = true;
+            this.raidOutcome = null;
+            this.raidKills = 0;
+            this.raidLooted = [];
+            this.extractionHoldTown = null;
+            this.extractionHoldTimer = 0;
             this.addCombatLog(t('log.deployed'));
 
             // Record departure town for no-return rule
-            const playerChunkX = Math.floor(this.player.gridX / 32);
-            const playerChunkY = Math.floor(this.player.gridY / 32);
-            const towns = this.worldMap.getTowns();
-            const departureTown = towns.find(town => {
-                const dx = playerChunkX - town.chunkX;
-                const dy = playerChunkY - town.chunkY;
-                return Math.sqrt(dx * dx + dy * dy) <= town.radius;
-            });
+            const departureTown = this.worldMap.getTownAtTile(this.player.gridX, this.player.gridY);
             this.departureTownId = departureTown?.id || '';
 
             const members = this.party.getCharacters();
@@ -298,8 +308,7 @@ export class GameEngine {
                 for (let tries = posIdx; tries < spawnPositions.length; tries++) {
                      const nx = spawnPositions[tries].x;
                      const ny = spawnPositions[tries].y;
-                     const tType = this.worldMap.getTileAt(nx, ny);
-                     if (TILE_PROPERTIES[tType] && TILE_PROPERTIES[tType].walkable) {
+                     if (this.worldMap.isWalkable(nx, ny)) {
                          px = nx;
                          py = ny;
                          posIdx = tries + 1;
@@ -327,34 +336,13 @@ export class GameEngine {
 
             // Spawn some test loot
             this.worldMap.loot = [
-                new LootObject('loot_1', this.player.gridX + 2, this.player.gridY + 1, [getItemDef('herb_common')!]),
-                new LootObject('loot_2', this.player.gridX + 4, this.player.gridY + 2, [getItemDef('short_sword')!]),
-                new LootObject('loot_3', this.player.gridX + 3, this.player.gridY + 3, [getItemDef('battle_t1_boots')!]),
+                new LootObject('loot_1', this.player.gridX + 2, this.player.gridY + 1, [getItemDef('herb_common')!], { sourceLabel: '낡은 보급 상자', kind: 'chest' }),
+                new LootObject('loot_2', this.player.gridX + 4, this.player.gridY + 2, [getItemDef('short_sword')!], { sourceLabel: '버려진 무기함', kind: 'chest' }),
+                new LootObject('loot_3', this.player.gridX + 3, this.player.gridY + 3, [getItemDef('battle_t1_boots')!], { sourceLabel: '전사자의 배낭', kind: 'corpse' }),
             ];
 
-            // Spawn an Extraction Zone randomly between 15-25 tiles away on walkable terrain
-            let extX = 0, extY = 0;
-            let attempts = 0;
-            let found = false;
-            while (!found && attempts < 100) {
-                const signX = Math.random() > 0.5 ? 1 : -1;
-                const signY = Math.random() > 0.5 ? 1 : -1;
-                extX = this.player.gridX + signX * Math.floor(15 + Math.random() * 10);
-                extY = this.player.gridY + signY * Math.floor(15 + Math.random() * 10);
-                const tileType = this.worldMap.getTileAt(extX, extY);
-                if (TILE_PROPERTIES[tileType] && TILE_PROPERTIES[tileType].walkable) {
-                    found = true;
-                }
-                attempts++;
-            }
-            if (!found) { // fallback
-                extX = this.player.gridX + 2;
-                extY = this.player.gridY + 2;
-            }
-            
-            this.worldMap.extractionZones = [
-                new ExtractionZone(extX, extY, 2)
-            ];
+            // v1 extraction is town-based: reach any non-departure town and hold position.
+            this.worldMap.extractionZones = [];
 
             // Spawn bosses independently via BossSpawner (NOT at extraction zone)
             this.bossSpawner.reset();
@@ -367,7 +355,7 @@ export class GameEngine {
                 this.addCombatLog(t('raid.bossSpawn'));
             }
 
-            this.raidTimeRemaining = 20 * 60; // 20 minutes
+            this.raidTimeRemaining = this.raidDurationSeconds;
             this.fogOfWar.reset(); // Fresh fog for each raid
         });
 
@@ -393,10 +381,11 @@ export class GameEngine {
             return true;
         };
 
-        // Spawn player at the central castle town on the biome map
-        const startTown = this.biomeMask.getTowns().find(t => t.id === 'central_castle')!;
-        const spawnTileX = startTown.chunkX * 32 + 16; // center of town chunk
-        const spawnTileY = startTown.chunkY * 32 + 16;
+        // Spawn player at the central castle town from the WorldMap source of truth.
+        const startTown = this.worldMap.getTowns().find(t => t.id === 'central_castle') || this.worldMap.getTowns()[0];
+        const spawn = this.worldMap.getTownSpawnTile(startTown);
+        const spawnTileX = spawn.x;
+        const spawnTileY = spawn.y;
         this.player = new Player(spawnTileX, spawnTileY);
         this.partyPlayers = [this.player];
 
@@ -465,6 +454,35 @@ export class GameEngine {
             this.state = GameState.LOBBY;
             this.lobbyUI.toggle();
         };
+    }
+
+    private getDestinationTownMarkers(): { centerX: number; centerY: number; radius: number }[] {
+        if (this.state !== GameState.RAID) return [];
+        return this.worldMap.getTowns()
+            .filter(town => town.id !== this.departureTownId)
+            .map(town => {
+                const spawn = this.worldMap.getTownSpawnTile(town);
+                return { centerX: spawn.x, centerY: spawn.y, radius: 3 };
+            });
+    }
+
+    private recordRaidLoot(placed: PlacedItem): void {
+        if (this.state !== GameState.RAID) return;
+        this.raidLooted.push(snapshotPlacedItem(placed));
+    }
+
+    private placeRaidLootItem(itemId: string, successPrefix: string): void {
+        const lootItem = getItemDef(itemId);
+        if (!lootItem) return;
+
+        const placed = this.inventory.autoPlace(lootItem);
+        if (placed) {
+            placed.acquiredInRaid = true;
+            this.recordRaidLoot(placed);
+            this.addCombatLog(`${successPrefix}${lootItem.name}`);
+        } else {
+            this.addCombatLog('배낭 가득! 전리품 소실.');
+        }
     }
 
     private spawnEnemiesAround(cx: number, cy: number, count: number): void {
@@ -643,11 +661,10 @@ export class GameEngine {
         this.raidTimeRemaining -= dt;
         if (this.raidTimeRemaining <= 0) {
             this.addCombatLog('MIA: Time limits exceeded!');
-            this.processDeathPenalty();
-            this.raidResult = 'MIA';
-            this.state = GameState.RESULTS;
+            this.completeRaid('MIA');
             return;
         }
+        this.updateExtractionHold(dt);
 
         // ─── BOSS SPAWNER ─────────────────────────────────────────
         const bossCount = this.enemies.filter(e => e.isBoss).length;
@@ -1071,6 +1088,7 @@ export class GameEngine {
                             this.floatingText.spawnDamage(target.gridX, target.gridY, result.damage, result.isCrit, false);
                             if (result.isCrit) sfxCritical(); else sfxHit();
                             if (dead) {
+                                this.raidKills++;
                                 this.addCombatLog(`${target.name} 처치! +${target.expReward} EXP`);
                                 if (activeChar) {
                                     const expResult = activeChar.gainExp(target.expReward);
@@ -1085,12 +1103,7 @@ export class GameEngine {
                                     }
                                 }
                                 if (target.isBoss && target.lootTableId) {
-                                    const lootItem = getItemDef(target.lootTableId);
-                                    if (lootItem) {
-                                        const placed = this.inventory.autoPlace(lootItem);
-                                        if (placed) this.addCombatLog(`${t('raid.bossLoot')}${lootItem.name}`);
-                                        else this.addCombatLog('배낭 가득! 보스 루팅 소실.');
-                                    }
+                                    this.placeRaidLootItem(target.lootTableId, t('raid.bossLoot'));
                                     this.network.sendBossKilled(target.id);
                                 }
                                 const idx = this.enemies.indexOf(target);
@@ -1171,9 +1184,9 @@ export class GameEngine {
                         if (dx <= 1 && dy <= 1) { // adjacent — open directly
 
                             clickedLoot.opened = true;
-                            this.inventoryUI.setExternalGrid(clickedLoot.inventory, '보물상자');
+                            this.inventoryUI.setExternalGrid(clickedLoot.inventory, clickedLoot.sourceLabel, { isRaidLoot: true });
                             if (!this.inventoryUI.isVisible()) this.inventoryUI.toggle();
-                            this.addCombatLog('상자를 검색합니다.');
+                            this.addCombatLog(`${clickedLoot.sourceLabel} 검색 중.`);
                         } else {
                             this.addCombatLog('상자가 너무 멉니다.');
                         }
@@ -1387,6 +1400,7 @@ export class GameEngine {
     /** Handle enemy kill — grant EXP, loot, remove from list, play kill SFX + fadeout */
     private handleEnemyKill(enemy: Enemy): void {
         sfxKill();
+        this.raidKills++;
         this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
         this.addCombatLog(`${enemy.name} 처치! +${enemy.expReward} EXP`);
         const active = this.party.getActive();
@@ -1404,12 +1418,7 @@ export class GameEngine {
             }
         }
         if (enemy.isBoss && enemy.lootTableId) {
-            const lootItem = getItemDef(enemy.lootTableId);
-            if (lootItem) {
-                const placed = this.inventory.autoPlace(lootItem);
-                if (placed) this.addCombatLog(`${t('raid.bossLoot')}${lootItem.name}`);
-                else this.addCombatLog('배낭 가득! 보스 루팅 소실.');
-            }
+            this.placeRaidLootItem(enemy.lootTableId, t('raid.bossLoot'));
             this.network.sendBossKilled(enemy.id);
         }
         const idx = this.enemies.indexOf(enemy);
@@ -1489,6 +1498,7 @@ export class GameEngine {
                     this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, result.damage, result.isCrit, false);
 
                     if (dead) {
+                        this.raidKills++;
                         this.addCombatLog(`${enemy.label} defeated! +${enemy.expReward} EXP`);
 
                         // Give EXP
@@ -1507,15 +1517,7 @@ export class GameEngine {
 
                         // Boss loot drops
                         if (enemy.isBoss && enemy.lootTableId) {
-                            const lootItem = getItemDef(enemy.lootTableId);
-                            if (lootItem) {
-                                const placed = this.inventory.autoPlace(lootItem);
-                                if (placed) {
-                                    this.addCombatLog(`${t('raid.bossLoot')}${lootItem.name}`);
-                                } else {
-                                    this.addCombatLog(`Backpack full! Boss loot lost.`);
-                                }
-                            }
+                            this.placeRaidLootItem(enemy.lootTableId, t('raid.bossLoot'));
                             this.network.sendBossKilled(enemy.id);
                         }
 
@@ -1564,15 +1566,11 @@ export class GameEngine {
                             this.addCombatLog(`${nextChar.name} (으)로 교체!`);
                         } else {
                             this.addCombatLog('출격조 전원 사망! 은신처로 복귀합니다.');
-                            this.processDeathPenalty();
-                            this.raidResult = 'DEAD';
-                            this.state = GameState.RESULTS;
+                            this.completeRaid('DEAD');
                         }
                     } else if (this.party.isSquadWiped()) {
                         this.addCombatLog('출격조 전원 사망! 은신처로 복귀합니다.');
-                        this.processDeathPenalty();
-                        this.raidResult = 'DEAD';
-                        this.state = GameState.RESULTS;
+                        this.completeRaid('DEAD');
                     }
                 }
             } else {
@@ -1674,40 +1672,50 @@ export class GameEngine {
             }
         }
 
-        // Check for extraction zone
-        for (const zone of this.worldMap.extractionZones) {
-            if (zone.contains(this.player.gridX, this.player.gridY)) {
-                this.addCombatLog(t('log.extraction'));
-                this.raidResult = 'WIN';
-                this.state = GameState.RESULTS;
-                return;
-            }
+        const enteredTown = this.worldMap.getTownAtTile(this.player.gridX, this.player.gridY);
+        if (!enteredTown || this.state !== GameState.RAID) {
+            this.extractionHoldTown = null;
+            this.extractionHoldTimer = 0;
+            return;
         }
 
-        // Check for town tile (extraction via town)
-        const currentTile = this.worldMap.getTileAt(this.player.gridX, this.player.gridY);
-        if (currentTile === TileType.TOWN && this.state === GameState.RAID) {
-            // Determine which town the player entered
-            const towns = this.worldMap.getTowns();
-            const playerChunkX = Math.floor(this.player.gridX / 32);
-            const playerChunkY = Math.floor(this.player.gridY / 32);
-            const enteredTown = towns.find(t => {
-                const dx = playerChunkX - t.chunkX;
-                const dy = playerChunkY - t.chunkY;
-                return Math.sqrt(dx * dx + dy * dy) <= t.radius;
-            });
+        if (enteredTown.id === this.departureTownId) {
+            this.extractionHoldTown = null;
+            this.extractionHoldTimer = 0;
+            this.addCombatLog(`⚠️ ${enteredTown.nameKr}: 출격한 마을로는 귀환 불가!`);
+            return;
+        }
 
-            if (enteredTown) {
-                if (enteredTown.id === this.departureTownId) {
-                    // Cannot return to the departure town!
-                    this.addCombatLog(`⚠️ ${enteredTown.nameKr}: 출격한 마을로는 귀환 불가!`);
-                } else {
-                    // Enter the town (M&B style)
-                    this.addCombatLog(`🏰 ${enteredTown.nameKr}에 도착!`);
-                    this.enterTown(enteredTown);
-                    return;
-                }
+        if (this.extractionHoldTown?.id !== enteredTown.id) {
+            this.extractionHoldTown = enteredTown;
+            this.extractionHoldTimer = 0;
+            this.addCombatLog(`🏰 ${enteredTown.nameKr} 도착. ${this.extractionHoldRequired}초 동안 버티면 생환합니다.`);
+        }
+    }
+
+    private updateExtractionHold(dt: number): void {
+        if (this.state !== GameState.RAID) return;
+
+        const currentTown = this.worldMap.getTownAtTile(this.player.gridX, this.player.gridY);
+        if (!currentTown || currentTown.id === this.departureTownId) {
+            if (this.extractionHoldTown && currentTown?.id !== this.extractionHoldTown.id) {
+                this.addCombatLog('탈출 대기 취소.');
             }
+            this.extractionHoldTown = null;
+            this.extractionHoldTimer = 0;
+            return;
+        }
+
+        if (this.extractionHoldTown?.id !== currentTown.id) {
+            this.extractionHoldTown = currentTown;
+            this.extractionHoldTimer = 0;
+            this.addCombatLog(`🏰 ${currentTown.nameKr} 도착. ${this.extractionHoldRequired}초 동안 버티면 생환합니다.`);
+        }
+
+        this.extractionHoldTimer += dt;
+        if (this.extractionHoldTimer >= this.extractionHoldRequired) {
+            this.addCombatLog(t('log.extraction'));
+            this.completeRaid('SURVIVED', currentTown);
         }
     }
 
@@ -1729,7 +1737,7 @@ export class GameEngine {
     }
 
     /** Use a consumable item from the quick-slot */
-    private useConsumable(placed: import('../inventory/GridInventory').PlacedItem): void {
+    private useConsumable(placed: PlacedItem): void {
         const item = placed.item;
         const lang = i18n.lang;
         const name = lang === 'ko' ? item.nameKr : item.name;
@@ -1757,23 +1765,57 @@ export class GameEngine {
         }
     }
 
-    private processDeathPenalty(): void {
-        // Lose entire shared backpack
-        const items = [...this.inventory.items];
-        for (const item of items) {
-            this.inventory.remove(item);
+    private processDeathPenalty(): RaidLossPlan {
+        const charList = this.party.getCharacters();
+        const loss = computeRaidFailureLoss(this.inventory.items, charList);
+        this.inventory.clear();
+
+        for (const equipmentLoss of loss.equipmentLost) {
+            const char = charList.find(c => c.id === equipmentLoss.characterId);
+            char?.unequip(equipmentLoss.slot);
+            this.addCombatLog(`${equipmentLoss.characterName} ${t('log.lostItem').replace('{slot}', equipmentLoss.slot)}`);
         }
 
-        // Lose 1 random equipped item from EVERY active character
-        const charList = this.party.getCharacters();
-        for (const char of charList) {
-            const equippedSlots = Array.from(char.equipment.keys());
-            if (equippedSlots.length > 0) {
-                const randomSlot = equippedSlots[Math.floor(Math.random() * equippedSlots.length)];
-                char.unequip(randomSlot);
-                this.addCombatLog(`${char.name} ${t('log.lostItem').replace('{slot}', randomSlot)}`);
+        return loss;
+    }
+
+    private snapshotSecuredRaidLoot(): ItemSnapshot[] {
+        const secured = this.inventory.items
+            .filter(item => item.acquiredInRaid)
+            .map(snapshotPlacedItem);
+
+        for (const char of this.party.getCharacters()) {
+            for (const equipped of char.equipment.values()) {
+                if (equipped.acquiredInRaid) secured.push(snapshotPlacedItem(equipped));
             }
         }
+
+        return mergeSnapshots(secured);
+    }
+
+    private completeRaid(result: RaidResultType, extractionTown?: TownInfo): void {
+        const loss = result === 'SURVIVED' ? null : this.processDeathPenalty();
+        const lost = loss ? mergeSnapshots([
+            ...loss.backpackLost,
+            ...loss.equipmentLost.map(item => item.item),
+        ]) : [];
+
+        this.raidResult = result === 'SURVIVED' ? 'WIN' : result;
+        this.raidOutcome = {
+            result,
+            elapsedSeconds: this.raidDurationSeconds - Math.max(0, this.raidTimeRemaining),
+            kills: this.raidKills,
+            departureTownId: this.departureTownId,
+            extractionTownId: extractionTown?.id,
+            looted: mergeSnapshots(this.raidLooted),
+            secured: result === 'SURVIVED' ? this.snapshotSecuredRaidLoot() : [],
+            lost,
+            equipmentLost: loss?.equipmentLost ?? [],
+        };
+
+        this.extractionHoldTown = null;
+        this.extractionHoldTimer = 0;
+        this.state = GameState.RESULTS;
     }
 
     private addCombatLog(msg: string): void {
@@ -2225,6 +2267,7 @@ export class GameEngine {
         this.ctx.textAlign = 'start';
         this.ctx.textBaseline = 'alphabetic';
         this.ctx.restore();
+        this.renderExtractionHold(width);
 
         // 9. Player HP/MP bars — positioned below tile label
         this.renderPlayerBars();
@@ -2445,44 +2488,137 @@ export class GameEngine {
         ctx.restore();
     }
     private renderResults(): void {
-        // Use virtual (scaled) dimensions for proper centering
         const scale = SettingsManager.getUIScale();
         const w = Math.floor(this.canvasW / scale);
         const h = Math.floor(this.canvasH / scale);
+        const outcome = this.raidOutcome;
+        const survived = outcome?.result === 'SURVIVED' || this.raidResult === 'WIN';
 
-        // Background
-        if (this.raidResult !== 'WIN' && this.gameoverBgImg.complete) {
-            // Draw gameover background scaled to fill
+        if (!survived && this.gameoverBgImg.complete) {
             this.ctx.drawImage(this.gameoverBgImg, 0, 0, w, h);
-            // Dark overlay for text readability
-            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-            this.ctx.fillRect(0, 0, w, h);
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.58)';
         } else {
-            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-            this.ctx.fillRect(0, 0, w, h);
+            this.ctx.fillStyle = '#0c0a08';
         }
+        this.ctx.fillRect(0, 0, w, h);
 
-        this.ctx.font = 'bold 48px "DOSMyungjo", sans-serif';
+        const leftW = Math.min(520, Math.floor(w * 0.44));
+        const pad = 32;
+        const title = survived ? 'SURVIVED' : (outcome?.result === 'MIA' ? 'MISSING' : 'YOU DIED');
+        const titleKr = survived ? '살아 돌아왔다' : (outcome?.result === 'MIA' ? '실종' : '사망');
+        const accent = survived ? '#d4ad55' : '#d96860';
+        const elapsed = outcome ? this.formatDuration(outcome.elapsedSeconds) : '--:--';
+
+        this.ctx.fillStyle = 'rgba(20, 17, 13, 0.96)';
+        this.ctx.fillRect(0, 0, leftW, h);
+        this.ctx.strokeStyle = accent;
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(10, 10, leftW - 20, h - 20);
+
+        this.ctx.fillStyle = accent;
+        this.ctx.font = `bold 12px ${UI.fontMono}`;
         this.ctx.textAlign = 'center';
+        this.ctx.fillText(survived ? 'EXTRACTION CONFIRMED · 생환' : 'EXTRACTION FAILED · 실패', leftW / 2, h / 2 - 120);
+        this.ctx.font = `bold 54px ${UI.fontPrimary}`;
+        this.ctx.fillText(title, leftW / 2, h / 2 - 64);
+        this.ctx.font = `20px ${UI.fontPrimary}`;
+        this.ctx.fillStyle = UI.textPrimary;
+        this.ctx.fillText(titleKr, leftW / 2, h / 2 - 26);
 
-        if (this.raidResult === 'WIN') {
-            this.ctx.fillStyle = '#00ff88';
-            this.ctx.fillText(t('raid.success'), w / 2, h / 2 - 40);
-            this.ctx.fillStyle = '#fff';
-            this.ctx.font = '18px "DOSMyungjo", sans-serif';
-            this.ctx.fillText(t('raid.successDesc'), w / 2, h / 2 + 10);
-        } else {
-            this.ctx.fillStyle = '#ff3333';
-            this.ctx.fillText(this.raidResult === 'MIA' ? t('raid.mia') : t('raid.died'), w / 2, h / 2 - 40);
-            this.ctx.fillStyle = '#ff8888';
-            this.ctx.font = '18px "DOSMyungjo", sans-serif';
-            this.ctx.fillText(t('raid.failDesc'), w / 2, h / 2 + 10);
+        const metaY = h / 2 + 28;
+        const meta = [
+            ['TIME', elapsed],
+            ['KILLS', String(outcome?.kills ?? this.raidKills)],
+            [survived ? 'SECURED' : 'LOST', String(survived ? outcome?.secured.length ?? 0 : outcome?.lost.length ?? 0)],
+        ];
+        const metaW = (leftW - pad * 2) / 3;
+        for (let i = 0; i < meta.length; i++) {
+            const x = pad + i * metaW;
+            this.ctx.fillStyle = 'rgba(12, 10, 8, 0.8)';
+            this.ctx.fillRect(x, metaY, metaW - 8, 58);
+            this.ctx.strokeStyle = 'rgba(94, 85, 68, 0.7)';
+            this.ctx.strokeRect(x, metaY, metaW - 8, 58);
+            this.ctx.fillStyle = '#998d75';
+            this.ctx.font = `10px ${UI.fontMono}`;
+            this.ctx.fillText(meta[i][0], x + (metaW - 8) / 2, metaY + 18);
+            this.ctx.fillStyle = accent;
+            this.ctx.font = `bold 18px ${UI.fontPrimary}`;
+            this.ctx.fillText(meta[i][1], x + (metaW - 8) / 2, metaY + 42);
         }
 
-        this.ctx.fillStyle = '#aaa';
-        this.ctx.fillText(t('raid.return'), w / 2, h / 2 + 70);
-        
+        this.ctx.fillStyle = '#998d75';
+        this.ctx.font = `13px ${UI.fontPrimary}`;
+        this.ctx.fillText(t('raid.return'), leftW / 2, h - 54);
+
+        const sideX = leftW + 24;
+        const sideW = w - sideX - 24;
+        const cardGap = 14;
+        const cardH = Math.max(130, Math.floor((h - 68 - cardGap * 2) / 3));
+        this.renderResultCard(sideX, 24, sideW, cardH, 'LOOTED · 이번 획득', outcome?.looted ?? []);
+        this.renderResultCard(sideX, 24 + cardH + cardGap, sideW, cardH, survived ? 'SECURED · 확보' : 'LOST · 손실', survived ? outcome?.secured ?? [] : outcome?.lost ?? []);
+        const equipmentLost = outcome?.equipmentLost.map(loss => loss.item) ?? [];
+        this.renderResultCard(sideX, 24 + (cardH + cardGap) * 2, sideW, cardH, 'GEAR LOST · 장비 손실', equipmentLost);
+
         this.ctx.textAlign = 'start';
+    }
+
+    private renderResultCard(x: number, y: number, w: number, h: number, title: string, items: ItemSnapshot[]): void {
+        this.ctx.fillStyle = 'rgba(20, 17, 13, 0.92)';
+        this.ctx.fillRect(x, y, w, h);
+        this.ctx.strokeStyle = 'rgba(94, 85, 68, 0.9)';
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeRect(x, y, w, h);
+
+        const value = items.reduce((sum, item) => sum + item.baseValue * item.quantity, 0);
+        this.ctx.fillStyle = '#d4ad55';
+        this.ctx.font = `bold 14px ${UI.fontPrimary}`;
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText(title, x + 14, y + 24);
+        this.ctx.textAlign = 'right';
+        this.ctx.font = `11px ${UI.fontMono}`;
+        this.ctx.fillText(`${items.length} ITEMS · ${value.toLocaleString()}G`, x + w - 14, y + 24);
+
+        this.ctx.textAlign = 'left';
+        const rows = items.slice(0, Math.max(1, Math.floor((h - 42) / 22)));
+        if (rows.length === 0) {
+            this.ctx.fillStyle = '#5e5544';
+            this.ctx.font = `12px ${UI.fontPrimary}`;
+            this.ctx.fillText('기록 없음', x + 14, y + 56);
+            return;
+        }
+
+        let rowY = y + 50;
+        for (const item of rows) {
+            this.ctx.fillStyle = this.rarityColor(item.rarity);
+            this.ctx.fillRect(x + 14, rowY - 10, 8, 8);
+            this.ctx.fillStyle = UI.textPrimary;
+            this.ctx.font = `12px ${UI.fontPrimary}`;
+            this.ctx.fillText(`${item.nameKr}${item.quantity > 1 ? ` x${item.quantity}` : ''}`, x + 30, rowY);
+            this.ctx.textAlign = 'right';
+            this.ctx.fillStyle = '#998d75';
+            this.ctx.font = `10px ${UI.fontMono}`;
+            this.ctx.fillText(`${item.baseValue.toLocaleString()}G`, x + w - 14, rowY);
+            this.ctx.textAlign = 'left';
+            rowY += 22;
+        }
+    }
+
+    private rarityColor(rarity: ItemSnapshot['rarity']): string {
+        switch (rarity) {
+            case 'uncommon': return '#6f9a5a';
+            case 'rare': return '#4f7fb0';
+            case 'epic': return '#8f6fb0';
+            case 'legend': return '#d4ad55';
+            case 'unique': return '#c0392b';
+            default: return '#8a8275';
+        }
+    }
+
+    private formatDuration(seconds: number): string {
+        const safeSeconds = Math.max(0, Math.floor(seconds));
+        const m = Math.floor(safeSeconds / 60).toString().padStart(2, '0');
+        const s = (safeSeconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
     }
 
     private renderPlayerBars(): void {
@@ -2514,6 +2650,31 @@ export class GameEngine {
         this.ctx.font = `bold 9px ${UI.fontPrimary}`;
         this.ctx.textAlign = 'right';
         this.ctx.fillText('MP', barX - 4, barY + barH * 2 + 5);
+        this.ctx.textAlign = 'start';
+    }
+
+    private renderExtractionHold(width: number): void {
+        if (!this.extractionHoldTown || this.state !== GameState.RAID) return;
+
+        const panelW = 340;
+        const panelH = 58;
+        const x = width / 2 - panelW / 2;
+        const y = 46;
+        const pct = Math.min(1, this.extractionHoldTimer / this.extractionHoldRequired);
+
+        drawGlassPanel(this.ctx, x, y, panelW, panelH, {
+            radius: UI.radiusSm,
+            bg: 'rgba(20, 17, 13, 0.82)',
+            border: 'rgba(212, 173, 85, 0.5)',
+        });
+        this.ctx.fillStyle = UI.textAccent;
+        this.ctx.font = `bold 13px ${UI.fontPrimary}`;
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(`EXTRACTING · ${this.extractionHoldTown.nameKr}`, width / 2, y + 20);
+        drawBar(this.ctx, x + 20, y + 32, panelW - 40, 8, pct, '#d4ad55', 'rgba(90, 70, 35, 0.5)', { radius: 2 });
+        this.ctx.fillStyle = UI.textSecondary;
+        this.ctx.font = `10px ${UI.fontMono}`;
+        this.ctx.fillText(`${Math.ceil(Math.max(0, this.extractionHoldRequired - this.extractionHoldTimer))}s`, width / 2, y + 52);
         this.ctx.textAlign = 'start';
     }
 
@@ -2592,23 +2753,10 @@ export class GameEngine {
         this.remotePlayers.clear();
     }
 
-    /** Enter a town during a raid (M&B / Uncharted Waters style) */
-    private enterTown(town: TownInfo): void {
-        this.state = GameState.TOWN_VISIT;
-        this.townUI.show(town);
-    }
-
     /** Deploy from a visited town back to the raid field */
     private deployFromTown(): void {
         // Record this town as new departure (can't come back)
-        const towns = this.worldMap.getTowns();
-        const playerChunkX = Math.floor(this.player.gridX / 32);
-        const playerChunkY = Math.floor(this.player.gridY / 32);
-        const currentTown = towns.find(town => {
-            const dx = playerChunkX - town.chunkX;
-            const dy = playerChunkY - town.chunkY;
-            return Math.sqrt(dx * dx + dy * dy) <= town.radius;
-        });
+        const currentTown = this.worldMap.getTownAtTile(this.player.gridX, this.player.gridY);
         this.departureTownId = currentTown?.id || '';
 
         // Heal at town (partial heal like inn)

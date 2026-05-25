@@ -6,6 +6,7 @@
 import { MasterBranch } from './ClassTree';
 
 export type ItemSlot = 'weapon' | 'shield' | 'head' | 'body' | 'boots' | 'accessory' | 'accessory2' | 'consumable' | 'material' | 'sin_core' | 'rune' | 'gem';
+export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legend' | 'unique';
 export interface ItemDef {
     id: string;
     name: string;
@@ -26,6 +27,9 @@ export interface ItemDef {
     };
     description: string;
     descriptionKr?: string;
+    rarity: ItemRarity;
+    weight: number;
+    baseValue: number;
     buyPrice?: number;     // gold cost to buy from shop
     requiredTier?: number; // minimum tier to equip (1-7)
     branch?: MasterBranch; // which branch can equip (battle/tactics/healer/magic)
@@ -34,6 +38,66 @@ export interface ItemDef {
     itemCategory?: 'divine_weapon' | 'normal_weapon' | 'armor' | 'accessory' | 'consumable' | 'material' | 'sin_core' | 'rune' | 'gem';
     maxSockets?: number;
     socketTypes?: Array<'sin_core' | 'rune' | 'gem'>;
+}
+
+export type RawItemDef = Omit<ItemDef, 'rarity' | 'weight' | 'baseValue'> & Partial<Pick<ItemDef, 'rarity' | 'weight' | 'baseValue'>>;
+
+function inferRarity(item: RawItemDef): ItemRarity {
+    if (item.rarity) return item.rarity;
+    if (item.itemCategory === 'divine_weapon') return 'legend';
+    if (item.id === 'heal_ring' || item.id === 'void_crystal') return 'legend';
+    if (item.id === 'corrupted_blade' || item.id === 'shadow_cloak') return 'epic';
+    const price = item.buyPrice ?? 0;
+    const statTotal = Object.values(item.stats ?? {}).reduce((sum, value) => sum + (value ?? 0), 0);
+    if (price >= 5000 || statTotal >= 40) return 'legend';
+    if (price >= 1000 || statTotal >= 25) return 'epic';
+    if (price >= 300 || statTotal >= 12) return 'rare';
+    if (price >= 50 || statTotal >= 5) return 'uncommon';
+    return 'common';
+}
+
+function inferWeight(item: RawItemDef): number {
+    if (item.weight !== undefined) return item.weight;
+    const cells = item.gridW * item.gridH;
+    switch (item.slot) {
+        case 'weapon': return Number((cells * 0.75).toFixed(1));
+        case 'shield': return Number((cells * 0.65).toFixed(1));
+        case 'body': return Number((cells * 0.9).toFixed(1));
+        case 'head':
+        case 'boots': return Number((cells * 0.45).toFixed(1));
+        case 'accessory':
+        case 'accessory2':
+        case 'rune':
+        case 'gem':
+        case 'sin_core': return 0.1;
+        case 'consumable': return Number(Math.max(0.1, cells * 0.2).toFixed(1));
+        default: return Number(Math.max(0.1, cells * 0.3).toFixed(1));
+    }
+}
+
+function inferBaseValue(item: RawItemDef): number {
+    if (item.baseValue !== undefined) return item.baseValue;
+    if (item.buyPrice !== undefined) return item.buyPrice;
+    const statTotal = Object.values(item.stats ?? {}).reduce((sum, value) => sum + (value ?? 0), 0);
+    const rarityMult: Record<ItemRarity, number> = {
+        common: 1,
+        uncommon: 2,
+        rare: 4,
+        epic: 8,
+        legend: 18,
+        unique: 30,
+    };
+    const rarity = inferRarity(item);
+    return Math.max(10, Math.round((item.gridW * item.gridH * 20 + statTotal * 18) * rarityMult[rarity]));
+}
+
+export function normalizeItemDef(item: RawItemDef): ItemDef {
+    return {
+        ...item,
+        rarity: inferRarity(item),
+        weight: inferWeight(item),
+        baseValue: inferBaseValue(item),
+    };
 }
 // ─── Armor Generation ─────────────────────────────────────────
 // 4 branches × 7 tiers × 3 slots = 84 armor pieces
@@ -113,8 +177,8 @@ const ARMOR_SLOTS: ArmorSlotInfo[] = [
     { slot: 'boots', nameEn: 'Boots',  nameKr: '장화',  icon: '🥾', gridW: 2, gridH: 2, defMult: 0.4, magDefMult: 0.2 },
 ];
 
-function generateBranchArmor(): ItemDef[] {
-    const items: ItemDef[] = [];
+function generateBranchArmor(): RawItemDef[] {
+    const items: RawItemDef[] = [];
     for (const branchInfo of ARMOR_SERIES) {
         for (const tier of branchInfo.series) {
             for (const slotInfo of ARMOR_SLOTS) {
@@ -152,10 +216,10 @@ function generateBranchArmor(): ItemDef[] {
 }
 
 /** All generated branch armor */
-const BRANCH_ARMOR = generateBranchArmor();
+const BRANCH_ARMOR: RawItemDef[] = generateBranchArmor();
 
 /** Item database — starting items */
-export const ITEMS: ItemDef[] = [
+const RAW_ITEMS: RawItemDef[] = [
     // ─── Divine Weapon ─────────────────────
     {
         id: 'absolution_edge', name: 'Absolution Edge', nameKr: '속죄의 검',
@@ -356,6 +420,8 @@ export const ITEMS: ItemDef[] = [
     },
 ];
 
+export const ITEMS: ItemDef[] = RAW_ITEMS.map(normalizeItemDef);
+
 /** Lookup item by ID */
 export function getItemDef(id: string): ItemDef | undefined {
     return ITEMS.find(item => item.id === id);
@@ -363,11 +429,10 @@ export function getItemDef(id: string): ItemDef | undefined {
 
 /** Get all armor for a specific branch and tier */
 export function getArmorForBranchTier(branch: MasterBranch, tier: number): ItemDef[] {
-    return BRANCH_ARMOR.filter(item => item.branch === branch && item.requiredTier === tier);
+    return ITEMS.filter(item => item.branch === branch && item.requiredTier === tier);
 }
 
 /** Get all armor equippable by a branch up to a certain tier */
 export function getEquippableArmor(branch: MasterBranch, maxTier: number): ItemDef[] {
-    return BRANCH_ARMOR.filter(item => item.branch === branch && (item.requiredTier || 1) <= maxTier);
+    return ITEMS.filter(item => item.branch === branch && (item.requiredTier || 1) <= maxTier);
 }
-

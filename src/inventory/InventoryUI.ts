@@ -55,8 +55,10 @@ export class InventoryUI {
     private inventory: GridInventory;
     private externalGrid: GridInventory | null = null;
     private externalTitle: string = 'Loot';
+    private externalGridIsRaidLoot: boolean = false;
     private visible: boolean = false;
     private hideCloseBtn: boolean = false;
+    public onRaidLootSecured: ((placed: PlacedItem) => void) | null = null;
 
     // Drag state
     private dragging: PlacedItem | null = null;
@@ -86,6 +88,9 @@ export class InventoryUI {
     private dragWinOffsetY = 0;
     private activeWindow: 'char' | 'ext' = 'char';
     private layoutInitialized = false;
+    private extActionRects: Array<{ x: number; y: number; w: number; h: number; action: 'takeAll' | 'sortBag' }> = [];
+    private feedbackText: string = '';
+    private feedbackTimer: number = 0;
 
     // Grid coordinates
     private gridStartX = 0;
@@ -112,12 +117,15 @@ export class InventoryUI {
         this.activeChar = char;
     }
 
-    public setExternalGrid(grid: GridInventory | null, title: string = 'Loot'): void {
+    public setExternalGrid(grid: GridInventory | null, title: string = 'Loot', options?: { isRaidLoot?: boolean }): void {
         this.externalGrid = grid;
         this.externalTitle = title;
+        this.externalGridIsRaidLoot = !!options?.isRaidLoot;
         if (grid) {
             this.layoutInitialized = false;
             this.activeWindow = 'ext';
+        } else {
+            this.externalGridIsRaidLoot = false;
         }
     }
 
@@ -198,6 +206,16 @@ export class InventoryUI {
 
         const checkExtWindow = () => {
             if (!this.externalGrid) return false;
+            for (const rect of this.extActionRects) {
+                if (sx >= rect.x && sx <= rect.x + rect.w && sy >= rect.y && sy <= rect.y + rect.h) {
+                    if (rect.action === 'takeAll') this.takeAllExternalLoot();
+                    if (rect.action === 'sortBag') {
+                        this.inventory.sort();
+                        this.setFeedback('배낭을 정리했습니다.');
+                    }
+                    return true;
+                }
+            }
             // close btn
             if (!this.hideCloseBtn) {
                 const closeX = this.extWinX + this.extWinW - 28;
@@ -327,6 +345,9 @@ export class InventoryUI {
                 const result = targetGrid.autoPlace(item.item);
                 if (result) {
                     result.durability = item.durability;
+                    result.quantity = item.quantity;
+                    result.sockets = item.sockets;
+                    this.markRaidLootIfNeeded(result, targetGrid);
                     placed = true;
                 }
             }
@@ -353,6 +374,10 @@ export class InventoryUI {
                 if (!placed && slotAcceptsItem(eqSlot, item.item.slot)) {
                     if (targetEq) {
                         this.inventory.autoPlace(targetEq.item);
+                    }
+                    if (this.externalGridIsRaidLoot && this.dragSourceGrid === this.externalGrid) {
+                        item.acquiredInRaid = true;
+                        this.onRaidLootSecured?.(item);
                     }
                     this.activeChar.equipment.set(eqSlot, item);
                     placed = true;
@@ -381,7 +406,9 @@ export class InventoryUI {
                 const result = targetGrid.place(item.item, this.hoverCell.x, this.hoverCell.y);
                 if (result) {
                     result.durability = item.durability;
+                    result.quantity = item.quantity;
                     result.sockets = item.sockets;
+                    this.markRaidLootIfNeeded(result, targetGrid);
                     placed = true;
                 }
             }
@@ -403,6 +430,40 @@ export class InventoryUI {
 
         this.dragging = null;
         this.dragFromEquip = null;
+    }
+
+    private markRaidLootIfNeeded(placed: PlacedItem, targetGrid: GridInventory): void {
+        if (this.externalGridIsRaidLoot && this.dragSourceGrid === this.externalGrid && targetGrid === this.inventory) {
+            placed.acquiredInRaid = true;
+            this.onRaidLootSecured?.(placed);
+        }
+    }
+
+    private takeAllExternalLoot(): void {
+        if (!this.externalGrid) return;
+        let moved = 0;
+        for (const placed of [...this.externalGrid.items]) {
+            const result = this.inventory.autoPlace(placed.item);
+            if (!result) {
+                this.setFeedback(moved > 0 ? `${moved}개 획득, 배낭이 가득 찼습니다.` : '배낭이 가득 찼습니다.');
+                return;
+            }
+            result.durability = placed.durability;
+            result.quantity = placed.quantity;
+            result.sockets = placed.sockets;
+            if (this.externalGridIsRaidLoot) {
+                result.acquiredInRaid = true;
+                this.onRaidLootSecured?.(result);
+            }
+            this.externalGrid.remove(placed);
+            moved++;
+        }
+        this.setFeedback(moved > 0 ? `${moved}개 전리품 획득.` : '가져갈 전리품이 없습니다.');
+    }
+
+    private setFeedback(text: string): void {
+        this.feedbackText = text;
+        this.feedbackTimer = 2.2;
     }
 
     // ─── Helpers ─────────────────────────────────────────────────
@@ -428,6 +489,7 @@ export class InventoryUI {
         if (!this.visible) return;
 
         this.animTimer += 0.016;
+        this.feedbackTimer = Math.max(0, this.feedbackTimer - 0.016);
 
         const gridPixelW = this.inventory.width * CELL;
         const gridPixelH = this.inventory.height * CELL;
@@ -440,7 +502,7 @@ export class InventoryUI {
 
         if (this.externalGrid) {
             this.extWinW = this.externalGrid.width * CELL + PAD * 2;
-            this.extWinH = this.externalGrid.height * CELL + 80;
+            this.extWinH = this.externalGrid.height * CELL + 140;
         }
 
         // ─── Initialize Layout ───
@@ -478,6 +540,7 @@ export class InventoryUI {
             this.extGridStartY = this.extWinY + 50;
 
             this.renderGridBase(ctx, this.externalGrid, this.extGridStartX, this.extGridStartY, true);
+            this.renderExternalSummary(ctx);
         };
 
         const renderCharWindow = () => {
@@ -531,6 +594,57 @@ export class InventoryUI {
 
         this.renderTooltip(ctx);
         this.renderDraggedItem(ctx);
+    }
+
+    private renderExternalSummary(ctx: CanvasRenderingContext2D): void {
+        if (!this.externalGrid) return;
+
+        const itemCount = this.externalGrid.items.length;
+        const totalWeight = this.externalGrid.items.reduce((sum, placed) => sum + placed.item.weight * placed.quantity, 0);
+        const totalValue = this.externalGrid.items.reduce((sum, placed) => sum + placed.item.baseValue * placed.quantity, 0);
+        const summaryY = this.extGridStartY + this.externalGrid.height * CELL + 14;
+
+        ctx.fillStyle = '#998d75';
+        ctx.font = '10px DOSMyungjo, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${itemCount} ITEMS · ${totalWeight.toFixed(1)}kg`, this.extWinX + PAD, summaryY);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#d4ad55';
+        ctx.fillText(`${totalValue.toLocaleString()}G`, this.extWinX + this.extWinW - PAD, summaryY);
+
+        const btnY = summaryY + 10;
+        const btnH = 28;
+        const gap = 8;
+        const btnW = Math.floor((this.extWinW - PAD * 2 - gap) / 2);
+        const takeRect = { x: this.extWinX + PAD, y: btnY, w: btnW, h: btnH, action: 'takeAll' as const };
+        const sortRect = { x: takeRect.x + btnW + gap, y: btnY, w: btnW, h: btnH, action: 'sortBag' as const };
+        this.extActionRects = [takeRect, sortRect];
+
+        this.renderSmallButton(ctx, takeRect.x, takeRect.y, takeRect.w, takeRect.h, 'TAKE ALL');
+        this.renderSmallButton(ctx, sortRect.x, sortRect.y, sortRect.w, sortRect.h, 'SORT BAG');
+
+        if (this.feedbackTimer > 0 && this.feedbackText) {
+            ctx.fillStyle = this.feedbackText.includes('가득') ? '#d96860' : '#9bb05a';
+            ctx.font = '10px DOSMyungjo, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(this.feedbackText, this.extWinX + this.extWinW / 2, btnY + btnH + 16);
+            ctx.textAlign = 'start';
+        }
+    }
+
+    private renderSmallButton(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, label: string): void {
+        ctx.fillStyle = 'rgba(44, 38, 31, 0.95)';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = '#5e5544';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, w, h);
+        ctx.fillStyle = '#f1e3bf';
+        ctx.font = 'bold 11px DOSMyungjo, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, x + w / 2, y + h / 2);
+        ctx.textAlign = 'start';
+        ctx.textBaseline = 'alphabetic';
     }
 
     private renderTitleBar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, text: string): void {

@@ -11,6 +11,7 @@ export interface PlacedItem {
     gridY: number;      // top-left cell Y
     durability: number;
     quantity: number;
+    acquiredInRaid?: boolean;
     sockets?: ItemDef[]; // Inserted runes/gems
 }
 
@@ -78,6 +79,16 @@ export class GridInventory {
         this.items = this.items.filter(i => i !== placed);
     }
 
+    /** Remove all items from the grid and return them in their previous order. */
+    public clear(): PlacedItem[] {
+        const removed = [...this.items];
+        for (let y = 0; y < this.height; y++) {
+            this.grid[y].fill(null);
+        }
+        this.items = [];
+        return removed;
+    }
+
     /** Get the item at a specific grid cell */
     public getAt(gx: number, gy: number): PlacedItem | null {
         if (gx < 0 || gy < 0 || gx >= this.width || gy >= this.height) return null;
@@ -94,6 +105,40 @@ export class GridInventory {
             }
         }
         return null; // no space
+    }
+
+    /** Repack items by size and value without changing their instances. */
+    public sort(): void {
+        const items = [...this.items].sort((a, b) => {
+            const areaDiff = (b.item.gridW * b.item.gridH) - (a.item.gridW * a.item.gridH);
+            if (areaDiff !== 0) return areaDiff;
+            return b.item.baseValue - a.item.baseValue;
+        });
+
+        for (let y = 0; y < this.height; y++) {
+            this.grid[y].fill(null);
+        }
+        this.items = [];
+
+        for (const placed of items) {
+            let didPlace = false;
+            for (let y = 0; y <= this.height - placed.item.gridH && !didPlace; y++) {
+                for (let x = 0; x <= this.width - placed.item.gridW; x++) {
+                    if (this.canPlace(placed.item, x, y)) {
+                        placed.gridX = x;
+                        placed.gridY = y;
+                        for (let dy = 0; dy < placed.item.gridH; dy++) {
+                            for (let dx = 0; dx < placed.item.gridW; dx++) {
+                                this.grid[y + dy][x + dx] = placed;
+                            }
+                        }
+                        this.items.push(placed);
+                        didPlace = true;
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     /** Check if inventory is full (no 1x1 space available) */

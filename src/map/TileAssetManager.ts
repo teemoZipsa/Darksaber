@@ -169,6 +169,7 @@ function computeShape(
 class TileAssetManagerClass {
     private sheets: Map<string, HTMLImageElement> = new Map();
     private loadPromises: Promise<void>[] = [];
+    private fallbackSheets = new Set(['World_A1.png', 'World_A2.png', 'World_B.png']);
 
     public init(): Promise<void[]> {
         const requiredSheets = new Set<string>();
@@ -178,15 +179,17 @@ class TileAssetManagerClass {
         }
 
         for (const sheetName of requiredSheets) {
+            if (this.fallbackSheets.has(sheetName)) continue;
+
             const img = new Image();
             const promise = new Promise<void>((resolve) => {
                 img.onload = () => resolve();
                 img.onerror = () => {
-                    console.error(`Failed to load tileset sheet: ${sheetName}`);
+                    console.warn(`Tileset sheet unavailable, using color fallback: ${sheetName}`);
                     resolve();
                 };
             });
-            img.src = `/Image/tilesets/${sheetName}`;
+            img.src = `/Image/Tileset/${sheetName}`;
             this.sheets.set(sheetName, img);
             this.loadPromises.push(promise);
         }
@@ -202,9 +205,9 @@ class TileAssetManagerClass {
         type: TileType, dx: number, dy: number, size: number
     ): boolean {
         const props = TILE_PROPERTIES[type];
-        if (!props?.sheet) return false;
+        if (!props?.sheet) return this.drawFallback(ctx, type, dx, dy, size);
         const img = this.sheets.get(props.sheet);
-        if (!img?.complete || img.naturalWidth <= 0) return false;
+        if (!img?.complete || img.naturalWidth <= 0) return this.drawFallback(ctx, type, dx, dy, size);
 
         // A2 autotile: draw shape 0 (default tile look)
         if (props.autotileCol !== undefined && props.autotileRow !== undefined) {
@@ -221,7 +224,7 @@ class TileAssetManagerClass {
             ctx.drawImage(img, props.sx, props.sy, 48, 48, dx, dy, size, size);
             return true;
         }
-        return false;
+        return this.drawFallback(ctx, type, dx, dy, size);
     }
 
     /**
@@ -234,9 +237,9 @@ class TileAssetManagerClass {
         s: boolean, sw: boolean, w: boolean, nw: boolean
     ): boolean {
         const props = TILE_PROPERTIES[type];
-        if (!props?.sheet) return false;
+        if (!props?.sheet) return this.drawFallback(ctx, type, dx, dy, size);
         const img = this.sheets.get(props.sheet);
-        if (!img?.complete || img.naturalWidth <= 0) return false;
+        if (!img?.complete || img.naturalWidth <= 0) return this.drawFallback(ctx, type, dx, dy, size);
 
         const shape = computeShape(n, ne, e, se, s, sw, w, nw);
 
@@ -356,6 +359,17 @@ class TileAssetManagerClass {
         const img = this.sheets.get(sheetName);
         if (img?.complete && img.naturalWidth > 0) return img;
         return undefined;
+    }
+
+    private drawFallback(
+        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+        type: TileType, dx: number, dy: number, size: number
+    ): boolean {
+        const props = TILE_PROPERTIES[type];
+        if (!props) return false;
+        ctx.fillStyle = props.color;
+        ctx.fillRect(dx, dy, size, size);
+        return true;
     }
 }
 

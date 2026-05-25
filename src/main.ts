@@ -34,7 +34,7 @@ async function init(): Promise<void> {
     const manager = new GameManager(canvas);
     manager.start();
 
-    console.log('🎮 Sin Eater Engine started (v2 — SRPG Mode)');
+    console.log('🎮 Darksaber : Extraction started');
 }
 
 // Wait for DOM

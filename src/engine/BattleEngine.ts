@@ -63,8 +63,6 @@ export class BattleEngine {
     private partyPlayers: Player[] = [];
     private enemies: Enemy[] = [];
     private party: PartyManager;
-    private inventory!: GridInventory;
-
     // ATB
     private playerTurnActive: boolean = false;
     private timeScale: number = 10.0;
@@ -111,14 +109,13 @@ export class BattleEngine {
     constructor(
         _canvas: HTMLCanvasElement, _ctx: CanvasRenderingContext2D,
         input: InputManager, camera: Camera,
-        party: PartyManager, inventory: GridInventory,
+        party: PartyManager, _inventory: GridInventory,
         _playerData: PlayerData, stage: StageData,
         gameManager: GameManager
     ) {
         this.camera = camera;
         this.gameManager = gameManager;
         this.party = party;
-        this.inventory = inventory;
         this.input = input;
         this.stage = stage;
         this.tiles = stage.tiles;

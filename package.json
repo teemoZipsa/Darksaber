@@ -7,12 +7,21 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "server": "npx tsx server/index.ts"
+    "server": "npx tsx server/index.ts",
+    "test": "node --import tsx --test tests/raid/*.test.ts tests/field/*.test.ts",
+    "test:raid": "node --import tsx --test tests/raid/*.test.ts",
+    "test:field": "node --import tsx --test tests/field/*.test.ts"
   },
-  "keywords": ["srpg", "grid", "rpg", "sin-eater"],
+  "keywords": [
+    "srpg",
+    "grid",
+    "rpg",
+    "sin-eater"
+  ],
   "author": "teemoZipsa",
   "license": "MIT",
   "devDependencies": {
+    "tsx": "^4.22.3",
     "typescript": "^5.9.3",
     "vite": "^8.0.1"
   }

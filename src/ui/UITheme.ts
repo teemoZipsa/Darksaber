@@ -497,7 +497,7 @@ export function drawParchmentPanel(
 }
 
 /**
- * Render the "SIN EATER" game title in an epic medieval dark-fantasy style.
+ * Render the "DARKSABER" game title in an epic medieval dark-fantasy style.
  * Gold gradient text + dark outline + metallic glow + decorative details.
  *
  * @returns The total height consumed (for stacking below).
@@ -516,8 +516,8 @@ export function renderGameTitle(
 
     ctx.save();
 
-    // ─── Main title: "SIN EATER" ─────────────────────
-    const titleText = 'SIN EATER';
+    // ─── Main title: "DARKSABER" ─────────────────────
+    const titleText = 'DARKSABER';
 
     // Gold gradient fill
     const grad = ctx.createLinearGradient(x, y, x, y + fontSize);
