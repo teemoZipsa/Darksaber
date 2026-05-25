@@ -1,6 +1,6 @@
 /**
  * WorldEngine — production 2D world field.
- * Click-to-move exploration and same-field ATB combat live here; the legacy
+ * Click-to-move exploration and same-field AP turn combat live here; the legacy
  * BattleEngine remains only for explicit staged encounters.
  */
 
@@ -17,23 +17,28 @@ import type { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
 import { getClassLine } from '../data/ClassTree';
+import { Skill, getLearnedSkills } from '../data/SkillDB';
 import { CombatFormulas } from '../combat/CombatFormulas';
+import { resolveSkillEffect, SkillEffectEnemyInput, SkillEffectResult } from '../combat/SkillEffectResolver';
 import { UI, renderGameTitle, Parchment, drawParchmentPanel, drawGlassPanel } from '../ui/UITheme';
 import { ActionMenuUI, ActionType } from '../ui/ActionMenuUI';
 import { EntityDisplayInfo, EntityInfoUI } from '../ui/EntityInfoUI';
+import { MagicUI } from '../ui/MagicUI';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { FieldPassableQuery, TilePoint, findPath, findPathToAny, isInRange, manhattan, tilesInRange } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
 import { advanceAtb, resolveAggroState } from '../field/FieldCombat';
-import { ATTACK_AP_COST, INTERACT_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getMoveApCost, hasExecutableFieldAction } from '../field/FieldActionEconomy';
+import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getMoveApCost, hasExecutableFieldAction } from '../field/FieldActionEconomy';
 
 interface FieldIntent {
-    kind: 'move' | 'attack' | 'interact' | 'rest' | 'wait';
+    kind: 'move' | 'attack' | 'interact' | 'magic' | 'rest' | 'wait';
     tile?: TilePoint;
     path?: TilePoint[];
     enemyId?: string;
     lootId?: string;
+    skillId?: string;
+    targetEnemyId?: string;
     apCost?: number;
 }
 
@@ -52,6 +57,11 @@ interface FieldEnemy {
 }
 
 type FieldHitParty = FieldActor & { gridX: number; gridY: number };
+
+type FieldMagicState =
+    | { mode: 'idle' }
+    | { mode: 'menu' }
+    | { mode: 'targeting'; skill: Skill; validTiles: Set<string>; hoverAoeTiles: Set<string> };
 
 const ACTOR_COLORS = ['#00e5ff', '#ff4fd8', '#ffd447'];
 const FORMATION_OFFSETS: TilePoint[] = [
@@ -79,8 +89,10 @@ export class WorldEngine {
     private actionMenuOpen = false;
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
+    private magicUI = new MagicUI();
     private actionMode: 'move' | 'attack' | 'interact' | null = null;
     private actionTiles: Set<string> = new Set();
+    private fieldMagicState: FieldMagicState = { mode: 'idle' };
     private activeTurnActorId: string | null = null;
     private readyQueue: string[] = [];
     private remainingActionPoints = 0;
@@ -108,6 +120,7 @@ export class WorldEngine {
         this.player = this.getControlledActor()?.entity ?? new Player(0, 0);
         this.selectedActorId = this.getControlledActor()?.id ?? null;
         this.spawnStarterFieldContent();
+        this.magicUI.onSkillSelect = (skill: Skill) => this.handleMagicSkillSelect(skill);
 
         camera.followTile(this.player.gridX, this.player.gridY);
         camera.snapToTarget();
@@ -115,7 +128,7 @@ export class WorldEngine {
     }
 
     public update(dt: number, input: InputManager, camera: Camera): void {
-        if (input.mouseWheelDelta !== 0) {
+        if (input.mouseWheelDelta !== 0 && !this.magicUI.isVisible()) {
             if (input.mouseWheelDelta > 0) camera.zoomOut();
             else camera.zoomIn();
         }
@@ -124,11 +137,27 @@ export class WorldEngine {
         this.hoverTile = { x: screenTile.tileX, y: screenTile.tileY };
         this.entityInfoUI.onMouseMove(input.mouseScreenX, input.mouseScreenY);
         this.actionMenuUI.onMouseMove(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
+        this.magicUI.onMouseMove(input.mouseScreenX, input.mouseScreenY);
+        this.updateMagicHoverPreview();
 
         if (!this.isInputLockedByReservation()) {
-            if (input.justPressed('Tab')) this.switchToNextAliveActor();
-            if (input.justPressed('Escape')) this.clearIntent();
-            if (input.mouseJustDown) this.handleFieldClick(this.hoverTile, input, camera);
+            if (input.justPressed('Escape')) {
+                if (this.fieldMagicState.mode !== 'idle' || this.magicUI.isVisible()) this.resetMagicState();
+                else this.clearIntent();
+            } else if (this.magicUI.isVisible()) {
+                this.magicUI.updateMp(this.getControlledActor()?.character.stats.mp ?? 0);
+                if (input.mouseWheelDelta !== 0) this.magicUI.onScroll(input.mouseWheelDelta);
+                if (input.mouseJustDown) {
+                    this.magicUI.onMouseDown(input.mouseScreenX, input.mouseScreenY);
+                    if (!this.magicUI.isVisible() && this.fieldMagicState.mode === 'menu') this.resetMagicState();
+                }
+                if (input.mouseJustUp) this.magicUI.onMouseUp();
+            } else if (this.fieldMagicState.mode === 'targeting') {
+                if (input.mouseJustDown) this.handleMagicTargetClick(this.hoverTile);
+            } else {
+                if (input.justPressed('Tab')) this.switchToNextAliveActor();
+                if (input.mouseJustDown) this.handleFieldClick(this.hoverTile, input, camera);
+            }
         }
 
         this.updatePartyActors(dt);
@@ -160,6 +189,7 @@ export class WorldEngine {
         this.worldMap.render(ctx, camX, camY, viewW, viewH);
 
         this.renderActionTiles(ctx, camX, camY);
+        this.renderMagicTargetTiles(ctx, camX, camY);
         this.renderPathPreview(ctx, camX, camY);
         this.renderSelectedLoot(ctx, camX, camY);
         this.renderEnemies(ctx, camX, camY);
@@ -322,6 +352,7 @@ export class WorldEngine {
             case 'move':
                 if (this.remainingActionPoints < MOVE_AP_PER_TILE || !this.hasExecutableMove(actor)) {
                     this.addCombatLog('이동할 행동력이 부족합니다.');
+                    this.reopenActionMenu(actor);
                     break;
                 }
                 this.actionMode = 'move';
@@ -329,17 +360,22 @@ export class WorldEngine {
                 this.addCombatLog('이동할 타일을 클릭하세요.');
                 break;
             case 'attack':
-                if (this.remainingActionPoints < ATTACK_AP_COST || !this.hasExecutableAttack(actor)) {
-                    this.addCombatLog('공격할 수 있는 대상이 없습니다.');
+                if (this.remainingActionPoints < ATTACK_AP_COST) {
+                    this.addCombatLog('공격할 행동력이 부족합니다.');
+                    this.reopenActionMenu(actor);
                     break;
                 }
                 this.actionMode = 'attack';
                 this.actionTiles = this.computeAttackableTiles(actor);
-                this.addCombatLog('공격할 적을 클릭하세요.');
+                this.addCombatLog(this.hasExecutableAttack(actor) ? '공격할 적을 클릭하세요.' : '사거리 안의 적을 선택하세요.');
+                break;
+            case 'magic':
+                this.openMagicMenu(actor);
                 break;
             case 'open':
                 if (this.remainingActionPoints < INTERACT_AP_COST || !this.hasExecutableInteract(actor)) {
                     this.addCombatLog('조사할 수 있는 대상이 없습니다.');
+                    this.reopenActionMenu(actor);
                     break;
                 }
                 this.actionMode = 'interact';
@@ -385,11 +421,11 @@ export class WorldEngine {
         if (this.actionMode === 'attack') {
             if (hit.kind !== 'enemy') {
                 this.addCombatLog('공격할 적이 없습니다.');
+                return;
             } else {
                 const enemy = this.getEnemyById(hit.enemy.id);
                 if (!enemy) {
                     this.addCombatLog('공격할 적이 없습니다.');
-                    this.clearActionMode();
                     return;
                 }
                 this.selectedEnemyId = enemy.id;
@@ -424,6 +460,220 @@ export class WorldEngine {
             }
             this.clearActionMode();
         }
+    }
+
+    private openMagicMenu(actor: FieldActor): void {
+        if (this.remainingActionPoints < MAGIC_AP_COST) {
+            this.addCombatLog('마법을 사용할 행동력이 부족합니다.');
+            this.reopenActionMenu(actor);
+            return;
+        }
+
+        const unlocked = this.getUnlockedSkillIds(actor.character);
+        const learned = getLearnedSkills(actor.character.classLineId, actor.character.currentTier, unlocked);
+        if (learned.length === 0) {
+            this.addCombatLog('사용 가능한 마법이 없습니다.');
+            this.reopenActionMenu(actor);
+            return;
+        }
+
+        this.fieldMagicState = { mode: 'menu' };
+        this.magicUI.show(
+            actor.character.classLineId,
+            actor.character.currentTier,
+            actor.character.stats.mp,
+            actor.character.stats.maxMp,
+            unlocked
+        );
+        this.addCombatLog('마법을 선택하세요.');
+    }
+
+    private handleMagicSkillSelect(skill: Skill): void {
+        const actor = this.getActivePartyTurnActor();
+        if (!actor) return;
+
+        if (this.remainingActionPoints < MAGIC_AP_COST) {
+            this.addCombatLog('마법을 사용할 행동력이 부족합니다.');
+            this.resetMagicState();
+            this.reopenActionMenu(actor);
+            return;
+        }
+
+        if (actor.character.stats.mp < skill.mpCost) {
+            this.addCombatLog(`MP 부족! (${skill.mpCost} 필요)`);
+            this.resetMagicState();
+            this.reopenActionMenu(actor);
+            return;
+        }
+
+        if (skill.type === 'heal' || skill.type === 'buff') {
+            this.castFieldSkill(actor, skill);
+            return;
+        }
+
+        const validTiles = this.computeMagicTargetTiles(actor, skill);
+        this.fieldMagicState = { mode: 'targeting', skill, validTiles, hoverAoeTiles: new Set() };
+        this.addCombatLog(`${skill.icon} ${skill.nameKr}: 대상을 선택하세요.`);
+    }
+
+    private handleMagicTargetClick(tile: TilePoint): void {
+        const actor = this.getActivePartyTurnActor();
+        if (!actor || this.fieldMagicState.mode !== 'targeting') return;
+
+        const tileKey = `${tile.x},${tile.y}`;
+        if (!this.fieldMagicState.validTiles.has(tileKey)) {
+            this.addCombatLog('마법 사거리 밖입니다.');
+            return;
+        }
+
+        const enemy = this.fieldEnemies
+            .map((entry) => entry.enemy)
+            .find((candidate) => candidate.stats.hp > 0 && candidate.gridX === tile.x && candidate.gridY === tile.y);
+        if (!enemy) {
+            this.addCombatLog('대상을 선택하세요.');
+            return;
+        }
+
+        this.castFieldSkill(actor, this.fieldMagicState.skill, enemy);
+    }
+
+    private castFieldSkill(actor: FieldActor, skill: Skill, targetEnemy?: Enemy): void {
+        if (this.remainingActionPoints < MAGIC_AP_COST) {
+            this.addCombatLog('마법을 사용할 행동력이 부족합니다.');
+            this.reopenActionMenu(actor);
+            return;
+        }
+        if (actor.character.stats.mp < skill.mpCost) {
+            this.addCombatLog(`MP 부족! (${skill.mpCost} 필요)`);
+            this.reopenActionMenu(actor);
+            return;
+        }
+        if ((skill.type === 'damage' || skill.type === 'debuff' || skill.type === 'aoe') && !targetEnemy) {
+            this.addCombatLog('대상 없음!');
+            return;
+        }
+
+        const effect = resolveSkillEffect({
+            casterStats: actor.character.stats,
+            casterCharacter: actor.character,
+            skill,
+            targetEnemy: targetEnemy ? this.toSkillEnemyInput(targetEnemy) : undefined,
+            allEnemies: this.fieldEnemies.map((entry) => this.toSkillEnemyInput(entry.enemy)),
+        });
+
+        if (!this.spendAp(MAGIC_AP_COST)) {
+            this.addCombatLog('마법을 사용할 행동력이 부족합니다.');
+            this.reopenActionMenu(actor);
+            return;
+        }
+
+        this.applySkillEffect(actor, effect);
+        this.resetMagicState();
+        this.resumeOrEndActiveTurn(actor);
+    }
+
+    private applySkillEffect(actor: FieldActor, effect: SkillEffectResult): void {
+        actor.character.stats.mp = Math.max(0, Math.min(actor.character.stats.maxMp, actor.character.stats.mp + effect.casterMpDelta));
+        actor.character.stats.hp = Math.max(0, Math.min(actor.character.stats.maxHp, actor.character.stats.hp + effect.casterHpDelta));
+        if (effect.appliesBuff) actor.character.applyBuff(effect.appliesBuff);
+
+        for (const enemyResult of effect.enemyResults) {
+            const enemy = this.getEnemyById(enemyResult.enemyId);
+            if (!enemy) continue;
+
+            if (enemyResult.statChanges?.atk) {
+                enemy.stats.atk = Math.max(1, enemy.stats.atk + enemyResult.statChanges.atk);
+            }
+            if (enemyResult.statChanges?.def) {
+                enemy.stats.def = Math.max(1, enemy.stats.def + enemyResult.statChanges.def);
+            }
+            if (enemyResult.statChanges?.magAtk) {
+                enemy.stats.magAtk = Math.max(1, enemy.stats.magAtk + enemyResult.statChanges.magAtk);
+            }
+            if (enemyResult.statChanges?.magDef) {
+                enemy.stats.magDef = Math.max(1, enemy.stats.magDef + enemyResult.statChanges.magDef);
+            }
+            if (enemyResult.statChanges?.spd) {
+                enemy.stats.spd = Math.max(1, enemy.stats.spd + enemyResult.statChanges.spd);
+            }
+
+            const dead = enemy.takeDamage(enemyResult.damage);
+            if (dead) this.handleEnemyDefeated(actor, enemy);
+        }
+
+        for (const log of effect.logs) this.addCombatLog(log);
+    }
+
+    private toSkillEnemyInput(enemy: Enemy): SkillEffectEnemyInput {
+        return {
+            id: enemy.id,
+            name: enemy.name,
+            gridX: enemy.gridX,
+            gridY: enemy.gridY,
+            stats: enemy.stats,
+        };
+    }
+
+    private getUnlockedSkillIds(character: Character): string[] {
+        const classLine = getClassLine(character.classLineId);
+        const unlocked: string[] = [];
+        if (!classLine) return unlocked;
+
+        for (let tier = 1; tier <= character.currentTier; tier++) {
+            const ids = classLine.skillUnlocks[tier];
+            if (ids) unlocked.push(...ids);
+        }
+        return unlocked;
+    }
+
+    private getLearnedFieldSkills(character: Character): Skill[] {
+        return getLearnedSkills(character.classLineId, character.currentTier, this.getUnlockedSkillIds(character));
+    }
+
+    private hasCastableFieldSkill(character: Character): boolean {
+        return this.getLearnedFieldSkills(character).some((skill) => character.stats.mp >= skill.mpCost);
+    }
+
+    private computeMagicTargetTiles(actor: FieldActor, skill: Skill): Set<string> {
+        const result = new Set<string>();
+        const start = this.actorTile(actor);
+        for (const tile of tilesInRange(start, Math.max(1, skill.range))) {
+            result.add(`${tile.x},${tile.y}`);
+        }
+        return result;
+    }
+
+    private updateMagicHoverPreview(): void {
+        if (this.fieldMagicState.mode !== 'targeting' || this.fieldMagicState.skill.aoeRadius <= 0) return;
+
+        const enemy = this.fieldEnemies
+            .map((entry) => entry.enemy)
+            .find((candidate) =>
+                candidate.stats.hp > 0 &&
+                candidate.gridX === this.hoverTile.x &&
+                candidate.gridY === this.hoverTile.y &&
+                this.fieldMagicState.mode === 'targeting' &&
+                this.fieldMagicState.validTiles.has(`${candidate.gridX},${candidate.gridY}`)
+            );
+        const hoverAoeTiles = new Set<string>();
+        if (enemy) {
+            const radius = this.fieldMagicState.skill.aoeRadius;
+            for (let dy = -radius; dy <= radius; dy++) {
+                for (let dx = -radius; dx <= radius; dx++) {
+                    hoverAoeTiles.add(`${enemy.gridX + dx},${enemy.gridY + dy}`);
+                }
+            }
+        }
+
+        this.fieldMagicState = {
+            ...this.fieldMagicState,
+            hoverAoeTiles,
+        };
+    }
+
+    private resetMagicState(): void {
+        this.fieldMagicState = { mode: 'idle' };
+        this.magicUI.hide();
     }
 
     private queueMoveIntent(actor: FieldActor, tile: TilePoint): boolean {
@@ -817,9 +1067,7 @@ export class WorldEngine {
     }
 
     private getAvailableTurnActions(actor: FieldActor): ActionType[] {
-        const available: ActionType[] = [];
-        if (this.hasExecutableMove(actor)) available.push('move');
-        if (this.hasExecutableAttack(actor)) available.push('attack');
+        const available: ActionType[] = ['move', 'attack', 'magic'];
         if (this.hasExecutableInteract(actor)) available.push('open');
         available.push('rest', 'wait');
         return available;
@@ -834,14 +1082,19 @@ export class WorldEngine {
     private resumeOrEndActiveTurn(actor: FieldActor): void {
         if (actor.id !== this.activeTurnActorId) return;
         if (this.hasExecutableAction(actor)) {
-            this.selectedActorId = actor.id;
-            this.selectedEnemyId = null;
-            this.selectedLootId = null;
-            this.actionMenuOpen = true;
-            this.actionMenuUI.open(this.getAvailableTurnActions(actor));
+            this.reopenActionMenu(actor);
             return;
         }
         this.endActorTurn(actor, '행동력 소진');
+    }
+
+    private reopenActionMenu(actor: FieldActor): void {
+        if (actor.id !== this.activeTurnActorId) return;
+        this.selectedActorId = actor.id;
+        this.selectedEnemyId = null;
+        this.selectedLootId = null;
+        this.actionMenuOpen = true;
+        this.actionMenuUI.open(this.getAvailableTurnActions(actor));
     }
 
     private endActorTurn(actor: FieldActor, reason: string): void {
@@ -853,6 +1106,7 @@ export class WorldEngine {
         this.clearActorIntent(actor);
         this.closeActionMenu();
         this.clearActionMode();
+        this.resetMagicState();
         this.addCombatLog(`${actor.character.name} 턴 종료: ${reason}`);
     }
 
@@ -980,6 +1234,7 @@ export class WorldEngine {
         this.selectedLootId = null;
         this.closeActionMenu();
         this.clearActionMode();
+        this.resetMagicState();
     }
 
     private clearActorIntent(actor: FieldActor): void {
@@ -1008,6 +1263,7 @@ export class WorldEngine {
             hasReachableMove: this.hasExecutableMove(actor),
             hasAttackTarget: this.hasExecutableAttack(actor),
             hasInteractTarget: this.hasExecutableInteract(actor),
+            hasMagicAvailable: this.hasExecutableMagic(actor),
         });
     }
 
@@ -1026,6 +1282,10 @@ export class WorldEngine {
 
     private hasExecutableInteract(actor: FieldActor): boolean {
         return this.remainingActionPoints >= INTERACT_AP_COST && this.hasAdjacentLoot(actor);
+    }
+
+    private hasExecutableMagic(actor: FieldActor): boolean {
+        return this.remainingActionPoints >= MAGIC_AP_COST && this.hasCastableFieldSkill(actor.character);
     }
 
     private computeWalkableTiles(actor: FieldActor): Set<string> {
@@ -1125,6 +1385,32 @@ export class WorldEngine {
                 ctx.lineWidth = 2;
                 ctx.strokeRect(sx + 1, sy + 1, TILE_SIZE - 2, TILE_SIZE - 2);
             }
+        }
+    }
+
+    private renderMagicTargetTiles(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
+        if (this.fieldMagicState.mode !== 'targeting') return;
+
+        for (const key of this.fieldMagicState.validTiles) {
+            const [x, y] = key.split(',').map(Number);
+            const sx = x * TILE_SIZE - camX;
+            const sy = y * TILE_SIZE - camY;
+            ctx.fillStyle = 'rgba(170, 80, 255, 0.20)';
+            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+            ctx.strokeStyle = 'rgba(190, 110, 255, 0.65)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        }
+
+        for (const key of this.fieldMagicState.hoverAoeTiles) {
+            const [x, y] = key.split(',').map(Number);
+            const sx = x * TILE_SIZE - camX;
+            const sy = y * TILE_SIZE - camY;
+            ctx.fillStyle = 'rgba(255, 80, 220, 0.24)';
+            ctx.fillRect(sx + 4, sy + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+            ctx.strokeStyle = 'rgba(255, 150, 240, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(sx + 4, sy + 4, TILE_SIZE - 8, TILE_SIZE - 8);
         }
     }
 
@@ -1272,6 +1558,7 @@ export class WorldEngine {
 
         this.renderActionModeHint(ctx, vw, vh);
         this.renderCombatLog(ctx, vw, vh);
+        this.magicUI.render(ctx, vw, vh);
 
         ctx.fillStyle = 'rgba(255,255,255,0.32)';
         ctx.font = `9px ${UI.fontMono}`;
@@ -1332,6 +1619,15 @@ export class WorldEngine {
     }
 
     private renderActionModeHint(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
+        if (this.fieldMagicState.mode === 'targeting') {
+            ctx.fillStyle = 'rgba(200, 90, 255, 0.9)';
+            ctx.font = `bold 12px ${UI.fontMono}`;
+            ctx.textAlign = 'center';
+            ctx.fillText('마법 대상을 클릭 (ESC 취소)', vw / 2, vh - 50);
+            ctx.textAlign = 'start';
+            return;
+        }
+
         if (!this.actionMode) return;
 
         const text = this.actionMode === 'move'

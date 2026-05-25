@@ -20,7 +20,7 @@
 - **Hideout UI** — Safe lobby (Stash + Roster) with an i18n English/Korean toggle.
 - **Drag-and-Drop Stash** — Manage the shared backpack between raids.
 - **Raid Entry & Timers** — Strict raid timers and randomly positioned Extraction Zones to escape.
-- **Real-Time ATB Combat** — Action Gauges fill continuously based on the Speed stat. Fast enemies act autonomously while the player's gauge is filling.
+- **AP Turn Combat** — Action Gauges prepare each unit's turn, then `actionLimit` becomes the per-turn AP budget for movement, attacks, skills, and waiting.
 - **High-Stakes Death Penalty** — Dying in a raid deletes the entire shared backpack and 1 random equipped piece per character.
 
 ---

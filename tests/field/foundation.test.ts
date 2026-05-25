@@ -6,7 +6,10 @@ import { WorldMap } from '../../src/map/WorldMap';
 import { resolveFieldHit } from '../../src/field/FieldInteraction';
 import { findPath, findPathToAny, manhattan, tilesInRange, FieldPassableQuery } from '../../src/field/FieldPathing';
 import { resolveAggroState, shouldAssistTarget } from '../../src/field/FieldCombat';
-import { ATTACK_AP_COST, INTERACT_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getMoveApCost, hasExecutableFieldAction } from '../../src/field/FieldActionEconomy';
+import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getMoveApCost, hasExecutableFieldAction } from '../../src/field/FieldActionEconomy';
+import { resolveSkillEffect } from '../../src/combat/SkillEffectResolver';
+import { getSkill } from '../../src/data/SkillDB';
+import { createBaseStats } from '../../src/data/Stats';
 
 class ImageStub {
     public src = '';
@@ -171,5 +174,88 @@ test('field AP continuation requires affordable and executable actions', () => {
         hasReachableMove: true,
         hasAttackTarget: true,
         hasInteractTarget: true,
+        hasMagicAvailable: true,
     }), false);
+
+    assert.equal(hasExecutableFieldAction({
+        remainingAp: MAGIC_AP_COST,
+        hasReachableMove: false,
+        hasAttackTarget: false,
+        hasInteractTarget: false,
+        hasMagicAvailable: true,
+    }), true);
+});
+
+test('skill effect resolver handles heal and special heal variants', () => {
+    const heal = getSkill('og_heal');
+    const ether = getSkill('alc_t4');
+    const sagePotion = getSkill('alc_t6');
+    const full = getSkill('cle_t7');
+    const shrineFull = getSkill('shr_t7');
+    assert.ok(heal);
+    assert.ok(ether);
+    assert.ok(sagePotion);
+    assert.ok(full);
+    assert.ok(shrineFull);
+
+    const stats = createBaseStats({ hp: 40, maxHp: 100, mp: 20, maxMp: 50, magAtk: 10 });
+    const healResult = resolveSkillEffect({ casterStats: stats, skill: heal });
+    assert.equal(healResult.casterHpDelta, 15);
+    assert.equal(healResult.casterMpDelta, -5);
+
+    const etherResult = resolveSkillEffect({ casterStats: stats, skill: ether });
+    assert.equal(etherResult.casterHpDelta, -20);
+    assert.equal(etherResult.casterMpDelta, 20);
+
+    const potionStats = createBaseStats({ hp: 45, maxHp: 100, mp: 35, maxMp: 50, magAtk: 10 });
+    const sageResult = resolveSkillEffect({ casterStats: potionStats, skill: sagePotion });
+    assert.equal(sageResult.casterHpDelta, 30);
+    assert.equal(sageResult.casterMpDelta, -5);
+
+    const fullStats = createBaseStats({ hp: 40, maxHp: 100, mp: 35, maxMp: 50, magAtk: 10 });
+    const fullResult = resolveSkillEffect({ casterStats: fullStats, skill: full });
+    assert.equal(fullResult.casterHpDelta, 60);
+    assert.equal(fullStats.mp + fullResult.casterMpDelta, fullStats.maxMp);
+
+    const shrineFullResult = resolveSkillEffect({ casterStats: fullStats, skill: shrineFull });
+    assert.equal(shrineFullResult.casterHpDelta, 60);
+    assert.equal(fullStats.mp + shrineFullResult.casterMpDelta, fullStats.maxMp);
+});
+
+test('skill effect resolver applies damage, debuff, and enemy-only aoe', () => {
+    const fireball = getSkill('og_fireball');
+    const poison = getSkill('og_poison');
+    const blizzard = getSkill('og_blizzard');
+    assert.ok(fireball);
+    assert.ok(poison);
+    assert.ok(blizzard);
+
+    const casterStats = createBaseStats({ magAtk: 20, atk: 8, mp: 50 });
+    const target = {
+        id: 'e1',
+        name: 'Enemy 1',
+        gridX: 5,
+        gridY: 5,
+        stats: createBaseStats({ hp: 40, maxHp: 40, def: 4, magDef: 2, atk: 10 }),
+    };
+
+    const damageResult = resolveSkillEffect({ casterStats, skill: fireball, targetEnemy: target });
+    assert.equal(damageResult.enemyResults.length, 1);
+    assert.equal(damageResult.enemyResults[0].damage, 25);
+
+    const debuffResult = resolveSkillEffect({ casterStats, skill: poison, targetEnemy: target });
+    assert.equal(debuffResult.enemyResults[0].statChanges?.atk, -3);
+    assert.equal(debuffResult.enemyResults[0].damage, 10);
+
+    const aoeResult = resolveSkillEffect({
+        casterStats,
+        skill: blizzard,
+        targetEnemy: target,
+        allEnemies: [
+            target,
+            { ...target, id: 'e2', name: 'Enemy 2', gridX: 6, gridY: 6 },
+            { ...target, id: 'e3', name: 'Enemy 3', gridX: 8, gridY: 8 },
+        ],
+    });
+    assert.deepEqual(aoeResult.enemyResults.map((result) => result.enemyId), ['e1', 'e2']);
 });
