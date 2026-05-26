@@ -154,6 +154,21 @@ export const i18n = {
             'raid.bossLoot': '보스 처치! 전리품 획득: ',
             'raid.bossSpawn': '강력한 적이 근처에 출현했습니다!',
             'raid.extraction': '🚁 탈출 지점 (20분 내 도달)',
+
+            // Tactical markers
+            'tactical.ping.position': '위치 핑',
+            'tactical.ping.danger': '위험 핑',
+            'tactical.ping.loot': '루팅 핑',
+            'tactical.ping.party': '아군 핑',
+            'tactical.rally': '집결 지정',
+            'tactical.watch': '주시 대상',
+            'tactical.clear': '마커 해제',
+            'tactical.log.ping': '전술 핑 표시',
+            'tactical.log.rally': '집결 지점 지정',
+            'tactical.log.watch': '주시 대상 지정',
+            'tactical.log.clear': '전술 마커 해제',
+            'tactical.log.cancelTargeting': '대상 지정을 취소했습니다.',
+
             // Multiplayer
             'mp.online': '온라인: ',
             'mp.players': '명',
@@ -335,6 +350,21 @@ export const i18n = {
             'raid.bossLoot': 'Boss killed! Loot acquired: ',
             'raid.bossSpawn': 'A powerful enemy has appeared nearby!',
             'raid.extraction': '🚁 Extraction Point (reach within 20 min)',
+
+            // Tactical markers
+            'tactical.ping.position': 'Ping Location',
+            'tactical.ping.danger': 'Ping Danger',
+            'tactical.ping.loot': 'Ping Loot',
+            'tactical.ping.party': 'Ping Ally',
+            'tactical.rally': 'Set Rally',
+            'tactical.watch': 'Watch Target',
+            'tactical.clear': 'Clear Marker',
+            'tactical.log.ping': 'Tactical ping placed.',
+            'tactical.log.rally': 'Rally point set.',
+            'tactical.log.watch': 'Watch target marked.',
+            'tactical.log.clear': 'Tactical marker cleared.',
+            'tactical.log.cancelTargeting': 'Targeting canceled.',
+
             // Multiplayer
             'mp.online': 'Online: ',
             'mp.players': ' players',

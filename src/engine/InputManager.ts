@@ -8,6 +8,7 @@ export class InputManager {
     public mouseScreenY: number = 0;
     public mouseClicked: boolean = false;
     public mouseJustDown: boolean = false;
+    public mouseRightJustDown: boolean = false;
     public mouseJustUp: boolean = false;
     public mouseIsDown: boolean = false;
     public mouseWheelDelta: number = 0;
@@ -45,7 +46,13 @@ export class InputManager {
             if (e.button === 0) {
                 this.mouseJustDown = true;
                 this.mouseIsDown = true;
+            } else if (e.button === 2) {
+                this.mouseRightJustDown = true;
             }
+        });
+
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
         });
 
         window.addEventListener('mouseup', (e) => {
@@ -81,6 +88,7 @@ export class InputManager {
         this.keysJustPressed.clear();
         this.mouseClicked = false;
         this.mouseJustDown = false;
+        this.mouseRightJustDown = false;
         this.mouseJustUp = false;
         this.mouseWheelDelta = 0;
     }

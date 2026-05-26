@@ -6,6 +6,7 @@
 import { Camera } from './Camera';
 import { InputManager } from './InputManager';
 import { SettingsManager } from './SettingsManager';
+import { t } from '../i18n/LanguageManager';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
 import { LootObject } from '../entity/LootObject';
@@ -38,6 +39,7 @@ import { UI, renderGameTitle, Parchment, drawParchmentPanel, drawGlassPanel } fr
 import { ActionMenuUI, ActionType } from '../ui/ActionMenuUI';
 import { EntityDisplayInfo, EntityInfoUI } from '../ui/EntityInfoUI';
 import { MagicUI } from '../ui/MagicUI';
+import { TacticalContextMenuUI } from '../ui/TacticalContextMenuUI';
 import { EffectManager } from '../ui/EffectManager';
 import { FloatingTextManager } from '../ui/FloatingTextManager';
 import type { GameManager } from './GameManager';
@@ -45,6 +47,15 @@ import { WorldMap } from '../map/WorldMap';
 import { TileType } from '../map/Tile';
 import { FieldPassableQuery, TilePoint, findPathToAny, findPathWithCost, findReachableTilesByCost, manhattan, tileKey, tilesInRange } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
+import {
+    TacticalMarkerStore,
+    buildTacticalMenuItems,
+    makeTacticalTargetKey,
+    type TacticalCommand,
+    type TacticalMarker,
+    type TacticalTargetRef,
+} from '../field/TacticalMarkers';
+import { getRightClickDisposition, type WorldInteractionMode } from '../field/WorldInteractionMode';
 import { advanceAtb, resolveAggroState } from '../field/FieldCombat';
 import { decideEnemyAction, type BossPattern, type EnemyAIDecision, type EnemyAIUnit, type EnemyRole } from '../field/EnemyAI';
 import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getWaitAtbCarryover, hasExecutableFieldAction } from '../field/FieldActionEconomy';
@@ -131,6 +142,7 @@ const ENEMY_ROLE_GLYPHS: Record<EnemyRole, string> = {
 };
 
 export class WorldEngine {
+    private canvas: HTMLCanvasElement;
     private party: PartyManager;
     private playerData: PlayerData;
     private gameManager: GameManager;
@@ -145,6 +157,9 @@ export class WorldEngine {
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
     private magicUI = new MagicUI();
+    private tacticalMenuUI = new TacticalContextMenuUI();
+    private tacticalMarkers = new TacticalMarkerStore();
+    private tacticalMenuTarget: TacticalTargetRef | null = null;
     private actionMode: 'move' | 'attack' | 'interact' | null = null;
     private actionTiles: Set<string> = new Set();
     private fieldMagicState: FieldMagicState = { mode: 'idle' };
@@ -161,7 +176,7 @@ export class WorldEngine {
     private worldTime: number = 0;
 
     constructor(
-        _canvas: HTMLCanvasElement,
+        canvas: HTMLCanvasElement,
         _ctx: CanvasRenderingContext2D,
         _input: InputManager,
         camera: Camera,
@@ -170,6 +185,7 @@ export class WorldEngine {
         playerData: PlayerData,
         gameManager: GameManager
     ) {
+        this.canvas = canvas;
         this.party = party;
         this.playerData = playerData;
         this.gameManager = gameManager;
@@ -198,12 +214,18 @@ export class WorldEngine {
         this.entityInfoUI.onMouseMove(input.mouseScreenX, input.mouseScreenY);
         this.actionMenuUI.onMouseMove(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
         this.magicUI.onMouseMove(input.mouseScreenX, input.mouseScreenY);
+        this.tacticalMenuUI.onMouseMove(input.uiMouseX, input.uiMouseY);
         this.updateMagicHoverPreview();
 
         if (!this.isInputLockedByReservation()) {
-            if (input.justPressed('Escape')) {
-                if (this.fieldMagicState.mode !== 'idle' || this.magicUI.isVisible()) this.resetMagicState();
+            if (input.mouseRightJustDown && !this.magicUI.isVisible()) {
+                this.handleFieldRightClick(this.hoverTile, input);
+            } else if (input.justPressed('Escape')) {
+                if (this.tacticalMenuUI.getIsOpen()) this.closeTacticalMenu();
+                else if (this.fieldMagicState.mode !== 'idle' || this.magicUI.isVisible()) this.resetMagicState();
                 else this.clearIntent();
+            } else if (this.tacticalMenuUI.getIsOpen()) {
+                if (input.mouseJustDown) this.handleTacticalMenuClick(input.uiMouseX, input.uiMouseY);
             } else if (this.magicUI.isVisible()) {
                 this.magicUI.updateMp(this.getControlledActor()?.character.stats.mp ?? 0);
                 if (input.mouseWheelDelta !== 0) this.magicUI.onScroll(input.mouseWheelDelta);
@@ -227,6 +249,7 @@ export class WorldEngine {
         this.updateAttackCues(dt);
         this.processQueuedIntents();
         this.refreshLootState();
+        this.updateTacticalMarkers(dt);
         this.startNextReadyTurn();
 
         const controlled = this.getControlledActor();
@@ -254,6 +277,7 @@ export class WorldEngine {
         this.renderActionTiles(ctx, camX, camY);
         this.renderMagicTargetTiles(ctx, camX, camY);
         this.renderPathPreview(ctx, camX, camY);
+        this.renderTacticalMarkers(ctx, camX, camY);
         this.renderSelectedLoot(ctx, camX, camY);
         this.renderEnemies(ctx, camX, camY);
         this.renderPartyActors(ctx, camX, camY);
@@ -342,17 +366,7 @@ export class WorldEngine {
     }
 
     private handleFieldClick(tile: TilePoint, input: InputManager, camera: Camera): void {
-        const partyTargets: FieldHitParty[] = this.partyActors.map((actor) => ({
-            ...actor,
-            gridX: actor.entity.gridX,
-            gridY: actor.entity.gridY,
-        }));
-        const hit = resolveFieldHit(tile, {
-            party: partyTargets,
-            enemies: this.fieldEnemies.map((entry) => entry.enemy),
-            loot: this.worldMap.loot,
-            isGroundWalkable: (x, y) => this.worldMap.isWalkable(x, y),
-        });
+        const hit = this.resolveFieldHitAt(tile);
 
         if (this.hasSelection() && this.entityInfoUI.onClick(input.mouseScreenX, input.mouseScreenY)) {
             this.clearSelection();
@@ -583,6 +597,7 @@ export class WorldEngine {
         }
 
         this.fieldMagicState = { mode: 'menu' };
+        this.closeTacticalMenu();
         this.magicUI.show(
             actor.character.classLineId,
             actor.character.currentTier,
@@ -910,6 +925,127 @@ export class WorldEngine {
                     enqueueReadyActor(this.readyQueue, enemy.id);
                 }
             }
+        }
+    }
+
+    private resolveFieldHitAt(tile: TilePoint) {
+        const partyTargets: FieldHitParty[] = this.partyActors.map((actor) => ({
+            ...actor,
+            gridX: actor.entity.gridX,
+            gridY: actor.entity.gridY,
+        }));
+        return resolveFieldHit(tile, {
+            party: partyTargets,
+            enemies: this.fieldEnemies.map((entry) => entry.enemy),
+            loot: this.worldMap.loot,
+            isGroundWalkable: (x, y) => this.worldMap.isWalkable(x, y),
+        });
+    }
+
+    private handleFieldRightClick(tile: TilePoint, input: InputManager): void {
+        const mode = this.getWorldInteractionMode();
+        const disposition = getRightClickDisposition(mode);
+
+        if (disposition === 'ignore') return;
+
+        if (disposition === 'cancelTargeting') {
+            if (mode.kind === 'magicTargeting') this.resetMagicState();
+            else this.clearActionMode();
+            this.closeActionMenu();
+            this.closeTacticalMenu();
+            this.addCombatLog(t('tactical.log.cancelTargeting'));
+            return;
+        }
+
+        if (disposition === 'reopenTacticalMenu') {
+            this.closeTacticalMenu();
+        } else {
+            this.closeActionMenu();
+        }
+
+        this.openTacticalMenu(tile, input.uiMouseX, input.uiMouseY);
+    }
+
+    private handleTacticalMenuClick(mx: number, my: number): void {
+        const result = this.tacticalMenuUI.onClick(mx, my);
+        if (!result) return;
+        if (result === 'outside') {
+            this.closeTacticalMenu();
+            return;
+        }
+
+        this.executeTacticalCommand(result);
+    }
+
+    private openTacticalMenu(tile: TilePoint, uiX: number, uiY: number): void {
+        const target = this.getTacticalTarget(tile);
+        const items = buildTacticalMenuItems(target);
+        const scale = SettingsManager.getUIScale();
+        const vw = Math.floor(this.canvas.width / scale);
+        const vh = Math.floor(this.canvas.height / scale);
+        this.tacticalMenuTarget = target;
+        this.tacticalMenuUI.open(uiX, uiY, items, vw, vh);
+    }
+
+    private closeTacticalMenu(): void {
+        this.tacticalMenuTarget = null;
+        this.tacticalMenuUI.close();
+    }
+
+    private executeTacticalCommand(command: TacticalCommand): void {
+        const target = this.tacticalMenuTarget;
+        if (!target) return;
+
+        switch (command) {
+            case 'ping':
+                this.tacticalMarkers.addPing(target);
+                this.addCombatLog(t('tactical.log.ping'));
+                break;
+            case 'rally':
+                if (target.kind === 'ground') {
+                    this.tacticalMarkers.setRally(target.tile);
+                    this.addCombatLog(t('tactical.log.rally'));
+                }
+                break;
+            case 'watch':
+                if (this.tacticalMarkers.setWatch(target)) {
+                    this.addCombatLog(t('tactical.log.watch'));
+                }
+                break;
+            case 'clear':
+                this.tacticalMarkers.clear(target);
+                this.addCombatLog(t('tactical.log.clear'));
+                break;
+        }
+
+        this.closeTacticalMenu();
+    }
+
+    private getTacticalTarget(tile: TilePoint): TacticalTargetRef {
+        const hit = this.resolveFieldHitAt(tile);
+        switch (hit.kind) {
+            case 'enemy':
+                return {
+                    kind: 'enemy',
+                    tile: this.enemyTile(hit.enemy),
+                    targetKey: makeTacticalTargetKey('enemy', hit.enemy.id),
+                };
+            case 'party':
+                return {
+                    kind: 'party',
+                    tile: { x: hit.party.entity.gridX, y: hit.party.entity.gridY },
+                    targetKey: makeTacticalTargetKey('party', hit.party.id),
+                };
+            case 'loot':
+                return {
+                    kind: 'loot',
+                    tile: { x: hit.loot.x, y: hit.loot.y },
+                    targetKey: makeTacticalTargetKey('loot', hit.loot.id),
+                };
+            case 'ground':
+                return { kind: 'ground', tile: hit.tile };
+            case 'blocked':
+                return { kind: 'blocked', tile: hit.tile };
         }
     }
 
@@ -1295,6 +1431,7 @@ export class WorldEngine {
         this.selectedLootId = null;
         this.clearActionMode();
         this.closeActionMenu();
+        this.closeTacticalMenu();
         this.addCombatLog(`${actor.character.name} 조작`);
         return true;
     }
@@ -1316,6 +1453,7 @@ export class WorldEngine {
             return;
         }
 
+        this.closeTacticalMenu();
         const available = this.getAvailableTurnActions(actor);
         this.actionMenuOpen = true;
         this.actionMenuUI.open(available);
@@ -1362,6 +1500,7 @@ export class WorldEngine {
         this.selectedActorId = actor.id;
         this.selectedEnemyId = null;
         this.selectedLootId = null;
+        this.closeTacticalMenu();
         this.actionMenuOpen = true;
         this.actionMenuUI.open(this.getAvailableTurnActions(actor));
     }
@@ -1373,6 +1512,7 @@ export class WorldEngine {
         this.reservedAction = null;
         this.clearActorIntent(actor);
         this.closeActionMenu();
+        this.closeTacticalMenu();
         this.clearActionMode();
         this.resetMagicState();
         this.addCombatLog(`${actor.character.name} 턴 종료: ${reason}`);
@@ -1469,6 +1609,7 @@ export class WorldEngine {
         if (!this.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
         else {
             this.actionMenuOpen = true;
+            this.closeTacticalMenu();
             this.actionMenuUI.open(this.getAvailableTurnActions(actor));
         }
     }
@@ -1873,6 +2014,43 @@ export class WorldEngine {
         return Boolean(this.reservedAction && actor && (actor.path.length > 0 || this.isEntityMoving(actor.entity)));
     }
 
+    private getWorldInteractionMode(): WorldInteractionMode {
+        if (this.isInputLockedByReservation()) return { kind: 'reservedAction' };
+        if (this.tacticalMenuUI.getIsOpen()) return { kind: 'tacticalMenu' };
+        if (this.fieldMagicState.mode === 'targeting') return { kind: 'magicTargeting' };
+        if (this.actionMode) return { kind: 'actionTargeting', action: this.actionMode };
+        if (this.actionMenuOpen) return { kind: 'actionMenu' };
+        return { kind: 'idle' };
+    }
+
+    private updateTacticalMarkers(dt: number): void {
+        this.tacticalMarkers.update(dt, (targetKey) => this.resolveTacticalMarkerTile(targetKey));
+    }
+
+    private resolveTacticalMarkerTile(targetKey: string): TilePoint | null {
+        const separator = targetKey.indexOf(':');
+        if (separator < 0) return null;
+        const kind = targetKey.slice(0, separator);
+        const id = targetKey.slice(separator + 1);
+
+        if (kind === 'enemy') {
+            const enemy = this.getEnemyById(id);
+            return enemy && enemy.stats.hp > 0 ? this.enemyTile(enemy) : null;
+        }
+
+        if (kind === 'loot') {
+            const loot = this.worldMap.loot.find((candidate) => candidate.id === id && !candidate.opened);
+            return loot ? { x: loot.x, y: loot.y } : null;
+        }
+
+        if (kind === 'party') {
+            const actor = this.partyActors.find((candidate) => candidate.id === id && !candidate.character.isDead);
+            return actor ? this.actorTile(actor) : null;
+        }
+
+        return null;
+    }
+
     private directionFromTo(from: TilePoint, to: TilePoint): 'up' | 'down' | 'left' | 'right' {
         const dx = to.x - from.x;
         const dy = to.y - from.y;
@@ -1888,6 +2066,7 @@ export class WorldEngine {
         this.selectedEnemyId = null;
         this.selectedLootId = null;
         this.closeActionMenu();
+        this.closeTacticalMenu();
         this.clearActionMode();
         this.resetMagicState();
     }
@@ -2036,6 +2215,82 @@ export class WorldEngine {
             ctx.fill();
             ctx.fillStyle = 'rgba(55, 220, 255, 0.22)';
         });
+    }
+
+    private renderTacticalMarkers(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
+        const markers = this.tacticalMarkers.getMarkers();
+        if (markers.length === 0) return;
+
+        ctx.save();
+        for (const marker of markers) {
+            const sx = marker.tile.x * TILE_SIZE - camX;
+            const sy = marker.tile.y * TILE_SIZE - camY;
+            const cx = sx + TILE_SIZE / 2;
+            const cy = sy + TILE_SIZE / 2;
+            const pulse = 0.5 + 0.5 * Math.sin(this.worldTime * 7);
+            const color = this.getTacticalMarkerColor(marker);
+            const alpha = marker.kind === 'ping'
+                ? Math.max(0.2, Math.min(1, marker.ttl / 3))
+                : Math.max(0.45, Math.min(1, marker.ttl / 30));
+
+            ctx.globalAlpha = alpha;
+            ctx.lineWidth = 2;
+
+            if (marker.kind === 'rally') {
+                ctx.strokeStyle = color;
+                ctx.fillStyle = 'rgba(40, 245, 150, 0.18)';
+                ctx.beginPath();
+                ctx.moveTo(cx, sy + 6);
+                ctx.lineTo(sx + TILE_SIZE - 7, cy);
+                ctx.lineTo(cx, sy + TILE_SIZE - 6);
+                ctx.lineTo(sx + 7, cy);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(cx, sy + 10);
+                ctx.lineTo(cx, sy + TILE_SIZE - 8);
+                ctx.stroke();
+            } else if (marker.kind === 'watch') {
+                const r = 12 + pulse * 3;
+                ctx.strokeStyle = color;
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(cx - 5, cy);
+                ctx.lineTo(cx + 5, cy);
+                ctx.moveTo(cx, cy - 5);
+                ctx.lineTo(cx, cy + 5);
+                ctx.stroke();
+            } else {
+                const r = 8 + pulse * 7;
+                ctx.strokeStyle = color;
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(cx - r - 3, cy);
+                ctx.lineTo(cx - r + 5, cy);
+                ctx.moveTo(cx + r - 5, cy);
+                ctx.lineTo(cx + r + 3, cy);
+                ctx.moveTo(cx, cy - r - 3);
+                ctx.lineTo(cx, cy - r + 5);
+                ctx.moveTo(cx, cy + r - 5);
+                ctx.lineTo(cx, cy + r + 3);
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+    }
+
+    private getTacticalMarkerColor(marker: TacticalMarker): string {
+        if (marker.kind === 'rally') return 'rgba(80, 255, 160, 0.95)';
+        if (marker.targetKind === 'enemy') return 'rgba(255, 78, 78, 0.95)';
+        if (marker.targetKind === 'loot') return 'rgba(255, 220, 74, 0.95)';
+        if (marker.targetKind === 'party') return 'rgba(82, 246, 255, 0.95)';
+        if (marker.targetKind === 'blocked') return 'rgba(255, 115, 90, 0.88)';
+        return 'rgba(240, 192, 80, 0.95)';
     }
 
     private renderActionTiles(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
@@ -2314,6 +2569,7 @@ export class WorldEngine {
         this.renderTerrainHoverInfo(ctx, vw);
         this.renderActionModeHint(ctx, vw, vh);
         this.renderCombatLog(ctx, vw, vh);
+        this.tacticalMenuUI.render(ctx);
         this.magicUI.render(ctx, vw, vh);
 
         ctx.fillStyle = 'rgba(255,255,255,0.32)';
