@@ -1,6 +1,8 @@
 import type { Character } from '../character/Character';
 import type { CharacterStats } from '../data/Stats';
 import type { Skill } from '../data/SkillDB';
+import { getMagicTerrainMultiplier } from '../field/TerrainRules';
+import type { TileType } from '../map/Tile';
 
 export interface SkillEffectEnemyInput {
     id: string;
@@ -14,6 +16,7 @@ export interface SkillEffectEnemyResult {
     enemyId: string;
     damage: number;
     killed: boolean;
+    terrainMultiplier?: number;
     statChanges?: Partial<Pick<CharacterStats, 'atk' | 'def' | 'magAtk' | 'magDef' | 'spd'>>;
 }
 
@@ -32,6 +35,13 @@ export interface ResolveSkillEffectInput {
     skill: Skill;
     targetEnemy?: SkillEffectEnemyInput;
     allEnemies?: SkillEffectEnemyInput[];
+    terrainContext?: SkillTerrainContext;
+}
+
+export interface SkillTerrainContext {
+    casterTile?: TileType;
+    impactTile?: TileType;
+    targetTiles?: Record<string, TileType>;
 }
 
 export function resolveSkillEffect(input: ResolveSkillEffectInput): SkillEffectResult {
@@ -58,16 +68,16 @@ export function resolveSkillEffect(input: ResolveSkillEffectInput): SkillEffectR
                 result.logs.push('대상 없음!');
                 break;
             }
-            result.enemyResults.push(resolveDamageToEnemy(skill, casterCombatStats, targetEnemy));
-            result.logs.push(`${skill.icon} ${skill.nameKr}: ${targetEnemy.name}에게 ${result.enemyResults[0].damage} 피해!`);
+            result.enemyResults.push(resolveDamageToEnemy(skill, casterCombatStats, targetEnemy, input.terrainContext));
+            result.logs.push(`${skill.icon} ${skill.nameKr}: ${targetEnemy.name}에게 ${result.enemyResults[0].damage} 피해!${formatTerrainNote(result.enemyResults[0])}`);
             break;
         case 'debuff':
             if (!targetEnemy) {
                 result.logs.push('대상 없음!');
                 break;
             }
-            result.enemyResults.push(resolveDebuffToEnemy(skill, casterCombatStats, targetEnemy));
-            result.logs.push(`${skill.icon} ${skill.nameKr}: ${targetEnemy.name} 약화`);
+            result.enemyResults.push(resolveDebuffToEnemy(skill, casterCombatStats, targetEnemy, input.terrainContext));
+            result.logs.push(`${skill.icon} ${skill.nameKr}: ${targetEnemy.name} 약화${formatTerrainNote(result.enemyResults[0])}`);
             break;
         case 'aoe': {
             if (!targetEnemy) {
@@ -80,7 +90,10 @@ export function resolveSkillEffect(input: ResolveSkillEffectInput): SkillEffectR
                 Math.abs(enemy.gridY - targetEnemy.gridY) <= skill.aoeRadius
             );
             result.logs.push(`${skill.icon} ${skill.nameKr}: ${targets.length}체 대상!`);
-            result.enemyResults = targets.map((enemy) => resolveDamageToEnemy(skill, casterCombatStats, enemy));
+            result.enemyResults = targets.map((enemy) => resolveDamageToEnemy(skill, casterCombatStats, enemy, input.terrainContext));
+            if (result.enemyResults.some((enemyResult) => hasTerrainMultiplier(enemyResult))) {
+                result.logs.push('지형 마법 상성 적용');
+            }
             break;
         }
     }
@@ -128,30 +141,57 @@ function resolveHeal(
 function resolveDamageToEnemy(
     skill: Skill,
     casterCombatStats: CharacterStats,
-    enemy: SkillEffectEnemyInput
+    enemy: SkillEffectEnemyInput,
+    terrainContext?: SkillTerrainContext
 ): SkillEffectEnemyResult {
     const isPhysical = skill.element === 'physical';
     const baseAtk = isPhysical ? casterCombatStats.atk : casterCombatStats.magAtk;
     const baseDef = isPhysical ? enemy.stats.def : enemy.stats.magDef;
-    const damage = Math.max(1, Math.floor(baseAtk * skill.power - baseDef * 0.5));
+    const terrainMultiplier = getEnemyTerrainMultiplier(skill, enemy, terrainContext);
+    const damage = Math.max(1, Math.floor((baseAtk * skill.power - baseDef * 0.5) * terrainMultiplier));
     return {
         enemyId: enemy.id,
         damage,
         killed: enemy.stats.hp - damage <= 0,
+        terrainMultiplier,
     };
 }
 
 function resolveDebuffToEnemy(
     skill: Skill,
     casterCombatStats: CharacterStats,
-    enemy: SkillEffectEnemyInput
+    enemy: SkillEffectEnemyInput,
+    terrainContext?: SkillTerrainContext
 ): SkillEffectEnemyResult {
     const atkReduction = Math.floor(enemy.stats.atk * (1 - skill.power));
-    const damage = Math.max(1, Math.floor(casterCombatStats.magAtk * 0.5));
+    const terrainMultiplier = getEnemyTerrainMultiplier(skill, enemy, terrainContext);
+    const damage = Math.max(1, Math.floor(casterCombatStats.magAtk * 0.5 * terrainMultiplier));
     return {
         enemyId: enemy.id,
         damage,
         killed: enemy.stats.hp - damage <= 0,
+        terrainMultiplier,
         statChanges: { atk: -atkReduction },
     };
+}
+
+function getEnemyTerrainMultiplier(
+    skill: Skill,
+    enemy: SkillEffectEnemyInput,
+    terrainContext?: SkillTerrainContext
+): number {
+    const targetTile = terrainContext?.targetTiles?.[enemy.id] ?? terrainContext?.impactTile;
+    return getMagicTerrainMultiplier(skill.element, {
+        casterTile: terrainContext?.casterTile,
+        targetTile,
+    }).multiplier;
+}
+
+function hasTerrainMultiplier(result: SkillEffectEnemyResult): boolean {
+    return result.terrainMultiplier !== undefined && Math.abs(result.terrainMultiplier - 1) > 0.001;
+}
+
+function formatTerrainNote(result: SkillEffectEnemyResult): string {
+    if (!hasTerrainMultiplier(result)) return '';
+    return ` (지형 x${result.terrainMultiplier!.toFixed(2)})`;
 }

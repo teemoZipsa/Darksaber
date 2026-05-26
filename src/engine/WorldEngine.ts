@@ -19,17 +19,28 @@ import { getItemDef } from '../data/ItemDB';
 import { getClassLine } from '../data/ClassTree';
 import { Skill, getLearnedSkills } from '../data/SkillDB';
 import { CombatFormulas } from '../combat/CombatFormulas';
-import { resolveSkillEffect, SkillEffectEnemyInput, SkillEffectResult } from '../combat/SkillEffectResolver';
+import { resolveSkillEffect, SkillEffectEnemyInput, SkillEffectResult, SkillTerrainContext } from '../combat/SkillEffectResolver';
 import { UI, renderGameTitle, Parchment, drawParchmentPanel, drawGlassPanel } from '../ui/UITheme';
 import { ActionMenuUI, ActionType } from '../ui/ActionMenuUI';
 import { EntityDisplayInfo, EntityInfoUI } from '../ui/EntityInfoUI';
 import { MagicUI } from '../ui/MagicUI';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
-import { FieldPassableQuery, TilePoint, findPath, findPathToAny, isInRange, manhattan, tilesInRange } from '../field/FieldPathing';
+import { TileType } from '../map/Tile';
+import { FieldPassableQuery, TilePoint, findPathToAny, findPathWithCost, findReachableTilesByCost, isInRange, manhattan, tilesInRange } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
 import { advanceAtb, resolveAggroState } from '../field/FieldCombat';
-import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getMoveApCost, hasExecutableFieldAction } from '../field/FieldActionEconomy';
+import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, hasExecutableFieldAction } from '../field/FieldActionEconomy';
+import { hasLineOfSight } from '../field/LineOfSight';
+import {
+    canAffordTerrainCost,
+    describeTerrainForHover,
+    getTerrainMoveCost,
+    isTerrainLineOfSightBlocking,
+    isTerrainPassable,
+    terrainCostToApCost,
+    TerrainActorTraits,
+} from '../field/TerrainRules';
 
 interface FieldIntent {
     kind: 'move' | 'attack' | 'interact' | 'magic' | 'rest' | 'wait';
@@ -40,6 +51,7 @@ interface FieldIntent {
     skillId?: string;
     targetEnemyId?: string;
     apCost?: number;
+    pathCost?: number;
 }
 
 interface FieldActor {
@@ -431,6 +443,10 @@ export class WorldEngine {
                 this.selectedEnemyId = enemy.id;
                 this.selectedActorId = null;
                 this.selectedLootId = null;
+                if (!this.canActorAttackTarget(actor, enemy)) {
+                    this.addCombatLog('공격 경로가 막혔습니다.');
+                    return;
+                }
                 if (this.spendAp(ATTACK_AP_COST) && this.tryActorAttack(actor, enemy)) {
                     this.resumeOrEndActiveTurn(actor);
                 }
@@ -553,12 +569,14 @@ export class WorldEngine {
             return;
         }
 
+        const targetEnemies = this.getSkillCandidateEnemies(skill, targetEnemy);
         const effect = resolveSkillEffect({
             casterStats: actor.character.stats,
             casterCharacter: actor.character,
             skill,
             targetEnemy: targetEnemy ? this.toSkillEnemyInput(targetEnemy) : undefined,
-            allEnemies: this.fieldEnemies.map((entry) => this.toSkillEnemyInput(entry.enemy)),
+            allEnemies: targetEnemies.map((enemy) => this.toSkillEnemyInput(enemy)),
+            terrainContext: this.getSkillTerrainContext(actor, targetEnemies, targetEnemy),
         });
 
         if (!this.spendAp(MAGIC_AP_COST)) {
@@ -638,6 +656,7 @@ export class WorldEngine {
         const result = new Set<string>();
         const start = this.actorTile(actor);
         for (const tile of tilesInRange(start, Math.max(1, skill.range))) {
+            if (!this.hasFieldLineOfSight(start, tile)) continue;
             result.add(`${tile.x},${tile.y}`);
         }
         return result;
@@ -660,7 +679,10 @@ export class WorldEngine {
             const radius = this.fieldMagicState.skill.aoeRadius;
             for (let dy = -radius; dy <= radius; dy++) {
                 for (let dx = -radius; dx <= radius; dx++) {
-                    hoverAoeTiles.add(`${enemy.gridX + dx},${enemy.gridY + dy}`);
+                    const tile = { x: enemy.gridX + dx, y: enemy.gridY + dy };
+                    if (this.hasFieldLineOfSight({ x: enemy.gridX, y: enemy.gridY }, tile)) {
+                        hoverAoeTiles.add(`${tile.x},${tile.y}`);
+                    }
                 }
             }
         }
@@ -677,25 +699,28 @@ export class WorldEngine {
     }
 
     private queueMoveIntent(actor: FieldActor, tile: TilePoint): boolean {
-        const path = findPath(this.actorTile(actor), tile, (query) => this.isFieldPassable(query), {
+        const movementBudget = this.getActorTerrainMovementBudget(actor);
+        const pathResult = findPathWithCost(this.actorTile(actor), tile, (query) => this.isFieldPassable(query), (step) => this.getActorTerrainStepCost(actor, step), {
             actorId: actor.id,
             intent: 'move',
             maxNodes: 8000,
+            maxCost: movementBudget,
         });
+        const path = pathResult.path;
         if (path.length === 0 && !this.isActorAt(actor, tile)) {
             this.clearActorIntent(actor);
             this.addCombatLog('이동 경로를 찾지 못했습니다.');
             return false;
         }
 
-        const apCost = getMoveApCost(path.length);
+        const apCost = terrainCostToApCost(pathResult.cost);
         if (!this.spendAp(apCost)) {
             this.addCombatLog('이동할 행동력이 부족합니다.');
             return false;
         }
 
         actor.path = path;
-        actor.queuedIntent = { kind: 'move', tile, path, apCost };
+        actor.queuedIntent = { kind: 'move', tile, path, apCost, pathCost: pathResult.cost };
         this.reservedAction = actor.queuedIntent;
         this.closeActionMenu();
         return true;
@@ -809,15 +834,17 @@ export class WorldEngine {
     }
 
     private tryActorAttack(actor: FieldActor, enemy: Enemy): boolean {
-        const range = this.getAttackRange(actor.character);
         const enemyTile = this.enemyTile(enemy);
-        if (!isInRange(this.actorTile(actor), enemyTile, range)) return false;
+        const start = this.actorTile(actor);
+        if (!this.canActorAttackTarget(actor, enemy)) return false;
         if (actor.entity.actionGauge < 100) return false;
+        const isRanged = manhattan(start, enemyTile) > 1;
 
         const result = CombatFormulas.calcPhysicalDamage(
             actor.character.getCombatStats(),
             enemy.stats,
-            this.worldMap.getTileAt(enemy.gridX, enemy.gridY)
+            this.worldMap.getTileAt(enemy.gridX, enemy.gridY),
+            { isRanged }
         );
         const dirBonus = CombatFormulas.getDirectionalMultiplier(
             actor.entity.gridX,
@@ -838,6 +865,7 @@ export class WorldEngine {
         const dead = enemy.takeDamage(result.damage);
         const critText = result.isCrit ? ' CRIT' : '';
         this.addCombatLog(`${actor.character.name} → ${enemy.name} ${result.damage} 피해${critText}`);
+        this.logPhysicalTerrainEffect(result);
 
         if (dead) this.handleEnemyDefeated(actor, enemy);
         return true;
@@ -848,7 +876,8 @@ export class WorldEngine {
         const result = CombatFormulas.calcPhysicalDamage(
             enemy.stats,
             actor.character.stats,
-            this.worldMap.getTileAt(actor.entity.gridX, actor.entity.gridY)
+            this.worldMap.getTileAt(actor.entity.gridX, actor.entity.gridY),
+            { defenderTraits: this.getActorTerrainTraits(actor) }
         );
         enemy.actionGauge = 0;
         enemy.facing = this.directionFromTo(this.enemyTile(enemy), this.actorTile(actor));
@@ -860,6 +889,7 @@ export class WorldEngine {
 
         actor.character.stats.hp = Math.max(0, actor.character.stats.hp - result.damage);
         this.addCombatLog(`${enemy.name} → ${actor.character.name} ${result.damage} 피해`);
+        this.logPhysicalTerrainEffect(result);
 
         if (actor.character.stats.hp <= 0 && !actor.character.isDead) {
             this.handleActorDown(actor);
@@ -960,7 +990,8 @@ export class WorldEngine {
     }
 
     private isFieldPassable(query: FieldPassableQuery): boolean {
-        if (!this.worldMap.isWalkable(query.x, query.y)) return false;
+        const tile = this.worldMap.getTileAt(query.x, query.y);
+        if (!isTerrainPassable(tile, this.getTerrainTraitsForActorId(query.actorId))) return false;
 
         const enemyAtTile = this.fieldEnemies.some((entry) =>
             entry.enemy.id !== query.actorId &&
@@ -1197,6 +1228,76 @@ export class WorldEngine {
         return getClassLine(character.classLineId)?.attackRange ?? 1;
     }
 
+    private getActorTerrainMovementBudget(actor: FieldActor): number {
+        return Math.max(1, actor.character.stats.mov || actor.entity.moveRange);
+    }
+
+    private getActorTerrainTraits(actor: FieldActor): TerrainActorTraits {
+        const classLine = getClassLine(actor.character.classLineId);
+        return {
+            ignoresTerrain: classLine?.ignoresTerrain ?? false,
+            waterBonus: classLine?.waterBonus ?? false,
+        };
+    }
+
+    private getTerrainTraitsForActorId(actorId?: string): TerrainActorTraits {
+        const actor = actorId ? this.partyActors.find((candidate) => candidate.id === actorId) : undefined;
+        return actor ? this.getActorTerrainTraits(actor) : {};
+    }
+
+    private getActorTerrainStepCost(actor: FieldActor, tile: TilePoint): number {
+        return getTerrainMoveCost(this.worldMap.getTileAt(tile.x, tile.y), this.getActorTerrainTraits(actor));
+    }
+
+    private hasFieldLineOfSight(from: TilePoint, to: TilePoint): boolean {
+        return hasLineOfSight(from, to, (tile) =>
+            isTerrainLineOfSightBlocking(this.worldMap.getTileAt(tile.x, tile.y))
+        );
+    }
+
+    private canActorAttackTarget(actor: FieldActor, enemy: Enemy): boolean {
+        const start = this.actorTile(actor);
+        const target = this.enemyTile(enemy);
+        const distance = manhattan(start, target);
+        if (!isInRange(start, target, this.getAttackRange(actor.character))) return false;
+        if (distance > 1 && !this.hasFieldLineOfSight(start, target)) return false;
+        return true;
+    }
+
+    private getSkillCandidateEnemies(skill: Skill, targetEnemy?: Enemy): Enemy[] {
+        const alive = this.fieldEnemies
+            .map((entry) => entry.enemy)
+            .filter((enemy) => enemy.stats.hp > 0);
+        if (skill.type !== 'aoe' || !targetEnemy) return alive;
+
+        const impact = this.enemyTile(targetEnemy);
+        return alive.filter((enemy) =>
+            Math.abs(enemy.gridX - impact.x) <= skill.aoeRadius &&
+            Math.abs(enemy.gridY - impact.y) <= skill.aoeRadius &&
+            this.hasFieldLineOfSight(impact, this.enemyTile(enemy))
+        );
+    }
+
+    private getSkillTerrainContext(actor: FieldActor, targetEnemies: Enemy[], targetEnemy?: Enemy): SkillTerrainContext {
+        const targetTiles: Record<string, TileType> = {};
+        for (const enemy of targetEnemies) {
+            targetTiles[enemy.id] = this.worldMap.getTileAt(enemy.gridX, enemy.gridY);
+        }
+        return {
+            casterTile: this.worldMap.getTileAt(actor.entity.gridX, actor.entity.gridY),
+            impactTile: targetEnemy ? this.worldMap.getTileAt(targetEnemy.gridX, targetEnemy.gridY) : undefined,
+            targetTiles,
+        };
+    }
+
+    private logPhysicalTerrainEffect(result: { terrainMultiplier?: number; hitChance?: number }): void {
+        const notes: string[] = [];
+        if (result.terrainMultiplier !== undefined && result.terrainMultiplier < 0.999) {
+            notes.push(`피해 -${Math.round((1 - result.terrainMultiplier) * 100)}%`);
+        }
+        if (notes.length > 0) this.addCombatLog(`지형 효과: ${notes.join(', ')}`);
+    }
+
     private actorTile(actor: FieldActor): TilePoint {
         return { x: actor.entity.gridX, y: actor.entity.gridY };
     }
@@ -1273,10 +1374,8 @@ export class WorldEngine {
 
     private hasExecutableAttack(actor: FieldActor): boolean {
         if (this.remainingActionPoints < ATTACK_AP_COST) return false;
-        const start = this.actorTile(actor);
-        const range = this.getAttackRange(actor.character);
         return this.fieldEnemies.some((entry) =>
-            entry.enemy.stats.hp > 0 && isInRange(start, this.enemyTile(entry.enemy), range)
+            entry.enemy.stats.hp > 0 && this.canActorAttackTarget(actor, entry.enemy)
         );
     }
 
@@ -1291,27 +1390,27 @@ export class WorldEngine {
     private computeWalkableTiles(actor: FieldActor): Set<string> {
         const result = new Set<string>();
         const start = this.actorTile(actor);
-        const range = Math.min(
-            Math.max(1, actor.character.stats.mov || actor.entity.moveRange),
-            Math.floor(this.remainingActionPoints / MOVE_AP_PER_TILE)
+        const movementBudget = this.getActorTerrainMovementBudget(actor);
+        const maxCost = Math.min(
+            movementBudget,
+            this.remainingActionPoints / MOVE_AP_PER_TILE
         );
-        if (range <= 0) return result;
-        const queue: { x: number; y: number; dist: number }[] = [{ ...start, dist: 0 }];
-        const visited = new Set<string>([`${start.x},${start.y}`]);
+        if (maxCost <= 0) return result;
 
-        while (queue.length > 0) {
-            const current = queue.shift()!;
-            if (current.dist > 0) result.add(`${current.x},${current.y}`);
-            if (current.dist >= range) continue;
+        const reachable = findReachableTilesByCost(
+            start,
+            (query) => this.isFieldPassable(query),
+            (tile) => this.getActorTerrainStepCost(actor, tile),
+            maxCost,
+            { actorId: actor.id, intent: 'move', maxNodes: 8000 }
+        );
 
-            for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
-                const next = { x: current.x + dx, y: current.y + dy };
-                const key = `${next.x},${next.y}`;
-                if (visited.has(key)) continue;
-                visited.add(key);
-                if (this.isFieldPassable({ ...next, actorId: actor.id, intent: 'move' })) {
-                    queue.push({ ...next, dist: current.dist + 1 });
-                }
+        for (const [key, reachableTile] of reachable) {
+            if (
+                reachableTile.cost <= movementBudget + 1e-9 &&
+                canAffordTerrainCost(reachableTile.cost, this.remainingActionPoints)
+            ) {
+                result.add(key);
             }
         }
 
@@ -1324,6 +1423,7 @@ export class WorldEngine {
         const range = this.getAttackRange(actor.character);
         for (const tile of tilesInRange(start, range)) {
             if (tile.x === start.x && tile.y === start.y) continue;
+            if (range >= 2 && !this.hasFieldLineOfSight(start, tile)) continue;
             result.add(`${tile.x},${tile.y}`);
         }
         return result;
@@ -1556,6 +1656,7 @@ export class WorldEngine {
             this.entityInfoUI.render(ctx, selectedInfo);
         }
 
+        this.renderTerrainHoverInfo(ctx, vw);
         this.renderActionModeHint(ctx, vw, vh);
         this.renderCombatLog(ctx, vw, vh);
         this.magicUI.render(ctx, vw, vh);
@@ -1566,6 +1667,25 @@ export class WorldEngine {
         ctx.fillText('캐릭터 클릭 행동 메뉴 | Tab 교체 | ESC 취소 | I 인벤토리', vw - 16, vh - 16);
         ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
+    }
+
+    private renderTerrainHoverInfo(ctx: CanvasRenderingContext2D, vw: number): void {
+        if (this.hoverTile.x < 0 || this.hoverTile.y < 0) return;
+        const activeActor = this.getControlledActor();
+        const tile = this.worldMap.getTileAt(this.hoverTile.x, this.hoverTile.y);
+        const lines = describeTerrainForHover(tile, activeActor ? this.getActorTerrainTraits(activeActor) : {});
+        const w = 214;
+        const h = 18 + lines.length * 14;
+        const x = Math.max(16, vw - w - 16);
+        const y = 56;
+        drawGlassPanel(ctx, x, y, w, h);
+        ctx.fillStyle = 'rgba(255,255,255,0.82)';
+        ctx.font = `9px ${UI.fontMono}`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        lines.forEach((line, index) => {
+            ctx.fillText(line, x + 10, y + 9 + index * 14);
+        });
     }
 
     private getSelectedDisplayInfo(): EntityDisplayInfo | null {

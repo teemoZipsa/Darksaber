@@ -29,6 +29,7 @@ import { sfxHit, sfxCritical, sfxMiss, sfxHeal, sfxLevelUp, sfxKill, sfxPromotio
 import { UI, Parchment, drawParchmentPanel, drawGlassPanel } from '../ui/UITheme';
 import { MinimapUI } from '../ui/MinimapUI';
 import { TileType } from '../map/Tile';
+import { battleStageTileToTerrainTile as mapBattleStageTileToTerrainTile, isTerrainPassable } from '../field/TerrainRules';
 import type { GameManager } from './GameManager';
 
 // ═══════════════════════════════════════════════════════════
@@ -40,10 +41,9 @@ const STAGE_TILE_COLORS: Record<number, string> = {
     1: '#2a2a2a',   // wall
 };
 
-const STAGE_TILE_WALKABLE: Record<number, boolean> = {
-    0: true,
-    1: false,
-};
+export function battleStageTileToTerrainTile(stageTile: number): TileType {
+    return mapBattleStageTileToTerrainTile(stageTile);
+}
 
 // ═══════════════════════════════════════════════════════════
 //  BattleEngine
@@ -132,7 +132,7 @@ export class BattleEngine {
         this.minimapUI = new MinimapUI({
             getTile: (gx, gy) => {
                 if (gy < 0 || gy >= this.tiles.length || gx < 0 || gx >= (this.tiles[0]?.length || 0)) return TileType.WALL;
-                return this.tiles[gy][gx] === 1 ? TileType.WALL : TileType.GRASS;
+                return battleStageTileToTerrainTile(this.tiles[gy][gx]);
             },
             getPlayerPos: () => ({ x: this.player.gridX, y: this.player.gridY }),
             getEnemies: () => this.enemies.map(e => ({ gridX: e.gridX, gridY: e.gridY, color: e.color, isBoss: e.isBoss })),
@@ -499,8 +499,8 @@ export class BattleEngine {
     }
 
     private performAttack(target: Enemy): void {
-        const defTile = this.tiles[target.gridY]?.[target.gridX] ?? 0;
-        const result = CombatFormulas.calcPhysicalDamage(this.playerStats, target.stats, defTile as any);
+        const defTile = battleStageTileToTerrainTile(this.tiles[target.gridY]?.[target.gridX] ?? 0);
+        const result = CombatFormulas.calcPhysicalDamage(this.playerStats, target.stats, defTile);
 
         // Directional bonus
         const dirBonus = CombatFormulas.getDirectionalMultiplier(
@@ -683,8 +683,8 @@ export class BattleEngine {
 
         if (dist <= 1) {
             // Attack
-            const defTile = this.tiles[targetPlayer.gridY]?.[targetPlayer.gridX] ?? 0;
-            const result = CombatFormulas.calcPhysicalDamage(enemy.stats, targetChar.stats, defTile as any);
+            const defTile = battleStageTileToTerrainTile(this.tiles[targetPlayer.gridY]?.[targetPlayer.gridX] ?? 0);
+            const result = CombatFormulas.calcPhysicalDamage(enemy.stats, targetChar.stats, defTile);
             const dirBonus = CombatFormulas.getDirectionalMultiplier(
                 enemy.gridX, enemy.gridY, targetPlayer.gridX, targetPlayer.gridY, targetPlayer.facing
             );
@@ -811,7 +811,7 @@ export class BattleEngine {
 
     private isBattleTileWalkable(x: number, y: number): boolean {
         if (x < 0 || y < 0 || y >= this.stage.height || x >= this.stage.width) return false;
-        return STAGE_TILE_WALKABLE[this.tiles[y][x]] ?? false;
+        return isTerrainPassable(battleStageTileToTerrainTile(this.tiles[y][x]));
     }
 
     private isOccupied(x: number, y: number): boolean {

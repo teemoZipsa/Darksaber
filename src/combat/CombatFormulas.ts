@@ -3,13 +3,21 @@
  */
 
 import { CharacterStats } from '../data/Stats';
-import { TileType, TILE_PROPERTIES } from '../map/Tile';
+import { TileType } from '../map/Tile';
+import { getTerrainDefenseMultiplier, getTerrainProfile, TerrainActorTraits } from '../field/TerrainRules';
 
 export interface DamageResult {
     damage: number;
     isCrit: boolean;
     isHit: boolean;
     isMiss: boolean;
+    terrainMultiplier?: number;
+    hitChance?: number;
+}
+
+export interface PhysicalTerrainContext {
+    defenderTraits?: TerrainActorTraits;
+    isRanged?: boolean;
 }
 
 export class CombatFormulas {
@@ -20,23 +28,24 @@ export class CombatFormulas {
     public static calcPhysicalDamage(
         attacker: CharacterStats,
         defender: CharacterStats,
-        defenderTile: TileType
+        defenderTile: TileType,
+        terrainContext: PhysicalTerrainContext = {}
     ): DamageResult {
         // Hit check
-        const hitChance = Math.min(95, attacker.hitRate - (defender.spd * 2));
+        const profile = getTerrainProfile(defenderTile);
+        const rangedPenalty = terrainContext.isRanged ? profile.rangedHitPenalty : 0;
+        const hitChance = Math.min(95, attacker.hitRate - (defender.spd * 2) + rangedPenalty);
         const hitRoll = Math.random() * 100;
         if (hitRoll > hitChance) {
-            return { damage: 0, isCrit: false, isHit: false, isMiss: true };
+            return { damage: 0, isCrit: false, isHit: false, isMiss: true, hitChance };
         }
 
         // Base damage
         let baseDmg = Math.max(1, attacker.atk - Math.floor(defender.def / 2));
 
         // Terrain defense bonus
-        const tileProps = TILE_PROPERTIES[defenderTile];
-        if (tileProps.moveCost > 1) {
-            baseDmg = Math.floor(baseDmg * 0.85); // terrain cover reduces damage
-        }
+        const terrainMultiplier = getTerrainDefenseMultiplier(defenderTile, terrainContext.defenderTraits);
+        baseDmg = Math.floor(baseDmg * terrainMultiplier);
 
         // Random variance (90% ~ 110%)
         baseDmg = Math.floor(baseDmg * (0.9 + Math.random() * 0.2));
@@ -49,7 +58,7 @@ export class CombatFormulas {
             baseDmg = Math.floor(baseDmg * 1.5);
         }
 
-        return { damage: Math.max(1, baseDmg), isCrit, isHit: true, isMiss: false };
+        return { damage: Math.max(1, baseDmg), isCrit, isHit: true, isMiss: false, terrainMultiplier, hitChance };
     }
 
     /**

@@ -4,12 +4,26 @@ import { PartyManager } from '../../src/character/PartyManager';
 import { Character } from '../../src/character/Character';
 import { WorldMap } from '../../src/map/WorldMap';
 import { resolveFieldHit } from '../../src/field/FieldInteraction';
-import { findPath, findPathToAny, manhattan, tilesInRange, FieldPassableQuery } from '../../src/field/FieldPathing';
+import { findPath, findPathToAny, findPathWithCost, findReachableTilesByCost, manhattan, tilesInRange, FieldPassableQuery } from '../../src/field/FieldPathing';
 import { resolveAggroState, shouldAssistTarget } from '../../src/field/FieldCombat';
 import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getMoveApCost, hasExecutableFieldAction } from '../../src/field/FieldActionEconomy';
 import { resolveSkillEffect } from '../../src/combat/SkillEffectResolver';
 import { getSkill } from '../../src/data/SkillDB';
 import { createBaseStats } from '../../src/data/Stats';
+import { CombatFormulas } from '../../src/combat/CombatFormulas';
+import { hasLineOfSight } from '../../src/field/LineOfSight';
+import {
+    TERRAIN_PROFILES,
+    battleStageTileToTerrainTile,
+    canAffordTerrainCost,
+    getMagicTerrainMultiplier,
+    getTerrainDefenseMultiplier,
+    getTerrainMoveCost,
+    isTerrainPassable,
+    terrainCostToApCost,
+} from '../../src/field/TerrainRules';
+import { battleStageTileToTerrainTile as battleEngineStageTileToTerrainTile } from '../../src/engine/BattleEngine';
+import { TileType } from '../../src/map/Tile';
 
 class ImageStub {
     public src = '';
@@ -139,6 +153,93 @@ test('field AP movement cost excludes the starting tile', () => {
     assert.equal(getMoveApCost(5), 10);
 });
 
+test('terrain rules cover every TileType and battle stage adapter stays shared', () => {
+    const tileTypes = Object.values(TileType).filter((value): value is TileType => typeof value === 'number');
+    assert.equal(Object.keys(TERRAIN_PROFILES).length, tileTypes.length);
+    for (const tile of tileTypes) {
+        assert.ok(TERRAIN_PROFILES[tile], `missing terrain profile for ${TileType[tile]}`);
+    }
+
+    assert.equal(battleStageTileToTerrainTile(0), TileType.GRASS);
+    assert.equal(battleStageTileToTerrainTile(1), TileType.WALL);
+    assert.equal(battleEngineStageTileToTerrainTile(0), TileType.GRASS);
+    assert.equal(battleEngineStageTileToTerrainTile(1), TileType.WALL);
+    assert.equal(isTerrainPassable(battleEngineStageTileToTerrainTile(0)), true);
+    assert.equal(isTerrainPassable(battleEngineStageTileToTerrainTile(1)), false);
+});
+
+test('weighted pathing uses the same terrain cost and AP rounding for reach and spend', () => {
+    const terrain = new Map<string, TileType>([
+        ['0,0', TileType.GRASS],
+        ['1,0', TileType.ROAD],
+        ['2,0', TileType.FOREST],
+        ['3,0', TileType.ROAD],
+    ]);
+    const passable = ({ x, y }: FieldPassableQuery) => y === 0 && x >= 0 && x <= 3;
+    const stepCost = (tile: { x: number; y: number }) => getTerrainMoveCost(terrain.get(`${tile.x},${tile.y}`) ?? TileType.GRASS);
+
+    const reachable = findReachableTilesByCost({ x: 0, y: 0 }, passable, stepCost, 3);
+    const forest = reachable.get('2,0');
+    assert.ok(forest);
+    assert.equal(forest.cost, 2.8);
+    assert.equal(terrainCostToApCost(forest.cost), 6);
+    assert.equal(canAffordTerrainCost(forest.cost, 6), true);
+    assert.equal(canAffordTerrainCost(forest.cost, 5), false);
+    assert.equal(reachable.has('3,0'), false);
+
+    const path = findPathWithCost({ x: 0, y: 0 }, { x: 2, y: 0 }, passable, stepCost, { maxCost: 3 });
+    assert.deepEqual(path.path, [{ x: 1, y: 0 }, { x: 2, y: 0 }]);
+    assert.equal(terrainCostToApCost(path.cost), terrainCostToApCost(forest.cost));
+});
+
+test('terrain traits apply only to movement unless explicitly defensive', () => {
+    assert.equal(getTerrainMoveCost(TileType.FOREST, { ignoresTerrain: true }), 1);
+    assert.equal(getTerrainMoveCost(TileType.WATER, { waterBonus: true }), 0.8);
+    assert.equal(Number.isFinite(getTerrainMoveCost(TileType.DEEP_WATER, { waterBonus: true })), false);
+    assert.equal(Number.isFinite(getTerrainMoveCost(TileType.LAVA, { ignoresTerrain: true })), false);
+    assert.equal(getTerrainDefenseMultiplier(TileType.WATER, { waterBonus: true }), 0.85);
+    assert.equal(getTerrainDefenseMultiplier(TileType.FOREST, { ignoresTerrain: true }), 0.85);
+});
+
+test('line of sight blocks walls and conservative diagonal corner gaps', () => {
+    assert.equal(hasLineOfSight(
+        { x: 0, y: 0 },
+        { x: 2, y: 0 },
+        (tile) => tile.x === 1 && tile.y === 0
+    ), false);
+    assert.equal(hasLineOfSight(
+        { x: 0, y: 0 },
+        { x: 1, y: 1 },
+        (tile) => (tile.x === 1 && tile.y === 0) || (tile.x === 0 && tile.y === 1)
+    ), false);
+    assert.equal(hasLineOfSight(
+        { x: 0, y: 0 },
+        { x: 3, y: 1 },
+        () => false
+    ), true);
+});
+
+test('physical combat applies terrain defense and ranged cover hit penalty', () => {
+    const attacker = createBaseStats({ atk: 50, hitRate: 90, critRate: 0, spd: 1 });
+    const defender = createBaseStats({ def: 0, spd: 0 });
+    const originalRandom = Math.random;
+    try {
+        Math.random = () => 0;
+        const grass = CombatFormulas.calcPhysicalDamage(attacker, defender, TileType.GRASS);
+        const stone = CombatFormulas.calcPhysicalDamage(attacker, defender, TileType.STONE);
+        assert.ok(stone.damage < grass.damage);
+        assert.equal(stone.terrainMultiplier, 0.8);
+
+        Math.random = () => 0.8;
+        const meleeForest = CombatFormulas.calcPhysicalDamage(attacker, defender, TileType.FOREST);
+        const rangedForest = CombatFormulas.calcPhysicalDamage(attacker, defender, TileType.FOREST, { isRanged: true });
+        assert.equal(meleeForest.isMiss, false);
+        assert.equal(rangedForest.isMiss, true);
+    } finally {
+        Math.random = originalRandom;
+    }
+});
+
 test('ready queue is FIFO and rejects duplicate actors', () => {
     const queue: string[] = [];
     assert.equal(enqueueReadyActor(queue, 'p1'), true);
@@ -243,6 +344,17 @@ test('skill effect resolver applies damage, debuff, and enemy-only aoe', () => {
     assert.equal(damageResult.enemyResults.length, 1);
     assert.equal(damageResult.enemyResults[0].damage, 25);
 
+    const waterDamageResult = resolveSkillEffect({
+        casterStats,
+        skill: fireball,
+        targetEnemy: target,
+        terrainContext: {
+            casterTile: TileType.GRASS,
+            targetTiles: { e1: TileType.WATER },
+        },
+    });
+    assert.equal(waterDamageResult.enemyResults[0].damage, 20);
+
     const debuffResult = resolveSkillEffect({ casterStats, skill: poison, targetEnemy: target });
     assert.equal(debuffResult.enemyResults[0].statChanges?.atk, -3);
     assert.equal(debuffResult.enemyResults[0].damage, 10);
@@ -258,4 +370,19 @@ test('skill effect resolver applies damage, debuff, and enemy-only aoe', () => {
         ],
     });
     assert.deepEqual(aoeResult.enemyResults.map((result) => result.enemyId), ['e1', 'e2']);
+});
+
+test('magic terrain multipliers remain clamped to tactical bounds', () => {
+    const weakFire = getMagicTerrainMultiplier('fire', {
+        casterTile: TileType.WATER,
+        targetTile: TileType.DEEP_WATER,
+    });
+    const strongIce = getMagicTerrainMultiplier('ice', {
+        casterTile: TileType.SNOW,
+        targetTile: TileType.DEEP_WATER,
+    });
+    assert.ok(weakFire.multiplier >= 0.65);
+    assert.ok(strongIce.multiplier <= 1.45);
+    assert.equal(Number(weakFire.multiplier.toFixed(3)), 0.72);
+    assert.equal(Number(strongIce.multiplier.toFixed(3)), 1.375);
 });
