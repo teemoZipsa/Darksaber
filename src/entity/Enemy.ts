@@ -6,6 +6,13 @@ import { Entity } from './Entity';
 import { CharacterStats, createBaseStats } from '../data/Stats';
 import { TileType, TILE_PROPERTIES } from '../map/Tile';
 import type { StatusEffect } from '../combat/StatusEffects';
+import { createEnemyAIProfile, type EnemyAIProfile, type EnemyRole } from '../field/EnemyAI';
+
+export interface EnemyAIMemory {
+    turnCount: number;
+    cooldowns: Record<string, number>;
+    lastPattern?: string;
+}
 
 export class Enemy extends Entity {
     public name: string;
@@ -17,6 +24,13 @@ export class Enemy extends Entity {
     public isBoss: boolean = false;
     public lootTableId: string = '';
     public statuses: StatusEffect[] = [];
+    public role: EnemyRole;
+    public aiProfile: EnemyAIProfile;
+    public aiMemory: EnemyAIMemory = {
+        turnCount: 0,
+        cooldowns: {},
+    };
+    private tunedRole: EnemyRole | null = null;
 
     constructor(
         id: string,
@@ -24,13 +38,16 @@ export class Enemy extends Entity {
         gridY: number,
         name: string,
         level: number,
-        color: string = '#ff4444'
+        color: string = '#ff4444',
+        role: EnemyRole = 'bruiser'
     ) {
         super(id, gridX, gridY, color, name.charAt(0).toUpperCase());
         this.name = name;
         this.level = level;
         this.aggroRange = 5;
         this.expReward = 25 + level * 8;
+        this.role = role;
+        this.aiProfile = createEnemyAIProfile(role);
 
         // Scale stats by level (tuned for balanced early game)
         this.stats = createBaseStats({
@@ -45,6 +62,14 @@ export class Enemy extends Entity {
             spd: 2 + level * 0.3,
             mov: 2,
         });
+        this.applyRoleTuning(role);
+    }
+
+    public setRole(role: EnemyRole): void {
+        this.role = role;
+        this.aiProfile = createEnemyAIProfile(role);
+        this.applyRoleTuning(role);
+        if (role === 'boss') this.isBoss = true;
     }
 
     /** Check if player is within aggro range (Manhattan distance) */
@@ -122,5 +147,68 @@ export class Enemy extends Entity {
     public takeDamage(amount: number): boolean {
         this.stats.hp = Math.max(0, this.stats.hp - amount);
         return this.stats.hp <= 0; // returns true if dead
+    }
+
+    private applyRoleTuning(role: EnemyRole): void {
+        if (this.tunedRole === role) return;
+        this.tunedRole = role;
+
+        switch (role) {
+            case 'tank':
+                this.scaleMaxHp(1.35);
+                this.stats.def += 4;
+                this.stats.spd = Math.max(1, this.stats.spd - 0.4);
+                this.stats.mov = 2;
+                break;
+            case 'archer':
+                this.scaleMaxHp(0.85);
+                this.stats.atk += 3;
+                this.stats.hitRate += 10;
+                this.stats.critRate += 3;
+                this.stats.def = Math.max(0, this.stats.def - 1);
+                this.stats.mov = 3;
+                break;
+            case 'healer':
+                this.scaleMaxHp(0.9);
+                this.stats.atk = Math.max(1, this.stats.atk - 2);
+                this.stats.magAtk += 5;
+                this.stats.magDef += 3;
+                this.stats.maxMp += 20;
+                this.stats.mp = this.stats.maxMp;
+                this.stats.mov = 3;
+                break;
+            case 'coward':
+                this.scaleMaxHp(0.8);
+                this.stats.def = Math.max(0, this.stats.def - 2);
+                this.stats.spd += 2;
+                this.stats.mov = 4;
+                break;
+            case 'support':
+                this.scaleMaxHp(0.95);
+                this.stats.magAtk += 3;
+                this.stats.magDef += 2;
+                this.stats.spd += 0.6;
+                this.stats.mov = 3;
+                break;
+            case 'boss':
+                this.scaleMaxHp(2.2);
+                this.stats.atk += 6;
+                this.stats.def += 5;
+                this.stats.magAtk += 5;
+                this.stats.magDef += 4;
+                this.stats.mov = 3;
+                this.isBoss = true;
+                break;
+            case 'bruiser':
+            default:
+                break;
+        }
+    }
+
+    private scaleMaxHp(multiplier: number): void {
+        const previousMax = Math.max(1, this.stats.maxHp);
+        const pct = this.stats.hp / previousMax;
+        this.stats.maxHp = Math.max(1, Math.floor(this.stats.maxHp * multiplier));
+        this.stats.hp = Math.max(1, Math.floor(this.stats.maxHp * pct));
     }
 }

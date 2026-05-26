@@ -132,7 +132,7 @@ export class BossSpawner {
             const tile = getTile(tx, ty);
             if (TILE_PROPERTIES[tile]?.walkable) {
                 const id = `boss_${this.bossIdCounter++}`;
-                const boss = new Enemy(id, tx, ty, t(template.nameKey), template.level, template.color);
+                const boss = new Enemy(id, tx, ty, t(template.nameKey), template.level, template.color, 'boss');
 
                 // Override stats
                 boss.stats.maxHp = template.hp;

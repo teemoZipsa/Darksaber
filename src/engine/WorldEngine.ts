@@ -32,17 +32,21 @@ import {
     getStatusIcons,
     hasStatus,
     resolveTurnStartStatuses,
+    type StatusKind,
 } from '../combat/StatusEffects';
 import { UI, renderGameTitle, Parchment, drawParchmentPanel, drawGlassPanel } from '../ui/UITheme';
 import { ActionMenuUI, ActionType } from '../ui/ActionMenuUI';
 import { EntityDisplayInfo, EntityInfoUI } from '../ui/EntityInfoUI';
 import { MagicUI } from '../ui/MagicUI';
+import { EffectManager } from '../ui/EffectManager';
+import { FloatingTextManager } from '../ui/FloatingTextManager';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TileType } from '../map/Tile';
 import { FieldPassableQuery, TilePoint, findPathToAny, findPathWithCost, findReachableTilesByCost, manhattan, tileKey, tilesInRange } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
 import { advanceAtb, resolveAggroState } from '../field/FieldCombat';
+import { decideEnemyAction, type BossPattern, type EnemyAIDecision, type EnemyAIUnit, type EnemyRole } from '../field/EnemyAI';
 import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getWaitAtbCarryover, hasExecutableFieldAction } from '../field/FieldActionEconomy';
 import { hasLineOfSight } from '../field/LineOfSight';
 import {
@@ -96,6 +100,15 @@ type FieldMagicState =
     | { mode: 'menu' }
     | { mode: 'targeting'; skill: Skill; validTiles: Set<string>; hoverAoeTiles: Set<string> };
 
+interface AttackCue {
+    from: TilePoint;
+    to: TilePoint;
+    timer: number;
+    duration: number;
+    color: string;
+    label?: string;
+}
+
 const ACTOR_COLORS = ['#00e5ff', '#ff4fd8', '#ffd447'];
 const FORMATION_OFFSETS: TilePoint[] = [
     { x: -1, y: 0 },
@@ -107,6 +120,15 @@ const ENEMY_AGGRO_RANGE = 6;
 const ENEMY_EXIT_RANGE = 10;
 const ENEMY_LEASH_RANGE = 16;
 const MOVEMENT_REPATH_INTERVAL = 0.35;
+const ENEMY_ROLE_GLYPHS: Record<EnemyRole, string> = {
+    bruiser: 'M',
+    tank: 'T',
+    archer: 'R',
+    healer: '+',
+    coward: '!',
+    support: 'S',
+    boss: 'B',
+};
 
 export class WorldEngine {
     private party: PartyManager;
@@ -133,6 +155,10 @@ export class WorldEngine {
     private hoverTile: TilePoint = { x: -1, y: -1 };
     private combatLog: string[] = [];
     private followRepathTimer: number = 0;
+    private floatingText = new FloatingTextManager();
+    private effectManager = new EffectManager();
+    private attackCues: AttackCue[] = [];
+    private worldTime: number = 0;
 
     constructor(
         _canvas: HTMLCanvasElement,
@@ -161,6 +187,7 @@ export class WorldEngine {
     }
 
     public update(dt: number, input: InputManager, camera: Camera): void {
+        this.worldTime += dt;
         if (input.mouseWheelDelta !== 0 && !this.magicUI.isVisible()) {
             if (input.mouseWheelDelta > 0) camera.zoomOut();
             else camera.zoomIn();
@@ -195,6 +222,9 @@ export class WorldEngine {
 
         this.updatePartyActors(dt);
         this.updateEnemies(dt);
+        this.effectManager.update(dt);
+        this.floatingText.update(dt);
+        this.updateAttackCues(dt);
         this.processQueuedIntents();
         this.refreshLootState();
         this.startNextReadyTurn();
@@ -227,6 +257,9 @@ export class WorldEngine {
         this.renderSelectedLoot(ctx, camX, camY);
         this.renderEnemies(ctx, camX, camY);
         this.renderPartyActors(ctx, camX, camY);
+        this.renderAttackCues(ctx, camX, camY);
+        this.effectManager.render(ctx, camera);
+        this.floatingText.render(ctx, camX, camY);
         this.renderHoverTile(ctx, camX, camY);
         this.renderActionMenu(ctx, camX, camY);
 
@@ -273,9 +306,12 @@ export class WorldEngine {
         if (!anchor) return;
 
         const enemySeeds = [
-            { offset: { x: 7, y: 3 }, name: 'Ash Raider', level: 1, color: '#d95763' },
-            { offset: { x: 10, y: -2 }, name: 'Wasteland Scout', level: 2, color: '#ff8a4a' },
-            { offset: { x: -6, y: 6 }, name: 'Hollow Guard', level: 1, color: '#b86cff' },
+            { offset: { x: 7, y: 3 }, name: '늑대인간', level: 1, color: '#d95763', role: 'bruiser' as EnemyRole },
+            { offset: { x: 10, y: -2 }, name: '에우리티온', level: 2, color: '#ff8a4a', role: 'archer' as EnemyRole },
+            { offset: { x: -6, y: 6 }, name: '미노타우로스', level: 1, color: '#b86cff', role: 'tank' as EnemyRole },
+            { offset: { x: 12, y: 4 }, name: '나이아드', level: 2, color: '#6fdc8c', role: 'healer' as EnemyRole },
+            { offset: { x: -9, y: -4 }, name: '만드라고라', level: 1, color: '#8fb6ff', role: 'coward' as EnemyRole },
+            { offset: { x: -11, y: 5 }, name: '마도사 마기', level: 2, color: '#9a7cff', role: 'support' as EnemyRole },
         ];
 
         this.fieldEnemies = enemySeeds.map((seed, index) => {
@@ -283,7 +319,7 @@ export class WorldEngine {
                 x: anchor.gridX + seed.offset.x,
                 y: anchor.gridY + seed.offset.y,
             }, `enemy_${index}`);
-            const enemy = new Enemy(`field_enemy_${index}`, tile.x, tile.y, seed.name, seed.level, seed.color);
+            const enemy = new Enemy(`field_enemy_${index}`, tile.x, tile.y, seed.name, seed.level, seed.color, seed.role);
             enemy.aggroRange = ENEMY_AGGRO_RANGE;
             return { enemy, home: tile, path: [] };
         });
@@ -428,6 +464,8 @@ export class WorldEngine {
             case 'rest':
                 actor.character.stats.hp = Math.min(actor.character.stats.maxHp, actor.character.stats.hp + 5);
                 actor.character.stats.mp = Math.min(actor.character.stats.maxMp, actor.character.stats.mp + 3);
+                this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, 5);
+                this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
                 this.addCombatLog('휴식: HP +5, MP +3 회복');
                 this.endActorTurn(actor, '휴식');
                 break;
@@ -437,11 +475,15 @@ export class WorldEngine {
                 break;
             case 'defend':
                 actor.character.statuses = applyStatus(actor.character.statuses, createStatus('guard'));
+                this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'GUARD');
+                this.effectManager.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
                 this.addCombatLog('방어 태세: 다음 피격 피해 감소');
                 this.endActorTurn(actor, '방어');
                 break;
             case 'counter':
                 actor.character.statuses = applyStatus(actor.character.statuses, createStatus('counterReady'));
+                this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'COUNTER');
+                this.effectManager.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
                 this.addCombatLog('반격 태세: 다음 피격 시 반격 준비');
                 this.endActorTurn(actor, '반격 태세');
                 break;
@@ -633,21 +675,34 @@ export class WorldEngine {
             return;
         }
 
-        this.applySkillEffect(actor, effect);
+        this.applySkillEffect(actor, skill, effect);
         this.resetMagicState();
         this.resumeOrEndActiveTurn(actor);
     }
 
-    private applySkillEffect(actor: FieldActor, effect: SkillEffectResult): void {
+    private applySkillEffect(actor: FieldActor, skill: Skill, effect: SkillEffectResult): void {
         actor.character.stats.mp = Math.max(0, Math.min(actor.character.stats.maxMp, actor.character.stats.mp + effect.casterMpDelta));
         actor.character.stats.hp = Math.max(0, Math.min(actor.character.stats.maxHp, actor.character.stats.hp + effect.casterHpDelta));
+        if (effect.casterHpDelta > 0) {
+            this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, effect.casterHpDelta);
+            this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
+        } else if (effect.casterHpDelta < 0) {
+            this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, Math.abs(effect.casterHpDelta), false, false);
+            this.effectManager.spawnHitEffect(actor.entity.gridX, actor.entity.gridY);
+        }
         if (effect.cleansesCasterStatuses) {
             actor.character.statuses = cleanseNegativeStatuses(actor.character.statuses);
+            this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'CLEANSE');
+            this.effectManager.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
         }
         if (effect.casterStatusEffects) {
             actor.character.statuses = applyStatuses(actor.character.statuses, effect.casterStatusEffects);
+            this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'BUFF');
+            this.effectManager.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
         } else if (effect.appliesBuff) {
             actor.character.applyBuff(effect.appliesBuff);
+            this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'BUFF');
+            this.effectManager.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
         }
 
         let counterTriggered = false;
@@ -657,11 +712,19 @@ export class WorldEngine {
 
             if (enemyResult.statusEffects) {
                 enemy.statuses = applyStatuses(enemy.statuses, enemyResult.statusEffects);
+                this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'WEAK');
+                this.effectManager.spawnDebuffEffect(enemy.gridX, enemy.gridY);
             }
 
+            if (skill.element !== 'none' && skill.element !== 'physical') {
+                this.effectManager.spawnByElement(skill.element, enemy.gridX, enemy.gridY);
+            } else {
+                this.effectManager.spawnHitEffect(enemy.gridX, enemy.gridY);
+            }
             const guarded = applyGuardToDamage(enemy.statuses, enemyResult.damage);
             enemy.statuses = guarded.statuses;
             const dead = enemy.takeDamage(guarded.damage);
+            this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, guarded.damage, false, false);
             if (guarded.guarded) this.addCombatLog(`${enemy.name} 방어: 피해 감소`);
             if (dead) this.handleEnemyDefeated(actor, enemy);
             else if (!guarded.guarded && !counterTriggered && this.tryEnemyCounterAttack(enemy, actor)) counterTriggered = true;
@@ -838,6 +901,7 @@ export class WorldEngine {
             const distanceToTarget = manhattan(enemyTile, this.actorTile(closest));
             const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
             enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
+            if (!enemy.isAggro && this.hasAggroAllyNear(entry, enemy.aiProfile.assistRange)) enemy.isAggro = true;
 
             if (enemy.id !== this.activeTurnActorId) {
                 enemy.actionGauge = advanceAtb(enemy.actionGauge, getEffectiveStatsForEnemy(enemy).spd, dt, FIELD_ATB_SCALE * 0.7);
@@ -887,6 +951,7 @@ export class WorldEngine {
         if (targetEnemies.length === 0) return false;
 
         actor.entity.facing = this.directionFromTo(start, this.enemyTile(enemy));
+        this.spawnAttackCue(start, this.enemyTile(enemy), '#72e8ff');
 
         let counterTriggered = false;
         for (const target of targetEnemies) {
@@ -913,7 +978,8 @@ export class WorldEngine {
             }
 
             if (result.isMiss) {
-                this.addCombatLog(`${actor.character.name} 공격 빗나감: ${target.name}`);
+                this.floatingText.spawnDamage(target.gridX, target.gridY, 0, false, true);
+                this.addCombatLog(`${actor.character.name} 명중 실패: ${target.name} (${Math.floor(result.hitChance ?? 0)}%)`);
                 continue;
             }
 
@@ -921,8 +987,11 @@ export class WorldEngine {
             target.statuses = guarded.statuses;
             const dealtDamage = guarded.damage;
             const dead = target.takeDamage(dealtDamage);
-            const critText = result.isCrit ? ' CRIT' : '';
-            this.addCombatLog(`${actor.character.name} → ${target.name} ${dealtDamage} 피해${critText}`);
+            this.floatingText.spawnDamage(target.gridX, target.gridY, dealtDamage, result.isCrit, false);
+            this.effectManager.spawnHitEffect(target.gridX, target.gridY, result.isCrit);
+            const critText = result.isCrit ? ' 치명' : '';
+            const dirText = dirBonus.label ? ` ${dirBonus.label}` : '';
+            this.addCombatLog(`${actor.character.name} → ${target.name} ${dealtDamage} 피해${critText}${dirText}`);
             if (guarded.guarded) this.addCombatLog(`${target.name} 방어: 피해 감소`);
             this.logPhysicalTerrainEffect(result);
 
@@ -932,26 +1001,31 @@ export class WorldEngine {
         return true;
     }
 
-    private enemyAttack(entry: FieldEnemy, actor: FieldActor): void {
+    private enemyAttack(entry: FieldEnemy, actor: FieldActor, range: number = 1): void {
         const enemy = entry.enemy;
+        if (!this.canEnemyAttackTarget(enemy, actor, range)) return;
         const result = CombatFormulas.calcPhysicalDamage(
             getEffectiveStatsForEnemy(enemy),
             getEffectiveStatsForCharacter(actor.character),
             this.worldMap.getTileAt(actor.entity.gridX, actor.entity.gridY),
-            { defenderTraits: this.getActorTerrainTraits(actor) }
+            { defenderTraits: this.getActorTerrainTraits(actor), isRanged: range > 1 }
         );
         enemy.actionGauge = 0;
         enemy.facing = this.directionFromTo(this.enemyTile(enemy), this.actorTile(actor));
+        this.spawnAttackCue(this.enemyTile(enemy), this.actorTile(actor), enemy.isBoss ? '#ff4ea3' : '#ff8a55');
 
         if (result.isMiss) {
-            this.addCombatLog(`${enemy.name} 공격 빗나감`);
+            this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, 0, false, true);
+            this.addCombatLog(`${enemy.name} 명중 실패: ${actor.character.name} (${Math.floor(result.hitChance ?? 0)}%)`);
             return;
         }
 
         const guarded = applyGuardToDamage(actor.character.statuses, result.damage);
         actor.character.statuses = guarded.statuses;
         actor.character.stats.hp = Math.max(0, actor.character.stats.hp - guarded.damage);
-        this.addCombatLog(`${enemy.name} → ${actor.character.name} ${guarded.damage} 피해`);
+        this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, guarded.damage, result.isCrit, false);
+        this.effectManager.spawnHitEffect(actor.entity.gridX, actor.entity.gridY, result.isCrit);
+        this.addCombatLog(`${enemy.name} → ${actor.character.name} ${guarded.damage} 피해${result.isCrit ? ' 치명' : ''}`);
         if (guarded.guarded) this.addCombatLog(`${actor.character.name} 방어: 피해 감소`);
         this.logPhysicalTerrainEffect(result);
 
@@ -979,12 +1053,16 @@ export class WorldEngine {
             { isRanged: manhattan(this.actorTile(actor), this.enemyTile(enemy)) > 1 }
         );
         if (result.isMiss) {
+            this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, 0, false, true);
             this.addCombatLog(`${actor.character.name} 반격 빗나감: ${enemy.name}`);
             return true;
         }
 
         const damage = Math.max(1, Math.floor(result.damage * (consumed.consumed.magnitude || 0.75)));
         const dead = enemy.takeDamage(damage);
+        this.spawnAttackCue(this.actorTile(actor), this.enemyTile(enemy), '#9ff6ff');
+        this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, damage, result.isCrit, false);
+        this.effectManager.spawnHitEffect(enemy.gridX, enemy.gridY, result.isCrit);
         this.addCombatLog(`${actor.character.name} 반격 → ${enemy.name} ${damage} 피해`);
         if (dead) this.handleEnemyDefeated(actor, enemy);
         return true;
@@ -1007,25 +1085,33 @@ export class WorldEngine {
             { defenderTraits: this.getActorTerrainTraits(actor) }
         );
         if (result.isMiss) {
+            this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, 0, false, true);
             this.addCombatLog(`${enemy.name} 반격 빗나감`);
             return true;
         }
 
         const damage = Math.max(1, Math.floor(result.damage * (consumed.consumed.magnitude || 0.75)));
         actor.character.stats.hp = Math.max(0, actor.character.stats.hp - damage);
+        this.spawnAttackCue(this.enemyTile(enemy), this.actorTile(actor), '#ff9b66');
+        this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, damage, result.isCrit, false);
+        this.effectManager.spawnHitEffect(actor.entity.gridX, actor.entity.gridY, result.isCrit);
         this.addCombatLog(`${enemy.name} 반격 → ${actor.character.name} ${damage} 피해`);
         if (actor.character.stats.hp <= 0 && !actor.character.isDead) this.handleActorDown(actor);
         return true;
     }
 
-    private enemyStepToward(entry: FieldEnemy, actor: FieldActor): void {
+    private enemyStepToward(entry: FieldEnemy, actor: FieldActor, desiredRange: number = 1): void {
         const enemy = entry.enemy;
-        const goals = tilesInRange(this.actorTile(actor), 1)
+        const targetTile = this.actorTile(actor);
+        if (manhattan(this.enemyTile(enemy), targetTile) <= desiredRange) return;
+
+        const goals = tilesInRange(targetTile, desiredRange)
+            .filter((tile) => manhattan(tile, targetTile) === desiredRange)
             .filter((tile) => this.isFieldPassable({
                 ...tile,
                 actorId: enemy.id,
                 intent: 'enemy',
-                goal: this.actorTile(actor),
+                goal: targetTile,
             }));
         const path = findPathToAny(this.enemyTile(enemy), goals, (query) => this.isFieldPassable(query), {
             actorId: enemy.id,
@@ -1040,8 +1126,32 @@ export class WorldEngine {
         enemy.gridY = next.y;
     }
 
+    private enemyStepAway(entry: FieldEnemy, actor: FieldActor): boolean {
+        const enemy = entry.enemy;
+        const start = this.enemyTile(enemy);
+        const target = this.actorTile(actor);
+        const startDistance = manhattan(start, target);
+        const candidates = tilesInRange(start, 1)
+            .filter((tile) => manhattan(tile, start) === 1)
+            .filter((tile) => this.isFieldPassable({
+                ...tile,
+                actorId: enemy.id,
+                intent: 'enemy',
+            }))
+            .sort((a, b) => manhattan(b, target) - manhattan(a, target));
+        const next = candidates.find((tile) => manhattan(tile, target) > startDistance);
+        if (!next) return false;
+
+        enemy.facing = this.directionFromTo(start, next);
+        enemy.gridX = next.x;
+        enemy.gridY = next.y;
+        return true;
+    }
+
     private handleEnemyDefeated(actor: FieldActor, enemy: Enemy): void {
         this.addCombatLog(`${enemy.name} 처치! +${enemy.expReward} EXP`);
+        this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
+        this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
         actor.character.gainExp(enemy.expReward);
         enemy.isAggro = false;
         if (this.selectedEnemyId === enemy.id) this.selectedEnemyId = null;
@@ -1061,6 +1171,7 @@ export class WorldEngine {
         if (index === this.party.getActiveIndex()) {
             const next = this.party.markActiveDead();
             this.addCombatLog(`${actor.character.name} 쓰러짐`);
+            this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'DOWN');
             if (next) {
                 const nextIndex = this.partyActors.findIndex((candidate) => candidate.character === next);
                 if (nextIndex >= 0) this.switchToPartyMember(nextIndex);
@@ -1073,6 +1184,7 @@ export class WorldEngine {
         actor.character.isDead = true;
         actor.character.exp = 0;
         this.addCombatLog(`${actor.character.name} 쓰러짐`);
+        this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'DOWN');
     }
 
     private openLoot(loot: LootObject): void {
@@ -1296,8 +1408,16 @@ export class WorldEngine {
         const result = resolveTurnStartStatuses(actor.character.stats, actor.character.statuses);
         actor.character.statuses = result.statuses;
         if (result.expiredReaction) this.addCombatLog(`${actor.character.name}: 방어/반격 태세 해제`);
-        if (result.poisonDamage > 0) this.addCombatLog(`${actor.character.name}: 독 ${result.poisonDamage} 피해`);
-        if (result.regenHealing > 0) this.addCombatLog(`${actor.character.name}: 재생 ${result.regenHealing} 회복`);
+        if (result.poisonDamage > 0) {
+            this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, result.poisonDamage, false, false);
+            this.effectManager.spawnDebuffEffect(actor.entity.gridX, actor.entity.gridY);
+            this.addCombatLog(`${actor.character.name}: 독 ${result.poisonDamage} 피해`);
+        }
+        if (result.regenHealing > 0) {
+            this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, result.regenHealing);
+            this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
+            this.addCombatLog(`${actor.character.name}: 재생 ${result.regenHealing} 회복`);
+        }
         actor.character.stats.hp = Math.max(0, Math.min(actor.character.stats.maxHp, actor.character.stats.hp + result.hpDelta));
 
         if (actor.character.stats.hp <= 0 && !actor.character.isDead) {
@@ -1312,8 +1432,16 @@ export class WorldEngine {
         const result = resolveTurnStartStatuses(enemy.stats, enemy.statuses);
         enemy.statuses = result.statuses;
         if (result.expiredReaction) this.addCombatLog(`${enemy.name}: 방어/반격 태세 해제`);
-        if (result.poisonDamage > 0) this.addCombatLog(`${enemy.name}: 독 ${result.poisonDamage} 피해`);
-        if (result.regenHealing > 0) this.addCombatLog(`${enemy.name}: 재생 ${result.regenHealing} 회복`);
+        if (result.poisonDamage > 0) {
+            this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, result.poisonDamage, false, false);
+            this.effectManager.spawnDebuffEffect(enemy.gridX, enemy.gridY);
+            this.addCombatLog(`${enemy.name}: 독 ${result.poisonDamage} 피해`);
+        }
+        if (result.regenHealing > 0) {
+            this.floatingText.spawnHeal(enemy.gridX, enemy.gridY, result.regenHealing);
+            this.effectManager.spawnHealEffect(enemy.gridX, enemy.gridY);
+            this.addCombatLog(`${enemy.name}: 재생 ${result.regenHealing} 회복`);
+        }
         enemy.stats.hp = Math.max(0, Math.min(enemy.stats.maxHp, enemy.stats.hp + result.hpDelta));
 
         if (enemy.stats.hp <= 0) {
@@ -1336,6 +1464,7 @@ export class WorldEngine {
             this.endActorTurn(actor, '상태이상');
             return;
         }
+        this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'READY');
         this.addCombatLog(`${actor.character.name} 턴 시작: 행동 ${this.remainingActionPoints}`);
         if (!this.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
         else {
@@ -1347,6 +1476,7 @@ export class WorldEngine {
     private beginEnemyTurn(entry: FieldEnemy): void {
         const enemy = entry.enemy;
         this.activeTurnActorId = enemy.id;
+        this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'READY');
 
         if (!this.processEnemyTurnStartStatuses(entry)) {
             this.endEnemyTurn(enemy);
@@ -1364,15 +1494,216 @@ export class WorldEngine {
         const distanceToTarget = manhattan(enemyTile, this.actorTile(closest));
         const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
         enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
+        if (!enemy.isAggro && this.hasAggroAllyNear(entry, enemy.aiProfile.assistRange)) enemy.isAggro = true;
         if (!enemy.isAggro || this.isEntityMoving(enemy)) {
             this.endEnemyTurn(enemy);
             return;
         }
 
-        if (distanceToTarget <= 1) this.enemyAttack(entry, closest);
-        else if (hasStatus(enemy.statuses, 'immobilize')) this.addCombatLog(`${enemy.name}: 이동불가`);
-        else this.enemyStepToward(entry, closest);
+        enemy.aiMemory.turnCount += 1;
+        const decision = decideEnemyAction({
+            self: this.toEnemyAIUnit(enemy),
+            targets: aliveActors.map((actor) => this.toActorAIUnit(actor)),
+            allies: this.fieldEnemies
+                .map((candidate) => candidate.enemy)
+                .filter((candidate) => candidate.stats.hp > 0)
+                .map((candidate) => this.toEnemyAIUnit(candidate)),
+            profile: enemy.aiProfile,
+            turnCount: enemy.aiMemory.turnCount,
+            hasLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to),
+        });
+        this.executeEnemyDecision(entry, decision);
         this.endEnemyTurn(enemy);
+    }
+
+    private executeEnemyDecision(entry: FieldEnemy, decision: EnemyAIDecision): void {
+        const enemy = entry.enemy;
+        switch (decision.kind) {
+            case 'attack': {
+                const actor = this.getActorById(decision.targetId);
+                if (!actor) return;
+                if (this.canEnemyAttackTarget(enemy, actor, decision.range)) {
+                    this.enemyAttack(entry, actor, decision.range);
+                } else if (!hasStatus(enemy.statuses, 'immobilize')) {
+                    this.enemyStepToward(entry, actor, Math.max(1, Math.min(decision.range, enemy.aiProfile.preferredRange)));
+                }
+                break;
+            }
+            case 'moveToward': {
+                const actor = this.getActorById(decision.targetId);
+                if (!actor) return;
+                if (hasStatus(enemy.statuses, 'immobilize')) {
+                    this.addCombatLog(`${enemy.name}: 이동불가`);
+                    this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'ROOT');
+                    return;
+                }
+                this.enemyStepToward(entry, actor, decision.desiredRange);
+                break;
+            }
+            case 'moveAway': {
+                const actor = this.getActorById(decision.targetId);
+                if (!actor) return;
+                if (hasStatus(enemy.statuses, 'immobilize')) {
+                    this.addCombatLog(`${enemy.name}: 이동불가`);
+                    this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'ROOT');
+                    return;
+                }
+                if (!this.enemyStepAway(entry, actor) && this.canEnemyAttackTarget(enemy, actor, enemy.aiProfile.attackRange)) {
+                    this.enemyAttack(entry, actor, enemy.aiProfile.attackRange);
+                }
+                break;
+            }
+            case 'healAlly': {
+                const ally = this.getEnemyById(decision.allyId);
+                if (ally) this.enemyHealAlly(enemy, ally);
+                break;
+            }
+            case 'buffAlly': {
+                const ally = this.getEnemyById(decision.allyId);
+                if (ally) this.enemyBuffAlly(enemy, ally, decision.status);
+                break;
+            }
+            case 'debuffTarget': {
+                const actor = this.getActorById(decision.targetId);
+                if (actor) this.enemyDebuffActor(enemy, actor, decision.status);
+                break;
+            }
+            case 'guard':
+                enemy.statuses = applyStatus(enemy.statuses, createStatus('guard'));
+                this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'GUARD');
+                this.effectManager.spawnBuffEffect(enemy.gridX, enemy.gridY);
+                this.addCombatLog(`${enemy.name}: 방어 태세`);
+                break;
+            case 'bossPattern':
+                this.executeBossPattern(entry, decision.pattern, decision.targetId);
+                break;
+            case 'wait':
+                this.addCombatLog(`${enemy.name}: 대기`);
+                break;
+        }
+    }
+
+    private enemyHealAlly(caster: Enemy, ally: Enemy): void {
+        const stats = getEffectiveStatsForEnemy(caster);
+        const amount = Math.max(8, Math.floor(stats.magAtk * 2 + caster.level * 2));
+        const before = ally.stats.hp;
+        ally.stats.hp = Math.min(ally.stats.maxHp, ally.stats.hp + amount);
+        const healed = ally.stats.hp - before;
+        if (healed <= 0) return;
+        this.floatingText.spawnHeal(ally.gridX, ally.gridY, healed);
+        this.effectManager.spawnHealEffect(ally.gridX, ally.gridY);
+        this.addCombatLog(`${caster.name} → ${ally.name} ${healed} 회복`);
+    }
+
+    private enemyBuffAlly(caster: Enemy, ally: Enemy, status: StatusKind): void {
+        ally.statuses = applyStatus(ally.statuses, createStatus(status));
+        this.floatingText.spawnStatus(ally.gridX, ally.gridY, 'BUFF');
+        this.effectManager.spawnBuffEffect(ally.gridX, ally.gridY);
+        this.addCombatLog(`${caster.name} → ${ally.name} 강화`);
+    }
+
+    private enemyDebuffActor(caster: Enemy, actor: FieldActor, status: StatusKind): void {
+        actor.character.statuses = applyStatus(actor.character.statuses, createStatus(status));
+        this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'WEAK');
+        this.effectManager.spawnDebuffEffect(actor.entity.gridX, actor.entity.gridY);
+        this.addCombatLog(`${caster.name} → ${actor.character.name} 약화`);
+    }
+
+    private executeBossPattern(entry: FieldEnemy, pattern: BossPattern, targetId: string): void {
+        const enemy = entry.enemy;
+        const target = this.getActorById(targetId);
+        if (!target) return;
+
+        switch (pattern) {
+            case 'enrage':
+                enemy.statuses = applyStatus(enemy.statuses, createStatus('allUp', { durationTurns: 4, magnitude: 1.3 }));
+                this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'ENRAGE');
+                this.effectManager.spawnDarkEffect(enemy.gridX, enemy.gridY);
+                this.addCombatLog(`${enemy.name}: 광폭화`);
+                return;
+            case 'darkPulse': {
+                this.effectManager.spawnDarkEffect(enemy.gridX, enemy.gridY);
+                const victims = this.partyActors.filter((actor) =>
+                    !actor.character.isDead && manhattan(this.enemyTile(enemy), this.actorTile(actor)) <= 2
+                );
+                if (victims.length === 0) {
+                    this.enemyStepToward(entry, target, 2);
+                    return;
+                }
+                this.addCombatLog(`${enemy.name}: 암흑 파동 (${victims.length}명)`);
+                for (const victim of victims) this.enemySpellDamage(enemy, victim, 0.7, 'dark');
+                return;
+            }
+            case 'cleave': {
+                const victims = this.partyActors.filter((actor) =>
+                    !actor.character.isDead && manhattan(this.enemyTile(enemy), this.actorTile(actor)) <= 1
+                );
+                this.addCombatLog(`${enemy.name}: 휩쓸기`);
+                for (const victim of victims) this.enemyAttack(entry, victim, 1);
+                return;
+            }
+            case 'voidBolt':
+                this.addCombatLog(`${enemy.name}: 공허 탄환`);
+                this.spawnAttackCue(this.enemyTile(enemy), this.actorTile(target), '#b86cff', 'BOLT');
+                this.enemySpellDamage(enemy, target, 1, 'dark');
+                return;
+        }
+    }
+
+    private enemySpellDamage(enemy: Enemy, actor: FieldActor, power: number, element: 'dark' | 'fire' | 'ice' | 'lightning' | 'wind' | 'earth'): void {
+        const attacker = getEffectiveStatsForEnemy(enemy);
+        const defender = getEffectiveStatsForCharacter(actor.character);
+        const baseDamage = Math.max(1, Math.floor((attacker.magAtk * 1.5 - defender.magDef * 0.6) * power));
+        actor.character.stats.hp = Math.max(0, actor.character.stats.hp - baseDamage);
+        this.effectManager.spawnByElement(element, actor.entity.gridX, actor.entity.gridY);
+        this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, baseDamage, false, false);
+        this.addCombatLog(`${enemy.name} → ${actor.character.name} ${baseDamage} 마법 피해`);
+        if (actor.character.stats.hp <= 0 && !actor.character.isDead) this.handleActorDown(actor);
+    }
+
+    private getActorById(actorId: string): FieldActor | null {
+        return this.partyActors.find((actor) => actor.id === actorId && !actor.character.isDead) ?? null;
+    }
+
+    private toEnemyAIUnit(enemy: Enemy): EnemyAIUnit {
+        return {
+            id: enemy.id,
+            name: enemy.name,
+            tile: this.enemyTile(enemy),
+            hp: enemy.stats.hp,
+            maxHp: enemy.stats.maxHp,
+            role: enemy.role,
+            isBoss: enemy.isBoss,
+            isAggro: enemy.isAggro,
+            statusKinds: enemy.statuses.map((status) => status.kind),
+        };
+    }
+
+    private toActorAIUnit(actor: FieldActor): EnemyAIUnit {
+        return {
+            id: actor.id,
+            name: actor.character.name,
+            tile: this.actorTile(actor),
+            hp: actor.character.stats.hp,
+            maxHp: actor.character.stats.maxHp,
+            statusKinds: actor.character.statuses.map((status) => status.kind),
+        };
+    }
+
+    private canEnemyAttackTarget(enemy: Enemy, actor: FieldActor, range: number): boolean {
+        const distance = manhattan(this.enemyTile(enemy), this.actorTile(actor));
+        if (distance > range) return false;
+        return range <= 1 || this.hasFieldLineOfSight(this.enemyTile(enemy), this.actorTile(actor));
+    }
+
+    private hasAggroAllyNear(entry: FieldEnemy, range: number): boolean {
+        const selfTile = this.enemyTile(entry.enemy);
+        return this.fieldEnemies.some((candidate) =>
+            candidate.enemy.id !== entry.enemy.id &&
+            candidate.enemy.stats.hp > 0 &&
+            candidate.enemy.isAggro &&
+            manhattan(selfTile, this.enemyTile(candidate.enemy)) <= range
+        );
     }
 
     private findClosestActor(point: TilePoint, actors: FieldActor[]): FieldActor | null {
@@ -1674,14 +2005,37 @@ export class WorldEngine {
         if (this.combatLog.length > 7) this.combatLog.shift();
     }
 
+    private spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void {
+        this.attackCues.push({ from, to, color, label, timer: 0, duration: 0.38 });
+    }
+
+    private updateAttackCues(dt: number): void {
+        for (let i = this.attackCues.length - 1; i >= 0; i--) {
+            this.attackCues[i].timer += dt;
+            if (this.attackCues[i].timer >= this.attackCues[i].duration) this.attackCues.splice(i, 1);
+        }
+    }
+
     private renderPathPreview(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
         const actor = this.getControlledActor();
         if (!actor || actor.path.length === 0) return;
 
         ctx.fillStyle = 'rgba(55, 220, 255, 0.22)';
-        for (const tile of actor.path) {
+        actor.path.forEach((tile, index) => {
             ctx.fillRect(tile.x * TILE_SIZE - camX + 8, tile.y * TILE_SIZE - camY + 8, TILE_SIZE - 16, TILE_SIZE - 16);
-        }
+            const pulse = 0.55 + 0.45 * Math.sin(this.worldTime * 8 - index * 0.8);
+            ctx.fillStyle = `rgba(180, 245, 255, ${0.35 + pulse * 0.4})`;
+            ctx.beginPath();
+            ctx.arc(
+                tile.x * TILE_SIZE - camX + TILE_SIZE / 2,
+                tile.y * TILE_SIZE - camY + TILE_SIZE / 2,
+                3 + pulse * 2,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+            ctx.fillStyle = 'rgba(55, 220, 255, 0.22)';
+        });
     }
 
     private renderActionTiles(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
@@ -1776,6 +2130,9 @@ export class WorldEngine {
 
             this.renderGauge(ctx, px + 4, py - 7, TILE_SIZE - 8, actor.entity.actionGauge / 100, '#39ff88');
             this.renderHpBar(ctx, px + 4, py + TILE_SIZE + 3, TILE_SIZE - 8, actor.character.stats.hp, actor.character.stats.maxHp);
+            if (actor.entity.actionGauge >= 100 || actor.id === this.activeTurnActorId) {
+                this.renderReadyRing(ctx, px, py, '#5fffd0');
+            }
         }
     }
 
@@ -1813,8 +2170,83 @@ export class WorldEngine {
                 ctx.strokeRect(px + 3, py + 3, TILE_SIZE - 6, TILE_SIZE - 6);
             }
 
+            this.renderEnemyRoleBadge(ctx, enemy, px, py);
             this.renderGauge(ctx, px + 5, py - 7, TILE_SIZE - 10, enemy.actionGauge / 100, '#ffb84d');
             this.renderHpBar(ctx, px + 5, py + TILE_SIZE + 3, TILE_SIZE - 10, enemy.stats.hp, enemy.stats.maxHp);
+            if (enemy.actionGauge >= 100 || enemy.id === this.activeTurnActorId) {
+                this.renderReadyRing(ctx, px, py, enemy.isBoss ? '#ff4ea3' : '#ffb84d');
+            }
+        }
+    }
+
+    private renderEnemyRoleBadge(ctx: CanvasRenderingContext2D, enemy: Enemy, px: number, py: number): void {
+        const glyph = ENEMY_ROLE_GLYPHS[enemy.role] ?? 'M';
+        ctx.fillStyle = enemy.isBoss ? 'rgba(80, 0, 45, 0.88)' : 'rgba(10, 14, 24, 0.78)';
+        ctx.strokeStyle = enemy.isBoss ? '#ff4ea3' : 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(px + TILE_SIZE - 8, py + 8, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold 9px ${UI.fontMono}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(glyph, px + TILE_SIZE - 8, py + 8);
+        ctx.textAlign = 'start';
+        ctx.textBaseline = 'alphabetic';
+    }
+
+    private renderReadyRing(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
+        const pulse = 0.5 + 0.5 * Math.sin(this.worldTime * 7);
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.45 + pulse * 0.35;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px + TILE_SIZE / 2, py + TILE_SIZE / 2, TILE_SIZE * (0.48 + pulse * 0.07), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+    }
+
+    private renderAttackCues(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
+        for (const cue of this.attackCues) {
+            const progress = cue.timer / cue.duration;
+            const alpha = Math.max(0, 1 - progress);
+            const fromX = cue.from.x * TILE_SIZE - camX + TILE_SIZE / 2;
+            const fromY = cue.from.y * TILE_SIZE - camY + TILE_SIZE / 2;
+            const toX = cue.to.x * TILE_SIZE - camX + TILE_SIZE / 2;
+            const toY = cue.to.y * TILE_SIZE - camY + TILE_SIZE / 2;
+            const dx = toX - fromX;
+            const dy = toY - fromY;
+            const len = Math.max(1, Math.hypot(dx, dy));
+            const ux = dx / len;
+            const uy = dy / len;
+            const headX = fromX + dx * Math.min(1, 0.35 + progress * 0.65);
+            const headY = fromY + dy * Math.min(1, 0.35 + progress * 0.65);
+
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = cue.color;
+            ctx.fillStyle = cue.color;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(fromX + ux * 10, fromY + uy * 10);
+            ctx.lineTo(headX, headY);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(headX, headY);
+            ctx.lineTo(headX - ux * 12 - uy * 6, headY - uy * 12 + ux * 6);
+            ctx.lineTo(headX - ux * 12 + uy * 6, headY - uy * 12 - ux * 6);
+            ctx.closePath();
+            ctx.fill();
+            if (cue.label) {
+                ctx.font = `bold 10px ${UI.fontMono}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(cue.label, headX, headY - 16);
+            }
+            ctx.restore();
         }
     }
 
@@ -1943,6 +2375,7 @@ export class WorldEngine {
             const stats = getEffectiveStatsForEnemy(enemy);
             return {
                 name: enemy.name || enemy.label,
+                className: this.getEnemyRoleLabel(enemy.role),
                 level: enemy.level,
                 hp: enemy.stats.hp,
                 maxHp: enemy.stats.maxHp,
@@ -1960,6 +2393,20 @@ export class WorldEngine {
         }
 
         return null;
+    }
+
+    private getEnemyRoleLabel(role: EnemyRole): string {
+        switch (role) {
+            case 'tank': return '탱커형 몬스터';
+            case 'archer': return '궁수형 몬스터';
+            case 'healer': return '힐러형 몬스터';
+            case 'coward': return '도망형 몬스터';
+            case 'support': return '지원형 몬스터';
+            case 'boss': return '보스 몬스터';
+            case 'bruiser':
+            default:
+                return '근접형 몬스터';
+        }
     }
 
     private renderActionModeHint(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
@@ -1990,19 +2437,28 @@ export class WorldEngine {
         ctx.textAlign = 'start';
     }
 
-    private renderCombatLog(ctx: CanvasRenderingContext2D, _vw: number, vh: number): void {
+    private renderCombatLog(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
         const x = this.hasSelection() ? 240 : 16;
         const y = Math.max(188, vh - 150);
-        const w = 360;
+        const w = Math.max(260, Math.min(430, vw - x - 16));
         const h = 112;
         drawGlassPanel(ctx, x, y, w, h);
-        ctx.fillStyle = 'rgba(255,255,255,0.78)';
         ctx.font = `10px ${UI.fontMono}`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
         const visible = this.combatLog.slice(-5);
         visible.forEach((line, index) => {
-            ctx.fillText(line, x + 12, y + 12 + index * 18);
+            ctx.fillStyle = this.getCombatLogColor(line);
+            ctx.fillText(line, x + 12, y + 12 + index * 18, w - 24);
         });
+    }
+
+    private getCombatLogColor(line: string): string {
+        if (line.includes('처치') || line.includes('치명')) return '#ffd15f';
+        if (line.includes('피해') || line.includes('약화') || line.includes('독')) return '#ff8a8a';
+        if (line.includes('회복') || line.includes('강화') || line.includes('방어')) return '#9dffb0';
+        if (line.includes('명중 실패') || line.includes('빗나감')) return '#d9d9e8';
+        if (line.includes('턴 시작') || line.includes('READY')) return '#88ddff';
+        return 'rgba(255,255,255,0.78)';
     }
 }

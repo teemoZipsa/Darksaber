@@ -159,6 +159,44 @@ export class EffectManager {
         });
     }
 
+    public spawnHitEffect(gridX: number, gridY: number, isCrit: boolean = false): void {
+        const cx = gridX * TILE_SIZE + TILE_SIZE / 2;
+        const cy = gridY * TILE_SIZE + TILE_SIZE / 2;
+        const particles: Particle[] = [];
+        const count = isCrit ? 18 : 10;
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = (isCrit ? 90 : 55) + Math.random() * 55;
+            particles.push({
+                x: cx,
+                y: cy,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 0.18 + Math.random() * 0.2,
+                maxLife: 0.38,
+                size: isCrit ? 4 + Math.random() * 3 : 3 + Math.random() * 2,
+                color: isCrit
+                    ? ['#ffdd55', '#ff6633', '#ffffff'][Math.floor(Math.random() * 3)]
+                    : ['#ffd0a0', '#ff7755', '#ffffff'][Math.floor(Math.random() * 3)],
+                alpha: 1,
+                kind: 'spark',
+            });
+        }
+        particles.push({
+            x: cx,
+            y: cy,
+            vx: 0,
+            vy: 0,
+            life: isCrit ? 0.28 : 0.18,
+            maxLife: isCrit ? 0.28 : 0.18,
+            size: isCrit ? TILE_SIZE * 0.75 : TILE_SIZE * 0.45,
+            color: isCrit ? '#ffcc44' : '#ffffff',
+            alpha: 1,
+            kind: 'ring',
+        });
+        this.effects.push({ particles, timer: 0, duration: isCrit ? 0.55 : 0.35 });
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  Spell Effects by Element
     // ═══════════════════════════════════════════════════════════

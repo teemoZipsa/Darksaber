@@ -141,10 +141,10 @@ export const i18n = {
             'stat.defMod': '방어수정',
 
             // Raid & Engine
-            'enemy.boss': '👿 타락한 거인',
-            'enemy.boss_giant': '👿 타락한 거인',
-            'enemy.boss_drake': '🐉 그림자 드레이크',
-            'enemy.boss_warden': '🔮 공허의 감시자',
+            'enemy.boss': '👿 메피스토',
+            'enemy.boss_giant': '👿 디스트로어 카이거',
+            'enemy.boss_drake': '🔥 불의 마신 베라모드',
+            'enemy.boss_warden': '🔮 메피스토',
             'raid.success': '탈출 성공',
             'raid.successDesc': '생존하여 배낭의 아이템을 확보했습니다.',
             'raid.mia': '실종 (MIA)',
@@ -322,10 +322,10 @@ export const i18n = {
             'stat.defMod': 'Def Mod',
 
             // Raid & Engine
-            'enemy.boss': '👿 Corrupted Giant',
-            'enemy.boss_giant': '👿 Corrupted Giant',
-            'enemy.boss_drake': '🐉 Shadow Drake',
-            'enemy.boss_warden': '🔮 Void Warden',
+            'enemy.boss': '👿 Mephisto',
+            'enemy.boss_giant': '👿 Destroyer Kaiger',
+            'enemy.boss_drake': '🔥 Fire Demon Veramode',
+            'enemy.boss_warden': '🔮 Mephisto',
             'raid.success': 'EXTRACTION SUCCESSFUL',
             'raid.successDesc': 'You survived and kept your backpack.',
             'raid.mia': 'MISSING IN ACTION',

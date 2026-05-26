@@ -7,7 +7,7 @@
 
 import { TILE_SIZE } from '../map/Chunk';
 
-export type FloatingTextType = 'damage' | 'heal' | 'miss' | 'crit';
+export type FloatingTextType = 'damage' | 'heal' | 'miss' | 'crit' | 'status';
 
 interface FloatingText {
     text: string;
@@ -28,6 +28,7 @@ const STYLE: Record<FloatingTextType, { color: string; outline: string; fontSize
     crit:   { color: '#ff8800', outline: '#441800', fontSize: 22 },
     heal:   { color: '#ffdd00', outline: '#443300', fontSize: 16 },
     miss:   { color: '#ffffff', outline: '#333333', fontSize: 14 },
+    status: { color: '#88ddff', outline: '#0d2633', fontSize: 14 },
 };
 
 const LIFETIME = 1.2;       // total duration in seconds
@@ -70,6 +71,13 @@ export class FloatingTextManager {
      */
     public spawnHeal(gridX: number, gridY: number, amount: number): void {
         this.spawn(`+${amount}`, gridX, gridY, 'heal');
+    }
+
+    /**
+     * Convenience: spawn short status text such as BUFF, GUARD, or DOWN.
+     */
+    public spawnStatus(gridX: number, gridY: number, text: string): void {
+        this.spawn(text, gridX, gridY, 'status');
     }
 
     /**

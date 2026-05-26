@@ -47,7 +47,7 @@
 - [x] Lootable objects (Chests, ground items) on the grid
 - [x] Extraction Zones — Randomly placed tiles for escaping
 - [x] Raid Time Limit — 20 min clock ticking down to MIA
-- [x] Boss Monsters — 3 tiers (Corrupted Giant, Shadow Drake, Void Warden) spawning independently
+- [x] Boss Monsters — 3 tiers (Destroyer Kaiger, Fire Demon Veramode, Mephisto) spawning independently
 
 ### 4.3 Progression & Loss
 - [x] Successful Extraction logic (keep stash and backpack, return to lobby)

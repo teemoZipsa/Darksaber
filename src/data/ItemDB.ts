@@ -399,24 +399,24 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'weapon', gridW: 2, gridH: 4, color: '#cc0033', icon: '🗡️',
         maxDurability: 200,
         stats: { atk: 28, magAtk: 8 },
-        description: 'A cursed blade dripping with dark energy. Dropped by Corrupted Giants.',
-        descriptionKr: '어둠의 에너지가 흐르는 저주받은 검입니다. 타락한 거인이 드랍합니다.'
+        description: 'A cursed blade dripping with dark energy. Dropped by Destroyer Kaiger.',
+        descriptionKr: '어둠의 에너지가 흐르는 저주받은 검입니다. 디스트로어 카이거가 드랍합니다.'
     },
     {
         id: 'shadow_cloak', name: 'Shadow Cloak', nameKr: '그림자 망토',
         slot: 'body', gridW: 2, gridH: 3, color: '#2a0845', icon: '🧥',
         maxDurability: 180,
         stats: { def: 18, magDef: 12 },
-        description: 'A cloak woven from shadows. Dropped by Shadow Drakes.',
-        descriptionKr: '그림자로 짠 망토입니다. 그림자 드레이크가 드랍합니다.'
+        description: 'A cloak woven from shadows. Dropped by Fire Demon Veramode.',
+        descriptionKr: '그림자로 짠 망토입니다. 불의 마신 베라모드가 드랍합니다.'
     },
     {
         id: 'void_crystal', name: 'Void Crystal', nameKr: '공허의 수정',
         slot: 'accessory', gridW: 1, gridH: 1, color: '#6600cc', icon: '💎',
         maxDurability: 999,
         stats: { magAtk: 15, mp: 30 },
-        description: 'A crystal pulsing with void energy. Dropped by Void Wardens.',
-        descriptionKr: '공허의 에너지가 맥동하는 수정입니다. 공허의 감시자가 드랍합니다.'
+        description: 'A crystal pulsing with void energy. Dropped by Mephisto.',
+        descriptionKr: '공허의 에너지가 맥동하는 수정입니다. 메피스토가 드랍합니다.'
     },
 ];
 
