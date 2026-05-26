@@ -81,7 +81,7 @@ export class CharacterCreationUI {
         this.nameInput.style.letterSpacing = '1px';
         this.nameInput.value = '다크마스터'; // Default name
 
-        // Must append to body, GameEngine should clean it up/hide it
+        // Must append to body, the top-level game manager cleans it up/hides it.
         document.body.appendChild(this.nameInput);
     }
 

@@ -37,7 +37,7 @@ export class EntityInfoUI {
     private w = 210;
     private h = 320;
 
-    /** Allow dynamic repositioning from GameEngine */
+    /** Allow dynamic repositioning from the active engine */
     public setPosition(x: number, y: number): void {
         this.x = x;
         this.y = y;

@@ -6,7 +6,7 @@ import { WorldMap } from '../../src/map/WorldMap';
 import { resolveFieldHit } from '../../src/field/FieldInteraction';
 import { findPath, findPathToAny, findPathWithCost, findReachableTilesByCost, manhattan, tilesInRange, FieldPassableQuery } from '../../src/field/FieldPathing';
 import { resolveAggroState, shouldAssistTarget } from '../../src/field/FieldCombat';
-import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getMoveApCost, hasExecutableFieldAction } from '../../src/field/FieldActionEconomy';
+import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getMoveApCost, getWaitAtbCarryover, hasExecutableFieldAction } from '../../src/field/FieldActionEconomy';
 import { resolveSkillEffect } from '../../src/combat/SkillEffectResolver';
 import { getSkill } from '../../src/data/SkillDB';
 import { createBaseStats } from '../../src/data/Stats';
@@ -22,7 +22,6 @@ import {
     isTerrainPassable,
     terrainCostToApCost,
 } from '../../src/field/TerrainRules';
-import { battleStageTileToTerrainTile as battleEngineStageTileToTerrainTile } from '../../src/engine/BattleEngine';
 import { TileType } from '../../src/map/Tile';
 
 class ImageStub {
@@ -153,6 +152,13 @@ test('field AP movement cost excludes the starting tile', () => {
     assert.equal(getMoveApCost(5), 10);
 });
 
+test('wait preserves action gauge based on remaining AP up to half gauge', () => {
+    assert.equal(getWaitAtbCarryover(0, 15), 0);
+    assert.equal(getWaitAtbCarryover(6, 15), 20);
+    assert.equal(getWaitAtbCarryover(15, 15), 50);
+    assert.equal(getWaitAtbCarryover(30, 15), 50);
+});
+
 test('terrain rules cover every TileType and battle stage adapter stays shared', () => {
     const tileTypes = Object.values(TileType).filter((value): value is TileType => typeof value === 'number');
     assert.equal(Object.keys(TERRAIN_PROFILES).length, tileTypes.length);
@@ -162,10 +168,8 @@ test('terrain rules cover every TileType and battle stage adapter stays shared',
 
     assert.equal(battleStageTileToTerrainTile(0), TileType.GRASS);
     assert.equal(battleStageTileToTerrainTile(1), TileType.WALL);
-    assert.equal(battleEngineStageTileToTerrainTile(0), TileType.GRASS);
-    assert.equal(battleEngineStageTileToTerrainTile(1), TileType.WALL);
-    assert.equal(isTerrainPassable(battleEngineStageTileToTerrainTile(0)), true);
-    assert.equal(isTerrainPassable(battleEngineStageTileToTerrainTile(1)), false);
+    assert.equal(isTerrainPassable(battleStageTileToTerrainTile(0)), true);
+    assert.equal(isTerrainPassable(battleStageTileToTerrainTile(1)), false);
 });
 
 test('weighted pathing uses the same terrain cost and AP rounding for reach and spend', () => {
@@ -356,7 +360,7 @@ test('skill effect resolver applies damage, debuff, and enemy-only aoe', () => {
     assert.equal(waterDamageResult.enemyResults[0].damage, 20);
 
     const debuffResult = resolveSkillEffect({ casterStats, skill: poison, targetEnemy: target });
-    assert.equal(debuffResult.enemyResults[0].statChanges?.atk, -3);
+    assert.deepEqual(debuffResult.enemyResults[0].statusEffects?.map((status) => status.kind), ['poison', 'attackDown']);
     assert.equal(debuffResult.enemyResults[0].damage, 10);
 
     const aoeResult = resolveSkillEffect({

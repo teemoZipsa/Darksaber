@@ -5,6 +5,7 @@
 import { Entity } from './Entity';
 import { CharacterStats, createBaseStats } from '../data/Stats';
 import { TileType, TILE_PROPERTIES } from '../map/Tile';
+import type { StatusEffect } from '../combat/StatusEffects';
 
 export class Enemy extends Entity {
     public name: string;
@@ -15,6 +16,7 @@ export class Enemy extends Entity {
     public isAggro: boolean = false;
     public isBoss: boolean = false;
     public lootTableId: string = '';
+    public statuses: StatusEffect[] = [];
 
     constructor(
         id: string,

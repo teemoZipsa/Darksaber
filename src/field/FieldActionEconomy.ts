@@ -2,8 +2,9 @@ export const MOVE_AP_PER_TILE = 2;
 export const ATTACK_AP_COST = 6;
 export const INTERACT_AP_COST = 4;
 export const MAGIC_AP_COST = 8;
+export const MAX_WAIT_ATB_CARRYOVER = 50;
 
-export type FieldApAction = 'attack' | 'interact' | 'magic' | 'rest' | 'wait';
+export type FieldApAction = 'attack' | 'interact' | 'magic' | 'rest' | 'wait' | 'defend' | 'counter';
 
 export interface ExecutableActionState {
     remainingAp: number;
@@ -22,10 +23,17 @@ export function getActionApCost(action: FieldApAction): number {
         case 'attack': return ATTACK_AP_COST;
         case 'interact': return INTERACT_AP_COST;
         case 'magic': return MAGIC_AP_COST;
+        case 'defend':
+        case 'counter':
         case 'rest':
         case 'wait':
             return 0;
     }
+}
+
+export function getWaitAtbCarryover(remainingAp: number, actionLimit: number): number {
+    if (remainingAp <= 0 || actionLimit <= 0) return 0;
+    return Math.min(MAX_WAIT_ATB_CARRYOVER, Math.floor(MAX_WAIT_ATB_CARRYOVER * remainingAp / actionLimit));
 }
 
 export function enqueueReadyActor(queue: string[], actorId: string): boolean {

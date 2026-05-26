@@ -8,6 +8,13 @@ import { ClassLine, getClassLine } from '../data/ClassTree';
 import { ItemSlot } from '../data/ItemDB';
 import { PlacedItem } from '../inventory/GridInventory';
 import { Skill } from '../data/SkillDB';
+import {
+    StatusEffect,
+    applyStatuses,
+    getEffectiveStatsForCharacter,
+    getStatusEffectsForSkill,
+    resolveTurnStartStatuses,
+} from '../combat/StatusEffects';
 
 export interface ActiveBuff {
     id: string;
@@ -39,8 +46,8 @@ export class Character {
     public age: number = 20;
     public gender: string = 'M';
 
-    // Current active buffs/debuffs
-    public buffs: ActiveBuff[] = [];
+    // Current active status effects, including legacy buff skill effects.
+    public statuses: StatusEffect[] = [];
     
     // Rogue-like raid state
     public isDead: boolean = false;
@@ -186,42 +193,27 @@ export class Character {
 
     public applyBuff(skill: Skill): void {
         if (skill.type !== 'buff' && skill.type !== 'debuff') return;
-        const stat = skill.buffStat || 'all';
-        const duration = skill.buffDuration || 3;
-        
-        // Refresh duration if same buff exists
-        this.buffs = this.buffs.filter(b => b.id !== skill.id);
-        
-        this.buffs.push({
-            id: skill.id,
-            icon: skill.icon,
-            stat: stat as any,
-            power: skill.power,
-            duration: duration
-        });
+        this.statuses = applyStatuses(this.statuses, getStatusEffectsForSkill(skill));
     }
 
     public tickBuffs(): void {
-        for (const buff of this.buffs) {
-            if (buff.stat === 'regen') {
-                const healAmt = Math.floor(this.stats.maxHp * 0.1);
-                this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + healAmt);
-            }
-            buff.duration -= 1;
-        }
-        this.buffs = this.buffs.filter(b => b.duration > 0);
+        const result = resolveTurnStartStatuses(this.stats, this.statuses);
+        this.stats.hp = Math.max(0, Math.min(this.stats.maxHp, this.stats.hp + result.hpDelta));
+        this.statuses = result.statuses;
     }
 
     public getCombatStats(): CharacterStats {
-        const cbStats = { ...this.stats }; 
-        for (const buff of this.buffs) {
-            const mult = buff.power;
-            if (buff.stat === 'atk' || buff.stat === 'all') cbStats.atk = Math.floor(cbStats.atk * mult);
-            if (buff.stat === 'def' || buff.stat === 'all') cbStats.def = Math.floor(cbStats.def * mult);
-            if (buff.stat === 'spd' || buff.stat === 'all') cbStats.spd = Math.floor(cbStats.spd * mult);
-            if (buff.stat === 'mdef' || buff.stat === 'all') cbStats.magDef = Math.floor(cbStats.magDef * mult);
-        }
-        return cbStats;
+        return getEffectiveStatsForCharacter(this);
+    }
+
+    public get buffs(): ActiveBuff[] {
+        return this.statuses.map((status) => ({
+            id: status.sourceSkillId ?? status.kind,
+            icon: status.icon,
+            stat: 'all',
+            power: status.magnitude,
+            duration: status.durationTurns,
+        }));
     }
 
     /**

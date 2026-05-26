@@ -1,6 +1,6 @@
 /**
  * GameManager — Master orchestrator for the new Sin Eater game loop.
- * Manages state transitions between WORLD and BATTLE modes.
+ * Manages title, character creation, and the unified WORLD combat mode.
  * Owns the canvas, input system, and shared data (party, inventory, gold).
  */
 
@@ -9,12 +9,10 @@ import { InputManager } from './InputManager';
 import { SettingsManager } from './SettingsManager';
 import { GameState } from './GameState';
 import { WorldEngine } from './WorldEngine';
-import { BattleEngine } from './BattleEngine';
 import { PartyManager } from '../character/PartyManager';
 import { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
-import { getStage } from '../data/StageDB';
 import { CharacterCreationUI } from '../ui/CharacterCreationUI';
 import { ITEMS } from '../data/ItemDB';
 import { renderGameTitle } from '../ui/UITheme';
@@ -38,9 +36,8 @@ export class GameManager {
     public inventory: GridInventory;
     public playerData: PlayerData;
 
-    // Sub-engines
+    // Unified field/combat engine
     private worldEngine!: WorldEngine;
-    private battleEngine: BattleEngine | null = null;
 
     // Field UI overlays
     public inventoryUI: InventoryUI;
@@ -49,10 +46,6 @@ export class GameManager {
 
     // Character creation
     private charCreateUI!: CharacterCreationUI;
-
-    // Battle result
-    private battleResultTimer: number = 0;
-    private lastBattleRewards: { gold: number; exp: number } | null = null;
 
     // Title screen
     private titleBg = new Image();
@@ -219,22 +212,6 @@ export class GameManager {
                 this.worldEngine.update(dt, this.input, this.camera);
                 break;
 
-            case GameState.BATTLE:
-                if (this.battleEngine) {
-                    this.battleEngine.update(dt, this.input, this.camera);
-                }
-                break;
-
-            case GameState.BATTLE_RESULT:
-                this.battleResultTimer += dt;
-                if (this.input.mouseJustDown || this.input.justPressed('Enter')) {
-                    // Return to world
-                    this.state = GameState.WORLD;
-                    this.battleEngine = null;
-                    this.lastBattleRewards = null;
-                    this.battleResultTimer = 0;
-                }
-                break;
         }
     }
 
@@ -275,50 +252,7 @@ export class GameManager {
                 this.ctx.restore();
                 break;
 
-            case GameState.BATTLE:
-                if (this.battleEngine) {
-                    this.battleEngine.render(this.ctx, this.camera, w, h);
-                }
-                break;
-
-            case GameState.BATTLE_RESULT:
-                this.renderBattleResult(w, h);
-                break;
         }
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  State Transitions
-    // ═══════════════════════════════════════════════════════════
-
-    /** Called by WorldEngine when player enters a dungeon */
-    public enterBattle(stageId: string): void {
-        const stage = getStage(stageId);
-        if (!stage) return;
-
-        this.battleEngine = new BattleEngine(
-            this.canvas, this.ctx, this.input, this.camera,
-            this.party, this.inventory, this.playerData, stage,
-            this   // pass self for callbacks
-        );
-        this.state = GameState.BATTLE;
-    }
-
-    /** Called by BattleEngine when battle is won */
-    public completeBattle(rewards: { gold: number; exp: number }, stageId: string): void {
-        this.playerData.addGold(rewards.gold);
-        this.playerData.markCleared(stageId);
-        this.playerData.save();
-        this.lastBattleRewards = rewards;
-        this.battleResultTimer = 0;
-        this.state = GameState.BATTLE_RESULT;
-    }
-
-    /** Called by BattleEngine when party is wiped */
-    public failBattle(): void {
-        this.lastBattleRewards = null;
-        this.battleResultTimer = 0;
-        this.state = GameState.BATTLE_RESULT;
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -329,7 +263,7 @@ export class GameManager {
         this.worldEngine = new WorldEngine(
             this.canvas, this.ctx, this.input, this.camera,
             this.party, this.inventory, this.playerData,
-            this  // pass self for enterBattle callback
+            this
         );
     }
 
@@ -375,35 +309,4 @@ export class GameManager {
         this.ctx.restore();
     }
 
-    private renderBattleResult(w: number, h: number): void {
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-        this.ctx.fillRect(0, 0, w, h);
-
-        const cx = w / 2;
-        const cy = h / 2;
-
-        this.ctx.textAlign = 'center';
-
-        if (this.lastBattleRewards) {
-            // Victory
-            this.ctx.fillStyle = '#00ff88';
-            this.ctx.font = 'bold 48px "DOSMyungjo", sans-serif';
-            this.ctx.fillText('⚔ 승리!', cx, cy - 60);
-
-            this.ctx.fillStyle = '#ffcc00';
-            this.ctx.font = '20px "DOSMyungjo", sans-serif';
-            this.ctx.fillText(`+${this.lastBattleRewards.gold} Gold`, cx, cy);
-            this.ctx.fillText(`+${this.lastBattleRewards.exp} EXP`, cx, cy + 30);
-        } else {
-            // Defeat
-            this.ctx.fillStyle = '#ff3333';
-            this.ctx.font = 'bold 48px "DOSMyungjo", sans-serif';
-            this.ctx.fillText('전멸...', cx, cy - 40);
-        }
-
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        this.ctx.font = '14px "DOSMyungjo", sans-serif';
-        this.ctx.fillText('클릭 또는 Enter로 돌아가기', cx, cy + 80);
-        this.ctx.textAlign = 'start';
-    }
 }

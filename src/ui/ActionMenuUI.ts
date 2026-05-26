@@ -7,7 +7,7 @@
 import { TILE_SIZE } from '../map/Chunk';
 import { UI } from './UITheme';
 
-export type ActionType = 'tool' | 'attack' | 'emote' | 'rest' | 'wait' | 'magic' | 'move' | 'open';
+export type ActionType = 'tool' | 'attack' | 'emote' | 'rest' | 'wait' | 'defend' | 'counter' | 'magic' | 'move' | 'open';
 
 interface ActionSlot {
     type: ActionType;
@@ -35,6 +35,8 @@ export class ActionMenuUI {
             { type: 'emote',  label: '감정', angle: TAU * 2 / 6, iconDraw: this.drawEmoteIcon },
             { type: 'rest',   label: '휴식', angle: TAU * 3 / 6, iconDraw: this.drawRestIcon },
             { type: 'wait',   label: '대기', angle: TAU * 3 / 6, iconDraw: this.drawWaitIcon },
+            { type: 'defend', label: '방어', angle: TAU * 3 / 6, iconDraw: this.drawDefendIcon },
+            { type: 'counter', label: '반격', angle: TAU * 3 / 6, iconDraw: this.drawCounterIcon },
             { type: 'magic',  label: '마법', angle: TAU * 4 / 6, iconDraw: this.drawMagicIcon },
             { type: 'move',   label: '이동', angle: TAU * 5 / 6, iconDraw: this.drawMoveIcon },
             { type: 'open',   label: '조사', angle: 0,           iconDraw: this.drawOpenIcon },
@@ -245,6 +247,37 @@ export class ActionMenuUI {
         ctx.moveTo(cx, cy);
         ctx.lineTo(cx + s * 0.34, cy + s * 0.22);
         ctx.stroke();
+    }
+
+    private drawDefendIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
+        ctx.fillStyle = ready ? '#8fc7ff' : 'rgba(255,255,255,0.25)';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - s * 0.75);
+        ctx.lineTo(cx + s * 0.55, cy - s * 0.35);
+        ctx.lineTo(cx + s * 0.42, cy + s * 0.55);
+        ctx.lineTo(cx, cy + s * 0.8);
+        ctx.lineTo(cx - s * 0.42, cy + s * 0.55);
+        ctx.lineTo(cx - s * 0.55, cy - s * 0.35);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = ready ? '#eaf6ff' : 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = Math.max(1, s * 0.12);
+        ctx.stroke();
+    }
+
+    private drawCounterIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
+        ctx.strokeStyle = ready ? '#ffcc66' : 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = Math.max(1, s * 0.16);
+        ctx.beginPath();
+        ctx.arc(cx, cy, s * 0.55, Math.PI * 0.25, Math.PI * 1.65);
+        ctx.stroke();
+        ctx.fillStyle = ready ? '#ffcc66' : 'rgba(255,255,255,0.25)';
+        ctx.beginPath();
+        ctx.moveTo(cx - s * 0.58, cy - s * 0.18);
+        ctx.lineTo(cx - s * 0.85, cy - s * 0.22);
+        ctx.lineTo(cx - s * 0.68, cy + s * 0.02);
+        ctx.closePath();
+        ctx.fill();
     }
 
     private drawMagicIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
