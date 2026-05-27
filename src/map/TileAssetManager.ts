@@ -1,5 +1,23 @@
 import { TileType, TILE_PROPERTIES } from './Tile';
 
+const DARKSABER_WORLD_ATLAS = 'darksaber_world_atlas.png';
+
+const ATLAS_TILE_INDEX: Partial<Record<TileType, number>> = {
+    [TileType.GRASS]: 0,
+    [TileType.FOREST]: 1,
+    [TileType.SAND]: 2,
+    [TileType.STONE]: 3,
+    [TileType.SNOW]: 4,
+    [TileType.POISON_SWAMP]: 5,
+    [TileType.WATER]: 6,
+    [TileType.DEEP_WATER]: 7,
+    [TileType.ROAD]: 8,
+    [TileType.TOWN]: 9,
+    [TileType.WALL]: 10,
+    [TileType.LAVA]: 11,
+    [TileType.DUNGEON_ENTRANCE]: 12,
+};
+
 /**
  * Official RPG Maker MV Floor Autotile Table (48 shapes).
  * Source: rpgtkoolmv/corescript — Tilemap.FLOOR_AUTOTILE_TABLE
@@ -172,6 +190,8 @@ class TileAssetManagerClass {
     private fallbackSheets = new Set(['World_A1.png', 'World_A2.png', 'World_B.png']);
 
     public init(): Promise<void[]> {
+        this.queueSheetLoad(DARKSABER_WORLD_ATLAS);
+
         const requiredSheets = new Set<string>();
         for (const key in TILE_PROPERTIES) {
             const props = TILE_PROPERTIES[Number(key) as TileType];
@@ -180,20 +200,25 @@ class TileAssetManagerClass {
 
         for (const sheetName of requiredSheets) {
             if (this.fallbackSheets.has(sheetName)) continue;
-
-            const img = new Image();
-            const promise = new Promise<void>((resolve) => {
-                img.onload = () => resolve();
-                img.onerror = () => {
-                    console.warn(`Tileset sheet unavailable, using color fallback: ${sheetName}`);
-                    resolve();
-                };
-            });
-            img.src = `/Image/Tileset/${sheetName}`;
-            this.sheets.set(sheetName, img);
-            this.loadPromises.push(promise);
+            this.queueSheetLoad(sheetName);
         }
         return Promise.all(this.loadPromises);
+    }
+
+    private queueSheetLoad(sheetName: string): void {
+        if (this.sheets.has(sheetName)) return;
+
+        const img = new Image();
+        const promise = new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+            img.onerror = () => {
+                console.warn(`Tileset sheet unavailable, using generated fallback: ${sheetName}`);
+                resolve();
+            };
+        });
+        img.src = `/Image/Tileset/${sheetName}`;
+        this.sheets.set(sheetName, img);
+        this.loadPromises.push(promise);
     }
 
     /**
@@ -207,7 +232,9 @@ class TileAssetManagerClass {
         const props = TILE_PROPERTIES[type];
         if (!props?.sheet) return this.drawFallback(ctx, type, dx, dy, size);
         const img = this.sheets.get(props.sheet);
-        if (!img?.complete || img.naturalWidth <= 0) return this.drawFallback(ctx, type, dx, dy, size);
+        if (!img?.complete || img.naturalWidth <= 0) {
+            return this.drawAtlasTile(ctx, type, dx, dy, size) || this.drawFallback(ctx, type, dx, dy, size);
+        }
 
         // A2 autotile: draw shape 0 (default tile look)
         if (props.autotileCol !== undefined && props.autotileRow !== undefined) {
@@ -237,9 +264,11 @@ class TileAssetManagerClass {
         s: boolean, sw: boolean, w: boolean, nw: boolean
     ): boolean {
         const props = TILE_PROPERTIES[type];
-        if (!props?.sheet) return this.drawFallback(ctx, type, dx, dy, size);
+        if (!props?.sheet) return this.drawAtlasTile(ctx, type, dx, dy, size) || this.drawFallback(ctx, type, dx, dy, size);
         const img = this.sheets.get(props.sheet);
-        if (!img?.complete || img.naturalWidth <= 0) return this.drawFallback(ctx, type, dx, dy, size);
+        if (!img?.complete || img.naturalWidth <= 0) {
+            return this.drawAtlasTile(ctx, type, dx, dy, size) || this.drawFallback(ctx, type, dx, dy, size);
+        }
 
         const shape = computeShape(n, ne, e, se, s, sw, w, nw);
 
@@ -359,6 +388,42 @@ class TileAssetManagerClass {
         const img = this.sheets.get(sheetName);
         if (img?.complete && img.naturalWidth > 0) return img;
         return undefined;
+    }
+
+    public drawAtlasCell(
+        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+        index: number, dx: number, dy: number, size: number,
+        options?: { cropInset?: number }
+    ): boolean {
+        const img = this.getSheet(DARKSABER_WORLD_ATLAS);
+        if (!img) return false;
+
+        const cols = 4;
+        const rows = 4;
+        const cellW = img.naturalWidth / cols;
+        const cellH = img.naturalHeight / rows;
+        const col = index % cols;
+        const row = Math.floor(index / cols);
+        const inset = options?.cropInset ?? Math.max(3, Math.floor(Math.min(cellW, cellH) * 0.018));
+        const sx = col * cellW + inset;
+        const sy = row * cellH + inset;
+        const sw = cellW - inset * 2;
+        const sh = cellH - inset * 2;
+
+        const prevSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(img, sx, sy, sw, sh, dx, dy, size, size);
+        ctx.imageSmoothingEnabled = prevSmoothing;
+        return true;
+    }
+
+    private drawAtlasTile(
+        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+        type: TileType, dx: number, dy: number, size: number
+    ): boolean {
+        const index = ATLAS_TILE_INDEX[type];
+        if (index === undefined) return false;
+        return this.drawAtlasCell(ctx, index, dx, dy, size);
     }
 
     private drawFallback(

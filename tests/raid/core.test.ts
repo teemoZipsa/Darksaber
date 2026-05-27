@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { getItemDef, ITEMS, normalizeItemDef, RawItemDef } from '../../src/data/ItemDB';
 import { PlacedItem } from '../../src/inventory/GridInventory';
 import { computeRaidFailureLoss } from '../../src/raid/RaidOutcome';
+import { resolveTownArrival, shouldAdvanceRaidTimer } from '../../src/raid/RaidRules';
 import { WorldMap } from '../../src/map/WorldMap';
 
 function placed(id: string): PlacedItem {
@@ -94,5 +95,73 @@ test('WorldMap exposes consistent town tile helpers', () => {
         assert.ok(world.isWalkable(spawn.x, spawn.y), `${town.id} spawn should be walkable`);
         assert.equal(world.getTownAtTile(spawn.x, spawn.y)?.id, town.id);
     }
+});
+
+test('WorldMap returns a non-town exit tile with spawn fallback available', () => {
+    const world = new WorldMap();
+    const town = world.getTowns().find((candidate) => candidate.id === 'central_castle');
+    assert.ok(town);
+
+    const exit = world.getTownExitTile(town);
+    assert.ok(world.isWalkable(exit.x, exit.y));
+    assert.notEqual(world.getTownAtTile(exit.x, exit.y)?.id, town.id);
+
+    class BlockedExitWorldMap extends WorldMap {
+        public override isWalkable(_tx: number, _ty: number): boolean {
+            return false;
+        }
+    }
+
+    const originalWarn = console.warn;
+    console.warn = () => {};
+    let blocked: BlockedExitWorldMap;
+    try {
+        blocked = new BlockedExitWorldMap();
+    } finally {
+        console.warn = originalWarn;
+    }
+    const fallback = blocked.getTownExitTile(town);
+    assert.deepEqual(fallback, blocked.getTownSpawnTile(town));
+});
+
+test('raid timer only advances during unblocked field exploration', () => {
+    assert.equal(shouldAdvanceRaidTimer({
+        raidActive: true,
+        townVisible: false,
+        resultVisible: false,
+        turnCombatActive: false,
+    }), true);
+
+    assert.equal(shouldAdvanceRaidTimer({
+        raidActive: true,
+        townVisible: false,
+        resultVisible: false,
+        turnCombatActive: true,
+    }), false);
+
+    assert.equal(shouldAdvanceRaidTimer({
+        raidActive: true,
+        townVisible: true,
+        resultVisible: false,
+        turnCombatActive: false,
+    }), false);
+});
+
+test('town arrival blocks departure and survives at any other town', () => {
+    assert.deepEqual(resolveTownArrival('central_castle', 'central_castle', true), {
+        kind: 'departureBlocked',
+        townId: 'central_castle',
+    });
+    assert.deepEqual(resolveTownArrival('w_forest_village', 'central_castle', true), {
+        kind: 'survived',
+        townId: 'w_forest_village',
+    });
+    assert.deepEqual(resolveTownArrival('central_castle', 'w_forest_village', true), {
+        kind: 'survived',
+        townId: 'central_castle',
+    });
+    assert.deepEqual(resolveTownArrival('central_castle', 'central_castle', false), {
+        kind: 'none',
+    });
 });
 

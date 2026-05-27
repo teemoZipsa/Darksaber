@@ -40,10 +40,13 @@ import { ActionMenuUI, ActionType } from '../ui/ActionMenuUI';
 import { EntityDisplayInfo, EntityInfoUI } from '../ui/EntityInfoUI';
 import { MagicUI } from '../ui/MagicUI';
 import { TacticalContextMenuUI } from '../ui/TacticalContextMenuUI';
+import { TownUI } from '../ui/TownUI';
+import { RaidResultUI } from '../ui/RaidResultUI';
 import { EffectManager } from '../ui/EffectManager';
 import { FloatingTextManager } from '../ui/FloatingTextManager';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
+import { TownInfo } from '../map/BiomeMask';
 import { TileType } from '../map/Tile';
 import { FieldPassableQuery, TilePoint, findPathToAny, findPathWithCost, findReachableTilesByCost, manhattan, tileKey, tilesInRange } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
@@ -77,6 +80,15 @@ import {
     terrainCostToApCost,
     TerrainActorTraits,
 } from '../field/TerrainRules';
+import {
+    computeRaidFailureLoss,
+    mergeSnapshots,
+    RaidOutcome,
+    RaidResultType,
+    snapshotPlacedItem,
+    type HeroRaidStatus,
+} from '../raid/RaidOutcome';
+import { resolveTownArrival, shouldAdvanceRaidTimer } from '../raid/RaidRules';
 
 interface FieldIntent {
     kind: 'move' | 'attack' | 'interact' | 'magic' | 'rest' | 'wait' | 'defend' | 'counter';
@@ -158,6 +170,8 @@ export class WorldEngine {
     private entityInfoUI = new EntityInfoUI();
     private magicUI = new MagicUI();
     private tacticalMenuUI = new TacticalContextMenuUI();
+    private townUI: TownUI;
+    private raidResultUI = new RaidResultUI();
     private tacticalMarkers = new TacticalMarkerStore();
     private tacticalMenuTarget: TacticalTargetRef | null = null;
     private actionMode: 'move' | 'attack' | 'interact' | null = null;
@@ -174,6 +188,14 @@ export class WorldEngine {
     private effectManager = new EffectManager();
     private attackCues: AttackCue[] = [];
     private worldTime: number = 0;
+    private currentHubTownId: string;
+    private departureTownId: string;
+    private raidElapsedSeconds = 0;
+    private readonly raidLimitSeconds = 30 * 60;
+    private raidActive = false;
+    private killsThisRaid = 0;
+    private pendingTownAfterResult: TownInfo | null = null;
+    private lastDepartureBlockTownId: string | null = null;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -190,20 +212,41 @@ export class WorldEngine {
         this.playerData = playerData;
         this.gameManager = gameManager;
         this.worldMap = new WorldMap();
+        this.currentHubTownId = this.getTownById(this.playerData.currentHubTownId)?.id ?? 'central_castle';
+        this.departureTownId = this.currentHubTownId;
+        this.townUI = new TownUI(this.gameManager.inventory, this.gameManager.stash);
+        this.configureTownUI();
+        this.raidResultUI.onClose = () => this.openPendingTownAfterResult();
 
-        this.spawnPartyAtCentralTown();
+        this.spawnPartyAtCurrentHub();
         this.player = this.getControlledActor()?.entity ?? new Player(0, 0);
         this.selectedActorId = this.getControlledActor()?.id ?? null;
-        this.spawnStarterFieldContent();
         this.magicUI.onSkillSelect = (skill: Skill) => this.handleMagicSkillSelect(skill);
+        this.openTown(this.getCurrentHubTown());
 
         camera.followTile(this.player.gridX, this.player.gridY);
         camera.snapToTarget();
-        this.addCombatLog('월드 필드 진입. 클릭으로 이동합니다.');
+        this.addCombatLog('마을에 도착했습니다. 출격 준비를 마치세요.');
     }
 
     public update(dt: number, input: InputManager, camera: Camera): void {
         this.worldTime += dt;
+        this.syncTownUIState();
+
+        if (this.raidResultUI.isVisible()) {
+            this.raidResultUI.updateInput(input);
+            camera.followTile(this.player.gridX, this.player.gridY);
+            camera.update();
+            return;
+        }
+
+        if (this.townUI.isVisible()) {
+            this.townUI.updateInput(input);
+            camera.followTile(this.player.gridX, this.player.gridY);
+            camera.update();
+            return;
+        }
+
         if (input.mouseWheelDelta !== 0 && !this.magicUI.isVisible()) {
             if (input.mouseWheelDelta > 0) camera.zoomOut();
             else camera.zoomIn();
@@ -251,11 +294,17 @@ export class WorldEngine {
         this.refreshLootState();
         this.updateTacticalMarkers(dt);
         this.startNextReadyTurn();
+        this.updateRaidTimer(dt);
+        this.checkRaidEndConditions();
 
         const controlled = this.getControlledActor();
         if (controlled) this.player = controlled.entity;
         camera.followTile(this.player.gridX, this.player.gridY);
         camera.update();
+    }
+
+    public isModalOverlayVisible(): boolean {
+        return this.townUI.isVisible() || this.raidResultUI.isVisible();
     }
 
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
@@ -291,20 +340,25 @@ export class WorldEngine {
 
         ctx.save();
         ctx.scale(scale, scale);
-        this.renderHud(ctx, Math.floor(width / scale), Math.floor(height / scale));
+        const uiW = Math.floor(width / scale);
+        const uiH = Math.floor(height / scale);
+        this.renderHud(ctx, uiW, uiH);
+        if (this.townUI.isVisible()) this.townUI.render(ctx, uiW, uiH);
+        if (this.raidResultUI.isVisible()) this.raidResultUI.render(ctx, uiW, uiH);
         ctx.restore();
     }
 
-    private spawnPartyAtCentralTown(): void {
-        const towns = this.worldMap.getTowns();
-        const centralTown = towns.find((town) => town.id === 'central_castle') ?? towns[0];
-        const spawn = this.worldMap.getTownSpawnTile(centralTown);
+    private spawnPartyAtCurrentHub(): void {
+        this.placePartyNear(this.worldMap.getTownSpawnTile(this.getCurrentHubTown()));
+    }
+
+    private placePartyNear(anchorTile: TilePoint): void {
         const members = this.party.getCharacters().slice(0, this.party.MAX_ACTIVE_PARTY_SIZE);
 
         this.partyActors = members.map((character, index) => {
             const tile = this.findNearbyWalkableTile({
-                x: spawn.x + (FORMATION_OFFSETS[index]?.x ?? 0),
-                y: spawn.y + (FORMATION_OFFSETS[index]?.y ?? 0),
+                x: anchorTile.x + (FORMATION_OFFSETS[index]?.x ?? 0),
+                y: anchorTile.y + (FORMATION_OFFSETS[index]?.y ?? 0),
             }, `party_${index}`);
             const entity = new Player(tile.x, tile.y);
             entity.color = ACTOR_COLORS[index % ACTOR_COLORS.length];
@@ -323,6 +377,96 @@ export class WorldEngine {
                 queuedIntent: null,
             };
         });
+    }
+
+    private getTownById(townId: string): TownInfo | null {
+        return this.worldMap.getTowns().find((town) => town.id === townId) ?? null;
+    }
+
+    private getCurrentHubTown(): TownInfo {
+        return this.getTownById(this.currentHubTownId)
+            ?? this.getTownById('central_castle')
+            ?? this.worldMap.getTowns()[0];
+    }
+
+    private configureTownUI(): void {
+        this.townUI.getQuestDone = (questId) => this.playerData.isCleared(questId);
+        this.townUI.onDeploy(() => this.beginRaidFromCurrentHub());
+        this.townUI.getShopUI().getGold = () => this.playerData.gold;
+        this.townUI.getShopUI().onBuy = (item, price) => {
+            if (!this.playerData.spendGold(price)) {
+                this.addCombatLog('골드가 부족합니다.');
+                return false;
+            }
+            const placed = this.gameManager.inventory.autoPlace(item);
+            if (!placed) {
+                this.playerData.addGold(price);
+                this.addCombatLog('배낭 공간이 부족합니다.');
+                return false;
+            }
+            this.playerData.save();
+            this.addCombatLog(`${item.nameKr} 구매`);
+            return true;
+        };
+    }
+
+    private syncTownUIState(): void {
+        this.townUI.playerGold = this.playerData.gold;
+        const active = this.party.getActive();
+        if (active) this.townUI.setActiveCharacter(active);
+    }
+
+    private openTown(town: TownInfo): void {
+        this.closeFieldOverlays();
+        this.raidActive = false;
+        this.townUI.show(town);
+    }
+
+    private beginRaidFromCurrentHub(): void {
+        const town = this.getCurrentHubTown();
+        this.departureTownId = town.id;
+        this.raidElapsedSeconds = 0;
+        this.raidActive = true;
+        this.killsThisRaid = 0;
+        this.lastDepartureBlockTownId = null;
+        this.pendingTownAfterResult = null;
+        this.party.resetForNewRaid();
+        this.placePartyNear(this.worldMap.getTownExitTile(town));
+        this.player = this.getControlledActor()?.entity ?? this.player;
+        this.selectedActorId = this.getControlledActor()?.id ?? null;
+        this.fieldEnemies = [];
+        this.worldMap.loot = [];
+        this.spawnStarterFieldContent();
+        this.clearFieldTurnState();
+        this.addCombatLog(`${town.nameKr}에서 출격. 다른 마을로 생환하세요.`);
+    }
+
+    private closeFieldOverlays(): void {
+        if (this.gameManager.inventoryUI.isVisible()) this.gameManager.inventoryUI.toggle();
+        if (this.gameManager.partyUI.isVisible()) this.gameManager.partyUI.toggle();
+        if (this.gameManager.charUI.isVisible()) this.gameManager.charUI.toggle();
+        this.closeActionMenu();
+        this.closeTacticalMenu();
+        this.resetMagicState();
+        this.clearActionMode();
+    }
+
+    private clearFieldTurnState(): void {
+        this.activeTurnActorId = null;
+        this.readyQueue = [];
+        this.remainingActionPoints = 0;
+        this.reservedAction = null;
+        this.actionMenuOpen = false;
+        for (const actor of this.partyActors) {
+            actor.path = [];
+            actor.queuedIntent = null;
+            actor.entity.actionGauge = 0;
+        }
+        for (const entry of this.fieldEnemies) {
+            entry.path = [];
+            entry.enemy.actionGauge = 0;
+            entry.enemy.isAggro = false;
+        }
     }
 
     private spawnStarterFieldContent(): void {
@@ -1078,6 +1222,196 @@ export class WorldEngine {
         }
     }
 
+    private updateRaidTimer(dt: number): void {
+        if (!shouldAdvanceRaidTimer({
+            raidActive: this.raidActive,
+            townVisible: this.townUI.isVisible(),
+            resultVisible: this.raidResultUI.isVisible(),
+            turnCombatActive: this.isTurnCombatActive(),
+        })) {
+            return;
+        }
+
+        this.raidElapsedSeconds += dt;
+        if (this.raidElapsedSeconds >= this.raidLimitSeconds) {
+            this.raidElapsedSeconds = this.raidLimitSeconds;
+            this.completeRaidFailure('MIA');
+        }
+    }
+
+    private isTurnCombatActive(): boolean {
+        if (this.fieldEnemies.some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro)) return true;
+        if (this.activeTurnActorId) return true;
+        if (this.readyQueue.length > 0) return true;
+        if (this.reservedAction) return true;
+        if (this.actionMenuOpen || this.actionMode) return true;
+        if (this.tacticalMenuUI.getIsOpen()) return true;
+        if (this.magicUI.isVisible() || this.fieldMagicState.mode !== 'idle') return true;
+        return this.partyActors.some((actor) => actor.queuedIntent || actor.path.length > 0);
+    }
+
+    private checkRaidEndConditions(): void {
+        if (!this.raidActive || this.raidResultUI.isVisible()) return;
+        if (this.party.isSquadWiped()) {
+            this.completeRaidFailure('DEAD');
+            return;
+        }
+        this.checkTownArrival();
+    }
+
+    private checkTownArrival(): void {
+        const actor = this.getControlledActor();
+        if (!actor || !this.worldMap.isWalkable(actor.entity.gridX, actor.entity.gridY)) return;
+
+        const town = this.worldMap.getTownAtTile(actor.entity.gridX, actor.entity.gridY);
+        const arrival = resolveTownArrival(town?.id, this.departureTownId, this.raidActive);
+        if (arrival.kind === 'none') {
+            this.lastDepartureBlockTownId = null;
+            return;
+        }
+        if (arrival.kind === 'departureBlocked') {
+            if (this.lastDepartureBlockTownId !== arrival.townId) {
+                this.addCombatLog('출발한 마을로는 생환할 수 없습니다. 다른 마을로 이동하세요.');
+                this.lastDepartureBlockTownId = arrival.townId ?? null;
+            }
+            return;
+        }
+
+        const destination = town ?? this.getTownById(arrival.townId ?? '') ?? this.getCurrentHubTown();
+        this.completeRaidSuccess(destination);
+    }
+
+    private completeRaidSuccess(destination: TownInfo): void {
+        if (!this.raidActive) return;
+
+        const heroStatuses = this.createHeroStatuses();
+        const secured = this.secureRaidLoot();
+        const questRewards: string[] = [];
+        let goldReward = 0;
+
+        if (!this.playerData.isCleared('quest:first_survival')) {
+            this.playerData.markCleared('quest:first_survival');
+            this.playerData.addGold(200);
+            goldReward = 200;
+            questRewards.push('퀘스트 완료: 첫 생환');
+        }
+
+        this.currentHubTownId = destination.id;
+        this.playerData.currentHubTownId = destination.id;
+        this.playerData.save();
+
+        this.raidActive = false;
+        this.party.resetForNewRaid();
+        this.placePartyNear(this.worldMap.getTownSpawnTile(destination));
+        this.player = this.getControlledActor()?.entity ?? this.player;
+        this.clearFieldTurnState();
+
+        const outcome: RaidOutcome = {
+            result: 'SURVIVED',
+            elapsedSeconds: this.raidElapsedSeconds,
+            kills: this.killsThisRaid,
+            departureTownId: this.departureTownId,
+            extractionTownId: destination.id,
+            heroStatuses,
+            looted: secured,
+            secured,
+            lost: [],
+            equipmentLost: [],
+            goldReward,
+            questRewards,
+            notes: ['전리품과 창고는 현재 세션에서만 유지됩니다.'],
+        };
+        this.showRaidResult(outcome, destination);
+        this.addCombatLog(`${destination.nameKr} 생환 성공.`);
+    }
+
+    private completeRaidFailure(result: Exclude<RaidResultType, 'SURVIVED'>): void {
+        if (!this.raidActive) return;
+
+        const heroStatuses = this.createHeroStatuses();
+        const loss = computeRaidFailureLoss(this.gameManager.inventory.items, this.party.getCharacters());
+        this.gameManager.inventory.clear();
+        for (const lost of loss.equipmentLost) {
+            const character = this.party.getCharacters().find((candidate) => candidate.id === lost.characterId);
+            character?.unequip(lost.slot);
+        }
+
+        const returnTown = this.getTownById(this.departureTownId) ?? this.getCurrentHubTown();
+        this.currentHubTownId = returnTown.id;
+        this.playerData.currentHubTownId = returnTown.id;
+        this.playerData.save();
+
+        this.raidActive = false;
+        this.party.resetForNewRaid();
+        this.placePartyNear(this.worldMap.getTownSpawnTile(returnTown));
+        this.player = this.getControlledActor()?.entity ?? this.player;
+        this.clearFieldTurnState();
+
+        const outcome: RaidOutcome = {
+            result,
+            elapsedSeconds: this.raidElapsedSeconds,
+            kills: this.killsThisRaid,
+            departureTownId: this.departureTownId,
+            extractionTownId: returnTown.id,
+            heroStatuses,
+            looted: [],
+            secured: [],
+            lost: mergeSnapshots(loss.backpackLost),
+            equipmentLost: loss.equipmentLost,
+            notes: [result === 'MIA' ? '시간 초과로 실종 처리되었습니다.' : '출격조가 전멸했습니다.'],
+        };
+        this.showRaidResult(outcome, returnTown);
+        this.addCombatLog(result === 'MIA' ? '시간 초과. 손실이 적용되었습니다.' : '전멸. 손실이 적용되었습니다.');
+    }
+
+    private showRaidResult(outcome: RaidOutcome, nextTown: TownInfo): void {
+        this.pendingTownAfterResult = nextTown;
+        this.townUI.hide();
+        this.raidResultUI.show(outcome);
+    }
+
+    private openPendingTownAfterResult(): void {
+        const nextTown = this.pendingTownAfterResult ?? this.getCurrentHubTown();
+        this.pendingTownAfterResult = null;
+        this.openTown(nextTown);
+    }
+
+    private createHeroStatuses(): HeroRaidStatus[] {
+        return this.party.getCharacters().map((character) => ({
+            characterId: character.id,
+            characterName: character.name,
+            hp: character.stats.hp,
+            maxHp: character.stats.maxHp,
+            isDead: character.isDead || character.stats.hp <= 0,
+        }));
+    }
+
+    private secureRaidLoot() {
+        const backpackSecured = [...this.gameManager.inventory.items].filter((placed) => placed.acquiredInRaid);
+        const equippedSecured = this.party.getCharacters().flatMap((character) =>
+            [...character.equipment.values()].filter((placed) => placed.acquiredInRaid)
+        );
+        const secured = mergeSnapshots([...backpackSecured, ...equippedSecured].map(snapshotPlacedItem));
+
+        for (const placed of backpackSecured) {
+            const moved = this.gameManager.stash.autoPlace(placed.item);
+            if (moved) {
+                moved.durability = placed.durability;
+                moved.quantity = placed.quantity;
+                moved.sockets = placed.sockets;
+                moved.acquiredInRaid = false;
+                this.gameManager.inventory.remove(placed);
+            } else {
+                placed.acquiredInRaid = false;
+            }
+        }
+        for (const placed of equippedSecured) {
+            placed.acquiredInRaid = false;
+        }
+
+        return secured;
+    }
+
     private tryActorAttack(actor: FieldActor, enemy: Enemy): boolean {
         const start = this.actorTile(actor);
         if (!this.canActorAttackTarget(actor, enemy)) return false;
@@ -1286,6 +1620,7 @@ export class WorldEngine {
 
     private handleEnemyDefeated(actor: FieldActor, enemy: Enemy): void {
         this.addCombatLog(`${enemy.name} 처치! +${enemy.expReward} EXP`);
+        if (this.raidActive) this.killsThisRaid += 1;
         this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
         this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
         actor.character.gainExp(enemy.expReward);
@@ -2528,6 +2863,11 @@ export class WorldEngine {
         ctx.fillRect(x, y, w * Math.max(0, Math.min(1, hp / Math.max(1, maxHp))), 5);
     }
 
+    private formatRaidTime(seconds: number): string {
+        const total = Math.max(0, Math.floor(seconds));
+        return `${Math.floor(total / 60).toString().padStart(2, '0')}:${(total % 60).toString().padStart(2, '0')}`;
+    }
+
     private renderHud(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
         renderGameTitle(ctx, 16, 12, { scale: 0.7, subtitle: '' });
 
@@ -2556,13 +2896,32 @@ export class WorldEngine {
         ctx.textAlign = 'left';
         ctx.fillText(`${this.playerData.gold} G`, 28, 154);
 
+        let infoY = 184;
+        if (this.raidActive) {
+            drawParchmentPanel(ctx, 16, 180, 210, 48);
+            const remaining = Math.max(0, this.raidLimitSeconds - this.raidElapsedSeconds);
+            ctx.fillStyle = shouldAdvanceRaidTimer({
+                raidActive: this.raidActive,
+                townVisible: this.townUI.isVisible(),
+                resultVisible: this.raidResultUI.isVisible(),
+                turnCombatActive: this.isTurnCombatActive(),
+            }) ? '#8a2d2d' : Parchment.textMid;
+            ctx.font = `bold 11px ${UI.fontMono}`;
+            ctx.fillText(`남은 시간 ${this.formatRaidTime(remaining)}`, 28, 190);
+            ctx.fillStyle = Parchment.textMid;
+            ctx.font = `9px ${UI.fontMono}`;
+            ctx.fillText(`출발 ${this.departureTownId}`, 28, 206);
+            ctx.fillText('목표: 다른 마을 생환', 28, 218);
+            infoY = 238;
+        }
+
         ctx.fillStyle = 'rgba(255,255,255,0.45)';
         ctx.font = `9px ${UI.fontMono}`;
-        ctx.fillText(`(${this.player.gridX}, ${this.player.gridY})`, 16, 184);
+        ctx.fillText(`(${this.player.gridX}, ${this.player.gridY})`, 16, infoY);
 
         const selectedInfo = this.getSelectedDisplayInfo();
         if (selectedInfo) {
-            this.entityInfoUI.setPosition(16, 202);
+            this.entityInfoUI.setPosition(16, infoY + 18);
             this.entityInfoUI.render(ctx, selectedInfo);
         }
 

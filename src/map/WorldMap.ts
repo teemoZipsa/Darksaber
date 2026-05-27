@@ -1,5 +1,6 @@
 import { Chunk, CHUNK_SIZE, TILE_SIZE } from './Chunk';
 import { TileType, TILE_PROPERTIES } from './Tile';
+import { TileAssetManager } from './TileAssetManager';
 import { LootObject } from '../entity/LootObject';
 import { ExtractionZone } from '../entity/ExtractionZone';
 import { BiomeMask, BiomeType, MAP_HEIGHT, MAP_WIDTH, TownInfo } from './BiomeMask';
@@ -78,6 +79,25 @@ export class WorldMap {
         return false;
     }
 
+    private computeTownTile(tx: number, ty: number, town: TownInfo): TileType {
+        const centerX = town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
+        const centerY = town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
+        const dx = tx - centerX;
+        const dy = ty - centerY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const townRadiusTiles = town.radius * CHUNK_SIZE;
+
+        if (Math.abs(dx) <= 7 && Math.abs(dy) <= 7) return TileType.TOWN;
+        if (dist <= 13 && this.hash(tx, ty, 21) > 0.35) return TileType.TOWN;
+        if ((Math.abs(dx) <= 2 || Math.abs(dy) <= 2) && dist <= townRadiusTiles * 0.9) return TileType.ROAD;
+
+        const n = this.hash(tx >> 1, ty >> 1, 22);
+        if (n > 0.9) return TileType.STONE;
+        if (town.id === 'nw_desert_city') return n > 0.2 ? TileType.SAND : TileType.STONE;
+        if (town.id === 's_coast_town' || town.id === 'se_port') return n > 0.28 ? TileType.GRASS : TileType.SAND;
+        return n > 0.18 ? TileType.GRASS : TileType.FOREST;
+    }
+
     private computeTileAt(tx: number, ty: number): TileType {
         const bounds = this.getBoundsTiles();
         if (tx < 0 || ty < 0 || tx >= bounds.width || ty >= bounds.height) {
@@ -95,7 +115,10 @@ export class WorldMap {
         if (biome === 'ocean') {
             return this.isCoastOceanChunk(chunkX, chunkY) ? TileType.WATER : TileType.DEEP_WATER;
         }
-        if (biome === 'town') return TileType.TOWN;
+        if (biome === 'town') {
+            const town = this.getTownAtTile(tx, ty);
+            return town ? this.computeTownTile(tx, ty, town) : TileType.GRASS;
+        }
 
         if (biome === 'special') {
             const dx = localX - CHUNK_SIZE / 2;
@@ -164,6 +187,8 @@ export class WorldMap {
             chunk.render(ctx, sx, sy, (nx, ny) => this.getTileAt(nx, ny));
         }
 
+        this.renderTownLandmarks(ctx, cameraX, cameraY, vw, vh);
+
         for (const zone of this.extractionZones) {
             zone.render(ctx, (gx, gy) => ({
                 x: gx * TILE_SIZE - cameraX,
@@ -219,6 +244,27 @@ export class WorldMap {
         return { x: centerX, y: centerY };
     }
 
+    public getTownExitTile(town: TownInfo): TilePoint {
+        const centerX = town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
+        const centerY = town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
+        const searchRadius = Math.max(8, town.radius * CHUNK_SIZE + CHUNK_SIZE);
+
+        for (let radius = town.radius * CHUNK_SIZE; radius <= searchRadius; radius++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+                for (let dx = -radius; dx <= radius; dx++) {
+                    if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
+                    const tx = centerX + dx;
+                    const ty = centerY + dy;
+                    if (this.isWalkable(tx, ty) && this.getTownAtTile(tx, ty)?.id !== town.id) {
+                        return { x: tx, y: ty };
+                    }
+                }
+            }
+        }
+
+        return this.getTownSpawnTile(town);
+    }
+
     public getBoundsTiles(): TileBounds {
         return {
             width: MAP_WIDTH * CHUNK_SIZE,
@@ -228,6 +274,47 @@ export class WorldMap {
 
     public updateEntities(dt: number): void {
         for (const zone of this.extractionZones) zone.update(dt);
+    }
+
+    private renderTownLandmarks(
+        ctx: CanvasRenderingContext2D,
+        cameraX: number,
+        cameraY: number,
+        vw: number,
+        vh: number
+    ): void {
+        for (const town of this.getTowns()) {
+            const centerTileX = town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
+            const centerTileY = town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
+            const isCastle = town.id === 'central_castle' || town.id === 'e_stronghold';
+            const isPort = town.id === 's_coast_town' || town.id === 'se_port';
+            const atlasIndex = isCastle ? 14 : isPort ? 15 : 13;
+            const tileSpan = isCastle ? 4 : 3;
+            const size = TILE_SIZE * tileSpan;
+            const sx = centerTileX * TILE_SIZE - cameraX - size / 2 + TILE_SIZE / 2;
+            const sy = centerTileY * TILE_SIZE - cameraY - size / 2 + TILE_SIZE / 2;
+
+            if (sx + size < 0 || sx > vw || sy + size < 0 || sy > vh) continue;
+
+            const drew = TileAssetManager.drawAtlasCell(ctx, atlasIndex, sx, sy, size, { cropInset: 8 });
+            if (!drew) {
+                ctx.fillStyle = isCastle ? '#a88a48' : isPort ? '#5b8aa8' : '#8a6a3a';
+                ctx.fillRect(sx, sy, size, size);
+            }
+
+            ctx.save();
+            ctx.font = 'bold 14px "DOSMyungjo", serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            const labelX = sx + size / 2;
+            const labelY = sy + size + 3;
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.fillStyle = '#f0d78a';
+            ctx.strokeText(town.nameKr, labelX, labelY);
+            ctx.fillText(town.nameKr, labelX, labelY);
+            ctx.restore();
+        }
     }
 
     private validateTownSpawns(): void {

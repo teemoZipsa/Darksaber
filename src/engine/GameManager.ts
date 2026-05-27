@@ -34,6 +34,7 @@ export class GameManager {
     // Shared data
     public party: PartyManager;
     public inventory: GridInventory;
+    public stash: GridInventory;
     public playerData: PlayerData;
 
     // Unified field/combat engine
@@ -61,6 +62,7 @@ export class GameManager {
         // Shared systems
         this.party = new PartyManager();
         this.inventory = new GridInventory(10, 6);
+        this.stash = new GridInventory(15, 10);
         this.playerData = new PlayerData();
         this.playerData.load();
 
@@ -169,6 +171,11 @@ export class GameManager {
                 break;
 
             case GameState.WORLD:
+                if (this.worldEngine.isModalOverlayVisible()) {
+                    this.worldEngine.update(dt, this.input, this.camera);
+                    break;
+                }
+
                 if (this.input.justPressed('KeyI')) {
                     this.inventoryUI.toggle();
                     if (this.inventoryUI.isVisible() && this.charUI.isVisible()) this.charUI.toggle();

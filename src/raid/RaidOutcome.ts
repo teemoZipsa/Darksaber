@@ -20,16 +20,28 @@ export interface EquipmentLoss {
     item: ItemSnapshot;
 }
 
+export interface HeroRaidStatus {
+    characterId: string;
+    characterName: string;
+    hp: number;
+    maxHp: number;
+    isDead: boolean;
+}
+
 export interface RaidOutcome {
     result: RaidResultType;
     elapsedSeconds: number;
     kills: number;
     departureTownId: string;
     extractionTownId?: string;
+    heroStatuses?: HeroRaidStatus[];
     looted: ItemSnapshot[];
     secured: ItemSnapshot[];
     lost: ItemSnapshot[];
     equipmentLost: EquipmentLoss[];
+    goldReward?: number;
+    questRewards?: string[];
+    notes?: string[];
 }
 
 export interface EquippedCharacterLike {

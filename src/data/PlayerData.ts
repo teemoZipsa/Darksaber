@@ -14,6 +14,7 @@ export interface InventoryItem {
 export interface SaveData {
     gold: number;
     clearedStages: string[];
+    currentHubTownId: string;
     inventory: InventoryItem[];
     equipped: { [slot: string]: InventoryItem | null };
     /** ISO date string of last save */
@@ -24,6 +25,7 @@ const SAVE_KEY = 'sin_eater_save';
 export class PlayerData {
     public gold: number = 500;  // Starting gold
     public clearedStages: Set<string> = new Set();
+    public currentHubTownId: string = 'central_castle';
     public inventory: InventoryItem[] = [];
     public equipped: Record<string, InventoryItem | null> = {
         weapon: null, shield: null, head: null, body: null, boots: null, accessory: null, accessory2: null
@@ -59,6 +61,7 @@ export class PlayerData {
         const data: SaveData = {
             gold: this.gold,
             clearedStages: Array.from(this.clearedStages),
+            currentHubTownId: this.currentHubTownId,
             inventory: this.inventory,
             equipped: this.equipped,
             lastSaved: new Date().toISOString(),
@@ -75,6 +78,7 @@ export class PlayerData {
             const data: SaveData = JSON.parse(raw);
             this.gold = data.gold ?? 500;
             this.clearedStages = new Set(data.clearedStages ?? []);
+            this.currentHubTownId = data.currentHubTownId ?? 'central_castle';
             this.inventory = data.inventory ?? [];
             this.equipped = data.equipped ?? {
                 weapon: null, shield: null, head: null, body: null, boots: null, accessory: null, accessory2: null

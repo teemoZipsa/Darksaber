@@ -17,6 +17,7 @@ import { ShopUI } from './ShopUI';
 import { InputManager } from '../engine/InputManager';
 import { renderGameTitle, UI } from './UITheme';
 import { TownInfo } from '../map/BiomeMask';
+import type { Character } from '../character/Character';
 
 type TownTab = 'storage' | 'shop' | 'quest' | 'rumors';
 
@@ -61,6 +62,7 @@ export class TownUI {
 
     // Player gold reference (updated externally)
     public playerGold: number = 0;
+    public getQuestDone: ((questId: string) => boolean) | null = null;
 
     // Main stash (shared with lobby)
     public stash: GridInventory;
@@ -81,6 +83,10 @@ export class TownUI {
     }
 
     public getShopUI(): ShopUI { return this.shopUI; }
+
+    public setActiveCharacter(char: Character): void {
+        this.inventoryUI.setActiveCharacter(char);
+    }
 
     // ── Lifecycle ──────────────────────────────────────────────────
 
@@ -173,6 +179,10 @@ export class TownUI {
             } else if (this.activeTab === 'shop') {
                 this.shopUI.onMouseUp(input.uiMouseX, input.uiMouseY);
             }
+        }
+
+        if (input.mouseWheelDelta !== 0 && this.activeTab === 'shop') {
+            this.shopUI.onScroll(input.mouseWheelDelta);
         }
     }
 
@@ -305,11 +315,14 @@ export class TownUI {
 
         // Placeholder quests
         const quests = [
-            { name: '첫 탈출', desc: '아무 마을로 탈출 성공하기', reward: '200G + 치료소 해금', done: false },
+            { id: 'quest:first_survival', name: '첫 생환', desc: '출발지가 아닌 다른 마을로 생환하기', reward: '200G', done: false },
             { name: '위협 제거', desc: '보스 1마리 처치하기', reward: '전직 상점 해금', done: false },
             { name: '약초 수집 (일일)', desc: '약초 3개를 마을로 가져오기', reward: '100G', done: false },
             { name: '사냥터 정리 (일일)', desc: '적 10마리 처치하기', reward: '150G', done: false },
-        ];
+        ].map((quest) => ({
+            ...quest,
+            done: 'id' in quest && quest.id ? !!this.getQuestDone?.(quest.id) : quest.done,
+        }));
 
         ctx.textAlign = 'left';
         for (let i = 0; i < quests.length; i++) {
@@ -348,7 +361,7 @@ export class TownUI {
         ctx.font = `12px ${UI.fontPrimary}`;
         ctx.fillStyle = '#5a5040';
         ctx.textAlign = 'center';
-        ctx.fillText('※ 퀘스트 시스템은 Phase 5.3에서 구현 예정', w / 2, py + panelH - 15);
+        ctx.fillText('※ 전리품 창고 저장은 현재 세션 한정입니다.', w / 2, py + panelH - 15);
     }
 
     private renderRumorsTab(ctx: CanvasRenderingContext2D, w: number, y: number, _h: number): void {
