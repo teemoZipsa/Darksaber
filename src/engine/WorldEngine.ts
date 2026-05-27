@@ -61,7 +61,7 @@ import {
 import { getRightClickDisposition, type WorldInteractionMode } from '../field/WorldInteractionMode';
 import { advanceAtb, resolveAggroState } from '../field/FieldCombat';
 import { decideEnemyAction, type BossPattern, type EnemyAIDecision, type EnemyAIUnit, type EnemyRole } from '../field/EnemyAI';
-import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getWaitAtbCarryover, hasExecutableFieldAction } from '../field/FieldActionEconomy';
+import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, hasExecutableFieldAction } from '../field/FieldActionEconomy';
 import { hasLineOfSight } from '../field/LineOfSight';
 import {
     AttackPatternProfile,
@@ -91,7 +91,7 @@ import {
 import { resolveTownArrival, shouldAdvanceRaidTimer } from '../raid/RaidRules';
 
 interface FieldIntent {
-    kind: 'move' | 'attack' | 'interact' | 'magic' | 'rest' | 'wait' | 'defend' | 'counter';
+    kind: 'move' | 'attack' | 'interact' | 'magic' | 'rest' | 'defend' | 'counter';
     tile?: TilePoint;
     path?: TilePoint[];
     enemyId?: string;
@@ -624,12 +624,8 @@ export class WorldEngine {
                 actor.character.stats.mp = Math.min(actor.character.stats.maxMp, actor.character.stats.mp + 3);
                 this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, 5);
                 this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
-                this.addCombatLog('휴식: HP +5, MP +3 회복');
+                this.addCombatLog('휴식: HP +5, MP +3 회복. 다음 행동 게이지는 보존되지 않습니다.');
                 this.endActorTurn(actor, '휴식');
-                break;
-            case 'wait':
-                this.addCombatLog('대기: 다음 행동 게이지 일부 보존');
-                this.endActorTurn(actor, '대기', this.getWaitCarryover(actor));
                 break;
             case 'defend':
                 actor.character.statuses = applyStatus(actor.character.statuses, createStatus('guard'));
@@ -1807,7 +1803,7 @@ export class WorldEngine {
     private getAvailableTurnActions(actor: FieldActor): ActionType[] {
         const available: ActionType[] = ['move', 'attack', 'magic'];
         if (this.hasExecutableInteract(actor)) available.push('open');
-        available.push('defend', 'counter', 'rest', 'wait');
+        available.push('defend', 'counter', 'rest');
         return available;
     }
 
@@ -1815,10 +1811,6 @@ export class WorldEngine {
         if (cost < 0 || this.remainingActionPoints < cost) return false;
         this.remainingActionPoints -= cost;
         return true;
-    }
-
-    private getWaitCarryover(actor: FieldActor): number {
-        return getWaitAtbCarryover(this.remainingActionPoints, actor.character.stats.actionLimit || 1);
     }
 
     private resumeOrEndActiveTurn(actor: FieldActor): void {

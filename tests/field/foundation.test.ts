@@ -6,7 +6,7 @@ import { WorldMap } from '../../src/map/WorldMap';
 import { resolveFieldHit } from '../../src/field/FieldInteraction';
 import { findPath, findPathToAny, findPathWithCost, findReachableTilesByCost, manhattan, tilesInRange, FieldPassableQuery } from '../../src/field/FieldPathing';
 import { resolveAggroState, shouldAssistTarget } from '../../src/field/FieldCombat';
-import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getMoveApCost, getWaitAtbCarryover, hasExecutableFieldAction } from '../../src/field/FieldActionEconomy';
+import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, getActionApCost, getMoveApCost, hasExecutableFieldAction } from '../../src/field/FieldActionEconomy';
 import { resolveSkillEffect } from '../../src/combat/SkillEffectResolver';
 import { getSkill } from '../../src/data/SkillDB';
 import { createBaseStats } from '../../src/data/Stats';
@@ -152,11 +152,8 @@ test('field AP movement cost excludes the starting tile', () => {
     assert.equal(getMoveApCost(5), 10);
 });
 
-test('wait preserves action gauge based on remaining AP up to half gauge', () => {
-    assert.equal(getWaitAtbCarryover(0, 15), 0);
-    assert.equal(getWaitAtbCarryover(6, 15), 20);
-    assert.equal(getWaitAtbCarryover(15, 15), 50);
-    assert.equal(getWaitAtbCarryover(30, 15), 50);
+test('rest ends a turn without an AP cost', () => {
+    assert.equal(getActionApCost('rest'), 0);
 });
 
 test('terrain rules cover every TileType and battle stage adapter stays shared', () => {
