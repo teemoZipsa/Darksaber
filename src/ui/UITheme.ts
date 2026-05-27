@@ -508,6 +508,8 @@ export function renderGameTitle(
     options?: {
         scale?: number;      // 1.0 = normal, 2.0 = double size
         subtitle?: string;
+        align?: 'left' | 'center';
+        glow?: 'normal' | 'subtle';
     }
 ): number {
     const s = options?.scale ?? 1.0;
@@ -519,8 +521,18 @@ export function renderGameTitle(
     // ─── Main title: "DARKSABER" ─────────────────────
     const titleText = 'DARKSABER';
 
+    // Font setup
+    ctx.font = `900 ${fontSize}px "Georgia", "Times New Roman", serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.letterSpacing = `${Math.round(4 * s)}px`;
+
+    const titleW = ctx.measureText(titleText).width;
+    const drawX = options?.align === 'center' ? x - titleW / 2 : x;
+    const subtleGlow = options?.glow === 'subtle';
+
     // Gold gradient fill
-    const grad = ctx.createLinearGradient(x, y, x, y + fontSize);
+    const grad = ctx.createLinearGradient(drawX, y, drawX, y + fontSize);
     grad.addColorStop(0, '#ffd700');   // bright gold top
     grad.addColorStop(0.3, '#f0c050');
     grad.addColorStop(0.5, '#ffe88a'); // light highlight center
@@ -528,16 +540,15 @@ export function renderGameTitle(
     grad.addColorStop(1, '#8b6914');   // deep dark gold bottom
 
     // Outer glow (red/crimson aura)
-    ctx.shadowColor = 'rgba(228, 63, 90, 0.6)';
-    ctx.shadowBlur = 20 * s;
+    ctx.shadowColor = subtleGlow ? 'rgba(228, 63, 90, 0.14)' : 'rgba(228, 63, 90, 0.35)';
+    ctx.shadowBlur = (subtleGlow ? 5 : 10) * s;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
+    ctx.fillStyle = subtleGlow ? 'rgba(60, 8, 12, 0.25)' : 'rgba(80, 10, 16, 0.45)';
+    ctx.fillText(titleText, drawX, y);
 
-    // Font setup
-    ctx.font = `900 ${fontSize}px "Georgia", "Times New Roman", serif`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.letterSpacing = `${Math.round(4 * s)}px`;
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
 
     // Dark outline (draw text multiple times offset for thick outline)
     ctx.fillStyle = '#1a0a00';
@@ -545,28 +556,27 @@ export function renderGameTitle(
     for (let ox = -off; ox <= off; ox++) {
         for (let oy = -off; oy <= off; oy++) {
             if (ox === 0 && oy === 0) continue;
-            ctx.fillText(titleText, x + ox, y + oy);
+            ctx.fillText(titleText, drawX + ox, y + oy);
         }
     }
 
     // Reset glow for main fill pass
-    ctx.shadowColor = 'rgba(255, 215, 0, 0.3)';
-    ctx.shadowBlur = 8 * s;
+    ctx.shadowColor = subtleGlow ? 'rgba(255, 215, 0, 0.1)' : 'rgba(255, 215, 0, 0.22)';
+    ctx.shadowBlur = (subtleGlow ? 2 : 5) * s;
 
     // Main gold gradient fill
     ctx.fillStyle = grad;
-    ctx.fillText(titleText, x, y);
+    ctx.fillText(titleText, drawX, y);
 
     // Inner highlight stroke (metallic edge)
     ctx.shadowBlur = 0;
     ctx.strokeStyle = 'rgba(255, 240, 180, 0.3)';
     ctx.lineWidth = 1;
-    ctx.strokeText(titleText, x, y);
+    ctx.strokeText(titleText, drawX, y);
 
     // ─── Decorative separator ──────────────────
     const lineY = y + fontSize + 4 * s;
-    const titleW = ctx.measureText(titleText).width;
-    const lineGrad = ctx.createLinearGradient(x, lineY, x + titleW, lineY);
+    const lineGrad = ctx.createLinearGradient(drawX, lineY, drawX + titleW, lineY);
     lineGrad.addColorStop(0, 'rgba(200, 163, 109, 0)');
     lineGrad.addColorStop(0.2, 'rgba(200, 163, 109, 0.6)');
     lineGrad.addColorStop(0.5, 'rgba(255, 215, 0, 0.8)');
@@ -574,8 +584,8 @@ export function renderGameTitle(
     lineGrad.addColorStop(1, 'rgba(200, 163, 109, 0)');
 
     ctx.beginPath();
-    ctx.moveTo(x, lineY);
-    ctx.lineTo(x + titleW, lineY);
+    ctx.moveTo(drawX, lineY);
+    ctx.lineTo(drawX + titleW, lineY);
     ctx.strokeStyle = lineGrad;
     ctx.lineWidth = 1.5 * s;
     ctx.stroke();
@@ -588,7 +598,7 @@ export function renderGameTitle(
         ctx.font = `${subFontSize}px ${UI.fontPrimary}`;
         ctx.fillStyle = DarkParchment.textMuted;
         ctx.letterSpacing = `${Math.round(2 * s)}px`;
-        ctx.fillText(options.subtitle, x + 2, subY);
+        ctx.fillText(options.subtitle, drawX + 2, subY);
         totalH = (subY - y) + subFontSize + 4 * s;
     }
 

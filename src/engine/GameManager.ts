@@ -290,14 +290,25 @@ export class GameManager {
         const cx = w / 2;
         const cy = h / 2;
 
-        renderGameTitle(this.ctx, cx - 140, cy - 80, { scale: 1.2, subtitle: '' });
+        const titleScale = Math.min(3.65, Math.max(1.35, (w - 48) / 275));
+        const titleY = Math.max(28, cy - Math.round(50 * titleScale));
+        const titleH = renderGameTitle(this.ctx, cx, titleY, { scale: titleScale, subtitle: '', align: 'center', glow: 'subtle' });
 
-        this.ctx.fillStyle = 'rgba(255, 200, 100, 0.7)';
-        this.ctx.font = `16px "DOSMyungjo", sans-serif`;
+        const promptSize = Math.round(Math.min(28, Math.max(18, titleScale * 7)));
+        const promptText = t('title.pressEnter');
+        const promptY = Math.min(h - 70, titleY + titleH + Math.round(20 * titleScale));
+        this.ctx.font = `${promptSize}px "DOSMyungjo", sans-serif`;
         this.ctx.textAlign = 'center';
-        const pulse = 0.5 + Math.sin(performance.now() / 500) * 0.3;
+        const pulse = 0.75 + Math.sin(performance.now() / 500) * 0.15;
         this.ctx.globalAlpha = pulse;
-        this.ctx.fillText(t('title.pressEnter'), cx, cy + 40);
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+        this.ctx.shadowBlur = 8;
+        this.ctx.lineWidth = Math.max(2, Math.round(promptSize / 7));
+        this.ctx.strokeStyle = 'rgba(20, 10, 0, 0.85)';
+        this.ctx.strokeText(promptText, cx, promptY);
+        this.ctx.fillStyle = 'rgba(255, 210, 120, 0.95)';
+        this.ctx.fillText(promptText, cx, promptY);
+        this.ctx.shadowBlur = 0;
         this.ctx.globalAlpha = 1;
         this.ctx.textAlign = 'start';
 

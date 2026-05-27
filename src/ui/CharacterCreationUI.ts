@@ -20,8 +20,8 @@ const CLASSES: CharConfig[] = [
 ];
 
 export class CharacterCreationUI {
-    private w = 640;
-    private h = 480;
+    private w = 820;
+    private h = 560;
     private selectedClassIndex = 0;
     private selectedGender = 'M'; // 'M' or 'F'
     private focusSection = 0; // 0=class, 1=name, 2=gender, 3=confirm
@@ -36,7 +36,6 @@ export class CharacterCreationUI {
     // Hover states
     private hoveredClassIndex = -1;
     private genderHovered = false;
-    private termsHovered = false;
     private confirmHovered = false;
 
     // Callbacks
@@ -45,7 +44,6 @@ export class CharacterCreationUI {
     // Internal geometry cached during render for mouse events
     private lastCx = 0;
     private lastCy = 0;
-    private lastCanvasH = 0;
 
     constructor() {
         // Load individual class images
@@ -72,10 +70,10 @@ export class CharacterCreationUI {
         this.nameInput.style.border = '2px solid #c8a36d';
         this.nameInput.style.borderRadius = '6px';
         this.nameInput.style.fontFamily = '"DOSMyungjo", sans-serif';
-        this.nameInput.style.fontSize = '18px';
-        this.nameInput.style.padding = '6px 14px';
+        this.nameInput.style.fontSize = '22px';
+        this.nameInput.style.padding = '5px 14px';
         this.nameInput.style.outline = 'none';
-        this.nameInput.style.width = '160px';
+        this.nameInput.style.width = '190px';
         this.nameInput.style.boxSizing = 'border-box';
         this.nameInput.style.textAlign = 'left';
         this.nameInput.style.letterSpacing = '1px';
@@ -99,16 +97,15 @@ export class CharacterCreationUI {
         this.hoveredClassIndex = -1;
         this.genderHovered = false;
         this.confirmHovered = false;
-        this.termsHovered = false;
 
         // Check class selection boxes
         const classCount = CLASSES.length;
-        const boxW = 120;
-        const boxH = 200;
-        const gap = 20;
+        const boxW = 154;
+        const boxH = 270;
+        const gap = 24;
         const totalW = boxW * classCount + gap * (classCount - 1);
         const startX = cx + (this.w - totalW) / 2;
-        const boxY = cy + 70;
+        const boxY = cy + 82;
 
         for (let i = 0; i < classCount; i++) {
             const bx = startX + i * (boxW + gap);
@@ -118,25 +115,20 @@ export class CharacterCreationUI {
         }
 
         // Check gender toggle
-        // Text is drawn left-aligned at cx + 330
-        const gx = cx + 330;
-        const gy = cy + 380;
-        if (mx >= gx && mx <= gx + 130 && my >= gy - 15 && my <= gy + 15) {
+        // Text is drawn left-aligned at cx + 425
+        const gx = cx + 425;
+        const gy = cy + 452;
+        if (mx >= gx && mx <= gx + 170 && my >= gy - 18 && my <= gy + 18) {
             this.genderHovered = true;
         }
 
         // Check confirm button
-        const btnX = cx + this.w - 120;
-        const btnY = cy + this.h - 60;
-        if (mx >= btnX && mx <= btnX + 80 && my >= btnY && my <= btnY + 40) {
+        const btnW = 148;
+        const btnH = 50;
+        const btnX = cx + this.w - 190;
+        const btnY = cy + this.h - 78;
+        if (mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH) {
             this.confirmHovered = true;
-        }
-
-        // Check Terms link (bottom-left of entire page)
-        const termsX = 12;
-        const termsY = this.lastCanvasH - 24;
-        if (mx >= termsX && mx <= termsX + 100 && my >= termsY && my <= termsY + 16) {
-            this.termsHovered = true;
         }
     }
 
@@ -146,9 +138,6 @@ export class CharacterCreationUI {
         }
         if (this.genderHovered) {
             this.selectedGender = this.selectedGender === 'M' ? 'F' : 'M';
-        }
-        if (this.termsHovered) {
-            window.open('/legal.html', '_blank');
         }
         if (this.confirmHovered) {
             const finalName = this.nameInput.value.trim() || 'Hero';
@@ -212,7 +201,6 @@ export class CharacterCreationUI {
         const cy = Math.floor(canvasH / 2 - this.h / 2);
         this.lastCx = cx;
         this.lastCy = cy;
-        this.lastCanvasH = canvasH;
 
         // 0. Full-screen background image
         if (this.bgLoaded) {
@@ -237,19 +225,19 @@ export class CharacterCreationUI {
 
         // 2. Title
         ctx.fillStyle = '#3a2618';
-        ctx.font = 'bold 24px "DOSMyungjo", sans-serif';
+        ctx.font = 'bold 30px "DOSMyungjo", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.fillText(t('create.title'), cx + this.w / 2, cy + 20);
+        ctx.fillText(t('create.title'), cx + this.w / 2, cy + 24);
 
         // 3. Render Class Boxes
         const classCount = CLASSES.length;
-        const boxW = 126;
-        const boxH = 230;
-        const gap = 20;
+        const boxW = 154;
+        const boxH = 270;
+        const gap = 24;
         const totalW = boxW * classCount + gap * (classCount - 1);
         const startX = cx + (this.w - totalW) / 2;
-        const boxY = cy + 70;
+        const boxY = cy + 82;
 
         for (let i = 0; i < classCount; i++) {
             const bx = startX + i * (boxW + gap);
@@ -262,9 +250,9 @@ export class CharacterCreationUI {
 
             // Portrait block background
             ctx.fillStyle = '#f0f0f0';
-            const portraitSize = 64;
+            const portraitSize = 86;
             const px = bx + (boxW - portraitSize) / 2;
-            const py = boxY + 16;
+            const py = boxY + 18;
             ctx.fillRect(px, py, portraitSize, portraitSize);
             ctx.strokeStyle = Parchment.borderDark;
             ctx.lineWidth = 1;
@@ -299,9 +287,9 @@ export class CharacterCreationUI {
 
             // Class Name
             ctx.fillStyle = Parchment.textDark;
-            ctx.font = `bold 15px ${UI.fontPrimary}`;
+            ctx.font = `bold 18px ${UI.fontPrimary}`;
             ctx.textBaseline = 'top';
-            ctx.fillText(t(CLASSES[i].labelKey as any), bx + boxW / 2, py + portraitSize + 12);
+            ctx.fillText(t(CLASSES[i].labelKey as any), bx + boxW / 2, py + portraitSize + 14);
 
             // Stat Bars (wider, thicker, with pct labels)
             const statNames = [t('create.hp'), t('create.atk'), t('create.def'), t('create.mag')];
@@ -310,16 +298,16 @@ export class CharacterCreationUI {
             
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
-            ctx.font = `bold 13px ${UI.fontPrimary}`;
-            const barW = 50;
-            const barH = 12;
-            const barStartX = bx + 48;
+            ctx.font = `bold 15px ${UI.fontPrimary}`;
+            const barW = 72;
+            const barH = 14;
+            const barStartX = bx + 62;
             
             for (let s = 0; s < 4; s++) {
-                const textY = py + portraitSize + 48 + s * 22;
+                const textY = py + portraitSize + 56 + s * 28;
                 ctx.fillStyle = '#1a1008';
-                ctx.font = `bold 14px ${UI.fontPrimary}`;
-                ctx.fillText(statNames[s], bx + 10, textY);
+                ctx.font = `bold 16px ${UI.fontPrimary}`;
+                ctx.fillText(statNames[s], bx + 14, textY);
                 
                 // Bar Background (rounded)
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
@@ -341,19 +329,19 @@ export class CharacterCreationUI {
         }
 
         // 4. Name input rendering / alignment
-        const promptY = cy + 340;
+        const promptY = cy + 404;
         
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#3a2618';
-        ctx.font = '18px "DOSMyungjo", sans-serif';
+        ctx.font = '22px "DOSMyungjo", sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText(t('create.namePrompt'), cx + 300, promptY);
+        ctx.fillText(t('create.namePrompt'), cx + 390, promptY);
         
         if (hideInput) {
             this.nameInput.style.display = 'none';
         } else {
             // Sync the HTML Input over the canvas
-            const inputX = cx + 330;
+            const inputX = cx + 425;
             
             const canvasBounds = ctx.canvas.getBoundingClientRect();
             const scaleX = canvasBounds.width / canvasW;
@@ -361,10 +349,10 @@ export class CharacterCreationUI {
 
             // Apply scale directly to CSS properties instead of using transform
             // This avoids transform-origin and alignment inconsistencies
-            const scaledWidth = 140 * scaleX;
-            const scaledFontSize = 18 * scaleY;
-            const padV = 4 * scaleY;
-            const padH = 12 * scaleX;
+            const scaledWidth = 190 * scaleX;
+            const scaledFontSize = 22 * scaleY;
+            const padV = 5 * scaleY;
+            const padH = 14 * scaleX;
             const totalHeight = scaledFontSize + (padV * 2) + (2 * scaleY); // +2 for border
             
             // Center the input vertically at promptY
@@ -384,26 +372,26 @@ export class CharacterCreationUI {
         }
 
         // 5. Gender selection
-        const genderY = cy + 380;
+        const genderY = cy + 452;
         const isMale = this.selectedGender === 'M';
         const isFemale = this.selectedGender === 'F';
         
         ctx.fillStyle = '#3a2618';
-        ctx.font = '18px "DOSMyungjo", sans-serif';
+        ctx.font = '22px "DOSMyungjo", sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText(t('create.genderPrompt'), cx + 300, genderY);
+        ctx.fillText(t('create.genderPrompt'), cx + 390, genderY);
         
         const genderText = `< ${isMale ? '▶' : ''}남 : ${isFemale ? '▶' : ''}여 >`;
         ctx.fillStyle = this.genderHovered ? '#8c6239' : '#3a2618';
-        ctx.font = 'bold 20px "DOSMyungjo", sans-serif';
+        ctx.font = 'bold 24px "DOSMyungjo", sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(genderText, cx + 330, genderY);
+        ctx.fillText(genderText, cx + 425, genderY);
 
         // 6. Confirm Button (medieval style)
-        const btnW = 120;
-        const btnH = 44;
-        const btnX = cx + this.w - 160;
-        const btnY = cy + this.h - 65;
+        const btnW = 148;
+        const btnH = 50;
+        const btnX = cx + this.w - 190;
+        const btnY = cy + this.h - 78;
         
         // Button background
         ctx.save();
@@ -432,20 +420,11 @@ export class CharacterCreationUI {
         ctx.fillStyle = '#f0e6d0';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.font = `bold 18px ${UI.fontPrimary}`;
+        ctx.font = `bold 22px ${UI.fontPrimary}`;
         ctx.fillText(t('create.confirm'), btnX + btnW / 2, btnY + btnH / 2);
 
         // ─── EPIC GAME TITLE (top-left) ──────────────────────
         renderGameTitle(ctx, 16, 12, { scale: 0.9, subtitle: 'Grid SRPG Engine v0.1' });
-
-
-
-        // 8. Terms | Privacy link (bottom-left of entire page)
-        ctx.fillStyle = this.termsHovered ? 'rgba(200,170,80,0.8)' : 'rgba(100,80,50,0.5)';
-        ctx.font = `11px ${UI.fontPrimary}`;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText('Terms | Privacy', 12, canvasH - 8);
 
         // Reset text alignments
         ctx.textAlign = 'start';
