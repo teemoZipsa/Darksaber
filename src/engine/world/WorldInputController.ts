@@ -44,6 +44,7 @@ export interface WorldInputContext {
     clearIntent: () => void;
     log: (message: string) => void;
     getCombatLog: () => string[];
+    onUnhandledEscape: () => void;
 }
 
 export class WorldInputController {
@@ -94,7 +95,9 @@ export class WorldInputController {
         } else if (input.justPressed('Escape')) {
             if (this.context.tacticalController.isOpen()) this.context.closeTacticalMenu();
             else if (this.context.magicController.isActive()) this.context.magicController.reset();
-            else this.context.clearIntent();
+            else if (this.context.actionMenuUI.getIsOpen()) this.context.closeActionMenu();
+            else if (this.context.getReservedAction()) this.context.clearIntent();
+            else this.context.onUnhandledEscape();
         } else if (this.context.tacticalController.isOpen()) {
             if (input.mouseJustDown) this.context.tacticalController.handleClick(input.uiMouseX, input.uiMouseY);
         } else if (this.context.magicController.isVisible()) {

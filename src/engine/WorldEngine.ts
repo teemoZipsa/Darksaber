@@ -343,6 +343,7 @@ export class WorldEngine {
             clearIntent: () => this.clearIntent(),
             log: (message) => this.addCombatLog(message),
             getCombatLog: () => this.combatLog,
+            onUnhandledEscape: () => this.gameManager.openPauseMenu(),
         });
 
         this.spawnPartyAtCurrentHub();

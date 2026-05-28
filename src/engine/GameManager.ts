@@ -20,6 +20,8 @@ import { t } from '../i18n/LanguageManager';
 import { InventoryUI } from '../inventory/InventoryUI';
 import { PartyUI } from '../ui/PartyUI';
 import { CharacterPanelUI } from '../character/CharacterPanelUI';
+import { TransitionManager } from '../ui/TransitionManager';
+import { PauseMenuUI } from '../ui/PauseMenuUI';
 
 export class GameManager {
     private canvas: HTMLCanvasElement;
@@ -52,6 +54,10 @@ export class GameManager {
     private titleBg = new Image();
     private titleBgLoaded = false;
     private termsHovered = false;
+
+    // Transitions + pause
+    private transitions = new TransitionManager();
+    private pauseMenu = new PauseMenuUI();
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -95,8 +101,12 @@ export class GameManager {
             this.party.switchTo(0);
             this.inventoryUI.setActiveCharacter(char);
             this.charCreateUI.destroy(); // Remove HTML name input from DOM
-            this.initWorldEngine();
-            this.state = GameState.WORLD;
+            this.transitionTo(GameState.WORLD, () => this.initWorldEngine());
+        };
+
+        this.pauseMenu.onResume = () => undefined;
+        this.pauseMenu.onReturnToTitle = () => {
+            this.transitionTo(GameState.TITLE);
         };
 
         // Resize handler
@@ -116,7 +126,27 @@ export class GameManager {
     public start(): void {
         this.isRunning = true;
         this.lastTime = performance.now();
+        this.transitions.fadeInFromBlack(500);
         requestAnimationFrame((t) => this.loop(t));
+    }
+
+    /**
+     * Transition to a new state with a fade. The mid-callback (state switch + any
+     * heavy init) runs while the screen is fully black so the user never sees a flash.
+     */
+    public transitionTo(next: GameState, prepare?: () => void): void {
+        this.transitions.requestTransition({
+            midCallback: () => {
+                if (prepare) prepare();
+                this.state = next;
+            },
+        });
+    }
+
+    /** Called by WorldEngine when ESC has no in-world target to cancel. */
+    public openPauseMenu(): void {
+        if (this.state !== GameState.WORLD) return;
+        this.pauseMenu.open();
     }
 
     private loop(timestamp: number): void {
@@ -124,6 +154,7 @@ export class GameManager {
         const dt = Math.min((timestamp - this.lastTime) / 1000, 0.1); // cap dt
         this.lastTime = timestamp;
 
+        this.transitions.update(timestamp);
         this.update(dt);
         this.render();
         this.input.endFrame();
@@ -138,6 +169,10 @@ export class GameManager {
         const scale = SettingsManager.getUIScale();
         const smx = this.input.mouseScreenX / scale;
         const smy = this.input.mouseScreenY / scale;
+
+        // While the screen is fading out / held black, swallow input so the user
+        // can't double-trigger transitions or interact with stale state.
+        if (this.transitions.isInputLocked()) return;
 
         switch (this.state) {
             case GameState.TITLE:
@@ -154,10 +189,9 @@ export class GameManager {
                 if (this.input.mouseJustDown || this.input.justPressed('Enter') || this.input.justPressed('Space')) {
                     // Check if we have a saved party
                     if (this.party.getCharacters().length > 0) {
-                        this.initWorldEngine();
-                        this.state = GameState.WORLD;
+                        this.transitionTo(GameState.WORLD, () => this.initWorldEngine());
                     } else {
-                        this.state = GameState.CHARACTER_CREATION;
+                        this.transitionTo(GameState.CHARACTER_CREATION);
                     }
                 }
                 break;
@@ -171,6 +205,12 @@ export class GameManager {
                 break;
 
             case GameState.WORLD:
+                // Pause menu takes priority over everything else in WORLD.
+                if (this.pauseMenu.isVisible()) {
+                    this.pauseMenu.updateInput(this.input);
+                    break;
+                }
+
                 if (this.worldEngine.isModalOverlayVisible()) {
                     this.worldEngine.update(dt, this.input, this.camera);
                     break;
@@ -256,10 +296,14 @@ export class GameManager {
                 if (this.inventoryUI.isVisible()) this.inventoryUI.render(this.ctx, vw_world, vh_world);
                 if (this.partyUI.isVisible()) this.partyUI.render(this.ctx, vw_world, vh_world);
                 if (this.charUI.isVisible()) this.charUI.render(this.ctx, vw_world, vh_world);
+                if (this.pauseMenu.isVisible()) this.pauseMenu.render(this.ctx, vw_world, vh_world);
                 this.ctx.restore();
                 break;
 
         }
+
+        // Transition overlay sits on top of everything.
+        this.transitions.render(this.ctx, w, h);
     }
 
     // ═══════════════════════════════════════════════════════════
