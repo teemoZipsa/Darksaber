@@ -1,4 +1,4 @@
-export type DarksaberSheetId = 'board' | 'fx2';
+export type DarksaberSheetId = 'board' | 'fx2' | 'fx' | 'micon';
 
 export interface SpriteRect {
     sheet: DarksaberSheetId;
@@ -17,7 +17,12 @@ interface NumberRow {
     charH: number;
 }
 
-interface DrawSpriteOptions {
+export interface IconCell {
+    col: number;
+    row: number;
+}
+
+export interface DrawSpriteOptions {
     alpha?: number;
     anchorX?: number;
     anchorY?: number;
@@ -43,9 +48,12 @@ interface SliceInset {
 const SHEET_SOURCES: Record<DarksaberSheetId, string> = {
     board: '/Image/Etc/darksaber_board.png',
     fx2: '/Image/Etc/darksaber_fx2.png',
+    fx: '/Image/Etc/darksaber_fx.png',
+    micon: '/Image/Etc/darksaber_micon.png',
 };
 
 const DAMAGE_GLYPHS = '1234567890+-';
+export const MICON_CELL_SIZE = 32;
 
 const NUMBER_ROWS: Record<DamageNumberVariant, NumberRow> = {
     damage: { x: 235, y: 418, charW: 8, charH: 14 },
@@ -109,6 +117,32 @@ class DarksaberSpriteAtlasClass {
         );
         ctx.restore();
         return true;
+    }
+
+    public drawIconCell(
+        ctx: CanvasRenderingContext2D,
+        col: number,
+        row: number,
+        x: number,
+        y: number,
+        size: number,
+        options: DrawSpriteOptions = {}
+    ): boolean {
+        return this.drawSprite(
+            ctx,
+            {
+                sheet: 'micon',
+                x: col * MICON_CELL_SIZE,
+                y: row * MICON_CELL_SIZE,
+                w: MICON_CELL_SIZE,
+                h: MICON_CELL_SIZE,
+            },
+            x,
+            y,
+            size,
+            size,
+            options
+        );
     }
 
     public drawNumberText(

@@ -4,7 +4,7 @@
  */
 
 import { Camera } from '../engine/Camera';
-import { DarksaberSpriteAtlas, type SpriteRect } from './DarksaberSpriteAtlas';
+import { DarksaberSpriteAtlas, type DarksaberSheetId, type SpriteRect } from './DarksaberSpriteAtlas';
 
 const TILE_SIZE = 48;
 
@@ -58,63 +58,73 @@ interface KillFade {
     expY: number;
 }
 
-const fx = (x: number, y: number, w: number, h: number): SpriteRect => ({ sheet: 'fx2', x, y, w, h });
+const spriteRect = (sheet: DarksaberSheetId, x: number, y: number, w: number, h: number): SpriteRect => ({ sheet, x, y, w, h });
+const fx2 = (x: number, y: number, w: number, h: number): SpriteRect => spriteRect('fx2', x, y, w, h);
+const fx = (x: number, y: number, w: number, h: number): SpriteRect => spriteRect('fx', x, y, w, h);
+const micon = (col: number, row: number): SpriteRect => spriteRect('micon', col * 32, row * 32, 32, 32);
 
-const SPRITE_FX = {
+const SPRITE_EFFECTS = {
     hit: [
-        { rect: fx(73, 68, 46, 40), duration: 0.08, scale: 0.95 },
-        { rect: fx(123, 68, 44, 40), duration: 0.08, scale: 1.1 },
-        { rect: fx(73, 138, 46, 40), duration: 0.09, scale: 1.2, alpha: 0.9 },
+        { rect: fx2(73, 68, 46, 40), duration: 0.08, scale: 0.95 },
+        { rect: fx2(123, 68, 44, 40), duration: 0.08, scale: 1.1 },
+        { rect: fx2(73, 138, 46, 40), duration: 0.09, scale: 1.2, alpha: 0.9 },
     ],
     critHit: [
-        { rect: fx(73, 68, 46, 40), duration: 0.06, scale: 1.1 },
-        { rect: fx(123, 68, 44, 40), duration: 0.06, scale: 1.35 },
-        { rect: fx(73, 138, 46, 40), duration: 0.08, scale: 1.55 },
-        { rect: fx(123, 138, 44, 40), duration: 0.08, scale: 1.65, alpha: 0.85 },
+        { rect: fx2(73, 68, 46, 40), duration: 0.06, scale: 1.1 },
+        { rect: fx2(123, 68, 44, 40), duration: 0.06, scale: 1.35 },
+        { rect: fx2(73, 138, 46, 40), duration: 0.08, scale: 1.55 },
+        { rect: fx2(123, 138, 44, 40), duration: 0.08, scale: 1.65, alpha: 0.85 },
     ],
     fire: [
-        { rect: fx(631, 581, 49, 62), duration: 0.08, scale: 0.95 },
-        { rect: fx(695, 582, 56, 60), duration: 0.08, scale: 1.05 },
-        { rect: fx(769, 581, 49, 61), duration: 0.08, scale: 1.12 },
-        { rect: fx(833, 582, 56, 60), duration: 0.1, scale: 1.18 },
+        { rect: fx2(631, 581, 49, 62), duration: 0.08, scale: 0.95 },
+        { rect: fx2(695, 582, 56, 60), duration: 0.08, scale: 1.05 },
+        { rect: fx2(769, 581, 49, 61), duration: 0.08, scale: 1.12 },
+        { rect: fx2(833, 582, 56, 60), duration: 0.1, scale: 1.18 },
+        { rect: fx(480, 896, 72, 64), duration: 0.08, scale: 1.05, alpha: 0.82 },
     ],
     ice: [
-        { rect: fx(135, 489, 31, 53), duration: 0.08, scale: 0.75 },
-        { rect: fx(254, 461, 42, 80), duration: 0.08, scale: 0.92 },
-        { rect: fx(365, 437, 70, 110), duration: 0.1, scale: 1.08 },
-        { rect: fx(474, 425, 102, 122), duration: 0.12, scale: 1.14 },
+        { rect: fx2(135, 489, 31, 53), duration: 0.08, scale: 0.75 },
+        { rect: fx2(254, 461, 42, 80), duration: 0.08, scale: 0.92 },
+        { rect: fx2(365, 437, 70, 110), duration: 0.1, scale: 1.08 },
+        { rect: fx2(474, 425, 102, 122), duration: 0.12, scale: 1.14 },
     ],
     lightning: [
-        { rect: fx(645, 70, 210, 116), duration: 0.07, scale: 0.78 },
-        { rect: fx(645, 70, 210, 116), duration: 0.07, scale: 0.92, flipX: true },
-        { rect: fx(645, 70, 210, 116), duration: 0.1, scale: 1.02, alpha: 0.82 },
+        { rect: fx(50, 208, 50, 280), duration: 0.06, scale: 0.86, offsetY: -50 },
+        { rect: fx(100, 208, 47, 350), duration: 0.07, scale: 1, offsetY: -68 },
+        { rect: fx(150, 208, 46, 350), duration: 0.07, scale: 1, offsetY: -68 },
+        { rect: fx(200, 208, 46, 350), duration: 0.1, scale: 1.02, offsetY: -68, alpha: 0.82 },
     ],
     wind: [
-        { rect: fx(3, 828, 64, 68), duration: 0.07, scale: 0.92 },
-        { rect: fx(71, 830, 66, 66), duration: 0.07, scale: 1 },
-        { rect: fx(138, 832, 69, 63), duration: 0.07, scale: 1.08 },
-        { rect: fx(210, 828, 64, 69), duration: 0.08, scale: 1.16 },
+        { rect: fx2(3, 828, 64, 68), duration: 0.07, scale: 0.92 },
+        { rect: fx2(71, 830, 66, 66), duration: 0.07, scale: 1 },
+        { rect: fx2(138, 832, 69, 63), duration: 0.07, scale: 1.08 },
+        { rect: fx2(210, 828, 64, 69), duration: 0.08, scale: 1.16 },
     ],
     heal: [
-        { rect: fx(541, 34, 22, 22), duration: 0.07, scale: 0.75, offsetY: -10 },
-        { rect: fx(541, 64, 22, 22), duration: 0.08, scale: 0.92, offsetY: -16 },
-        { rect: fx(541, 94, 23, 23), duration: 0.09, scale: 1.08, offsetY: -22 },
-        { rect: fx(541, 125, 25, 25), duration: 0.1, scale: 1.18, offsetY: -26 },
+        { rect: fx2(541, 34, 22, 22), duration: 0.07, scale: 0.75, offsetY: -10 },
+        { rect: fx2(541, 64, 22, 22), duration: 0.08, scale: 0.92, offsetY: -16 },
+        { rect: fx2(541, 94, 23, 23), duration: 0.09, scale: 1.08, offsetY: -22 },
+        { rect: fx2(541, 125, 25, 25), duration: 0.1, scale: 1.18, offsetY: -26 },
+        { rect: micon(11, 3), duration: 0.08, scale: 0.65, offsetY: -24, alpha: 0.9 },
     ],
     dark: [
-        { rect: fx(16, 745, 46, 54), duration: 0.08, scale: 0.95 },
-        { rect: fx(86, 745, 47, 54), duration: 0.08, scale: 1.05 },
-        { rect: fx(154, 745, 48, 54), duration: 0.1, scale: 1.16 },
+        { rect: fx2(16, 745, 46, 54), duration: 0.08, scale: 0.95 },
+        { rect: fx2(86, 745, 47, 54), duration: 0.08, scale: 1.05 },
+        { rect: fx2(154, 745, 48, 54), duration: 0.1, scale: 1.16 },
     ],
     buff: [
-        { rect: fx(589, 224, 32, 32), duration: 0.08, scale: 0.85, offsetY: -12 },
-        { rect: fx(622, 224, 32, 32), duration: 0.08, scale: 1.02, offsetY: -18 },
-        { rect: fx(657, 224, 32, 32), duration: 0.1, scale: 1.14, offsetY: -24 },
+        { rect: micon(7, 0), duration: 0.08, scale: 0.74, offsetY: -24 },
+        { rect: fx(440, 480, 96, 96), duration: 0.12, scale: 1.04, alpha: 0.82 },
+        { rect: micon(11, 2), duration: 0.1, scale: 0.82, offsetY: -26, alpha: 0.9 },
     ],
     debuff: [
-        { rect: fx(281, 745, 43, 37), duration: 0.08, scale: 0.9 },
-        { rect: fx(348, 745, 42, 39), duration: 0.08, scale: 1.05 },
-        { rect: fx(417, 745, 46, 39), duration: 0.1, scale: 1.18 },
+        { rect: micon(17, 2), duration: 0.08, scale: 0.72, offsetY: -18 },
+        { rect: fx(536, 384, 96, 96), duration: 0.12, scale: 1.06, alpha: 0.8 },
+        { rect: micon(10, 1), duration: 0.1, scale: 0.84, offsetY: -10, alpha: 0.9 },
+    ],
+    earth: [
+        { rect: fx(771, 264, 130, 129), duration: 0.1, scale: 0.9, alpha: 0.85 },
+        { rect: fx(733, 451, 216, 215), duration: 0.14, scale: 0.96, alpha: 0.78 },
     ],
 } satisfies Record<string, SpriteEffectFrame[]>;
 
@@ -253,7 +263,7 @@ export class EffectManager {
     }
 
     public spawnHitEffect(gridX: number, gridY: number, isCrit: boolean = false): void {
-        this.spawnSpriteEffect(gridX, gridY, isCrit ? SPRITE_FX.critHit : SPRITE_FX.hit, isCrit ? 74 : 58);
+        this.spawnSpriteEffect(gridX, gridY, isCrit ? SPRITE_EFFECTS.critHit : SPRITE_EFFECTS.hit, isCrit ? 74 : 58);
 
         const cx = gridX * TILE_SIZE + TILE_SIZE / 2;
         const cy = gridY * TILE_SIZE + TILE_SIZE / 2;
@@ -297,7 +307,7 @@ export class EffectManager {
     // ═══════════════════════════════════════════════════════════
 
     public spawnFireEffect(gridX: number, gridY: number): void {
-        this.spawnSpriteEffect(gridX, gridY, SPRITE_FX.fire, 80);
+        this.spawnSpriteEffect(gridX, gridY, SPRITE_EFFECTS.fire, 80);
 
         const cx = gridX * TILE_SIZE + TILE_SIZE / 2;
         const cy = gridY * TILE_SIZE + TILE_SIZE / 2;
@@ -321,7 +331,7 @@ export class EffectManager {
     }
 
     public spawnIceEffect(gridX: number, gridY: number): void {
-        this.spawnSpriteEffect(gridX, gridY, SPRITE_FX.ice, 92);
+        this.spawnSpriteEffect(gridX, gridY, SPRITE_EFFECTS.ice, 92);
 
         const cx = gridX * TILE_SIZE + TILE_SIZE / 2;
         const cy = gridY * TILE_SIZE + TILE_SIZE / 2;
@@ -352,7 +362,7 @@ export class EffectManager {
     }
 
     public spawnThunderEffect(gridX: number, gridY: number): void {
-        this.spawnSpriteEffect(gridX, gridY, SPRITE_FX.lightning, 92);
+        this.spawnSpriteEffect(gridX, gridY, SPRITE_EFFECTS.lightning, 154);
 
         const cx = gridX * TILE_SIZE + TILE_SIZE / 2;
         const cy = gridY * TILE_SIZE + TILE_SIZE / 2;
@@ -383,7 +393,7 @@ export class EffectManager {
     }
 
     public spawnWindEffect(gridX: number, gridY: number): void {
-        this.spawnSpriteEffect(gridX, gridY, SPRITE_FX.wind, 78);
+        this.spawnSpriteEffect(gridX, gridY, SPRITE_EFFECTS.wind, 78);
 
         const cx = gridX * TILE_SIZE + TILE_SIZE / 2;
         const cy = gridY * TILE_SIZE + TILE_SIZE / 2;
@@ -409,6 +419,8 @@ export class EffectManager {
     }
 
     public spawnEarthEffect(gridX: number, gridY: number): void {
+        this.spawnSpriteEffect(gridX, gridY, SPRITE_EFFECTS.earth, 86);
+
         const cx = gridX * TILE_SIZE + TILE_SIZE / 2;
         const cy = gridY * TILE_SIZE + TILE_SIZE / 2;
         const particles: Particle[] = [];
@@ -439,7 +451,7 @@ export class EffectManager {
     }
 
     public spawnHealEffect(gridX: number, gridY: number): void {
-        this.spawnSpriteEffect(gridX, gridY, SPRITE_FX.heal, 64);
+        this.spawnSpriteEffect(gridX, gridY, SPRITE_EFFECTS.heal, 64);
 
         const cx = gridX * TILE_SIZE + TILE_SIZE / 2;
         const cy = gridY * TILE_SIZE + TILE_SIZE / 2;
@@ -469,7 +481,7 @@ export class EffectManager {
     }
 
     public spawnDarkEffect(gridX: number, gridY: number): void {
-        this.spawnSpriteEffect(gridX, gridY, SPRITE_FX.dark, 72);
+        this.spawnSpriteEffect(gridX, gridY, SPRITE_EFFECTS.dark, 72);
 
         const cx = gridX * TILE_SIZE + TILE_SIZE / 2;
         const cy = gridY * TILE_SIZE + TILE_SIZE / 2;
@@ -494,7 +506,7 @@ export class EffectManager {
     }
 
     public spawnBuffEffect(gridX: number, gridY: number): void {
-        this.spawnSpriteEffect(gridX, gridY, SPRITE_FX.buff, 54);
+        this.spawnSpriteEffect(gridX, gridY, SPRITE_EFFECTS.buff, 58);
 
         const cx = gridX * TILE_SIZE + TILE_SIZE / 2;
         const cy = gridY * TILE_SIZE + TILE_SIZE / 2;
@@ -517,7 +529,7 @@ export class EffectManager {
     }
 
     public spawnDebuffEffect(gridX: number, gridY: number): void {
-        this.spawnSpriteEffect(gridX, gridY, SPRITE_FX.debuff, 62);
+        this.spawnSpriteEffect(gridX, gridY, SPRITE_EFFECTS.debuff, 62);
 
         const cx = gridX * TILE_SIZE + TILE_SIZE / 2;
         const cy = gridY * TILE_SIZE + TILE_SIZE / 2;

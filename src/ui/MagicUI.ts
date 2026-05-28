@@ -6,6 +6,8 @@
  */
 
 import { Skill, getLearnedSkills } from '../data/SkillDB';
+import { getSkillIconCell } from './DarksaberIconRegistry';
+import { DarksaberSpriteAtlas } from './DarksaberSpriteAtlas';
 import { UI, drawParchmentPanel, Parchment } from './UITheme';
 
 export class MagicUI {
@@ -207,9 +209,21 @@ export class MagicUI {
             }
 
             // Icon
-            ctx.font = `14px serif`;
-            ctx.fillStyle = Parchment.textDark;
-            ctx.fillText(skill.icon, px + 10, rowY + 24);
+            const iconCell = getSkillIconCell(skill);
+            const iconSize = 22;
+            const iconDrawn = iconCell
+                ? DarksaberSpriteAtlas.drawIconCell(ctx, iconCell.col, iconCell.row, px + 7, rowY + 7, iconSize, {
+                    alpha: canCast ? 1 : 0.38,
+                })
+                : false;
+            if (!iconDrawn) {
+                ctx.save();
+                ctx.globalAlpha *= canCast ? 1 : 0.45;
+                ctx.font = `14px serif`;
+                ctx.fillStyle = Parchment.textDark;
+                ctx.fillText(skill.icon, px + 10, rowY + 24);
+                ctx.restore();
+            }
 
             // Skill name
             ctx.font = `bold 13px ${UI.fontPrimary}`;

@@ -4,6 +4,9 @@
  * preserving the classic Sin Eater feel while using modern animations.
  */
 
+import type { StatusKind } from '../combat/StatusEffects';
+import { getStatusIconCell } from './DarksaberIconRegistry';
+import { DarksaberSpriteAtlas } from './DarksaberSpriteAtlas';
 import { UI, isCloseButtonHit, Parchment, drawParchmentPanel } from './UITheme';
 
 export interface EntityDisplayInfo {
@@ -18,6 +21,7 @@ export interface EntityDisplayInfo {
     exp?: number;
     maxExp?: number;
     buffs?: string[];
+    statusKinds?: StatusKind[];
     atk: number;
     def: number;
     magAtk: number;
@@ -147,9 +151,14 @@ export class EntityInfoUI {
             for (let i = 0; i < Math.min(info.buffs.length, buffSlots.length); i++) {
                 const slot = buffSlots[i];
                 const icon = info.buffs[i];
+                const iconCell = getStatusIconCell(info.statusKinds?.[i] ?? icon);
                 const cx = gridX + slot.c * cellSize + cellSize / 2;
                 const cy = gridY + slot.r * cellSize + cellSize / 2;
-                ctx.fillText(icon, cx, cy);
+                const iconSize = 18;
+                const iconDrawn = iconCell
+                    ? DarksaberSpriteAtlas.drawIconCell(ctx, iconCell.col, iconCell.row, cx - iconSize / 2, cy - iconSize / 2, iconSize)
+                    : false;
+                if (!iconDrawn) ctx.fillText(icon, cx, cy);
             }
             ctx.textAlign = 'start';
             ctx.textBaseline = 'alphabetic';

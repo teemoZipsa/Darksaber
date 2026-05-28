@@ -5,6 +5,8 @@
  */
 
 import { TILE_SIZE } from '../map/Chunk';
+import { ACTION_ICON_CELLS } from './DarksaberIconRegistry';
+import { DarksaberSpriteAtlas } from './DarksaberSpriteAtlas';
 import { UI, Parchment } from './UITheme';
 
 export type ActionType = 'tool' | 'attack' | 'emote' | 'rest' | 'defend' | 'counter' | 'magic' | 'move' | 'open';
@@ -211,7 +213,31 @@ export class ActionMenuUI {
 
     // ─── ICON DRAWING FUNCTIONS ────────────────────────────────
 
+    private static drawActionIconCell(
+        ctx: CanvasRenderingContext2D,
+        type: ActionType,
+        cx: number,
+        cy: number,
+        s: number,
+        ready: boolean
+    ): boolean {
+        const iconCell = ACTION_ICON_CELLS[type];
+        if (!iconCell) return false;
+
+        const iconSize = Math.max(18, s * 2.35);
+        return DarksaberSpriteAtlas.drawIconCell(
+            ctx,
+            iconCell.col,
+            iconCell.row,
+            cx - iconSize / 2,
+            cy - iconSize / 2,
+            iconSize,
+            { alpha: ready ? 1 : 0.35 }
+        );
+    }
+
     private drawToolIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
+        if (ActionMenuUI.drawActionIconCell(ctx, 'tool', cx, cy, s, ready)) return;
         const c = ready ? '#d4a040' : 'rgba(255,255,255,0.25)';
         ctx.fillStyle = c;
         ctx.fillRect(cx - s * 0.5, cy - s * 0.2, s * 1.0, s * 0.8);
@@ -219,6 +245,7 @@ export class ActionMenuUI {
     }
 
     private drawAttackIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
+        if (ActionMenuUI.drawActionIconCell(ctx, 'attack', cx, cy, s, ready)) return;
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(-Math.PI / 4);
@@ -232,6 +259,7 @@ export class ActionMenuUI {
     }
 
     private drawEmoteIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
+        if (ActionMenuUI.drawActionIconCell(ctx, 'emote', cx, cy, s, ready)) return;
         ctx.fillStyle = ready ? '#f0c080' : 'rgba(255,255,255,0.25)';
         ctx.fillRect(cx - s * 0.2, cy, s * 0.4, s * 0.4);
         ctx.fillRect(cx - s * 0.2, cy - s * 0.7, s * 0.12, s * 0.7);
@@ -251,6 +279,7 @@ export class ActionMenuUI {
     }
 
     private drawDefendIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
+        if (ActionMenuUI.drawActionIconCell(ctx, 'defend', cx, cy, s, ready)) return;
         ctx.fillStyle = ready ? '#8fc7ff' : 'rgba(255,255,255,0.25)';
         ctx.beginPath();
         ctx.moveTo(cx, cy - s * 0.75);
@@ -267,6 +296,7 @@ export class ActionMenuUI {
     }
 
     private drawCounterIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
+        if (ActionMenuUI.drawActionIconCell(ctx, 'counter', cx, cy, s, ready)) return;
         ctx.strokeStyle = ready ? '#ffcc66' : 'rgba(255,255,255,0.25)';
         ctx.lineWidth = Math.max(1, s * 0.16);
         ctx.beginPath();
@@ -282,6 +312,7 @@ export class ActionMenuUI {
     }
 
     private drawMagicIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
+        if (ActionMenuUI.drawActionIconCell(ctx, 'magic', cx, cy, s, ready)) return;
         ctx.fillStyle = ready ? '#44ff88' : 'rgba(255,255,255,0.25)';
         ctx.fillRect(cx - s * 0.08, cy - s * 0.6, s * 0.16, s * 1.2);
         ctx.fillRect(cx - s * 0.6, cy - s * 0.08, s * 1.2, s * 0.16);
@@ -294,6 +325,7 @@ export class ActionMenuUI {
     }
 
     private drawMoveIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
+        if (ActionMenuUI.drawActionIconCell(ctx, 'move', cx, cy, s, ready)) return;
         ctx.fillStyle = ready ? '#cc8844' : 'rgba(255,255,255,0.25)';
         ctx.fillRect(cx - s * 0.4, cy + s * 0.2, s * 0.8, s * 0.25);
         ctx.fillRect(cx - s * 0.4, cy - s * 0.3, s * 0.25, s * 0.5);
@@ -301,6 +333,7 @@ export class ActionMenuUI {
     }
 
     private drawOpenIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
+        if (ActionMenuUI.drawActionIconCell(ctx, 'open', cx, cy, s, ready)) return;
         ctx.font = `${s * 2}px "DOSMyungjo", sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
