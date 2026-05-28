@@ -22,7 +22,9 @@ import { PartyUI } from '../ui/PartyUI';
 import { CharacterPanelUI } from '../character/CharacterPanelUI';
 import { TransitionManager } from '../ui/TransitionManager';
 import { PauseMenuUI } from '../ui/PauseMenuUI';
+import { SettingsUI } from '../ui/SettingsUI';
 import { HitStop } from './world/HitStop';
+import { AudioManager } from './AudioManager';
 
 export class GameManager {
     private canvas: HTMLCanvasElement;
@@ -56,9 +58,10 @@ export class GameManager {
     private titleBgLoaded = false;
     private termsHovered = false;
 
-    // Transitions + pause
+    // Transitions + pause + settings
     private transitions = new TransitionManager();
     private pauseMenu = new PauseMenuUI();
+    private settingsUI = new SettingsUI();
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -106,10 +109,12 @@ export class GameManager {
         };
 
         this.pauseMenu.onResume = () => undefined;
+        this.pauseMenu.onOpenSettings = () => this.settingsUI.open();
         this.pauseMenu.onReturnToTitle = () => {
             this.pauseMenu.close();
             this.transitionTo(GameState.TITLE);
         };
+        this.settingsUI.onClose = () => this.pauseMenu.open();
 
         // Resize handler
         const resize = () => {
@@ -129,6 +134,7 @@ export class GameManager {
         this.isRunning = true;
         this.lastTime = performance.now();
         this.transitions.fadeInFromBlack(500);
+        AudioManager.init();
         requestAnimationFrame((frameTime) => this.loop(frameTime));
     }
 
@@ -227,6 +233,11 @@ export class GameManager {
                 break;
 
             case GameState.WORLD:
+                // Settings modal sits on top of the pause menu when both are present.
+                if (this.settingsUI.isVisible()) {
+                    this.settingsUI.updateInput(this.input);
+                    break;
+                }
                 // Pause menu takes priority over everything else in WORLD.
                 if (this.pauseMenu.isVisible()) {
                     this.pauseMenu.updateInput(this.input);
@@ -319,6 +330,7 @@ export class GameManager {
                 if (this.partyUI.isVisible()) this.partyUI.render(this.ctx, vw_world, vh_world);
                 if (this.charUI.isVisible()) this.charUI.render(this.ctx, vw_world, vh_world);
                 if (this.pauseMenu.isVisible()) this.pauseMenu.render(this.ctx, vw_world, vh_world);
+                if (this.settingsUI.isVisible()) this.settingsUI.render(this.ctx, vw_world, vh_world);
                 this.ctx.restore();
                 break;
 

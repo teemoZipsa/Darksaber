@@ -6,13 +6,14 @@
  */
 
 import type { InputManager } from '../engine/InputManager';
+import { AudioManager } from '../engine/AudioManager';
 import { UI, Parchment, drawParchmentPanel, drawParchmentButton } from './UITheme';
 import { t } from '../i18n/LanguageManager';
 import { Tween, easeOutCubic } from './Tween';
 
 interface MenuButton {
     label: string;
-    action: 'resume' | 'title';
+    action: 'resume' | 'settings' | 'title';
     rect: { x: number; y: number; w: number; h: number };
 }
 
@@ -23,6 +24,7 @@ export class PauseMenuUI {
     private openTween: Tween;
 
     public onResume: () => void = () => undefined;
+    public onOpenSettings: () => void = () => undefined;
     public onReturnToTitle: () => void = () => undefined;
 
     constructor() {
@@ -34,6 +36,7 @@ export class PauseMenuUI {
         this.visible = true;
         this.openTween = new Tween(0, 1, 200, easeOutCubic);
         this.openTween.start(performance.now());
+        AudioManager.playUi('ui.open');
     }
 
     public close(): void {
@@ -49,6 +52,7 @@ export class PauseMenuUI {
         if (!this.visible) return;
 
         if (input.justPressed('Escape')) {
+            AudioManager.playUi('ui.cancel');
             this.close();
             this.onResume();
             return;
@@ -61,9 +65,13 @@ export class PauseMenuUI {
 
         if (input.mouseJustDown && this.hovered) {
             const action = this.hovered.action;
+            AudioManager.playUi('ui.confirm');
             if (action === 'resume') {
                 this.close();
                 this.onResume();
+            } else if (action === 'settings') {
+                this.close();
+                this.onOpenSettings();
             } else if (action === 'title') {
                 this.close();
                 this.onReturnToTitle();
@@ -81,7 +89,7 @@ export class PauseMenuUI {
         ctx.fillRect(0, 0, vw, vh);
 
         const panelW = 320;
-        const panelH = 240;
+        const panelH = 300;
         const px = Math.floor((vw - panelW) / 2);
         // Slide-in from above by a few px
         const py = Math.floor((vh - panelH) / 2) + Math.round((1 - progress) * -16);
@@ -105,7 +113,8 @@ export class PauseMenuUI {
 
         this.buttons = [];
         const items: { label: string; action: MenuButton['action'] }[] = [
-            { label: t('pause.resume') || '이어하기',      action: 'resume' },
+            { label: t('pause.resume') || '이어하기',           action: 'resume' },
+            { label: t('pause.settings') || '설정',             action: 'settings' },
             { label: t('pause.toTitle') || '타이틀로 돌아가기', action: 'title' },
         ];
 
