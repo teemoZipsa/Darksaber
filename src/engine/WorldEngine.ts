@@ -5,12 +5,9 @@
 
 import { Camera } from './Camera';
 import { InputManager } from './InputManager';
-import { SettingsManager } from './SettingsManager';
-import { t } from '../i18n/LanguageManager';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
 import { LootObject } from '../entity/LootObject';
-import { TILE_SIZE } from '../map/Chunk';
 import { PartyManager } from '../character/PartyManager';
 import type { Character } from '../character/Character';
 import type { GridInventory } from '../inventory/GridInventory';
@@ -33,7 +30,6 @@ import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
 import { TilePoint, manhattan, tileKey } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
-import { getRightClickDisposition, type WorldInteractionMode } from '../field/WorldInteractionMode';
 import { enqueueReadyActor } from '../field/FieldActionEconomy';
 import { hasLineOfSight } from '../field/LineOfSight';
 import {
@@ -42,7 +38,6 @@ import {
     getEffectTiles,
 } from '../field/TargetPatterns';
 import {
-    describeTerrainForHover,
     getTerrainMoveCost,
     isTerrainLineOfSightBlocking,
     TerrainActorTraits,
@@ -53,10 +48,8 @@ import {
     getActorAttackTargetFailure as resolveActorAttackTargetFailure,
     type AttackTargetFailure,
 } from '../field/FieldTargeting';
-import type { WorldRenderModel } from './world/WorldRenderModel';
 import { WorldRaidSession, type WorldPhase } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
-import { WorldFieldRenderer } from './world/WorldFieldRenderer';
 import { WorldCombatController, createCombatResult, type CombatResult } from './world/WorldCombatController';
 import { WorldMovementController } from './world/WorldMovementController';
 import { WorldEnemyTurnController } from './world/WorldEnemyTurnController';
@@ -66,6 +59,8 @@ import { WorldRaidOutcomeController } from './world/WorldRaidOutcomeController';
 import { WorldTacticalController } from './world/WorldTacticalController';
 import { WorldSelectionController } from './world/WorldSelectionController';
 import { WorldFieldSpawnController } from './world/WorldFieldSpawnController';
+import { WorldRenderController } from './world/WorldRenderController';
+import { WorldInputController } from './world/WorldInputController';
 
 export class WorldEngine {
     private canvas: HTMLCanvasElement;
@@ -76,7 +71,6 @@ export class WorldEngine {
     private player: Player;
     private partyActors: FieldActor[] = [];
     private fieldEnemies: FieldEnemy[] = [];
-    private actionMenuOpen = false;
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
     private townSession: WorldTownSession;
@@ -91,6 +85,8 @@ export class WorldEngine {
     private tacticalController: WorldTacticalController;
     private selectionController: WorldSelectionController;
     private fieldSpawnController: WorldFieldSpawnController;
+    private renderController: WorldRenderController;
+    private inputController: WorldInputController;
     private activeTurnActorId: string | null = null;
     private readyQueue: string[] = [];
     private remainingActionPoints = 0;
@@ -269,6 +265,60 @@ export class WorldEngine {
             getLoot: () => this.worldMap.loot,
             log: (message) => this.addCombatLog(message),
         });
+        this.renderController = new WorldRenderController({
+            party: this.party,
+            playerData: this.playerData,
+            worldMap: this.worldMap,
+            townSession: this.townSession,
+            raidSession: this.raidSession,
+            actionMenuUI: this.actionMenuUI,
+            entityInfoUI: this.entityInfoUI,
+            effectManager: this.effectManager,
+            floatingText: this.floatingText,
+            magicController: this.magicController,
+            playerActionController: this.playerActionController,
+            raidOutcomeController: this.raidOutcomeController,
+            tacticalController: this.tacticalController,
+            selectionController: this.selectionController,
+            getWorldTime: () => this.worldTime,
+            getPhase: () => this.currentPhase,
+            getPlayer: () => this.player,
+            getControlledActor: () => this.getControlledActor(),
+            getPartyActors: () => this.partyActors,
+            getFieldEnemies: () => this.fieldEnemies,
+            getActiveTurnActorId: () => this.activeTurnActorId,
+            getRemainingActionPoints: () => this.remainingActionPoints,
+            getHoverTile: () => this.hoverTile,
+            getAttackCues: () => this.attackCues,
+            getCombatLog: () => this.combatLog,
+            getActorTerrainTraits: (actor) => this.getActorTerrainTraits(actor),
+            isTurnCombatActive: () => this.isTurnCombatActive(),
+        });
+        this.inputController = new WorldInputController({
+            actionMenuUI: this.actionMenuUI,
+            entityInfoUI: this.entityInfoUI,
+            magicController: this.magicController,
+            playerActionController: this.playerActionController,
+            selectionController: this.selectionController,
+            tacticalController: this.tacticalController,
+            getCanvasSize: () => ({ width: this.canvas.width, height: this.canvas.height }),
+            getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
+            getActiveTurnActorId: () => this.activeTurnActorId,
+            getReservedAction: () => this.reservedAction,
+            getControlledActor: () => this.getControlledActor(),
+            getPartyActors: () => this.partyActors,
+            getHoverTile: () => this.hoverTile,
+            setHoverTile: (tile) => { this.hoverTile = tile; },
+            isEntityMoving: (entity) => this.isEntityMoving(entity),
+            resolveFieldHitAt: (tile) => this.resolveFieldHitAt(tile),
+            switchToNextAliveActor: () => this.switchToNextAliveActor(),
+            switchToPartyMember: (index) => this.switchToPartyMember(index),
+            toggleActionMenuForControlled: () => this.toggleActionMenuForControlled(),
+            closeActionMenu: () => this.closeActionMenu(),
+            closeTacticalMenu: () => this.closeTacticalMenu(),
+            clearIntent: () => this.clearIntent(),
+            log: (message) => this.addCombatLog(message),
+        });
 
         this.spawnPartyAtCurrentHub();
         this.player = this.getControlledActor()?.entity ?? new Player(0, 0);
@@ -298,42 +348,7 @@ export class WorldEngine {
             return;
         }
 
-        if (input.mouseWheelDelta !== 0 && !this.magicController.isVisible()) {
-            if (input.mouseWheelDelta > 0) camera.zoomOut();
-            else camera.zoomIn();
-        }
-
-        const screenTile = camera.screenToTile(input.mouseScreenX, input.mouseScreenY);
-        this.hoverTile = { x: screenTile.tileX, y: screenTile.tileY };
-        this.entityInfoUI.onMouseMove(input.mouseScreenX, input.mouseScreenY);
-        this.actionMenuUI.onMouseMove(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
-        this.magicController.onMouseMove(input.mouseScreenX, input.mouseScreenY);
-        this.tacticalController.onMouseMove(input.uiMouseX, input.uiMouseY);
-        this.magicController.updateHoverPreview(this.hoverTile);
-
-        if (!this.isInputLockedByReservation()) {
-            if (input.mouseRightJustDown && !this.magicController.isVisible()) {
-                this.handleFieldRightClick(this.hoverTile, input);
-            } else if (input.justPressed('Escape')) {
-                if (this.tacticalController.isOpen()) this.closeTacticalMenu();
-                else if (this.magicController.isActive()) this.magicController.reset();
-                else this.clearIntent();
-            } else if (this.tacticalController.isOpen()) {
-                if (input.mouseJustDown) this.tacticalController.handleClick(input.uiMouseX, input.uiMouseY);
-            } else if (this.magicController.isVisible()) {
-                this.magicController.updateMp(this.getControlledActor()?.character.stats.mp ?? 0);
-                if (input.mouseWheelDelta !== 0) this.magicController.onScroll(input.mouseWheelDelta);
-                if (input.mouseJustDown) {
-                    this.magicController.handleMenuMouseDown(input.mouseScreenX, input.mouseScreenY);
-                }
-                if (input.mouseJustUp) this.magicController.onMouseUp();
-            } else if (this.magicController.getState().mode === 'targeting') {
-                if (input.mouseJustDown) this.magicController.handleTargetClick(this.hoverTile);
-            } else {
-                if (input.justPressed('Tab')) this.switchToNextAliveActor();
-                if (input.mouseJustDown) this.handleFieldClick(this.hoverTile, input, camera);
-            }
-        }
+        this.inputController.process(input, camera);
 
         const partyMovement = this.movementController.updatePartyActors({
             dt,
@@ -370,106 +385,7 @@ export class WorldEngine {
     }
 
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
-        const model = this.buildRenderModel();
-        const camX = camera.x;
-        const camY = camera.y;
-        const scale = SettingsManager.getUIScale();
-
-        ctx.fillStyle = '#080b12';
-        ctx.fillRect(0, 0, width, height);
-
-        ctx.save();
-        ctx.scale(camera.zoom, camera.zoom);
-
-        const viewW = width / camera.zoom;
-        const viewH = height / camera.zoom;
-        this.worldMap.updateLoadedChunks(model.player.pixelX * TILE_SIZE, model.player.pixelY * TILE_SIZE);
-        this.worldMap.render(ctx, camX, camY, viewW, viewH);
-
-        WorldFieldRenderer.renderActionTiles(ctx, model, camX, camY);
-        WorldFieldRenderer.renderMagicTargetTiles(ctx, model, camX, camY);
-        WorldFieldRenderer.renderPathPreview(ctx, model, camX, camY);
-        WorldFieldRenderer.renderTacticalMarkers(ctx, model, camX, camY);
-        WorldFieldRenderer.renderSelectedLoot(ctx, model, camX, camY);
-        WorldFieldRenderer.renderEnemies(ctx, model, camX, camY);
-        WorldFieldRenderer.renderPartyActors(ctx, model, camX, camY);
-        WorldFieldRenderer.renderAttackCues(ctx, model, camX, camY);
-        this.effectManager.render(ctx, camera);
-        this.floatingText.render(ctx, camX, camY);
-        WorldFieldRenderer.renderHoverTile(ctx, model, camX, camY);
-        this.renderActionMenu(ctx, camX, camY);
-
-        ctx.restore();
-
-        ctx.save();
-        ctx.scale(scale, scale);
-        const uiW = Math.floor(width / scale);
-        const uiH = Math.floor(height / scale);
-        const infoY = WorldFieldRenderer.renderHudPanels(ctx, model, uiW, uiH);
-        if (model.selectedDisplayInfo) {
-            this.entityInfoUI.setPosition(16, infoY + 18);
-            this.entityInfoUI.render(ctx, model.selectedDisplayInfo);
-        }
-        this.tacticalController.render(ctx);
-        this.magicController.render(ctx, uiW, uiH);
-        if (this.townSession.isVisible()) this.townSession.render(ctx, uiW, uiH);
-        if (this.raidOutcomeController.isVisible()) this.raidOutcomeController.render(ctx, uiW, uiH);
-        ctx.restore();
-    }
-
-    private buildRenderModel(): WorldRenderModel {
-        const activeActor = this.getControlledActor();
-        const terrainHoverLines = this.hoverTile.x >= 0 && this.hoverTile.y >= 0
-            ? describeTerrainForHover(
-                this.worldMap.getTileAt(this.hoverTile.x, this.hoverTile.y),
-                activeActor ? this.getActorTerrainTraits(activeActor) : {}
-            )
-            : [];
-        const selectedLoot = this.selectionController.lootId
-            ? this.worldMap.loot.find((candidate) => candidate.id === this.selectionController.lootId) ?? null
-            : null;
-
-        return {
-            worldTime: this.worldTime,
-            phase: this.currentPhase,
-            player: this.player,
-            activeCharacter: this.party.getActive() ?? null,
-            controlledActor: activeActor,
-            partyActors: this.partyActors,
-            fieldEnemies: this.fieldEnemies,
-            activeTurnActorId: this.activeTurnActorId,
-            remainingActionPoints: this.remainingActionPoints,
-            selectedActorId: this.selectionController.actorId,
-            selectedEnemyId: this.selectionController.enemyId,
-            selectedLootId: this.selectionController.lootId,
-            selectedDisplayInfo: this.selectionController.getSelectedDisplayInfo(),
-            hasSelection: this.selectionController.hasSelection(),
-            actionMode: this.playerActionController.getMode(),
-            actionTiles: this.playerActionController.getTiles(),
-            actionMenuOpen: this.actionMenuOpen,
-            fieldMagicState: this.magicController.getState(),
-            hoverTile: this.hoverTile,
-            hoverTileWalkable: this.hoverTile.x >= 0 && this.hoverTile.y >= 0
-                ? this.worldMap.isWalkable(this.hoverTile.x, this.hoverTile.y)
-                : false,
-            terrainHoverLines,
-            tacticalMarkers: this.tacticalController.getMarkers(),
-            selectedLootTile: selectedLoot ? { x: selectedLoot.x, y: selectedLoot.y } : null,
-            attackCues: this.attackCues,
-            combatLog: this.combatLog,
-            gold: this.playerData.gold,
-            raid: {
-                active: this.raidSession.active,
-                elapsedSeconds: this.raidSession.elapsedSeconds,
-                limitSeconds: this.raidSession.limitSeconds,
-                departureTownId: this.raidSession.departureTownId,
-                timerAdvancing: this.raidSession.shouldAdvanceTimer({
-                    townVisible: this.townSession.isVisible(),
-                    resultVisible: this.raidOutcomeController.isVisible(),
-                    turnCombatActive: this.isTurnCombatActive(),
-                }),
-            },
-        };
+        this.renderController.render(ctx, camera, width, height);
     }
 
     private spawnPartyAtCurrentHub(): void {
@@ -529,7 +445,7 @@ export class WorldEngine {
         this.readyQueue = [];
         this.remainingActionPoints = 0;
         this.reservedAction = null;
-        this.actionMenuOpen = false;
+        this.closeActionMenu();
         for (const actor of this.partyActors) {
             actor.path = [];
             actor.queuedIntent = null;
@@ -550,55 +466,6 @@ export class WorldEngine {
         this.worldMap.loot = content.loot;
     }
 
-    private handleFieldClick(tile: TilePoint, input: InputManager, camera: Camera): void {
-        const hit = this.resolveFieldHitAt(tile);
-
-        if (this.selectionController.hasSelection() && this.entityInfoUI.onClick(input.mouseScreenX, input.mouseScreenY)) {
-            this.selectionController.clear();
-            return;
-        }
-
-        if (this.actionMenuOpen) {
-            const action = this.actionMenuUI.onClick(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
-            if (action) {
-                this.playerActionController.execute(action);
-                return;
-            }
-            this.closeActionMenu();
-            return;
-        }
-
-        if (this.playerActionController.getMode()) {
-            this.playerActionController.handleTargetClick(tile, hit);
-            return;
-        }
-
-        switch (hit.kind) {
-            case 'enemy':
-                this.selectionController.selectEnemy(hit.enemy.id);
-                this.addCombatLog(`${hit.enemy.name} 선택`);
-                break;
-            case 'party': {
-                const index = this.partyActors.findIndex((actor) => actor.id === hit.party.id);
-                if (index >= 0) this.switchToPartyMember(index);
-                const actor = this.partyActors[index];
-                if (actor && actor.id === this.activeTurnActorId) this.toggleActionMenuForControlled();
-                break;
-            }
-            case 'loot':
-                this.selectionController.selectLoot(hit.loot.id);
-                this.addCombatLog(`${hit.loot.sourceLabel} 선택`);
-                break;
-            case 'ground':
-                this.closeActionMenu();
-                break;
-            case 'blocked':
-                this.clearIntent();
-                this.addCombatLog('갈 수 없는 위치입니다.');
-                break;
-        }
-    }
-
     private resolveFieldHitAt(tile: TilePoint) {
         const partyTargets: FieldHitParty[] = this.partyActors.map((actor) => ({
             ...actor,
@@ -611,34 +478,6 @@ export class WorldEngine {
             loot: this.worldMap.loot,
             isGroundWalkable: (x, y) => this.worldMap.isWalkable(x, y),
         });
-    }
-
-    private handleFieldRightClick(tile: TilePoint, input: InputManager): void {
-        const mode = this.getWorldInteractionMode();
-        const disposition = getRightClickDisposition(mode);
-
-        if (disposition === 'ignore') return;
-
-        if (disposition === 'cancelTargeting') {
-            if (mode.kind === 'magicTargeting') this.magicController.reset();
-            else this.playerActionController.clearTargeting();
-            this.closeActionMenu();
-            this.closeTacticalMenu();
-            this.addCombatLog(t('tactical.log.cancelTargeting'));
-            return;
-        }
-
-        if (disposition === 'reopenTacticalMenu') {
-            this.closeTacticalMenu();
-        } else {
-            this.closeActionMenu();
-        }
-
-        this.openTacticalMenu(tile, input.uiMouseX, input.uiMouseY);
-    }
-
-    private openTacticalMenu(tile: TilePoint, uiX: number, uiY: number): void {
-        this.tacticalController.open(tile, uiX, uiY, this.canvas.width, this.canvas.height);
     }
 
     private closeTacticalMenu(): void {
@@ -662,7 +501,7 @@ export class WorldEngine {
         if (this.activeTurnActorId) return true;
         if (this.readyQueue.length > 0) return true;
         if (this.reservedAction) return true;
-        if (this.actionMenuOpen || this.playerActionController.getMode()) return true;
+        if (this.actionMenuUI.getIsOpen() || this.playerActionController.getMode()) return true;
         if (this.tacticalController.isOpen()) return true;
         if (this.magicController.isActive()) return true;
         return this.partyActors.some((actor) => actor.queuedIntent || actor.path.length > 0);
@@ -847,19 +686,17 @@ export class WorldEngine {
             return;
         }
 
-        if (this.actionMenuOpen) {
+        if (this.actionMenuUI.getIsOpen()) {
             this.closeActionMenu();
             return;
         }
 
         this.closeTacticalMenu();
         const available = this.playerActionController.getAvailableTurnActions(actor);
-        this.actionMenuOpen = true;
         this.actionMenuUI.open(available);
     }
 
     private closeActionMenu(): void {
-        this.actionMenuOpen = false;
         this.actionMenuUI.close();
     }
 
@@ -882,7 +719,6 @@ export class WorldEngine {
         if (actor.id !== this.activeTurnActorId) return;
         this.selectionController.selectActor(actor.id);
         this.closeTacticalMenu();
-        this.actionMenuOpen = true;
         this.actionMenuUI.open(this.playerActionController.getAvailableTurnActions(actor));
     }
 
@@ -990,7 +826,6 @@ export class WorldEngine {
         this.addCombatLog(`${actor.character.name} 턴 시작: 행동 ${this.remainingActionPoints}`);
         if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
         else {
-            this.actionMenuOpen = true;
             this.closeTacticalMenu();
             this.actionMenuUI.open(this.playerActionController.getAvailableTurnActions(actor));
         }
@@ -1113,21 +948,6 @@ export class WorldEngine {
         return Math.abs(entity.pixelX - entity.gridX) > 0.01 || Math.abs(entity.pixelY - entity.gridY) > 0.01;
     }
 
-    private isInputLockedByReservation(): boolean {
-        const actor = this.getActivePartyTurnActor();
-        return Boolean(this.reservedAction && actor && (actor.path.length > 0 || this.isEntityMoving(actor.entity)));
-    }
-
-    private getWorldInteractionMode(): WorldInteractionMode {
-        if (this.isInputLockedByReservation()) return { kind: 'reservedAction' };
-        if (this.tacticalController.isOpen()) return { kind: 'tacticalMenu' };
-        if (this.magicController.getState().mode === 'targeting') return { kind: 'magicTargeting' };
-        const actionMode = this.playerActionController.getMode();
-        if (actionMode) return { kind: 'actionTargeting', action: actionMode };
-        if (this.actionMenuOpen) return { kind: 'actionMenu' };
-        return { kind: 'idle' };
-    }
-
     private directionFromTo(from: TilePoint, to: TilePoint): 'up' | 'down' | 'left' | 'right' {
         const dx = to.x - from.x;
         const dy = to.y - from.y;
@@ -1169,20 +989,6 @@ export class WorldEngine {
         for (let i = this.attackCues.length - 1; i >= 0; i--) {
             this.attackCues[i].timer += dt;
             if (this.attackCues[i].timer >= this.attackCues[i].duration) this.attackCues.splice(i, 1);
-        }
-    }
-
-    private renderActionMenu(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
-        const actor = this.getControlledActor();
-        if (!actor || actor.character.isDead) return;
-
-        const px = actor.entity.pixelX * TILE_SIZE - camX;
-        const py = actor.entity.pixelY * TILE_SIZE - camY;
-        const ready = actor.entity.actionGauge >= 100;
-        if (this.actionMenuOpen) {
-            this.actionMenuUI.render(ctx, px, py, ready);
-        } else if (ready) {
-            this.actionMenuUI.renderReadyIndicator(ctx, px, py);
         }
     }
 
