@@ -1,14 +1,15 @@
 /**
- * ShopUI — Dark themed merchant shop panel with category tabs.
- * Buy items with gold, sell items for 50% value.
- * Canvas-rendered overlay within the Lobby.
+ * ShopUI — RPG merchant panel.
+ * Left panel buys from the selected shop category, right panel sells from registered grids.
  */
 
 import { ItemDef } from '../data/ItemDB';
-import { getShopItems, ShopItem } from '../data/ShopData';
+import { getSellPrice, getShopItems, isSellableItem, ShopItem, type ShopKind } from '../data/ShopData';
 import { t, i18n } from '../i18n/LanguageManager';
+import { GridInventory, PlacedItem } from '../inventory/GridInventory';
 
-const CELL = 44;
+const CELL = 42;
+const ROW_H = 54;
 const SLOT_FRAME = 'rgba(160, 130, 60, 0.7)';
 
 interface ShopEntry {
@@ -17,380 +18,504 @@ interface ShopEntry {
     remaining: number;
 }
 
-type ShopTab = 'all' | 'weapon' | 'armor' | 'accessory' | 'consumable';
+export interface ShopSellSource {
+    id: string;
+    label: string;
+    grid: GridInventory;
+}
 
-const TAB_DEFS: { id: ShopTab; label: string; icon: string }[] = [
-    { id: 'all',        label: '전체',   icon: '📋' },
-    { id: 'weapon',     label: '무기',   icon: '⚔️' },
-    { id: 'armor',      label: '방어구', icon: '🛡️' },
-    { id: 'accessory',  label: '장신구', icon: '💍' },
-    { id: 'consumable', label: '소모품', icon: '🧪' },
+interface SellEntry {
+    source: ShopSellSource;
+    placed: PlacedItem;
+    price: number;
+}
+
+const SHOP_KIND_TABS: Array<{ id: ShopKind; labelKey: string; icon: string }> = [
+    { id: 'equipment', labelKey: 'shop.equipment', icon: '⚔️' },
+    { id: 'goods', labelKey: 'shop.goods', icon: '🧪' },
 ];
 
 export class ShopUI {
-    private visible: boolean = false;
+    private visible = false;
     private entries: ShopEntry[] = [];
-    private filteredEntries: ShopEntry[] = [];
-    private scrollY: number = 0;
-    private hoverIndex: number = -1;
-    private activeTab: ShopTab = 'all';
-    
-    // Drag scroll
-    private isDragging = false;
-    private dragStartY = 0;
-    private dragScrollStart = 0;
-    private dragDistance = 0;
-    
-    // Layout
+    private sellSources: ShopSellSource[] = [];
+    private activeKind: ShopKind = 'equipment';
+
+    private buyScrollY = 0;
+    private sellScrollY = 0;
+    private hoverBuyIndex = -1;
+    private hoverSellIndex = -1;
+    private mouseX = 0;
+
     private panelX = 0;
     private panelY = 0;
-    private panelW = 500;
-    private panelH = 440;
-    private listY = 0;
+    private panelW = 900;
+    private panelH = 520;
     private tabY = 0;
-    private readonly TAB_H = 32;
-    
-    // Callbacks
+    private buyX = 0;
+    private sellX = 0;
+    private buyW = 0;
+    private sellW = 0;
+    private listY = 0;
+    private listH = 0;
+
+    private pendingSell: SellEntry | null = null;
+    private confirmRect = { x: 0, y: 0, w: 0, h: 0 };
+    private cancelRect = { x: 0, y: 0, w: 0, h: 0 };
+    private feedbackText = '';
+    private feedbackTimer = 0;
+
     public onBuy: ((item: ItemDef, price: number) => boolean) | null = null;
-    public onSell: ((item: ItemDef, price: number) => void) | null = null;
+    public onSell: ((placed: PlacedItem, sourceGrid: GridInventory, price: number) => boolean) | null = null;
     public getGold: (() => number) | null = null;
 
     constructor() {
         this.refreshInventory();
     }
 
+    public setSellSources(sources: ShopSellSource[]): void {
+        this.sellSources = sources;
+        this.clampSellScroll();
+    }
+
     public refreshInventory(): void {
         this.entries = getShopItems().map(({ shopEntry, item }) => ({
             shopItem: shopEntry,
             item,
-            remaining: shopEntry.stock
+            remaining: shopEntry.stock,
         }));
-        this.applyFilter();
-    }
-
-    private applyFilter(): void {
-        this.scrollY = 0;
-        if (this.activeTab === 'all') {
-            this.filteredEntries = [...this.entries];
-        } else {
-            this.filteredEntries = this.entries.filter(e => {
-                const slot = e.item.slot;
-                switch (this.activeTab) {
-                    case 'weapon': return slot === 'weapon';
-                    case 'armor': return slot === 'head' || slot === 'body' || slot === 'boots' || slot === 'shield';
-                    case 'accessory': return slot === 'accessory';
-                    case 'consumable': return slot === 'consumable';
-                    default: return true;
-                }
-            });
-        }
-    }
-
-    private getTabCount(tab: ShopTab): number {
-        if (tab === 'all') return this.entries.length;
-        return this.entries.filter(e => {
-            const slot = e.item.slot;
-            switch (tab) {
-                case 'weapon': return slot === 'weapon';
-                case 'armor': return slot === 'head' || slot === 'body' || slot === 'boots' || slot === 'shield';
-                case 'accessory': return slot === 'accessory';
-                case 'consumable': return slot === 'consumable';
-                default: return true;
-            }
-        }).length;
+        this.clampBuyScroll();
     }
 
     public toggle(): void {
         this.visible = !this.visible;
         if (this.visible) this.refreshInventory();
+        else this.pendingSell = null;
     }
 
     public isVisible(): boolean { return this.visible; }
 
-    public show(): void { this.visible = true; this.refreshInventory(); }
-    public hide(): void { this.visible = false; }
+    public show(): void {
+        this.visible = true;
+        this.refreshInventory();
+    }
+
+    public hide(): void {
+        this.visible = false;
+        this.pendingSell = null;
+        this.feedbackText = '';
+    }
 
     public onMouseMove(sx: number, sy: number): void {
         if (!this.visible) return;
+        this.mouseX = sx;
 
-        // Handle drag scrolling
-        if (this.isDragging) {
-            const deltaY = this.dragStartY - sy;
-            this.dragDistance += Math.abs(deltaY);
-            this.scrollY = this.dragScrollStart + deltaY;
-            const listH = this.panelY + this.panelH - 10 - this.listY;
-            const maxScroll = Math.max(0, this.filteredEntries.length * 52 - listH);
-            this.scrollY = Math.max(0, Math.min(this.scrollY, maxScroll));
-            this.dragStartY = sy;
-            this.dragScrollStart = this.scrollY;
+        if (this.pendingSell) {
+            this.hoverBuyIndex = -1;
+            this.hoverSellIndex = -1;
             return;
         }
-        
-        const relY = sy - this.listY + this.scrollY;
-        const idx = Math.floor(relY / 52);
-        if (sx >= this.panelX + 10 && sx <= this.panelX + this.panelW - 10 &&
-            sy >= this.listY && sy <= this.panelY + this.panelH - 10) {
-            this.hoverIndex = idx >= 0 && idx < this.filteredEntries.length ? idx : -1;
-        } else {
-            this.hoverIndex = -1;
-        }
+
+        this.hoverBuyIndex = this.indexAt(sx, sy, this.buyX, this.buyW, this.buyScrollY, this.getBuyEntries().length);
+        this.hoverSellIndex = this.indexAt(sx, sy, this.sellX, this.sellW, this.sellScrollY, this.getSellEntries().length);
     }
 
     public onMouseDown(sx: number, sy: number): void {
-        if (!this.visible) return;
+        if (!this.visible || this.pendingSell) return;
 
-        // Check tab clicks
-        if (sy >= this.tabY && sy <= this.tabY + this.TAB_H) {
-            const tabW = (this.panelW - 20) / TAB_DEFS.length;
-            for (let i = 0; i < TAB_DEFS.length; i++) {
-                const tx = this.panelX + 10 + i * tabW;
+        if (sy >= this.tabY && sy <= this.tabY + 34) {
+            const tabW = 150;
+            for (let i = 0; i < SHOP_KIND_TABS.length; i++) {
+                const tx = this.panelX + 18 + i * (tabW + 8);
                 if (sx >= tx && sx <= tx + tabW) {
-                    this.activeTab = TAB_DEFS[i].id;
-                    this.applyFilter();
+                    this.activeKind = SHOP_KIND_TABS[i].id;
+                    this.buyScrollY = 0;
+                    this.hoverBuyIndex = -1;
                     return;
                 }
             }
-        }
-
-        // Start drag if clicking within the list area
-        if (sx >= this.panelX + 10 && sx <= this.panelX + this.panelW - 10 &&
-            sy >= this.listY && sy <= this.panelY + this.panelH - 10) {
-            this.isDragging = true;
-            this.dragStartY = sy;
-            this.dragScrollStart = this.scrollY;
-            this.dragDistance = 0;
         }
     }
 
     public onMouseUp(sx: number, sy: number): void {
         if (!this.visible) return;
 
-        const wasDragging = this.isDragging;
-        const totalDragDist = this.dragDistance;
-        this.isDragging = false;
-        this.dragDistance = 0;
+        if (this.pendingSell) {
+            if (this.inRect(sx, sy, this.confirmRect)) this.commitPendingSell();
+            else if (this.inRect(sx, sy, this.cancelRect)) this.pendingSell = null;
+            return;
+        }
 
-        // Only buy if it was a click (not a drag > 5px)
-        if (wasDragging && totalDragDist > 5) return;
+        const buyIndex = this.indexAt(sx, sy, this.buyX, this.buyW, this.buyScrollY, this.getBuyEntries().length);
+        if (buyIndex >= 0) {
+            const entry = this.getBuyEntries()[buyIndex];
+            if (!entry || entry.remaining === 0) return;
+            const success = this.onBuy?.(entry.item, entry.shopItem.buyPrice) ?? false;
+            if (success && entry.remaining > 0) entry.remaining--;
+            return;
+        }
 
-        // Check if clicking on a shop entry to buy
-        const relY = sy - this.listY + this.scrollY;
-        const idx = Math.floor(relY / 52);
-        if (idx >= 0 && idx < this.filteredEntries.length &&
-            sx >= this.panelX + 10 && sx <= this.panelX + this.panelW - 10 &&
-            sy >= this.listY && sy <= this.panelY + this.panelH - 10) {
-            
-            const entry = this.filteredEntries[idx];
-            if (entry.remaining === 0) return;
-            
-            const price = entry.shopItem.buyPrice;
-            if (this.onBuy) {
-                const success = this.onBuy(entry.item, price);
-                if (success && entry.remaining > 0) {
-                    entry.remaining--;
-                }
+        const sellEntries = this.getSellEntries();
+        const sellIndex = this.indexAt(sx, sy, this.sellX, this.sellW, this.sellScrollY, sellEntries.length);
+        if (sellIndex >= 0) {
+            const entry = sellEntries[sellIndex];
+            if (!entry) return;
+            if (!isSellableItem(entry.placed.item)) {
+                this.setFeedback(t('shop.cannotSell'));
+                return;
             }
+            this.pendingSell = entry;
         }
     }
 
     public onScroll(delta: number): void {
-        if (!this.visible) return;
-        this.scrollY = Math.max(0, this.scrollY + delta * 30);
-        const listH = this.panelY + this.panelH - 10 - this.listY;
-        const maxScroll = Math.max(0, this.filteredEntries.length * 52 - listH);
-        this.scrollY = Math.min(this.scrollY, maxScroll);
+        if (!this.visible || this.pendingSell) return;
+        const amount = delta * 30;
+        if (this.mouseX >= this.sellX && this.mouseX <= this.sellX + this.sellW) {
+            this.sellScrollY += amount;
+            this.clampSellScroll();
+        } else {
+            this.buyScrollY += amount;
+            this.clampBuyScroll();
+        }
     }
 
     public render(ctx: CanvasRenderingContext2D, canvasW: number, canvasH: number): void {
         if (!this.visible) return;
 
-        this.panelW = Math.min(520, canvasW - 40);
-        this.panelH = Math.min(500, canvasH - 100);
+        this.panelW = Math.min(980, Math.max(640, canvasW - 40));
+        this.panelH = Math.min(560, Math.max(440, canvasH - 90));
         this.panelX = Math.floor((canvasW - this.panelW) / 2);
         this.panelY = Math.floor((canvasH - this.panelH) / 2);
 
+        const gutter = 14;
+        this.buyW = Math.floor((this.panelW - 36 - gutter) / 2);
+        this.sellW = this.panelW - 36 - gutter - this.buyW;
+        this.buyX = this.panelX + 18;
+        this.sellX = this.buyX + this.buyW + gutter;
+        this.tabY = this.panelY + 44;
+        this.listY = this.panelY + 118;
+        this.listH = this.panelY + this.panelH - 26 - this.listY;
+        this.clampBuyScroll();
+        this.clampSellScroll();
 
+        this.feedbackTimer = Math.max(0, this.feedbackTimer - 1 / 60);
 
+        this.renderFrame(ctx);
+        this.renderTabs(ctx);
+        this.renderPanel(ctx, this.buyX, this.buyW, t('shop.buyPanel'), this.getBuyEntries(), 'buy');
+        this.renderPanel(ctx, this.sellX, this.sellW, t('shop.sellPanel'), this.getSellEntries(), 'sell');
 
-        // Panel background
+        if (this.feedbackTimer > 0 && this.feedbackText) {
+            ctx.fillStyle = '#d96860';
+            ctx.font = 'bold 12px DOSMyungjo, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(this.feedbackText, this.panelX + this.panelW / 2, this.panelY + this.panelH - 8);
+            ctx.textAlign = 'start';
+        }
+
+        if (this.pendingSell) this.renderSellConfirm(ctx);
+    }
+
+    private getBuyEntries(): ShopEntry[] {
+        return this.entries.filter((entry) => entry.shopItem.shopKind === this.activeKind);
+    }
+
+    private getSellEntries(): SellEntry[] {
+        const entries: SellEntry[] = [];
+        for (const source of this.sellSources) {
+            for (const placed of source.grid.items) {
+                if (!isSellableItem(placed.item)) continue;
+                entries.push({
+                    source,
+                    placed,
+                    price: getSellPrice(placed.item) * Math.max(1, placed.quantity),
+                });
+            }
+        }
+        return entries;
+    }
+
+    private commitPendingSell(): void {
+        if (!this.pendingSell) return;
+        const entry = this.pendingSell;
+        this.pendingSell = null;
+        if (!entry.source.grid.items.includes(entry.placed)) return;
+        const success = this.onSell?.(entry.placed, entry.source.grid, entry.price) ?? false;
+        if (success) {
+            this.setFeedback(t('shop.soldItem'));
+            this.clampSellScroll();
+        }
+    }
+
+    private indexAt(sx: number, sy: number, x: number, w: number, scrollY: number, count: number): number {
+        if (sx < x || sx > x + w || sy < this.listY || sy > this.listY + this.listH) return -1;
+        const index = Math.floor((sy - this.listY + scrollY) / ROW_H);
+        return index >= 0 && index < count ? index : -1;
+    }
+
+    private inRect(sx: number, sy: number, rect: { x: number; y: number; w: number; h: number }): boolean {
+        return sx >= rect.x && sx <= rect.x + rect.w && sy >= rect.y && sy <= rect.y + rect.h;
+    }
+
+    private clampBuyScroll(): void {
+        this.buyScrollY = this.clampScroll(this.buyScrollY, this.getBuyEntries().length);
+    }
+
+    private clampSellScroll(): void {
+        this.sellScrollY = this.clampScroll(this.sellScrollY, this.getSellEntries().length);
+    }
+
+    private clampScroll(scrollY: number, count: number): number {
+        const maxScroll = Math.max(0, count * ROW_H - Math.max(1, this.listH));
+        return Math.max(0, Math.min(scrollY, maxScroll));
+    }
+
+    private setFeedback(text: string): void {
+        this.feedbackText = text;
+        this.feedbackTimer = 2.2;
+    }
+
+    private renderFrame(ctx: CanvasRenderingContext2D): void {
         ctx.fillStyle = 'rgba(8, 10, 18, 0.97)';
         ctx.fillRect(this.panelX, this.panelY, this.panelW, this.panelH);
 
-        // Ornate border
         ctx.strokeStyle = '#8a7030';
         ctx.lineWidth = 3;
         ctx.strokeRect(this.panelX + 1, this.panelY + 1, this.panelW - 2, this.panelH - 2);
-
         ctx.strokeStyle = 'rgba(200, 170, 80, 0.3)';
         ctx.lineWidth = 1;
         ctx.strokeRect(this.panelX + 4, this.panelY + 4, this.panelW - 8, this.panelH - 8);
 
-        // Title
         ctx.fillStyle = '#c8a84e';
         ctx.font = 'bold 18px DOSMyungjo, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(t('shop.title'), this.panelX + this.panelW / 2, this.panelY + 28);
 
-        // Gold display
         const gold = this.getGold ? this.getGold() : 0;
         ctx.fillStyle = '#ffd700';
         ctx.font = 'bold 14px DOSMyungjo, sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText(`💰 ${gold}G`, this.panelX + this.panelW - 16, this.panelY + 28);
+        ctx.fillText(`💰 ${gold}G`, this.panelX + this.panelW - 18, this.panelY + 28);
         ctx.textAlign = 'start';
+    }
 
-        // ─── CATEGORY TABS ───
-        this.tabY = this.panelY + 42;
-        const tabW = (this.panelW - 20) / TAB_DEFS.length;
-        for (let i = 0; i < TAB_DEFS.length; i++) {
-            const tx = this.panelX + 10 + i * tabW;
-            const isActive = this.activeTab === TAB_DEFS[i].id;
-            const count = this.getTabCount(TAB_DEFS[i].id);
+    private renderTabs(ctx: CanvasRenderingContext2D): void {
+        const tabW = 150;
+        for (let i = 0; i < SHOP_KIND_TABS.length; i++) {
+            const tab = SHOP_KIND_TABS[i];
+            const x = this.panelX + 18 + i * (tabW + 8);
+            const active = this.activeKind === tab.id;
+            ctx.fillStyle = active ? 'rgba(200, 170, 80, 0.22)' : 'rgba(20, 24, 35, 0.7)';
+            ctx.fillRect(x, this.tabY, tabW, 34);
+            ctx.strokeStyle = active ? '#c8a84e' : 'rgba(130, 110, 50, 0.35)';
+            ctx.lineWidth = active ? 2 : 1;
+            ctx.strokeRect(x, this.tabY, tabW, 34);
 
-            // Tab background
-            if (isActive) {
-                ctx.fillStyle = 'rgba(200, 170, 80, 0.18)';
-                ctx.fillRect(tx, this.tabY, tabW, this.TAB_H);
-                // Active indicator line
-                ctx.fillStyle = '#c8a84e';
-                ctx.fillRect(tx, this.tabY + this.TAB_H - 2, tabW, 2);
-            } else {
-                ctx.fillStyle = 'rgba(20, 24, 35, 0.6)';
-                ctx.fillRect(tx, this.tabY, tabW, this.TAB_H);
-            }
-
-            // Tab border
-            ctx.strokeStyle = 'rgba(130, 110, 50, 0.3)';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(tx, this.tabY, tabW, this.TAB_H);
-
-            // Tab text
-            ctx.fillStyle = isActive ? '#c8a84e' : '#888';
-            ctx.font = `${isActive ? 'bold ' : ''}11px DOSMyungjo, sans-serif`;
+            ctx.fillStyle = active ? '#f1d476' : '#9a947e';
+            ctx.font = `bold 12px DOSMyungjo, sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText(
-                `${TAB_DEFS[i].icon} ${TAB_DEFS[i].label} (${count})`,
-                tx + tabW / 2,
-                this.tabY + this.TAB_H / 2 + 4
-            );
-            ctx.textAlign = 'start';
+            ctx.fillText(`${tab.icon} ${t(tab.labelKey)}`, x + tabW / 2, this.tabY + 22);
         }
+        ctx.textAlign = 'start';
+    }
 
-        // Column headers
-        const headerY = this.tabY + this.TAB_H + 16;
+    private renderPanel(
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        w: number,
+        title: string,
+        entries: Array<ShopEntry | SellEntry>,
+        kind: 'buy' | 'sell'
+    ): void {
+        ctx.fillStyle = 'rgba(15, 18, 28, 0.82)';
+        ctx.fillRect(x, this.listY - 32, w, this.listH + 34);
+        ctx.strokeStyle = 'rgba(130, 110, 50, 0.35)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, this.listY - 32, w, this.listH + 34);
+
+        ctx.fillStyle = '#c8a84e';
+        ctx.font = 'bold 14px DOSMyungjo, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(title, x + 10, this.listY - 11);
         ctx.fillStyle = '#888';
         ctx.font = '11px DOSMyungjo, sans-serif';
-        ctx.fillText(t('inv.title'), this.panelX + 60, headerY);
         ctx.textAlign = 'right';
-        ctx.fillText(t('shop.gold'), this.panelX + this.panelW - 16, headerY);
+        ctx.fillText(kind === 'buy' ? t('shop.gold') : t('shop.sellPrice'), x + w - 10, this.listY - 11);
         ctx.textAlign = 'start';
-
-        // Clip region for scrollable list
-        this.listY = headerY + 8;
-        const listH = this.panelY + this.panelH - 10 - this.listY;
 
         ctx.save();
         ctx.beginPath();
-        ctx.rect(this.panelX + 8, this.listY, this.panelW - 16, listH);
+        ctx.rect(x + 1, this.listY, w - 2, this.listH);
         ctx.clip();
 
-        // Render shop items
-        for (let i = 0; i < this.filteredEntries.length; i++) {
-            const entry = this.filteredEntries[i];
-            const itemY = this.listY + i * 52 - this.scrollY;
-
-            if (itemY > this.listY + listH || itemY + 50 < this.listY) continue;
-
-            const isHover = i === this.hoverIndex;
-            const soldOut = entry.remaining === 0;
-            const canAfford = gold >= entry.shopItem.buyPrice;
-
-            // Row background
-            ctx.fillStyle = isHover ? 'rgba(200, 170, 80, 0.12)' : 
-                           (i % 2 === 0 ? 'rgba(20, 24, 35, 0.8)' : 'rgba(15, 18, 28, 0.8)');
-            ctx.fillRect(this.panelX + 10, itemY, this.panelW - 20, 48);
-
-            if (isHover && !soldOut) {
-                ctx.strokeStyle = 'rgba(200, 170, 80, 0.4)';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(this.panelX + 10, itemY, this.panelW - 20, 48);
-            }
-
-            // Item icon
-            ctx.globalAlpha = soldOut ? 0.3 : 1;
-            ctx.fillStyle = entry.item.color + '88';
-            ctx.fillRect(this.panelX + 14, itemY + 4, CELL - 4, CELL - 4);
-            ctx.strokeStyle = SLOT_FRAME;
-            ctx.lineWidth = 1;
-            ctx.strokeRect(this.panelX + 14, itemY + 4, CELL - 4, CELL - 4);
-
-            ctx.font = '18px serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(entry.item.icon, this.panelX + 14 + (CELL - 4) / 2, itemY + 28);
-            ctx.textAlign = 'start';
-
-            // Item name
-            ctx.fillStyle = soldOut ? '#555' : '#ddd';
-            ctx.font = 'bold 13px DOSMyungjo, sans-serif';
-            const name = i18n.lang === 'ko' ? entry.item.nameKr : entry.item.name;
-            ctx.fillText(name, this.panelX + 60, itemY + 20);
-
-            // Item stats summary
-            ctx.fillStyle = '#777';
-            ctx.font = '10px DOSMyungjo, sans-serif';
-            const statStr: string[] = [];
-            if (entry.item.stats?.atk) statStr.push(`공격+${entry.item.stats.atk}`);
-            if (entry.item.stats?.def) statStr.push(`방어+${entry.item.stats.def}`);
-            if (entry.item.stats?.magAtk) statStr.push(`마공+${entry.item.stats.magAtk}`);
-            if (entry.item.stats?.hp) statStr.push(`HP+${entry.item.stats.hp}`);
-            ctx.fillText(statStr.join(' · '), this.panelX + 60, itemY + 36);
-
-            // Stock
-            if (entry.remaining >= 0) {
-                ctx.fillStyle = soldOut ? '#aa3333' : '#888';
-                ctx.font = '10px DOSMyungjo, sans-serif';
-                ctx.textAlign = 'right';
-                ctx.fillText(soldOut ? '품절' : `x${entry.remaining}`, this.panelX + this.panelW - 80, itemY + 36);
-                ctx.textAlign = 'start';
-            }
-
-            // Price
-            ctx.fillStyle = soldOut ? '#555' : (canAfford ? '#ffd700' : '#cc4444');
-            ctx.font = 'bold 13px DOSMyungjo, sans-serif';
-            ctx.textAlign = 'right';
-            ctx.fillText(`${entry.shopItem.buyPrice}G`, this.panelX + this.panelW - 16, itemY + 22);
-            ctx.textAlign = 'start';
-
-            // Buy indicator on hover
-            if (isHover && !soldOut && canAfford) {
-                ctx.fillStyle = 'rgba(80, 200, 80, 0.7)';
-                ctx.font = 'bold 11px DOSMyungjo, sans-serif';
-                ctx.textAlign = 'right';
-                ctx.fillText(`▶ ${t('shop.buy')}`, this.panelX + this.panelW - 16, itemY + 42);
-                ctx.textAlign = 'start';
-            }
-
-            ctx.globalAlpha = 1;
+        for (let i = 0; i < entries.length; i++) {
+            const rowY = this.listY + i * ROW_H - (kind === 'buy' ? this.buyScrollY : this.sellScrollY);
+            if (rowY > this.listY + this.listH || rowY + ROW_H < this.listY) continue;
+            const isHover = kind === 'buy' ? i === this.hoverBuyIndex : i === this.hoverSellIndex;
+            if (kind === 'buy') this.renderBuyRow(ctx, entries[i] as ShopEntry, x, w, rowY, i, isHover);
+            else this.renderSellRow(ctx, entries[i] as SellEntry, x, w, rowY, i, isHover);
         }
 
         ctx.restore();
+        this.renderEmptyMessage(ctx, x, w, entries.length, kind);
+        this.renderScrollIndicator(ctx, x, w, entries.length, kind === 'buy' ? this.buyScrollY : this.sellScrollY);
+    }
 
-        // Scroll indicator
-        if (this.filteredEntries.length * 52 > listH) {
-            const totalH = this.filteredEntries.length * 52;
-            const thumbH = Math.max(20, (listH / totalH) * listH);
-            const thumbY = this.listY + (this.scrollY / totalH) * listH;
-            ctx.fillStyle = 'rgba(160, 130, 60, 0.3)';
-            ctx.fillRect(this.panelX + this.panelW - 8, thumbY, 4, thumbH);
+    private renderBuyRow(ctx: CanvasRenderingContext2D, entry: ShopEntry, x: number, w: number, y: number, index: number, hover: boolean): void {
+        const soldOut = entry.remaining === 0;
+        const canAfford = (this.getGold ? this.getGold() : 0) >= entry.shopItem.buyPrice;
+        this.renderRowBase(ctx, x, w, y, index, hover && !soldOut);
+        this.renderItemIcon(ctx, entry.item, x + 8, y + 5, soldOut ? 0.35 : 1);
+
+        ctx.fillStyle = soldOut ? '#555' : '#ddd';
+        ctx.font = 'bold 13px DOSMyungjo, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(this.itemName(entry.item), x + 58, y + 20);
+        ctx.fillStyle = '#777';
+        ctx.font = '10px DOSMyungjo, sans-serif';
+        ctx.fillText(this.statSummary(entry.item), x + 58, y + 37);
+
+        if (entry.remaining >= 0) {
+            ctx.fillStyle = soldOut ? '#aa4444' : '#888';
+            ctx.textAlign = 'right';
+            ctx.fillText(soldOut ? t('shop.soldOut') : `x${entry.remaining}`, x + w - 82, y + 38);
         }
 
-        // Empty tab message
-        if (this.filteredEntries.length === 0) {
-            ctx.fillStyle = 'rgba(255,255,255,0.3)';
-            ctx.font = '13px DOSMyungjo, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('이 카테고리에 상품이 없습니다.', this.panelX + this.panelW / 2, this.listY + 40);
-            ctx.textAlign = 'start';
+        ctx.fillStyle = soldOut ? '#555' : (canAfford ? '#ffd700' : '#cc4444');
+        ctx.font = 'bold 13px DOSMyungjo, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(`${entry.shopItem.buyPrice}G`, x + w - 10, y + 21);
+        if (hover && !soldOut && canAfford) {
+            ctx.fillStyle = 'rgba(80, 200, 80, 0.78)';
+            ctx.font = 'bold 11px DOSMyungjo, sans-serif';
+            ctx.fillText(`▶ ${t('shop.buy')}`, x + w - 10, y + 41);
         }
+        ctx.textAlign = 'start';
+    }
+
+    private renderSellRow(ctx: CanvasRenderingContext2D, entry: SellEntry, x: number, w: number, y: number, index: number, hover: boolean): void {
+        this.renderRowBase(ctx, x, w, y, index, hover);
+        this.renderItemIcon(ctx, entry.placed.item, x + 8, y + 5, 1);
+
+        const qty = Math.max(1, entry.placed.quantity);
+        ctx.fillStyle = '#ddd';
+        ctx.font = 'bold 13px DOSMyungjo, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${this.itemName(entry.placed.item)}${qty > 1 ? ` x${qty}` : ''}`, x + 58, y + 19);
+        ctx.fillStyle = '#8f927b';
+        ctx.font = '10px DOSMyungjo, sans-serif';
+        ctx.fillText(entry.source.label, x + 58, y + 35);
+
+        ctx.fillStyle = '#ffd700';
+        ctx.font = 'bold 13px DOSMyungjo, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(`${entry.price}G`, x + w - 10, y + 21);
+        if (hover) {
+            ctx.fillStyle = 'rgba(230, 165, 76, 0.78)';
+            ctx.font = 'bold 11px DOSMyungjo, sans-serif';
+            ctx.fillText(`▶ ${t('shop.sell')}`, x + w - 10, y + 41);
+        }
+        ctx.textAlign = 'start';
+    }
+
+    private renderRowBase(ctx: CanvasRenderingContext2D, x: number, w: number, y: number, index: number, hover: boolean): void {
+        ctx.fillStyle = hover ? 'rgba(200, 170, 80, 0.12)' : (index % 2 === 0 ? 'rgba(20, 24, 35, 0.8)' : 'rgba(15, 18, 28, 0.8)');
+        ctx.fillRect(x + 6, y + 2, w - 12, ROW_H - 6);
+        if (hover) {
+            ctx.strokeStyle = 'rgba(200, 170, 80, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x + 6, y + 2, w - 12, ROW_H - 6);
+        }
+    }
+
+    private renderItemIcon(ctx: CanvasRenderingContext2D, item: ItemDef, x: number, y: number, alpha: number): void {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = item.color + '88';
+        ctx.fillRect(x, y, CELL - 4, CELL - 4);
+        ctx.strokeStyle = SLOT_FRAME;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, CELL - 4, CELL - 4);
+        ctx.font = '18px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(item.icon, x + (CELL - 4) / 2, y + 26);
+        ctx.restore();
+    }
+
+    private renderEmptyMessage(ctx: CanvasRenderingContext2D, x: number, w: number, count: number, kind: 'buy' | 'sell'): void {
+        if (count > 0) return;
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.font = '13px DOSMyungjo, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(kind === 'buy' ? t('shop.emptyBuy') : t('shop.emptySell'), x + w / 2, this.listY + 42);
+        ctx.textAlign = 'start';
+    }
+
+    private renderScrollIndicator(ctx: CanvasRenderingContext2D, x: number, w: number, count: number, scrollY: number): void {
+        const totalH = count * ROW_H;
+        if (totalH <= this.listH) return;
+        const thumbH = Math.max(20, (this.listH / totalH) * this.listH);
+        const thumbY = this.listY + (scrollY / totalH) * this.listH;
+        ctx.fillStyle = 'rgba(160, 130, 60, 0.35)';
+        ctx.fillRect(x + w - 6, thumbY, 4, thumbH);
+    }
+
+    private renderSellConfirm(ctx: CanvasRenderingContext2D): void {
+        if (!this.pendingSell) return;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.58)';
+        ctx.fillRect(this.panelX, this.panelY, this.panelW, this.panelH);
+
+        const w = 360;
+        const h = 150;
+        const x = this.panelX + (this.panelW - w) / 2;
+        const y = this.panelY + (this.panelH - h) / 2;
+        ctx.fillStyle = 'rgba(18, 16, 14, 0.98)';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = '#c8a84e';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, w, h);
+
+        const entry = this.pendingSell;
+        const qty = Math.max(1, entry.placed.quantity);
+        ctx.fillStyle = '#f1e3bf';
+        ctx.font = 'bold 15px DOSMyungjo, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(t('shop.sellConfirm'), x + w / 2, y + 30);
+        ctx.fillStyle = '#c8a84e';
+        ctx.font = '13px DOSMyungjo, sans-serif';
+        ctx.fillText(`${this.itemName(entry.placed.item)}${qty > 1 ? ` x${qty}` : ''} → ${entry.price}G`, x + w / 2, y + 62);
+
+        this.confirmRect = { x: x + 42, y: y + 96, w: 122, h: 34 };
+        this.cancelRect = { x: x + w - 164, y: y + 96, w: 122, h: 34 };
+        this.renderButton(ctx, this.confirmRect, t('shop.sellAll'), true);
+        this.renderButton(ctx, this.cancelRect, t('shop.cancel'), false);
+        ctx.textAlign = 'start';
+    }
+
+    private renderButton(ctx: CanvasRenderingContext2D, rect: { x: number; y: number; w: number; h: number }, label: string, primary: boolean): void {
+        ctx.fillStyle = primary ? 'rgba(130, 82, 34, 0.96)' : 'rgba(44, 38, 31, 0.96)';
+        ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+        ctx.strokeStyle = primary ? '#d7a450' : '#5e5544';
+        ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+        ctx.fillStyle = '#f1e3bf';
+        ctx.font = 'bold 12px DOSMyungjo, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2);
+        ctx.textBaseline = 'alphabetic';
+    }
+
+    private itemName(item: ItemDef): string {
+        return i18n.lang === 'ko' ? item.nameKr : item.name;
+    }
+
+    private statSummary(item: ItemDef): string {
+        const stats: string[] = [];
+        if (item.stats?.atk) stats.push(`ATK+${item.stats.atk}`);
+        if (item.stats?.def) stats.push(`DEF+${item.stats.def}`);
+        if (item.stats?.magAtk) stats.push(`MAG+${item.stats.magAtk}`);
+        if (item.stats?.hp) stats.push(`HP+${item.stats.hp}`);
+        return stats.join(' · ') || item.descriptionKr || item.description;
     }
 }

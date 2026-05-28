@@ -18,6 +18,7 @@ import { InputManager } from '../engine/InputManager';
 import { renderGameTitle, UI } from './UITheme';
 import { TownInfo } from '../map/BiomeMask';
 import type { Character } from '../character/Character';
+import { t } from '../i18n/LanguageManager';
 
 type TownTab = 'storage' | 'shop' | 'quest' | 'rumors';
 
@@ -44,6 +45,7 @@ export class TownUI {
     // Sub-UIs
     private inventoryUI: InventoryUI;
     private shopUI: ShopUI;
+    private backpack: GridInventory;
 
     // State
     private visible: boolean = false;
@@ -68,12 +70,14 @@ export class TownUI {
     public stash: GridInventory;
 
     constructor(activeCharInv: GridInventory, stash: GridInventory) {
+        this.backpack = activeCharInv;
         this.stash = stash;
         this.inventoryUI = new InventoryUI(activeCharInv);
         this.inventoryUI.setExternalGrid(this.stash, '🏰 마을 창고');
         this.inventoryUI.setHideCloseBtn(true);
         this.shopUI = new ShopUI();
         this.shopUI.getGold = () => this.playerGold;
+        this.syncShopSources();
     }
 
     // ── Callbacks ──────────────────────────────────────────────────
@@ -83,6 +87,13 @@ export class TownUI {
     }
 
     public getShopUI(): ShopUI { return this.shopUI; }
+
+    private syncShopSources(): void {
+        this.shopUI.setSellSources([
+            { id: 'backpack', label: t('inv.backpack'), grid: this.backpack },
+            { id: 'stash', label: t('lobby.stash'), grid: this.stash },
+        ]);
+    }
 
     public setActiveCharacter(char: Character): void {
         this.inventoryUI.setActiveCharacter(char);
@@ -124,6 +135,7 @@ export class TownUI {
                 if (!this.inventoryUI.isVisible()) this.inventoryUI.toggle();
                 break;
             case 'shop':
+                this.syncShopSources();
                 this.shopUI.show();
                 break;
             // quest and rumors are rendered inline (no sub-UI)
@@ -222,6 +234,7 @@ export class TownUI {
                 this.inventoryUI.render(ctx, w, h);
                 break;
             case 'shop':
+                this.syncShopSources();
                 this.shopUI.render(ctx, w, h);
                 break;
             case 'quest':

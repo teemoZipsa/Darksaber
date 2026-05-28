@@ -28,6 +28,7 @@ export class LobbyUI {
     private shopUI: ShopUI;
     private partyUI: PartyUI;
     private settingsUI: SettingsUI;
+    private backpack: GridInventory;
 
     // State
     private visible: boolean = false;
@@ -52,11 +53,13 @@ export class LobbyUI {
     
     constructor(party: PartyManager, activeCharInv: GridInventory) {
         this.party = party;
+        this.backpack = activeCharInv;
         this.stash = new GridInventory(STASH_W, STASH_H);
         this.charInventoryUI = new InventoryUI(activeCharInv);
         this.charInventoryUI.setExternalGrid(this.stash, t('lobby.stash'));
         this.charInventoryUI.setHideCloseBtn(true);
         this.shopUI = new ShopUI();
+        this.syncShopSources();
         
         this.partyUI = new PartyUI(party);
 
@@ -81,6 +84,13 @@ export class LobbyUI {
     }
 
     public getShopUI(): ShopUI { return this.shopUI; }
+
+    private syncShopSources(): void {
+        this.shopUI.setSellSources([
+            { id: 'backpack', label: t('inv.backpack'), grid: this.backpack },
+            { id: 'stash', label: t('lobby.stash'), grid: this.stash },
+        ]);
+    }
 
     public toggle(): void {
         this.visible = !this.visible;
@@ -108,6 +118,7 @@ export class LobbyUI {
                 if (!this.charInventoryUI.isVisible()) this.charInventoryUI.toggle();
                 break;
             case 'shop':
+                this.syncShopSources();
                 this.shopUI.show();
                 break;
             case 'party':
@@ -245,6 +256,7 @@ export class LobbyUI {
             if (!this.charInventoryUI.isVisible()) this.charInventoryUI.toggle();
             this.charInventoryUI.render(ctx, canvasW, canvasH);
         } else if (this.activeTab === 'shop') {
+            this.syncShopSources();
             this.shopUI.render(ctx, canvasW, canvasH);
         } else if (this.activeTab === 'party') {
             if (!this.partyUI.isVisible()) this.partyUI.toggle();

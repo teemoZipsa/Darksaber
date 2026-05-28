@@ -85,13 +85,25 @@ export const i18n = {
             
             // Shop
             'shop.title': '🏪 상점',
+            'shop.equipment': '장비 상점',
+            'shop.goods': '잡화 상점',
+            'shop.buyPanel': '구매',
+            'shop.sellPanel': '판매',
             'shop.buy': '구매',
             'shop.sell': '판매',
             'shop.gold': '골드',
+            'shop.sellPrice': '판매가',
             'shop.buyConfirm': '구매하시겠습니까?',
+            'shop.sellConfirm': '정말 판매하시겠습니까?',
+            'shop.sellAll': '전량 판매',
+            'shop.cancel': '취소',
             'shop.soldItem': '아이템을 판매했습니다!',
+            'shop.soldOut': '품절',
             'shop.noGold': '골드가 부족합니다!',
             'shop.backpackFull': '배낭이 가득 찼습니다!',
+            'shop.emptyBuy': '이 상점에 상품이 없습니다.',
+            'shop.emptySell': '판매할 아이템이 없습니다.',
+            'shop.cannotSell': '이 아이템은 판매할 수 없습니다.',
             
             // Lobby Tabs
             'tab.inventory': '인벤토리',
@@ -281,13 +293,25 @@ export const i18n = {
             
             // Shop
             'shop.title': '🏪 Merchant',
+            'shop.equipment': 'Equipment',
+            'shop.goods': 'Goods',
+            'shop.buyPanel': 'Buy',
+            'shop.sellPanel': 'Sell',
             'shop.buy': 'BUY',
             'shop.sell': 'SELL',
             'shop.gold': 'Gold',
+            'shop.sellPrice': 'Sell Price',
             'shop.buyConfirm': 'Purchase this item?',
+            'shop.sellConfirm': 'Sell this item?',
+            'shop.sellAll': 'Sell All',
+            'shop.cancel': 'Cancel',
             'shop.soldItem': 'Item sold!',
+            'shop.soldOut': 'Sold out',
             'shop.noGold': 'Not enough gold!',
             'shop.backpackFull': 'Backpack is full!',
+            'shop.emptyBuy': 'No goods in this shop.',
+            'shop.emptySell': 'No items to sell.',
+            'shop.cannotSell': 'This item cannot be sold.',
             
             // Lobby Tabs
             'tab.inventory': 'Inventory',

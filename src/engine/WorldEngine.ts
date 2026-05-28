@@ -408,6 +408,14 @@ export class WorldEngine {
             this.addCombatLog(`${item.nameKr} 구매`);
             return true;
         };
+        this.townUI.getShopUI().onSell = (placed, sourceGrid, price) => {
+            if (!sourceGrid.items.includes(placed)) return false;
+            sourceGrid.remove(placed);
+            this.playerData.addGold(price);
+            this.playerData.save();
+            this.addCombatLog(`${placed.item.nameKr} 판매 +${price}G`);
+            return true;
+        };
     }
 
     private syncTownUIState(): void {

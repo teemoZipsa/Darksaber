@@ -5,6 +5,7 @@ import { PlacedItem } from '../../src/inventory/GridInventory';
 import { computeRaidFailureLoss } from '../../src/raid/RaidOutcome';
 import { resolveTownArrival, shouldAdvanceRaidTimer } from '../../src/raid/RaidRules';
 import { WorldMap } from '../../src/map/WorldMap';
+import { getSellPrice, getShopItems, isSellableItem } from '../../src/data/ShopData';
 
 function placed(id: string): PlacedItem {
     const item = getItemDef(id);
@@ -46,6 +47,56 @@ test('normalizeItemDef applies stable defaults to raw items', () => {
     assert.equal(normalized.rarity, 'common');
     assert.equal(normalized.weight, 2.3);
     assert.ok(normalized.baseValue > 0);
+});
+
+test('shop inventory is split into equipment and goods categories', () => {
+    const equipment = getShopItems('equipment');
+    const goods = getShopItems('goods');
+
+    assert.ok(equipment.length > 0);
+    assert.ok(goods.length > 0);
+    assert.ok(equipment.every(({ shopEntry, item }) => shopEntry.shopKind === 'equipment' && item.slot !== 'consumable'));
+    assert.ok(goods.every(({ shopEntry, item }) => shopEntry.shopKind === 'goods' && item.slot === 'consumable'));
+});
+
+test('sell price uses half buy price or half normalized base value', () => {
+    const herb = getItemDef('herb_common');
+    assert.ok(herb);
+    assert.equal(getSellPrice(herb), 25);
+
+    const raw: RawItemDef = {
+        id: 'test_relic',
+        name: 'Test Relic',
+        nameKr: '시험 유물',
+        slot: 'material',
+        gridW: 1,
+        gridH: 1,
+        color: '#fff',
+        icon: '?',
+        maxDurability: 1,
+        description: 'test',
+        baseValue: 77,
+    };
+    assert.equal(getSellPrice(normalizeItemDef(raw)), 38);
+});
+
+test('sellable flag blocks bound or quest items from shop sale lists', () => {
+    const bound = normalizeItemDef({
+        id: 'bound_test_item',
+        name: 'Bound Test Item',
+        nameKr: '귀속 시험 아이템',
+        slot: 'material',
+        gridW: 1,
+        gridH: 1,
+        color: '#fff',
+        icon: '!',
+        maxDurability: 1,
+        description: 'test',
+        sellable: false,
+    });
+
+    assert.equal(isSellableItem(bound), false);
+    assert.equal(isSellableItem({ ...bound, sellable: undefined }), true);
 });
 
 test('raid failure loss clears backpack snapshots and skips empty equipment', () => {

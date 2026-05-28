@@ -4,55 +4,63 @@
 
 import { getItemDef, ItemDef } from './ItemDB';
 
+export type ShopKind = 'equipment' | 'goods';
+
 export interface ShopItem {
     itemId: string;
     stock: number;   // -1 = unlimited
     buyPrice: number;
+    shopKind: ShopKind;
 }
 
 /** Items available for purchase at the merchant */
 export const SHOP_INVENTORY: ShopItem[] = [
     // Weapons
-    { itemId: 'short_sword', stock: -1, buyPrice: 80 },
-    { itemId: 'long_sword',  stock: -1, buyPrice: 200 },
+    { itemId: 'short_sword', stock: -1, buyPrice: 80, shopKind: 'equipment' },
+    { itemId: 'long_sword',  stock: -1, buyPrice: 200, shopKind: 'equipment' },
 
     // Tier 1 Armor (all branches)
-    { itemId: 'battle_t1_head',  stock: -1, buyPrice: 90 },
-    { itemId: 'battle_t1_body',  stock: -1, buyPrice: 130 },
-    { itemId: 'battle_t1_boots', stock: -1, buyPrice: 70 },
-    { itemId: 'tactics_t1_body', stock: -1, buyPrice: 130 },
-    { itemId: 'healer_t1_body',  stock: -1, buyPrice: 130 },
-    { itemId: 'magic_t1_body',   stock: -1, buyPrice: 130 },
+    { itemId: 'battle_t1_head',  stock: -1, buyPrice: 90, shopKind: 'equipment' },
+    { itemId: 'battle_t1_body',  stock: -1, buyPrice: 130, shopKind: 'equipment' },
+    { itemId: 'battle_t1_boots', stock: -1, buyPrice: 70, shopKind: 'equipment' },
+    { itemId: 'tactics_t1_body', stock: -1, buyPrice: 130, shopKind: 'equipment' },
+    { itemId: 'healer_t1_body',  stock: -1, buyPrice: 130, shopKind: 'equipment' },
+    { itemId: 'magic_t1_body',   stock: -1, buyPrice: 130, shopKind: 'equipment' },
 
     // Tier 2 Armor (sample)
-    { itemId: 'battle_t2_body',  stock: 3, buyPrice: 210 },
-    { itemId: 'magic_t2_body',   stock: 3, buyPrice: 210 },
+    { itemId: 'battle_t2_body',  stock: 3, buyPrice: 210, shopKind: 'equipment' },
+    { itemId: 'magic_t2_body',   stock: 3, buyPrice: 210, shopKind: 'equipment' },
 
     // Accessories
-    { itemId: 'sword_manual', stock: -1, buyPrice: 300 },
-    { itemId: 'power_ring',   stock: 2,  buyPrice: 800 },
-    { itemId: 'shell_ring',   stock: -1, buyPrice: 500 },
-    { itemId: 'amulet',       stock: -1, buyPrice: 400 },
-    { itemId: 'heal_ring',    stock: 1,  buyPrice: 5000 },
+    { itemId: 'sword_manual', stock: -1, buyPrice: 300, shopKind: 'equipment' },
+    { itemId: 'power_ring',   stock: 2,  buyPrice: 800, shopKind: 'equipment' },
+    { itemId: 'shell_ring',   stock: -1, buyPrice: 500, shopKind: 'equipment' },
+    { itemId: 'amulet',       stock: -1, buyPrice: 400, shopKind: 'equipment' },
+    { itemId: 'heal_ring',    stock: 1,  buyPrice: 5000, shopKind: 'equipment' },
 
     // Consumables (약초 시리즈)
-    { itemId: 'herb_cheap',     stock: -1, buyPrice: 10 },
-    { itemId: 'herb_common',    stock: -1, buyPrice: 50 },
-    { itemId: 'herb_rare',      stock: -1, buyPrice: 200 },
-    { itemId: 'herb_legendary', stock: -1, buyPrice: 500 },
-    { itemId: 'mp_potion',      stock: -1, buyPrice: 25 },
-    { itemId: 'repair_kit',     stock: -1, buyPrice: 50 },
+    { itemId: 'herb_cheap',     stock: -1, buyPrice: 10, shopKind: 'goods' },
+    { itemId: 'herb_common',    stock: -1, buyPrice: 50, shopKind: 'goods' },
+    { itemId: 'herb_rare',      stock: -1, buyPrice: 200, shopKind: 'goods' },
+    { itemId: 'herb_legendary', stock: -1, buyPrice: 500, shopKind: 'goods' },
+    { itemId: 'mp_potion',      stock: -1, buyPrice: 25, shopKind: 'goods' },
+    { itemId: 'repair_kit',     stock: -1, buyPrice: 50, shopKind: 'goods' },
 ];
 
-/** Sell price = 50% of buy price */
+/** Sell price = 50% of buy price, falling back to normalized base value. */
 export function getSellPrice(item: ItemDef): number {
-    return Math.floor((item.buyPrice || 10) * 0.5);
+    return Math.floor((item.buyPrice ?? item.baseValue ?? 10) * 0.5);
+}
+
+export function isSellableItem(item: ItemDef): boolean {
+    return item.sellable !== false;
 }
 
 /** Get ShopItem with its full ItemDef resolved */
-export function getShopItems(): Array<{ shopEntry: ShopItem; item: ItemDef }> {
+export function getShopItems(shopKind?: ShopKind): Array<{ shopEntry: ShopItem; item: ItemDef }> {
     const result: Array<{ shopEntry: ShopItem; item: ItemDef }> = [];
     for (const entry of SHOP_INVENTORY) {
+        if (shopKind && entry.shopKind !== shopKind) continue;
         const item = getItemDef(entry.itemId);
         if (item) {
             result.push({ shopEntry: entry, item });

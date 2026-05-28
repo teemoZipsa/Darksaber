@@ -31,6 +31,7 @@ export interface ItemDef {
     weight: number;
     baseValue: number;
     buyPrice?: number;     // gold cost to buy from shop
+    sellable?: boolean;    // false for quest/bound items that cannot be sold
     requiredTier?: number; // minimum tier to equip (1-7)
     branch?: MasterBranch; // which branch can equip (battle/tactics/healer/magic)
     
