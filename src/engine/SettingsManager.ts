@@ -24,9 +24,9 @@ export class SettingsManager {
         this.muteBGM = localStorage.getItem('setting_muteBgm') === 'true';
         this.muteSFX = localStorage.getItem('setting_muteSfx') === 'true';
         const savedScale = localStorage.getItem('setting_uiScale');
-        if (savedScale) this.uiScale = parseFloat(savedScale) || 1.0;
+        if (savedScale) this.uiScale = Number.parseFloat(savedScale) || 1.0;
         const savedFps = localStorage.getItem('setting_fpsLimit');
-        if (savedFps) this.fpsLimit = parseInt(savedFps) || 0;
+        if (savedFps) this.fpsLimit = Number.parseInt(savedFps, 10) || 0;
         this.vsync = localStorage.getItem('setting_vsync') !== 'false';
     }
 
@@ -50,7 +50,12 @@ export class SettingsManager {
 
     /** Cycle through scale presets */
     public static cycleUIScale(): void {
-        const idx = this.SCALE_PRESETS.indexOf(this.uiScale);
+        let idx = this.SCALE_PRESETS.findIndex((preset) => Math.abs(preset - this.uiScale) < 0.001);
+        if (idx < 0) {
+            idx = this.SCALE_PRESETS.reduce((bestIndex, preset, index) => (
+                Math.abs(preset - this.uiScale) < Math.abs(this.SCALE_PRESETS[bestIndex] - this.uiScale) ? index : bestIndex
+            ), 0);
+        }
         const next = (idx + 1) % this.SCALE_PRESETS.length;
         this.setUIScale(this.SCALE_PRESETS[next]);
     }

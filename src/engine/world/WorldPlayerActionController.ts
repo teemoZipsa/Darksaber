@@ -235,7 +235,10 @@ export class WorldPlayerActionController {
     }
 
     public getAvailableTurnActions(actor: FieldActor): ActionType[] {
-        const available: ActionType[] = ['move', 'attack', 'magic'];
+        const available: ActionType[] = [];
+        if (this.hasExecutableMove(actor)) available.push('move');
+        if (this.hasExecutableAttack(actor)) available.push('attack');
+        if (this.hasExecutableMagic(actor)) available.push('magic');
         if (this.hasExecutableInteract(actor)) available.push('open');
         available.push('defend', 'counter', 'rest');
         return available;

@@ -160,9 +160,7 @@ export class WorldEngine {
             },
             spawnKillEffect: (enemy) => {
                 this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
-                // A kill is the strongest impact — bigger shake, longer pause.
-                this.camera.shake(16, 320);
-                HitStop.freeze(60);
+                this.applyKillFeel();
             },
             spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
             spawnLoot: (enemy) => this.spawnEnemyLoot(enemy),
@@ -382,21 +380,21 @@ export class WorldEngine {
         if (this.raidOutcomeController.isVisible()) {
             this.raidOutcomeController.updateInput(input);
             camera.followTile(this.player.gridX, this.player.gridY);
-            camera.update();
+            camera.update(dt);
             return;
         }
 
         if (this.fusionTempleUI.isVisible()) {
             this.fusionTempleUI.updateInput(input);
             camera.followTile(this.player.gridX, this.player.gridY);
-            camera.update();
+            camera.update(dt);
             return;
         }
 
         if (this.townSession.isVisible()) {
             this.townSession.updateInput(input);
             camera.followTile(this.player.gridX, this.player.gridY);
-            camera.update();
+            camera.update(dt);
             return;
         }
 
@@ -431,7 +429,7 @@ export class WorldEngine {
         const controlled = this.getControlledActor();
         if (controlled) this.player = controlled.entity;
         camera.followTile(this.player.gridX, this.player.gridY);
-        camera.update();
+        camera.update(dt);
     }
 
     public isModalOverlayVisible(): boolean {
@@ -489,6 +487,7 @@ export class WorldEngine {
         if (this.gameManager.inventoryUI.isVisible()) this.gameManager.inventoryUI.toggle();
         if (this.gameManager.partyUI.isVisible()) this.gameManager.partyUI.toggle();
         if (this.gameManager.charUI.isVisible()) this.gameManager.charUI.toggle();
+        this.gameManager.closePauseMenu();
         this.closeActionMenu();
         this.closeTacticalMenu();
         this.magicController.reset();
@@ -809,6 +808,7 @@ export class WorldEngine {
         this.awardDefeatExp(actor, enemy);
         this.raidSession.recordKill();
         this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
+        this.applyKillFeel();
         this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
         enemy.isAggro = false;
         this.selectionController.clearEnemyIfSelected(enemy.id);
@@ -1174,7 +1174,7 @@ export class WorldEngine {
 
     private getTerrainTraitsForActorId(actorId?: string): TerrainActorTraits {
         const actor = actorId ? this.partyActors.find((candidate) => candidate.id === actorId) : undefined;
-        return actor ? this.getActorTerrainTraits(actor) : {};
+        return actor ? this.getActorTerrainTraits(actor) : { ignoresTerrain: false, waterBonus: false };
     }
 
     private getActorTerrainStepCost(actor: FieldActor, tile: TilePoint): number {
@@ -1261,6 +1261,12 @@ export class WorldEngine {
             this.camera.shake(6, 180);
             HitStop.freeze(18);
         }
+    }
+
+    /** A kill is the strongest combat impact. */
+    private applyKillFeel(): void {
+        this.camera.shake(16, 320);
+        HitStop.freeze(60);
     }
 
     private spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void {

@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Character } from '../../src/character/Character';
+import { Enemy } from '../../src/entity/Enemy';
 import { Player } from '../../src/entity/Player';
-import { MOVE_AP_PER_TILE } from '../../src/field/FieldActionEconomy';
-import type { FieldActor } from '../../src/field/FieldTypes';
+import { ATTACK_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE } from '../../src/field/FieldActionEconomy';
+import type { FieldActor, FieldEnemy } from '../../src/field/FieldTypes';
 import { WorldPlayerActionController, type WorldPlayerActionContext } from '../../src/engine/world/WorldPlayerActionController';
 
 class ImageStub {
@@ -25,11 +26,25 @@ function makeActor(id: string, x: number, y: number): FieldActor {
     };
 }
 
-function makeController(actor: FieldActor, remainingAp: number): WorldPlayerActionController {
+function makeEnemyEntry(id: string, x: number, y: number): FieldEnemy {
+    return {
+        enemy: new Enemy(id, x, y, id, 1),
+        home: { x, y },
+        path: [],
+    };
+}
+
+interface ControllerOptions {
+    fieldEnemies?: FieldEnemy[];
+    hasCastableFieldSkill?: boolean;
+    getActorAttackTargetFailure?: WorldPlayerActionContext['getActorAttackTargetFailure'];
+}
+
+function makeController(actor: FieldActor, remainingAp: number, options: ControllerOptions = {}): WorldPlayerActionController {
     const context: WorldPlayerActionContext = {
         getActivePartyTurnActor: () => actor,
         getPartyActors: () => [actor],
-        getFieldEnemies: () => [],
+        getFieldEnemies: () => options.fieldEnemies ?? [],
         getRemainingActionPoints: () => remainingAp,
         getReservedAction: () => null,
         getActiveTurnActorId: () => actor.id,
@@ -37,7 +52,7 @@ function makeController(actor: FieldActor, remainingAp: number): WorldPlayerActi
         getActorTerrainStepCost: () => 1,
         getActorAttackProfile: () => ({ select: { kind: 'adjacent', maxRange: 1 }, effect: { kind: 'single' } }),
         getPatternContext: () => ({ casterTile: { x: actor.entity.gridX, y: actor.entity.gridY } }),
-        getActorAttackTargetFailure: () => null,
+        getActorAttackTargetFailure: options.getActorAttackTargetFailure ?? (() => null),
         getEnemyById: () => null,
         getLootById: () => null,
         getLoot: () => [],
@@ -48,7 +63,7 @@ function makeController(actor: FieldActor, remainingAp: number): WorldPlayerActi
         tryActorAttack: () => false,
         openLoot: () => undefined,
         openMagic: () => undefined,
-        hasCastableFieldSkill: () => false,
+        hasCastableFieldSkill: () => options.hasCastableFieldSkill ?? false,
         reopenActionMenu: () => undefined,
         closeActionMenu: () => undefined,
         closeTacticalMenu: () => undefined,
@@ -80,4 +95,30 @@ test('player turn continuation remains active when movement is affordable', () =
     const controller = makeController(actor, MOVE_AP_PER_TILE);
 
     assert.equal(controller.hasExecutableAction(actor), true);
+});
+
+test('available action menu hides attacks that cannot be executed now', () => {
+    const actor = makeActor('hero', 0, 0);
+    const enemy = makeEnemyEntry('enemy', 1, 0);
+    const lowApController = makeController(actor, ATTACK_AP_COST - 1, { fieldEnemies: [enemy] });
+    const readyController = makeController(actor, ATTACK_AP_COST, { fieldEnemies: [enemy] });
+    const blockedController = makeController(actor, ATTACK_AP_COST, {
+        fieldEnemies: [enemy],
+        getActorAttackTargetFailure: () => 'blocked',
+    });
+
+    assert.equal(lowApController.getAvailableTurnActions(actor).includes('attack'), false);
+    assert.equal(readyController.getAvailableTurnActions(actor).includes('attack'), true);
+    assert.equal(blockedController.getAvailableTurnActions(actor).includes('attack'), false);
+});
+
+test('available action menu hides magic until AP and a castable field skill are both present', () => {
+    const actor = makeActor('hero', 0, 0);
+    const lowApController = makeController(actor, MAGIC_AP_COST - 1, { hasCastableFieldSkill: true });
+    const noSkillController = makeController(actor, MAGIC_AP_COST, { hasCastableFieldSkill: false });
+    const readyController = makeController(actor, MAGIC_AP_COST, { hasCastableFieldSkill: true });
+
+    assert.equal(lowApController.getAvailableTurnActions(actor).includes('magic'), false);
+    assert.equal(noSkillController.getAvailableTurnActions(actor).includes('magic'), false);
+    assert.equal(readyController.getAvailableTurnActions(actor).includes('magic'), true);
 });

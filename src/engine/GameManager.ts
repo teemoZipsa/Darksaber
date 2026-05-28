@@ -107,6 +107,7 @@ export class GameManager {
 
         this.pauseMenu.onResume = () => undefined;
         this.pauseMenu.onReturnToTitle = () => {
+            this.pauseMenu.close();
             this.transitionTo(GameState.TITLE);
         };
 
@@ -128,7 +129,7 @@ export class GameManager {
         this.isRunning = true;
         this.lastTime = performance.now();
         this.transitions.fadeInFromBlack(500);
-        requestAnimationFrame((t) => this.loop(t));
+        requestAnimationFrame((frameTime) => this.loop(frameTime));
     }
 
     /**
@@ -150,10 +151,21 @@ export class GameManager {
         this.pauseMenu.open();
     }
 
+    public closePauseMenu(): void {
+        this.pauseMenu.close();
+    }
+
     private loop(timestamp: number): void {
         if (!this.isRunning) return;
-        const rawDt = Math.min((timestamp - this.lastTime) / 1000, 0.1); // cap dt
-        this.lastTime = timestamp;
+        const elapsedMs = timestamp - this.lastTime;
+        const frameInterval = SettingsManager.getFrameInterval();
+        if (frameInterval > 0 && elapsedMs < frameInterval) {
+            requestAnimationFrame((frameTime) => this.loop(frameTime));
+            return;
+        }
+
+        const rawDt = Math.min(elapsedMs / 1000, 0.1); // cap dt
+        this.lastTime = frameInterval > 0 ? timestamp - (elapsedMs % frameInterval) : timestamp;
 
         // Hit-pause freezes world time. Transitions and overlays keep their own clock.
         const dt = rawDt * HitStop.timeScale;
@@ -162,7 +174,7 @@ export class GameManager {
         this.update(dt);
         this.render();
         this.input.endFrame();
-        requestAnimationFrame((t) => this.loop(t));
+        requestAnimationFrame((frameTime) => this.loop(frameTime));
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -181,7 +193,13 @@ export class GameManager {
         switch (this.state) {
             case GameState.TITLE:
                 // Hover detection for terms link
-                this.termsHovered = (smx >= 12 && smx <= 112 && smy >= Math.floor(this.canvas.height / scale) - 24 && smy <= Math.floor(this.canvas.height / scale) - 8);
+                const termsBounds = this.getTermsLinkBounds(scale);
+                this.termsHovered = (
+                    smx >= termsBounds.x &&
+                    smx <= termsBounds.x + termsBounds.w &&
+                    smy >= termsBounds.y &&
+                    smy <= termsBounds.y + termsBounds.h
+                );
 
                 if (this.input.mouseJustDown) {
                     // Check terms link click
@@ -320,6 +338,18 @@ export class GameManager {
             this.party, this.inventory, this.playerData,
             this
         );
+    }
+
+    private getTermsLinkBounds(scale: number): { x: number; y: number; w: number; h: number } {
+        const text = t('title.terms');
+        this.ctx.save();
+        this.ctx.font = '14px "DOSMyungjo", sans-serif';
+        const width = Math.ceil(this.ctx.measureText(text).width);
+        this.ctx.restore();
+
+        const height = 16;
+        const bottom = Math.floor(this.canvas.height / scale) - 8;
+        return { x: 12, y: bottom - height, w: width, h: height };
     }
 
     // ═══════════════════════════════════════════════════════════

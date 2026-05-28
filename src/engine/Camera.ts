@@ -57,18 +57,23 @@ export class Camera {
 
     /** Set the target to follow (centers camera on this world position) */
     public followTile(tileX: number, tileY: number): void {
+        this.followTilePosition(tileX, tileY);
+    }
+
+    /** Follow a fractional tile position for smooth movement */
+    public followTilePosition(tileX: number, tileY: number): void {
         const scaledW = this.viewWidth / this.zoom;
         const scaledH = this.viewHeight / this.zoom;
         this.targetX = (tileX * TILE_SIZE) + (TILE_SIZE / 2) - (scaledW / 2);
         this.targetY = (tileY * TILE_SIZE) + (TILE_SIZE / 2) - (scaledH / 2);
     }
 
-    /** Follow a sub-tile pixel position for smooth movement */
+    /** Follow a pixel-space entity/tile position */
     public followPixel(pixelX: number, pixelY: number): void {
         const scaledW = this.viewWidth / this.zoom;
         const scaledH = this.viewHeight / this.zoom;
-        this.targetX = (pixelX * TILE_SIZE) + (TILE_SIZE / 2) - (scaledW / 2);
-        this.targetY = (pixelY * TILE_SIZE) + (TILE_SIZE / 2) - (scaledH / 2);
+        this.targetX = pixelX + (TILE_SIZE / 2) - (scaledW / 2);
+        this.targetY = pixelY + (TILE_SIZE / 2) - (scaledH / 2);
     }
 
     /** Snap camera immediately to target (no lerp) */
@@ -100,9 +105,10 @@ export class Camera {
     }
 
     /** Smooth update towards target. Applies shake on top of the lerped base. */
-    public update(): void {
-        this.baseX += (this.targetX - this.baseX) * this.lerpSpeed;
-        this.baseY += (this.targetY - this.baseY) * this.lerpSpeed;
+    public update(dt: number = 1 / 60): void {
+        const lerpFactor = 1 - Math.pow(1 - this.lerpSpeed, dt * 60);
+        this.baseX += (this.targetX - this.baseX) * lerpFactor;
+        this.baseY += (this.targetY - this.baseY) * lerpFactor;
 
         const amp = this.currentShakeAmp();
         if (amp > 0) {
