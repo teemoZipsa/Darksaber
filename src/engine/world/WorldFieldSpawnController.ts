@@ -40,6 +40,9 @@ export class WorldFieldSpawnController {
             } else {
                 entity.setImage(character.portraitImage?.src || '/Image/Character/fighter.png');
             }
+            if (character.classLineId === 'infantry' && character.currentTier === 1) {
+                entity.setWalkSprite('/Image/Character/fighter_walk.png', 128, 128, 4, 8);
+            }
             return {
                 id: character.id,
                 character,

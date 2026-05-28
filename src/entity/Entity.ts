@@ -1,6 +1,6 @@
 /**
  * Entity — base class for all game objects (players, monsters, NPCs).
- * Uses a simple static image (128x128) instead of sprite-sheet animation.
+ * Uses a static image by default, with optional sprite-sheet animation.
  *
  * Movement: SRPG board-game style — hops tile by tile with a brief
  * settle pause at each tile, like placing a piece on a board.
@@ -21,6 +21,15 @@ export class Entity {
     /** Optional static portrait image (128x128 single illustration) */
     public image?: HTMLImageElement;
     public imageLoaded: boolean = false;
+    /** Optional 1-row walking sprite sheet used only while this entity is moving */
+    public walkSprite?: {
+        image: HTMLImageElement;
+        frameWidth: number;
+        frameHeight: number;
+        frameCount: number;
+        framesPerSecond: number;
+    };
+    public walkSpriteLoaded: boolean = false;
 
     // ── Tile-step movement state ──
     /** Current step target (one tile away from current integer position) */
@@ -54,6 +63,18 @@ export class Entity {
         this.image.onload = () => { this.imageLoaded = true; };
         this.image.onerror = () => { this.imageLoaded = false; };
         this.image.src = src;
+    }
+
+    public setWalkSprite(src: string, frameWidth: number, frameHeight: number, frameCount: number, framesPerSecond: number = 8): void {
+        const image = new Image();
+        this.walkSpriteLoaded = false;
+        this.walkSprite = { image, frameWidth, frameHeight, frameCount, framesPerSecond };
+        image.onload = () => { this.walkSpriteLoaded = true; };
+        image.onerror = () => {
+            this.walkSpriteLoaded = false;
+            this.walkSprite = undefined;
+        };
+        image.src = src;
     }
 
     public update(dt: number): void {

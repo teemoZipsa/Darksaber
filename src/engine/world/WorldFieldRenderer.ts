@@ -3,6 +3,7 @@ import { getEffectiveStatsForCharacter } from '../../combat/StatusEffects';
 import { UI, Parchment, drawGlassPanel, drawParchmentPanel, renderGameTitle } from '../../ui/UITheme';
 import { ENEMY_ROLE_GLYPHS } from '../../field/FieldConfig';
 import { formatRaidTime, getCombatLogColor, getTacticalMarkerColor } from '../../field/FieldDisplay';
+import type { Entity } from '../../entity/Entity';
 import type { TacticalMarker } from '../../field/TacticalMarkers';
 import type { WorldRenderModel } from './WorldRenderModel';
 
@@ -100,9 +101,10 @@ export class WorldFieldRenderer {
             const px = entity.pixelX * TILE_SIZE - camX;
             const py = entity.pixelY * TILE_SIZE - camY;
 
-            if (entity.image && entity.imageLoaded) {
+            const walkSpriteRendered = renderWalkSprite(ctx, entity, model.worldTime, px, py);
+            if (!walkSpriteRendered && entity.image && entity.imageLoaded) {
                 ctx.drawImage(entity.image, px, py, TILE_SIZE, TILE_SIZE);
-            } else {
+            } else if (!walkSpriteRendered) {
                 ctx.fillStyle = entity.color;
                 ctx.fillRect(px + 5, py + 5, TILE_SIZE - 10, TILE_SIZE - 10);
             }
@@ -269,6 +271,32 @@ export class WorldFieldRenderer {
 
         return infoY;
     }
+}
+
+function renderWalkSprite(ctx: CanvasRenderingContext2D, entity: Entity, worldTime: number, px: number, py: number): boolean {
+    const sprite = entity.walkSprite;
+    if (!sprite || !entity.walkSpriteLoaded || !isEntityMoving(entity)) return false;
+
+    const frame = Math.floor(worldTime * sprite.framesPerSecond) % sprite.frameCount;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+        sprite.image,
+        frame * sprite.frameWidth,
+        0,
+        sprite.frameWidth,
+        sprite.frameHeight,
+        px,
+        py,
+        TILE_SIZE,
+        TILE_SIZE
+    );
+    ctx.restore();
+    return true;
+}
+
+function isEntityMoving(entity: Entity): boolean {
+    return Math.abs(entity.pixelX - entity.gridX) > 0.01 || Math.abs(entity.pixelY - entity.gridY) > 0.01;
 }
 
 function renderTacticalMarker(ctx: CanvasRenderingContext2D, marker: TacticalMarker, worldTime: number, camX: number, camY: number): void {
