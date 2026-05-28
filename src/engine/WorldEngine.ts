@@ -31,7 +31,6 @@ import {
     getStatusIcons,
     hasStatus,
     resolveTurnStartStatuses,
-    type StatusKind,
 } from '../combat/StatusEffects';
 import { ActionMenuUI, ActionType } from '../ui/ActionMenuUI';
 import { EntityDisplayInfo, EntityInfoUI } from '../ui/EntityInfoUI';
@@ -43,7 +42,7 @@ import { FloatingTextManager } from '../ui/FloatingTextManager';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
-import { FieldPassableQuery, TilePoint, findPathToAny, findPathWithCost, findReachableTilesByCost, manhattan, tileKey, tilesInRange } from '../field/FieldPathing';
+import { TilePoint, findPathWithCost, findReachableTilesByCost, manhattan, tileKey, tilesInRange } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
 import {
     TacticalMarkerStore,
@@ -53,8 +52,7 @@ import {
     type TacticalTargetRef,
 } from '../field/TacticalMarkers';
 import { getRightClickDisposition, type WorldInteractionMode } from '../field/WorldInteractionMode';
-import { advanceAtb, resolveAggroState } from '../field/FieldCombat';
-import { decideEnemyAction, type BossPattern, type EnemyAIDecision, type EnemyAIUnit, type EnemyRole } from '../field/EnemyAI';
+import type { EnemyRole } from '../field/EnemyAI';
 import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, hasExecutableFieldAction } from '../field/FieldActionEconomy';
 import { hasLineOfSight } from '../field/LineOfSight';
 import {
@@ -68,7 +66,6 @@ import {
     describeTerrainForHover,
     getTerrainMoveCost,
     isTerrainLineOfSightBlocking,
-    isTerrainPassable,
     terrainCostToApCost,
     TerrainActorTraits,
 } from '../field/TerrainRules';
@@ -81,7 +78,7 @@ import {
     type HeroRaidStatus,
 } from '../raid/RaidOutcome';
 import { resolveTownArrival } from '../raid/RaidRules';
-import { ACTOR_COLORS, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, ENEMY_LEASH_RANGE, FIELD_ATB_SCALE, FORMATION_OFFSETS, MOVEMENT_REPATH_INTERVAL } from '../field/FieldConfig';
+import { ACTOR_COLORS, ENEMY_AGGRO_RANGE, FORMATION_OFFSETS } from '../field/FieldConfig';
 import type { AttackCue, FieldActor, FieldEnemy, FieldHitParty, FieldIntent, FieldMagicState } from '../field/FieldTypes';
 import { getEnemyRoleLabel } from '../field/FieldDisplay';
 import {
@@ -96,6 +93,8 @@ import { WorldRaidSession, type WorldPhase } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
 import { WorldFieldRenderer } from './world/WorldFieldRenderer';
 import { WorldCombatController, createCombatResult, type CombatResult } from './world/WorldCombatController';
+import { WorldMovementController } from './world/WorldMovementController';
+import { WorldEnemyTurnController } from './world/WorldEnemyTurnController';
 
 export class WorldEngine {
     private canvas: HTMLCanvasElement;
@@ -118,6 +117,8 @@ export class WorldEngine {
     private raidSession: WorldRaidSession;
     private currentPhase: WorldPhase = 'lobby';
     private combatController: WorldCombatController;
+    private movementController: WorldMovementController;
+    private enemyTurnController: WorldEnemyTurnController;
     private raidResultUI = new RaidResultUI();
     private tacticalMarkers = new TacticalMarkerStore();
     private tacticalMenuTarget: TacticalTargetRef | null = null;
@@ -169,6 +170,40 @@ export class WorldEngine {
             spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
             spawnLoot: (enemy) => this.spawnEnemyLoot(enemy),
         });
+        this.movementController = new WorldMovementController({
+            getPartyActors: () => this.partyActors,
+            getFieldEnemies: () => this.fieldEnemies,
+            getTileAt: (x, y) => this.worldMap.getTileAt(x, y),
+            getTerrainTraitsForActorId: (actorId) => this.getTerrainTraitsForActorId(actorId),
+        });
+        this.enemyTurnController = new WorldEnemyTurnController(
+            {
+                getPartyActors: () => this.partyActors,
+                getFieldEnemies: () => this.fieldEnemies,
+                getActorById: (actorId) => this.getActorById(actorId),
+                getEnemyById: (enemyId) => this.getEnemyById(enemyId),
+                getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
+                getActorTerrainTraits: (actor) => this.getActorTerrainTraits(actor),
+                canEnemyAttackTarget: (enemy, actor, range) => this.canEnemyAttackTarget(enemy, actor, range),
+                canActorAttackTarget: (actor, enemy) => this.canActorAttackTarget(actor, enemy),
+                hasFieldLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to),
+                directionFromTo: (from, to) => this.directionFromTo(from, to),
+            },
+            this.movementController,
+            this.combatController,
+            {
+                log: (message) => this.addCombatLog(message),
+                spawnDamage: (x, y, amount, isCrit, isMiss) => this.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
+                spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
+                spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
+                spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
+                spawnBuffEffect: (x, y) => this.effectManager.spawnBuffEffect(x, y),
+                spawnDebuffEffect: (x, y) => this.effectManager.spawnDebuffEffect(x, y),
+                spawnDarkEffect: (x, y) => this.effectManager.spawnDarkEffect(x, y),
+                spawnElementEffect: (element, x, y) => this.effectManager.spawnByElement(element, x, y),
+                spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
+            }
+        );
         this.raidResultUI.onClose = () => this.openPendingTownAfterResult();
 
         this.spawnPartyAtCurrentHub();
@@ -238,8 +273,20 @@ export class WorldEngine {
             }
         }
 
-        this.updatePartyActors(dt);
-        this.updateEnemies(dt);
+        const partyMovement = this.movementController.updatePartyActors({
+            dt,
+            controlled: this.getControlledActor(),
+            activeTurnActorId: this.activeTurnActorId,
+            followRepathTimer: this.followRepathTimer,
+        });
+        this.followRepathTimer = partyMovement.followRepathTimer;
+        for (const actorId of partyMovement.readyActorIds) enqueueReadyActor(this.readyQueue, actorId);
+
+        const enemyMovement = this.movementController.updateEnemies({
+            dt,
+            activeTurnActorId: this.activeTurnActorId,
+        });
+        for (const enemyId of enemyMovement.readyEnemyIds) enqueueReadyActor(this.readyQueue, enemyId);
         this.effectManager.update(dt);
         this.floatingText.update(dt);
         this.updateAttackCues(dt);
@@ -371,7 +418,7 @@ export class WorldEngine {
         const members = this.party.getCharacters().slice(0, this.party.MAX_ACTIVE_PARTY_SIZE);
 
         this.partyActors = members.map((character, index) => {
-            const tile = this.findNearbyWalkableTile({
+            const tile = this.movementController.findNearbyWalkableTile({
                 x: anchorTile.x + (FORMATION_OFFSETS[index]?.x ?? 0),
                 y: anchorTile.y + (FORMATION_OFFSETS[index]?.y ?? 0),
             }, `party_${index}`);
@@ -469,7 +516,7 @@ export class WorldEngine {
         ];
 
         this.fieldEnemies = enemySeeds.map((seed, index) => {
-            const tile = this.findNearbyWalkableTile({
+            const tile = this.movementController.findNearbyWalkableTile({
                 x: anchor.gridX + seed.offset.x,
                 y: anchor.gridY + seed.offset.y,
             }, `enemy_${index}`);
@@ -487,7 +534,7 @@ export class WorldEngine {
 
         this.worldMap.loot = lootSeeds.flatMap((seed) => {
             if (!seed.item) return [];
-            const tile = this.findNearbyWalkableTile({
+            const tile = this.movementController.findNearbyWalkableTile({
                 x: anchor.gridX + seed.offset.x,
                 y: anchor.gridY + seed.offset.y,
             }, seed.id);
@@ -856,6 +903,12 @@ export class WorldEngine {
             const enemy = this.getEnemyById(enemyResult.enemyId);
             if (!enemy) continue;
 
+            if (enemyResult.isMiss) {
+                this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, 0, false, true);
+                this.addCombatLog(`${skill.nameKr} 명중 실패: ${enemy.name} (${Math.floor(enemyResult.hitChance ?? 0)}%)`);
+                continue;
+            }
+
             if (enemyResult.statusEffects) {
                 enemy.statuses = applyStatuses(enemy.statuses, enemyResult.statusEffects);
                 this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'WEAK');
@@ -954,7 +1007,7 @@ export class WorldEngine {
 
     private queueMoveIntent(actor: FieldActor, tile: TilePoint): boolean {
         const movementBudget = this.getActorTerrainMovementBudget(actor);
-        const pathResult = findPathWithCost(this.actorTile(actor), tile, (query) => this.isFieldPassable(query), (step) => this.getActorTerrainStepCost(actor, step), {
+        const pathResult = findPathWithCost(this.actorTile(actor), tile, (query) => this.movementController.isFieldPassable(query), (step) => this.getActorTerrainStepCost(actor, step), {
             actorId: actor.id,
             intent: 'move',
             maxNodes: 8000,
@@ -978,85 +1031,6 @@ export class WorldEngine {
         this.reservedAction = actor.queuedIntent;
         this.closeActionMenu();
         return true;
-    }
-
-    private updatePartyActors(dt: number): void {
-        const controlled = this.getControlledActor();
-        this.followRepathTimer -= dt;
-
-        for (const actor of this.partyActors) {
-            if (actor.character.isDead) continue;
-            if (actor.id !== this.activeTurnActorId) {
-                actor.entity.actionGauge = advanceAtb(actor.entity.actionGauge, getEffectiveStatsForCharacter(actor.character).spd, dt, FIELD_ATB_SCALE);
-                if (actor.entity.actionGauge >= 100) {
-                    actor.entity.actionGauge = 100;
-                    enqueueReadyActor(this.readyQueue, actor.id);
-                }
-            }
-            this.stepActorAlongPath(actor);
-            actor.entity.update(dt);
-        }
-
-        if (controlled && this.followRepathTimer <= 0) {
-            this.followRepathTimer = MOVEMENT_REPATH_INTERVAL;
-            this.updateFollowerPaths(controlled);
-        }
-    }
-
-    private updateFollowerPaths(controlled: FieldActor): void {
-        for (let i = 0; i < this.partyActors.length; i++) {
-            const actor = this.partyActors[i];
-            if (actor === controlled || actor.character.isDead || actor.queuedIntent?.kind === 'attack') continue;
-            if (actor.path.length > 0) continue;
-
-            const offset = FORMATION_OFFSETS[i % FORMATION_OFFSETS.length];
-            const preferred = { x: controlled.entity.gridX + offset.x, y: controlled.entity.gridY + offset.y };
-            if (manhattan(this.actorTile(actor), preferred) <= 1) continue;
-
-            const goals = [preferred, ...tilesInRange(preferred, 1)]
-                .filter((tile) => this.isFieldPassable({
-                    ...tile,
-                    actorId: actor.id,
-                    intent: 'follow',
-                    goal: preferred,
-                }));
-            const path = findPathToAny(this.actorTile(actor), goals, (query) => this.isFieldPassable(query), {
-                actorId: actor.id,
-                intent: 'follow',
-                maxNodes: 2000,
-            });
-            if (path.length > 0) {
-                actor.path = path;
-                actor.queuedIntent = { kind: 'move', tile: path[path.length - 1] };
-            }
-        }
-    }
-
-    private updateEnemies(dt: number): void {
-        const aliveActors = this.partyActors.filter((actor) => !actor.character.isDead);
-
-        for (const entry of this.fieldEnemies) {
-            const enemy = entry.enemy;
-            if (enemy.stats.hp <= 0) continue;
-            enemy.update(dt);
-
-            const closest = this.findClosestActor(this.enemyTile(enemy), aliveActors);
-            if (!closest) continue;
-
-            const enemyTile = this.enemyTile(enemy);
-            const distanceToTarget = manhattan(enemyTile, this.actorTile(closest));
-            const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
-            enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
-            if (!enemy.isAggro && this.hasAggroAllyNear(entry, enemy.aiProfile.assistRange)) enemy.isAggro = true;
-
-            if (enemy.id !== this.activeTurnActorId) {
-                enemy.actionGauge = advanceAtb(enemy.actionGauge, getEffectiveStatsForEnemy(enemy).spd, dt, FIELD_ATB_SCALE * 0.7);
-                if (enemy.actionGauge >= 100) {
-                    enemy.actionGauge = 100;
-                    enqueueReadyActor(this.readyQueue, enemy.id);
-                }
-            }
-        }
     }
 
     private resolveFieldHitAt(tile: TilePoint) {
@@ -1438,30 +1412,6 @@ export class WorldEngine {
         return result.executed;
     }
 
-    private enemyAttack(entry: FieldEnemy, actor: FieldActor, range: number = 1): void {
-        const enemy = entry.enemy;
-        if (!this.canEnemyAttackTarget(enemy, actor, range)) return;
-        const result = this.combatController.enemyAttack({
-            enemy,
-            actor,
-            range,
-            getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
-            getActorTerrainTraits: (targetActor) => this.getActorTerrainTraits(targetActor),
-            directionFromTo: (from, to) => this.directionFromTo(from, to),
-            tryActorCounterAttack: (counterActor, counterEnemy) => this.runActorCounterAttack(counterActor, counterEnemy),
-        });
-        this.applyCombatResult(result);
-    }
-
-    private runActorCounterAttack(actor: FieldActor, enemy: Enemy): CombatResult {
-        return this.combatController.tryActorCounterAttack({
-            actor,
-            enemy,
-            canActorAttackTarget: (counterActor, counterEnemy) => this.canActorAttackTarget(counterActor, counterEnemy),
-            getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
-        });
-    }
-
     private tryEnemyCounterAttack(enemy: Enemy, actor: FieldActor): boolean {
         const result = this.combatController.tryEnemyCounterAttack({
             enemy,
@@ -1471,54 +1421,6 @@ export class WorldEngine {
         });
         this.applyCombatResult(result);
         return result.executed;
-    }
-
-    private enemyStepToward(entry: FieldEnemy, actor: FieldActor, desiredRange: number = 1): void {
-        const enemy = entry.enemy;
-        const targetTile = this.actorTile(actor);
-        if (manhattan(this.enemyTile(enemy), targetTile) <= desiredRange) return;
-
-        const goals = tilesInRange(targetTile, desiredRange)
-            .filter((tile) => manhattan(tile, targetTile) === desiredRange)
-            .filter((tile) => this.isFieldPassable({
-                ...tile,
-                actorId: enemy.id,
-                intent: 'enemy',
-                goal: targetTile,
-            }));
-        const path = findPathToAny(this.enemyTile(enemy), goals, (query) => this.isFieldPassable(query), {
-            actorId: enemy.id,
-            intent: 'enemy',
-            maxNodes: 2500,
-        });
-        if (path.length === 0) return;
-
-        const next = path[0];
-        enemy.facing = this.directionFromTo(this.enemyTile(enemy), next);
-        enemy.gridX = next.x;
-        enemy.gridY = next.y;
-    }
-
-    private enemyStepAway(entry: FieldEnemy, actor: FieldActor): boolean {
-        const enemy = entry.enemy;
-        const start = this.enemyTile(enemy);
-        const target = this.actorTile(actor);
-        const startDistance = manhattan(start, target);
-        const candidates = tilesInRange(start, 1)
-            .filter((tile) => manhattan(tile, start) === 1)
-            .filter((tile) => this.isFieldPassable({
-                ...tile,
-                actorId: enemy.id,
-                intent: 'enemy',
-            }))
-            .sort((a, b) => manhattan(b, target) - manhattan(a, target));
-        const next = candidates.find((tile) => manhattan(tile, target) > startDistance);
-        if (!next) return false;
-
-        enemy.facing = this.directionFromTo(start, next);
-        enemy.gridX = next.x;
-        enemy.gridY = next.y;
-        return true;
     }
 
     private handleEnemyDefeated(actor: FieldActor, enemy: Enemy): void {
@@ -1569,65 +1471,6 @@ export class WorldEngine {
         for (const loot of this.worldMap.loot) {
             loot.opened = loot.inventory.items.length === 0;
         }
-    }
-
-    private stepActorAlongPath(actor: FieldActor): void {
-        if (this.isEntityMoving(actor.entity) || actor.path.length === 0) return;
-
-        const next = actor.path[0];
-        if (!this.isFieldPassable({
-            ...next,
-            actorId: actor.id,
-            intent: actor.queuedIntent?.kind === 'attack' ? 'attack' : actor.queuedIntent?.kind === 'interact' ? 'interact' : 'move',
-            goal: actor.queuedIntent?.tile,
-        })) {
-            actor.path = [];
-            return;
-        }
-
-        actor.path.shift();
-        actor.entity.facing = this.directionFromTo(this.actorTile(actor), next);
-        actor.entity.gridX = next.x;
-        actor.entity.gridY = next.y;
-    }
-
-    private isFieldPassable(query: FieldPassableQuery): boolean {
-        const tile = this.worldMap.getTileAt(query.x, query.y);
-        if (!isTerrainPassable(tile, this.getTerrainTraitsForActorId(query.actorId))) return false;
-
-        const enemyAtTile = this.fieldEnemies.some((entry) =>
-            entry.enemy.id !== query.actorId &&
-            entry.enemy.stats.hp > 0 &&
-            entry.enemy.gridX === query.x &&
-            entry.enemy.gridY === query.y
-        );
-        if (enemyAtTile) return false;
-
-        if (query.intent === 'enemy') {
-            return !this.partyActors.some((actor) =>
-                !actor.character.isDead &&
-                actor.id !== query.actorId &&
-                actor.entity.gridX === query.x &&
-                actor.entity.gridY === query.y
-            );
-        }
-
-        return true;
-    }
-
-    private findNearbyWalkableTile(tile: TilePoint, actorId: string): TilePoint {
-        if (this.isFieldPassable({ ...tile, actorId, intent: 'move' })) return tile;
-
-        for (let radius = 1; radius <= 8; radius++) {
-            for (let dy = -radius; dy <= radius; dy++) {
-                for (let dx = -radius; dx <= radius; dx++) {
-                    if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
-                    const candidate = { x: tile.x + dx, y: tile.y + dy };
-                    if (this.isFieldPassable({ ...candidate, actorId, intent: 'move' })) return candidate;
-                }
-            }
-        }
-        return tile;
     }
 
     private getControlledActor(): FieldActor | null {
@@ -1853,243 +1696,18 @@ export class WorldEngine {
             return;
         }
 
-        const aliveActors = this.partyActors.filter((actor) => !actor.character.isDead);
-        const closest = this.findClosestActor(this.enemyTile(enemy), aliveActors);
-        if (!closest) {
-            this.endEnemyTurn(enemy);
-            return;
-        }
-
-        const enemyTile = this.enemyTile(enemy);
-        const distanceToTarget = manhattan(enemyTile, this.actorTile(closest));
-        const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
-        enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
-        if (!enemy.isAggro && this.hasAggroAllyNear(entry, enemy.aiProfile.assistRange)) enemy.isAggro = true;
-        if (!enemy.isAggro || this.isEntityMoving(enemy)) {
-            this.endEnemyTurn(enemy);
-            return;
-        }
-
-        enemy.aiMemory.turnCount += 1;
-        const decision = decideEnemyAction({
-            self: this.toEnemyAIUnit(enemy),
-            targets: aliveActors.map((actor) => this.toActorAIUnit(actor)),
-            allies: this.fieldEnemies
-                .map((candidate) => candidate.enemy)
-                .filter((candidate) => candidate.stats.hp > 0)
-                .map((candidate) => this.toEnemyAIUnit(candidate)),
-            profile: enemy.aiProfile,
-            turnCount: enemy.aiMemory.turnCount,
-            hasLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to),
-        });
-        this.executeEnemyDecision(entry, decision);
+        this.applyCombatResult(this.enemyTurnController.beginEnemyTurn(entry));
         this.endEnemyTurn(enemy);
-    }
-
-    private executeEnemyDecision(entry: FieldEnemy, decision: EnemyAIDecision): void {
-        const enemy = entry.enemy;
-        switch (decision.kind) {
-            case 'attack': {
-                const actor = this.getActorById(decision.targetId);
-                if (!actor) return;
-                if (this.canEnemyAttackTarget(enemy, actor, decision.range)) {
-                    this.enemyAttack(entry, actor, decision.range);
-                } else if (!hasStatus(enemy.statuses, 'immobilize')) {
-                    this.enemyStepToward(entry, actor, Math.max(1, Math.min(decision.range, enemy.aiProfile.preferredRange)));
-                }
-                break;
-            }
-            case 'moveToward': {
-                const actor = this.getActorById(decision.targetId);
-                if (!actor) return;
-                if (hasStatus(enemy.statuses, 'immobilize')) {
-                    this.addCombatLog(`${enemy.name}: 이동불가`);
-                    this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'ROOT');
-                    return;
-                }
-                this.enemyStepToward(entry, actor, decision.desiredRange);
-                break;
-            }
-            case 'moveAway': {
-                const actor = this.getActorById(decision.targetId);
-                if (!actor) return;
-                if (hasStatus(enemy.statuses, 'immobilize')) {
-                    this.addCombatLog(`${enemy.name}: 이동불가`);
-                    this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'ROOT');
-                    return;
-                }
-                if (!this.enemyStepAway(entry, actor) && this.canEnemyAttackTarget(enemy, actor, enemy.aiProfile.attackRange)) {
-                    this.enemyAttack(entry, actor, enemy.aiProfile.attackRange);
-                }
-                break;
-            }
-            case 'healAlly': {
-                const ally = this.getEnemyById(decision.allyId);
-                if (ally) this.enemyHealAlly(enemy, ally);
-                break;
-            }
-            case 'buffAlly': {
-                const ally = this.getEnemyById(decision.allyId);
-                if (ally) this.enemyBuffAlly(enemy, ally, decision.status);
-                break;
-            }
-            case 'debuffTarget': {
-                const actor = this.getActorById(decision.targetId);
-                if (actor) this.enemyDebuffActor(enemy, actor, decision.status);
-                break;
-            }
-            case 'guard':
-                enemy.statuses = applyStatus(enemy.statuses, createStatus('guard'));
-                this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'GUARD');
-                this.effectManager.spawnBuffEffect(enemy.gridX, enemy.gridY);
-                this.addCombatLog(`${enemy.name}: 방어 태세`);
-                break;
-            case 'bossPattern':
-                this.executeBossPattern(entry, decision.pattern, decision.targetId);
-                break;
-            case 'wait':
-                this.addCombatLog(`${enemy.name}: 대기`);
-                break;
-        }
-    }
-
-    private enemyHealAlly(caster: Enemy, ally: Enemy): void {
-        const stats = getEffectiveStatsForEnemy(caster);
-        const amount = Math.max(8, Math.floor(stats.magAtk * 2 + caster.level * 2));
-        const before = ally.stats.hp;
-        ally.stats.hp = Math.min(ally.stats.maxHp, ally.stats.hp + amount);
-        const healed = ally.stats.hp - before;
-        if (healed <= 0) return;
-        this.floatingText.spawnHeal(ally.gridX, ally.gridY, healed);
-        this.effectManager.spawnHealEffect(ally.gridX, ally.gridY);
-        this.addCombatLog(`${caster.name} → ${ally.name} ${healed} 회복`);
-    }
-
-    private enemyBuffAlly(caster: Enemy, ally: Enemy, status: StatusKind): void {
-        ally.statuses = applyStatus(ally.statuses, createStatus(status));
-        this.floatingText.spawnStatus(ally.gridX, ally.gridY, 'BUFF');
-        this.effectManager.spawnBuffEffect(ally.gridX, ally.gridY);
-        this.addCombatLog(`${caster.name} → ${ally.name} 강화`);
-    }
-
-    private enemyDebuffActor(caster: Enemy, actor: FieldActor, status: StatusKind): void {
-        actor.character.statuses = applyStatus(actor.character.statuses, createStatus(status));
-        this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'WEAK');
-        this.effectManager.spawnDebuffEffect(actor.entity.gridX, actor.entity.gridY);
-        this.addCombatLog(`${caster.name} → ${actor.character.name} 약화`);
-    }
-
-    private executeBossPattern(entry: FieldEnemy, pattern: BossPattern, targetId: string): void {
-        const enemy = entry.enemy;
-        const target = this.getActorById(targetId);
-        if (!target) return;
-
-        switch (pattern) {
-            case 'enrage':
-                enemy.statuses = applyStatus(enemy.statuses, createStatus('allUp', { durationTurns: 4, magnitude: 1.3 }));
-                this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'ENRAGE');
-                this.effectManager.spawnDarkEffect(enemy.gridX, enemy.gridY);
-                this.addCombatLog(`${enemy.name}: 광폭화`);
-                return;
-            case 'darkPulse': {
-                this.effectManager.spawnDarkEffect(enemy.gridX, enemy.gridY);
-                const victims = this.partyActors.filter((actor) =>
-                    !actor.character.isDead && manhattan(this.enemyTile(enemy), this.actorTile(actor)) <= 2
-                );
-                if (victims.length === 0) {
-                    this.enemyStepToward(entry, target, 2);
-                    return;
-                }
-                this.addCombatLog(`${enemy.name}: 암흑 파동 (${victims.length}명)`);
-                for (const victim of victims) this.enemySpellDamage(enemy, victim, 0.7, 'dark');
-                return;
-            }
-            case 'cleave': {
-                const victims = this.partyActors.filter((actor) =>
-                    !actor.character.isDead && manhattan(this.enemyTile(enemy), this.actorTile(actor)) <= 1
-                );
-                this.addCombatLog(`${enemy.name}: 휩쓸기`);
-                for (const victim of victims) this.enemyAttack(entry, victim, 1);
-                return;
-            }
-            case 'voidBolt':
-                this.addCombatLog(`${enemy.name}: 공허 탄환`);
-                this.spawnAttackCue(this.enemyTile(enemy), this.actorTile(target), '#b86cff', 'BOLT');
-                this.enemySpellDamage(enemy, target, 1, 'dark');
-                return;
-        }
-    }
-
-    private enemySpellDamage(enemy: Enemy, actor: FieldActor, power: number, element: 'dark' | 'fire' | 'ice' | 'lightning' | 'wind' | 'earth'): void {
-        const attacker = getEffectiveStatsForEnemy(enemy);
-        const defender = getEffectiveStatsForCharacter(actor.character);
-        const baseDamage = Math.max(1, Math.floor((attacker.magAtk * 1.5 - defender.magDef * 0.6) * power));
-        const guarded = applyGuardToDamage(actor.character.statuses, baseDamage);
-        actor.character.statuses = guarded.statuses;
-        const damage = guarded.damage;
-        actor.character.stats.hp = Math.max(0, actor.character.stats.hp - damage);
-        this.effectManager.spawnByElement(element, actor.entity.gridX, actor.entity.gridY);
-        this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, damage, false, false);
-        this.addCombatLog(`${enemy.name} → ${actor.character.name} ${damage} 마법 피해`);
-        if (actor.character.stats.hp <= 0 && !actor.character.isDead) this.handleActorDown(actor);
     }
 
     private getActorById(actorId: string): FieldActor | null {
         return this.partyActors.find((actor) => actor.id === actorId && !actor.character.isDead) ?? null;
     }
 
-    private toEnemyAIUnit(enemy: Enemy): EnemyAIUnit {
-        return {
-            id: enemy.id,
-            name: enemy.name,
-            tile: this.enemyTile(enemy),
-            hp: enemy.stats.hp,
-            maxHp: enemy.stats.maxHp,
-            role: enemy.role,
-            isBoss: enemy.isBoss,
-            isAggro: enemy.isAggro,
-            statusKinds: enemy.statuses.map((status) => status.kind),
-        };
-    }
-
-    private toActorAIUnit(actor: FieldActor): EnemyAIUnit {
-        return {
-            id: actor.id,
-            name: actor.character.name,
-            tile: this.actorTile(actor),
-            hp: actor.character.stats.hp,
-            maxHp: actor.character.stats.maxHp,
-            statusKinds: actor.character.statuses.map((status) => status.kind),
-        };
-    }
-
     private canEnemyAttackTarget(enemy: Enemy, actor: FieldActor, range: number): boolean {
         const distance = manhattan(this.enemyTile(enemy), this.actorTile(actor));
         if (distance > range) return false;
         return range <= 1 || this.hasFieldLineOfSight(this.enemyTile(enemy), this.actorTile(actor));
-    }
-
-    private hasAggroAllyNear(entry: FieldEnemy, range: number): boolean {
-        const selfTile = this.enemyTile(entry.enemy);
-        return this.fieldEnemies.some((candidate) =>
-            candidate.enemy.id !== entry.enemy.id &&
-            candidate.enemy.stats.hp > 0 &&
-            candidate.enemy.isAggro &&
-            manhattan(selfTile, this.enemyTile(candidate.enemy)) <= range
-        );
-    }
-
-    private findClosestActor(point: TilePoint, actors: FieldActor[]): FieldActor | null {
-        let closest: FieldActor | null = null;
-        let closestDist = Infinity;
-        for (const actor of actors) {
-            const distance = manhattan(point, this.actorTile(actor));
-            if (distance < closestDist) {
-                closest = actor;
-                closestDist = distance;
-            }
-        }
-        return closest;
     }
 
     private getEnemyById(enemyId: string): Enemy | null {
@@ -2332,7 +1950,7 @@ export class WorldEngine {
 
         const reachable = findReachableTilesByCost(
             start,
-            (query) => this.isFieldPassable(query),
+            (query) => this.movementController.isFieldPassable(query),
             (tile) => this.getActorTerrainStepCost(actor, tile),
             maxCost,
             { actorId: actor.id, intent: 'move', maxNodes: 8000 }

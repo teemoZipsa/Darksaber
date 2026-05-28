@@ -15,9 +15,16 @@ export interface DamageResult {
     hitChance?: number;
 }
 
+export type RandomSource = () => number;
+
 export interface PhysicalTerrainContext {
     defenderTraits?: TerrainActorTraits;
     isRanged?: boolean;
+    random?: RandomSource;
+}
+
+export function clampHitChance(raw: number): number {
+    return Math.max(5, Math.min(95, raw));
 }
 
 export class CombatFormulas {
@@ -31,12 +38,14 @@ export class CombatFormulas {
         defenderTile: TileType,
         terrainContext: PhysicalTerrainContext = {}
     ): DamageResult {
+        const random = terrainContext.random ?? Math.random;
+
         // Hit check
         const profile = getTerrainProfile(defenderTile);
         const rangedPenalty = terrainContext.isRanged ? profile.rangedHitPenalty : 0;
         const evasionBonus = Math.max(0, (defender.evasion ?? 10) - 10);
-        const hitChance = Math.min(95, attacker.hitRate - (defender.spd * 2) - evasionBonus + rangedPenalty);
-        const hitRoll = Math.random() * 100;
+        const hitChance = clampHitChance(attacker.hitRate - (defender.spd * 2) - evasionBonus + rangedPenalty);
+        const hitRoll = random() * 100;
         if (hitRoll > hitChance) {
             return { damage: 0, isCrit: false, isHit: false, isMiss: true, hitChance };
         }
@@ -49,11 +58,11 @@ export class CombatFormulas {
         baseDmg = Math.floor(baseDmg * terrainMultiplier);
 
         // Random variance (90% ~ 110%)
-        baseDmg = Math.floor(baseDmg * (0.9 + Math.random() * 0.2));
+        baseDmg = Math.floor(baseDmg * (0.9 + random() * 0.2));
 
         // Crit check
         const critChance = attacker.critRate;
-        const critRoll = Math.random() * 100;
+        const critRoll = random() * 100;
         const isCrit = critRoll < critChance;
         if (isCrit) {
             baseDmg = Math.floor(baseDmg * 1.5);
@@ -68,18 +77,19 @@ export class CombatFormulas {
      */
     public static calcMagicDamage(
         attacker: CharacterStats,
-        defender: CharacterStats
+        defender: CharacterStats,
+        random: RandomSource = Math.random
     ): DamageResult {
-        const hitChance = Math.min(95, 85 + attacker.magAtk - defender.magDef);
-        const hitRoll = Math.random() * 100;
+        const hitChance = clampHitChance(85 + attacker.magAtk - defender.magDef);
+        const hitRoll = random() * 100;
         if (hitRoll > hitChance) {
-            return { damage: 0, isCrit: false, isHit: false, isMiss: true };
+            return { damage: 0, isCrit: false, isHit: false, isMiss: true, hitChance };
         }
 
         let baseDmg = Math.max(1, Math.floor(attacker.magAtk * 1.5) - defender.magDef);
-        baseDmg = Math.floor(baseDmg * (0.9 + Math.random() * 0.2));
+        baseDmg = Math.floor(baseDmg * (0.9 + random() * 0.2));
 
-        return { damage: Math.max(1, baseDmg), isCrit: false, isHit: true, isMiss: false };
+        return { damage: Math.max(1, baseDmg), isCrit: false, isHit: true, isMiss: false, hitChance };
     }
 
     /**

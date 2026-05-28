@@ -32,6 +32,11 @@ class ImageStub {
 
 (globalThis as unknown as { Image: typeof ImageStub }).Image = ImageStub;
 
+function randomSequence(values: number[]): () => number {
+    let index = 0;
+    return () => values[Math.min(index++, values.length - 1)];
+}
+
 test('central field spawn is walkable and belongs to central_castle', () => {
     const world = new WorldMap();
     const central = world.getTowns().find((town) => town.id === 'central_castle');
@@ -223,22 +228,60 @@ test('line of sight blocks walls and conservative diagonal corner gaps', () => {
 test('physical combat applies terrain defense and ranged cover hit penalty', () => {
     const attacker = createBaseStats({ atk: 50, hitRate: 90, critRate: 0, spd: 1 });
     const defender = createBaseStats({ def: 0, spd: 0 });
-    const originalRandom = Math.random;
-    try {
-        Math.random = () => 0;
-        const grass = CombatFormulas.calcPhysicalDamage(attacker, defender, TileType.GRASS);
-        const stone = CombatFormulas.calcPhysicalDamage(attacker, defender, TileType.STONE);
-        assert.ok(stone.damage < grass.damage);
-        assert.equal(stone.terrainMultiplier, 0.8);
+    const grass = CombatFormulas.calcPhysicalDamage(attacker, defender, TileType.GRASS, { random: () => 0 });
+    const stone = CombatFormulas.calcPhysicalDamage(attacker, defender, TileType.STONE, { random: () => 0 });
+    assert.ok(stone.damage < grass.damage);
+    assert.equal(stone.terrainMultiplier, 0.8);
 
-        Math.random = () => 0.8;
-        const meleeForest = CombatFormulas.calcPhysicalDamage(attacker, defender, TileType.FOREST);
-        const rangedForest = CombatFormulas.calcPhysicalDamage(attacker, defender, TileType.FOREST, { isRanged: true });
-        assert.equal(meleeForest.isMiss, false);
-        assert.equal(rangedForest.isMiss, true);
-    } finally {
-        Math.random = originalRandom;
-    }
+    const meleeForest = CombatFormulas.calcPhysicalDamage(attacker, defender, TileType.FOREST, { random: () => 0.8 });
+    const rangedForest = CombatFormulas.calcPhysicalDamage(attacker, defender, TileType.FOREST, { isRanged: true, random: () => 0.8 });
+    assert.equal(meleeForest.isMiss, false);
+    assert.equal(rangedForest.isMiss, true);
+});
+
+test('combat formulas clamp hit chance and accept injected random sources', () => {
+    const defender = createBaseStats({ def: 0, spd: 0, evasion: 10 });
+    const lowPhysical = CombatFormulas.calcPhysicalDamage(
+        createBaseStats({ atk: 20, hitRate: -50, critRate: 0 }),
+        defender,
+        TileType.GRASS,
+        { random: randomSequence([0.04, 0.5, 1]) }
+    );
+    assert.equal(lowPhysical.hitChance, 5);
+    assert.equal(lowPhysical.isMiss, false);
+
+    const highPhysical = CombatFormulas.calcPhysicalDamage(
+        createBaseStats({ atk: 20, hitRate: 200, critRate: 0 }),
+        defender,
+        TileType.GRASS,
+        { random: randomSequence([0.96]) }
+    );
+    assert.equal(highPhysical.hitChance, 95);
+    assert.equal(highPhysical.isMiss, true);
+
+    const critPhysical = CombatFormulas.calcPhysicalDamage(
+        createBaseStats({ atk: 20, hitRate: 100, critRate: 100 }),
+        defender,
+        TileType.GRASS,
+        { random: randomSequence([0, 0.5, 0]) }
+    );
+    assert.equal(critPhysical.damage, 30);
+
+    const lowMagic = CombatFormulas.calcMagicDamage(
+        createBaseStats({ magAtk: 0 }),
+        createBaseStats({ magDef: 200 }),
+        randomSequence([0.04, 0.5])
+    );
+    assert.equal(lowMagic.hitChance, 5);
+    assert.equal(lowMagic.isMiss, false);
+
+    const highMagic = CombatFormulas.calcMagicDamage(
+        createBaseStats({ magAtk: 200 }),
+        createBaseStats({ magDef: 0 }),
+        randomSequence([0.96])
+    );
+    assert.equal(highMagic.hitChance, 95);
+    assert.equal(highMagic.isMiss, true);
 });
 
 test('ready queue is FIFO and rejects duplicate actors', () => {
@@ -341,7 +384,7 @@ test('skill effect resolver applies damage, debuff, and enemy-only aoe', () => {
         stats: createBaseStats({ hp: 40, maxHp: 40, def: 4, magDef: 2, atk: 10 }),
     };
 
-    const damageResult = resolveSkillEffect({ casterStats, skill: fireball, targetEnemy: target });
+    const damageResult = resolveSkillEffect({ casterStats, skill: fireball, targetEnemy: target, random: () => 0 });
     assert.equal(damageResult.enemyResults.length, 1);
     assert.equal(damageResult.enemyResults[0].damage, 25);
 
@@ -349,6 +392,7 @@ test('skill effect resolver applies damage, debuff, and enemy-only aoe', () => {
         casterStats,
         skill: fireball,
         targetEnemy: target,
+        random: () => 0,
         terrainContext: {
             casterTile: TileType.GRASS,
             targetTiles: { e1: TileType.WATER },
@@ -356,7 +400,7 @@ test('skill effect resolver applies damage, debuff, and enemy-only aoe', () => {
     });
     assert.equal(waterDamageResult.enemyResults[0].damage, 20);
 
-    const debuffResult = resolveSkillEffect({ casterStats, skill: poison, targetEnemy: target });
+    const debuffResult = resolveSkillEffect({ casterStats, skill: poison, targetEnemy: target, random: () => 0 });
     assert.deepEqual(debuffResult.enemyResults[0].statusEffects?.map((status) => status.kind), ['poison', 'attackDown']);
     assert.equal(debuffResult.enemyResults[0].damage, 10);
 
@@ -369,8 +413,76 @@ test('skill effect resolver applies damage, debuff, and enemy-only aoe', () => {
             { ...target, id: 'e2', name: 'Enemy 2', gridX: 6, gridY: 6 },
             { ...target, id: 'e3', name: 'Enemy 3', gridX: 8, gridY: 8 },
         ],
+        random: () => 0,
     });
     assert.deepEqual(aoeResult.enemyResults.map((result) => result.enemyId), ['e1', 'e2']);
+});
+
+test('skill effect resolver applies target hit rolls and aimed shot bonus', () => {
+    const fireball = getSkill('og_fireball');
+    const poison = getSkill('og_poison');
+    const blizzard = getSkill('og_blizzard');
+    const aimedShot = getSkill('arc_t2');
+    assert.ok(fireball);
+    assert.ok(poison);
+    assert.ok(blizzard);
+    assert.ok(aimedShot);
+
+    const casterStats = createBaseStats({ atk: 30, magAtk: 20, hitRate: 50, magHit: 80 });
+    const evasiveTarget = {
+        id: 'e1',
+        name: 'Enemy 1',
+        gridX: 5,
+        gridY: 5,
+        stats: createBaseStats({ hp: 40, maxHp: 40, def: 4, magDef: 2, magEva: 95 }),
+    };
+
+    const damageMiss = resolveSkillEffect({ casterStats, skill: fireball, targetEnemy: evasiveTarget, random: () => 0.06 });
+    assert.equal(damageMiss.enemyResults[0].isMiss, true);
+    assert.equal(damageMiss.enemyResults[0].hitChance, 5);
+    assert.equal(damageMiss.enemyResults[0].damage, 0);
+    assert.equal(damageMiss.enemyResults[0].killed, false);
+    assert.equal(damageMiss.casterMpDelta, -fireball.mpCost);
+
+    const debuffMiss = resolveSkillEffect({ casterStats, skill: poison, targetEnemy: evasiveTarget, random: () => 0.06 });
+    assert.equal(debuffMiss.enemyResults[0].isMiss, true);
+    assert.equal(debuffMiss.enemyResults[0].statusEffects, undefined);
+    assert.equal(debuffMiss.casterMpDelta, -poison.mpCost);
+
+    const first = {
+        ...evasiveTarget,
+        stats: createBaseStats({ hp: 40, maxHp: 40, magDef: 2, magEva: 5 }),
+    };
+    const second = {
+        ...first,
+        id: 'e2',
+        name: 'Enemy 2',
+        gridX: 6,
+        gridY: 6,
+    };
+    const aoePartial = resolveSkillEffect({
+        casterStats,
+        skill: blizzard,
+        targetEnemy: first,
+        allEnemies: [first, second],
+        targetsResolvedByPattern: true,
+        random: randomSequence([0.74, 0.76]),
+    });
+    assert.equal(aoePartial.enemyResults[0].isHit, true);
+    assert.equal(aoePartial.enemyResults[1].isMiss, true);
+
+    const aimedResult = resolveSkillEffect({
+        casterStats,
+        skill: aimedShot,
+        targetEnemy: {
+            ...first,
+            stats: createBaseStats({ hp: 40, maxHp: 40, def: 2, spd: 0, evasion: 10 }),
+        },
+        terrainContext: { targetTiles: { e1: TileType.FOREST } },
+        random: () => 0.54,
+    });
+    assert.equal(aimedResult.enemyResults[0].hitChance, 55);
+    assert.equal(aimedResult.enemyResults[0].isHit, true);
 });
 
 test('magic terrain multipliers remain clamped to tactical bounds', () => {

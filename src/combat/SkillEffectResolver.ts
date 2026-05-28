@@ -1,8 +1,9 @@
 import type { Character } from '../character/Character';
 import type { CharacterStats } from '../data/Stats';
 import type { Skill } from '../data/SkillDB';
-import { getMagicTerrainMultiplier } from '../field/TerrainRules';
+import { getMagicTerrainMultiplier, getTerrainProfile } from '../field/TerrainRules';
 import type { TileType } from '../map/Tile';
+import { clampHitChance, type RandomSource } from './CombatFormulas';
 import { StatusEffect, getStatusEffectsForSkill } from './StatusEffects';
 
 export interface SkillEffectEnemyInput {
@@ -17,6 +18,9 @@ export interface SkillEffectEnemyResult {
     enemyId: string;
     damage: number;
     killed: boolean;
+    isHit: boolean;
+    isMiss: boolean;
+    hitChance?: number;
     terrainMultiplier?: number;
     statusEffects?: StatusEffect[];
 }
@@ -40,6 +44,7 @@ export interface ResolveSkillEffectInput {
     allEnemies?: SkillEffectEnemyInput[];
     targetsResolvedByPattern?: boolean;
     terrainContext?: SkillTerrainContext;
+    random?: RandomSource;
 }
 
 export interface SkillTerrainContext {
@@ -51,6 +56,7 @@ export interface SkillTerrainContext {
 export function resolveSkillEffect(input: ResolveSkillEffectInput): SkillEffectResult {
     const { casterStats, skill, targetEnemy } = input;
     const casterCombatStats = input.casterCharacter?.getCombatStats() ?? casterStats;
+    const random = input.random ?? Math.random;
     const result: SkillEffectResult = {
         mpCost: skill.mpCost,
         casterHpDelta: 0,
@@ -75,10 +81,12 @@ export function resolveSkillEffect(input: ResolveSkillEffectInput): SkillEffectR
                 break;
             }
             result.enemyResults = getResolvedTargets(input, targetEnemy).map((enemy) =>
-                resolveDamageToEnemy(skill, casterCombatStats, enemy, input.terrainContext)
+                resolveDamageToEnemy(skill, casterCombatStats, enemy, input.terrainContext, random)
             );
             if (result.enemyResults.length === 1) {
-                result.logs.push(`${skill.icon} ${skill.nameKr}: ${targetEnemy.name}에게 ${result.enemyResults[0].damage} 피해!${formatTerrainNote(result.enemyResults[0])}`);
+                if (!result.enemyResults[0].isMiss) {
+                    result.logs.push(`${skill.icon} ${skill.nameKr}: ${targetEnemy.name}에게 ${result.enemyResults[0].damage} 피해!${formatTerrainNote(result.enemyResults[0])}`);
+                }
             } else {
                 result.logs.push(`${skill.icon} ${skill.nameKr}: ${result.enemyResults.length}체 대상!`);
             }
@@ -89,10 +97,12 @@ export function resolveSkillEffect(input: ResolveSkillEffectInput): SkillEffectR
                 break;
             }
             result.enemyResults = getResolvedTargets(input, targetEnemy).map((enemy) =>
-                resolveDebuffToEnemy(skill, casterCombatStats, enemy, input.terrainContext)
+                resolveDebuffToEnemy(skill, casterCombatStats, enemy, input.terrainContext, random)
             );
             if (result.enemyResults.length === 1) {
-                result.logs.push(`${skill.icon} ${skill.nameKr}: ${targetEnemy.name} 약화${formatTerrainNote(result.enemyResults[0])}`);
+                if (!result.enemyResults[0].isMiss) {
+                    result.logs.push(`${skill.icon} ${skill.nameKr}: ${targetEnemy.name} 약화${formatTerrainNote(result.enemyResults[0])}`);
+                }
             } else {
                 result.logs.push(`${skill.icon} ${skill.nameKr}: ${result.enemyResults.length}체 약화`);
             }
@@ -110,7 +120,7 @@ export function resolveSkillEffect(input: ResolveSkillEffectInput): SkillEffectR
                     Math.abs(enemy.gridY - targetEnemy.gridY) <= skill.aoeRadius
                 );
             result.logs.push(`${skill.icon} ${skill.nameKr}: ${targets.length}체 대상!`);
-            result.enemyResults = targets.map((enemy) => resolveDamageToEnemy(skill, casterCombatStats, enemy, input.terrainContext));
+            result.enemyResults = targets.map((enemy) => resolveDamageToEnemy(skill, casterCombatStats, enemy, input.terrainContext, random));
             if (result.enemyResults.some((enemyResult) => hasTerrainMultiplier(enemyResult))) {
                 result.logs.push('지형 마법 상성 적용');
             }
@@ -168,8 +178,12 @@ function resolveDamageToEnemy(
     skill: Skill,
     casterCombatStats: CharacterStats,
     enemy: SkillEffectEnemyInput,
-    terrainContext?: SkillTerrainContext
+    terrainContext: SkillTerrainContext | undefined,
+    random: RandomSource
 ): SkillEffectEnemyResult {
+    const hit = rollSkillHit(skill, casterCombatStats, enemy, terrainContext, random);
+    if (hit.isMiss) return createMissResult(enemy.id, hit.hitChance);
+
     const isPhysical = skill.element === 'physical';
     const baseAtk = isPhysical ? casterCombatStats.atk : casterCombatStats.magAtk;
     const baseDef = isPhysical ? enemy.stats.def : enemy.stats.magDef;
@@ -179,6 +193,9 @@ function resolveDamageToEnemy(
         enemyId: enemy.id,
         damage,
         killed: enemy.stats.hp - damage <= 0,
+        isHit: true,
+        isMiss: false,
+        hitChance: hit.hitChance,
         terrainMultiplier,
     };
 }
@@ -187,17 +204,69 @@ function resolveDebuffToEnemy(
     skill: Skill,
     casterCombatStats: CharacterStats,
     enemy: SkillEffectEnemyInput,
-    terrainContext?: SkillTerrainContext
+    terrainContext: SkillTerrainContext | undefined,
+    random: RandomSource
 ): SkillEffectEnemyResult {
+    const hit = rollSkillHit(skill, casterCombatStats, enemy, terrainContext, random);
+    if (hit.isMiss) return createMissResult(enemy.id, hit.hitChance);
+
     const terrainMultiplier = getEnemyTerrainMultiplier(skill, enemy, terrainContext);
     const damage = Math.max(1, Math.floor(casterCombatStats.magAtk * 0.5 * terrainMultiplier));
     return {
         enemyId: enemy.id,
         damage,
         killed: enemy.stats.hp - damage <= 0,
+        isHit: true,
+        isMiss: false,
+        hitChance: hit.hitChance,
         terrainMultiplier,
         statusEffects: getStatusEffectsForSkill(skill),
     };
+}
+
+function rollSkillHit(
+    skill: Skill,
+    casterCombatStats: CharacterStats,
+    enemy: SkillEffectEnemyInput,
+    terrainContext: SkillTerrainContext | undefined,
+    random: RandomSource
+): { isMiss: boolean; hitChance: number } {
+    const hitChance = getSkillHitChance(skill, casterCombatStats, enemy, terrainContext);
+    return { isMiss: random() * 100 > hitChance, hitChance };
+}
+
+function getSkillHitChance(
+    skill: Skill,
+    casterCombatStats: CharacterStats,
+    enemy: SkillEffectEnemyInput,
+    terrainContext?: SkillTerrainContext
+): number {
+    const hitBonus = skill.hitBonus ?? 0;
+    if (skill.element === 'physical') {
+        const targetTile = getEnemyTargetTile(enemy, terrainContext);
+        const rangedTerrainPenalty = skill.range > 1 && targetTile !== undefined
+            ? getTerrainProfile(targetTile).rangedHitPenalty
+            : 0;
+        const evasionBonus = Math.max(0, (enemy.stats.evasion ?? 10) - 10);
+        return clampHitChance(casterCombatStats.hitRate - (enemy.stats.spd * 2) - evasionBonus + rangedTerrainPenalty + hitBonus);
+    }
+
+    return clampHitChance(casterCombatStats.magHit - enemy.stats.magEva + hitBonus);
+}
+
+function createMissResult(enemyId: string, hitChance: number): SkillEffectEnemyResult {
+    return {
+        enemyId,
+        damage: 0,
+        killed: false,
+        isHit: false,
+        isMiss: true,
+        hitChance,
+    };
+}
+
+function getEnemyTargetTile(enemy: SkillEffectEnemyInput, terrainContext?: SkillTerrainContext): TileType | undefined {
+    return terrainContext?.targetTiles?.[enemy.id] ?? terrainContext?.impactTile;
 }
 
 function getEnemyTerrainMultiplier(
@@ -205,7 +274,7 @@ function getEnemyTerrainMultiplier(
     enemy: SkillEffectEnemyInput,
     terrainContext?: SkillTerrainContext
 ): number {
-    const targetTile = terrainContext?.targetTiles?.[enemy.id] ?? terrainContext?.impactTile;
+    const targetTile = getEnemyTargetTile(enemy, terrainContext);
     return getMagicTerrainMultiplier(skill.element, {
         casterTile: terrainContext?.casterTile,
         targetTile,

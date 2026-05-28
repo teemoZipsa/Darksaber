@@ -208,6 +208,7 @@ test('pattern-resolved damage skills can apply to multiple selected targets', ()
         targetEnemy: target,
         allEnemies: [target, second],
         targetsResolvedByPattern: true,
+        random: () => 0,
     });
 
     assert.deepEqual(result.enemyResults.map((enemyResult) => enemyResult.enemyId), ['e1', 'e2']);

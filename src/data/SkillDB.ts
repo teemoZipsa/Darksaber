@@ -24,6 +24,7 @@ export interface Skill {
     descEn: string;
     buffStat?: 'atk' | 'def' | 'spd' | 'mdef' | 'regen' | 'all'; // specifically which stat to boost
     buffDuration?: number; // duration in turns
+    hitBonus?: number;     // flat hit chance bonus in percentage points
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -353,6 +354,7 @@ const ARCHER_SKILLS: Skill[] = [
         range: 5, aoeRadius: 0, icon: '🎯',
         descKr: '정밀 조준 1.8배 피해 + 명중 보너스',
         descEn: 'Precise aim, 1.8x damage + hit bonus',
+        hitBonus: 20,
     },
     {
         id: 'arc_t3', nameKr: '관통화살', nameEn: 'Piercing Arrow',
