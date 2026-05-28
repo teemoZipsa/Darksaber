@@ -242,14 +242,13 @@ export class WorldPlayerActionController {
     }
 
     public hasExecutableAction(actor: FieldActor): boolean {
-        const hasApAction = hasExecutableFieldAction({
+        return hasExecutableFieldAction({
             remainingAp: this.context.getRemainingActionPoints(),
             hasReachableMove: this.hasExecutableMove(actor),
             hasAttackTarget: this.hasExecutableAttack(actor),
             hasInteractTarget: this.hasExecutableInteract(actor),
             hasMagicAvailable: this.hasExecutableMagic(actor),
         });
-        return hasApAction || this.context.getRemainingActionPoints() > 0;
     }
 
     public hasExecutableMove(actor: FieldActor): boolean {
