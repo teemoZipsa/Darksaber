@@ -40,11 +40,12 @@ tsFiles.forEach(file => {
       const cleanPath = assetString.startsWith('/') ? assetString.slice(1) : assetString;
       
       const existsInPublic = fs.existsSync(path.join(publicDir, cleanPath));
+      const existsInPublicTileset = fs.existsSync(path.join(publicDir, 'Image', 'Tileset', cleanPath));
       const existsInAssetsDir = fs.existsSync(path.join(assetsDir, cleanPath));
       const existsInRoot = fs.existsSync(path.join(targetDir, cleanPath));
       const existsInSrc = fs.existsSync(path.join(srcDir, cleanPath));
       
-      if (!existsInPublic && !existsInRoot && !existsInSrc && !existsInAssetsDir) {
+      if (!existsInPublic && !existsInPublicTileset && !existsInRoot && !existsInSrc && !existsInAssetsDir) {
          console.error(`❌ [Error]: Asset '${assetString}' is referenced in [${path.basename(file)}], but actual file is missing!`);
          hasError = true;
       } else {

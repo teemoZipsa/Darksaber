@@ -6,6 +6,7 @@
 import { GameManager } from './engine/GameManager';
 import { SettingsManager } from './engine/SettingsManager';
 import { TileAssetManager } from './map/TileAssetManager';
+import { DarksaberSpriteAtlas } from './ui/DarksaberSpriteAtlas';
 
 async function init(): Promise<void> {
     SettingsManager.init();
@@ -24,6 +25,7 @@ async function init(): Promise<void> {
     }
 
     await TileAssetManager.init();
+    await DarksaberSpriteAtlas.init();
 
     const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
     if (!canvas) {

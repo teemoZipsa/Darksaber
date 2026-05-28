@@ -6,6 +6,7 @@
  */
 
 import { TILE_SIZE } from '../map/Chunk';
+import { DarksaberSpriteAtlas, type DamageNumberVariant } from './DarksaberSpriteAtlas';
 import { UI } from './UITheme';
 import { easeOutBack } from './Tween';
 
@@ -134,6 +135,10 @@ export class FloatingTextManager {
                 scale = eased * (1 + peakOvershoot * (1 - t));
             }
 
+            if (this.renderSpriteNumber(ctx, ft, screenX, screenY, alpha, scale)) {
+                continue;
+            }
+
             const fontSize = Math.round(style.fontSize * scale);
             ctx.font = `bold ${fontSize}px ${UI.fontPrimary}`;
             ctx.globalAlpha = alpha;
@@ -156,5 +161,38 @@ export class FloatingTextManager {
     /** Clear all floating texts (e.g. on state change) */
     public clear(): void {
         this.texts.length = 0;
+    }
+
+    private renderSpriteNumber(
+        ctx: CanvasRenderingContext2D,
+        ft: FloatingText,
+        screenX: number,
+        screenY: number,
+        alpha: number,
+        popScale: number
+    ): boolean {
+        const variant = this.getNumberVariant(ft.type);
+        if (!variant) return false;
+
+        const baseScale = ft.type === 'crit' ? 2.45 : 2.15;
+        return DarksaberSpriteAtlas.drawNumberText(ctx, ft.text, screenX, screenY, variant, {
+            alpha,
+            align: 'center',
+            scale: baseScale * popScale,
+            spacing: 1,
+        });
+    }
+
+    private getNumberVariant(type: FloatingTextType): DamageNumberVariant | null {
+        switch (type) {
+            case 'damage':
+                return 'damage';
+            case 'crit':
+                return 'crit';
+            case 'heal':
+                return 'heal';
+            default:
+                return null;
+        }
     }
 }

@@ -232,7 +232,7 @@ export class WorldFieldRenderer {
         if (model.activeCharacter) {
             const active = model.activeCharacter;
             const effective = getEffectiveStatsForCharacter(active);
-            drawParchmentPanel(ctx, HUD_X, charY, HUD_W, charH, { headerH: 28 });
+            drawParchmentPanel(ctx, HUD_X, charY, HUD_W, charH, { headerH: 28, darksaberFrame: true });
 
             ctx.fillStyle = Parchment.textDark;
             ctx.font = `bold 14px ${UI.fontPrimary}`;
@@ -415,7 +415,7 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
     const urgent = model.raid.timerAdvancing;
 
     ctx.save();
-    drawParchmentPanel(ctx, x, y, bannerW, bannerH, { radius: 8, headerH: 0 });
+    drawParchmentPanel(ctx, x, y, bannerW, bannerH, { radius: 8, headerH: 0, darksaberFrame: true });
 
     // Urgent state: red accent stripe along the top border.
     if (urgent) {

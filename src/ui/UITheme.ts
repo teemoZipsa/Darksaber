@@ -5,6 +5,8 @@
  * All UI components should import from here instead of hardcoding colors.
  */
 
+import { DARKSABER_PANEL_FRAME, DarksaberSpriteAtlas } from './DarksaberSpriteAtlas';
+
 // ─── COLOR TOKENS ────────────────────────────────────────────
 
 export const UI = {
@@ -452,6 +454,7 @@ export function drawParchmentPanel(
         shadow?: boolean;
         headerH?: number;     // If > 0, draw a darker gold-tinted header band
         compact?: boolean;    // Skip the 3rd inner fill (for small panels)
+        darksaberFrame?: boolean;
     }
 ): void {
     const r = options?.radius ?? Parchment.radius;
@@ -528,6 +531,12 @@ export function drawParchmentPanel(
     ctx.strokeStyle = Parchment.borderLight;
     ctx.lineWidth = 1;
     ctx.stroke();
+
+    if (options?.darksaberFrame) {
+        DarksaberSpriteAtlas.drawNineSlice(ctx, DARKSABER_PANEL_FRAME, x - 2, y - 2, w + 4, h + 4, 14, {
+            alpha: 0.92,
+        });
+    }
 
     ctx.restore();
 }
