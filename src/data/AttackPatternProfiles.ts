@@ -6,30 +6,36 @@ const adjacentSingle: AttackPatternProfile = {
     effect: { kind: 'single', origin: 'selected' },
 };
 
+const cavalryLine: AttackPatternProfile = {
+    select: { kind: 'orthogonalLine', minRange: 1, maxRange: 2 },
+    effect: { kind: 'single', origin: 'selected' },
+};
+
+const archerLine: AttackPatternProfile = {
+    select: { kind: 'orthogonalLine', minRange: 2, maxRange: 4, requiresLineOfSight: true },
+    effect: { kind: 'single', origin: 'selected' },
+};
+
+const mageArea: AttackPatternProfile = {
+    select: { kind: 'diamond', minRange: 1, maxRange: 3, requiresLineOfSight: true },
+    effect: { kind: 'square', radius: 1, origin: 'selected' },
+    damageMultiplier: 0.6,
+};
+
 const CLASS_ATTACK_PROFILES: Record<string, AttackPatternProfile> = {
     infantry: adjacentSingle,
-    cavalry: {
-        select: { kind: 'orthogonalLine', minRange: 1, maxRange: 2 },
-        effect: { kind: 'single', origin: 'selected' },
-    },
+    cavalry: cavalryLine,
     flying: adjacentSingle,
     naval: adjacentSingle,
     lancer: {
         select: { kind: 'orthogonalLine', minRange: 1, maxRange: 2 },
         effect: { kind: 'piercingLine', length: 2, origin: 'caster' },
     },
-    archer: {
-        select: { kind: 'orthogonalLine', minRange: 2, maxRange: 4, requiresLineOfSight: true },
-        effect: { kind: 'single', origin: 'selected' },
-    },
+    archer: archerLine,
     cleric: adjacentSingle,
     priest: adjacentSingle,
     shrine: adjacentSingle,
-    mage: {
-        select: { kind: 'diamond', minRange: 1, maxRange: 3, requiresLineOfSight: true },
-        effect: { kind: 'square', radius: 1, origin: 'selected' },
-        damageMultiplier: 0.6,
-    },
+    mage: mageArea,
     cultist: {
         select: { kind: 'diamond', minRange: 1, maxRange: 3, requiresLineOfSight: true },
         effect: { kind: 'single', origin: 'selected' },
@@ -38,6 +44,16 @@ const CLASS_ATTACK_PROFILES: Record<string, AttackPatternProfile> = {
         select: { kind: 'diamond', minRange: 1, maxRange: 2, requiresLineOfSight: true },
         effect: { kind: 'single', origin: 'selected' },
     },
+
+    // Master fusion stores IDs as `master_${branch}`; branch keys support direct MasterBranch lookups.
+    battle: cavalryLine,
+    master_battle: cavalryLine,
+    tactics: archerLine,
+    master_tactics: archerLine,
+    healer: adjacentSingle,
+    master_healer: adjacentSingle,
+    magic: mageArea,
+    master_magic: mageArea,
 };
 
 const SKILL_ATTACK_PROFILES: Record<string, AttackPatternProfile> = {
@@ -73,10 +89,11 @@ export function getFallbackClassAttackProfile(range: number): AttackPatternProfi
 
 export function getFallbackSkillAttackProfile(skill: Skill): AttackPatternProfile {
     const maxRange = Math.max(1, skill.range);
+    const aoeRadius = skill.aoeRadius ?? 0;
     return {
         select: { kind: 'diamond', minRange: 1, maxRange, requiresLineOfSight: true },
-        effect: skill.aoeRadius > 0
-            ? { kind: 'square', radius: skill.aoeRadius, origin: 'selected' }
+        effect: aoeRadius > 0
+            ? { kind: 'square', radius: aoeRadius, origin: 'selected' }
             : { kind: 'single', origin: 'selected' },
     };
 }

@@ -1,12 +1,13 @@
 /**
- * ClassTree — full 10-tier class progression with 3 master fusion branches.
+ * ClassTree — full 10-tier class progression with 4 master fusion branches.
  * Based on the original Dark Saver class chart.
  *
  * Structure:
- *   9 base classes → 7 tiers each → fuse 3-into-1 at tier 8, 9, 10
+ *   12 base class lines (5 start at tier 1, 7 start at tier 2) → fuse 3-into-1 at tier 8, 9, 10
  *   배틀마스터 branch: 보병 + 기병 + 비병
  *   택틱스마스터 branch: 수병 + 창병 + 궁병
- *   매직마스터 branch: 승려 + 신관 + 마법사
+ *   힐러마스터 branch: 승려 + 신관 + 무녀
+ *   매직마스터 branch: 마법사 + 사교 + 연금술사
  */
 
 import {
@@ -236,6 +237,29 @@ const PRIEST: ClassLine = {
     }
 };
 
+const SHRINE: ClassLine = {
+    id: 'shrine', branch: 'healer',
+    nameKr: '무녀', nameEn: 'Shrine Maiden',
+    growth: GROWTH_SHRINE, baseMovRange: 3, attackRange: 1,
+    ignoresTerrain: false, waterBonus: false,
+    tiers: [
+        { tier: 2, nameKr: '무녀', nameEn: 'Shrine Maiden' },
+        { tier: 3, nameKr: '신무', nameEn: 'Divine Dancer' },
+        { tier: 4, nameKr: '영매사', nameEn: 'Spirit Medium' },
+        { tier: 5, nameKr: '백련무녀', nameEn: 'Veteran Shrine' },
+        { tier: 6, nameKr: '대신관', nameEn: 'Grand Oracle' },
+        { tier: 7, nameKr: '신녀', nameEn: 'Holy Maiden' },
+    ],
+    skillUnlocks: {
+        2: ['shr_t1'],
+        3: ['shr_t2'],
+        4: ['shr_t3'],
+        5: ['shr_t4'],
+        6: ['shr_t5'],
+        7: ['shr_t6']
+    }
+};
+
 // ─── 매직마스터 Branch ─────────────────────────────────────────
 
 const MAGE: ClassLine = {
@@ -283,29 +307,6 @@ const CULTIST: ClassLine = {
         5: ['cul_t4', 'og_forceheal'],
         6: ['cul_t5', 'og_hpdrain', 'og_earthquake'],
         7: ['cul_t6', 'og_mute']
-    }
-};
-
-const SHRINE: ClassLine = {
-    id: 'shrine', branch: 'healer',
-    nameKr: '무녀', nameEn: 'Shrine Maiden',
-    growth: GROWTH_SHRINE, baseMovRange: 3, attackRange: 1,
-    ignoresTerrain: false, waterBonus: false,
-    tiers: [
-        { tier: 2, nameKr: '무녀', nameEn: 'Shrine Maiden' },
-        { tier: 3, nameKr: '신무', nameEn: 'Divine Dancer' },
-        { tier: 4, nameKr: '영매사', nameEn: 'Spirit Medium' },
-        { tier: 5, nameKr: '백련무녀', nameEn: 'Veteran Shrine' },
-        { tier: 6, nameKr: '대신관', nameEn: 'Grand Oracle' },
-        { tier: 7, nameKr: '신녀', nameEn: 'Holy Maiden' },
-    ],
-    skillUnlocks: {
-        2: ['shr_t1'],
-        3: ['shr_t2'],
-        4: ['shr_t3'],
-        5: ['shr_t4'],
-        6: ['shr_t5'],
-        7: ['shr_t6']
     }
 };
 
@@ -373,7 +374,7 @@ export const MASTER_CLASSES: MasterClass[] = [
     }
 ];
 
-/** All 10 base class lines */
+/** All 12 base class lines */
 export const ALL_CLASS_LINES: ClassLine[] = [
     INFANTRY, CAVALRY, FLYING,
     NAVAL, LANCER, ARCHER,

@@ -1,0 +1,26 @@
+import type { EnemyRole } from './EnemyAI';
+import type { TilePoint } from './FieldPathing';
+
+export const ACTOR_COLORS = ['#00e5ff', '#ff4fd8', '#ffd447'];
+
+export const FORMATION_OFFSETS: TilePoint[] = [
+    { x: -1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 1, y: 0 },
+];
+
+export const FIELD_ATB_SCALE = 10;
+export const ENEMY_AGGRO_RANGE = 6;
+export const ENEMY_EXIT_RANGE = 10;
+export const ENEMY_LEASH_RANGE = 16;
+export const MOVEMENT_REPATH_INTERVAL = 0.35;
+
+export const ENEMY_ROLE_GLYPHS: Record<EnemyRole, string> = {
+    bruiser: 'M',
+    tank: 'T',
+    archer: 'R',
+    healer: '+',
+    coward: '!',
+    support: 'S',
+    boss: 'B',
+};

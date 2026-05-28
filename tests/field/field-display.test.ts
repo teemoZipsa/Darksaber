@@ -1,0 +1,32 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { formatRaidTime, getCombatLogColor, getEnemyRoleLabel, getTacticalMarkerColor } from '../../src/field/FieldDisplay';
+import type { TacticalMarker } from '../../src/field/TacticalMarkers';
+
+test('field display formats raid time as floored mm:ss', () => {
+    assert.equal(formatRaidTime(0), '00:00');
+    assert.equal(formatRaidTime(65.9), '01:05');
+    assert.equal(formatRaidTime(-12), '00:00');
+});
+
+test('field display maps enemy roles and log colors', () => {
+    assert.equal(getEnemyRoleLabel('boss'), '보스 몬스터');
+    assert.equal(getEnemyRoleLabel('bruiser'), '근접형 몬스터');
+    assert.equal(getCombatLogColor('고블린 처치!'), '#ffd15f');
+    assert.equal(getCombatLogColor('명중 실패'), '#d9d9e8');
+    assert.equal(getCombatLogColor('대기'), 'rgba(255,255,255,0.78)');
+});
+
+test('field display colors tactical markers by target priority', () => {
+    const marker: TacticalMarker = {
+        id: 'm1',
+        kind: 'watch',
+        tile: { x: 1, y: 2 },
+        ttl: 10,
+        targetKind: 'enemy',
+        targetKey: 'enemy:e1',
+    };
+
+    assert.equal(getTacticalMarkerColor(marker), 'rgba(255, 78, 78, 0.95)');
+    assert.equal(getTacticalMarkerColor({ ...marker, kind: 'rally', targetKind: 'ground' }), 'rgba(80, 255, 160, 0.95)');
+});

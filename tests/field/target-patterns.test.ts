@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { resolveSkillEffect } from '../../src/combat/SkillEffectResolver';
 import { getClassAttackProfile, getSkillAttackProfile } from '../../src/data/AttackPatternProfiles';
 import { getSkill } from '../../src/data/SkillDB';
+import type { Skill } from '../../src/data/SkillDB';
 import { createBaseStats } from '../../src/data/Stats';
 import { hasLineOfSight } from '../../src/field/LineOfSight';
 import {
@@ -46,6 +47,26 @@ test('class attack profiles differentiate infantry, cavalry, lancer, archer, and
     const mage = getClassAttackProfile('mage');
     assert.equal(mage.damageMultiplier, 0.6);
     assert.equal(getEffectTiles(mage, { casterTile: caster, selectedTile: { x: 2, y: 0 } }).length, 9);
+});
+
+test('master class attack profiles preserve branch combat roles', () => {
+    const caster = { x: 0, y: 0 };
+
+    const battle = getClassAttackProfile('master_battle');
+    assert.equal(isSelectableTile(battle, { casterTile: caster }, { x: 2, y: 0 }), true);
+    assert.equal(isSelectableTile(getClassAttackProfile('battle'), { casterTile: caster }, { x: 2, y: 0 }), true);
+
+    const tactics = getClassAttackProfile('master_tactics');
+    assert.equal(isSelectableTile(tactics, { casterTile: caster }, { x: 4, y: 0 }), true);
+    assert.equal(isSelectableTile(tactics, { casterTile: caster }, { x: 1, y: 0 }), false);
+
+    const healer = getClassAttackProfile('master_healer');
+    assert.equal(isSelectableTile(healer, { casterTile: caster }, { x: 1, y: 0 }), true);
+    assert.equal(isSelectableTile(healer, { casterTile: caster }, { x: 2, y: 0 }), false);
+
+    const magic = getClassAttackProfile('master_magic');
+    assert.equal(getEffectTiles(magic, { casterTile: caster, selectedTile: { x: 2, y: 0 } }).length, 9);
+    assert.equal(getClassAttackProfile('magic').damageMultiplier, 0.6);
 });
 
 test('directional effects require a cardinal selected tile and never snap diagonals', () => {
@@ -138,6 +159,27 @@ test('skills without explicit profiles preserve the old diamond select and squar
             { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 },
         ]
     );
+});
+
+test('fallback skill attack profile treats missing aoe radius as single target', () => {
+    const skill = {
+        id: 'unknown_single',
+        nameKr: 'Unknown',
+        nameEn: 'Unknown',
+        classId: 'shared',
+        tier: 1,
+        mpCost: 0,
+        type: 'damage',
+        element: 'none',
+        power: 1,
+        range: 2,
+        icon: '?',
+        descKr: '',
+        descEn: '',
+    } as unknown as Skill;
+
+    const profile = getSkillAttackProfile(skill);
+    assert.deepEqual(profile.effect, { kind: 'single', origin: 'selected' });
 });
 
 test('pattern-resolved damage skills can apply to multiple selected targets', () => {

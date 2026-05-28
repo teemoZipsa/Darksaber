@@ -19,41 +19,30 @@ import { getItemDef } from '../data/ItemDB';
 import { getClassLine } from '../data/ClassTree';
 import { Skill, getLearnedSkills } from '../data/SkillDB';
 import { getClassAttackProfile, getSkillAttackProfile } from '../data/AttackPatternProfiles';
-import { CombatFormulas } from '../combat/CombatFormulas';
 import { resolveSkillEffect, SkillEffectEnemyInput, SkillEffectResult, SkillTerrainContext } from '../combat/SkillEffectResolver';
 import {
     applyGuardToDamage,
     applyStatus,
-    applyStatusToCarrier,
-    applyStatusesToCarrier,
-    advanceTimedStatuses,
     applyStatuses,
     cleanseNegativeStatuses,
-    consumeStatus,
     createStatus,
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
     getStatusIcons,
     hasStatus,
-    removeRestStatusesFromCarrier,
-    removeStatusesFromCarrier,
     resolveTurnStartStatuses,
     type StatusKind,
-    type StatusEffect,
 } from '../combat/StatusEffects';
-import { UI, renderGameTitle, Parchment, drawParchmentPanel, drawGlassPanel } from '../ui/UITheme';
 import { ActionMenuUI, ActionType } from '../ui/ActionMenuUI';
 import { EntityDisplayInfo, EntityInfoUI } from '../ui/EntityInfoUI';
 import { MagicUI } from '../ui/MagicUI';
 import { TacticalContextMenuUI } from '../ui/TacticalContextMenuUI';
-import { TownUI } from '../ui/TownUI';
 import { RaidResultUI } from '../ui/RaidResultUI';
 import { EffectManager } from '../ui/EffectManager';
 import { FloatingTextManager } from '../ui/FloatingTextManager';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
-import { TileType } from '../map/Tile';
 import { FieldPassableQuery, TilePoint, findPathToAny, findPathWithCost, findReachableTilesByCost, manhattan, tileKey, tilesInRange } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
 import {
@@ -61,7 +50,6 @@ import {
     buildTacticalMenuItems,
     makeTacticalTargetKey,
     type TacticalCommand,
-    type TacticalMarker,
     type TacticalTargetRef,
 } from '../field/TacticalMarkers';
 import { getRightClickDisposition, type WorldInteractionMode } from '../field/WorldInteractionMode';
@@ -73,9 +61,7 @@ import {
     AttackPatternProfile,
     PatternContext,
     getEffectTiles,
-    getSelectDistance,
     getSelectableTiles,
-    isSelectableTile,
 } from '../field/TargetPatterns';
 import {
     canAffordTerrainCost,
@@ -94,71 +80,22 @@ import {
     snapshotPlacedItem,
     type HeroRaidStatus,
 } from '../raid/RaidOutcome';
-import { resolveTownArrival, shouldAdvanceRaidTimer } from '../raid/RaidRules';
-import { getRestMenu, INJURY_TREATMENT_PRICE, type RestMenu } from '../data/RestFacilityData';
-
-interface FieldIntent {
-    kind: 'move' | 'attack' | 'interact' | 'magic' | 'rest' | 'defend' | 'counter';
-    tile?: TilePoint;
-    path?: TilePoint[];
-    enemyId?: string;
-    lootId?: string;
-    skillId?: string;
-    targetEnemyId?: string;
-    apCost?: number;
-    pathCost?: number;
-}
-
-interface FieldActor {
-    id: string;
-    character: Character;
-    entity: Player;
-    path: TilePoint[];
-    queuedIntent: FieldIntent | null;
-}
-
-interface FieldEnemy {
-    enemy: Enemy;
-    home: TilePoint;
-    path: TilePoint[];
-}
-
-type FieldHitParty = FieldActor & { gridX: number; gridY: number };
-
-type FieldMagicState =
-    | { mode: 'idle' }
-    | { mode: 'menu' }
-    | { mode: 'targeting'; skill: Skill; validTiles: Set<string>; hoverAoeTiles: Set<string> };
-
-interface AttackCue {
-    from: TilePoint;
-    to: TilePoint;
-    timer: number;
-    duration: number;
-    color: string;
-    label?: string;
-}
-
-const ACTOR_COLORS = ['#00e5ff', '#ff4fd8', '#ffd447'];
-const FORMATION_OFFSETS: TilePoint[] = [
-    { x: -1, y: 0 },
-    { x: 0, y: 1 },
-    { x: 1, y: 0 },
-];
-const FIELD_ATB_SCALE = 10;
-const ENEMY_AGGRO_RANGE = 6;
-const ENEMY_EXIT_RANGE = 10;
-const ENEMY_LEASH_RANGE = 16;
-const MOVEMENT_REPATH_INTERVAL = 0.35;
-const ENEMY_ROLE_GLYPHS: Record<EnemyRole, string> = {
-    bruiser: 'M',
-    tank: 'T',
-    archer: 'R',
-    healer: '+',
-    coward: '!',
-    support: 'S',
-    boss: 'B',
-};
+import { resolveTownArrival } from '../raid/RaidRules';
+import { ACTOR_COLORS, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, ENEMY_LEASH_RANGE, FIELD_ATB_SCALE, FORMATION_OFFSETS, MOVEMENT_REPATH_INTERVAL } from '../field/FieldConfig';
+import type { AttackCue, FieldActor, FieldEnemy, FieldHitParty, FieldIntent, FieldMagicState } from '../field/FieldTypes';
+import { getEnemyRoleLabel } from '../field/FieldDisplay';
+import {
+    buildSkillTerrainContext,
+    getActorAttackTargetFailure as resolveActorAttackTargetFailure,
+    getAttackFailureMessage,
+    getSkillCandidateEnemies as resolveSkillCandidateEnemies,
+    type AttackTargetFailure,
+} from '../field/FieldTargeting';
+import type { WorldRenderModel } from './world/WorldRenderModel';
+import { WorldRaidSession, type WorldPhase } from './world/WorldRaidSession';
+import { WorldTownSession } from './world/WorldTownSession';
+import { WorldFieldRenderer } from './world/WorldFieldRenderer';
+import { WorldCombatController, createCombatResult, type CombatResult } from './world/WorldCombatController';
 
 export class WorldEngine {
     private canvas: HTMLCanvasElement;
@@ -177,7 +114,10 @@ export class WorldEngine {
     private entityInfoUI = new EntityInfoUI();
     private magicUI = new MagicUI();
     private tacticalMenuUI = new TacticalContextMenuUI();
-    private townUI: TownUI;
+    private townSession: WorldTownSession;
+    private raidSession: WorldRaidSession;
+    private currentPhase: WorldPhase = 'lobby';
+    private combatController: WorldCombatController;
     private raidResultUI = new RaidResultUI();
     private tacticalMarkers = new TacticalMarkerStore();
     private tacticalMenuTarget: TacticalTargetRef | null = null;
@@ -195,15 +135,6 @@ export class WorldEngine {
     private effectManager = new EffectManager();
     private attackCues: AttackCue[] = [];
     private worldTime: number = 0;
-    private currentHubTownId: string;
-    private departureTownId: string;
-    private raidElapsedSeconds = 0;
-    private readonly raidLimitSeconds = 30 * 60;
-    private raidActive = false;
-    private killsThisRaid = 0;
-    private downedCharacterIdsThisRaid: Set<string> = new Set();
-    private pendingTownAfterResult: TownInfo | null = null;
-    private lastDepartureBlockTownId: string | null = null;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -220,10 +151,24 @@ export class WorldEngine {
         this.playerData = playerData;
         this.gameManager = gameManager;
         this.worldMap = new WorldMap();
-        this.currentHubTownId = this.getTownById(this.playerData.currentHubTownId)?.id ?? 'central_castle';
-        this.departureTownId = this.currentHubTownId;
-        this.townUI = new TownUI(this.gameManager.inventory, this.gameManager.stash);
-        this.configureTownUI();
+        const initialHubTownId = this.getTownById(this.playerData.currentHubTownId)?.id ?? 'central_castle';
+        this.raidSession = new WorldRaidSession(initialHubTownId);
+        this.townSession = new WorldTownSession({
+            party: this.party,
+            playerData: this.playerData,
+            gameManager: this.gameManager,
+            onDeploy: () => this.beginRaidFromCurrentHub(),
+            log: (message) => this.addCombatLog(message),
+        });
+        this.combatController = new WorldCombatController({
+            log: (message) => this.addCombatLog(message),
+            spawnDamage: (x, y, amount, isCrit, isMiss) => this.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
+            spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
+            spawnHitEffect: (x, y, isCrit) => this.effectManager.spawnHitEffect(x, y, isCrit),
+            spawnKillEffect: (enemy) => this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image),
+            spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
+            spawnLoot: (enemy) => this.spawnEnemyLoot(enemy),
+        });
         this.raidResultUI.onClose = () => this.openPendingTownAfterResult();
 
         this.spawnPartyAtCurrentHub();
@@ -239,7 +184,7 @@ export class WorldEngine {
 
     public update(dt: number, input: InputManager, camera: Camera): void {
         this.worldTime += dt;
-        this.syncTownUIState();
+        this.townSession.sync();
 
         if (this.raidResultUI.isVisible()) {
             this.raidResultUI.updateInput(input);
@@ -248,8 +193,8 @@ export class WorldEngine {
             return;
         }
 
-        if (this.townUI.isVisible()) {
-            this.townUI.updateInput(input);
+        if (this.townSession.isVisible()) {
+            this.townSession.updateInput(input);
             camera.followTile(this.player.gridX, this.player.gridY);
             camera.update();
             return;
@@ -312,10 +257,11 @@ export class WorldEngine {
     }
 
     public isModalOverlayVisible(): boolean {
-        return this.townUI.isVisible() || this.raidResultUI.isVisible();
+        return this.townSession.isVisible() || this.raidResultUI.isVisible();
     }
 
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
+        const model = this.buildRenderModel();
         const camX = camera.x;
         const camY = camera.y;
         const scale = SettingsManager.getUIScale();
@@ -328,20 +274,20 @@ export class WorldEngine {
 
         const viewW = width / camera.zoom;
         const viewH = height / camera.zoom;
-        this.worldMap.updateLoadedChunks(this.player.pixelX * TILE_SIZE, this.player.pixelY * TILE_SIZE);
+        this.worldMap.updateLoadedChunks(model.player.pixelX * TILE_SIZE, model.player.pixelY * TILE_SIZE);
         this.worldMap.render(ctx, camX, camY, viewW, viewH);
 
-        this.renderActionTiles(ctx, camX, camY);
-        this.renderMagicTargetTiles(ctx, camX, camY);
-        this.renderPathPreview(ctx, camX, camY);
-        this.renderTacticalMarkers(ctx, camX, camY);
-        this.renderSelectedLoot(ctx, camX, camY);
-        this.renderEnemies(ctx, camX, camY);
-        this.renderPartyActors(ctx, camX, camY);
-        this.renderAttackCues(ctx, camX, camY);
+        WorldFieldRenderer.renderActionTiles(ctx, model, camX, camY);
+        WorldFieldRenderer.renderMagicTargetTiles(ctx, model, camX, camY);
+        WorldFieldRenderer.renderPathPreview(ctx, model, camX, camY);
+        WorldFieldRenderer.renderTacticalMarkers(ctx, model, camX, camY);
+        WorldFieldRenderer.renderSelectedLoot(ctx, model, camX, camY);
+        WorldFieldRenderer.renderEnemies(ctx, model, camX, camY);
+        WorldFieldRenderer.renderPartyActors(ctx, model, camX, camY);
+        WorldFieldRenderer.renderAttackCues(ctx, model, camX, camY);
         this.effectManager.render(ctx, camera);
         this.floatingText.render(ctx, camX, camY);
-        this.renderHoverTile(ctx, camX, camY);
+        WorldFieldRenderer.renderHoverTile(ctx, model, camX, camY);
         this.renderActionMenu(ctx, camX, camY);
 
         ctx.restore();
@@ -350,10 +296,71 @@ export class WorldEngine {
         ctx.scale(scale, scale);
         const uiW = Math.floor(width / scale);
         const uiH = Math.floor(height / scale);
-        this.renderHud(ctx, uiW, uiH);
-        if (this.townUI.isVisible()) this.townUI.render(ctx, uiW, uiH);
+        const infoY = WorldFieldRenderer.renderHudPanels(ctx, model, uiW, uiH);
+        if (model.selectedDisplayInfo) {
+            this.entityInfoUI.setPosition(16, infoY + 18);
+            this.entityInfoUI.render(ctx, model.selectedDisplayInfo);
+        }
+        this.tacticalMenuUI.render(ctx);
+        this.magicUI.render(ctx, uiW, uiH);
+        if (this.townSession.isVisible()) this.townSession.render(ctx, uiW, uiH);
         if (this.raidResultUI.isVisible()) this.raidResultUI.render(ctx, uiW, uiH);
         ctx.restore();
+    }
+
+    private buildRenderModel(): WorldRenderModel {
+        const activeActor = this.getControlledActor();
+        const terrainHoverLines = this.hoverTile.x >= 0 && this.hoverTile.y >= 0
+            ? describeTerrainForHover(
+                this.worldMap.getTileAt(this.hoverTile.x, this.hoverTile.y),
+                activeActor ? this.getActorTerrainTraits(activeActor) : {}
+            )
+            : [];
+        const selectedLoot = this.selectedLootId
+            ? this.worldMap.loot.find((candidate) => candidate.id === this.selectedLootId) ?? null
+            : null;
+
+        return {
+            worldTime: this.worldTime,
+            phase: this.currentPhase,
+            player: this.player,
+            activeCharacter: this.party.getActive() ?? null,
+            controlledActor: activeActor,
+            partyActors: this.partyActors,
+            fieldEnemies: this.fieldEnemies,
+            activeTurnActorId: this.activeTurnActorId,
+            remainingActionPoints: this.remainingActionPoints,
+            selectedActorId: this.selectedActorId,
+            selectedEnemyId: this.selectedEnemyId,
+            selectedLootId: this.selectedLootId,
+            selectedDisplayInfo: this.getSelectedDisplayInfo(),
+            hasSelection: this.hasSelection(),
+            actionMode: this.actionMode,
+            actionTiles: this.actionTiles,
+            actionMenuOpen: this.actionMenuOpen,
+            fieldMagicState: this.fieldMagicState,
+            hoverTile: this.hoverTile,
+            hoverTileWalkable: this.hoverTile.x >= 0 && this.hoverTile.y >= 0
+                ? this.worldMap.isWalkable(this.hoverTile.x, this.hoverTile.y)
+                : false,
+            terrainHoverLines,
+            tacticalMarkers: this.tacticalMarkers.getMarkers(),
+            selectedLootTile: selectedLoot ? { x: selectedLoot.x, y: selectedLoot.y } : null,
+            attackCues: this.attackCues,
+            combatLog: this.combatLog,
+            gold: this.playerData.gold,
+            raid: {
+                active: this.raidSession.active,
+                elapsedSeconds: this.raidSession.elapsedSeconds,
+                limitSeconds: this.raidSession.limitSeconds,
+                departureTownId: this.raidSession.departureTownId,
+                timerAdvancing: this.raidSession.shouldAdvanceTimer({
+                    townVisible: this.townSession.isVisible(),
+                    resultVisible: this.raidResultUI.isVisible(),
+                    turnCombatActive: this.isTurnCombatActive(),
+                }),
+            },
+        };
     }
 
     private spawnPartyAtCurrentHub(): void {
@@ -392,173 +399,24 @@ export class WorldEngine {
     }
 
     private getCurrentHubTown(): TownInfo {
-        return this.getTownById(this.currentHubTownId)
+        return this.getTownById(this.raidSession.currentHubTownId)
             ?? this.getTownById('central_castle')
             ?? this.worldMap.getTowns()[0];
     }
 
-    private configureTownUI(): void {
-        this.townUI.getQuestDone = (questId) => this.playerData.isCleared(questId);
-        this.townUI.onDeploy(() => this.beginRaidFromCurrentHub());
-        this.townUI.getShopUI().getGold = () => this.playerData.gold;
-        this.townUI.getShopUI().onBuy = (item, price) => {
-            if (!this.playerData.spendGold(price)) {
-                this.addCombatLog('골드가 부족합니다.');
-                return false;
-            }
-            const placed = this.gameManager.inventory.autoPlace(item);
-            if (!placed) {
-                this.playerData.addGold(price);
-                this.addCombatLog('배낭 공간이 부족합니다.');
-                return false;
-            }
-            this.playerData.save();
-            this.addCombatLog(`${item.nameKr} 구매`);
-            return true;
-        };
-        this.townUI.getShopUI().onSell = (placed, sourceGrid, price) => {
-            if (!sourceGrid.items.includes(placed)) return false;
-            sourceGrid.remove(placed);
-            this.playerData.addGold(price);
-            this.playerData.save();
-            this.addCombatLog(`${placed.item.nameKr} 판매 +${price}G`);
-            return true;
-        };
-        this.townUI.getPendingRestMenuId = () => this.playerData.pendingRestMenuId;
-        this.townUI.getInjuredCount = () => this.getActivePartyInjuryCount();
-        this.townUI.onPurchaseRestMenu = (menuId) => this.purchaseRestMenu(menuId);
-        this.townUI.onTreatInjuries = () => this.treatActivePartyInjuries();
-    }
-
-    private syncTownUIState(): void {
-        this.townUI.playerGold = this.playerData.gold;
-        const active = this.party.getActive();
-        if (active) this.townUI.setActiveCharacter(active);
-    }
-
-    private purchaseRestMenu(menuId: string): boolean {
-        const menu = getRestMenu(menuId);
-        if (!menu) return false;
-        if (!this.playerData.spendGold(menu.price)) {
-            this.addCombatLog(t('rest.noGold'));
-            return false;
-        }
-
-        for (const character of this.party.getCharacters()) {
-            removeRestStatusesFromCarrier(character);
-            applyStatusesToCarrier(character, this.createRestStatuses(menu, 'immediate'));
-        }
-        this.playerData.pendingRestMenuId = menu.id;
-        this.playerData.save();
-        this.addCombatLog(`${t(menu.nameKey)} 예약`);
-        return true;
-    }
-
-    private treatActivePartyInjuries(): boolean {
-        const injured = this.party.getCharacters().filter((character) => hasStatus(character.statuses, 'injury'));
-        if (injured.length === 0) return false;
-
-        const price = injured.length * INJURY_TREATMENT_PRICE;
-        if (!this.playerData.spendGold(price)) {
-            this.addCombatLog(t('rest.noGold'));
-            return false;
-        }
-
-        for (const character of injured) {
-            removeStatusesFromCarrier(character, (status) => status.kind === 'injury');
-        }
-        this.playerData.save();
-        this.addCombatLog(`${t('rest.treated')} -${price}G`);
-        return true;
-    }
-
-    private getActivePartyInjuryCount(): number {
-        return this.party.getCharacters().filter((character) => hasStatus(character.statuses, 'injury')).length;
-    }
-
-    private applyPendingRestPreview(): void {
-        const menu = this.playerData.pendingRestMenuId ? getRestMenu(this.playerData.pendingRestMenuId) : null;
-        for (const character of this.party.getCharacters()) {
-            removeRestStatusesFromCarrier(character);
-            if (menu) applyStatusesToCarrier(character, this.createRestStatuses(menu, 'immediate'));
-        }
-    }
-
-    private applyPendingRestForRaidStart(): void {
-        const menu = this.playerData.pendingRestMenuId ? getRestMenu(this.playerData.pendingRestMenuId) : null;
-        for (const character of this.party.getCharacters()) {
-            removeRestStatusesFromCarrier(character);
-            if (menu) applyStatusesToCarrier(character, this.createRestStatuses(menu));
-        }
-        if (menu) {
-            this.addCombatLog(`${t(menu.nameKey)} 효과 적용`);
-            this.playerData.pendingRestMenuId = null;
-            this.playerData.save();
-        }
-    }
-
-    private clearRestStatusesFromParty(): void {
-        for (const character of this.party.getCharacters()) {
-            removeRestStatusesFromCarrier(character);
-        }
-    }
-
-    private applyRaidInjuries(): void {
-        for (const character of this.party.getCharacters()) {
-            if (!this.downedCharacterIdsThisRaid.has(character.id)) continue;
-            applyStatusToCarrier(character, createStatus('injury', {
-                icon: '✚',
-                magnitude: 0.9,
-                sourceType: 'injury',
-                activation: 'immediate',
-            }));
-        }
-    }
-
-    private advancePartyTimedRestStatuses(dt: number): void {
-        for (const character of this.party.getCharacters()) {
-            const before = character.statuses?.length ?? 0;
-            character.statuses = advanceTimedStatuses(character.statuses, dt);
-            if ((character.statuses?.length ?? 0) !== before) {
-                const effective = getEffectiveStatsForCharacter(character);
-                character.stats.hp = Math.min(character.stats.hp, effective.maxHp);
-                character.stats.mp = Math.min(character.stats.mp, effective.maxMp);
-            }
-        }
-    }
-
-    private createRestStatuses(menu: RestMenu, activation?: 'immediate' | 'on_raid_start'): StatusEffect[] {
-        return menu.buffs
-            .filter((buff) => !activation || buff.activation === activation)
-            .map((buff) => createStatus(buff.kind, {
-                icon: buff.icon,
-                magnitude: buff.magnitude,
-                activation: buff.activation,
-                durationSeconds: buff.durationSeconds,
-                remainingSeconds: buff.activation === 'on_raid_start' ? buff.durationSeconds : undefined,
-                sourceType: 'rest',
-                sourceRestMenuId: menu.id,
-            }));
-    }
-
     private openTown(town: TownInfo): void {
         this.closeFieldOverlays();
-        this.raidActive = false;
-        this.applyPendingRestPreview();
-        this.townUI.show(town);
+        this.currentPhase = 'town';
+        this.raidSession.enterTown(town.id);
+        this.townSession.show(town);
     }
 
     private beginRaidFromCurrentHub(): void {
         const town = this.getCurrentHubTown();
-        this.departureTownId = town.id;
-        this.raidElapsedSeconds = 0;
-        this.raidActive = true;
-        this.killsThisRaid = 0;
-        this.downedCharacterIdsThisRaid.clear();
-        this.lastDepartureBlockTownId = null;
-        this.pendingTownAfterResult = null;
+        this.currentPhase = 'raid';
+        this.raidSession.beginRaidFromTown(town.id);
         this.party.resetForNewRaid();
-        this.applyPendingRestForRaidStart();
+        this.townSession.applyPendingRestForRaidStart();
         this.placePartyNear(this.worldMap.getTownExitTile(town));
         this.player = this.getControlledActor()?.entity ?? this.player;
         this.selectedActorId = this.getControlledActor()?.id ?? null;
@@ -797,7 +655,7 @@ export class WorldEngine {
                 this.selectedLootId = null;
                 const failure = this.getActorAttackTargetFailure(actor, enemy);
                 if (failure) {
-                    this.addCombatLog(this.getAttackFailureMessage(failure));
+                    this.addCombatLog(getAttackFailureMessage(failure));
                     return;
                 }
                 if (this.spendAp(ATTACK_AP_COST) && this.tryActorAttack(actor, enemy)) {
@@ -1352,19 +1210,13 @@ export class WorldEngine {
     }
 
     private updateRaidTimer(dt: number): void {
-        if (!shouldAdvanceRaidTimer({
-            raidActive: this.raidActive,
-            townVisible: this.townUI.isVisible(),
+        const result = this.raidSession.advanceTimer(dt, {
+            townVisible: this.townSession.isVisible(),
             resultVisible: this.raidResultUI.isVisible(),
             turnCombatActive: this.isTurnCombatActive(),
-        })) {
-            return;
-        }
-
-        this.raidElapsedSeconds += dt;
-        this.advancePartyTimedRestStatuses(dt);
-        if (this.raidElapsedSeconds >= this.raidLimitSeconds) {
-            this.raidElapsedSeconds = this.raidLimitSeconds;
+        });
+        if (result.advanced) this.townSession.advancePartyTimedRestStatuses(dt);
+        if (result.expired) {
             this.completeRaidFailure('MIA');
         }
     }
@@ -1381,7 +1233,7 @@ export class WorldEngine {
     }
 
     private checkRaidEndConditions(): void {
-        if (!this.raidActive || this.raidResultUI.isVisible()) return;
+        if (!this.raidSession.active || this.raidResultUI.isVisible()) return;
         if (this.party.isSquadWiped()) {
             this.completeRaidFailure('DEAD');
             return;
@@ -1394,15 +1246,14 @@ export class WorldEngine {
         if (!actor || !this.worldMap.isWalkable(actor.entity.gridX, actor.entity.gridY)) return;
 
         const town = this.worldMap.getTownAtTile(actor.entity.gridX, actor.entity.gridY);
-        const arrival = resolveTownArrival(town?.id, this.departureTownId, this.raidActive);
+        const arrival = resolveTownArrival(town?.id, this.raidSession.departureTownId, this.raidSession.active);
         if (arrival.kind === 'none') {
-            this.lastDepartureBlockTownId = null;
+            this.raidSession.clearDepartureBlock();
             return;
         }
         if (arrival.kind === 'departureBlocked') {
-            if (this.lastDepartureBlockTownId !== arrival.townId) {
+            if (this.raidSession.shouldReportDepartureBlock(arrival.townId)) {
                 this.addCombatLog('출발한 마을로는 생환할 수 없습니다. 다른 마을로 이동하세요.');
-                this.lastDepartureBlockTownId = arrival.townId ?? null;
             }
             return;
         }
@@ -1412,7 +1263,7 @@ export class WorldEngine {
     }
 
     private completeRaidSuccess(destination: TownInfo): void {
-        if (!this.raidActive) return;
+        if (!this.raidSession.active) return;
 
         const heroStatuses = this.createHeroStatuses();
         const secured = this.secureRaidLoot();
@@ -1426,13 +1277,12 @@ export class WorldEngine {
             questRewards.push('퀘스트 완료: 첫 생환');
         }
 
-        this.currentHubTownId = destination.id;
+        this.raidSession.completeAtTown(destination.id);
         this.playerData.currentHubTownId = destination.id;
         this.playerData.save();
 
-        this.raidActive = false;
-        this.clearRestStatusesFromParty();
-        this.applyRaidInjuries();
+        this.townSession.clearRestStatusesFromParty();
+        this.townSession.applyRaidInjuries(this.raidSession.downedCharacterIds);
         this.party.resetForNewRaid();
         this.placePartyNear(this.worldMap.getTownSpawnTile(destination));
         this.player = this.getControlledActor()?.entity ?? this.player;
@@ -1440,9 +1290,9 @@ export class WorldEngine {
 
         const outcome: RaidOutcome = {
             result: 'SURVIVED',
-            elapsedSeconds: this.raidElapsedSeconds,
-            kills: this.killsThisRaid,
-            departureTownId: this.departureTownId,
+            elapsedSeconds: this.raidSession.elapsedSeconds,
+            kills: this.raidSession.kills,
+            departureTownId: this.raidSession.departureTownId,
             extractionTownId: destination.id,
             heroStatuses,
             looted: secured,
@@ -1458,7 +1308,7 @@ export class WorldEngine {
     }
 
     private completeRaidFailure(result: Exclude<RaidResultType, 'SURVIVED'>): void {
-        if (!this.raidActive) return;
+        if (!this.raidSession.active) return;
 
         const heroStatuses = this.createHeroStatuses();
         const loss = computeRaidFailureLoss(this.gameManager.inventory.items, this.party.getCharacters());
@@ -1468,14 +1318,13 @@ export class WorldEngine {
             character?.unequip(lost.slot);
         }
 
-        const returnTown = this.getTownById(this.departureTownId) ?? this.getCurrentHubTown();
-        this.currentHubTownId = returnTown.id;
+        const returnTown = this.getTownById(this.raidSession.departureTownId) ?? this.getCurrentHubTown();
+        this.raidSession.failBackToTown(returnTown.id);
         this.playerData.currentHubTownId = returnTown.id;
         this.playerData.save();
 
-        this.raidActive = false;
-        this.clearRestStatusesFromParty();
-        this.applyRaidInjuries();
+        this.townSession.clearRestStatusesFromParty();
+        this.townSession.applyRaidInjuries(this.raidSession.downedCharacterIds);
         this.party.resetForNewRaid();
         this.placePartyNear(this.worldMap.getTownSpawnTile(returnTown));
         this.player = this.getControlledActor()?.entity ?? this.player;
@@ -1483,9 +1332,9 @@ export class WorldEngine {
 
         const outcome: RaidOutcome = {
             result,
-            elapsedSeconds: this.raidElapsedSeconds,
-            kills: this.killsThisRaid,
-            departureTownId: this.departureTownId,
+            elapsedSeconds: this.raidSession.elapsedSeconds,
+            kills: this.raidSession.kills,
+            departureTownId: this.raidSession.departureTownId,
             extractionTownId: returnTown.id,
             heroStatuses,
             looted: [],
@@ -1499,14 +1348,15 @@ export class WorldEngine {
     }
 
     private showRaidResult(outcome: RaidOutcome, nextTown: TownInfo): void {
-        this.pendingTownAfterResult = nextTown;
-        this.townUI.hide();
+        this.currentPhase = 'lobby';
+        this.raidSession.setPendingTownAfterResult(nextTown.id);
+        this.townSession.hide();
         this.raidResultUI.show(outcome);
     }
 
     private openPendingTownAfterResult(): void {
-        const nextTown = this.pendingTownAfterResult ?? this.getCurrentHubTown();
-        this.pendingTownAfterResult = null;
+        const nextTown = this.getTownById(this.raidSession.consumePendingTownAfterResultId() ?? '')
+            ?? this.getCurrentHubTown();
         this.openTown(nextTown);
     }
 
@@ -1546,165 +1396,81 @@ export class WorldEngine {
         return secured;
     }
 
+    private applyCombatResult(result: CombatResult): void {
+        for (const enemyId of result.killedEnemyIds) {
+            this.raidSession.recordKill();
+            if (this.selectedEnemyId === enemyId) this.selectedEnemyId = null;
+        }
+        for (const characterId of result.downedCharacterIds) {
+            const actor = this.partyActors.find((candidate) => candidate.character.id === characterId);
+            if (actor && !actor.character.isDead) this.handleActorDown(actor);
+            else this.raidSession.recordCharacterDown(characterId);
+        }
+    }
+
+    private spawnEnemyLoot(enemy: Enemy): void {
+        const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
+        if (!herb) return;
+        const loot = new LootObject(`corpse_${enemy.id}`, enemy.gridX, enemy.gridY, [herb], {
+            sourceLabel: `${enemy.name} 전리품`,
+            kind: 'corpse',
+        });
+        this.worldMap.loot.push(loot);
+    }
+
     private tryActorAttack(actor: FieldActor, enemy: Enemy): boolean {
-        const start = this.actorTile(actor);
         if (!this.canActorAttackTarget(actor, enemy)) return false;
-        if (actor.entity.actionGauge < 100) return false;
         const profile = this.getActorAttackProfile(actor);
         const targetEnemies = this.getAttackPatternTargetEnemies(actor, enemy);
-        if (targetEnemies.length === 0) return false;
-
-        actor.entity.facing = this.directionFromTo(start, this.enemyTile(enemy));
-        this.spawnAttackCue(start, this.enemyTile(enemy), '#72e8ff');
-
-        let counterTriggered = false;
-        for (const target of targetEnemies) {
-            const targetTile = this.enemyTile(target);
-            const isRanged = manhattan(start, targetTile) > 1;
-            const result = CombatFormulas.calcPhysicalDamage(
-                actor.character.getCombatStats(),
-                getEffectiveStatsForEnemy(target),
-                this.worldMap.getTileAt(target.gridX, target.gridY),
-                { isRanged }
-            );
-            const dirBonus = CombatFormulas.getDirectionalMultiplier(
-                actor.entity.gridX,
-                actor.entity.gridY,
-                target.gridX,
-                target.gridY,
-                target.facing
-            );
-            if (!result.isMiss) {
-                result.damage = Math.max(1, Math.floor(result.damage * dirBonus.multiplier));
-                if (profile.damageMultiplier !== undefined) {
-                    result.damage = Math.max(1, Math.floor(result.damage * profile.damageMultiplier));
-                }
-            }
-
-            if (result.isMiss) {
-                this.floatingText.spawnDamage(target.gridX, target.gridY, 0, false, true);
-                this.addCombatLog(`${actor.character.name} 명중 실패: ${target.name} (${Math.floor(result.hitChance ?? 0)}%)`);
-                continue;
-            }
-
-            const guarded = applyGuardToDamage(target.statuses, result.damage);
-            target.statuses = guarded.statuses;
-            const dealtDamage = guarded.damage;
-            const dead = target.takeDamage(dealtDamage);
-            this.floatingText.spawnDamage(target.gridX, target.gridY, dealtDamage, result.isCrit, false);
-            this.effectManager.spawnHitEffect(target.gridX, target.gridY, result.isCrit);
-            const critText = result.isCrit ? ' 치명' : '';
-            const dirText = dirBonus.label ? ` ${dirBonus.label}` : '';
-            this.addCombatLog(`${actor.character.name} → ${target.name} ${dealtDamage} 피해${critText}${dirText}`);
-            if (guarded.guarded) this.addCombatLog(`${target.name} 방어: 피해 감소`);
-            this.logPhysicalTerrainEffect(result);
-
-            if (dead) this.handleEnemyDefeated(actor, target);
-            else if (!guarded.guarded && !counterTriggered && this.tryEnemyCounterAttack(target, actor)) counterTriggered = true;
-        }
-        return true;
+        const result = this.combatController.tryActorAttack({
+            actor,
+            selectedEnemy: enemy,
+            targetEnemies,
+            profile,
+            getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
+            directionFromTo: (from, to) => this.directionFromTo(from, to),
+            tryEnemyCounterAttack: (counterEnemy, counterActor) => {
+                const countered = this.tryEnemyCounterAttack(counterEnemy, counterActor);
+                return createCombatResult(countered);
+            },
+        });
+        this.applyCombatResult(result);
+        return result.executed;
     }
 
     private enemyAttack(entry: FieldEnemy, actor: FieldActor, range: number = 1): void {
         const enemy = entry.enemy;
         if (!this.canEnemyAttackTarget(enemy, actor, range)) return;
-        const result = CombatFormulas.calcPhysicalDamage(
-            getEffectiveStatsForEnemy(enemy),
-            getEffectiveStatsForCharacter(actor.character),
-            this.worldMap.getTileAt(actor.entity.gridX, actor.entity.gridY),
-            { defenderTraits: this.getActorTerrainTraits(actor), isRanged: range > 1 }
-        );
-        enemy.actionGauge = 0;
-        enemy.facing = this.directionFromTo(this.enemyTile(enemy), this.actorTile(actor));
-        this.spawnAttackCue(this.enemyTile(enemy), this.actorTile(actor), enemy.isBoss ? '#ff4ea3' : '#ff8a55');
-
-        if (result.isMiss) {
-            this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, 0, false, true);
-            this.addCombatLog(`${enemy.name} 명중 실패: ${actor.character.name} (${Math.floor(result.hitChance ?? 0)}%)`);
-            return;
-        }
-
-        const guarded = applyGuardToDamage(actor.character.statuses, result.damage);
-        actor.character.statuses = guarded.statuses;
-        actor.character.stats.hp = Math.max(0, actor.character.stats.hp - guarded.damage);
-        this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, guarded.damage, result.isCrit, false);
-        this.effectManager.spawnHitEffect(actor.entity.gridX, actor.entity.gridY, result.isCrit);
-        this.addCombatLog(`${enemy.name} → ${actor.character.name} ${guarded.damage} 피해${result.isCrit ? ' 치명' : ''}`);
-        if (guarded.guarded) this.addCombatLog(`${actor.character.name} 방어: 피해 감소`);
-        this.logPhysicalTerrainEffect(result);
-
-        if (actor.character.stats.hp <= 0 && !actor.character.isDead) {
-            this.handleActorDown(actor);
-            return;
-        }
-        if (!guarded.guarded) this.tryActorCounterAttack(actor, enemy);
+        const result = this.combatController.enemyAttack({
+            enemy,
+            actor,
+            range,
+            getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
+            getActorTerrainTraits: (targetActor) => this.getActorTerrainTraits(targetActor),
+            directionFromTo: (from, to) => this.directionFromTo(from, to),
+            tryActorCounterAttack: (counterActor, counterEnemy) => this.runActorCounterAttack(counterActor, counterEnemy),
+        });
+        this.applyCombatResult(result);
     }
 
-    private tryActorCounterAttack(actor: FieldActor, enemy: Enemy): boolean {
-        const consumed = consumeStatus(actor.character.statuses, 'counterReady');
-        if (!consumed.consumed) return false;
-        actor.character.statuses = consumed.statuses;
-        if (actor.character.isDead || actor.character.stats.hp <= 0 || enemy.stats.hp <= 0) return false;
-        if (!this.canActorAttackTarget(actor, enemy)) {
-            this.addCombatLog(`${actor.character.name} 반격 실패: 사거리 밖`);
-            return false;
-        }
-
-        const result = CombatFormulas.calcPhysicalDamage(
-            actor.character.getCombatStats(),
-            getEffectiveStatsForEnemy(enemy),
-            this.worldMap.getTileAt(enemy.gridX, enemy.gridY),
-            { isRanged: manhattan(this.actorTile(actor), this.enemyTile(enemy)) > 1 }
-        );
-        if (result.isMiss) {
-            this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, 0, false, true);
-            this.addCombatLog(`${actor.character.name} 반격 빗나감: ${enemy.name}`);
-            return true;
-        }
-
-        const damage = Math.max(1, Math.floor(result.damage * (consumed.consumed.magnitude || 0.75)));
-        const dead = enemy.takeDamage(damage);
-        this.spawnAttackCue(this.actorTile(actor), this.enemyTile(enemy), '#9ff6ff');
-        this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, damage, result.isCrit, false);
-        this.effectManager.spawnHitEffect(enemy.gridX, enemy.gridY, result.isCrit);
-        this.addCombatLog(`${actor.character.name} 반격 → ${enemy.name} ${damage} 피해`);
-        if (dead) this.handleEnemyDefeated(actor, enemy);
-        return true;
+    private runActorCounterAttack(actor: FieldActor, enemy: Enemy): CombatResult {
+        return this.combatController.tryActorCounterAttack({
+            actor,
+            enemy,
+            canActorAttackTarget: (counterActor, counterEnemy) => this.canActorAttackTarget(counterActor, counterEnemy),
+            getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
+        });
     }
 
     private tryEnemyCounterAttack(enemy: Enemy, actor: FieldActor): boolean {
-        const consumed = consumeStatus(enemy.statuses, 'counterReady');
-        if (!consumed.consumed) return false;
-        enemy.statuses = consumed.statuses;
-        if (enemy.stats.hp <= 0 || actor.character.isDead || actor.character.stats.hp <= 0) return false;
-        if (manhattan(this.enemyTile(enemy), this.actorTile(actor)) > 1) {
-            this.addCombatLog(`${enemy.name} 반격 실패: 사거리 밖`);
-            return false;
-        }
-
-        const result = CombatFormulas.calcPhysicalDamage(
-            getEffectiveStatsForEnemy(enemy),
-            getEffectiveStatsForCharacter(actor.character),
-            this.worldMap.getTileAt(actor.entity.gridX, actor.entity.gridY),
-            { defenderTraits: this.getActorTerrainTraits(actor) }
-        );
-        if (result.isMiss) {
-            this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, 0, false, true);
-            this.addCombatLog(`${enemy.name} 반격 빗나감`);
-            return true;
-        }
-
-        const baseDamage = Math.max(1, Math.floor(result.damage * (consumed.consumed.magnitude || 0.75)));
-        const guarded = applyGuardToDamage(actor.character.statuses, baseDamage);
-        actor.character.statuses = guarded.statuses;
-        const damage = guarded.damage;
-        actor.character.stats.hp = Math.max(0, actor.character.stats.hp - damage);
-        this.spawnAttackCue(this.enemyTile(enemy), this.actorTile(actor), '#ff9b66');
-        this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, damage, result.isCrit, false);
-        this.effectManager.spawnHitEffect(actor.entity.gridX, actor.entity.gridY, result.isCrit);
-        this.addCombatLog(`${enemy.name} 반격 → ${actor.character.name} ${damage} 피해`);
-        if (actor.character.stats.hp <= 0 && !actor.character.isDead) this.handleActorDown(actor);
-        return true;
+        const result = this.combatController.tryEnemyCounterAttack({
+            enemy,
+            actor,
+            getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
+            getActorTerrainTraits: (targetActor) => this.getActorTerrainTraits(targetActor),
+        });
+        this.applyCombatResult(result);
+        return result.executed;
     }
 
     private enemyStepToward(entry: FieldEnemy, actor: FieldActor, desiredRange: number = 1): void {
@@ -1757,25 +1523,18 @@ export class WorldEngine {
 
     private handleEnemyDefeated(actor: FieldActor, enemy: Enemy): void {
         this.addCombatLog(`${enemy.name} 처치! +${enemy.expReward} EXP`);
-        if (this.raidActive) this.killsThisRaid += 1;
+        this.raidSession.recordKill();
         this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
         this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
         actor.character.gainExp(enemy.expReward);
         enemy.isAggro = false;
         if (this.selectedEnemyId === enemy.id) this.selectedEnemyId = null;
 
-        const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
-        if (herb) {
-            const loot = new LootObject(`corpse_${enemy.id}`, enemy.gridX, enemy.gridY, [herb], {
-                sourceLabel: `${enemy.name} 전리품`,
-                kind: 'corpse',
-            });
-            this.worldMap.loot.push(loot);
-        }
+        this.spawnEnemyLoot(enemy);
     }
 
     private handleActorDown(actor: FieldActor): void {
-        this.downedCharacterIdsThisRaid.add(actor.character.id);
+        this.raidSession.recordCharacterDown(actor.character.id);
         const index = this.partyActors.indexOf(actor);
         if (index === this.party.getActiveIndex()) {
             const next = this.party.markActiveDead();
@@ -2399,35 +2158,15 @@ export class WorldEngine {
         return this.getActorAttackTargetFailure(actor, enemy) === null;
     }
 
-    private getActorAttackTargetFailure(actor: FieldActor, enemy: Enemy): 'tooClose' | 'blocked' | 'outOfRange' | null {
+    private getActorAttackTargetFailure(actor: FieldActor, enemy: Enemy): AttackTargetFailure | null {
         const profile = this.getActorAttackProfile(actor);
         const target = this.enemyTile(enemy);
-        const context = this.getPatternContext(actor);
-        if (isSelectableTile(profile, context, target)) {
-            const effectTileKeys = new Set(
-                getEffectTiles(profile, this.getPatternContext(actor, target)).map((tile) => tileKey(tile.x, tile.y))
-            );
-            return effectTileKeys.has(tileKey(target.x, target.y)) ? null : 'blocked';
-        }
-        if (this.isAttackTargetTooClose(profile, this.actorTile(actor), target)) return 'tooClose';
-        if (isSelectableTile(profile, context, target, { ignoreLineOfSight: true })) return 'blocked';
-        return 'outOfRange';
-    }
-
-    private getAttackFailureMessage(failure: 'tooClose' | 'blocked' | 'outOfRange'): string {
-        switch (failure) {
-            case 'tooClose': return '너무 가까운 대상입니다.';
-            case 'blocked': return '공격 경로가 막혔습니다.';
-            case 'outOfRange': return '공격 사거리 밖입니다.';
-        }
-    }
-
-    private isAttackTargetTooClose(profile: AttackPatternProfile, from: TilePoint, to: TilePoint): boolean {
-        const minRange = profile.select.minRange ?? 1;
-        if (minRange <= 1) return false;
-        if (profile.select.kind === 'orthogonalLine' && from.x !== to.x && from.y !== to.y) return false;
-        const distance = getSelectDistance(profile.select, from, to);
-        return distance > 0 && distance < minRange;
+        return resolveActorAttackTargetFailure({
+            profile,
+            context: this.getPatternContext(actor),
+            selectedContext: this.getPatternContext(actor, target),
+            target,
+        });
     }
 
     private getSkillCandidateEnemies(skill: Skill, targetEnemy?: Enemy): Enemy[] {
@@ -2439,31 +2178,16 @@ export class WorldEngine {
         const actor = this.getActivePartyTurnActor();
         if (!actor) return [targetEnemy];
         const profile = getSkillAttackProfile(skill);
-        const effectTileKeys = new Set(
-            getEffectTiles(profile, this.getPatternContext(actor, this.enemyTile(targetEnemy)))
-                .map((tile) => tileKey(tile.x, tile.y))
-        );
-        return alive.filter((enemy) => effectTileKeys.has(tileKey(enemy.gridX, enemy.gridY)));
+        return resolveSkillCandidateEnemies(alive, profile, this.getPatternContext(actor, this.enemyTile(targetEnemy)), targetEnemy);
     }
 
     private getSkillTerrainContext(actor: FieldActor, targetEnemies: Enemy[], targetEnemy?: Enemy): SkillTerrainContext {
-        const targetTiles: Record<string, TileType> = {};
-        for (const enemy of targetEnemies) {
-            targetTiles[enemy.id] = this.worldMap.getTileAt(enemy.gridX, enemy.gridY);
-        }
-        return {
-            casterTile: this.worldMap.getTileAt(actor.entity.gridX, actor.entity.gridY),
-            impactTile: targetEnemy ? this.worldMap.getTileAt(targetEnemy.gridX, targetEnemy.gridY) : undefined,
-            targetTiles,
-        };
-    }
-
-    private logPhysicalTerrainEffect(result: { terrainMultiplier?: number; hitChance?: number }): void {
-        const notes: string[] = [];
-        if (result.terrainMultiplier !== undefined && result.terrainMultiplier < 0.999) {
-            notes.push(`피해 -${Math.round((1 - result.terrainMultiplier) * 100)}%`);
-        }
-        if (notes.length > 0) this.addCombatLog(`지형 효과: ${notes.join(', ')}`);
+        return buildSkillTerrainContext({
+            casterTile: this.actorTile(actor),
+            targetEnemies,
+            targetEnemy,
+            getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
+        });
     }
 
     private actorTile(actor: FieldActor): TilePoint {
@@ -2668,203 +2392,6 @@ export class WorldEngine {
         }
     }
 
-    private renderPathPreview(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
-        const actor = this.getControlledActor();
-        if (!actor || actor.path.length === 0) return;
-
-        ctx.fillStyle = 'rgba(55, 220, 255, 0.22)';
-        actor.path.forEach((tile, index) => {
-            ctx.fillRect(tile.x * TILE_SIZE - camX + 8, tile.y * TILE_SIZE - camY + 8, TILE_SIZE - 16, TILE_SIZE - 16);
-            const pulse = 0.55 + 0.45 * Math.sin(this.worldTime * 8 - index * 0.8);
-            ctx.fillStyle = `rgba(180, 245, 255, ${0.35 + pulse * 0.4})`;
-            ctx.beginPath();
-            ctx.arc(
-                tile.x * TILE_SIZE - camX + TILE_SIZE / 2,
-                tile.y * TILE_SIZE - camY + TILE_SIZE / 2,
-                3 + pulse * 2,
-                0,
-                Math.PI * 2
-            );
-            ctx.fill();
-            ctx.fillStyle = 'rgba(55, 220, 255, 0.22)';
-        });
-    }
-
-    private renderTacticalMarkers(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
-        const markers = this.tacticalMarkers.getMarkers();
-        if (markers.length === 0) return;
-
-        ctx.save();
-        for (const marker of markers) {
-            const sx = marker.tile.x * TILE_SIZE - camX;
-            const sy = marker.tile.y * TILE_SIZE - camY;
-            const cx = sx + TILE_SIZE / 2;
-            const cy = sy + TILE_SIZE / 2;
-            const pulse = 0.5 + 0.5 * Math.sin(this.worldTime * 7);
-            const color = this.getTacticalMarkerColor(marker);
-            const alpha = marker.kind === 'ping'
-                ? Math.max(0.2, Math.min(1, marker.ttl / 3))
-                : Math.max(0.45, Math.min(1, marker.ttl / 30));
-
-            ctx.globalAlpha = alpha;
-            ctx.lineWidth = 2;
-
-            if (marker.kind === 'rally') {
-                ctx.strokeStyle = color;
-                ctx.fillStyle = 'rgba(40, 245, 150, 0.18)';
-                ctx.beginPath();
-                ctx.moveTo(cx, sy + 6);
-                ctx.lineTo(sx + TILE_SIZE - 7, cy);
-                ctx.lineTo(cx, sy + TILE_SIZE - 6);
-                ctx.lineTo(sx + 7, cy);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(cx, sy + 10);
-                ctx.lineTo(cx, sy + TILE_SIZE - 8);
-                ctx.stroke();
-            } else if (marker.kind === 'watch') {
-                const r = 12 + pulse * 3;
-                ctx.strokeStyle = color;
-                ctx.beginPath();
-                ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(cx - 5, cy);
-                ctx.lineTo(cx + 5, cy);
-                ctx.moveTo(cx, cy - 5);
-                ctx.lineTo(cx, cy + 5);
-                ctx.stroke();
-            } else {
-                const r = 8 + pulse * 7;
-                ctx.strokeStyle = color;
-                ctx.beginPath();
-                ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(cx - r - 3, cy);
-                ctx.lineTo(cx - r + 5, cy);
-                ctx.moveTo(cx + r - 5, cy);
-                ctx.lineTo(cx + r + 3, cy);
-                ctx.moveTo(cx, cy - r - 3);
-                ctx.lineTo(cx, cy - r + 5);
-                ctx.moveTo(cx, cy + r - 5);
-                ctx.lineTo(cx, cy + r + 3);
-                ctx.stroke();
-            }
-        }
-        ctx.restore();
-    }
-
-    private getTacticalMarkerColor(marker: TacticalMarker): string {
-        if (marker.kind === 'rally') return 'rgba(80, 255, 160, 0.95)';
-        if (marker.targetKind === 'enemy') return 'rgba(255, 78, 78, 0.95)';
-        if (marker.targetKind === 'loot') return 'rgba(255, 220, 74, 0.95)';
-        if (marker.targetKind === 'party') return 'rgba(82, 246, 255, 0.95)';
-        if (marker.targetKind === 'blocked') return 'rgba(255, 115, 90, 0.88)';
-        return 'rgba(240, 192, 80, 0.95)';
-    }
-
-    private renderActionTiles(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
-        if (!this.actionMode || this.actionTiles.size === 0) return;
-
-        const colors = {
-            move: ['rgba(255, 204, 66, 0.18)', 'rgba(255, 204, 66, 0.68)'],
-            attack: ['rgba(255, 70, 70, 0.24)', 'rgba(255, 70, 70, 0.78)'],
-            interact: ['rgba(88, 210, 255, 0.20)', 'rgba(88, 210, 255, 0.72)'],
-        } as const;
-        const [fill, stroke] = colors[this.actionMode];
-
-        for (const key of this.actionTiles) {
-            const [x, y] = key.split(',').map(Number);
-            const sx = x * TILE_SIZE - camX;
-            const sy = y * TILE_SIZE - camY;
-            ctx.fillStyle = fill;
-            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
-
-            const edge = [[0, -1], [0, 1], [-1, 0], [1, 0]]
-                .some(([dx, dy]) => !this.actionTiles.has(`${x + dx},${y + dy}`));
-            if (edge) {
-                ctx.strokeStyle = stroke;
-                ctx.lineWidth = 2;
-                ctx.strokeRect(sx + 1, sy + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-            }
-        }
-    }
-
-    private renderMagicTargetTiles(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
-        if (this.fieldMagicState.mode !== 'targeting') return;
-
-        for (const key of this.fieldMagicState.validTiles) {
-            const [x, y] = key.split(',').map(Number);
-            const sx = x * TILE_SIZE - camX;
-            const sy = y * TILE_SIZE - camY;
-            ctx.fillStyle = 'rgba(170, 80, 255, 0.20)';
-            ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
-            ctx.strokeStyle = 'rgba(190, 110, 255, 0.65)';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-        }
-
-        for (const key of this.fieldMagicState.hoverAoeTiles) {
-            const [x, y] = key.split(',').map(Number);
-            const sx = x * TILE_SIZE - camX;
-            const sy = y * TILE_SIZE - camY;
-            ctx.fillStyle = 'rgba(255, 80, 220, 0.24)';
-            ctx.fillRect(sx + 4, sy + 4, TILE_SIZE - 8, TILE_SIZE - 8);
-            ctx.strokeStyle = 'rgba(255, 150, 240, 0.8)';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(sx + 4, sy + 4, TILE_SIZE - 8, TILE_SIZE - 8);
-        }
-    }
-
-    private renderSelectedLoot(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
-        if (!this.selectedLootId) return;
-        const loot = this.worldMap.loot.find((candidate) => candidate.id === this.selectedLootId);
-        if (!loot) return;
-
-        ctx.strokeStyle = '#f3d66b';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(loot.x * TILE_SIZE - camX + 5, loot.y * TILE_SIZE - camY + 5, TILE_SIZE - 10, TILE_SIZE - 10);
-    }
-
-    private renderPartyActors(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
-        const controlled = this.getControlledActor();
-        for (const actor of this.partyActors) {
-            if (actor.character.isDead) continue;
-            const entity = actor.entity;
-            const px = entity.pixelX * TILE_SIZE - camX;
-            const py = entity.pixelY * TILE_SIZE - camY;
-
-            if (entity.image && entity.imageLoaded) {
-                ctx.drawImage(entity.image, px, py, TILE_SIZE, TILE_SIZE);
-            } else {
-                ctx.fillStyle = entity.color;
-                ctx.fillRect(px + 5, py + 5, TILE_SIZE - 10, TILE_SIZE - 10);
-            }
-
-            if (actor === controlled) {
-                ctx.strokeStyle = '#52f6ff';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(px + 3, py + 3, TILE_SIZE - 6, TILE_SIZE - 6);
-            }
-
-            if (this.selectedActorId === actor.id) {
-                ctx.strokeStyle = '#ffdd55';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(px + 1, py + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-            }
-
-            this.renderGauge(ctx, px + 4, py - 7, TILE_SIZE - 8, actor.entity.actionGauge / 100, '#39ff88');
-            const effective = getEffectiveStatsForCharacter(actor.character);
-            this.renderHpBar(ctx, px + 4, py + TILE_SIZE + 3, TILE_SIZE - 8, actor.character.stats.hp, effective.maxHp);
-            if (actor.entity.actionGauge >= 100 || actor.id === this.activeTurnActorId) {
-                this.renderReadyRing(ctx, px, py, '#5fffd0');
-            }
-        }
-    }
-
     private renderActionMenu(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
         const actor = this.getControlledActor();
         if (!actor || actor.character.isDead) return;
@@ -2877,225 +2404,6 @@ export class WorldEngine {
         } else if (ready) {
             this.actionMenuUI.renderReadyIndicator(ctx, px, py);
         }
-    }
-
-    private renderEnemies(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
-        for (const entry of this.fieldEnemies) {
-            const enemy = entry.enemy;
-            if (enemy.stats.hp <= 0) continue;
-            const px = enemy.pixelX * TILE_SIZE - camX;
-            const py = enemy.pixelY * TILE_SIZE - camY;
-
-            if (enemy.image && enemy.imageLoaded) {
-                ctx.drawImage(enemy.image, px, py, TILE_SIZE, TILE_SIZE);
-            } else {
-                ctx.fillStyle = enemy.isAggro ? '#ff4d5e' : enemy.color;
-                ctx.fillRect(px + 7, py + 7, TILE_SIZE - 14, TILE_SIZE - 14);
-            }
-
-            if (this.selectedEnemyId === enemy.id) {
-                ctx.strokeStyle = '#ffdd55';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(px + 3, py + 3, TILE_SIZE - 6, TILE_SIZE - 6);
-            }
-
-            this.renderEnemyRoleBadge(ctx, enemy, px, py);
-            this.renderGauge(ctx, px + 5, py - 7, TILE_SIZE - 10, enemy.actionGauge / 100, '#ffb84d');
-            this.renderHpBar(ctx, px + 5, py + TILE_SIZE + 3, TILE_SIZE - 10, enemy.stats.hp, enemy.stats.maxHp);
-            if (enemy.actionGauge >= 100 || enemy.id === this.activeTurnActorId) {
-                this.renderReadyRing(ctx, px, py, enemy.isBoss ? '#ff4ea3' : '#ffb84d');
-            }
-        }
-    }
-
-    private renderEnemyRoleBadge(ctx: CanvasRenderingContext2D, enemy: Enemy, px: number, py: number): void {
-        const glyph = ENEMY_ROLE_GLYPHS[enemy.role] ?? 'M';
-        ctx.fillStyle = enemy.isBoss ? 'rgba(80, 0, 45, 0.88)' : 'rgba(10, 14, 24, 0.78)';
-        ctx.strokeStyle = enemy.isBoss ? '#ff4ea3' : 'rgba(255,255,255,0.5)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(px + TILE_SIZE - 8, py + 8, 7, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = '#ffffff';
-        ctx.font = `bold 9px ${UI.fontMono}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(glyph, px + TILE_SIZE - 8, py + 8);
-        ctx.textAlign = 'start';
-        ctx.textBaseline = 'alphabetic';
-    }
-
-    private renderReadyRing(ctx: CanvasRenderingContext2D, px: number, py: number, color: string): void {
-        const pulse = 0.5 + 0.5 * Math.sin(this.worldTime * 7);
-        ctx.strokeStyle = color;
-        ctx.globalAlpha = 0.45 + pulse * 0.35;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(px + TILE_SIZE / 2, py + TILE_SIZE / 2, TILE_SIZE * (0.48 + pulse * 0.07), 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-    }
-
-    private renderAttackCues(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
-        for (const cue of this.attackCues) {
-            const progress = cue.timer / cue.duration;
-            const alpha = Math.max(0, 1 - progress);
-            const fromX = cue.from.x * TILE_SIZE - camX + TILE_SIZE / 2;
-            const fromY = cue.from.y * TILE_SIZE - camY + TILE_SIZE / 2;
-            const toX = cue.to.x * TILE_SIZE - camX + TILE_SIZE / 2;
-            const toY = cue.to.y * TILE_SIZE - camY + TILE_SIZE / 2;
-            const dx = toX - fromX;
-            const dy = toY - fromY;
-            const len = Math.max(1, Math.hypot(dx, dy));
-            const ux = dx / len;
-            const uy = dy / len;
-            const headX = fromX + dx * Math.min(1, 0.35 + progress * 0.65);
-            const headY = fromY + dy * Math.min(1, 0.35 + progress * 0.65);
-
-            ctx.save();
-            ctx.globalAlpha = alpha;
-            ctx.strokeStyle = cue.color;
-            ctx.fillStyle = cue.color;
-            ctx.lineWidth = 4;
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            ctx.moveTo(fromX + ux * 10, fromY + uy * 10);
-            ctx.lineTo(headX, headY);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(headX, headY);
-            ctx.lineTo(headX - ux * 12 - uy * 6, headY - uy * 12 + ux * 6);
-            ctx.lineTo(headX - ux * 12 + uy * 6, headY - uy * 12 - ux * 6);
-            ctx.closePath();
-            ctx.fill();
-            if (cue.label) {
-                ctx.font = `bold 10px ${UI.fontMono}`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(cue.label, headX, headY - 16);
-            }
-            ctx.restore();
-        }
-    }
-
-    private renderHoverTile(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
-        if (this.hoverTile.x < 0 || this.hoverTile.y < 0) return;
-        ctx.strokeStyle = this.worldMap.isWalkable(this.hoverTile.x, this.hoverTile.y)
-            ? 'rgba(255,255,255,0.32)'
-            : 'rgba(255,70,70,0.35)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(this.hoverTile.x * TILE_SIZE - camX + 1, this.hoverTile.y * TILE_SIZE - camY + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-    }
-
-    private renderGauge(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, pct: number, color: string): void {
-        ctx.fillStyle = 'rgba(0,0,0,0.65)';
-        ctx.fillRect(x, y, w, 4);
-        ctx.fillStyle = color;
-        ctx.fillRect(x, y, w * Math.max(0, Math.min(1, pct)), 4);
-    }
-
-    private renderHpBar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, hp: number, maxHp: number): void {
-        ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        ctx.fillRect(x, y, w, 5);
-        ctx.fillStyle = '#d95454';
-        ctx.fillRect(x, y, w * Math.max(0, Math.min(1, hp / Math.max(1, maxHp))), 5);
-    }
-
-    private formatRaidTime(seconds: number): string {
-        const total = Math.max(0, Math.floor(seconds));
-        return `${Math.floor(total / 60).toString().padStart(2, '0')}:${(total % 60).toString().padStart(2, '0')}`;
-    }
-
-    private renderHud(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
-        renderGameTitle(ctx, 16, 12, { scale: 0.7, subtitle: '' });
-
-        const active = this.party.getActive();
-        if (active) {
-            const effective = getEffectiveStatsForCharacter(active);
-            drawParchmentPanel(ctx, 16, 56, 210, 80);
-            ctx.fillStyle = Parchment.textDark;
-            ctx.font = `bold 11px ${UI.fontMono}`;
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
-            ctx.fillText(`${active.name} Lv.${active.level}`, 28, 68);
-            ctx.fillStyle = Parchment.textMid;
-            ctx.font = `10px ${UI.fontMono}`;
-            ctx.fillText(`HP ${active.stats.hp}/${effective.maxHp}  MP ${active.stats.mp}/${effective.maxMp}`, 28, 84);
-            ctx.fillText(`ATB ${Math.floor(this.player.actionGauge)}%`, 28, 100);
-            const activeActor = this.getControlledActor();
-            const apText = activeActor?.id === this.activeTurnActorId
-                ? `${this.remainingActionPoints}/${active.stats.actionLimit}`
-                : `-/${active.stats.actionLimit}`;
-            ctx.fillText(`AP ${apText}`, 28, 116);
-        }
-
-        drawParchmentPanel(ctx, 16, 146, 130, 28);
-        ctx.fillStyle = '#ffcc00';
-        ctx.font = `bold 11px ${UI.fontMono}`;
-        ctx.textAlign = 'left';
-        ctx.fillText(`${this.playerData.gold} G`, 28, 154);
-
-        let infoY = 184;
-        if (this.raidActive) {
-            drawParchmentPanel(ctx, 16, 180, 210, 48);
-            const remaining = Math.max(0, this.raidLimitSeconds - this.raidElapsedSeconds);
-            ctx.fillStyle = shouldAdvanceRaidTimer({
-                raidActive: this.raidActive,
-                townVisible: this.townUI.isVisible(),
-                resultVisible: this.raidResultUI.isVisible(),
-                turnCombatActive: this.isTurnCombatActive(),
-            }) ? '#8a2d2d' : Parchment.textMid;
-            ctx.font = `bold 11px ${UI.fontMono}`;
-            ctx.fillText(`남은 시간 ${this.formatRaidTime(remaining)}`, 28, 190);
-            ctx.fillStyle = Parchment.textMid;
-            ctx.font = `9px ${UI.fontMono}`;
-            ctx.fillText(`출발 ${this.departureTownId}`, 28, 206);
-            ctx.fillText('목표: 다른 마을 생환', 28, 218);
-            infoY = 238;
-        }
-
-        ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.font = `9px ${UI.fontMono}`;
-        ctx.fillText(`(${this.player.gridX}, ${this.player.gridY})`, 16, infoY);
-
-        const selectedInfo = this.getSelectedDisplayInfo();
-        if (selectedInfo) {
-            this.entityInfoUI.setPosition(16, infoY + 18);
-            this.entityInfoUI.render(ctx, selectedInfo);
-        }
-
-        this.renderTerrainHoverInfo(ctx, vw);
-        this.renderActionModeHint(ctx, vw, vh);
-        this.renderCombatLog(ctx, vw, vh);
-        this.tacticalMenuUI.render(ctx);
-        this.magicUI.render(ctx, vw, vh);
-
-        ctx.fillStyle = 'rgba(255,255,255,0.32)';
-        ctx.font = `9px ${UI.fontMono}`;
-        ctx.textAlign = 'right';
-        ctx.fillText('캐릭터 클릭 행동 메뉴 | Tab 교체 | ESC 취소 | I 인벤토리', vw - 16, vh - 16);
-        ctx.textAlign = 'start';
-        ctx.textBaseline = 'alphabetic';
-    }
-
-    private renderTerrainHoverInfo(ctx: CanvasRenderingContext2D, vw: number): void {
-        if (this.hoverTile.x < 0 || this.hoverTile.y < 0) return;
-        const activeActor = this.getControlledActor();
-        const tile = this.worldMap.getTileAt(this.hoverTile.x, this.hoverTile.y);
-        const lines = describeTerrainForHover(tile, activeActor ? this.getActorTerrainTraits(activeActor) : {});
-        const w = 214;
-        const h = 18 + lines.length * 14;
-        const x = Math.max(16, vw - w - 16);
-        const y = 56;
-        drawGlassPanel(ctx, x, y, w, h);
-        ctx.fillStyle = 'rgba(255,255,255,0.82)';
-        ctx.font = `9px ${UI.fontMono}`;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        lines.forEach((line, index) => {
-            ctx.fillText(line, x + 10, y + 9 + index * 14);
-        });
     }
 
     private getSelectedDisplayInfo(): EntityDisplayInfo | null {
@@ -3130,7 +2438,7 @@ export class WorldEngine {
             const stats = getEffectiveStatsForEnemy(enemy);
             return {
                 name: enemy.name || enemy.label,
-                className: this.getEnemyRoleLabel(enemy.role),
+                className: getEnemyRoleLabel(enemy.role),
                 level: enemy.level,
                 hp: enemy.stats.hp,
                 maxHp: enemy.stats.maxHp,
@@ -3150,70 +2458,4 @@ export class WorldEngine {
         return null;
     }
 
-    private getEnemyRoleLabel(role: EnemyRole): string {
-        switch (role) {
-            case 'tank': return '탱커형 몬스터';
-            case 'archer': return '궁수형 몬스터';
-            case 'healer': return '힐러형 몬스터';
-            case 'coward': return '도망형 몬스터';
-            case 'support': return '지원형 몬스터';
-            case 'boss': return '보스 몬스터';
-            case 'bruiser':
-            default:
-                return '근접형 몬스터';
-        }
-    }
-
-    private renderActionModeHint(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
-        if (this.fieldMagicState.mode === 'targeting') {
-            ctx.fillStyle = 'rgba(200, 90, 255, 0.9)';
-            ctx.font = `bold 12px ${UI.fontMono}`;
-            ctx.textAlign = 'center';
-            ctx.fillText('마법 대상을 클릭 (ESC 취소)', vw / 2, vh - 50);
-            ctx.textAlign = 'start';
-            return;
-        }
-
-        if (!this.actionMode) return;
-
-        const text = this.actionMode === 'move'
-            ? '이동할 타일을 클릭 (ESC 취소)'
-            : this.actionMode === 'attack'
-                ? '공격할 적을 클릭 (ESC 취소)'
-                : '조사할 대상을 클릭 (ESC 취소)';
-        ctx.fillStyle = this.actionMode === 'attack'
-            ? 'rgba(255, 80, 80, 0.88)'
-            : this.actionMode === 'interact'
-                ? 'rgba(88, 210, 255, 0.88)'
-                : 'rgba(255, 204, 66, 0.9)';
-        ctx.font = `bold 12px ${UI.fontMono}`;
-        ctx.textAlign = 'center';
-        ctx.fillText(text, vw / 2, vh - 50);
-        ctx.textAlign = 'start';
-    }
-
-    private renderCombatLog(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
-        const x = this.hasSelection() ? 240 : 16;
-        const y = Math.max(188, vh - 150);
-        const w = Math.max(260, Math.min(430, vw - x - 16));
-        const h = 112;
-        drawGlassPanel(ctx, x, y, w, h);
-        ctx.font = `10px ${UI.fontMono}`;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        const visible = this.combatLog.slice(-5);
-        visible.forEach((line, index) => {
-            ctx.fillStyle = this.getCombatLogColor(line);
-            ctx.fillText(line, x + 12, y + 12 + index * 18, w - 24);
-        });
-    }
-
-    private getCombatLogColor(line: string): string {
-        if (line.includes('처치') || line.includes('치명')) return '#ffd15f';
-        if (line.includes('피해') || line.includes('약화') || line.includes('독')) return '#ff8a8a';
-        if (line.includes('회복') || line.includes('강화') || line.includes('방어')) return '#9dffb0';
-        if (line.includes('명중 실패') || line.includes('빗나감')) return '#d9d9e8';
-        if (line.includes('턴 시작') || line.includes('READY')) return '#88ddff';
-        return 'rgba(255,255,255,0.78)';
-    }
 }
