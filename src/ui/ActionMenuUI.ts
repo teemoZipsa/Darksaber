@@ -5,7 +5,7 @@
  */
 
 import { TILE_SIZE } from '../map/Chunk';
-import { UI } from './UITheme';
+import { UI, Parchment } from './UITheme';
 
 export type ActionType = 'tool' | 'attack' | 'emote' | 'rest' | 'defend' | 'counter' | 'magic' | 'move' | 'open';
 
@@ -105,15 +105,22 @@ export class ActionMenuUI {
 
         ctx.save();
 
-        // Blurred backdrop circle (simulated with layered transparency)
+        // Parchment-tinted backdrop circle (warm beige with dark border)
         const outerR = this.menuRadius + this.iconRadius + 12;
         ctx.beginPath();
         ctx.arc(this.centerX, this.centerY, outerR, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(8, 10, 20, 0.6)';
+        ctx.fillStyle = 'rgba(58, 38, 24, 0.55)';
         ctx.fill();
-        ctx.strokeStyle = UI.borderSubtle;
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = Parchment.borderDark;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(this.centerX, this.centerY, outerR - 3, 0, Math.PI * 2);
+        ctx.strokeStyle = Parchment.borderLight;
+        ctx.globalAlpha = 0.5;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
 
         // Draw each slot
         for (const slot of this.activeSlots) {
@@ -127,33 +134,42 @@ export class ActionMenuUI {
 
             if (isReady) {
                 if (isHovered) {
-                    ctx.fillStyle = 'rgba(240, 192, 80, 0.25)';
-                    ctx.shadowColor = UI.textAccent;
+                    ctx.fillStyle = Parchment.panelBgLight;
+                    ctx.shadowColor = Parchment.borderGold;
                     ctx.shadowBlur = 10;
                 } else {
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+                    ctx.fillStyle = Parchment.panelBg;
                 }
                 ctx.fill();
-                ctx.strokeStyle = isHovered ? UI.borderAccentBright : UI.borderAccent;
+                ctx.strokeStyle = isHovered ? Parchment.borderGold : Parchment.borderDark;
+                ctx.lineWidth = isHovered ? 2 : 1.5;
             } else {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+                ctx.fillStyle = 'rgba(120, 100, 70, 0.35)';
                 ctx.fill();
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+                ctx.strokeStyle = 'rgba(58, 38, 24, 0.35)';
+                ctx.lineWidth = 1;
             }
             ctx.shadowBlur = 0;
-            ctx.lineWidth = 1;
             ctx.stroke();
 
             // Draw icon
             slot.iconDraw(ctx, ix, iy, r * 0.5, isReady);
 
-            // Label — only on hover
+            // Label — only on hover (parchment-style floating tooltip)
             if (isHovered) {
-                ctx.fillStyle = isReady ? UI.textAccent : UI.textSecondary;
-                ctx.font = `10px ${UI.fontPrimary}`;
+                ctx.font = `bold 12px ${UI.fontPrimary}`;
+                const labelW = ctx.measureText(slot.label).width + 14;
+                const labelX = ix - labelW / 2;
+                const labelY = iy + r + 4;
+                ctx.fillStyle = Parchment.panelBg;
+                ctx.fillRect(labelX, labelY, labelW, 16);
+                ctx.strokeStyle = Parchment.borderDark;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(labelX, labelY, labelW, 16);
+                ctx.fillStyle = isReady ? Parchment.textDark : Parchment.textMuted;
                 ctx.textAlign = 'center';
-                ctx.textBaseline = 'top';
-                ctx.fillText(slot.label, ix, iy + r + 4);
+                ctx.textBaseline = 'middle';
+                ctx.fillText(slot.label, ix, labelY + 8);
                 ctx.textAlign = 'start';
                 ctx.textBaseline = 'alphabetic';
             }
@@ -177,16 +193,16 @@ export class ActionMenuUI {
         ctx.save();
         ctx.globalAlpha = 0.85;
 
-        // Tiny boot/shoe icon
-        ctx.fillStyle = UI.textAccent;
+        // Tiny boot/shoe icon — burnished gold for "ready"
+        ctx.fillStyle = '#c8922a';
         ctx.fillRect(bx - 4 * s, by - 1 * s, 6 * s, 2 * s);
         ctx.fillRect(bx - 4 * s, by - 4 * s, 2 * s, 3 * s);
         ctx.fillRect(bx - 2 * s, by - 3 * s, 4 * s, 2 * s);
 
         // Subtle glow
-        ctx.shadowColor = UI.textAccent;
+        ctx.shadowColor = '#c8922a';
         ctx.shadowBlur = 6;
-        ctx.fillStyle = 'rgba(240, 192, 80, 0.2)';
+        ctx.fillStyle = 'rgba(200, 146, 42, 0.25)';
         ctx.fillRect(bx - 5 * s, by - 5 * s, 8 * s, 7 * s);
         ctx.shadowBlur = 0;
 

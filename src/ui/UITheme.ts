@@ -56,9 +56,10 @@ export const UI = {
     radiusLg: 20,
     radiusFull: 999,
 
-    // Font
-    fontPrimary: '\"DOSMyungjo\", serif',
-    fontMono: '\"DOSMyungjo\", serif',
+    // Font — sans-serif Korean for readability; DOSMyungjo only for the decorative title logo.
+    fontPrimary: '"Pretendard", "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif',
+    fontMono: '"Pretendard", "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif',
+    fontTitle: '"DOSMyungjo", serif',
 
     // Transition (for manual lerp calculations)
     transitionMs: 150,
@@ -77,6 +78,9 @@ export function lerp(a: number, b: number, t: number): number {
 }
 
 /**
+ * @deprecated Glass-morphism is being phased out in favor of `drawParchmentPanel`
+ * (Darksaber canon style). Use `drawParchmentPanel` for new code.
+ *
  * Draw a glass-morphism panel with subtle border and rounded corners.
  */
 export function drawGlassPanel(
@@ -343,6 +347,9 @@ export const DarkParchment = {
 } as const;
 
 /**
+ * @deprecated Use `drawParchmentPanel` (light Darksaber canon). The dark-parchment
+ * variant is being unified into the warm beige Parchment palette.
+ *
  * Draw a dark-parchment panel — the unified container style for Sin Eater.
  * Double border (dark outer + light inner), rounded corners, subtle shadow.
  */
@@ -443,9 +450,12 @@ export function drawParchmentPanel(
     options?: {
         radius?: number;
         shadow?: boolean;
+        headerH?: number;     // If > 0, draw a darker gold-tinted header band
+        compact?: boolean;    // Skip the 3rd inner fill (for small panels)
     }
 ): void {
     const r = options?.radius ?? Parchment.radius;
+    const compact = options?.compact ?? false;
 
     ctx.save();
 
@@ -473,11 +483,37 @@ export function drawParchmentPanel(
     ctx.fillStyle = Parchment.panelBgLight;
     ctx.fill();
 
-    // Another inner fill (classic retro 3-layer)
-    ctx.beginPath();
-    roundRect(ctx, x + 5, y + 5, w - 10, h - 10, Math.max(0, r - 3));
-    ctx.fillStyle = Parchment.panelBgInner;
-    ctx.fill();
+    // Another inner fill (classic retro 3-layer) — skipped in compact mode
+    if (!compact) {
+        ctx.beginPath();
+        roundRect(ctx, x + 5, y + 5, w - 10, h - 10, Math.max(0, r - 3));
+        ctx.fillStyle = Parchment.panelBgInner;
+        ctx.fill();
+    }
+
+    // Header band (darker gold tint, classic Sin Eater title bar)
+    if (options?.headerH && options.headerH > 0) {
+        ctx.save();
+        ctx.beginPath();
+        roundRect(ctx, x + 2, y + 2, w - 4, options.headerH, Math.max(0, r - 1));
+        ctx.clip();
+        // gradient: gold top → fade
+        const grad = ctx.createLinearGradient(x, y, x, y + options.headerH);
+        grad.addColorStop(0, 'rgba(196, 142, 60, 0.55)');
+        grad.addColorStop(1, 'rgba(196, 142, 60, 0.10)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(x + 2, y + 2, w - 4, options.headerH);
+        ctx.restore();
+        // header underline
+        ctx.beginPath();
+        ctx.moveTo(x + 6, y + options.headerH + 2);
+        ctx.lineTo(x + w - 6, y + options.headerH + 2);
+        ctx.strokeStyle = Parchment.borderDark;
+        ctx.globalAlpha = 0.5;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+    }
 
     // Outer border (dark)
     ctx.beginPath();
@@ -492,6 +528,83 @@ export function drawParchmentPanel(
     ctx.strokeStyle = Parchment.borderLight;
     ctx.lineWidth = 1;
     ctx.stroke();
+
+    ctx.restore();
+}
+
+/**
+ * Draw a parchment-style button with hover/active/disabled states.
+ * Replaces the deprecated glass `drawButton`.
+ */
+export function drawParchmentButton(
+    ctx: CanvasRenderingContext2D,
+    x: number, y: number, w: number, h: number,
+    label: string,
+    state: 'default' | 'hover' | 'active' | 'disabled' = 'default'
+): void {
+    const r = 4;
+    ctx.save();
+
+    let bg: string, textColor: string, borderColor: string, innerColor: string;
+    switch (state) {
+        case 'hover':
+            bg = Parchment.panelBgLight;
+            innerColor = 'rgba(220, 195, 145, 0.95)';
+            textColor = Parchment.textDark;
+            borderColor = Parchment.borderGold;
+            break;
+        case 'active':
+            bg = 'rgba(170, 138, 80, 0.95)';
+            innerColor = 'rgba(196, 162, 100, 0.95)';
+            textColor = Parchment.textDark;
+            borderColor = Parchment.borderDark;
+            break;
+        case 'disabled':
+            bg = 'rgba(170, 150, 110, 0.6)';
+            innerColor = 'rgba(180, 160, 120, 0.6)';
+            textColor = Parchment.textMuted;
+            borderColor = 'rgba(58, 38, 24, 0.4)';
+            break;
+        default:
+            bg = Parchment.panelBg;
+            innerColor = Parchment.panelBgInner;
+            textColor = Parchment.textDark;
+            borderColor = Parchment.borderDark;
+    }
+
+    // Outer fill
+    ctx.beginPath();
+    roundRect(ctx, x, y, w, h, r);
+    ctx.fillStyle = bg;
+    ctx.fill();
+    // Inner fill (slight depth)
+    ctx.beginPath();
+    roundRect(ctx, x + 2, y + 2, w - 4, h - 4, Math.max(0, r - 1));
+    ctx.fillStyle = innerColor;
+    ctx.fill();
+    // Border (dark outer)
+    ctx.beginPath();
+    roundRect(ctx, x, y, w, h, r);
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Inner gold border
+    ctx.beginPath();
+    roundRect(ctx, x + 3, y + 3, w - 6, h - 6, Math.max(0, r - 2));
+    ctx.strokeStyle = Parchment.borderLight;
+    ctx.lineWidth = 0.5;
+    ctx.globalAlpha = state === 'disabled' ? 0.3 : 0.7;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Label
+    ctx.fillStyle = textColor;
+    ctx.font = `14px ${UI.fontPrimary}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, x + w / 2, y + h / 2);
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
 
     ctx.restore();
 }

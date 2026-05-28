@@ -6,7 +6,7 @@
  */
 
 import { Skill, getLearnedSkills } from '../data/SkillDB';
-import { UI, drawGlassPanel } from './UITheme';
+import { UI, drawParchmentPanel, Parchment } from './UITheme';
 
 export class MagicUI {
     private visible = false;
@@ -157,48 +157,36 @@ export class MagicUI {
 
         ctx.save();
 
-        // ── Glass panel backdrop ──
-        drawGlassPanel(ctx, px, py, this.PANEL_W, this.panelH, {
-            radius: 10, shadow: true, bg: 'rgba(8, 10, 24, 0.92)'
+        // ── Parchment panel backdrop with header band ──
+        drawParchmentPanel(ctx, px, py, this.PANEL_W, this.panelH, {
+            radius: 10, headerH: this.HEADER_H,
         });
 
-        // ── Header ──
-        ctx.fillStyle = 'rgba(240, 192, 80, 0.12)';
-        ctx.fillRect(px + 1, py + 1, this.PANEL_W - 2, this.HEADER_H);
-
         // Drag handle dots (3 vertical dots)
-        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.fillStyle = 'rgba(58, 38, 24, 0.45)';
         for (let d = 0; d < 3; d++) {
             ctx.fillRect(px + 6, py + 10 + d * 6, 2, 2);
         }
 
         // Title
-        ctx.fillStyle = UI.textAccent;
-        ctx.font = `bold 13px ${UI.fontPrimary}`;
+        ctx.fillStyle = Parchment.textDark;
+        ctx.font = `bold 15px ${UI.fontPrimary}`;
         ctx.textAlign = 'left';
         ctx.fillText('✦ 마법', px + 14, py + 22);
 
-        // MP indicator
-        ctx.fillStyle = UI.textSecondary;
-        ctx.font = `11px ${UI.fontMono}`;
+        // MP indicator (dark on gold header for contrast)
+        ctx.fillStyle = Parchment.textDark;
+        ctx.font = `bold 13px ${UI.fontPrimary}`;
         ctx.textAlign = 'right';
         ctx.fillText(`MP ${this.currentMp}/${this.maxMp}`, px + this.PANEL_W - 30, py + 22);
         ctx.textAlign = 'left';
 
         // Close button
-        ctx.fillStyle = 'rgba(255,80,80,0.7)';
+        ctx.fillStyle = '#a01818';
         ctx.font = `bold 14px ${UI.fontPrimary}`;
         ctx.textAlign = 'center';
         ctx.fillText('✕', px + this.PANEL_W - 14, py + 19);
         ctx.textAlign = 'left';
-
-        // ── Divider ──
-        ctx.strokeStyle = UI.borderSubtle;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(px + 8, py + this.HEADER_H);
-        ctx.lineTo(px + this.PANEL_W - 8, py + this.HEADER_H);
-        ctx.stroke();
 
         // ── Skill rows ──
         const listY = py + this.HEADER_H;
@@ -214,23 +202,24 @@ export class MagicUI {
 
             // Row highlight
             if (isHovered && canCast) {
-                ctx.fillStyle = 'rgba(240, 192, 80, 0.12)';
+                ctx.fillStyle = 'rgba(196, 142, 60, 0.28)';
                 ctx.fillRect(px + 2, rowY, this.PANEL_W - 4, this.ROW_H);
             }
 
             // Icon
             ctx.font = `14px serif`;
+            ctx.fillStyle = Parchment.textDark;
             ctx.fillText(skill.icon, px + 10, rowY + 24);
 
             // Skill name
-            ctx.font = `12px ${UI.fontPrimary}`;
+            ctx.font = `bold 13px ${UI.fontPrimary}`;
             ctx.fillStyle = canCast
-                ? (isHovered ? UI.textAccent : '#e0e0e0')
-                : 'rgba(255,255,255,0.3)';
+                ? Parchment.textDark
+                : Parchment.textMuted;
             ctx.fillText(skill.nameKr, px + 34, rowY + 16);
 
             // Tier badge
-            ctx.font = `9px ${UI.fontMono}`;
+            ctx.font = `11px ${UI.fontPrimary}`;
             ctx.fillStyle = this.getTierColor(skill.tier);
             ctx.fillText(`T${skill.tier}`, px + 34, rowY + 30);
 
@@ -239,24 +228,24 @@ export class MagicUI {
             ctx.fillText(this.getElementLabel(skill.element), px + 56, rowY + 30);
 
             // Type tag
-            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.fillStyle = Parchment.textMuted;
             ctx.fillText(this.getTypeLabel(skill.type), px + 100, rowY + 30);
 
             // MP cost (right side)
-            ctx.font = `11px ${UI.fontMono}`;
+            ctx.font = `bold 13px ${UI.fontPrimary}`;
             ctx.textAlign = 'right';
-            ctx.fillStyle = canCast ? '#66bbff' : '#ff4444';
+            ctx.fillStyle = canCast ? '#1f4878' : '#a01818';
             ctx.fillText(`${skill.mpCost} MP`, px + this.PANEL_W - 12, rowY + 16);
 
             // Power (right side small)
-            ctx.font = `9px ${UI.fontMono}`;
-            ctx.fillStyle = 'rgba(255,255,255,0.35)';
+            ctx.font = `11px ${UI.fontPrimary}`;
+            ctx.fillStyle = Parchment.textDark;
             ctx.fillText(`×${skill.power}`, px + this.PANEL_W - 12, rowY + 30);
             ctx.textAlign = 'left';
 
             // Row divider
             if (i < visibleCount - 1) {
-                ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+                ctx.strokeStyle = 'rgba(58, 38, 24, 0.15)';
                 ctx.beginPath();
                 ctx.moveTo(px + 10, rowY + this.ROW_H);
                 ctx.lineTo(px + this.PANEL_W - 10, rowY + this.ROW_H);
@@ -271,7 +260,7 @@ export class MagicUI {
             const maxScroll = this.skills.length - this.MAX_VISIBLE;
             const thumbY = listY + (this.scrollOffset / maxScroll) * (totalH - thumbH);
 
-            ctx.fillStyle = 'rgba(255,255,255,0.12)';
+            ctx.fillStyle = 'rgba(58, 38, 24, 0.35)';
             ctx.fillRect(px + this.PANEL_W - 5, thumbY, 3, thumbH);
         }
 
@@ -287,16 +276,14 @@ export class MagicUI {
             if (tipX + tipW > canvasW) tipX = px - tipW - 6;
             if (tipY + tipH > canvasH) tipY = canvasH - tipH - 4;
 
-            drawGlassPanel(ctx, tipX, tipY, tipW, tipH, {
-                radius: 6, shadow: true, bg: 'rgba(8, 10, 24, 0.95)'
-            });
+            drawParchmentPanel(ctx, tipX, tipY, tipW, tipH, { radius: 6, compact: true });
 
-            ctx.fillStyle = '#ccc';
-            ctx.font = `10px ${UI.fontPrimary}`;
+            ctx.fillStyle = Parchment.textDark;
+            ctx.font = `12px ${UI.fontPrimary}`;
             ctx.fillText(skill.descKr, tipX + 8, tipY + 16);
 
-            ctx.fillStyle = 'rgba(255,255,255,0.4)';
-            ctx.font = `9px ${UI.fontMono}`;
+            ctx.fillStyle = Parchment.textDark;
+            ctx.font = `11px ${UI.fontPrimary}`;
             ctx.fillText(`범위: ${skill.range} | 반경: ${skill.aoeRadius} | 위력: ×${skill.power}`, tipX + 8, tipY + 32);
         }
 

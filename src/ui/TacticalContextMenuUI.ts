@@ -1,6 +1,6 @@
 import { t } from '../i18n/LanguageManager';
 import type { TacticalCommand, TacticalMenuItem } from '../field/TacticalMarkers';
-import { drawGlassPanel, UI } from './UITheme';
+import { drawParchmentPanel, Parchment, UI } from './UITheme';
 
 export class TacticalContextMenuUI {
     private visible = false;
@@ -51,15 +51,10 @@ export class TacticalContextMenuUI {
         if (!this.visible) return;
 
         const h = this.getHeight();
-        drawGlassPanel(ctx, this.x, this.y, this.width, h, {
-            bg: 'rgba(12, 15, 24, 0.92)',
-            border: UI.borderAccent,
-            radius: 6,
-            shadow: true,
-        });
+        drawParchmentPanel(ctx, this.x, this.y, this.width, h, { radius: 6, compact: true });
 
         ctx.save();
-        ctx.font = `11px ${UI.fontMono}`;
+        ctx.font = `bold 13px ${UI.fontPrimary}`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
 
@@ -70,14 +65,14 @@ export class TacticalContextMenuUI {
             const isHovered = i === this.hoveredIndex;
 
             if (isHovered) {
-                ctx.fillStyle = 'rgba(240, 192, 80, 0.18)';
+                ctx.fillStyle = 'rgba(196, 142, 60, 0.32)';
                 ctx.fillRect(rowX, rowY, rowW, this.rowHeight);
-                ctx.strokeStyle = 'rgba(240, 192, 80, 0.45)';
+                ctx.strokeStyle = Parchment.borderGold;
                 ctx.lineWidth = 1;
                 ctx.strokeRect(rowX + 0.5, rowY + 0.5, rowW - 1, this.rowHeight - 1);
             }
 
-            ctx.fillStyle = isHovered ? UI.textAccent : UI.textPrimary;
+            ctx.fillStyle = Parchment.textDark;
             ctx.fillText(t(this.items[i].labelKey), rowX + 10, rowY + this.rowHeight / 2);
         }
 

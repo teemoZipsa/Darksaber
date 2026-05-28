@@ -14,6 +14,7 @@ import type { WorldPlayerActionController } from './WorldPlayerActionController'
 import type { WorldSelectionController } from './WorldSelectionController';
 import type { WorldTacticalController } from './WorldTacticalController';
 import type { MinimapUI } from '../../ui/MinimapUI';
+import { CombatLogUI } from '../../ui/CombatLogUI';
 
 type WorldInputFieldHit = FieldHit<FieldHitParty, Enemy, LootObject>;
 
@@ -42,6 +43,7 @@ export interface WorldInputContext {
     closeTacticalMenu: () => void;
     clearIntent: () => void;
     log: (message: string) => void;
+    getCombatLog: () => string[];
 }
 
 export class WorldInputController {
@@ -52,6 +54,16 @@ export class WorldInputController {
     }
 
     public process(input: InputManager, camera: Camera): void {
+        // Combat log claims wheel/drag inside its region first.
+        const canvasSize = this.context.getCanvasSize();
+        const logConsumed = CombatLogUI.update(
+            input,
+            this.context.getCombatLog().length,
+            canvasSize.width,
+            canvasSize.height,
+        );
+        if (logConsumed) return;
+
         if (input.mouseWheelDelta !== 0 && !this.context.magicController.isVisible()) {
             if (input.mouseWheelDelta > 0) camera.zoomOut();
             else camera.zoomIn();

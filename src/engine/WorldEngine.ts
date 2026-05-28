@@ -342,6 +342,7 @@ export class WorldEngine {
             closeTacticalMenu: () => this.closeTacticalMenu(),
             clearIntent: () => this.clearIntent(),
             log: (message) => this.addCombatLog(message),
+            getCombatLog: () => this.combatLog,
         });
 
         this.spawnPartyAtCurrentHub();
@@ -1127,7 +1128,8 @@ export class WorldEngine {
 
     private addCombatLog(message: string): void {
         this.combatLog.push(message);
-        if (this.combatLog.length > 7) this.combatLog.shift();
+        // Keep a generous history so drag-to-scroll can reach further back.
+        if (this.combatLog.length > 200) this.combatLog.shift();
     }
 
     private spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void {

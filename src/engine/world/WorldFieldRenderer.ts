@@ -1,8 +1,9 @@
 import { TILE_SIZE } from '../../map/Chunk';
 import { getEffectiveStatsForCharacter } from '../../combat/StatusEffects';
-import { UI, DarkParchment, drawDarkPanel, renderGameTitle } from '../../ui/UITheme';
+import { UI, Parchment, drawParchmentPanel, renderGameTitle } from '../../ui/UITheme';
+import { CombatLogUI } from '../../ui/CombatLogUI';
 import { ENEMY_ROLE_GLYPHS } from '../../field/FieldConfig';
-import { formatRaidTime, getCombatLogColor, getTacticalMarkerColor } from '../../field/FieldDisplay';
+import { formatRaidTime, getTacticalMarkerColor } from '../../field/FieldDisplay';
 import type { Entity } from '../../entity/Entity';
 import type { TacticalMarker } from '../../field/TacticalMarkers';
 import type { WorldRenderModel } from './WorldRenderModel';
@@ -209,74 +210,97 @@ export class WorldFieldRenderer {
     }
 
     public static renderHudPanels(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number, vh: number): number {
-        renderGameTitle(ctx, 16, 12, { scale: 0.7, subtitle: '' });
+        // ── HUD column grid ────────────────────────────────────────
+        // All left-column panels share the same x, width, and gap so they
+        // read as one stack. Internal text uses two columns (left/right).
+        const HUD_X       = 16;
+        const HUD_W       = 232;
+        const TEXT_X      = HUD_X + 14;          // 30 — left text column
+        const RIGHT_X     = HUD_X + HUD_W - 92;  // 156 — right text column
+        const PANEL_GAP   = 8;
 
+        renderGameTitle(ctx, HUD_X, 12, { scale: 0.7, subtitle: '' });
+
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+
+        // ── Panel 1: Character status ─────────────────────────────
+        const charY = 56;
+        const charH = 100;
         if (model.activeCharacter) {
             const active = model.activeCharacter;
             const effective = getEffectiveStatsForCharacter(active);
-            drawDarkPanel(ctx, 16, 56, 238, 94, { headerH: 28 });
-            ctx.fillStyle = DarkParchment.textLabel;
-            ctx.font = `bold 13px ${UI.fontMono}`;
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
-            ctx.fillText(`${active.name}  T${active.currentTier} Lv.${active.level}`, 30, 68);
-            ctx.fillStyle = DarkParchment.textBody;
-            ctx.font = `11px ${UI.fontMono}`;
-            ctx.fillText(active.getTierName(), 30, 92);
-            ctx.fillStyle = '#e8dfc8';
-            ctx.fillText(`HP ${active.stats.hp}/${effective.maxHp}`, 30, 113);
-            ctx.fillText(`MP ${active.stats.mp}/${effective.maxMp}`, 116, 113);
-            ctx.fillStyle = '#b8e7ff';
-            ctx.fillText(`ATB ${Math.floor(model.player.actionGauge)}%`, 30, 132);
+            drawParchmentPanel(ctx, HUD_X, charY, HUD_W, charH, { headerH: 28 });
+
+            // Title row (on gold header band)
+            ctx.fillStyle = Parchment.textDark;
+            ctx.font = `bold 14px ${UI.fontPrimary}`;
+            ctx.fillText(`${active.name}  T${active.currentTier} Lv.${active.level}`, TEXT_X, charY + 8);
+
+            // Tier name (just below header underline)
+            ctx.fillStyle = Parchment.textMid;
+            ctx.font = `12px ${UI.fontPrimary}`;
+            ctx.fillText(`[ ${active.getTierName()} ]`, TEXT_X, charY + 34);
+
+            // Stats grid: 2 cols × 2 rows
+            ctx.font = `bold 13px ${UI.fontPrimary}`;
+            ctx.fillStyle = '#7a2030';
+            ctx.fillText(`HP ${active.stats.hp}/${effective.maxHp}`, TEXT_X, charY + 56);
+            ctx.fillStyle = '#1f4878';
+            ctx.fillText(`MP ${active.stats.mp}/${effective.maxMp}`, RIGHT_X, charY + 56);
+            ctx.fillStyle = '#7a4c10';
+            ctx.fillText(`ATB ${Math.floor(model.player.actionGauge)}%`, TEXT_X, charY + 76);
             const apText = model.controlledActor?.id === model.activeTurnActorId
                 ? `${model.remainingActionPoints}/${active.stats.actionLimit}`
                 : `-/${active.stats.actionLimit}`;
-            ctx.fillStyle = '#ffe080';
-            ctx.fillText(`AP ${apText}`, 130, 132);
+            ctx.fillStyle = '#5c3a08';
+            ctx.fillText(`AP ${apText}`, RIGHT_X, charY + 76);
         }
 
-        drawDarkPanel(ctx, 16, 160, 176, 48, { shadow: false });
-        ctx.fillStyle = '#ffcc00';
-        ctx.font = `bold 12px ${UI.fontMono}`;
-        ctx.textAlign = 'left';
-        ctx.fillText(`${model.gold} G`, 30, 172);
-        ctx.fillStyle = DarkParchment.textBody;
-        ctx.font = `10px ${UI.fontMono}`;
-        ctx.fillText(model.worldName, 30, 190);
+        // ── Panel 2: Gold + World ─────────────────────────────────
+        const goldY = charY + charH + PANEL_GAP;
+        const goldH = 46;
+        drawParchmentPanel(ctx, HUD_X, goldY, HUD_W, goldH, { shadow: false, compact: true });
+        ctx.fillStyle = '#7a5410';
+        ctx.font = `bold 14px ${UI.fontPrimary}`;
+        ctx.fillText(`${model.gold} G`, TEXT_X, goldY + 8);
+        ctx.fillStyle = Parchment.textMid;
+        ctx.font = `12px ${UI.fontPrimary}`;
+        ctx.fillText(model.worldName, TEXT_X, goldY + 26);
 
-        let infoY = 220;
+        // ── Panel 3: Raid timer (conditional) ─────────────────────
+        let nextY = goldY + goldH + PANEL_GAP;
         if (model.raid.active) {
-            drawDarkPanel(ctx, 16, 220, 238, 62, {
-                bg: model.raid.timerAdvancing ? 'rgba(42, 20, 20, 0.92)' : undefined,
-                borderColor: model.raid.timerAdvancing ? 'rgba(230, 82, 82, 0.75)' : undefined,
-            });
+            const raidH = 68;
+            drawParchmentPanel(ctx, HUD_X, nextY, HUD_W, raidH, { headerH: 26 });
             const remaining = Math.max(0, model.raid.limitSeconds - model.raid.elapsedSeconds);
-            ctx.fillStyle = model.raid.timerAdvancing ? '#ff9090' : '#ffe080';
-            ctx.font = `bold 13px ${UI.fontMono}`;
-            ctx.fillText(`남은 시간 ${formatRaidTime(remaining)}`, 30, 233);
-            ctx.fillStyle = DarkParchment.textBody;
-            ctx.font = `10px ${UI.fontMono}`;
-            ctx.fillText(`출발 ${model.raid.departureTownId}`, 30, 253);
-            ctx.fillText('목표: 다른 마을 생환', 30, 267);
-            infoY = 294;
+            ctx.fillStyle = model.raid.timerAdvancing ? '#a01818' : Parchment.textDark;
+            ctx.font = `bold 14px ${UI.fontPrimary}`;
+            ctx.fillText(`남은 시간 ${formatRaidTime(remaining)}`, TEXT_X, nextY + 7);
+            ctx.fillStyle = Parchment.textMid;
+            ctx.font = `12px ${UI.fontPrimary}`;
+            ctx.fillText(`출발 ${model.raid.departureTownId}`, TEXT_X, nextY + 36);
+            ctx.fillText('목표: 다른 마을 생환', TEXT_X, nextY + 52);
+            nextY += raidH + PANEL_GAP;
         }
 
-        ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.font = `10px ${UI.fontMono}`;
-        ctx.fillText(`좌표 ${model.player.gridX}, ${model.player.gridY}`, 16, infoY);
+        // Coord readout — small, low contrast, plain (no panel)
+        const infoY = nextY;
+        ctx.fillStyle = 'rgba(45, 31, 18, 0.65)';
+        ctx.font = `11px ${UI.fontPrimary}`;
+        ctx.fillText(`좌표 ${model.player.gridX}, ${model.player.gridY}`, HUD_X, infoY);
 
         renderTerrainHoverInfo(ctx, model, vw);
         renderActionModeHint(ctx, model, vw, vh);
         renderCombatLog(ctx, model, vw, vh);
 
-        ctx.fillStyle = 'rgba(8, 10, 14, 0.72)';
         const helpText = '캐릭터 클릭 행동 메뉴 | Tab 교체 | M 미니맵 | ESC 취소 | I 인벤토리';
-        ctx.font = `10px ${UI.fontMono}`;
+        ctx.font = `12px ${UI.fontPrimary}`;
         const helpW = ctx.measureText(helpText).width + 22;
-        ctx.fillRect(vw - helpW - 12, vh - 30, helpW, 22);
-        ctx.fillStyle = 'rgba(245,235,210,0.78)';
+        drawParchmentPanel(ctx, vw - helpW - 12, vh - 34, helpW, 26, { shadow: false, compact: true, radius: 4 });
+        ctx.fillStyle = Parchment.textDark;
         ctx.textAlign = 'right';
-        ctx.fillText(helpText, vw - 22, vh - 16);
+        ctx.fillText(helpText, vw - 22, vh - 17);
         ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
 
@@ -415,21 +439,17 @@ function renderHpBar(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
 
 function renderTerrainHoverInfo(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number): void {
     if (model.hoverTile.x < 0 || model.hoverTile.y < 0 || model.terrainHoverLines.length === 0) return;
-    const w = 236;
-    const h = 22 + model.terrainHoverLines.length * 16;
+    const w = 248;
+    const h = 22 + model.terrainHoverLines.length * 18;
     const x = Math.max(16, vw - w - 16);
     const y = 248;
-    drawDarkPanel(ctx, x, y, w, h, {
-        bg: 'rgba(16, 19, 24, 0.86)',
-        borderColor: 'rgba(200, 170, 80, 0.42)',
-        shadow: false,
-    });
-    ctx.fillStyle = 'rgba(245,238,220,0.9)';
-    ctx.font = `10px ${UI.fontMono}`;
+    drawParchmentPanel(ctx, x, y, w, h, { shadow: false, compact: true });
+    ctx.fillStyle = Parchment.textDark;
+    ctx.font = `12px ${UI.fontPrimary}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     model.terrainHoverLines.forEach((line, index) => {
-        ctx.fillText(line, x + 12, y + 10 + index * 16);
+        ctx.fillText(line, x + 12, y + 10 + index * 18);
     });
 }
 
@@ -460,33 +480,7 @@ function renderActionModeHint(ctx: CanvasRenderingContext2D, model: WorldRenderM
 }
 
 function renderCombatLog(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number, vh: number): void {
-    const x = model.hasSelection ? 240 : 16;
-    const y = Math.max(214, vh - 158);
-    const w = Math.max(260, Math.min(430, vw - x - 16));
-    const h = 118;
-    drawDarkPanel(ctx, x, y, w, h, {
-        bg: 'rgba(13, 16, 22, 0.84)',
-        borderColor: 'rgba(200, 170, 80, 0.34)',
-        radius: 8,
-        headerH: 24,
-    });
-    ctx.fillStyle = DarkParchment.textLabel;
-    ctx.font = `bold 10px ${UI.fontMono}`;
-    ctx.fillText('로그', x + 12, y + 8);
-
-    ctx.font = `11px ${UI.fontMono}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    const visible = model.combatLog.slice(-5);
-    visible.forEach((line, index) => {
-        const rowY = y + 31 + index * 16;
-        if (index % 2 === 0) {
-            ctx.fillStyle = 'rgba(255,255,255,0.035)';
-            ctx.fillRect(x + 8, rowY - 3, w - 16, 15);
-        }
-        ctx.fillStyle = getCombatLogColor(line);
-        ctx.fillText(line, x + 12, rowY, w - 24);
-    });
+    CombatLogUI.render(ctx, model.combatLog, vw, vh);
 }
 
 function renderCenterHint(
@@ -504,7 +498,20 @@ function renderCenterHint(
     const w = ctx.measureText(text).width + 34;
     const x = vw / 2 - w / 2;
     const y = vh - 70;
-    drawDarkPanel(ctx, x, y, w, 34, { bg, borderColor: 'rgba(255,255,255,0.18)', shadow: false });
+    // Semantic banner: keep colored bg (red/blue/gold) — UX state cue, not generic panel
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    const r = 6;
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + 34, r);
+    ctx.arcTo(x + w, y + 34, x, y + 34, r);
+    ctx.arcTo(x, y + 34, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = Parchment.borderLight;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
     ctx.fillStyle = fg;
     ctx.fillText(text, vw / 2, y + 17);
     ctx.restore();

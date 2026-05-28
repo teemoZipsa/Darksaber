@@ -1,5 +1,5 @@
 import { TILE_PROPERTIES, TileType } from '../map/Tile';
-import { drawDarkPanel, DarkParchment, UI } from './UITheme';
+import { drawParchmentPanel, Parchment, UI } from './UITheme';
 
 interface MinimapEntity {
     gridX: number;
@@ -83,32 +83,35 @@ export class MinimapUI {
         const tilePx = MAP_SIZE / (VIEW_RANGE * 2);
 
         ctx.save();
-        drawDarkPanel(ctx, this.panelX, this.panelY, PANEL_W, PANEL_H, {
-            bg: 'rgba(16, 19, 24, 0.9)',
-            borderColor: 'rgba(216, 180, 92, 0.75)',
+        drawParchmentPanel(ctx, this.panelX, this.panelY, PANEL_W, PANEL_H, {
             radius: 8,
             headerH: 24,
         });
 
-        ctx.fillStyle = DarkParchment.textLabel;
-        ctx.font = `bold 11px ${UI.fontMono}`;
+        ctx.fillStyle = Parchment.textDark;
+        ctx.font = `bold 13px ${UI.fontPrimary}`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillText('미니맵', this.panelX + 12, this.panelY + 15);
 
-        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.fillStyle = 'rgba(58, 38, 24, 0.15)';
         ctx.beginPath();
         ctx.arc(this.closeX, this.closeY, 10, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.24)';
+        ctx.strokeStyle = Parchment.borderDark;
+        ctx.lineWidth = 1;
         ctx.stroke();
-        ctx.fillStyle = '#efe3c4';
+        ctx.fillStyle = Parchment.textDark;
         ctx.font = `bold 10px ${UI.fontMono}`;
         ctx.textAlign = 'center';
         ctx.fillText('X', this.closeX, this.closeY + 1);
 
-        ctx.fillStyle = '#07090d';
+        // Dark map background — the minimap interior should stay dark for tile color contrast
+        ctx.fillStyle = '#1a140c';
         ctx.fillRect(mapX, mapY, MAP_SIZE, MAP_SIZE);
+        ctx.strokeStyle = Parchment.borderDark;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(mapX, mapY, MAP_SIZE, MAP_SIZE);
 
         for (let dy = -VIEW_RANGE; dy < VIEW_RANGE; dy++) {
             for (let dx = -VIEW_RANGE; dx < VIEW_RANGE; dx++) {

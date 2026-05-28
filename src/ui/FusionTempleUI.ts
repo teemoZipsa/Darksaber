@@ -2,7 +2,7 @@ import type { FusionCandidate } from '../character/FusionSystem';
 import type { MasterBranch } from '../data/ClassTree';
 import type { InputManager } from '../engine/InputManager';
 import type { WorldRealm } from '../map/BiomeMask';
-import { UI, drawButton, drawGlassPanel, renderGameTitle } from './UITheme';
+import { UI, Parchment, drawParchmentPanel, drawParchmentButton, renderGameTitle } from './UITheme';
 
 type TempleAction =
     | { kind: 'close' }
@@ -84,11 +84,7 @@ export class FusionTempleUI {
         const panelH = Math.min(560, h - 64);
         const x = Math.floor((w - panelW) / 2);
         const y = Math.floor((h - panelH) / 2);
-        drawGlassPanel(ctx, x, y, panelW, panelH, {
-            bg: 'rgba(14, 12, 22, 0.92)',
-            border: 'rgba(216, 164, 255, 0.28)',
-            radius: 8,
-        });
+        drawParchmentPanel(ctx, x, y, panelW, panelH, { radius: 8, headerH: 82 });
 
         this.buttons = [];
         this.renderHeader(ctx, x, y, panelW);
@@ -105,10 +101,10 @@ export class FusionTempleUI {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.font = `bold 28px ${UI.fontPrimary}`;
-        ctx.fillStyle = this.state.realm === 'master' ? '#bdf6ff' : '#f0c8ff';
+        ctx.fillStyle = this.state.realm === 'master' ? '#1f4878' : '#5a2d6e';
         ctx.fillText(this.state.realm === 'master' ? '현세의 문' : '융합의 신전', x + panelW / 2, y + 28);
         ctx.font = `13px ${UI.fontPrimary}`;
-        ctx.fillStyle = UI.textSecondary;
+        ctx.fillStyle = Parchment.textMid;
         ctx.fillText(
             this.state.realm === 'master' ? '마스터 월드와 현세를 잇는 문' : '출격 중인 세 계통의 전승자가 하나의 마스터 클래스로 융합합니다.',
             x + panelW / 2,
@@ -127,21 +123,21 @@ export class FusionTempleUI {
         let rowY = y + 108;
 
         for (const candidate of this.state.candidates) {
-            drawGlassPanel(ctx, rowX, rowY, rowW, rowH, {
-                bg: candidate.canFuse ? 'rgba(72, 42, 100, 0.34)' : 'rgba(255,255,255,0.045)',
-                border: candidate.canFuse ? 'rgba(240, 192, 80, 0.42)' : UI.borderSubtle,
-                radius: 6,
-                shadow: false,
-            });
+            drawParchmentPanel(ctx, rowX, rowY, rowW, rowH, { radius: 6, shadow: false, compact: true });
+            if (candidate.canFuse) {
+                ctx.strokeStyle = Parchment.borderGold;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(rowX + 1, rowY + 1, rowW - 2, rowH - 2);
+            }
 
-            ctx.fillStyle = candidate.canFuse ? UI.textAccent : UI.textPrimary;
+            ctx.fillStyle = candidate.canFuse ? '#5a2d6e' : Parchment.textMuted;
             ctx.font = `bold 16px ${UI.fontPrimary}`;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
             ctx.fillText(candidate.masterNameKr, rowX + 18, rowY + 14);
 
             ctx.font = `11px ${UI.fontPrimary}`;
-            ctx.fillStyle = UI.textSecondary;
+            ctx.fillStyle = Parchment.textMid;
             const requirementText = candidate.requirements.map((requirement) => {
                 const mark = requirement.ready ? 'OK' : '--';
                 const name = requirement.character ? requirement.character.name : requirement.classNameKr;
@@ -216,7 +212,7 @@ export class FusionTempleUI {
             : this.isHoveredButton(button)
                 ? 'hover'
                 : 'default';
-        drawButton(ctx, button.rect.x, button.rect.y, button.rect.w, button.rect.h, button.label, state);
+        drawParchmentButton(ctx, button.rect.x, button.rect.y, button.rect.w, button.rect.h, button.label, state);
     }
 
     private isHoveredButton(button: TempleButton): boolean {
