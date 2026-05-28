@@ -17,75 +17,40 @@ import type { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
 import { getClassLine } from '../data/ClassTree';
-import { Skill, getLearnedSkills } from '../data/SkillDB';
-import { getClassAttackProfile, getSkillAttackProfile } from '../data/AttackPatternProfiles';
-import { resolveSkillEffect, SkillEffectEnemyInput, SkillEffectResult, SkillTerrainContext } from '../combat/SkillEffectResolver';
+import { getClassAttackProfile } from '../data/AttackPatternProfiles';
 import {
-    applyGuardToDamage,
-    applyStatus,
-    applyStatuses,
-    cleanseNegativeStatuses,
-    createStatus,
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
-    getStatusIcons,
     hasStatus,
     resolveTurnStartStatuses,
 } from '../combat/StatusEffects';
-import { ActionMenuUI, ActionType } from '../ui/ActionMenuUI';
-import { EntityDisplayInfo, EntityInfoUI } from '../ui/EntityInfoUI';
-import { MagicUI } from '../ui/MagicUI';
-import { TacticalContextMenuUI } from '../ui/TacticalContextMenuUI';
-import { RaidResultUI } from '../ui/RaidResultUI';
+import { ActionMenuUI } from '../ui/ActionMenuUI';
+import { EntityInfoUI } from '../ui/EntityInfoUI';
 import { EffectManager } from '../ui/EffectManager';
 import { FloatingTextManager } from '../ui/FloatingTextManager';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
-import { TilePoint, findPathWithCost, findReachableTilesByCost, manhattan, tileKey, tilesInRange } from '../field/FieldPathing';
+import { TilePoint, manhattan, tileKey } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
-import {
-    TacticalMarkerStore,
-    buildTacticalMenuItems,
-    makeTacticalTargetKey,
-    type TacticalCommand,
-    type TacticalTargetRef,
-} from '../field/TacticalMarkers';
 import { getRightClickDisposition, type WorldInteractionMode } from '../field/WorldInteractionMode';
-import type { EnemyRole } from '../field/EnemyAI';
-import { ATTACK_AP_COST, INTERACT_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, enqueueReadyActor, hasExecutableFieldAction } from '../field/FieldActionEconomy';
+import { enqueueReadyActor } from '../field/FieldActionEconomy';
 import { hasLineOfSight } from '../field/LineOfSight';
 import {
     AttackPatternProfile,
     PatternContext,
     getEffectTiles,
-    getSelectableTiles,
 } from '../field/TargetPatterns';
 import {
-    canAffordTerrainCost,
     describeTerrainForHover,
     getTerrainMoveCost,
     isTerrainLineOfSightBlocking,
-    terrainCostToApCost,
     TerrainActorTraits,
 } from '../field/TerrainRules';
-import {
-    computeRaidFailureLoss,
-    mergeSnapshots,
-    RaidOutcome,
-    RaidResultType,
-    snapshotPlacedItem,
-    type HeroRaidStatus,
-} from '../raid/RaidOutcome';
 import { resolveTownArrival } from '../raid/RaidRules';
-import { ACTOR_COLORS, ENEMY_AGGRO_RANGE, FORMATION_OFFSETS } from '../field/FieldConfig';
-import type { AttackCue, FieldActor, FieldEnemy, FieldHitParty, FieldIntent, FieldMagicState } from '../field/FieldTypes';
-import { getEnemyRoleLabel } from '../field/FieldDisplay';
+import type { AttackCue, FieldActor, FieldEnemy, FieldHitParty, FieldIntent } from '../field/FieldTypes';
 import {
-    buildSkillTerrainContext,
     getActorAttackTargetFailure as resolveActorAttackTargetFailure,
-    getAttackFailureMessage,
-    getSkillCandidateEnemies as resolveSkillCandidateEnemies,
     type AttackTargetFailure,
 } from '../field/FieldTargeting';
 import type { WorldRenderModel } from './world/WorldRenderModel';
@@ -95,6 +60,12 @@ import { WorldFieldRenderer } from './world/WorldFieldRenderer';
 import { WorldCombatController, createCombatResult, type CombatResult } from './world/WorldCombatController';
 import { WorldMovementController } from './world/WorldMovementController';
 import { WorldEnemyTurnController } from './world/WorldEnemyTurnController';
+import { WorldMagicController } from './world/WorldMagicController';
+import { WorldPlayerActionController } from './world/WorldPlayerActionController';
+import { WorldRaidOutcomeController } from './world/WorldRaidOutcomeController';
+import { WorldTacticalController } from './world/WorldTacticalController';
+import { WorldSelectionController } from './world/WorldSelectionController';
+import { WorldFieldSpawnController } from './world/WorldFieldSpawnController';
 
 export class WorldEngine {
     private canvas: HTMLCanvasElement;
@@ -105,26 +76,21 @@ export class WorldEngine {
     private player: Player;
     private partyActors: FieldActor[] = [];
     private fieldEnemies: FieldEnemy[] = [];
-    private selectedActorId: string | null = null;
-    private selectedEnemyId: string | null = null;
-    private selectedLootId: string | null = null;
     private actionMenuOpen = false;
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
-    private magicUI = new MagicUI();
-    private tacticalMenuUI = new TacticalContextMenuUI();
     private townSession: WorldTownSession;
     private raidSession: WorldRaidSession;
     private currentPhase: WorldPhase = 'lobby';
     private combatController: WorldCombatController;
     private movementController: WorldMovementController;
     private enemyTurnController: WorldEnemyTurnController;
-    private raidResultUI = new RaidResultUI();
-    private tacticalMarkers = new TacticalMarkerStore();
-    private tacticalMenuTarget: TacticalTargetRef | null = null;
-    private actionMode: 'move' | 'attack' | 'interact' | null = null;
-    private actionTiles: Set<string> = new Set();
-    private fieldMagicState: FieldMagicState = { mode: 'idle' };
+    private magicController: WorldMagicController;
+    private playerActionController: WorldPlayerActionController;
+    private raidOutcomeController: WorldRaidOutcomeController;
+    private tacticalController: WorldTacticalController;
+    private selectionController: WorldSelectionController;
+    private fieldSpawnController: WorldFieldSpawnController;
     private activeTurnActorId: string | null = null;
     private readyQueue: string[] = [];
     private remainingActionPoints = 0;
@@ -176,6 +142,7 @@ export class WorldEngine {
             getTileAt: (x, y) => this.worldMap.getTileAt(x, y),
             getTerrainTraitsForActorId: (actorId) => this.getTerrainTraitsForActorId(actorId),
         });
+        this.fieldSpawnController = new WorldFieldSpawnController(this.movementController);
         this.enemyTurnController = new WorldEnemyTurnController(
             {
                 getPartyActors: () => this.partyActors,
@@ -204,12 +171,108 @@ export class WorldEngine {
                 spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
             }
         );
-        this.raidResultUI.onClose = () => this.openPendingTownAfterResult();
+        this.selectionController = new WorldSelectionController({
+            getPartyActors: () => this.partyActors,
+            getEnemyById: (enemyId) => this.getEnemyById(enemyId),
+            getLootById: (lootId) => this.worldMap.loot.find((candidate) => candidate.id === lootId) ?? null,
+        });
+        this.magicController = new WorldMagicController(
+            {
+                getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
+                getFieldEnemies: () => this.fieldEnemies,
+                getEnemyById: (enemyId) => this.getEnemyById(enemyId),
+                getRemainingActionPoints: () => this.remainingActionPoints,
+                getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
+                getBoundsTiles: () => this.worldMap.getBoundsTiles(),
+                hasFieldLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to),
+                spendAp: (cost) => this.spendAp(cost),
+                reopenActionMenu: (actor) => this.reopenActionMenu(actor),
+                resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
+                handleEnemyDefeated: (actor, enemy) => this.handleEnemyDefeated(actor, enemy),
+                tryEnemyCounterAttack: (enemy, actor) => this.tryEnemyCounterAttack(enemy, actor),
+            },
+            {
+                log: (message) => this.addCombatLog(message),
+                spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
+                spawnDamage: (x, y, amount, isCrit, isMiss) => this.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
+                spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
+                spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
+                spawnHitEffect: (x, y) => this.effectManager.spawnHitEffect(x, y),
+                spawnBuffEffect: (x, y) => this.effectManager.spawnBuffEffect(x, y),
+                spawnDebuffEffect: (x, y) => this.effectManager.spawnDebuffEffect(x, y),
+                spawnElementEffect: (element, x, y) => this.effectManager.spawnByElement(element, x, y),
+            }
+        );
+        this.playerActionController = new WorldPlayerActionController(
+            {
+                getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
+                getPartyActors: () => this.partyActors,
+                getFieldEnemies: () => this.fieldEnemies,
+                getRemainingActionPoints: () => this.remainingActionPoints,
+                getReservedAction: () => this.reservedAction,
+                getActiveTurnActorId: () => this.activeTurnActorId,
+                getActorTerrainMovementBudget: (actor) => this.getActorTerrainMovementBudget(actor),
+                getActorTerrainStepCost: (actor, tile) => this.getActorTerrainStepCost(actor, tile),
+                getActorAttackProfile: (actor) => this.getActorAttackProfile(actor),
+                getPatternContext: (actor) => this.getPatternContext(actor),
+                getActorAttackTargetFailure: (actor, enemy) => this.getActorAttackTargetFailure(actor, enemy),
+                getEnemyById: (enemyId) => this.getEnemyById(enemyId),
+                getLootById: (lootId) => this.worldMap.loot.find((candidate) => candidate.id === lootId) ?? null,
+                getLoot: () => this.worldMap.loot,
+                isActorAt: (actor, tile) => this.isActorAt(actor, tile),
+                isEntityMoving: (entity) => this.isEntityMoving(entity),
+                isFieldPassable: (query) => this.movementController.isFieldPassable(query),
+                spendAp: (cost) => this.spendAp(cost),
+                tryActorAttack: (actor, enemy) => this.tryActorAttack(actor, enemy),
+                openLoot: (loot) => this.openLoot(loot),
+                openMagic: (actor) => this.magicController.open(actor),
+                hasCastableFieldSkill: (actor) => this.magicController.hasCastableFieldSkill(actor.character),
+                reopenActionMenu: (actor) => this.reopenActionMenu(actor),
+                closeActionMenu: () => this.closeActionMenu(),
+                closeTacticalMenu: () => this.closeTacticalMenu(),
+                resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
+                endActorTurn: (actor, reason, atbCarryover) => this.endActorTurn(actor, reason, atbCarryover),
+                clearActorIntent: (actor) => this.clearActorIntent(actor),
+                setReservedAction: (intent) => { this.reservedAction = intent; },
+                selectEnemy: (enemyId) => this.selectionController.selectEnemy(enemyId),
+                selectLoot: (lootId) => this.selectionController.selectLoot(lootId),
+            },
+            {
+                log: (message) => this.addCombatLog(message),
+                spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
+                spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
+                spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
+                spawnBuffEffect: (x, y) => this.effectManager.spawnBuffEffect(x, y),
+            }
+        );
+        this.raidOutcomeController = new WorldRaidOutcomeController({
+            party: this.party,
+            playerData: this.playerData,
+            gameManager: this.gameManager,
+            raidSession: this.raidSession,
+            townSession: this.townSession,
+            getTownById: (townId) => this.getTownById(townId),
+            getCurrentHubTown: () => this.getCurrentHubTown(),
+            placePartyAtTown: (town) => {
+                this.placePartyNear(this.worldMap.getTownSpawnTile(town));
+                this.player = this.getControlledActor()?.entity ?? this.player;
+                this.clearFieldTurnState();
+            },
+            openTown: (town) => this.openTown(town),
+            setPhase: (phase) => { this.currentPhase = phase; },
+            log: (message) => this.addCombatLog(message),
+        });
+        this.tacticalController = new WorldTacticalController({
+            resolveFieldHitAt: (tile) => this.resolveFieldHitAt(tile),
+            getEnemyById: (enemyId) => this.getEnemyById(enemyId),
+            getPartyActors: () => this.partyActors,
+            getLoot: () => this.worldMap.loot,
+            log: (message) => this.addCombatLog(message),
+        });
 
         this.spawnPartyAtCurrentHub();
         this.player = this.getControlledActor()?.entity ?? new Player(0, 0);
-        this.selectedActorId = this.getControlledActor()?.id ?? null;
-        this.magicUI.onSkillSelect = (skill: Skill) => this.handleMagicSkillSelect(skill);
+        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
         this.openTown(this.getCurrentHubTown());
 
         camera.followTile(this.player.gridX, this.player.gridY);
@@ -221,8 +284,8 @@ export class WorldEngine {
         this.worldTime += dt;
         this.townSession.sync();
 
-        if (this.raidResultUI.isVisible()) {
-            this.raidResultUI.updateInput(input);
+        if (this.raidOutcomeController.isVisible()) {
+            this.raidOutcomeController.updateInput(input);
             camera.followTile(this.player.gridX, this.player.gridY);
             camera.update();
             return;
@@ -235,7 +298,7 @@ export class WorldEngine {
             return;
         }
 
-        if (input.mouseWheelDelta !== 0 && !this.magicUI.isVisible()) {
+        if (input.mouseWheelDelta !== 0 && !this.magicController.isVisible()) {
             if (input.mouseWheelDelta > 0) camera.zoomOut();
             else camera.zoomIn();
         }
@@ -244,29 +307,28 @@ export class WorldEngine {
         this.hoverTile = { x: screenTile.tileX, y: screenTile.tileY };
         this.entityInfoUI.onMouseMove(input.mouseScreenX, input.mouseScreenY);
         this.actionMenuUI.onMouseMove(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
-        this.magicUI.onMouseMove(input.mouseScreenX, input.mouseScreenY);
-        this.tacticalMenuUI.onMouseMove(input.uiMouseX, input.uiMouseY);
-        this.updateMagicHoverPreview();
+        this.magicController.onMouseMove(input.mouseScreenX, input.mouseScreenY);
+        this.tacticalController.onMouseMove(input.uiMouseX, input.uiMouseY);
+        this.magicController.updateHoverPreview(this.hoverTile);
 
         if (!this.isInputLockedByReservation()) {
-            if (input.mouseRightJustDown && !this.magicUI.isVisible()) {
+            if (input.mouseRightJustDown && !this.magicController.isVisible()) {
                 this.handleFieldRightClick(this.hoverTile, input);
             } else if (input.justPressed('Escape')) {
-                if (this.tacticalMenuUI.getIsOpen()) this.closeTacticalMenu();
-                else if (this.fieldMagicState.mode !== 'idle' || this.magicUI.isVisible()) this.resetMagicState();
+                if (this.tacticalController.isOpen()) this.closeTacticalMenu();
+                else if (this.magicController.isActive()) this.magicController.reset();
                 else this.clearIntent();
-            } else if (this.tacticalMenuUI.getIsOpen()) {
-                if (input.mouseJustDown) this.handleTacticalMenuClick(input.uiMouseX, input.uiMouseY);
-            } else if (this.magicUI.isVisible()) {
-                this.magicUI.updateMp(this.getControlledActor()?.character.stats.mp ?? 0);
-                if (input.mouseWheelDelta !== 0) this.magicUI.onScroll(input.mouseWheelDelta);
+            } else if (this.tacticalController.isOpen()) {
+                if (input.mouseJustDown) this.tacticalController.handleClick(input.uiMouseX, input.uiMouseY);
+            } else if (this.magicController.isVisible()) {
+                this.magicController.updateMp(this.getControlledActor()?.character.stats.mp ?? 0);
+                if (input.mouseWheelDelta !== 0) this.magicController.onScroll(input.mouseWheelDelta);
                 if (input.mouseJustDown) {
-                    this.magicUI.onMouseDown(input.mouseScreenX, input.mouseScreenY);
-                    if (!this.magicUI.isVisible() && this.fieldMagicState.mode === 'menu') this.resetMagicState();
+                    this.magicController.handleMenuMouseDown(input.mouseScreenX, input.mouseScreenY);
                 }
-                if (input.mouseJustUp) this.magicUI.onMouseUp();
-            } else if (this.fieldMagicState.mode === 'targeting') {
-                if (input.mouseJustDown) this.handleMagicTargetClick(this.hoverTile);
+                if (input.mouseJustUp) this.magicController.onMouseUp();
+            } else if (this.magicController.getState().mode === 'targeting') {
+                if (input.mouseJustDown) this.magicController.handleTargetClick(this.hoverTile);
             } else {
                 if (input.justPressed('Tab')) this.switchToNextAliveActor();
                 if (input.mouseJustDown) this.handleFieldClick(this.hoverTile, input, camera);
@@ -290,9 +352,9 @@ export class WorldEngine {
         this.effectManager.update(dt);
         this.floatingText.update(dt);
         this.updateAttackCues(dt);
-        this.processQueuedIntents();
+        this.playerActionController.processQueuedIntents();
         this.refreshLootState();
-        this.updateTacticalMarkers(dt);
+        this.tacticalController.updateMarkers(dt);
         this.startNextReadyTurn();
         this.updateRaidTimer(dt);
         this.checkRaidEndConditions();
@@ -304,7 +366,7 @@ export class WorldEngine {
     }
 
     public isModalOverlayVisible(): boolean {
-        return this.townSession.isVisible() || this.raidResultUI.isVisible();
+        return this.townSession.isVisible() || this.raidOutcomeController.isVisible();
     }
 
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
@@ -348,10 +410,10 @@ export class WorldEngine {
             this.entityInfoUI.setPosition(16, infoY + 18);
             this.entityInfoUI.render(ctx, model.selectedDisplayInfo);
         }
-        this.tacticalMenuUI.render(ctx);
-        this.magicUI.render(ctx, uiW, uiH);
+        this.tacticalController.render(ctx);
+        this.magicController.render(ctx, uiW, uiH);
         if (this.townSession.isVisible()) this.townSession.render(ctx, uiW, uiH);
-        if (this.raidResultUI.isVisible()) this.raidResultUI.render(ctx, uiW, uiH);
+        if (this.raidOutcomeController.isVisible()) this.raidOutcomeController.render(ctx, uiW, uiH);
         ctx.restore();
     }
 
@@ -363,8 +425,8 @@ export class WorldEngine {
                 activeActor ? this.getActorTerrainTraits(activeActor) : {}
             )
             : [];
-        const selectedLoot = this.selectedLootId
-            ? this.worldMap.loot.find((candidate) => candidate.id === this.selectedLootId) ?? null
+        const selectedLoot = this.selectionController.lootId
+            ? this.worldMap.loot.find((candidate) => candidate.id === this.selectionController.lootId) ?? null
             : null;
 
         return {
@@ -377,21 +439,21 @@ export class WorldEngine {
             fieldEnemies: this.fieldEnemies,
             activeTurnActorId: this.activeTurnActorId,
             remainingActionPoints: this.remainingActionPoints,
-            selectedActorId: this.selectedActorId,
-            selectedEnemyId: this.selectedEnemyId,
-            selectedLootId: this.selectedLootId,
-            selectedDisplayInfo: this.getSelectedDisplayInfo(),
-            hasSelection: this.hasSelection(),
-            actionMode: this.actionMode,
-            actionTiles: this.actionTiles,
+            selectedActorId: this.selectionController.actorId,
+            selectedEnemyId: this.selectionController.enemyId,
+            selectedLootId: this.selectionController.lootId,
+            selectedDisplayInfo: this.selectionController.getSelectedDisplayInfo(),
+            hasSelection: this.selectionController.hasSelection(),
+            actionMode: this.playerActionController.getMode(),
+            actionTiles: this.playerActionController.getTiles(),
             actionMenuOpen: this.actionMenuOpen,
-            fieldMagicState: this.fieldMagicState,
+            fieldMagicState: this.magicController.getState(),
             hoverTile: this.hoverTile,
             hoverTileWalkable: this.hoverTile.x >= 0 && this.hoverTile.y >= 0
                 ? this.worldMap.isWalkable(this.hoverTile.x, this.hoverTile.y)
                 : false,
             terrainHoverLines,
-            tacticalMarkers: this.tacticalMarkers.getMarkers(),
+            tacticalMarkers: this.tacticalController.getMarkers(),
             selectedLootTile: selectedLoot ? { x: selectedLoot.x, y: selectedLoot.y } : null,
             attackCues: this.attackCues,
             combatLog: this.combatLog,
@@ -403,7 +465,7 @@ export class WorldEngine {
                 departureTownId: this.raidSession.departureTownId,
                 timerAdvancing: this.raidSession.shouldAdvanceTimer({
                     townVisible: this.townSession.isVisible(),
-                    resultVisible: this.raidResultUI.isVisible(),
+                    resultVisible: this.raidOutcomeController.isVisible(),
                     turnCombatActive: this.isTurnCombatActive(),
                 }),
             },
@@ -416,29 +478,7 @@ export class WorldEngine {
 
     private placePartyNear(anchorTile: TilePoint): void {
         const members = this.party.getCharacters().slice(0, this.party.MAX_ACTIVE_PARTY_SIZE);
-
-        this.partyActors = members.map((character, index) => {
-            const tile = this.movementController.findNearbyWalkableTile({
-                x: anchorTile.x + (FORMATION_OFFSETS[index]?.x ?? 0),
-                y: anchorTile.y + (FORMATION_OFFSETS[index]?.y ?? 0),
-            }, `party_${index}`);
-            const entity = new Player(tile.x, tile.y);
-            entity.color = ACTOR_COLORS[index % ACTOR_COLORS.length];
-            entity.label = character.name;
-            if (character.portraitImage && character.portraitLoaded) {
-                entity.image = character.portraitImage;
-                entity.imageLoaded = true;
-            } else {
-                entity.setImage(character.portraitImage?.src || '/Image/Character/fighter.png');
-            }
-            return {
-                id: character.id,
-                character,
-                entity,
-                path: [],
-                queuedIntent: null,
-            };
-        });
+        this.partyActors = this.fieldSpawnController.createPartyActors(anchorTile, members);
     }
 
     private getTownById(townId: string): TownInfo | null {
@@ -466,7 +506,7 @@ export class WorldEngine {
         this.townSession.applyPendingRestForRaidStart();
         this.placePartyNear(this.worldMap.getTownExitTile(town));
         this.player = this.getControlledActor()?.entity ?? this.player;
-        this.selectedActorId = this.getControlledActor()?.id ?? null;
+        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
         this.fieldEnemies = [];
         this.worldMap.loot = [];
         this.spawnStarterFieldContent();
@@ -480,8 +520,8 @@ export class WorldEngine {
         if (this.gameManager.charUI.isVisible()) this.gameManager.charUI.toggle();
         this.closeActionMenu();
         this.closeTacticalMenu();
-        this.resetMagicState();
-        this.clearActionMode();
+        this.magicController.reset();
+        this.playerActionController.clearTargeting();
     }
 
     private clearFieldTurnState(): void {
@@ -505,71 +545,37 @@ export class WorldEngine {
     private spawnStarterFieldContent(): void {
         const anchor = this.getControlledActor()?.entity;
         if (!anchor) return;
-
-        const enemySeeds = [
-            { offset: { x: 7, y: 3 }, name: '늑대인간', level: 1, color: '#d95763', role: 'bruiser' as EnemyRole },
-            { offset: { x: 10, y: -2 }, name: '에우리티온', level: 2, color: '#ff8a4a', role: 'archer' as EnemyRole },
-            { offset: { x: -6, y: 6 }, name: '미노타우로스', level: 1, color: '#b86cff', role: 'tank' as EnemyRole },
-            { offset: { x: 12, y: 4 }, name: '나이아드', level: 2, color: '#6fdc8c', role: 'healer' as EnemyRole },
-            { offset: { x: -9, y: -4 }, name: '만드라고라', level: 1, color: '#8fb6ff', role: 'coward' as EnemyRole },
-            { offset: { x: -11, y: 5 }, name: '마도사 마기', level: 2, color: '#9a7cff', role: 'support' as EnemyRole },
-        ];
-
-        this.fieldEnemies = enemySeeds.map((seed, index) => {
-            const tile = this.movementController.findNearbyWalkableTile({
-                x: anchor.gridX + seed.offset.x,
-                y: anchor.gridY + seed.offset.y,
-            }, `enemy_${index}`);
-            const enemy = new Enemy(`field_enemy_${index}`, tile.x, tile.y, seed.name, seed.level, seed.color, seed.role);
-            enemy.aggroRange = ENEMY_AGGRO_RANGE;
-            return { enemy, home: tile, path: [] };
-        });
-
-        const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
-        const sword = getItemDef('short_sword');
-        const lootSeeds = [
-            { offset: { x: 3, y: 2 }, id: 'field_chest_1', label: '버려진 보급 상자', item: herb, kind: 'chest' as const },
-            { offset: { x: -3, y: 4 }, id: 'field_pack_1', label: '전사자의 배낭', item: sword, kind: 'corpse' as const },
-        ];
-
-        this.worldMap.loot = lootSeeds.flatMap((seed) => {
-            if (!seed.item) return [];
-            const tile = this.movementController.findNearbyWalkableTile({
-                x: anchor.gridX + seed.offset.x,
-                y: anchor.gridY + seed.offset.y,
-            }, seed.id);
-            return [new LootObject(seed.id, tile.x, tile.y, [seed.item], { sourceLabel: seed.label, kind: seed.kind })];
-        });
+        const content = this.fieldSpawnController.createStarterFieldContent(anchor);
+        this.fieldEnemies = content.enemies;
+        this.worldMap.loot = content.loot;
     }
 
     private handleFieldClick(tile: TilePoint, input: InputManager, camera: Camera): void {
         const hit = this.resolveFieldHitAt(tile);
 
-        if (this.hasSelection() && this.entityInfoUI.onClick(input.mouseScreenX, input.mouseScreenY)) {
-            this.clearSelection();
+        if (this.selectionController.hasSelection() && this.entityInfoUI.onClick(input.mouseScreenX, input.mouseScreenY)) {
+            this.selectionController.clear();
             return;
         }
 
         if (this.actionMenuOpen) {
             const action = this.actionMenuUI.onClick(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
             if (action) {
-                this.executeFieldAction(action);
+                this.playerActionController.execute(action);
                 return;
             }
             this.closeActionMenu();
             return;
         }
 
-        if (this.actionMode) {
-            this.handleActionTargetClick(tile, hit);
+        if (this.playerActionController.getMode()) {
+            this.playerActionController.handleTargetClick(tile, hit);
             return;
         }
 
         switch (hit.kind) {
             case 'enemy':
-                this.selectedEnemyId = hit.enemy.id;
-                this.selectedActorId = null;
-                this.selectedLootId = null;
+                this.selectionController.selectEnemy(hit.enemy.id);
                 this.addCombatLog(`${hit.enemy.name} 선택`);
                 break;
             case 'party': {
@@ -580,9 +586,7 @@ export class WorldEngine {
                 break;
             }
             case 'loot':
-                this.selectedActorId = null;
-                this.selectedEnemyId = null;
-                this.selectedLootId = hit.loot.id;
+                this.selectionController.selectLoot(hit.loot.id);
                 this.addCombatLog(`${hit.loot.sourceLabel} 선택`);
                 break;
             case 'ground':
@@ -593,444 +597,6 @@ export class WorldEngine {
                 this.addCombatLog('갈 수 없는 위치입니다.');
                 break;
         }
-    }
-
-    private executeFieldAction(action: ActionType): void {
-        const actor = this.getActivePartyTurnActor();
-        if (!actor) return;
-
-        if (actor.entity.actionGauge < 100 || this.activeTurnActorId !== actor.id) {
-            this.addCombatLog('행동 게이지가 차지 않았습니다.');
-            this.closeActionMenu();
-            return;
-        }
-
-        this.closeActionMenu();
-        this.clearActionMode();
-
-        switch (action) {
-            case 'move':
-                if (hasStatus(actor.character.statuses, 'immobilize')) {
-                    this.addCombatLog('이동불가 상태입니다.');
-                    this.reopenActionMenu(actor);
-                    break;
-                }
-                if (this.remainingActionPoints < MOVE_AP_PER_TILE || !this.hasExecutableMove(actor)) {
-                    this.addCombatLog('이동할 행동력이 부족합니다.');
-                    this.reopenActionMenu(actor);
-                    break;
-                }
-                this.actionMode = 'move';
-                this.actionTiles = this.computeWalkableTiles(actor);
-                this.addCombatLog('이동할 타일을 클릭하세요.');
-                break;
-            case 'attack':
-                if (this.remainingActionPoints < ATTACK_AP_COST) {
-                    this.addCombatLog('공격할 행동력이 부족합니다.');
-                    this.reopenActionMenu(actor);
-                    break;
-                }
-                this.actionMode = 'attack';
-                this.actionTiles = this.computeAttackableTiles(actor);
-                this.addCombatLog(this.hasExecutableAttack(actor) ? '공격할 적을 클릭하세요.' : '사거리 안의 적을 선택하세요.');
-                break;
-            case 'magic':
-                if (hasStatus(actor.character.statuses, 'silence')) {
-                    this.addCombatLog('침묵 상태로 마법을 사용할 수 없습니다.');
-                    this.reopenActionMenu(actor);
-                    break;
-                }
-                this.openMagicMenu(actor);
-                break;
-            case 'open':
-                if (this.remainingActionPoints < INTERACT_AP_COST || !this.hasExecutableInteract(actor)) {
-                    this.addCombatLog('조사할 수 있는 대상이 없습니다.');
-                    this.reopenActionMenu(actor);
-                    break;
-                }
-                this.actionMode = 'interact';
-                this.actionTiles = this.computeInteractTiles(actor);
-                this.addCombatLog('조사할 상자나 전리품을 클릭하세요.');
-                break;
-            case 'rest':
-                {
-                    const effective = getEffectiveStatsForCharacter(actor.character);
-                    actor.character.stats.hp = Math.min(effective.maxHp, actor.character.stats.hp + 5);
-                    actor.character.stats.mp = Math.min(effective.maxMp, actor.character.stats.mp + 3);
-                }
-                this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, 5);
-                this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
-                this.addCombatLog('휴식: HP +5, MP +3 회복. 다음 행동 게이지는 보존되지 않습니다.');
-                this.endActorTurn(actor, '휴식');
-                break;
-            case 'defend':
-                actor.character.statuses = applyStatus(actor.character.statuses, createStatus('guard'));
-                this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'GUARD');
-                this.effectManager.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
-                this.addCombatLog('방어 태세: 다음 피격 피해 감소');
-                this.endActorTurn(actor, '방어');
-                break;
-            case 'counter':
-                actor.character.statuses = applyStatus(actor.character.statuses, createStatus('counterReady'));
-                this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'COUNTER');
-                this.effectManager.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
-                this.addCombatLog('반격 태세: 다음 피격 시 반격 준비');
-                this.endActorTurn(actor, '반격 태세');
-                break;
-            default:
-                this.addCombatLog('아직 필드에서 사용할 수 없는 행동입니다.');
-                break;
-        }
-    }
-
-    private handleActionTargetClick(tile: TilePoint, hit: ReturnType<typeof resolveFieldHit>): void {
-        const actor = this.getActivePartyTurnActor();
-        if (!actor) return;
-
-        if (this.actionMode === 'attack') {
-            if (hit.kind !== 'enemy') {
-                this.addCombatLog('공격할 적이 없습니다.');
-                return;
-            } else {
-                const enemy = this.getEnemyById(hit.enemy.id);
-                if (!enemy) {
-                    this.addCombatLog('공격할 적이 없습니다.');
-                    return;
-                }
-                this.selectedEnemyId = enemy.id;
-                this.selectedActorId = null;
-                this.selectedLootId = null;
-                const failure = this.getActorAttackTargetFailure(actor, enemy);
-                if (failure) {
-                    this.addCombatLog(getAttackFailureMessage(failure));
-                    return;
-                }
-                if (this.spendAp(ATTACK_AP_COST) && this.tryActorAttack(actor, enemy)) {
-                    this.resumeOrEndActiveTurn(actor);
-                }
-            }
-            this.clearActionMode();
-            return;
-        }
-
-        const selectedTileKey = tileKey(tile.x, tile.y);
-        if (!this.actionTiles.has(selectedTileKey)) {
-            this.addCombatLog('선택할 수 없는 위치입니다.');
-            this.clearActionMode();
-            return;
-        }
-
-        if (this.actionMode === 'move') {
-            const queued = this.queueMoveIntent(actor, tile);
-            if (queued) {
-                this.addCombatLog(`이동 시작 (${tile.x}, ${tile.y})`);
-            }
-            this.clearActionMode();
-            return;
-        }
-
-        if (this.actionMode === 'interact') {
-            if (hit.kind !== 'loot') {
-                this.addCombatLog('조사할 대상이 없습니다.');
-            } else {
-                const loot = this.worldMap.loot.find((candidate) => candidate.id === hit.loot.id);
-                if (!loot) {
-                    this.addCombatLog('조사할 대상이 없습니다.');
-                    this.clearActionMode();
-                    return;
-                }
-                this.selectedLootId = loot.id;
-                if (!this.spendAp(INTERACT_AP_COST)) {
-                    this.addCombatLog('조사할 행동력이 부족합니다.');
-                    this.clearActionMode();
-                    return;
-                }
-                this.openLoot(loot);
-                this.resumeOrEndActiveTurn(actor);
-            }
-            this.clearActionMode();
-        }
-    }
-
-    private openMagicMenu(actor: FieldActor): void {
-        if (hasStatus(actor.character.statuses, 'silence')) {
-            this.addCombatLog('침묵 상태로 마법을 사용할 수 없습니다.');
-            this.reopenActionMenu(actor);
-            return;
-        }
-        if (this.remainingActionPoints < MAGIC_AP_COST) {
-            this.addCombatLog('마법을 사용할 행동력이 부족합니다.');
-            this.reopenActionMenu(actor);
-            return;
-        }
-
-        const unlocked = this.getUnlockedSkillIds(actor.character);
-        const learned = getLearnedSkills(actor.character.classLineId, actor.character.currentTier, unlocked);
-        if (learned.length === 0) {
-            this.addCombatLog('사용 가능한 마법이 없습니다.');
-            this.reopenActionMenu(actor);
-            return;
-        }
-
-        this.fieldMagicState = { mode: 'menu' };
-        this.closeTacticalMenu();
-        const effective = getEffectiveStatsForCharacter(actor.character);
-        this.magicUI.show(
-            actor.character.classLineId,
-            actor.character.currentTier,
-            actor.character.stats.mp,
-            effective.maxMp,
-            unlocked
-        );
-        this.addCombatLog('마법을 선택하세요.');
-    }
-
-    private handleMagicSkillSelect(skill: Skill): void {
-        const actor = this.getActivePartyTurnActor();
-        if (!actor) return;
-
-        if (this.remainingActionPoints < MAGIC_AP_COST) {
-            this.addCombatLog('마법을 사용할 행동력이 부족합니다.');
-            this.resetMagicState();
-            this.reopenActionMenu(actor);
-            return;
-        }
-
-        if (actor.character.stats.mp < skill.mpCost) {
-            this.addCombatLog(`MP 부족! (${skill.mpCost} 필요)`);
-            this.resetMagicState();
-            this.reopenActionMenu(actor);
-            return;
-        }
-
-        if (skill.type === 'heal' || skill.type === 'buff') {
-            this.castFieldSkill(actor, skill);
-            return;
-        }
-
-        const validTiles = this.computeMagicTargetTiles(actor, skill);
-        this.fieldMagicState = { mode: 'targeting', skill, validTiles, hoverAoeTiles: new Set() };
-        this.addCombatLog(`${skill.icon} ${skill.nameKr}: 대상을 선택하세요.`);
-    }
-
-    private handleMagicTargetClick(tile: TilePoint): void {
-        const actor = this.getActivePartyTurnActor();
-        if (!actor || this.fieldMagicState.mode !== 'targeting') return;
-
-        const targetTileKey = tileKey(tile.x, tile.y);
-        if (!this.fieldMagicState.validTiles.has(targetTileKey)) {
-            this.addCombatLog('마법 사거리 밖입니다.');
-            return;
-        }
-
-        const enemy = this.fieldEnemies
-            .map((entry) => entry.enemy)
-            .find((candidate) => candidate.stats.hp > 0 && candidate.gridX === tile.x && candidate.gridY === tile.y);
-        if (!enemy) {
-            this.addCombatLog('대상을 선택하세요.');
-            return;
-        }
-
-        this.castFieldSkill(actor, this.fieldMagicState.skill, enemy);
-    }
-
-    private castFieldSkill(actor: FieldActor, skill: Skill, targetEnemy?: Enemy): void {
-        if (this.remainingActionPoints < MAGIC_AP_COST) {
-            this.addCombatLog('마법을 사용할 행동력이 부족합니다.');
-            this.reopenActionMenu(actor);
-            return;
-        }
-        if (actor.character.stats.mp < skill.mpCost) {
-            this.addCombatLog(`MP 부족! (${skill.mpCost} 필요)`);
-            this.reopenActionMenu(actor);
-            return;
-        }
-        if ((skill.type === 'damage' || skill.type === 'debuff' || skill.type === 'aoe') && !targetEnemy) {
-            this.addCombatLog('대상 없음!');
-            return;
-        }
-
-        const targetEnemies = this.getSkillCandidateEnemies(skill, targetEnemy);
-        const effect = resolveSkillEffect({
-            casterStats: actor.character.stats,
-            casterCharacter: actor.character,
-            skill,
-            targetEnemy: targetEnemy ? this.toSkillEnemyInput(targetEnemy) : undefined,
-            allEnemies: targetEnemies.map((enemy) => this.toSkillEnemyInput(enemy)),
-            targetsResolvedByPattern: Boolean(targetEnemy),
-            terrainContext: this.getSkillTerrainContext(actor, targetEnemies, targetEnemy),
-        });
-
-        if (!this.spendAp(MAGIC_AP_COST)) {
-            this.addCombatLog('마법을 사용할 행동력이 부족합니다.');
-            this.reopenActionMenu(actor);
-            return;
-        }
-
-        this.applySkillEffect(actor, skill, effect);
-        this.resetMagicState();
-        this.resumeOrEndActiveTurn(actor);
-    }
-
-    private applySkillEffect(actor: FieldActor, skill: Skill, effect: SkillEffectResult): void {
-        const effective = getEffectiveStatsForCharacter(actor.character);
-        actor.character.stats.mp = Math.max(0, Math.min(effective.maxMp, actor.character.stats.mp + effect.casterMpDelta));
-        actor.character.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.character.stats.hp + effect.casterHpDelta));
-        if (effect.casterHpDelta > 0) {
-            this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, effect.casterHpDelta);
-            this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
-        } else if (effect.casterHpDelta < 0) {
-            this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, Math.abs(effect.casterHpDelta), false, false);
-            this.effectManager.spawnHitEffect(actor.entity.gridX, actor.entity.gridY);
-        }
-        if (effect.cleansesCasterStatuses) {
-            actor.character.statuses = cleanseNegativeStatuses(actor.character.statuses);
-            this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'CLEANSE');
-            this.effectManager.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
-        }
-        if (effect.casterStatusEffects) {
-            actor.character.statuses = applyStatuses(actor.character.statuses, effect.casterStatusEffects);
-            this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'BUFF');
-            this.effectManager.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
-        } else if (effect.appliesBuff) {
-            actor.character.applyBuff(effect.appliesBuff);
-            this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'BUFF');
-            this.effectManager.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
-        }
-
-        let counterTriggered = false;
-        for (const enemyResult of effect.enemyResults) {
-            const enemy = this.getEnemyById(enemyResult.enemyId);
-            if (!enemy) continue;
-
-            if (enemyResult.isMiss) {
-                this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, 0, false, true);
-                this.addCombatLog(`${skill.nameKr} 명중 실패: ${enemy.name} (${Math.floor(enemyResult.hitChance ?? 0)}%)`);
-                continue;
-            }
-
-            if (enemyResult.statusEffects) {
-                enemy.statuses = applyStatuses(enemy.statuses, enemyResult.statusEffects);
-                this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'WEAK');
-                this.effectManager.spawnDebuffEffect(enemy.gridX, enemy.gridY);
-            }
-
-            if (skill.element !== 'none' && skill.element !== 'physical') {
-                this.effectManager.spawnByElement(skill.element, enemy.gridX, enemy.gridY);
-            } else {
-                this.effectManager.spawnHitEffect(enemy.gridX, enemy.gridY);
-            }
-            const guarded = applyGuardToDamage(enemy.statuses, enemyResult.damage);
-            enemy.statuses = guarded.statuses;
-            const dead = enemy.takeDamage(guarded.damage);
-            this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, guarded.damage, false, false);
-            if (guarded.guarded) this.addCombatLog(`${enemy.name} 방어: 피해 감소`);
-            if (dead) this.handleEnemyDefeated(actor, enemy);
-            else if (!guarded.guarded && !counterTriggered && this.tryEnemyCounterAttack(enemy, actor)) counterTriggered = true;
-        }
-
-        for (const log of effect.logs) this.addCombatLog(log);
-    }
-
-    private toSkillEnemyInput(enemy: Enemy): SkillEffectEnemyInput {
-        return {
-            id: enemy.id,
-            name: enemy.name,
-            gridX: enemy.gridX,
-            gridY: enemy.gridY,
-            stats: getEffectiveStatsForEnemy(enemy),
-        };
-    }
-
-    private getUnlockedSkillIds(character: Character): string[] {
-        const classLine = getClassLine(character.classLineId);
-        const unlocked: string[] = [];
-        if (!classLine) return unlocked;
-
-        for (let tier = 1; tier <= character.currentTier; tier++) {
-            const ids = classLine.skillUnlocks[tier];
-            if (ids) unlocked.push(...ids);
-        }
-        return unlocked;
-    }
-
-    private getLearnedFieldSkills(character: Character): Skill[] {
-        return getLearnedSkills(character.classLineId, character.currentTier, this.getUnlockedSkillIds(character));
-    }
-
-    private hasCastableFieldSkill(character: Character): boolean {
-        if (hasStatus(character.statuses, 'silence')) return false;
-        return this.getLearnedFieldSkills(character).some((skill) => character.stats.mp >= skill.mpCost);
-    }
-
-    private computeMagicTargetTiles(actor: FieldActor, skill: Skill): Set<string> {
-        const result = new Set<string>();
-        const profile = getSkillAttackProfile(skill);
-        for (const tile of getSelectableTiles(profile, this.getPatternContext(actor))) {
-            result.add(tileKey(tile.x, tile.y));
-        }
-        return result;
-    }
-
-    private updateMagicHoverPreview(): void {
-        if (this.fieldMagicState.mode !== 'targeting') return;
-        const actor = this.getActivePartyTurnActor();
-        if (!actor) return;
-
-        const enemy = this.fieldEnemies
-            .map((entry) => entry.enemy)
-            .find((candidate) =>
-                candidate.stats.hp > 0 &&
-                candidate.gridX === this.hoverTile.x &&
-                candidate.gridY === this.hoverTile.y &&
-                this.fieldMagicState.mode === 'targeting' &&
-                this.fieldMagicState.validTiles.has(`${candidate.gridX},${candidate.gridY}`)
-            );
-        const hoverAoeTiles = new Set<string>();
-        if (enemy) {
-            const profile = getSkillAttackProfile(this.fieldMagicState.skill);
-            for (const tile of getEffectTiles(profile, this.getPatternContext(actor, this.enemyTile(enemy)))) {
-                hoverAoeTiles.add(tileKey(tile.x, tile.y));
-            }
-        }
-
-        this.fieldMagicState = {
-            ...this.fieldMagicState,
-            hoverAoeTiles,
-        };
-    }
-
-    private resetMagicState(): void {
-        this.fieldMagicState = { mode: 'idle' };
-        this.magicUI.hide();
-    }
-
-    private queueMoveIntent(actor: FieldActor, tile: TilePoint): boolean {
-        const movementBudget = this.getActorTerrainMovementBudget(actor);
-        const pathResult = findPathWithCost(this.actorTile(actor), tile, (query) => this.movementController.isFieldPassable(query), (step) => this.getActorTerrainStepCost(actor, step), {
-            actorId: actor.id,
-            intent: 'move',
-            maxNodes: 8000,
-            maxCost: movementBudget,
-        });
-        const path = pathResult.path;
-        if (path.length === 0 && !this.isActorAt(actor, tile)) {
-            this.clearActorIntent(actor);
-            this.addCombatLog('이동 경로를 찾지 못했습니다.');
-            return false;
-        }
-
-        const apCost = terrainCostToApCost(pathResult.cost);
-        if (!this.spendAp(apCost)) {
-            this.addCombatLog('이동할 행동력이 부족합니다.');
-            return false;
-        }
-
-        actor.path = path;
-        actor.queuedIntent = { kind: 'move', tile, path, apCost, pathCost: pathResult.cost };
-        this.reservedAction = actor.queuedIntent;
-        this.closeActionMenu();
-        return true;
     }
 
     private resolveFieldHitAt(tile: TilePoint) {
@@ -1054,8 +620,8 @@ export class WorldEngine {
         if (disposition === 'ignore') return;
 
         if (disposition === 'cancelTargeting') {
-            if (mode.kind === 'magicTargeting') this.resetMagicState();
-            else this.clearActionMode();
+            if (mode.kind === 'magicTargeting') this.magicController.reset();
+            else this.playerActionController.clearTargeting();
             this.closeActionMenu();
             this.closeTacticalMenu();
             this.addCombatLog(t('tactical.log.cancelTargeting'));
@@ -1071,127 +637,23 @@ export class WorldEngine {
         this.openTacticalMenu(tile, input.uiMouseX, input.uiMouseY);
     }
 
-    private handleTacticalMenuClick(mx: number, my: number): void {
-        const result = this.tacticalMenuUI.onClick(mx, my);
-        if (!result) return;
-        if (result === 'outside') {
-            this.closeTacticalMenu();
-            return;
-        }
-
-        this.executeTacticalCommand(result);
-    }
-
     private openTacticalMenu(tile: TilePoint, uiX: number, uiY: number): void {
-        const target = this.getTacticalTarget(tile);
-        const items = buildTacticalMenuItems(target);
-        const scale = SettingsManager.getUIScale();
-        const vw = Math.floor(this.canvas.width / scale);
-        const vh = Math.floor(this.canvas.height / scale);
-        this.tacticalMenuTarget = target;
-        this.tacticalMenuUI.open(uiX, uiY, items, vw, vh);
+        this.tacticalController.open(tile, uiX, uiY, this.canvas.width, this.canvas.height);
     }
 
     private closeTacticalMenu(): void {
-        this.tacticalMenuTarget = null;
-        this.tacticalMenuUI.close();
-    }
-
-    private executeTacticalCommand(command: TacticalCommand): void {
-        const target = this.tacticalMenuTarget;
-        if (!target) return;
-
-        switch (command) {
-            case 'ping':
-                this.tacticalMarkers.addPing(target);
-                this.addCombatLog(t('tactical.log.ping'));
-                break;
-            case 'rally':
-                if (target.kind === 'ground') {
-                    this.tacticalMarkers.setRally(target.tile);
-                    this.addCombatLog(t('tactical.log.rally'));
-                }
-                break;
-            case 'watch':
-                if (this.tacticalMarkers.setWatch(target)) {
-                    this.addCombatLog(t('tactical.log.watch'));
-                }
-                break;
-            case 'clear':
-                this.tacticalMarkers.clear(target);
-                this.addCombatLog(t('tactical.log.clear'));
-                break;
-        }
-
-        this.closeTacticalMenu();
-    }
-
-    private getTacticalTarget(tile: TilePoint): TacticalTargetRef {
-        const hit = this.resolveFieldHitAt(tile);
-        switch (hit.kind) {
-            case 'enemy':
-                return {
-                    kind: 'enemy',
-                    tile: this.enemyTile(hit.enemy),
-                    targetKey: makeTacticalTargetKey('enemy', hit.enemy.id),
-                };
-            case 'party':
-                return {
-                    kind: 'party',
-                    tile: { x: hit.party.entity.gridX, y: hit.party.entity.gridY },
-                    targetKey: makeTacticalTargetKey('party', hit.party.id),
-                };
-            case 'loot':
-                return {
-                    kind: 'loot',
-                    tile: { x: hit.loot.x, y: hit.loot.y },
-                    targetKey: makeTacticalTargetKey('loot', hit.loot.id),
-                };
-            case 'ground':
-                return { kind: 'ground', tile: hit.tile };
-            case 'blocked':
-                return { kind: 'blocked', tile: hit.tile };
-        }
-    }
-
-    private processQueuedIntents(): void {
-        for (const actor of this.partyActors) {
-            if (actor.character.isDead || actor.path.length > 0 || this.isEntityMoving(actor.entity) || !actor.queuedIntent) continue;
-
-            if (actor.queuedIntent.kind === 'move') {
-                actor.queuedIntent = null;
-                if (this.reservedAction?.kind === 'move' && this.activeTurnActorId === actor.id) {
-                    this.reservedAction = null;
-                    this.resumeOrEndActiveTurn(actor);
-                }
-                continue;
-            }
-
-            if (actor.queuedIntent.kind === 'attack' && actor.queuedIntent.enemyId) {
-                const enemy = this.getEnemyById(actor.queuedIntent.enemyId);
-                if (enemy && enemy.stats.hp > 0) this.tryActorAttack(actor, enemy);
-                else this.clearActorIntent(actor);
-            }
-
-            if (actor.queuedIntent.kind === 'interact' && actor.queuedIntent.lootId) {
-                const loot = this.worldMap.loot.find((candidate) => candidate.id === actor.queuedIntent?.lootId);
-                if (loot && !loot.opened && manhattan(this.actorTile(actor), { x: loot.x, y: loot.y }) <= 1) {
-                    this.openLoot(loot);
-                }
-                this.clearActorIntent(actor);
-            }
-        }
+        this.tacticalController.close();
     }
 
     private updateRaidTimer(dt: number): void {
         const result = this.raidSession.advanceTimer(dt, {
             townVisible: this.townSession.isVisible(),
-            resultVisible: this.raidResultUI.isVisible(),
+            resultVisible: this.raidOutcomeController.isVisible(),
             turnCombatActive: this.isTurnCombatActive(),
         });
         if (result.advanced) this.townSession.advancePartyTimedRestStatuses(dt);
         if (result.expired) {
-            this.completeRaidFailure('MIA');
+            this.raidOutcomeController.completeFailure('MIA');
         }
     }
 
@@ -1200,16 +662,16 @@ export class WorldEngine {
         if (this.activeTurnActorId) return true;
         if (this.readyQueue.length > 0) return true;
         if (this.reservedAction) return true;
-        if (this.actionMenuOpen || this.actionMode) return true;
-        if (this.tacticalMenuUI.getIsOpen()) return true;
-        if (this.magicUI.isVisible() || this.fieldMagicState.mode !== 'idle') return true;
+        if (this.actionMenuOpen || this.playerActionController.getMode()) return true;
+        if (this.tacticalController.isOpen()) return true;
+        if (this.magicController.isActive()) return true;
         return this.partyActors.some((actor) => actor.queuedIntent || actor.path.length > 0);
     }
 
     private checkRaidEndConditions(): void {
-        if (!this.raidSession.active || this.raidResultUI.isVisible()) return;
+        if (!this.raidSession.active || this.raidOutcomeController.isVisible()) return;
         if (this.party.isSquadWiped()) {
-            this.completeRaidFailure('DEAD');
+            this.raidOutcomeController.completeFailure('DEAD');
             return;
         }
         this.checkTownArrival();
@@ -1233,147 +695,13 @@ export class WorldEngine {
         }
 
         const destination = town ?? this.getTownById(arrival.townId ?? '') ?? this.getCurrentHubTown();
-        this.completeRaidSuccess(destination);
-    }
-
-    private completeRaidSuccess(destination: TownInfo): void {
-        if (!this.raidSession.active) return;
-
-        const heroStatuses = this.createHeroStatuses();
-        const secured = this.secureRaidLoot();
-        const questRewards: string[] = [];
-        let goldReward = 0;
-
-        if (!this.playerData.isCleared('quest:first_survival')) {
-            this.playerData.markCleared('quest:first_survival');
-            this.playerData.addGold(200);
-            goldReward = 200;
-            questRewards.push('퀘스트 완료: 첫 생환');
-        }
-
-        this.raidSession.completeAtTown(destination.id);
-        this.playerData.currentHubTownId = destination.id;
-        this.playerData.save();
-
-        this.townSession.clearRestStatusesFromParty();
-        this.townSession.applyRaidInjuries(this.raidSession.downedCharacterIds);
-        this.party.resetForNewRaid();
-        this.placePartyNear(this.worldMap.getTownSpawnTile(destination));
-        this.player = this.getControlledActor()?.entity ?? this.player;
-        this.clearFieldTurnState();
-
-        const outcome: RaidOutcome = {
-            result: 'SURVIVED',
-            elapsedSeconds: this.raidSession.elapsedSeconds,
-            kills: this.raidSession.kills,
-            departureTownId: this.raidSession.departureTownId,
-            extractionTownId: destination.id,
-            heroStatuses,
-            looted: secured,
-            secured,
-            lost: [],
-            equipmentLost: [],
-            goldReward,
-            questRewards,
-            notes: ['전리품과 창고는 현재 세션에서만 유지됩니다.'],
-        };
-        this.showRaidResult(outcome, destination);
-        this.addCombatLog(`${destination.nameKr} 생환 성공.`);
-    }
-
-    private completeRaidFailure(result: Exclude<RaidResultType, 'SURVIVED'>): void {
-        if (!this.raidSession.active) return;
-
-        const heroStatuses = this.createHeroStatuses();
-        const loss = computeRaidFailureLoss(this.gameManager.inventory.items, this.party.getCharacters());
-        this.gameManager.inventory.clear();
-        for (const lost of loss.equipmentLost) {
-            const character = this.party.getCharacters().find((candidate) => candidate.id === lost.characterId);
-            character?.unequip(lost.slot);
-        }
-
-        const returnTown = this.getTownById(this.raidSession.departureTownId) ?? this.getCurrentHubTown();
-        this.raidSession.failBackToTown(returnTown.id);
-        this.playerData.currentHubTownId = returnTown.id;
-        this.playerData.save();
-
-        this.townSession.clearRestStatusesFromParty();
-        this.townSession.applyRaidInjuries(this.raidSession.downedCharacterIds);
-        this.party.resetForNewRaid();
-        this.placePartyNear(this.worldMap.getTownSpawnTile(returnTown));
-        this.player = this.getControlledActor()?.entity ?? this.player;
-        this.clearFieldTurnState();
-
-        const outcome: RaidOutcome = {
-            result,
-            elapsedSeconds: this.raidSession.elapsedSeconds,
-            kills: this.raidSession.kills,
-            departureTownId: this.raidSession.departureTownId,
-            extractionTownId: returnTown.id,
-            heroStatuses,
-            looted: [],
-            secured: [],
-            lost: mergeSnapshots(loss.backpackLost),
-            equipmentLost: loss.equipmentLost,
-            notes: [result === 'MIA' ? '시간 초과로 실종 처리되었습니다.' : '출격조가 전멸했습니다.'],
-        };
-        this.showRaidResult(outcome, returnTown);
-        this.addCombatLog(result === 'MIA' ? '시간 초과. 손실이 적용되었습니다.' : '전멸. 손실이 적용되었습니다.');
-    }
-
-    private showRaidResult(outcome: RaidOutcome, nextTown: TownInfo): void {
-        this.currentPhase = 'lobby';
-        this.raidSession.setPendingTownAfterResult(nextTown.id);
-        this.townSession.hide();
-        this.raidResultUI.show(outcome);
-    }
-
-    private openPendingTownAfterResult(): void {
-        const nextTown = this.getTownById(this.raidSession.consumePendingTownAfterResultId() ?? '')
-            ?? this.getCurrentHubTown();
-        this.openTown(nextTown);
-    }
-
-    private createHeroStatuses(): HeroRaidStatus[] {
-        return this.party.getCharacters().map((character) => ({
-            characterId: character.id,
-            characterName: character.name,
-            hp: character.stats.hp,
-            maxHp: character.stats.maxHp,
-            isDead: character.isDead || character.stats.hp <= 0,
-        }));
-    }
-
-    private secureRaidLoot() {
-        const backpackSecured = [...this.gameManager.inventory.items].filter((placed) => placed.acquiredInRaid);
-        const equippedSecured = this.party.getCharacters().flatMap((character) =>
-            [...character.equipment.values()].filter((placed) => placed.acquiredInRaid)
-        );
-        const secured = mergeSnapshots([...backpackSecured, ...equippedSecured].map(snapshotPlacedItem));
-
-        for (const placed of backpackSecured) {
-            const moved = this.gameManager.stash.autoPlace(placed.item);
-            if (moved) {
-                moved.durability = placed.durability;
-                moved.quantity = placed.quantity;
-                moved.sockets = placed.sockets;
-                moved.acquiredInRaid = false;
-                this.gameManager.inventory.remove(placed);
-            } else {
-                placed.acquiredInRaid = false;
-            }
-        }
-        for (const placed of equippedSecured) {
-            placed.acquiredInRaid = false;
-        }
-
-        return secured;
+        this.raidOutcomeController.completeSuccess(destination);
     }
 
     private applyCombatResult(result: CombatResult): void {
         for (const enemyId of result.killedEnemyIds) {
             this.raidSession.recordKill();
-            if (this.selectedEnemyId === enemyId) this.selectedEnemyId = null;
+            this.selectionController.clearEnemyIfSelected(enemyId);
         }
         for (const characterId of result.downedCharacterIds) {
             const actor = this.partyActors.find((candidate) => candidate.character.id === characterId);
@@ -1430,7 +758,7 @@ export class WorldEngine {
         this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
         actor.character.gainExp(enemy.expReward);
         enemy.isAggro = false;
-        if (this.selectedEnemyId === enemy.id) this.selectedEnemyId = null;
+        this.selectionController.clearEnemyIfSelected(enemy.id);
 
         this.spawnEnemyLoot(enemy);
     }
@@ -1458,7 +786,7 @@ export class WorldEngine {
     }
 
     private openLoot(loot: LootObject): void {
-        this.selectedLootId = loot.id;
+        this.selectionController.selectLoot(loot.id);
         this.addCombatLog(`${loot.sourceLabel} 검색 중.`);
         this.clearControlledPath();
         this.requireControlledActor().queuedIntent = null;
@@ -1501,10 +829,8 @@ export class WorldEngine {
         if (!actor || actor.character.isDead) return false;
         if (!this.party.switchTo(index)) return false;
         this.player = actor.entity;
-        this.selectedActorId = actor.id;
-        this.selectedEnemyId = null;
-        this.selectedLootId = null;
-        this.clearActionMode();
+        this.selectionController.selectActor(actor.id);
+        this.playerActionController.clearTargeting();
         this.closeActionMenu();
         this.closeTacticalMenu();
         this.addCombatLog(`${actor.character.name} 조작`);
@@ -1514,9 +840,7 @@ export class WorldEngine {
     private toggleActionMenuForControlled(): void {
         const actor = this.getControlledActor();
         if (!actor) return;
-        this.selectedActorId = actor.id;
-        this.selectedEnemyId = null;
-        this.selectedLootId = null;
+        this.selectionController.selectActor(actor.id);
 
         if (actor.id !== this.activeTurnActorId) {
             this.addCombatLog('아직 행동 순서가 아닙니다.');
@@ -1529,7 +853,7 @@ export class WorldEngine {
         }
 
         this.closeTacticalMenu();
-        const available = this.getAvailableTurnActions(actor);
+        const available = this.playerActionController.getAvailableTurnActions(actor);
         this.actionMenuOpen = true;
         this.actionMenuUI.open(available);
     }
@@ -1537,18 +861,6 @@ export class WorldEngine {
     private closeActionMenu(): void {
         this.actionMenuOpen = false;
         this.actionMenuUI.close();
-    }
-
-    private clearActionMode(): void {
-        this.actionMode = null;
-        this.actionTiles.clear();
-    }
-
-    private getAvailableTurnActions(actor: FieldActor): ActionType[] {
-        const available: ActionType[] = ['move', 'attack', 'magic'];
-        if (this.hasExecutableInteract(actor)) available.push('open');
-        available.push('defend', 'counter', 'rest');
-        return available;
     }
 
     private spendAp(cost: number): boolean {
@@ -1559,7 +871,7 @@ export class WorldEngine {
 
     private resumeOrEndActiveTurn(actor: FieldActor): void {
         if (actor.id !== this.activeTurnActorId) return;
-        if (this.hasExecutableAction(actor)) {
+        if (this.playerActionController.hasExecutableAction(actor)) {
             this.reopenActionMenu(actor);
             return;
         }
@@ -1568,12 +880,10 @@ export class WorldEngine {
 
     private reopenActionMenu(actor: FieldActor): void {
         if (actor.id !== this.activeTurnActorId) return;
-        this.selectedActorId = actor.id;
-        this.selectedEnemyId = null;
-        this.selectedLootId = null;
+        this.selectionController.selectActor(actor.id);
         this.closeTacticalMenu();
         this.actionMenuOpen = true;
-        this.actionMenuUI.open(this.getAvailableTurnActions(actor));
+        this.actionMenuUI.open(this.playerActionController.getAvailableTurnActions(actor));
     }
 
     private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = 0): void {
@@ -1584,8 +894,8 @@ export class WorldEngine {
         this.clearActorIntent(actor);
         this.closeActionMenu();
         this.closeTacticalMenu();
-        this.clearActionMode();
-        this.resetMagicState();
+        this.playerActionController.clearTargeting();
+        this.magicController.reset();
         this.addCombatLog(`${actor.character.name} 턴 종료: ${reason}`);
     }
 
@@ -1671,18 +981,18 @@ export class WorldEngine {
         this.activeTurnActorId = actor.id;
         this.remainingActionPoints = Math.max(1, Math.floor(actor.character.stats.actionLimit || 15));
         actor.entity.actionGauge = 100;
-        this.selectedActorId = actor.id;
+        this.selectionController.selectActor(actor.id);
         if (!this.processActorTurnStartStatuses(actor)) {
             this.endActorTurn(actor, '상태이상');
             return;
         }
         this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'READY');
         this.addCombatLog(`${actor.character.name} 턴 시작: 행동 ${this.remainingActionPoints}`);
-        if (!this.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
+        if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
         else {
             this.actionMenuOpen = true;
             this.closeTacticalMenu();
-            this.actionMenuUI.open(this.getAvailableTurnActions(actor));
+            this.actionMenuUI.open(this.playerActionController.getAvailableTurnActions(actor));
         }
     }
 
@@ -1787,27 +1097,6 @@ export class WorldEngine {
         });
     }
 
-    private getSkillCandidateEnemies(skill: Skill, targetEnemy?: Enemy): Enemy[] {
-        const alive = this.fieldEnemies
-            .map((entry) => entry.enemy)
-            .filter((enemy) => enemy.stats.hp > 0);
-        if (!targetEnemy) return alive;
-
-        const actor = this.getActivePartyTurnActor();
-        if (!actor) return [targetEnemy];
-        const profile = getSkillAttackProfile(skill);
-        return resolveSkillCandidateEnemies(alive, profile, this.getPatternContext(actor, this.enemyTile(targetEnemy)), targetEnemy);
-    }
-
-    private getSkillTerrainContext(actor: FieldActor, targetEnemies: Enemy[], targetEnemy?: Enemy): SkillTerrainContext {
-        return buildSkillTerrainContext({
-            casterTile: this.actorTile(actor),
-            targetEnemies,
-            targetEnemy,
-            getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
-        });
-    }
-
     private actorTile(actor: FieldActor): TilePoint {
         return { x: actor.entity.gridX, y: actor.entity.gridY };
     }
@@ -1831,39 +1120,12 @@ export class WorldEngine {
 
     private getWorldInteractionMode(): WorldInteractionMode {
         if (this.isInputLockedByReservation()) return { kind: 'reservedAction' };
-        if (this.tacticalMenuUI.getIsOpen()) return { kind: 'tacticalMenu' };
-        if (this.fieldMagicState.mode === 'targeting') return { kind: 'magicTargeting' };
-        if (this.actionMode) return { kind: 'actionTargeting', action: this.actionMode };
+        if (this.tacticalController.isOpen()) return { kind: 'tacticalMenu' };
+        if (this.magicController.getState().mode === 'targeting') return { kind: 'magicTargeting' };
+        const actionMode = this.playerActionController.getMode();
+        if (actionMode) return { kind: 'actionTargeting', action: actionMode };
         if (this.actionMenuOpen) return { kind: 'actionMenu' };
         return { kind: 'idle' };
-    }
-
-    private updateTacticalMarkers(dt: number): void {
-        this.tacticalMarkers.update(dt, (targetKey) => this.resolveTacticalMarkerTile(targetKey));
-    }
-
-    private resolveTacticalMarkerTile(targetKey: string): TilePoint | null {
-        const separator = targetKey.indexOf(':');
-        if (separator < 0) return null;
-        const kind = targetKey.slice(0, separator);
-        const id = targetKey.slice(separator + 1);
-
-        if (kind === 'enemy') {
-            const enemy = this.getEnemyById(id);
-            return enemy && enemy.stats.hp > 0 ? this.enemyTile(enemy) : null;
-        }
-
-        if (kind === 'loot') {
-            const loot = this.worldMap.loot.find((candidate) => candidate.id === id && !candidate.opened);
-            return loot ? { x: loot.x, y: loot.y } : null;
-        }
-
-        if (kind === 'party') {
-            const actor = this.partyActors.find((candidate) => candidate.id === id && !candidate.character.isDead);
-            return actor ? this.actorTile(actor) : null;
-        }
-
-        return null;
     }
 
     private directionFromTo(from: TilePoint, to: TilePoint): 'up' | 'down' | 'left' | 'right' {
@@ -1877,13 +1139,11 @@ export class WorldEngine {
         if (this.reservedAction) return;
         const actor = this.getControlledActor();
         if (actor) this.clearActorIntent(actor);
-        this.selectedActorId = actor?.id ?? null;
-        this.selectedEnemyId = null;
-        this.selectedLootId = null;
+        this.selectionController.selectActor(actor?.id ?? null);
         this.closeActionMenu();
         this.closeTacticalMenu();
-        this.clearActionMode();
-        this.resetMagicState();
+        this.playerActionController.clearTargeting();
+        this.magicController.reset();
     }
 
     private clearActorIntent(actor: FieldActor): void {
@@ -1894,104 +1154,6 @@ export class WorldEngine {
     private clearControlledPath(): void {
         const actor = this.getControlledActor();
         if (actor) actor.path = [];
-    }
-
-    private clearSelection(): void {
-        this.selectedActorId = null;
-        this.selectedEnemyId = null;
-        this.selectedLootId = null;
-    }
-
-    private hasSelection(): boolean {
-        return Boolean(this.selectedActorId || this.selectedEnemyId || this.selectedLootId);
-    }
-
-    private hasExecutableAction(actor: FieldActor): boolean {
-        const hasApAction = hasExecutableFieldAction({
-            remainingAp: this.remainingActionPoints,
-            hasReachableMove: this.hasExecutableMove(actor),
-            hasAttackTarget: this.hasExecutableAttack(actor),
-            hasInteractTarget: this.hasExecutableInteract(actor),
-            hasMagicAvailable: this.hasExecutableMagic(actor),
-        });
-        return hasApAction || this.remainingActionPoints > 0;
-    }
-
-    private hasExecutableMove(actor: FieldActor): boolean {
-        if (hasStatus(actor.character.statuses, 'immobilize')) return false;
-        return this.remainingActionPoints >= MOVE_AP_PER_TILE && this.computeWalkableTiles(actor).size > 0;
-    }
-
-    private hasExecutableAttack(actor: FieldActor): boolean {
-        if (this.remainingActionPoints < ATTACK_AP_COST) return false;
-        return this.fieldEnemies.some((entry) =>
-            entry.enemy.stats.hp > 0 && this.canActorAttackTarget(actor, entry.enemy)
-        );
-    }
-
-    private hasExecutableInteract(actor: FieldActor): boolean {
-        return this.remainingActionPoints >= INTERACT_AP_COST && this.hasAdjacentLoot(actor);
-    }
-
-    private hasExecutableMagic(actor: FieldActor): boolean {
-        if (hasStatus(actor.character.statuses, 'silence')) return false;
-        return this.remainingActionPoints >= MAGIC_AP_COST && this.hasCastableFieldSkill(actor.character);
-    }
-
-    private computeWalkableTiles(actor: FieldActor): Set<string> {
-        const result = new Set<string>();
-        const start = this.actorTile(actor);
-        const movementBudget = this.getActorTerrainMovementBudget(actor);
-        const maxCost = Math.min(
-            movementBudget,
-            this.remainingActionPoints / MOVE_AP_PER_TILE
-        );
-        if (maxCost <= 0) return result;
-
-        const reachable = findReachableTilesByCost(
-            start,
-            (query) => this.movementController.isFieldPassable(query),
-            (tile) => this.getActorTerrainStepCost(actor, tile),
-            maxCost,
-            { actorId: actor.id, intent: 'move', maxNodes: 8000 }
-        );
-
-        for (const [key, reachableTile] of reachable) {
-            if (
-                reachableTile.cost <= movementBudget + 1e-9 &&
-                canAffordTerrainCost(reachableTile.cost, this.remainingActionPoints)
-            ) {
-                result.add(key);
-            }
-        }
-
-        return result;
-    }
-
-    private computeAttackableTiles(actor: FieldActor): Set<string> {
-        const result = new Set<string>();
-        const profile = this.getActorAttackProfile(actor);
-        for (const tile of getSelectableTiles(profile, this.getPatternContext(actor))) {
-            result.add(tileKey(tile.x, tile.y));
-        }
-        return result;
-    }
-
-    private computeInteractTiles(actor: FieldActor): Set<string> {
-        const result = new Set<string>();
-        const start = this.actorTile(actor);
-        for (const tile of tilesInRange(start, 1)) {
-            if (tile.x === start.x && tile.y === start.y) continue;
-            result.add(`${tile.x},${tile.y}`);
-        }
-        return result;
-    }
-
-    private hasAdjacentLoot(actor: FieldActor): boolean {
-        const actorTile = this.actorTile(actor);
-        return this.worldMap.loot.some((loot) =>
-            !loot.opened && manhattan(actorTile, { x: loot.x, y: loot.y }) <= 1
-        );
     }
 
     private addCombatLog(message: string): void {
@@ -2022,58 +1184,6 @@ export class WorldEngine {
         } else if (ready) {
             this.actionMenuUI.renderReadyIndicator(ctx, px, py);
         }
-    }
-
-    private getSelectedDisplayInfo(): EntityDisplayInfo | null {
-        if (this.selectedActorId) {
-            const actor = this.partyActors.find((candidate) => candidate.id === this.selectedActorId);
-            if (!actor) return null;
-            const stats = getEffectiveStatsForCharacter(actor.character);
-            return {
-                name: actor.character.name,
-                className: actor.character.getTierName(),
-                level: actor.character.level,
-                hp: stats.hp,
-                maxHp: stats.maxHp,
-                mp: stats.mp,
-                maxMp: stats.maxMp,
-                actionGauge: actor.entity.actionGauge,
-                exp: actor.character.exp,
-                maxExp: actor.character.expToNext,
-                buffs: getStatusIcons(actor.character.statuses),
-                atk: stats.atk,
-                def: stats.def,
-                magAtk: stats.magAtk,
-                magDef: stats.magDef,
-                spriteColor: actor.entity.color,
-                spriteImage: actor.character.portraitImage,
-            };
-        }
-
-        if (this.selectedEnemyId) {
-            const enemy = this.getEnemyById(this.selectedEnemyId);
-            if (!enemy) return null;
-            const stats = getEffectiveStatsForEnemy(enemy);
-            return {
-                name: enemy.name || enemy.label,
-                className: getEnemyRoleLabel(enemy.role),
-                level: enemy.level,
-                hp: enemy.stats.hp,
-                maxHp: enemy.stats.maxHp,
-                mp: enemy.stats.mp,
-                maxMp: enemy.stats.maxMp,
-                actionGauge: enemy.actionGauge,
-                buffs: getStatusIcons(enemy.statuses),
-                atk: stats.atk,
-                def: stats.def,
-                magAtk: stats.magAtk,
-                magDef: stats.magDef,
-                spriteColor: enemy.color,
-                spriteImage: enemy.image,
-            };
-        }
-
-        return null;
     }
 
 }
