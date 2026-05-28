@@ -24,6 +24,9 @@ import { resolveSkillEffect, SkillEffectEnemyInput, SkillEffectResult, SkillTerr
 import {
     applyGuardToDamage,
     applyStatus,
+    applyStatusToCarrier,
+    applyStatusesToCarrier,
+    advanceTimedStatuses,
     applyStatuses,
     cleanseNegativeStatuses,
     consumeStatus,
@@ -32,8 +35,11 @@ import {
     getEffectiveStatsForEnemy,
     getStatusIcons,
     hasStatus,
+    removeRestStatusesFromCarrier,
+    removeStatusesFromCarrier,
     resolveTurnStartStatuses,
     type StatusKind,
+    type StatusEffect,
 } from '../combat/StatusEffects';
 import { UI, renderGameTitle, Parchment, drawParchmentPanel, drawGlassPanel } from '../ui/UITheme';
 import { ActionMenuUI, ActionType } from '../ui/ActionMenuUI';
@@ -89,6 +95,7 @@ import {
     type HeroRaidStatus,
 } from '../raid/RaidOutcome';
 import { resolveTownArrival, shouldAdvanceRaidTimer } from '../raid/RaidRules';
+import { getRestMenu, INJURY_TREATMENT_PRICE, type RestMenu } from '../data/RestFacilityData';
 
 interface FieldIntent {
     kind: 'move' | 'attack' | 'interact' | 'magic' | 'rest' | 'defend' | 'counter';
@@ -194,6 +201,7 @@ export class WorldEngine {
     private readonly raidLimitSeconds = 30 * 60;
     private raidActive = false;
     private killsThisRaid = 0;
+    private downedCharacterIdsThisRaid: Set<string> = new Set();
     private pendingTownAfterResult: TownInfo | null = null;
     private lastDepartureBlockTownId: string | null = null;
 
@@ -416,6 +424,10 @@ export class WorldEngine {
             this.addCombatLog(`${placed.item.nameKr} 판매 +${price}G`);
             return true;
         };
+        this.townUI.getPendingRestMenuId = () => this.playerData.pendingRestMenuId;
+        this.townUI.getInjuredCount = () => this.getActivePartyInjuryCount();
+        this.townUI.onPurchaseRestMenu = (menuId) => this.purchaseRestMenu(menuId);
+        this.townUI.onTreatInjuries = () => this.treatActivePartyInjuries();
     }
 
     private syncTownUIState(): void {
@@ -424,9 +436,115 @@ export class WorldEngine {
         if (active) this.townUI.setActiveCharacter(active);
     }
 
+    private purchaseRestMenu(menuId: string): boolean {
+        const menu = getRestMenu(menuId);
+        if (!menu) return false;
+        if (!this.playerData.spendGold(menu.price)) {
+            this.addCombatLog(t('rest.noGold'));
+            return false;
+        }
+
+        for (const character of this.party.getCharacters()) {
+            removeRestStatusesFromCarrier(character);
+            applyStatusesToCarrier(character, this.createRestStatuses(menu, 'immediate'));
+        }
+        this.playerData.pendingRestMenuId = menu.id;
+        this.playerData.save();
+        this.addCombatLog(`${t(menu.nameKey)} 예약`);
+        return true;
+    }
+
+    private treatActivePartyInjuries(): boolean {
+        const injured = this.party.getCharacters().filter((character) => hasStatus(character.statuses, 'injury'));
+        if (injured.length === 0) return false;
+
+        const price = injured.length * INJURY_TREATMENT_PRICE;
+        if (!this.playerData.spendGold(price)) {
+            this.addCombatLog(t('rest.noGold'));
+            return false;
+        }
+
+        for (const character of injured) {
+            removeStatusesFromCarrier(character, (status) => status.kind === 'injury');
+        }
+        this.playerData.save();
+        this.addCombatLog(`${t('rest.treated')} -${price}G`);
+        return true;
+    }
+
+    private getActivePartyInjuryCount(): number {
+        return this.party.getCharacters().filter((character) => hasStatus(character.statuses, 'injury')).length;
+    }
+
+    private applyPendingRestPreview(): void {
+        const menu = this.playerData.pendingRestMenuId ? getRestMenu(this.playerData.pendingRestMenuId) : null;
+        for (const character of this.party.getCharacters()) {
+            removeRestStatusesFromCarrier(character);
+            if (menu) applyStatusesToCarrier(character, this.createRestStatuses(menu, 'immediate'));
+        }
+    }
+
+    private applyPendingRestForRaidStart(): void {
+        const menu = this.playerData.pendingRestMenuId ? getRestMenu(this.playerData.pendingRestMenuId) : null;
+        for (const character of this.party.getCharacters()) {
+            removeRestStatusesFromCarrier(character);
+            if (menu) applyStatusesToCarrier(character, this.createRestStatuses(menu));
+        }
+        if (menu) {
+            this.addCombatLog(`${t(menu.nameKey)} 효과 적용`);
+            this.playerData.pendingRestMenuId = null;
+            this.playerData.save();
+        }
+    }
+
+    private clearRestStatusesFromParty(): void {
+        for (const character of this.party.getCharacters()) {
+            removeRestStatusesFromCarrier(character);
+        }
+    }
+
+    private applyRaidInjuries(): void {
+        for (const character of this.party.getCharacters()) {
+            if (!this.downedCharacterIdsThisRaid.has(character.id)) continue;
+            applyStatusToCarrier(character, createStatus('injury', {
+                icon: '✚',
+                magnitude: 0.9,
+                sourceType: 'injury',
+                activation: 'immediate',
+            }));
+        }
+    }
+
+    private advancePartyTimedRestStatuses(dt: number): void {
+        for (const character of this.party.getCharacters()) {
+            const before = character.statuses?.length ?? 0;
+            character.statuses = advanceTimedStatuses(character.statuses, dt);
+            if ((character.statuses?.length ?? 0) !== before) {
+                const effective = getEffectiveStatsForCharacter(character);
+                character.stats.hp = Math.min(character.stats.hp, effective.maxHp);
+                character.stats.mp = Math.min(character.stats.mp, effective.maxMp);
+            }
+        }
+    }
+
+    private createRestStatuses(menu: RestMenu, activation?: 'immediate' | 'on_raid_start'): StatusEffect[] {
+        return menu.buffs
+            .filter((buff) => !activation || buff.activation === activation)
+            .map((buff) => createStatus(buff.kind, {
+                icon: buff.icon,
+                magnitude: buff.magnitude,
+                activation: buff.activation,
+                durationSeconds: buff.durationSeconds,
+                remainingSeconds: buff.activation === 'on_raid_start' ? buff.durationSeconds : undefined,
+                sourceType: 'rest',
+                sourceRestMenuId: menu.id,
+            }));
+    }
+
     private openTown(town: TownInfo): void {
         this.closeFieldOverlays();
         this.raidActive = false;
+        this.applyPendingRestPreview();
         this.townUI.show(town);
     }
 
@@ -436,9 +554,11 @@ export class WorldEngine {
         this.raidElapsedSeconds = 0;
         this.raidActive = true;
         this.killsThisRaid = 0;
+        this.downedCharacterIdsThisRaid.clear();
         this.lastDepartureBlockTownId = null;
         this.pendingTownAfterResult = null;
         this.party.resetForNewRaid();
+        this.applyPendingRestForRaidStart();
         this.placePartyNear(this.worldMap.getTownExitTile(town));
         this.player = this.getControlledActor()?.entity ?? this.player;
         this.selectedActorId = this.getControlledActor()?.id ?? null;
@@ -628,8 +748,11 @@ export class WorldEngine {
                 this.addCombatLog('조사할 상자나 전리품을 클릭하세요.');
                 break;
             case 'rest':
-                actor.character.stats.hp = Math.min(actor.character.stats.maxHp, actor.character.stats.hp + 5);
-                actor.character.stats.mp = Math.min(actor.character.stats.maxMp, actor.character.stats.mp + 3);
+                {
+                    const effective = getEffectiveStatsForCharacter(actor.character);
+                    actor.character.stats.hp = Math.min(effective.maxHp, actor.character.stats.hp + 5);
+                    actor.character.stats.mp = Math.min(effective.maxMp, actor.character.stats.mp + 3);
+                }
                 this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, 5);
                 this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
                 this.addCombatLog('휴식: HP +5, MP +3 회복. 다음 행동 게이지는 보존되지 않습니다.');
@@ -746,11 +869,12 @@ export class WorldEngine {
 
         this.fieldMagicState = { mode: 'menu' };
         this.closeTacticalMenu();
+        const effective = getEffectiveStatsForCharacter(actor.character);
         this.magicUI.show(
             actor.character.classLineId,
             actor.character.currentTier,
             actor.character.stats.mp,
-            actor.character.stats.maxMp,
+            effective.maxMp,
             unlocked
         );
         this.addCombatLog('마법을 선택하세요.');
@@ -844,8 +968,9 @@ export class WorldEngine {
     }
 
     private applySkillEffect(actor: FieldActor, skill: Skill, effect: SkillEffectResult): void {
-        actor.character.stats.mp = Math.max(0, Math.min(actor.character.stats.maxMp, actor.character.stats.mp + effect.casterMpDelta));
-        actor.character.stats.hp = Math.max(0, Math.min(actor.character.stats.maxHp, actor.character.stats.hp + effect.casterHpDelta));
+        const effective = getEffectiveStatsForCharacter(actor.character);
+        actor.character.stats.mp = Math.max(0, Math.min(effective.maxMp, actor.character.stats.mp + effect.casterMpDelta));
+        actor.character.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.character.stats.hp + effect.casterHpDelta));
         if (effect.casterHpDelta > 0) {
             this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, effect.casterHpDelta);
             this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
@@ -1237,6 +1362,7 @@ export class WorldEngine {
         }
 
         this.raidElapsedSeconds += dt;
+        this.advancePartyTimedRestStatuses(dt);
         if (this.raidElapsedSeconds >= this.raidLimitSeconds) {
             this.raidElapsedSeconds = this.raidLimitSeconds;
             this.completeRaidFailure('MIA');
@@ -1305,6 +1431,8 @@ export class WorldEngine {
         this.playerData.save();
 
         this.raidActive = false;
+        this.clearRestStatusesFromParty();
+        this.applyRaidInjuries();
         this.party.resetForNewRaid();
         this.placePartyNear(this.worldMap.getTownSpawnTile(destination));
         this.player = this.getControlledActor()?.entity ?? this.player;
@@ -1346,6 +1474,8 @@ export class WorldEngine {
         this.playerData.save();
 
         this.raidActive = false;
+        this.clearRestStatusesFromParty();
+        this.applyRaidInjuries();
         this.party.resetForNewRaid();
         this.placePartyNear(this.worldMap.getTownSpawnTile(returnTown));
         this.player = this.getControlledActor()?.entity ?? this.player;
@@ -1564,7 +1694,10 @@ export class WorldEngine {
             return true;
         }
 
-        const damage = Math.max(1, Math.floor(result.damage * (consumed.consumed.magnitude || 0.75)));
+        const baseDamage = Math.max(1, Math.floor(result.damage * (consumed.consumed.magnitude || 0.75)));
+        const guarded = applyGuardToDamage(actor.character.statuses, baseDamage);
+        actor.character.statuses = guarded.statuses;
+        const damage = guarded.damage;
         actor.character.stats.hp = Math.max(0, actor.character.stats.hp - damage);
         this.spawnAttackCue(this.enemyTile(enemy), this.actorTile(actor), '#ff9b66');
         this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, damage, result.isCrit, false);
@@ -1642,6 +1775,7 @@ export class WorldEngine {
     }
 
     private handleActorDown(actor: FieldActor): void {
+        this.downedCharacterIdsThisRaid.add(actor.character.id);
         const index = this.partyActors.indexOf(actor);
         if (index === this.party.getActiveIndex()) {
             const next = this.party.markActiveDead();
@@ -1880,7 +2014,7 @@ export class WorldEngine {
     }
 
     private processActorTurnStartStatuses(actor: FieldActor): boolean {
-        const result = resolveTurnStartStatuses(actor.character.stats, actor.character.statuses);
+        const result = resolveTurnStartStatuses(getEffectiveStatsForCharacter(actor.character), actor.character.statuses);
         actor.character.statuses = result.statuses;
         if (result.expiredReaction) this.addCombatLog(`${actor.character.name}: 방어/반격 태세 해제`);
         if (result.poisonDamage > 0) {
@@ -1893,7 +2027,8 @@ export class WorldEngine {
             this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
             this.addCombatLog(`${actor.character.name}: 재생 ${result.regenHealing} 회복`);
         }
-        actor.character.stats.hp = Math.max(0, Math.min(actor.character.stats.maxHp, actor.character.stats.hp + result.hpDelta));
+        const effective = getEffectiveStatsForCharacter(actor.character);
+        actor.character.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.character.stats.hp + result.hpDelta));
 
         if (actor.character.stats.hp <= 0 && !actor.character.isDead) {
             this.handleActorDown(actor);
@@ -1904,7 +2039,7 @@ export class WorldEngine {
 
     private processEnemyTurnStartStatuses(entry: FieldEnemy): boolean {
         const enemy = entry.enemy;
-        const result = resolveTurnStartStatuses(enemy.stats, enemy.statuses);
+        const result = resolveTurnStartStatuses(getEffectiveStatsForEnemy(enemy), enemy.statuses);
         enemy.statuses = result.statuses;
         if (result.expiredReaction) this.addCombatLog(`${enemy.name}: 방어/반격 태세 해제`);
         if (result.poisonDamage > 0) {
@@ -2130,10 +2265,13 @@ export class WorldEngine {
         const attacker = getEffectiveStatsForEnemy(enemy);
         const defender = getEffectiveStatsForCharacter(actor.character);
         const baseDamage = Math.max(1, Math.floor((attacker.magAtk * 1.5 - defender.magDef * 0.6) * power));
-        actor.character.stats.hp = Math.max(0, actor.character.stats.hp - baseDamage);
+        const guarded = applyGuardToDamage(actor.character.statuses, baseDamage);
+        actor.character.statuses = guarded.statuses;
+        const damage = guarded.damage;
+        actor.character.stats.hp = Math.max(0, actor.character.stats.hp - damage);
         this.effectManager.spawnByElement(element, actor.entity.gridX, actor.entity.gridY);
-        this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, baseDamage, false, false);
-        this.addCombatLog(`${enemy.name} → ${actor.character.name} ${baseDamage} 마법 피해`);
+        this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, damage, false, false);
+        this.addCombatLog(`${enemy.name} → ${actor.character.name} ${damage} 마법 피해`);
         if (actor.character.stats.hp <= 0 && !actor.character.isDead) this.handleActorDown(actor);
     }
 
@@ -2719,7 +2857,8 @@ export class WorldEngine {
             }
 
             this.renderGauge(ctx, px + 4, py - 7, TILE_SIZE - 8, actor.entity.actionGauge / 100, '#39ff88');
-            this.renderHpBar(ctx, px + 4, py + TILE_SIZE + 3, TILE_SIZE - 8, actor.character.stats.hp, actor.character.stats.maxHp);
+            const effective = getEffectiveStatsForCharacter(actor.character);
+            this.renderHpBar(ctx, px + 4, py + TILE_SIZE + 3, TILE_SIZE - 8, actor.character.stats.hp, effective.maxHp);
             if (actor.entity.actionGauge >= 100 || actor.id === this.activeTurnActorId) {
                 this.renderReadyRing(ctx, px, py, '#5fffd0');
             }
@@ -2873,6 +3012,7 @@ export class WorldEngine {
 
         const active = this.party.getActive();
         if (active) {
+            const effective = getEffectiveStatsForCharacter(active);
             drawParchmentPanel(ctx, 16, 56, 210, 80);
             ctx.fillStyle = Parchment.textDark;
             ctx.font = `bold 11px ${UI.fontMono}`;
@@ -2881,7 +3021,7 @@ export class WorldEngine {
             ctx.fillText(`${active.name} Lv.${active.level}`, 28, 68);
             ctx.fillStyle = Parchment.textMid;
             ctx.font = `10px ${UI.fontMono}`;
-            ctx.fillText(`HP ${active.stats.hp}/${active.stats.maxHp}  MP ${active.stats.mp}/${active.stats.maxMp}`, 28, 84);
+            ctx.fillText(`HP ${active.stats.hp}/${effective.maxHp}  MP ${active.stats.mp}/${effective.maxMp}`, 28, 84);
             ctx.fillText(`ATB ${Math.floor(this.player.actionGauge)}%`, 28, 100);
             const activeActor = this.getControlledActor();
             const apText = activeActor?.id === this.activeTurnActorId

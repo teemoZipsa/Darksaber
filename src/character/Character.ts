@@ -212,7 +212,7 @@ export class Character {
             icon: status.icon,
             stat: 'all',
             power: status.magnitude,
-            duration: status.durationTurns,
+            duration: status.durationTurns ?? Math.ceil(status.remainingSeconds ?? 0),
         }));
     }
 

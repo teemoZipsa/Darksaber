@@ -15,6 +15,7 @@ export interface SaveData {
     gold: number;
     clearedStages: string[];
     currentHubTownId: string;
+    pendingRestMenuId: string | null;
     inventory: InventoryItem[];
     equipped: { [slot: string]: InventoryItem | null };
     /** ISO date string of last save */
@@ -26,6 +27,7 @@ export class PlayerData {
     public gold: number = 500;  // Starting gold
     public clearedStages: Set<string> = new Set();
     public currentHubTownId: string = 'central_castle';
+    public pendingRestMenuId: string | null = null;
     public inventory: InventoryItem[] = [];
     public equipped: Record<string, InventoryItem | null> = {
         weapon: null, shield: null, head: null, body: null, boots: null, accessory: null, accessory2: null
@@ -62,6 +64,7 @@ export class PlayerData {
             gold: this.gold,
             clearedStages: Array.from(this.clearedStages),
             currentHubTownId: this.currentHubTownId,
+            pendingRestMenuId: this.pendingRestMenuId,
             inventory: this.inventory,
             equipped: this.equipped,
             lastSaved: new Date().toISOString(),
@@ -79,6 +82,7 @@ export class PlayerData {
             this.gold = data.gold ?? 500;
             this.clearedStages = new Set(data.clearedStages ?? []);
             this.currentHubTownId = data.currentHubTownId ?? 'central_castle';
+            this.pendingRestMenuId = data.pendingRestMenuId ?? null;
             this.inventory = data.inventory ?? [];
             this.equipped = data.equipped ?? {
                 weapon: null, shield: null, head: null, body: null, boots: null, accessory: null, accessory2: null

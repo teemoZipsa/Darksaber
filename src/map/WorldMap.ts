@@ -27,6 +27,94 @@ const BIOME_TILE: Record<BiomeType, TileType> = {
     lava: TileType.LAVA,
 };
 
+interface RoutePoint {
+    chunkX: number;
+    chunkY: number;
+}
+
+interface TileRoute {
+    points: RoutePoint[];
+    width: number;
+    noiseSalt: number;
+}
+
+const ROAD_ROUTES: TileRoute[] = [
+    {
+        points: [
+            { chunkX: 16, chunkY: 11 },
+            { chunkX: 23, chunkY: 23 },
+            { chunkX: 30, chunkY: 35 },
+            { chunkX: 37, chunkY: 44 },
+        ],
+        width: 2.2,
+        noiseSalt: 101,
+    },
+    {
+        points: [
+            { chunkX: 10, chunkY: 52 },
+            { chunkX: 20, chunkY: 48 },
+            { chunkX: 28, chunkY: 45 },
+            { chunkX: 37, chunkY: 44 },
+        ],
+        width: 2.2,
+        noiseSalt: 102,
+    },
+    {
+        points: [
+            { chunkX: 37, chunkY: 44 },
+            { chunkX: 39, chunkY: 62 },
+            { chunkX: 41, chunkY: 80 },
+        ],
+        width: 2.3,
+        noiseSalt: 103,
+    },
+    {
+        points: [
+            { chunkX: 12, chunkY: 79 },
+            { chunkX: 24, chunkY: 82 },
+            { chunkX: 41, chunkY: 80 },
+        ],
+        width: 2.1,
+        noiseSalt: 104,
+    },
+    {
+        points: [
+            { chunkX: 64, chunkY: 23 },
+            { chunkX: 64, chunkY: 35 },
+            { chunkX: 63, chunkY: 49 },
+            { chunkX: 63, chunkY: 60 },
+            { chunkX: 63, chunkY: 72 },
+        ],
+        width: 2.1,
+        noiseSalt: 105,
+    },
+];
+
+const RIVER_ROUTES: TileRoute[] = [
+    {
+        points: [
+            { chunkX: 32, chunkY: 25 },
+            { chunkX: 36, chunkY: 34 },
+            { chunkX: 34, chunkY: 48 },
+            { chunkX: 29, chunkY: 59 },
+            { chunkX: 21, chunkY: 72 },
+        ],
+        width: 2.4,
+        noiseSalt: 201,
+    },
+    {
+        points: [
+            { chunkX: 68, chunkY: 16 },
+            { chunkX: 66, chunkY: 31 },
+            { chunkX: 61, chunkY: 44 },
+            { chunkX: 65, chunkY: 58 },
+            { chunkX: 61, chunkY: 75 },
+        ],
+        width: 2.1,
+        noiseSalt: 202,
+    },
+];
+
 export class WorldMap {
     private chunks: Map<string, Chunk> = new Map();
     private loadRadius: number = 2;
@@ -48,6 +136,34 @@ export class WorldMap {
         let h = x * 374761393 + y * 668265263 + salt * 1442695041;
         h = (h ^ (h >> 13)) * 1274126177;
         return ((h ^ (h >> 16)) & 0x7fffffff) / 0x7fffffff;
+    }
+
+    private smoothstep(t: number): number {
+        return t * t * (3 - 2 * t);
+    }
+
+    private noise(x: number, y: number, scale: number, salt: number = 0): number {
+        const sx = x * scale;
+        const sy = y * scale;
+        const ix = Math.floor(sx);
+        const iy = Math.floor(sy);
+        const fx = sx - ix;
+        const fy = sy - iy;
+        const u = this.smoothstep(fx);
+        const v = this.smoothstep(fy);
+
+        const a = this.hash(ix, iy, salt);
+        const b = this.hash(ix + 1, iy, salt);
+        const c = this.hash(ix, iy + 1, salt);
+        const d = this.hash(ix + 1, iy + 1, salt);
+
+        return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+    }
+
+    private fbm(x: number, y: number, scale: number, salt: number = 0): number {
+        return this.noise(x, y, scale, salt) * 0.56
+            + this.noise(x + 113, y - 79, scale * 2.05, salt + 1) * 0.31
+            + this.noise(x - 211, y + 157, scale * 4.15, salt + 2) * 0.13;
     }
 
     private tileToChunk(tx: number, ty: number): { chunkX: number; chunkY: number; localX: number; localY: number } {
@@ -79,6 +195,52 @@ export class WorldMap {
         return false;
     }
 
+    private routePointToTile(point: RoutePoint): TilePoint {
+        return {
+            x: point.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+            y: point.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+        };
+    }
+
+    private pointToSegmentDistance(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+        const vx = bx - ax;
+        const vy = by - ay;
+        const wx = px - ax;
+        const wy = py - ay;
+        const lenSq = vx * vx + vy * vy;
+        if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+        const t = Math.max(0, Math.min(1, (wx * vx + wy * vy) / lenSq));
+        const cx = ax + vx * t;
+        const cy = ay + vy * t;
+        return Math.hypot(px - cx, py - cy);
+    }
+
+    private distanceToRoute(tx: number, ty: number, route: TileRoute): number {
+        let min = Infinity;
+        for (let i = 0; i < route.points.length - 1; i++) {
+            const a = this.routePointToTile(route.points[i]);
+            const b = this.routePointToTile(route.points[i + 1]);
+            min = Math.min(min, this.pointToSegmentDistance(tx, ty, a.x, a.y, b.x, b.y));
+        }
+        return min;
+    }
+
+    private isRouteTile(tx: number, ty: number, route: TileRoute, hardCenterWidth: number): boolean {
+        const dist = this.distanceToRoute(tx, ty, route);
+        if (dist <= hardCenterWidth) return true;
+
+        const raggedEdge = (this.fbm(tx, ty, 0.035, route.noiseSalt) - 0.5) * 1.1;
+        return dist <= route.width + raggedEdge;
+    }
+
+    private isRoadTile(tx: number, ty: number): boolean {
+        return ROAD_ROUTES.some((route) => this.isRouteTile(tx, ty, route, 1.35));
+    }
+
+    private isRiverTile(tx: number, ty: number): boolean {
+        return RIVER_ROUTES.some((route) => this.isRouteTile(tx, ty, route, 1.65));
+    }
+
     private computeTownTile(tx: number, ty: number, town: TownInfo): TileType {
         const centerX = town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
         const centerY = town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
@@ -90,12 +252,76 @@ export class WorldMap {
         if (Math.abs(dx) <= 7 && Math.abs(dy) <= 7) return TileType.TOWN;
         if (dist <= 13 && this.hash(tx, ty, 21) > 0.35) return TileType.TOWN;
         if ((Math.abs(dx) <= 2 || Math.abs(dy) <= 2) && dist <= townRadiusTiles * 0.9) return TileType.ROAD;
+        if (Math.abs(dist - 18) <= 1.3 && this.hash(tx >> 1, ty >> 1, 24) > 0.22) return TileType.ROAD;
 
-        const n = this.hash(tx >> 1, ty >> 1, 22);
-        if (n > 0.9) return TileType.STONE;
-        if (town.id === 'nw_desert_city') return n > 0.2 ? TileType.SAND : TileType.STONE;
-        if (town.id === 's_coast_town' || town.id === 'se_port') return n > 0.28 ? TileType.GRASS : TileType.SAND;
-        return n > 0.18 ? TileType.GRASS : TileType.FOREST;
+        const patch = this.fbm(tx, ty, 0.026, 22);
+        const detail = this.fbm(tx, ty, 0.085, 23);
+        if (detail > 0.94) return TileType.STONE;
+
+        switch (town.id) {
+            case 'nw_desert_city':
+                if (patch < 0.08) return TileType.GRASS;
+                if (patch > 0.72) return TileType.STONE;
+                return TileType.SAND;
+            case 'w_forest_village':
+                if (patch < 0.2) return TileType.GRASS;
+                if (detail > 0.82) return TileType.STONE;
+                return TileType.FOREST;
+            case 'central_castle':
+                if (patch > 0.74) return TileType.STONE;
+                if (detail > 0.7) return TileType.FOREST;
+                return TileType.GRASS;
+            case 'sw_hideout':
+                if (patch < 0.1) return TileType.POISON_SWAMP;
+                return detail > 0.38 ? TileType.FOREST : TileType.GRASS;
+            case 's_coast_town':
+            case 'se_port':
+                if (patch < 0.28) return TileType.SAND;
+                if (detail > 0.82) return TileType.FOREST;
+                return TileType.GRASS;
+            case 'e_stronghold':
+                if (patch > 0.38) return TileType.STONE;
+                return detail > 0.72 ? TileType.FOREST : TileType.GRASS;
+            default:
+                if (patch > 0.78) return TileType.STONE;
+                if (detail > 0.68) return TileType.FOREST;
+                return TileType.GRASS;
+        }
+    }
+
+    private varyBiomeTile(base: TileType, tx: number, ty: number): TileType {
+        const broad = this.fbm(tx, ty, 0.018, 40);
+        const detail = this.fbm(tx, ty, 0.074, 41);
+
+        switch (base) {
+            case TileType.GRASS:
+                if (broad > 0.72 && detail > 0.48) return TileType.FOREST;
+                if (broad < 0.1 && detail > 0.62) return TileType.STONE;
+                return TileType.GRASS;
+            case TileType.FOREST:
+                if (broad < 0.22) return TileType.GRASS;
+                if (detail > 0.88) return TileType.STONE;
+                return TileType.FOREST;
+            case TileType.SAND:
+                if (broad > 0.76) return TileType.STONE;
+                if (broad < 0.08 && detail > 0.52) return TileType.GRASS;
+                return TileType.SAND;
+            case TileType.STONE:
+                if (broad < 0.16) return TileType.GRASS;
+                if (detail > 0.92) return TileType.SNOW;
+                return TileType.STONE;
+            case TileType.SNOW:
+                if (broad < 0.16) return TileType.STONE;
+                return TileType.SNOW;
+            case TileType.LAVA:
+                if (broad < 0.34) return TileType.STONE;
+                return TileType.LAVA;
+            case TileType.POISON_SWAMP:
+                if (detail > 0.86) return TileType.STONE;
+                return TileType.POISON_SWAMP;
+            default:
+                return base;
+        }
     }
 
     private computeTileAt(tx: number, ty: number): TileType {
@@ -124,18 +350,16 @@ export class WorldMap {
             const dx = localX - CHUNK_SIZE / 2;
             const dy = localY - CHUNK_SIZE / 2;
             if (Math.sqrt(dx * dx + dy * dy) <= 4) return TileType.DUNGEON_ENTRANCE;
+            if (this.isRoadTile(tx, ty)) return TileType.ROAD;
+            if (this.isRiverTile(tx, ty)) return TileType.WATER;
             return this.hash(tx, ty, 9) > 0.82 ? TileType.STONE : TileType.POISON_SWAMP;
         }
 
+        if (this.isRoadTile(tx, ty)) return TileType.ROAD;
+        if (this.isRiverTile(tx, ty)) return TileType.WATER;
+
         const base = BIOME_TILE[biome];
-        const n = this.hash(tx >> 1, ty >> 1, 3);
-
-        if (base === TileType.FOREST && n < 0.22) return TileType.GRASS;
-        if (base === TileType.GRASS && n > 0.88) return TileType.FOREST;
-        if (base === TileType.SAND && n > 0.9) return TileType.STONE;
-        if (base === TileType.STONE && n < 0.18) return TileType.GRASS;
-
-        return base;
+        return this.varyBiomeTile(base, tx, ty);
     }
 
     private generateChunk(chunkX: number, chunkY: number): Chunk {

@@ -5,6 +5,7 @@
  */
 
 import { Character } from './Character';
+import { getEffectiveStatsForCharacter } from '../combat/StatusEffects';
 
 export const MAX_PARTY_SIZE = 9;
 
@@ -123,8 +124,9 @@ export class PartyManager {
     public resetForNewRaid(): void {
         for (const c of this.roster) {
             c.isDead = false;
-            c.stats.hp = c.stats.maxHp;
-            c.stats.mp = c.stats.maxMp;
+            const effective = getEffectiveStatsForCharacter(c);
+            c.stats.hp = effective.maxHp;
+            c.stats.mp = effective.maxMp;
         }
         this.activeIndex = 0;
     }

@@ -34,7 +34,8 @@ export class CombatFormulas {
         // Hit check
         const profile = getTerrainProfile(defenderTile);
         const rangedPenalty = terrainContext.isRanged ? profile.rangedHitPenalty : 0;
-        const hitChance = Math.min(95, attacker.hitRate - (defender.spd * 2) + rangedPenalty);
+        const evasionBonus = Math.max(0, (defender.evasion ?? 10) - 10);
+        const hitChance = Math.min(95, attacker.hitRate - (defender.spd * 2) - evasionBonus + rangedPenalty);
         const hitRoll = Math.random() * 100;
         if (hitRoll > hitChance) {
             return { damage: 0, isCrit: false, isHit: false, isMiss: true, hitChance };

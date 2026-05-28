@@ -17,15 +17,30 @@ export type StatusKind =
     | 'defenseUp'
     | 'speedUp'
     | 'resistUp'
-    | 'allUp';
+    | 'allUp'
+    | 'maxHpUp'
+    | 'maxMpUp'
+    | 'critUp'
+    | 'evasionUp'
+    | 'hitDown'
+    | 'damageTakenDown'
+    | 'injury';
+
+export type StatusActivation = 'immediate' | 'on_raid_start';
+export type StatusSourceType = 'skill' | 'rest' | 'injury';
 
 export interface StatusEffect {
     kind: StatusKind;
     icon: string;
-    durationTurns: number;
+    durationTurns?: number;
+    durationSeconds?: number;
+    remainingSeconds?: number;
     magnitude: number;
+    activation?: StatusActivation;
+    sourceType?: StatusSourceType;
     charges?: number;
     sourceSkillId?: string;
+    sourceRestMenuId?: string;
 }
 
 export interface StatusCarrier {
@@ -64,6 +79,13 @@ const DEFAULT_STATUS: Record<StatusKind, Omit<StatusEffect, 'kind'>> = {
     speedUp: { icon: '💨', durationTurns: 3, magnitude: 1.3 },
     resistUp: { icon: '🔰', durationTurns: 3, magnitude: 1.3 },
     allUp: { icon: '✨', durationTurns: 3, magnitude: 1.2 },
+    maxHpUp: { icon: '♥', magnitude: 1.1 },
+    maxMpUp: { icon: '◆', magnitude: 1.1 },
+    critUp: { icon: '✦', magnitude: 10 },
+    evasionUp: { icon: '◇', magnitude: 10 },
+    hitDown: { icon: '▽', magnitude: 5 },
+    damageTakenDown: { icon: '▣', magnitude: 0.9 },
+    injury: { icon: '✚', magnitude: 0.9, sourceType: 'injury' },
 };
 
 const LOWER_IS_STRONGER = new Set<StatusKind>([
@@ -87,11 +109,17 @@ const NEGATIVE_STATUSES = new Set<StatusKind>([
 ]);
 
 export function createStatus(kind: StatusKind, overrides: Partial<Omit<StatusEffect, 'kind'>> = {}): StatusEffect {
-    return {
+    const status: StatusEffect = {
         kind,
+        activation: 'immediate',
+        sourceType: 'skill',
         ...DEFAULT_STATUS[kind],
         ...overrides,
     };
+    if (status.activation === 'on_raid_start') {
+        delete status.durationTurns;
+    }
+    return status;
 }
 
 export function getStatus(statuses: StatusEffect[] | undefined, kind: StatusKind): StatusEffect | undefined {
@@ -104,24 +132,71 @@ export function hasStatus(statuses: StatusEffect[] | undefined, kind: StatusKind
 
 export function applyStatus(statuses: StatusEffect[] | undefined, next: StatusEffect): StatusEffect[] {
     const current = statuses ?? [];
-    const existing = current.find((status) => status.kind === next.kind);
+    const existing = current.find((status) => isSameStatusSlot(status, next));
     if (!existing) return [...current, { ...next }];
 
     return current.map((status) => {
-        if (status.kind !== next.kind) return status;
+        if (!isSameStatusSlot(status, next)) return status;
         return {
             ...status,
             icon: next.icon,
             magnitude: chooseStrongerMagnitude(status.kind, status.magnitude, next.magnitude),
-            durationTurns: Math.max(status.durationTurns, next.durationTurns),
+            durationTurns: maxOptional(status.durationTurns, next.durationTurns),
+            durationSeconds: maxOptional(status.durationSeconds, next.durationSeconds),
+            remainingSeconds: maxOptional(status.remainingSeconds, next.remainingSeconds),
+            activation: next.activation ?? status.activation,
+            sourceType: next.sourceType ?? status.sourceType,
             charges: Math.max(status.charges ?? 0, next.charges ?? 0) || undefined,
             sourceSkillId: next.sourceSkillId ?? status.sourceSkillId,
+            sourceRestMenuId: next.sourceRestMenuId ?? status.sourceRestMenuId,
         };
     });
 }
 
 export function applyStatuses(statuses: StatusEffect[] | undefined, nextStatuses: StatusEffect[]): StatusEffect[] {
     return nextStatuses.reduce((result, status) => applyStatus(result, status), statuses ?? []);
+}
+
+export function applyStatusToCarrier(carrier: StatusCarrier, next: StatusEffect): void {
+    const before = getEffectiveStats(carrier.stats, carrier.statuses);
+    carrier.statuses = applyStatus(carrier.statuses, next);
+    adjustCurrentResources(carrier.stats, before, getEffectiveStats(carrier.stats, carrier.statuses));
+}
+
+export function applyStatusesToCarrier(carrier: StatusCarrier, nextStatuses: StatusEffect[]): void {
+    for (const status of nextStatuses) applyStatusToCarrier(carrier, status);
+}
+
+export function removeStatusesFromCarrier(
+    carrier: StatusCarrier,
+    predicate: (status: StatusEffect) => boolean
+): StatusEffect[] {
+    const current = carrier.statuses ?? [];
+    const removed = current.filter(predicate);
+    if (removed.length === 0) return [];
+
+    const before = getEffectiveStats(carrier.stats, current);
+    carrier.statuses = current.filter((status) => !predicate(status));
+    adjustCurrentResources(carrier.stats, before, getEffectiveStats(carrier.stats, carrier.statuses));
+    return removed;
+}
+
+export function removeRestStatusesFromCarrier(carrier: StatusCarrier): StatusEffect[] {
+    return removeStatusesFromCarrier(carrier, (status) => status.sourceType === 'rest');
+}
+
+export function advanceTimedStatuses(statuses: StatusEffect[] | undefined, dt: number): StatusEffect[] {
+    const next: StatusEffect[] = [];
+    for (const status of statuses ?? []) {
+        if (status.activation !== 'on_raid_start' || status.remainingSeconds === undefined) {
+            next.push(status);
+            continue;
+        }
+
+        const remainingSeconds = status.remainingSeconds - dt;
+        if (remainingSeconds > 0) next.push({ ...status, remainingSeconds });
+    }
+    return next;
 }
 
 export function consumeStatus(statuses: StatusEffect[] | undefined, kind: StatusKind): { statuses: StatusEffect[]; consumed?: StatusEffect } {
@@ -135,11 +210,21 @@ export function consumeStatus(statuses: StatusEffect[] | undefined, kind: Status
 
 export function applyGuardToDamage(statuses: StatusEffect[] | undefined, damage: number): GuardDamageResult {
     const guard = getStatus(statuses, 'guard');
-    if (!guard) return { damage, statuses: statuses ?? [], guarded: false };
+    const damageTakenMultiplier = (statuses ?? [])
+        .filter((status) => status.kind === 'damageTakenDown')
+        .reduce((multiplier, status) => multiplier * status.magnitude, 1);
+
+    if (!guard) {
+        return {
+            damage: scaleIncomingDamage(damage, damageTakenMultiplier),
+            statuses: statuses ?? [],
+            guarded: false,
+        };
+    }
 
     const consumed = consumeStatus(statuses, 'guard');
     return {
-        damage: Math.max(1, Math.floor(damage * guard.magnitude)),
+        damage: scaleIncomingDamage(damage, guard.magnitude * damageTakenMultiplier),
         statuses: consumed.statuses,
         guarded: true,
     };
@@ -159,6 +244,11 @@ export function resolveTurnStartStatuses(stats: CharacterStats, statuses: Status
             poisonDamage += Math.max(1, Math.floor(stats.maxHp * status.magnitude));
         } else if (status.kind === 'regen') {
             regenHealing += Math.max(1, Math.floor(stats.maxHp * status.magnitude));
+        }
+
+        if (status.durationTurns === undefined) {
+            nextStatuses.push(status);
+            continue;
         }
 
         const durationTurns = status.durationTurns - 1;
@@ -226,6 +316,26 @@ export function getEffectiveStats(stats: CharacterStats, statuses: StatusEffect[
                 effective.spd = Math.max(1, Math.floor(effective.spd * status.magnitude));
                 effective.magDef = Math.max(0, Math.floor(effective.magDef * status.magnitude));
                 break;
+            case 'maxHpUp':
+                effective.maxHp = Math.max(1, Math.floor(effective.maxHp * status.magnitude));
+                break;
+            case 'maxMpUp':
+                effective.maxMp = Math.max(0, Math.floor(effective.maxMp * status.magnitude));
+                break;
+            case 'critUp':
+                effective.critRate = Math.max(0, effective.critRate + status.magnitude);
+                break;
+            case 'evasionUp':
+                effective.evasion = Math.max(0, effective.evasion + status.magnitude);
+                break;
+            case 'hitDown':
+                effective.hitRate = Math.max(1, effective.hitRate - status.magnitude);
+                break;
+            case 'damageTakenDown':
+                break;
+            case 'injury':
+                effective.maxHp = Math.max(1, Math.floor(effective.maxHp * status.magnitude));
+                break;
         }
     }
 
@@ -275,4 +385,36 @@ export function getStatusEffectsForSkill(skill: Skill): StatusEffect[] {
 function chooseStrongerMagnitude(kind: StatusKind, current: number, next: number): number {
     if (LOWER_IS_STRONGER.has(kind)) return Math.min(current, next);
     return Math.max(current, next);
+}
+
+function isSameStatusSlot(current: StatusEffect, next: StatusEffect): boolean {
+    if (current.kind !== next.kind) return false;
+    if (current.kind === 'injury' || next.kind === 'injury') return true;
+    if (current.sourceType === 'rest' || next.sourceType === 'rest') {
+        return current.sourceType === next.sourceType && current.sourceRestMenuId === next.sourceRestMenuId;
+    }
+    return true;
+}
+
+function maxOptional(a: number | undefined, b: number | undefined): number | undefined {
+    if (a === undefined) return b;
+    if (b === undefined) return a;
+    return Math.max(a, b);
+}
+
+function adjustCurrentResources(stats: CharacterStats, before: CharacterStats, after: CharacterStats): void {
+    if (after.maxHp > before.maxHp) {
+        stats.hp = Math.floor(stats.hp * (after.maxHp / Math.max(1, before.maxHp)));
+    }
+    if (after.maxMp > before.maxMp) {
+        stats.mp = Math.floor(stats.mp * (after.maxMp / Math.max(1, before.maxMp)));
+    }
+
+    stats.hp = Math.max(0, Math.min(after.maxHp, stats.hp));
+    stats.mp = Math.max(0, Math.min(after.maxMp, stats.mp));
+}
+
+function scaleIncomingDamage(damage: number, multiplier: number): number {
+    if (damage <= 0) return 0;
+    return Math.max(1, Math.floor(damage * multiplier));
 }

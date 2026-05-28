@@ -5,8 +5,9 @@
  * Tabs:
  *   1. 창고 (Storage)  — Stash + Equipment + Backpack
  *   2. 상점 (Shop)     — Buy/sell items
- *   3. 퀘스트 (Quest)  — Quest board (placeholder)
- *   4. 소문 (Rumors)   — World gossip & info
+ *   3. 휴식 (Rest)     — Town-specific food/rest buffs and injury treatment
+ *   4. 퀘스트 (Quest)  — Quest board (placeholder)
+ *   5. 소문 (Rumors)   — World gossip & info
  *
  * Bottom: 출격 (Deploy) button to leave town and continue the raid.
  */
@@ -19,8 +20,14 @@ import { renderGameTitle, UI } from './UITheme';
 import { TownInfo } from '../map/BiomeMask';
 import type { Character } from '../character/Character';
 import { t } from '../i18n/LanguageManager';
+import {
+    getRestFacility,
+    getRestMenu,
+    INJURY_TREATMENT_PRICE,
+    type RestFacility,
+} from '../data/RestFacilityData';
 
-type TownTab = 'storage' | 'shop' | 'quest' | 'rumors';
+type TownTab = 'storage' | 'shop' | 'rest' | 'quest' | 'rumors';
 
 /** Random rumors per town, cycling for variety */
 const RUMORS_KR: string[] = [
@@ -61,10 +68,21 @@ export class TownUI {
 
     // Deploy button rect
     private deployBtnRect = { x: 0, y: 0, w: 0, h: 0 };
+    private restMenuRects: Array<{ x: number; y: number; w: number; h: number; menuId: string }> = [];
+    private restTreatRect = { x: 0, y: 0, w: 0, h: 0 };
+    private restConfirmMenuId: string | null = null;
+    private restConfirmRect = { x: 0, y: 0, w: 0, h: 0 };
+    private restCancelRect = { x: 0, y: 0, w: 0, h: 0 };
+    private restFeedbackText = '';
+    private restFeedbackTimer = 0;
 
     // Player gold reference (updated externally)
     public playerGold: number = 0;
     public getQuestDone: ((questId: string) => boolean) | null = null;
+    public getPendingRestMenuId: (() => string | null) | null = null;
+    public getInjuredCount: (() => number) | null = null;
+    public onPurchaseRestMenu: ((menuId: string) => boolean) | null = null;
+    public onTreatInjuries: (() => boolean) | null = null;
 
     // Main stash (shared with lobby)
     public stash: GridInventory;
@@ -95,6 +113,10 @@ export class TownUI {
         ]);
     }
 
+    private getCurrentRestFacility(): RestFacility | null {
+        return this.currentTown ? getRestFacility(this.currentTown.id) : null;
+    }
+
     public setActiveCharacter(char: Character): void {
         this.inventoryUI.setActiveCharacter(char);
     }
@@ -118,12 +140,19 @@ export class TownUI {
         if (this.inventoryUI.isVisible()) this.inventoryUI.toggle();
         this.shopUI.hide();
         this.currentTown = null;
+        this.restConfirmMenuId = null;
+        this.restFeedbackText = '';
+        this.restFeedbackTimer = 0;
     }
 
     public isVisible(): boolean { return this.visible; }
 
     private showTab(tab: TownTab): void {
+        if (tab === 'rest' && !this.getCurrentRestFacility()) {
+            tab = 'storage';
+        }
         this.activeTab = tab;
+        this.restConfirmMenuId = null;
 
         // Hide all sub-UIs
         if (this.inventoryUI.isVisible()) this.inventoryUI.toggle();
@@ -138,7 +167,7 @@ export class TownUI {
                 this.syncShopSources();
                 this.shopUI.show();
                 break;
-            // quest and rumors are rendered inline (no sub-UI)
+            // rest, quest and rumors are rendered inline (no sub-UI)
         }
     }
 
@@ -158,6 +187,8 @@ export class TownUI {
         if (input.mouseJustDown) {
             const mx = input.uiMouseX;
             const my = input.uiMouseY;
+
+            if (this.activeTab === 'rest' && this.handleRestMouseDown(mx, my)) return;
 
             // Tab clicks
             for (const rect of this.tabRects) {
@@ -237,6 +268,9 @@ export class TownUI {
                 this.syncShopSources();
                 this.shopUI.render(ctx, w, h);
                 break;
+            case 'rest':
+                this.renderRestTab(ctx, w, contentY, contentH);
+                break;
             case 'quest':
                 this.renderQuestTab(ctx, w, contentY, contentH);
                 break;
@@ -250,14 +284,16 @@ export class TownUI {
     }
 
     private renderTabs(ctx: CanvasRenderingContext2D, w: number): void {
+        const restFacility = this.getCurrentRestFacility();
         const tabs: { label: string; tab: TownTab }[] = [
             { label: '📦 창고', tab: 'storage' },
             { label: '🛒 상점', tab: 'shop' },
+            ...(restFacility ? [{ label: `${this.getRestFacilityIcon(restFacility.type)} ${t('tab.rest')}`, tab: 'rest' as const }] : []),
             { label: '📜 퀘스트', tab: 'quest' },
             { label: '💬 소문', tab: 'rumors' },
         ];
 
-        const tabW = 130;
+        const tabW = 120;
         const tabH = 36;
         const gap = 8;
         const totalW = tabs.length * tabW + (tabs.length - 1) * gap;
@@ -297,6 +333,268 @@ export class TownUI {
             ctx.fillText(tabs[i].label, x + tabW / 2, tabY + tabH / 2);
 
             this.tabRects.push({ x, y: tabY, w: tabW, h: tabH, tab: tabs[i].tab });
+        }
+    }
+
+    private handleRestMouseDown(mx: number, my: number): boolean {
+        if (this.restConfirmMenuId) {
+            if (mx >= this.restConfirmRect.x && mx <= this.restConfirmRect.x + this.restConfirmRect.w &&
+                my >= this.restConfirmRect.y && my <= this.restConfirmRect.y + this.restConfirmRect.h) {
+                this.purchaseRestMenu(this.restConfirmMenuId);
+                this.restConfirmMenuId = null;
+                return true;
+            }
+            if (mx >= this.restCancelRect.x && mx <= this.restCancelRect.x + this.restCancelRect.w &&
+                my >= this.restCancelRect.y && my <= this.restCancelRect.y + this.restCancelRect.h) {
+                this.restConfirmMenuId = null;
+                return true;
+            }
+            return true;
+        }
+
+        if (mx >= this.restTreatRect.x && mx <= this.restTreatRect.x + this.restTreatRect.w &&
+            my >= this.restTreatRect.y && my <= this.restTreatRect.y + this.restTreatRect.h) {
+            const ok = this.onTreatInjuries?.() ?? false;
+            this.setRestFeedback(ok ? t('rest.treated') : t('rest.noGold'));
+            return true;
+        }
+
+        for (const rect of this.restMenuRects) {
+            if (mx < rect.x || mx > rect.x + rect.w || my < rect.y || my > rect.y + rect.h) continue;
+            const pending = this.getPendingRestMenuId?.() ?? null;
+            if (pending === rect.menuId) {
+                this.setRestFeedback(t('rest.current'));
+            } else if (pending) {
+                this.restConfirmMenuId = rect.menuId;
+            } else {
+                this.purchaseRestMenu(rect.menuId);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    private purchaseRestMenu(menuId: string): void {
+        const ok = this.onPurchaseRestMenu?.(menuId) ?? false;
+        this.setRestFeedback(ok ? t('rest.purchased') : t('rest.noGold'));
+    }
+
+    private setRestFeedback(text: string): void {
+        this.restFeedbackText = text;
+        this.restFeedbackTimer = 180;
+    }
+
+    private renderRestTab(ctx: CanvasRenderingContext2D, w: number, y: number, _h: number): void {
+        const facility = this.getCurrentRestFacility();
+        if (!facility) return;
+
+        const panelW = Math.min(760, w - 80);
+        const panelH = 430;
+        const px = (w - panelW) / 2;
+        const py = y + 12;
+        const pendingId = this.getPendingRestMenuId?.() ?? null;
+        const pendingMenu = pendingId ? getRestMenu(pendingId) : null;
+        const injuredCount = this.getInjuredCount?.() ?? 0;
+
+        this.restMenuRects = [];
+        this.restTreatRect = { x: 0, y: 0, w: 0, h: 0 };
+
+        ctx.fillStyle = '#1a1510';
+        ctx.strokeStyle = '#5a4a3a';
+        ctx.lineWidth = 2;
+        ctx.fillRect(px, py, panelW, panelH);
+        ctx.strokeRect(px, py, panelW, panelH);
+
+        ctx.font = `bold 21px ${UI.fontPrimary}`;
+        ctx.fillStyle = '#c8a84e';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${this.getRestFacilityIcon(facility.type)} ${t(facility.nameKey)}`, w / 2, py + 30);
+
+        ctx.strokeStyle = '#3a2a18';
+        ctx.beginPath();
+        ctx.moveTo(px + 22, py + 56);
+        ctx.lineTo(px + panelW - 22, py + 56);
+        ctx.stroke();
+
+        ctx.font = `13px ${UI.fontPrimary}`;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#b8a980';
+        ctx.fillText(`${t('rest.current')}: ${pendingMenu ? t(pendingMenu.nameKey) : t('rest.none')}`, px + 28, py + 82);
+
+        const menuY = py + 105;
+        const cardGap = 14;
+        const cardW = (panelW - 56 - cardGap * (facility.menu.length - 1)) / Math.max(1, facility.menu.length);
+        const cardH = 150;
+        for (let i = 0; i < facility.menu.length; i++) {
+            const menu = facility.menu[i];
+            const x = px + 28 + i * (cardW + cardGap);
+            const isCurrent = pendingId === menu.id;
+
+            ctx.fillStyle = isCurrent ? '#2a2316' : '#221e16';
+            ctx.strokeStyle = isCurrent ? '#c8a84e' : '#3a3020';
+            ctx.lineWidth = isCurrent ? 2 : 1;
+            ctx.fillRect(x, menuY, cardW, cardH);
+            ctx.strokeRect(x, menuY, cardW, cardH);
+
+            ctx.font = `bold 16px ${UI.fontPrimary}`;
+            ctx.fillStyle = '#e6d3a4';
+            ctx.textAlign = 'left';
+            ctx.fillText(t(menu.nameKey), x + 14, menuY + 26);
+
+            ctx.font = `12px ${UI.fontPrimary}`;
+            ctx.fillStyle = '#9a8b66';
+            this.drawWrappedText(ctx, t(menu.descKey), x + 14, menuY + 50, cardW - 28, 17, 3);
+
+            ctx.font = `bold 13px ${UI.fontPrimary}`;
+            ctx.fillStyle = '#d2b55c';
+            ctx.fillText(`${menu.price}G`, x + 14, menuY + cardH - 18);
+
+            const btnW = 86;
+            const btnH = 28;
+            const btnX = x + cardW - btnW - 12;
+            const btnY = menuY + cardH - btnH - 10;
+            this.drawSmallButton(ctx, btnX, btnY, btnW, btnH, isCurrent ? t('rest.current') : t('rest.purchase'));
+            this.restMenuRects.push({ x: btnX, y: btnY, w: btnW, h: btnH, menuId: menu.id });
+        }
+
+        const injuryY = menuY + cardH + 26;
+        ctx.fillStyle = '#181812';
+        ctx.strokeStyle = '#3a3020';
+        ctx.lineWidth = 1;
+        ctx.fillRect(px + 28, injuryY, panelW - 56, 84);
+        ctx.strokeRect(px + 28, injuryY, panelW - 56, 84);
+
+        ctx.font = `bold 16px ${UI.fontPrimary}`;
+        ctx.fillStyle = '#d8c690';
+        ctx.textAlign = 'left';
+        ctx.fillText(t('rest.injuryTitle'), px + 44, injuryY + 28);
+
+        ctx.font = `13px ${UI.fontPrimary}`;
+        ctx.fillStyle = injuredCount > 0 ? '#d08a6a' : '#8a8a6a';
+        const injuryText = injuredCount > 0
+            ? `${t('rest.injuryCount')}: ${injuredCount} (${injuredCount * INJURY_TREATMENT_PRICE}G)`
+            : t('rest.injuryNone');
+        ctx.fillText(injuryText, px + 44, injuryY + 56);
+
+        if (injuredCount > 0) {
+            const btnW = 128;
+            const btnH = 34;
+            const btnX = px + panelW - btnW - 44;
+            const btnY = injuryY + 25;
+            this.drawSmallButton(ctx, btnX, btnY, btnW, btnH, t('rest.treat'));
+            this.restTreatRect = { x: btnX, y: btnY, w: btnW, h: btnH };
+        }
+
+        if (this.restFeedbackText) {
+            ctx.font = `bold 13px ${UI.fontPrimary}`;
+            ctx.fillStyle = '#c8a84e';
+            ctx.textAlign = 'center';
+            ctx.fillText(this.restFeedbackText, w / 2, py + panelH - 22);
+            this.restFeedbackTimer--;
+            if (this.restFeedbackTimer <= 0) this.restFeedbackText = '';
+        }
+
+        if (this.restConfirmMenuId) {
+            this.renderRestConfirm(ctx, w, py + 120);
+        }
+    }
+
+    private renderRestConfirm(ctx: CanvasRenderingContext2D, w: number, y: number): void {
+        const modalW = 420;
+        const modalH = 180;
+        const x = (w - modalW) / 2;
+        const menu = getRestMenu(this.restConfirmMenuId ?? '');
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.68)';
+        ctx.fillRect(0, 0, w, 900);
+
+        ctx.fillStyle = '#211810';
+        ctx.strokeStyle = '#c8a84e';
+        ctx.lineWidth = 2;
+        ctx.fillRect(x, y, modalW, modalH);
+        ctx.strokeRect(x, y, modalW, modalH);
+
+        ctx.font = `bold 19px ${UI.fontPrimary}`;
+        ctx.fillStyle = '#e0c878';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(t('rest.replaceTitle'), x + modalW / 2, y + 38);
+
+        ctx.font = `13px ${UI.fontPrimary}`;
+        ctx.fillStyle = '#c8b890';
+        const target = menu ? t(menu.nameKey) : '';
+        ctx.fillText(target ? `${target} - ${t('rest.replaceDesc')}` : t('rest.replaceDesc'), x + modalW / 2, y + 78);
+
+        const btnW = 120;
+        const btnH = 34;
+        const gap = 18;
+        const confirmX = x + modalW / 2 - btnW - gap / 2;
+        const cancelX = x + modalW / 2 + gap / 2;
+        const btnY = y + 118;
+        this.drawSmallButton(ctx, confirmX, btnY, btnW, btnH, t('rest.confirm'));
+        this.drawSmallButton(ctx, cancelX, btnY, btnW, btnH, t('rest.cancel'), true);
+        this.restConfirmRect = { x: confirmX, y: btnY, w: btnW, h: btnH };
+        this.restCancelRect = { x: cancelX, y: btnY, w: btnW, h: btnH };
+    }
+
+    private drawSmallButton(
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        w: number,
+        h: number,
+        label: string,
+        muted: boolean = false
+    ): void {
+        ctx.fillStyle = muted ? '#2a2720' : '#3a2a18';
+        ctx.strokeStyle = muted ? '#5a5040' : '#c8a84e';
+        ctx.lineWidth = 1;
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeRect(x, y, w, h);
+        ctx.font = `bold 12px ${UI.fontPrimary}`;
+        ctx.fillStyle = muted ? '#a09070' : '#e0d0a0';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, x + w / 2, y + h / 2);
+    }
+
+    private drawWrappedText(
+        ctx: CanvasRenderingContext2D,
+        text: string,
+        x: number,
+        y: number,
+        maxW: number,
+        lineH: number,
+        maxLines: number
+    ): void {
+        const words = text.split(' ');
+        let line = '';
+        let lineNo = 0;
+        for (const word of words) {
+            const candidate = line ? `${line} ${word}` : word;
+            if (ctx.measureText(candidate).width > maxW && line) {
+                ctx.fillText(line, x, y + lineNo * lineH);
+                line = word;
+                lineNo++;
+                if (lineNo >= maxLines) return;
+            } else {
+                line = candidate;
+            }
+        }
+        if (line && lineNo < maxLines) ctx.fillText(line, x, y + lineNo * lineH);
+    }
+
+    private getRestFacilityIcon(type: RestFacility['type']): string {
+        switch (type) {
+            case 'tavern': return '🍺';
+            case 'tea_house': return '🍵';
+            case 'shrine': return '⛩️';
+            case 'barracks': return '🍛';
+            case 'inn':
+            default:
+                return '🛏️';
         }
     }
 
