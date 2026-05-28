@@ -8,6 +8,7 @@ import type { EntityInfoUI } from '../../ui/EntityInfoUI';
 import type { EffectManager } from '../../ui/EffectManager';
 import type { FusionTempleUI } from '../../ui/FusionTempleUI';
 import type { FloatingTextManager } from '../../ui/FloatingTextManager';
+import type { MinimapUI } from '../../ui/MinimapUI';
 import { SettingsManager } from '../SettingsManager';
 import type { Camera } from '../Camera';
 import { describeTerrainForHover, type TerrainActorTraits } from '../../field/TerrainRules';
@@ -34,6 +35,7 @@ export interface WorldRenderContext {
     entityInfoUI: EntityInfoUI;
     effectManager: EffectManager;
     floatingText: FloatingTextManager;
+    minimapUI: MinimapUI;
     magicController: WorldMagicController;
     playerActionController: WorldPlayerActionController;
     raidOutcomeController: WorldRaidOutcomeController;
@@ -104,6 +106,7 @@ export class WorldRenderController {
         }
         this.context.tacticalController.render(ctx);
         this.context.magicController.render(ctx, uiW, uiH);
+        this.context.minimapUI.render(ctx, uiW, uiH);
         if (this.context.townSession.isVisible()) this.context.townSession.render(ctx, uiW, uiH);
         if (this.context.fusionTempleUI.isVisible()) this.context.fusionTempleUI.render(ctx, uiW, uiH);
         if (this.context.raidOutcomeController.isVisible()) this.context.raidOutcomeController.render(ctx, uiW, uiH);

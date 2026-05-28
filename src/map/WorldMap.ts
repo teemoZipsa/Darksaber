@@ -1,6 +1,6 @@
 import { Chunk, CHUNK_SIZE, TILE_SIZE } from './Chunk';
 import { TileType, TILE_PROPERTIES } from './Tile';
-import { TileAssetManager } from './TileAssetManager';
+import { LandmarkSpriteId, TileAssetManager } from './TileAssetManager';
 import { LootObject } from '../entity/LootObject';
 import { ExtractionZone } from '../entity/ExtractionZone';
 import { BiomeMask, BiomeType, MAP_HEIGHT, MAP_WIDTH, TempleInfo, TownInfo, WorldRealm } from './BiomeMask';
@@ -113,6 +113,18 @@ const RIVER_ROUTES: TileRoute[] = [
         width: 2.1,
         noiseSalt: 202,
     },
+];
+
+const DUNGEON_LANDMARKS: Array<{
+    nameKr: string;
+    chunkX: number;
+    chunkY: number;
+    sprite: LandmarkSpriteId;
+    tileSpan: number;
+}> = [
+    { nameKr: '초심자의 폐광', chunkX: 38, chunkY: 35, sprite: 'beginnerMine', tileSpan: 3 },
+    { nameKr: '초보자 유적', chunkX: 62, chunkY: 28, sprite: 'beginnerRuins', tileSpan: 3 },
+    { nameKr: '암흑 동굴', chunkX: 62, chunkY: 48, sprite: 'caveEntrance', tileSpan: 3 },
 ];
 
 export class WorldMap {
@@ -561,33 +573,65 @@ export class WorldMap {
             const centerTileY = town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
             const isCastle = town.id === 'central_castle' || town.id === 'e_stronghold';
             const isPort = town.id === 's_coast_town' || town.id === 'se_port';
-            const atlasIndex = isCastle ? 14 : isPort ? 15 : 13;
+            const sprite: LandmarkSpriteId = isCastle ? 'castle' : isPort ? 'portTown' : 'village';
             const tileSpan = isCastle ? 4 : 3;
-            const size = TILE_SIZE * tileSpan;
-            const sx = centerTileX * TILE_SIZE - cameraX - size / 2 + TILE_SIZE / 2;
-            const sy = centerTileY * TILE_SIZE - cameraY - size / 2 + TILE_SIZE / 2;
-
-            if (sx + size < 0 || sx > vw || sy + size < 0 || sy > vh) continue;
-
-            const drew = TileAssetManager.drawAtlasCell(ctx, atlasIndex, sx, sy, size, { cropInset: 8 });
-            if (!drew) {
-                ctx.fillStyle = isCastle ? '#a88a48' : isPort ? '#5b8aa8' : '#8a6a3a';
-                ctx.fillRect(sx, sy, size, size);
-            }
-
-            ctx.save();
-            ctx.font = 'bold 14px "DOSMyungjo", serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            const labelX = sx + size / 2;
-            const labelY = sy + size + 3;
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)';
-            ctx.fillStyle = '#f0d78a';
-            ctx.strokeText(town.nameKr, labelX, labelY);
-            ctx.fillText(town.nameKr, labelX, labelY);
-            ctx.restore();
+            const fallbackColor = isCastle ? '#a88a48' : isPort ? '#5b8aa8' : '#8a6a3a';
+            this.renderLandmarkSprite(
+                ctx, cameraX, cameraY, vw, vh,
+                centerTileX, centerTileY, tileSpan, sprite, town.nameKr, fallbackColor
+            );
         }
+
+        for (const dungeon of DUNGEON_LANDMARKS) {
+            this.renderLandmarkSprite(
+                ctx, cameraX, cameraY, vw, vh,
+                dungeon.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+                dungeon.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+                dungeon.tileSpan,
+                dungeon.sprite,
+                dungeon.nameKr,
+                '#5c4a68'
+            );
+        }
+    }
+
+    private renderLandmarkSprite(
+        ctx: CanvasRenderingContext2D,
+        cameraX: number,
+        cameraY: number,
+        vw: number,
+        vh: number,
+        centerTileX: number,
+        centerTileY: number,
+        tileSpan: number,
+        sprite: LandmarkSpriteId,
+        label: string,
+        fallbackColor: string
+    ): void {
+        const size = TILE_SIZE * tileSpan;
+        const sx = centerTileX * TILE_SIZE - cameraX - size / 2 + TILE_SIZE / 2;
+        const sy = centerTileY * TILE_SIZE - cameraY - size / 2 + TILE_SIZE / 2;
+
+        if (sx + size < 0 || sx > vw || sy + size < 0 || sy > vh) return;
+
+        const drew = TileAssetManager.drawLandmarkSprite(ctx, sprite, sx, sy, size, size);
+        if (!drew) {
+            ctx.fillStyle = fallbackColor;
+            ctx.fillRect(sx, sy, size, size);
+        }
+
+        ctx.save();
+        ctx.font = 'bold 14px "DOSMyungjo", serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const labelX = sx + size / 2;
+        const labelY = sy + size + 3;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)';
+        ctx.fillStyle = '#f0d78a';
+        ctx.strokeText(label, labelX, labelY);
+        ctx.fillText(label, labelX, labelY);
+        ctx.restore();
     }
 
     private renderTempleLandmarks(

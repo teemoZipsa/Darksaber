@@ -20,7 +20,7 @@ export class InputManager {
 
     constructor(canvas: HTMLCanvasElement) {
         window.addEventListener('keydown', (e) => {
-            if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyW','KeyA','KeyS','KeyD','Tab','KeyI'].includes(e.code)) {
+            if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyW','KeyA','KeyS','KeyD','Tab','KeyI','KeyM'].includes(e.code)) {
                 e.preventDefault();
             }
             if (!this.keysDown.has(e.code)) {

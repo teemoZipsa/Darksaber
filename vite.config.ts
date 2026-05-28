@@ -4,7 +4,9 @@ export default defineConfig({
     root: '.',
     publicDir: 'public',
     server: {
-        port: 3000,
+        host: '127.0.0.1',
+        port: 5731,
+        strictPort: true,
         open: true
     },
     build: {

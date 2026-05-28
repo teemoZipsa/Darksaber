@@ -63,15 +63,17 @@ export class Chunk {
         for (let y = 0; y < CHUNK_SIZE; y++) {
             for (let x = 0; x < CHUNK_SIZE; x++) {
                 const tileType = this.tiles[y][x];
+                const worldX = this.chunkX * CHUNK_SIZE + x;
+                const worldY = this.chunkY * CHUNK_SIZE + y;
                 if (tileType === TileType.DEEP_WATER) {
                     // Far from coast → Deep Sea #0 (dark blue ocean)
-                    TileAssetManager.drawTile(this.bufferCtx, TileType.DEEP_WATER, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE);
+                    TileAssetManager.drawTile(this.bufferCtx, TileType.DEEP_WATER, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, worldX, worldY);
                 } else if (tileType === TileType.WATER) {
                     // Near coast → Sea #0 (lighter blue)
-                    TileAssetManager.drawTile(this.bufferCtx, TileType.WATER, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE);
+                    TileAssetManager.drawTile(this.bufferCtx, TileType.WATER, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, worldX, worldY);
                 } else {
                     // Land tiles get grass base
-                    TileAssetManager.drawTile(this.bufferCtx, TileType.GRASS, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE);
+                    TileAssetManager.drawTile(this.bufferCtx, TileType.GRASS, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, worldX, worldY);
                 }
             }
         }
@@ -103,10 +105,10 @@ export class Chunk {
                 // Blend: overlay the OTHER water type at reduced opacity
                 if (tileType === TileType.DEEP_WATER) {
                     this.bufferCtx.globalAlpha = 0.4;
-                    TileAssetManager.drawTile(this.bufferCtx, TileType.WATER, px, py, TILE_SIZE);
+                    TileAssetManager.drawTile(this.bufferCtx, TileType.WATER, px, py, TILE_SIZE, worldX, worldY);
                 } else {
                     this.bufferCtx.globalAlpha = 0.35;
-                    TileAssetManager.drawTile(this.bufferCtx, TileType.DEEP_WATER, px, py, TILE_SIZE);
+                    TileAssetManager.drawTile(this.bufferCtx, TileType.DEEP_WATER, px, py, TILE_SIZE, worldX, worldY);
                 }
             }
         }
@@ -141,7 +143,8 @@ export class Chunk {
                 // Coastline tile: draw Sea autotile with proper neighbor detection
                 TileAssetManager.drawAutotile(
                     this.bufferCtx, TileType.WATER, px, py, TILE_SIZE,
-                    n_w, ne_w, e_w, se_w, s_w, sw_w, w_w, nw_w
+                    n_w, ne_w, e_w, se_w, s_w, sw_w, w_w, nw_w,
+                    worldX, worldY
                 );
             }
         }
@@ -170,7 +173,8 @@ export class Chunk {
 
                 TileAssetManager.drawAutotile(
                     this.bufferCtx, tileType, px, py, TILE_SIZE,
-                    n, ne, e, se, s, sw, w, nw
+                    n, ne, e, se, s, sw, w, nw,
+                    worldX, worldY
                 );
             }
         }

@@ -13,6 +13,7 @@ import type { WorldMagicController } from './WorldMagicController';
 import type { WorldPlayerActionController } from './WorldPlayerActionController';
 import type { WorldSelectionController } from './WorldSelectionController';
 import type { WorldTacticalController } from './WorldTacticalController';
+import type { MinimapUI } from '../../ui/MinimapUI';
 
 type WorldInputFieldHit = FieldHit<FieldHitParty, Enemy, LootObject>;
 
@@ -20,6 +21,7 @@ export interface WorldInputContext {
     actionMenuUI: ActionMenuUI;
     entityInfoUI: EntityInfoUI;
     magicController: WorldMagicController;
+    minimapUI: MinimapUI;
     playerActionController: WorldPlayerActionController;
     selectionController: WorldSelectionController;
     tacticalController: WorldTacticalController;
@@ -65,6 +67,15 @@ export class WorldInputController {
         this.context.magicController.updateHoverPreview(hoverTile);
 
         if (this.isInputLockedByReservation()) return;
+
+        if (input.justPressed('KeyM')) {
+            this.context.minimapUI.toggle();
+            return;
+        }
+
+        if (input.mouseJustDown && this.context.minimapUI.onClick(input.uiMouseX, input.uiMouseY)) {
+            return;
+        }
 
         if (input.mouseRightJustDown && !this.context.magicController.isVisible()) {
             this.handleFieldRightClick(hoverTile, input);

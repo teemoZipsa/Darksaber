@@ -1,6 +1,6 @@
 import { TILE_SIZE } from '../../map/Chunk';
 import { getEffectiveStatsForCharacter } from '../../combat/StatusEffects';
-import { UI, Parchment, drawGlassPanel, drawParchmentPanel, renderGameTitle } from '../../ui/UITheme';
+import { UI, DarkParchment, drawDarkPanel, renderGameTitle } from '../../ui/UITheme';
 import { ENEMY_ROLE_GLYPHS } from '../../field/FieldConfig';
 import { formatRaidTime, getCombatLogColor, getTacticalMarkerColor } from '../../field/FieldDisplay';
 import type { Entity } from '../../entity/Entity';
@@ -214,58 +214,69 @@ export class WorldFieldRenderer {
         if (model.activeCharacter) {
             const active = model.activeCharacter;
             const effective = getEffectiveStatsForCharacter(active);
-            drawParchmentPanel(ctx, 16, 56, 210, 80);
-            ctx.fillStyle = Parchment.textDark;
-            ctx.font = `bold 11px ${UI.fontMono}`;
+            drawDarkPanel(ctx, 16, 56, 238, 94, { headerH: 28 });
+            ctx.fillStyle = DarkParchment.textLabel;
+            ctx.font = `bold 13px ${UI.fontMono}`;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
-            ctx.fillText(`${active.name} T${active.currentTier} Lv.${active.level}`, 28, 68);
-            ctx.fillStyle = Parchment.textMid;
-            ctx.font = `10px ${UI.fontMono}`;
-            ctx.fillText(active.getTierName(), 28, 84);
-            ctx.fillText(`HP ${active.stats.hp}/${effective.maxHp}  MP ${active.stats.mp}/${effective.maxMp}`, 28, 100);
-            ctx.fillText(`ATB ${Math.floor(model.player.actionGauge)}%`, 28, 116);
+            ctx.fillText(`${active.name}  T${active.currentTier} Lv.${active.level}`, 30, 68);
+            ctx.fillStyle = DarkParchment.textBody;
+            ctx.font = `11px ${UI.fontMono}`;
+            ctx.fillText(active.getTierName(), 30, 92);
+            ctx.fillStyle = '#e8dfc8';
+            ctx.fillText(`HP ${active.stats.hp}/${effective.maxHp}`, 30, 113);
+            ctx.fillText(`MP ${active.stats.mp}/${effective.maxMp}`, 116, 113);
+            ctx.fillStyle = '#b8e7ff';
+            ctx.fillText(`ATB ${Math.floor(model.player.actionGauge)}%`, 30, 132);
             const apText = model.controlledActor?.id === model.activeTurnActorId
                 ? `${model.remainingActionPoints}/${active.stats.actionLimit}`
                 : `-/${active.stats.actionLimit}`;
-            ctx.fillText(`AP ${apText}`, 128, 116);
+            ctx.fillStyle = '#ffe080';
+            ctx.fillText(`AP ${apText}`, 130, 132);
         }
 
-        drawParchmentPanel(ctx, 16, 146, 150, 42);
+        drawDarkPanel(ctx, 16, 160, 176, 48, { shadow: false });
         ctx.fillStyle = '#ffcc00';
-        ctx.font = `bold 11px ${UI.fontMono}`;
+        ctx.font = `bold 12px ${UI.fontMono}`;
         ctx.textAlign = 'left';
-        ctx.fillText(`${model.gold} G`, 28, 154);
-        ctx.fillStyle = Parchment.textMid;
-        ctx.font = `9px ${UI.fontMono}`;
-        ctx.fillText(model.worldName, 28, 170);
+        ctx.fillText(`${model.gold} G`, 30, 172);
+        ctx.fillStyle = DarkParchment.textBody;
+        ctx.font = `10px ${UI.fontMono}`;
+        ctx.fillText(model.worldName, 30, 190);
 
-        let infoY = 198;
+        let infoY = 220;
         if (model.raid.active) {
-            drawParchmentPanel(ctx, 16, 194, 210, 48);
+            drawDarkPanel(ctx, 16, 220, 238, 62, {
+                bg: model.raid.timerAdvancing ? 'rgba(42, 20, 20, 0.92)' : undefined,
+                borderColor: model.raid.timerAdvancing ? 'rgba(230, 82, 82, 0.75)' : undefined,
+            });
             const remaining = Math.max(0, model.raid.limitSeconds - model.raid.elapsedSeconds);
-            ctx.fillStyle = model.raid.timerAdvancing ? '#8a2d2d' : Parchment.textMid;
-            ctx.font = `bold 11px ${UI.fontMono}`;
-            ctx.fillText(`남은 시간 ${formatRaidTime(remaining)}`, 28, 204);
-            ctx.fillStyle = Parchment.textMid;
-            ctx.font = `9px ${UI.fontMono}`;
-            ctx.fillText(`출발 ${model.raid.departureTownId}`, 28, 220);
-            ctx.fillText('목표: 다른 마을 생환', 28, 232);
-            infoY = 252;
+            ctx.fillStyle = model.raid.timerAdvancing ? '#ff9090' : '#ffe080';
+            ctx.font = `bold 13px ${UI.fontMono}`;
+            ctx.fillText(`남은 시간 ${formatRaidTime(remaining)}`, 30, 233);
+            ctx.fillStyle = DarkParchment.textBody;
+            ctx.font = `10px ${UI.fontMono}`;
+            ctx.fillText(`출발 ${model.raid.departureTownId}`, 30, 253);
+            ctx.fillText('목표: 다른 마을 생환', 30, 267);
+            infoY = 294;
         }
 
         ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.font = `9px ${UI.fontMono}`;
-        ctx.fillText(`(${model.player.gridX}, ${model.player.gridY})`, 16, infoY);
+        ctx.font = `10px ${UI.fontMono}`;
+        ctx.fillText(`좌표 ${model.player.gridX}, ${model.player.gridY}`, 16, infoY);
 
         renderTerrainHoverInfo(ctx, model, vw);
         renderActionModeHint(ctx, model, vw, vh);
         renderCombatLog(ctx, model, vw, vh);
 
-        ctx.fillStyle = 'rgba(255,255,255,0.32)';
-        ctx.font = `9px ${UI.fontMono}`;
+        ctx.fillStyle = 'rgba(8, 10, 14, 0.72)';
+        const helpText = '캐릭터 클릭 행동 메뉴 | Tab 교체 | M 미니맵 | ESC 취소 | I 인벤토리';
+        ctx.font = `10px ${UI.fontMono}`;
+        const helpW = ctx.measureText(helpText).width + 22;
+        ctx.fillRect(vw - helpW - 12, vh - 30, helpW, 22);
+        ctx.fillStyle = 'rgba(245,235,210,0.78)';
         ctx.textAlign = 'right';
-        ctx.fillText('캐릭터 클릭 행동 메뉴 | Tab 교체 | ESC 취소 | I 인벤토리', vw - 16, vh - 16);
+        ctx.fillText(helpText, vw - 22, vh - 16);
         ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
 
@@ -404,27 +415,27 @@ function renderHpBar(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
 
 function renderTerrainHoverInfo(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number): void {
     if (model.hoverTile.x < 0 || model.hoverTile.y < 0 || model.terrainHoverLines.length === 0) return;
-    const w = 214;
-    const h = 18 + model.terrainHoverLines.length * 14;
+    const w = 236;
+    const h = 22 + model.terrainHoverLines.length * 16;
     const x = Math.max(16, vw - w - 16);
-    const y = 56;
-    drawGlassPanel(ctx, x, y, w, h);
-    ctx.fillStyle = 'rgba(255,255,255,0.82)';
-    ctx.font = `9px ${UI.fontMono}`;
+    const y = 248;
+    drawDarkPanel(ctx, x, y, w, h, {
+        bg: 'rgba(16, 19, 24, 0.86)',
+        borderColor: 'rgba(200, 170, 80, 0.42)',
+        shadow: false,
+    });
+    ctx.fillStyle = 'rgba(245,238,220,0.9)';
+    ctx.font = `10px ${UI.fontMono}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     model.terrainHoverLines.forEach((line, index) => {
-        ctx.fillText(line, x + 10, y + 9 + index * 14);
+        ctx.fillText(line, x + 12, y + 10 + index * 16);
     });
 }
 
 function renderActionModeHint(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number, vh: number): void {
     if (model.fieldMagicState.mode === 'targeting') {
-        ctx.fillStyle = 'rgba(200, 90, 255, 0.9)';
-        ctx.font = `bold 12px ${UI.fontMono}`;
-        ctx.textAlign = 'center';
-        ctx.fillText('마법 대상을 클릭 (ESC 취소)', vw / 2, vh - 50);
-        ctx.textAlign = 'start';
+        renderCenterHint(ctx, vw, vh, '마법 대상을 클릭 (ESC 취소)', 'rgba(116, 52, 160, 0.88)', '#f2d6ff');
         return;
     }
 
@@ -435,29 +446,66 @@ function renderActionModeHint(ctx: CanvasRenderingContext2D, model: WorldRenderM
         : model.actionMode === 'attack'
             ? '공격할 적을 클릭 (ESC 취소)'
             : '조사할 대상을 클릭 (ESC 취소)';
-    ctx.fillStyle = model.actionMode === 'attack'
-        ? 'rgba(255, 80, 80, 0.88)'
+    const bg = model.actionMode === 'attack'
+        ? 'rgba(116, 28, 28, 0.9)'
         : model.actionMode === 'interact'
-            ? 'rgba(88, 210, 255, 0.88)'
-            : 'rgba(255, 204, 66, 0.9)';
-    ctx.font = `bold 12px ${UI.fontMono}`;
-    ctx.textAlign = 'center';
-    ctx.fillText(text, vw / 2, vh - 50);
-    ctx.textAlign = 'start';
+            ? 'rgba(24, 88, 116, 0.9)'
+            : 'rgba(104, 78, 20, 0.9)';
+    const fg = model.actionMode === 'attack'
+        ? '#ffd6d6'
+        : model.actionMode === 'interact'
+            ? '#d8f5ff'
+            : '#ffe59a';
+    renderCenterHint(ctx, vw, vh, text, bg, fg);
 }
 
 function renderCombatLog(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number, vh: number): void {
     const x = model.hasSelection ? 240 : 16;
-    const y = Math.max(188, vh - 150);
+    const y = Math.max(214, vh - 158);
     const w = Math.max(260, Math.min(430, vw - x - 16));
-    const h = 112;
-    drawGlassPanel(ctx, x, y, w, h);
-    ctx.font = `10px ${UI.fontMono}`;
+    const h = 118;
+    drawDarkPanel(ctx, x, y, w, h, {
+        bg: 'rgba(13, 16, 22, 0.84)',
+        borderColor: 'rgba(200, 170, 80, 0.34)',
+        radius: 8,
+        headerH: 24,
+    });
+    ctx.fillStyle = DarkParchment.textLabel;
+    ctx.font = `bold 10px ${UI.fontMono}`;
+    ctx.fillText('로그', x + 12, y + 8);
+
+    ctx.font = `11px ${UI.fontMono}`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     const visible = model.combatLog.slice(-5);
     visible.forEach((line, index) => {
+        const rowY = y + 31 + index * 16;
+        if (index % 2 === 0) {
+            ctx.fillStyle = 'rgba(255,255,255,0.035)';
+            ctx.fillRect(x + 8, rowY - 3, w - 16, 15);
+        }
         ctx.fillStyle = getCombatLogColor(line);
-        ctx.fillText(line, x + 12, y + 12 + index * 18, w - 24);
+        ctx.fillText(line, x + 12, rowY, w - 24);
     });
+}
+
+function renderCenterHint(
+    ctx: CanvasRenderingContext2D,
+    vw: number,
+    vh: number,
+    text: string,
+    bg: string,
+    fg: string
+): void {
+    ctx.save();
+    ctx.font = `bold 13px ${UI.fontMono}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const w = ctx.measureText(text).width + 34;
+    const x = vw / 2 - w / 2;
+    const y = vh - 70;
+    drawDarkPanel(ctx, x, y, w, 34, { bg, borderColor: 'rgba(255,255,255,0.18)', shadow: false });
+    ctx.fillStyle = fg;
+    ctx.fillText(text, vw / 2, y + 17);
+    ctx.restore();
 }

@@ -1,45 +1,63 @@
 import { TileType, TILE_PROPERTIES } from './Tile';
 
-const TILE_IMAGE_SRC: Partial<Record<TileType, string>> = {
-    [TileType.GRASS]: '/Image/Tileset/grass.png',
-    [TileType.FOREST]: '/Image/Tileset/forest.png',
-    [TileType.SAND]: '/Image/Tileset/sand.png',
-    [TileType.ROAD]: '/Image/Tileset/road.png',
-    [TileType.TOWN]: '/Image/Tileset/road.png',
-    [TileType.STONE]: '/Image/Tileset/stone.png',
-    [TileType.SNOW]: '/Image/Tileset/snow.png',
-    [TileType.POISON_SWAMP]: '/Image/Tileset/forest.png',
-    [TileType.WATER]: '/Image/Tileset/water.png',
-    [TileType.DEEP_WATER]: '/Image/Tileset/water.png',
-    [TileType.LAVA]: '/Image/Tileset/lava.png',
-    [TileType.WALL]: '/Image/Tileset/wall.png',
-    [TileType.DUNGEON_ENTRANCE]: '/Image/Tileset/stone.png',
+const DARKSABER_TERRAIN_TEXTURES: Partial<Record<TileType, string>> = {
+    [TileType.GRASS]: 'darksaber/grass.png',
+    [TileType.FOREST]: 'darksaber/forest.png',
+    [TileType.SAND]: 'darksaber/sand.png',
+    [TileType.STONE]: 'darksaber/stone.png',
+    [TileType.SNOW]: 'darksaber/snow.png',
+    [TileType.POISON_SWAMP]: 'darksaber/poison_swamp.png',
+    [TileType.WATER]: 'darksaber/water.png',
+    [TileType.DEEP_WATER]: 'darksaber/deep_water.png',
+    [TileType.ROAD]: 'darksaber/road.png',
+    [TileType.TOWN]: 'darksaber/town_pavement.png',
+    [TileType.WALL]: 'darksaber/dungeon_floor.png',
+    [TileType.LAVA]: 'darksaber/lava.png',
+    [TileType.DUNGEON_ENTRANCE]: 'darksaber/dungeon_floor.png',
 };
+
+const DARKSABER_LANDMARK_SPRITES = {
+    village: '/Image/Landmarks/darksaber/village.png',
+    portTown: '/Image/Landmarks/darksaber/port_town.png',
+    castle: '/Image/Landmarks/darksaber/castle.png',
+    caveEntrance: '/Image/Landmarks/darksaber/cave_entrance.png',
+    beginnerRuins: '/Image/Landmarks/darksaber/beginner_ruins.png',
+    beginnerMine: '/Image/Landmarks/darksaber/beginner_mine.png',
+} as const;
+
+export type LandmarkSpriteId = keyof typeof DARKSABER_LANDMARK_SPRITES;
 
 class TileAssetManagerClass {
     private images: Map<string, HTMLImageElement> = new Map();
     private loadPromises: Promise<void>[] = [];
 
     public init(): Promise<void[]> {
-        for (const src of new Set(Object.values(TILE_IMAGE_SRC))) {
-            if (src) this.queueImageLoad(src);
+        for (const texturePath of Object.values(DARKSABER_TERRAIN_TEXTURES)) {
+            if (texturePath) this.queueTilesetLoad(texturePath);
+        }
+        for (const [key, src] of Object.entries(DARKSABER_LANDMARK_SPRITES)) {
+            this.queueImageLoad(`landmark:${key}`, src);
         }
         return Promise.all(this.loadPromises);
     }
 
-    private queueImageLoad(src: string): void {
-        if (this.images.has(src)) return;
+    private queueTilesetLoad(sheetName: string): void {
+        this.queueImageLoad(sheetName, `/Image/Tileset/${sheetName}`);
+    }
+
+    private queueImageLoad(key: string, src: string): void {
+        if (this.images.has(key)) return;
 
         const img = new Image();
         const promise = new Promise<void>((resolve) => {
             img.onload = () => resolve();
             img.onerror = () => {
-                console.warn(`Tileset image unavailable, using color fallback: ${src}`);
+                console.warn(`Image unavailable, using fallback rendering: ${src}`);
                 resolve();
             };
         });
         img.src = src;
-        this.images.set(src, img);
+        this.images.set(key, img);
         this.loadPromises.push(promise);
     }
 
@@ -48,17 +66,11 @@ class TileAssetManagerClass {
         type: TileType,
         dx: number,
         dy: number,
-        size: number
+        size: number,
+        _worldX: number = 0,
+        _worldY: number = 0
     ): boolean {
-        const src = TILE_IMAGE_SRC[type];
-        const img = src ? this.getImage(src) : undefined;
-        if (!img) return this.drawFallback(ctx, type, dx, dy, size);
-
-        const prevSmoothing = ctx.imageSmoothingEnabled;
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(img, dx, dy, size, size);
-        ctx.imageSmoothingEnabled = prevSmoothing;
-        return true;
+        return this.drawTerrainTexture(ctx, type, dx, dy, size) || this.drawFallback(ctx, type, dx, dy, size);
     }
 
     public drawAutotile(
@@ -67,14 +79,16 @@ class TileAssetManagerClass {
         dx: number,
         dy: number,
         size: number,
-        _n: boolean,
-        _ne: boolean,
-        _e: boolean,
-        _se: boolean,
-        _s: boolean,
-        _sw: boolean,
-        _w: boolean,
-        _nw: boolean
+        _n: boolean = true,
+        _ne: boolean = true,
+        _e: boolean = true,
+        _se: boolean = true,
+        _s: boolean = true,
+        _sw: boolean = true,
+        _w: boolean = true,
+        _nw: boolean = true,
+        _worldX: number = 0,
+        _worldY: number = 0
     ): boolean {
         return this.drawTile(ctx, type, dx, dy, size);
     }
@@ -90,7 +104,9 @@ class TileAssetManagerClass {
     }
 
     public getSheet(sheetName: string): HTMLImageElement | undefined {
-        return this.getImage(sheetName.startsWith('/') ? sheetName : `/Image/Tileset/${sheetName}`);
+        const img = this.images.get(sheetName);
+        if (img?.complete && img.naturalWidth > 0) return img;
+        return undefined;
     }
 
     public drawAtlasCell(
@@ -104,10 +120,41 @@ class TileAssetManagerClass {
         return false;
     }
 
-    private getImage(src: string): HTMLImageElement | undefined {
-        const img = this.images.get(src);
-        if (img?.complete && img.naturalWidth > 0) return img;
-        return undefined;
+    public drawLandmarkSprite(
+        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+        spriteId: LandmarkSpriteId,
+        dx: number,
+        dy: number,
+        width: number,
+        height: number
+    ): boolean {
+        const img = this.getSheet(`landmark:${spriteId}`);
+        if (!img) return false;
+
+        const prevSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(img, dx, dy, width, height);
+        ctx.imageSmoothingEnabled = prevSmoothing;
+        return true;
+    }
+
+    private drawTerrainTexture(
+        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+        type: TileType,
+        dx: number,
+        dy: number,
+        size: number
+    ): boolean {
+        const texturePath = DARKSABER_TERRAIN_TEXTURES[type];
+        if (!texturePath) return false;
+        const img = this.getSheet(texturePath);
+        if (!img) return false;
+
+        const prevSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, dx, dy, size, size);
+        ctx.imageSmoothingEnabled = prevSmoothing;
+        return true;
     }
 
     private drawFallback(

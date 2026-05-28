@@ -26,6 +26,7 @@ import { EntityInfoUI } from '../ui/EntityInfoUI';
 import { EffectManager } from '../ui/EffectManager';
 import { FusionTempleUI } from '../ui/FusionTempleUI';
 import { FloatingTextManager } from '../ui/FloatingTextManager';
+import { MinimapUI } from '../ui/MinimapUI';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
@@ -77,6 +78,7 @@ export class WorldEngine {
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
     private fusionTempleUI = new FusionTempleUI();
+    private minimapUI: MinimapUI;
     private townSession: WorldTownSession;
     private raidSession: WorldRaidSession;
     private currentPhase: WorldPhase = 'lobby';
@@ -119,6 +121,13 @@ export class WorldEngine {
         this.playerData = playerData;
         this.gameManager = gameManager;
         this.worldMap = new WorldMap();
+        this.minimapUI = new MinimapUI({
+            getTile: (gx, gy) => this.worldMap.getTileAt(gx, gy),
+            getPlayerPos: () => ({ x: this.player.gridX, y: this.player.gridY }),
+            getEnemies: () => this.fieldEnemies.map((entry) => entry.enemy),
+            getExtractionZones: () => this.worldMap.extractionZones,
+            getLoot: () => this.worldMap.loot,
+        });
         const initialHubTownId = this.getTownById(this.playerData.currentHubTownId)?.id ?? 'central_castle';
         this.raidSession = new WorldRaidSession(initialHubTownId);
         this.townSession = new WorldTownSession({
@@ -288,6 +297,7 @@ export class WorldEngine {
             entityInfoUI: this.entityInfoUI,
             effectManager: this.effectManager,
             floatingText: this.floatingText,
+            minimapUI: this.minimapUI,
             magicController: this.magicController,
             playerActionController: this.playerActionController,
             raidOutcomeController: this.raidOutcomeController,
@@ -311,6 +321,7 @@ export class WorldEngine {
             actionMenuUI: this.actionMenuUI,
             entityInfoUI: this.entityInfoUI,
             magicController: this.magicController,
+            minimapUI: this.minimapUI,
             playerActionController: this.playerActionController,
             selectionController: this.selectionController,
             tacticalController: this.tacticalController,
