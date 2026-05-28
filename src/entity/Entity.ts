@@ -7,6 +7,13 @@
  */
 
 export class Entity {
+    public static readonly WALK_ROW_BY_FACING: Record<'up' | 'down' | 'left' | 'right', number> = {
+        down: 0,
+        up: 1,
+        left: 2,
+        right: 3,
+    };
+
     public id: string;
     public gridX: number;
     public gridY: number;
@@ -21,13 +28,14 @@ export class Entity {
     /** Optional static portrait image (128x128 single illustration) */
     public image?: HTMLImageElement;
     public imageLoaded: boolean = false;
-    /** Optional 1-row walking sprite sheet used only while this entity is moving */
+    /** Optional walking sprite sheet used only while this entity is moving */
     public walkSprite?: {
         image: HTMLImageElement;
         frameWidth: number;
         frameHeight: number;
         frameCount: number;
         framesPerSecond: number;
+        rowByFacing: Record<'up' | 'down' | 'left' | 'right', number>;
     };
     public walkSpriteLoaded: boolean = false;
 
@@ -65,10 +73,17 @@ export class Entity {
         this.image.src = src;
     }
 
-    public setWalkSprite(src: string, frameWidth: number, frameHeight: number, frameCount: number, framesPerSecond: number = 8): void {
+    public setWalkSprite(
+        src: string,
+        frameWidth: number,
+        frameHeight: number,
+        frameCount: number,
+        framesPerSecond: number = 8,
+        rowByFacing: Record<'up' | 'down' | 'left' | 'right', number> = Entity.WALK_ROW_BY_FACING
+    ): void {
         const image = new Image();
         this.walkSpriteLoaded = false;
-        this.walkSprite = { image, frameWidth, frameHeight, frameCount, framesPerSecond };
+        this.walkSprite = { image, frameWidth, frameHeight, frameCount, framesPerSecond, rowByFacing };
         image.onload = () => { this.walkSpriteLoaded = true; };
         image.onerror = () => {
             this.walkSpriteLoaded = false;

@@ -283,7 +283,7 @@ function renderWalkSprite(ctx: CanvasRenderingContext2D, entity: Entity, worldTi
     ctx.drawImage(
         sprite.image,
         frame * sprite.frameWidth,
-        0,
+        sprite.rowByFacing[entity.facing] * sprite.frameHeight,
         sprite.frameWidth,
         sprite.frameHeight,
         px,
