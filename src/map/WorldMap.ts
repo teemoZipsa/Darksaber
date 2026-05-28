@@ -3,7 +3,7 @@ import { TileType, TILE_PROPERTIES } from './Tile';
 import { TileAssetManager } from './TileAssetManager';
 import { LootObject } from '../entity/LootObject';
 import { ExtractionZone } from '../entity/ExtractionZone';
-import { BiomeMask, BiomeType, MAP_HEIGHT, MAP_WIDTH, TownInfo } from './BiomeMask';
+import { BiomeMask, BiomeType, MAP_HEIGHT, MAP_WIDTH, TempleInfo, TownInfo, WorldRealm } from './BiomeMask';
 
 export interface TileBounds {
     width: number;
@@ -123,8 +123,25 @@ export class WorldMap {
     public loot: LootObject[] = [];
     public extractionZones: ExtractionZone[] = [];
 
-    constructor(biomeMask: BiomeMask = new BiomeMask()) {
-        this.biomeMask = biomeMask;
+    constructor(realmOrMask: WorldRealm | BiomeMask = 'mortal') {
+        this.biomeMask = typeof realmOrMask === 'string' ? new BiomeMask(realmOrMask) : realmOrMask;
+        this.validateTownSpawns();
+    }
+
+    public getRealm(): WorldRealm {
+        return this.biomeMask.getRealm();
+    }
+
+    public getDisplayName(): string {
+        return this.getRealm() === 'master' ? '마스터 월드' : '현세 월드';
+    }
+
+    public setRealm(realm: WorldRealm): void {
+        if (this.getRealm() === realm) return;
+        this.biomeMask = new BiomeMask(realm);
+        this.chunks.clear();
+        this.loot = [];
+        this.extractionZones = [];
         this.validateTownSpawns();
     }
 
@@ -337,6 +354,8 @@ export class WorldMap {
         const { chunkX, chunkY, localX, localY } = this.tileToChunk(tx, ty);
         if (!this.isChunkInBounds(chunkX, chunkY)) return TileType.DEEP_WATER;
 
+        if (this.getTempleAtTile(tx, ty)) return TileType.DUNGEON_ENTRANCE;
+
         const biome = this.biomeMask.getBiome(chunkX, chunkY);
         if (biome === 'ocean') {
             return this.isCoastOceanChunk(chunkX, chunkY) ? TileType.WATER : TileType.DEEP_WATER;
@@ -412,6 +431,7 @@ export class WorldMap {
         }
 
         this.renderTownLandmarks(ctx, cameraX, cameraY, vw, vh);
+        this.renderTempleLandmarks(ctx, cameraX, cameraY, vw, vh);
 
         for (const zone of this.extractionZones) {
             zone.render(ctx, (gx, gy) => ({
@@ -439,6 +459,31 @@ export class WorldMap {
 
     public getTowns(): TownInfo[] {
         return this.biomeMask.getTowns();
+    }
+
+    public getTemples(): TempleInfo[] {
+        return this.biomeMask.getTemples();
+    }
+
+    public getTempleAtTile(tx: number, ty: number): TempleInfo | null {
+        for (const temple of this.getTemples()) {
+            const center = this.getTempleCenterTile(temple);
+            if (Math.hypot(tx - center.x, ty - center.y) <= temple.tileRadius) return temple;
+        }
+        return null;
+    }
+
+    public getTempleCenterTile(temple: TempleInfo): TilePoint {
+        return {
+            x: temple.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+            y: temple.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+        };
+    }
+
+    public getPrimaryTempleTile(): TilePoint {
+        const temple = this.getTemples()[0];
+        if (!temple) return this.getTownSpawnTile(this.getTowns()[0]);
+        return this.getTempleCenterTile(temple);
     }
 
     public getTownAtTile(tx: number, ty: number): TownInfo | null {
@@ -541,6 +586,57 @@ export class WorldMap {
             ctx.fillStyle = '#f0d78a';
             ctx.strokeText(town.nameKr, labelX, labelY);
             ctx.fillText(town.nameKr, labelX, labelY);
+            ctx.restore();
+        }
+    }
+
+    private renderTempleLandmarks(
+        ctx: CanvasRenderingContext2D,
+        cameraX: number,
+        cameraY: number,
+        vw: number,
+        vh: number
+    ): void {
+        for (const temple of this.getTemples()) {
+            const center = this.getTempleCenterTile(temple);
+            const size = TILE_SIZE * 3.2;
+            const sx = center.x * TILE_SIZE - cameraX - size / 2 + TILE_SIZE / 2;
+            const sy = center.y * TILE_SIZE - cameraY - size / 2 + TILE_SIZE / 2;
+
+            if (sx + size < 0 || sx > vw || sy + size < 0 || sy > vh) continue;
+
+            ctx.save();
+            const pulse = 0.55 + 0.45 * Math.sin(Date.now() / 500);
+            ctx.fillStyle = this.getRealm() === 'master'
+                ? `rgba(100, 210, 255, ${0.34 + pulse * 0.18})`
+                : `rgba(210, 120, 255, ${0.34 + pulse * 0.18})`;
+            ctx.strokeStyle = this.getRealm() === 'master' ? '#80e6ff' : '#d98cff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(sx + size / 2, sy + 4);
+            ctx.lineTo(sx + size - 8, sy + size * 0.42);
+            ctx.lineTo(sx + size * 0.72, sy + size - 8);
+            ctx.lineTo(sx + size * 0.28, sy + size - 8);
+            ctx.lineTo(sx + 8, sy + size * 0.42);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(8, 8, 16, 0.7)';
+            ctx.fillRect(sx + size * 0.42, sy + size * 0.42, size * 0.16, size * 0.35);
+            ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+            ctx.strokeRect(sx + size * 0.42, sy + size * 0.42, size * 0.16, size * 0.35);
+
+            ctx.font = 'bold 14px "DOSMyungjo", serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            const labelX = sx + size / 2;
+            const labelY = sy + size + 3;
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.78)';
+            ctx.fillStyle = this.getRealm() === 'master' ? '#bdf6ff' : '#f0c8ff';
+            ctx.strokeText(temple.nameKr, labelX, labelY);
+            ctx.fillText(temple.nameKr, labelX, labelY);
             ctx.restore();
         }
     }

@@ -13,7 +13,7 @@ import type { Character } from '../character/Character';
 import type { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
-import { getClassLine } from '../data/ClassTree';
+import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
 import { getClassAttackProfile } from '../data/AttackPatternProfiles';
 import {
     getEffectiveStatsForCharacter,
@@ -24,10 +24,13 @@ import {
 import { ActionMenuUI } from '../ui/ActionMenuUI';
 import { EntityInfoUI } from '../ui/EntityInfoUI';
 import { EffectManager } from '../ui/EffectManager';
+import { FusionTempleUI } from '../ui/FusionTempleUI';
 import { FloatingTextManager } from '../ui/FloatingTextManager';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
+import { fuseActivePartyBranch, getFusionCandidates, hasActiveMasterCharacter } from '../character/FusionSystem';
+import type { MasterBranch } from '../data/ClassTree';
 import { TilePoint, manhattan, tileKey } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
 import { enqueueReadyActor } from '../field/FieldActionEconomy';
@@ -73,6 +76,7 @@ export class WorldEngine {
     private fieldEnemies: FieldEnemy[] = [];
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
+    private fusionTempleUI = new FusionTempleUI();
     private townSession: WorldTownSession;
     private raidSession: WorldRaidSession;
     private currentPhase: WorldPhase = 'lobby';
@@ -98,6 +102,7 @@ export class WorldEngine {
     private effectManager = new EffectManager();
     private attackCues: AttackCue[] = [];
     private worldTime: number = 0;
+    private dismissedTempleVisitKey: string | null = null;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -123,6 +128,12 @@ export class WorldEngine {
             onDeploy: () => this.beginRaidFromCurrentHub(),
             log: (message) => this.addCombatLog(message),
         });
+        this.fusionTempleUI.onFuse = (branch) => this.performTempleFusion(branch);
+        this.fusionTempleUI.onEnterMasterWorld = () => this.enterMasterWorld();
+        this.fusionTempleUI.onReturnToMortalWorld = () => this.returnToMortalWorld();
+        this.fusionTempleUI.onClose = () => {
+            this.dismissedTempleVisitKey = this.getCurrentTempleVisitKey();
+        };
         this.combatController = new WorldCombatController({
             log: (message) => this.addCombatLog(message),
             spawnDamage: (x, y, amount, isCrit, isMiss) => this.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
@@ -131,6 +142,7 @@ export class WorldEngine {
             spawnKillEffect: (enemy) => this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image),
             spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
             spawnLoot: (enemy) => this.spawnEnemyLoot(enemy),
+            awardExp: (actor, enemy) => this.awardDefeatExp(actor, enemy),
         });
         this.movementController = new WorldMovementController({
             getPartyActors: () => this.partyActors,
@@ -271,6 +283,7 @@ export class WorldEngine {
             worldMap: this.worldMap,
             townSession: this.townSession,
             raidSession: this.raidSession,
+            fusionTempleUI: this.fusionTempleUI,
             actionMenuUI: this.actionMenuUI,
             entityInfoUI: this.entityInfoUI,
             effectManager: this.effectManager,
@@ -341,6 +354,13 @@ export class WorldEngine {
             return;
         }
 
+        if (this.fusionTempleUI.isVisible()) {
+            this.fusionTempleUI.updateInput(input);
+            camera.followTile(this.player.gridX, this.player.gridY);
+            camera.update();
+            return;
+        }
+
         if (this.townSession.isVisible()) {
             this.townSession.updateInput(input);
             camera.followTile(this.player.gridX, this.player.gridY);
@@ -373,6 +393,7 @@ export class WorldEngine {
         this.startNextReadyTurn();
         this.updateRaidTimer(dt);
         this.checkRaidEndConditions();
+        this.checkTempleArrival();
 
         const controlled = this.getControlledActor();
         if (controlled) this.player = controlled.entity;
@@ -381,7 +402,7 @@ export class WorldEngine {
     }
 
     public isModalOverlayVisible(): boolean {
-        return this.townSession.isVisible() || this.raidOutcomeController.isVisible();
+        return this.townSession.isVisible() || this.raidOutcomeController.isVisible() || this.fusionTempleUI.isVisible();
     }
 
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
@@ -461,9 +482,106 @@ export class WorldEngine {
     private spawnStarterFieldContent(): void {
         const anchor = this.getControlledActor()?.entity;
         if (!anchor) return;
-        const content = this.fieldSpawnController.createStarterFieldContent(anchor);
+        const content = this.fieldSpawnController.createStarterFieldContent(anchor, {
+            masterRealm: this.worldMap.getRealm() === 'master',
+        });
         this.fieldEnemies = content.enemies;
         this.worldMap.loot = content.loot;
+    }
+
+    private checkTempleArrival(): void {
+        const actor = this.getControlledActor();
+        if (!actor) return;
+
+        const temple = this.worldMap.getTempleAtTile(actor.entity.gridX, actor.entity.gridY);
+        if (!temple) {
+            this.dismissedTempleVisitKey = null;
+            return;
+        }
+
+        const key = this.getCurrentTempleVisitKey();
+        if (!key || this.dismissedTempleVisitKey === key || this.fusionTempleUI.isVisible()) return;
+
+        const hostileActive = this.fieldEnemies.some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro);
+        if (hostileActive) {
+            this.addCombatLog('주변의 적을 정리해야 신전에 들어갈 수 있습니다.');
+            this.dismissedTempleVisitKey = key;
+            return;
+        }
+
+        this.openFusionTemple();
+    }
+
+    private openFusionTemple(): void {
+        this.closeFieldOverlays();
+        this.clearFieldTurnState();
+        this.fusionTempleUI.show({
+            realm: this.worldMap.getRealm(),
+            candidates: getFusionCandidates(this.party),
+            canEnterMasterWorld: hasActiveMasterCharacter(this.party),
+        });
+        this.addCombatLog(this.worldMap.getRealm() === 'master' ? '현세의 문에 도착했습니다.' : '융합의 신전에 들어섰습니다.');
+    }
+
+    private performTempleFusion(branch: MasterBranch): void {
+        const result = fuseActivePartyBranch(this.party, branch);
+        this.addCombatLog(result.message);
+        if (!result.success) {
+            this.fusionTempleUI.show({
+                realm: this.worldMap.getRealm(),
+                candidates: getFusionCandidates(this.party),
+                canEnterMasterWorld: hasActiveMasterCharacter(this.party),
+            });
+            return;
+        }
+
+        this.fusionTempleUI.hide();
+        this.enterMasterWorld();
+    }
+
+    private enterMasterWorld(): void {
+        if (!hasActiveMasterCharacter(this.party)) {
+            this.addCombatLog('마스터 클래스가 있어야 마스터 월드에 들어갈 수 있습니다.');
+            return;
+        }
+
+        this.fusionTempleUI.hide();
+        this.townSession.hide();
+        this.raidSession.failBackToTown(this.raidSession.currentHubTownId);
+        this.currentPhase = 'master';
+        this.worldMap.setRealm('master');
+        this.placePartyNear(this.worldMap.getPrimaryTempleTile());
+        this.player = this.getControlledActor()?.entity ?? this.player;
+        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
+        this.fieldEnemies = [];
+        this.worldMap.loot = [];
+        this.spawnStarterFieldContent();
+        this.clearFieldTurnState();
+        this.dismissedTempleVisitKey = this.getCurrentTempleVisitKey();
+        this.addCombatLog('마스터 월드에 진입했습니다. T8~T10 성장이 시작됩니다.');
+    }
+
+    private returnToMortalWorld(): void {
+        this.fusionTempleUI.hide();
+        this.raidSession.failBackToTown(this.raidSession.currentHubTownId);
+        this.currentPhase = 'lobby';
+        this.worldMap.setRealm('mortal');
+        this.placePartyNear(this.worldMap.getPrimaryTempleTile());
+        this.player = this.getControlledActor()?.entity ?? this.player;
+        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
+        this.fieldEnemies = [];
+        this.worldMap.loot = [];
+        this.clearFieldTurnState();
+        this.dismissedTempleVisitKey = this.getCurrentTempleVisitKey();
+        this.addCombatLog('현세의 융합 신전으로 돌아왔습니다.');
+    }
+
+    private getCurrentTempleVisitKey(): string | null {
+        const actor = this.getControlledActor();
+        if (!actor) return null;
+        const temple = this.worldMap.getTempleAtTile(actor.entity.gridX, actor.entity.gridY);
+        if (!temple) return null;
+        return `${this.worldMap.getRealm()}:${temple.id}:${actor.entity.gridX},${actor.entity.gridY}`;
     }
 
     private resolveFieldHitAt(tile: TilePoint) {
@@ -591,15 +709,35 @@ export class WorldEngine {
     }
 
     private handleEnemyDefeated(actor: FieldActor, enemy: Enemy): void {
-        this.addCombatLog(`${enemy.name} 처치! +${enemy.expReward} EXP`);
+        this.awardDefeatExp(actor, enemy);
         this.raidSession.recordKill();
         this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
         this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
-        actor.character.gainExp(enemy.expReward);
         enemy.isAggro = false;
         this.selectionController.clearEnemyIfSelected(enemy.id);
 
         this.spawnEnemyLoot(enemy);
+    }
+
+    private awardDefeatExp(actor: FieldActor, enemy: Enemy): void {
+        const canGainExp = this.canCharacterGainExpInCurrentRealm(actor.character);
+        this.addCombatLog(canGainExp ? `${enemy.name} 처치! +${enemy.expReward} EXP` : `${enemy.name} 처치!`);
+        if (canGainExp) {
+            const expResult = actor.character.gainExp(enemy.expReward);
+            if (expResult.promoted && expResult.newTierName) {
+                this.addCombatLog(`${actor.character.name} 승급: ${expResult.newTierName}`);
+            }
+            if (expResult.emblemUnlocked) {
+                this.addCombatLog(`${actor.character.name}: 융합 문장 각성`);
+            }
+        } else {
+            this.addCombatLog('이 월드에서는 해당 티어가 성장하지 않습니다.');
+        }
+    }
+
+    private canCharacterGainExpInCurrentRealm(character: Character): boolean {
+        const isMaster = isMasterClassLineId(character.classLineId) || character.currentTier >= 8;
+        return this.worldMap.getRealm() === 'master' ? isMaster : !isMaster;
     }
 
     private handleActorDown(actor: FieldActor): void {

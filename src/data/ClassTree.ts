@@ -41,6 +41,20 @@ export interface ClassLine {
     skillUnlocks: Record<number, string[]>;
 }
 
+function combineGrowth(rates: GrowthRates[], multiplier: number = 1): GrowthRates {
+    const avg = (key: keyof GrowthRates) =>
+        rates.reduce((sum, growth) => sum + growth[key], 0) / rates.length * multiplier;
+    return {
+        hp: avg('hp'),
+        mp: avg('mp'),
+        atk: avg('atk'),
+        def: avg('def'),
+        magAtk: avg('magAtk'),
+        magDef: avg('magDef'),
+        spd: avg('spd'),
+    };
+}
+
 // ─── 배틀마스터 Branch ──────────────────────────────────────────
 
 const INFANTRY: ClassLine = {
@@ -374,12 +388,74 @@ export const MASTER_CLASSES: MasterClass[] = [
     }
 ];
 
+const MASTER_BATTLE: ClassLine = {
+    id: 'master_battle', branch: 'battle',
+    nameKr: '배틀마스터', nameEn: 'Battle Master',
+    growth: combineGrowth([GROWTH_MELEE, GROWTH_CAVALRY, GROWTH_FLYING], 1.18),
+    baseMovRange: 4, attackRange: 2,
+    ignoresTerrain: false, waterBonus: false,
+    tiers: MASTER_CLASSES[0].tiers,
+    skillUnlocks: {
+        8: ['og_attack', 'og_protection'],
+        9: ['og_thunderstorm', 'og_tornado'],
+        10: ['og_earthquake'],
+    }
+};
+
+const MASTER_TACTICS: ClassLine = {
+    id: 'master_tactics', branch: 'tactics',
+    nameKr: '택틱스마스터', nameEn: 'Tactics Master',
+    growth: combineGrowth([GROWTH_NAVAL, GROWTH_LANCE, GROWTH_ARCHER], 1.18),
+    baseMovRange: 3, attackRange: 4,
+    ignoresTerrain: false, waterBonus: true,
+    tiers: MASTER_CLASSES[1].tiers,
+    skillUnlocks: {
+        8: ['og_quick', 'og_resist'],
+        9: ['og_windcutter', 'og_blizzard'],
+        10: ['og_thunderstorm'],
+    }
+};
+
+const MASTER_HEALER: ClassLine = {
+    id: 'master_healer', branch: 'healer',
+    nameKr: '힐러마스터', nameEn: 'Healer Master',
+    growth: combineGrowth([GROWTH_CLERIC, GROWTH_PRIEST, GROWTH_SHRINE], 1.18),
+    baseMovRange: 3, attackRange: 1,
+    ignoresTerrain: false, waterBonus: false,
+    tiers: MASTER_CLASSES[2].tiers,
+    skillUnlocks: {
+        8: ['og_heal', 'og_cure', 'og_forceheal'],
+        9: ['og_resist', 'og_antiresist'],
+        10: ['og_meteor'],
+    }
+};
+
+const MASTER_MAGIC: ClassLine = {
+    id: 'master_magic', branch: 'magic',
+    nameKr: '매직마스터', nameEn: 'Magic Master',
+    growth: combineGrowth([GROWTH_MAGE, GROWTH_CULTIST, GROWTH_ALCHEMIST], 1.18),
+    baseMovRange: 3, attackRange: 3,
+    ignoresTerrain: false, waterBonus: false,
+    tiers: MASTER_CLASSES[3].tiers,
+    skillUnlocks: {
+        8: ['og_fire', 'og_freeze', 'og_poison'],
+        9: ['og_hpdrain', 'og_mpdrain', 'og_earthquake'],
+        10: ['og_meteor'],
+    }
+};
+
 /** All 12 base class lines */
-export const ALL_CLASS_LINES: ClassLine[] = [
+export const ALL_BASE_CLASS_LINES: ClassLine[] = [
     INFANTRY, CAVALRY, FLYING,
     NAVAL, LANCER, ARCHER,
     CLERIC, PRIEST, SHRINE,
     MAGE, CULTIST, ALCHEMIST
+];
+
+/** All playable class lines, including T8~T10 master fusion lines */
+export const ALL_CLASS_LINES: ClassLine[] = [
+    ...ALL_BASE_CLASS_LINES,
+    MASTER_BATTLE, MASTER_TACTICS, MASTER_HEALER, MASTER_MAGIC,
 ];
 
 /** Lookup a class line by ID */
@@ -390,4 +466,12 @@ export function getClassLine(id: string): ClassLine | undefined {
 /** Get the master class for a given branch */
 export function getMasterClass(branch: MasterBranch): MasterClass | undefined {
     return MASTER_CLASSES.find(m => m.branch === branch);
+}
+
+export function getMasterClassLineId(branch: MasterBranch): string {
+    return `master_${branch}`;
+}
+
+export function isMasterClassLineId(classLineId: string): boolean {
+    return classLineId.startsWith('master_');
 }

@@ -217,35 +217,39 @@ export class WorldFieldRenderer {
             ctx.font = `bold 11px ${UI.fontMono}`;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
-            ctx.fillText(`${active.name} Lv.${active.level}`, 28, 68);
+            ctx.fillText(`${active.name} T${active.currentTier} Lv.${active.level}`, 28, 68);
             ctx.fillStyle = Parchment.textMid;
             ctx.font = `10px ${UI.fontMono}`;
-            ctx.fillText(`HP ${active.stats.hp}/${effective.maxHp}  MP ${active.stats.mp}/${effective.maxMp}`, 28, 84);
-            ctx.fillText(`ATB ${Math.floor(model.player.actionGauge)}%`, 28, 100);
+            ctx.fillText(active.getTierName(), 28, 84);
+            ctx.fillText(`HP ${active.stats.hp}/${effective.maxHp}  MP ${active.stats.mp}/${effective.maxMp}`, 28, 100);
+            ctx.fillText(`ATB ${Math.floor(model.player.actionGauge)}%`, 28, 116);
             const apText = model.controlledActor?.id === model.activeTurnActorId
                 ? `${model.remainingActionPoints}/${active.stats.actionLimit}`
                 : `-/${active.stats.actionLimit}`;
-            ctx.fillText(`AP ${apText}`, 28, 116);
+            ctx.fillText(`AP ${apText}`, 128, 116);
         }
 
-        drawParchmentPanel(ctx, 16, 146, 130, 28);
+        drawParchmentPanel(ctx, 16, 146, 150, 42);
         ctx.fillStyle = '#ffcc00';
         ctx.font = `bold 11px ${UI.fontMono}`;
         ctx.textAlign = 'left';
         ctx.fillText(`${model.gold} G`, 28, 154);
+        ctx.fillStyle = Parchment.textMid;
+        ctx.font = `9px ${UI.fontMono}`;
+        ctx.fillText(model.worldName, 28, 170);
 
-        let infoY = 184;
+        let infoY = 198;
         if (model.raid.active) {
-            drawParchmentPanel(ctx, 16, 180, 210, 48);
+            drawParchmentPanel(ctx, 16, 194, 210, 48);
             const remaining = Math.max(0, model.raid.limitSeconds - model.raid.elapsedSeconds);
             ctx.fillStyle = model.raid.timerAdvancing ? '#8a2d2d' : Parchment.textMid;
             ctx.font = `bold 11px ${UI.fontMono}`;
-            ctx.fillText(`남은 시간 ${formatRaidTime(remaining)}`, 28, 190);
+            ctx.fillText(`남은 시간 ${formatRaidTime(remaining)}`, 28, 204);
             ctx.fillStyle = Parchment.textMid;
             ctx.font = `9px ${UI.fontMono}`;
-            ctx.fillText(`출발 ${model.raid.departureTownId}`, 28, 206);
-            ctx.fillText('목표: 다른 마을 생환', 28, 218);
-            infoY = 238;
+            ctx.fillText(`출발 ${model.raid.departureTownId}`, 28, 220);
+            ctx.fillText('목표: 다른 마을 생환', 28, 232);
+            infoY = 252;
         }
 
         ctx.fillStyle = 'rgba(255,255,255,0.45)';

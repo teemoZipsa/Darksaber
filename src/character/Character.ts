@@ -4,7 +4,7 @@
  */
 
 import { CharacterStats, createBaseStats, GrowthRates, getBaseStatsForClass } from '../data/Stats';
-import { ClassLine, getClassLine } from '../data/ClassTree';
+import { ClassLine, MasterBranch, getClassLine, getMasterClassLineId } from '../data/ClassTree';
 import { ItemSlot } from '../data/ItemDB';
 import { PlacedItem } from '../inventory/GridInventory';
 import { Skill } from '../data/SkillDB';
@@ -29,6 +29,7 @@ export interface ExpGainResult {
     leveledUp: boolean;
     promoted: boolean;       // true = tier promotion happened (trigger flash effect)
     newTierName?: string;    // Korean name of the new tier (for combat log)
+    emblemUnlocked?: boolean;
 }
 
 export class Character {
@@ -233,9 +234,11 @@ export class Character {
                     result.promoted = true;
                     result.leveledUp = true;
                     result.newTierName = this.getTierName();
+                    if (this.tryUnlockFusionEmblem()) result.emblemUnlocked = true;
                 } else {
                     // Max tier, max level — cap EXP
                     this.exp = this.expToNext;
+                    if (this.tryUnlockFusionEmblem()) result.emblemUnlocked = true;
                     break;
                 }
             } else {
@@ -245,6 +248,7 @@ export class Character {
                 this.applyLevelUpGrowth();
                 this.expToNext = this.calcExpToNext();
                 result.leveledUp = true;
+                if (this.tryUnlockFusionEmblem()) result.emblemUnlocked = true;
             }
         }
 
@@ -275,6 +279,14 @@ export class Character {
 
         // Update portrait for new tier
         this.updatePortrait();
+    }
+
+    private tryUnlockFusionEmblem(): boolean {
+        if (this.hasEmblem || this.hasNextTier || this.currentTier < 7 || this.level < Character.MAX_LEVEL) {
+            return false;
+        }
+        this.hasEmblem = true;
+        return true;
     }
 
     /** Apply stat growth on level up */
@@ -332,6 +344,7 @@ export class Character {
     public promote(): boolean {
         if (!this.canPromote()) return false;
         this.doPromote();
+        this.tryUnlockFusionEmblem();
         return true;
     }
 
@@ -339,5 +352,58 @@ export class Character {
     public isFusionReady(): boolean {
         return !this.hasNextTier && this.level >= Character.MAX_LEVEL && this.hasEmblem;
     }
-}
 
+    public fuseToMaster(branch: MasterBranch, absorbed: Character[]): boolean {
+        if (!this.isFusionReady() || absorbed.some((character) => !character.isFusionReady())) return false;
+
+        const nextClassLineId = getMasterClassLineId(branch);
+        const nextClassLine = getClassLine(nextClassLineId);
+        if (!nextClassLine) return false;
+
+        const sourceStats = [this.stats, ...absorbed.map((character) => character.stats)];
+
+        this.classLineId = nextClassLineId;
+        this.classLine = nextClassLine;
+        this.currentTier = nextClassLine.tiers[0]?.tier ?? 8;
+        this.level = 1;
+        this.exp = 0;
+        this.expToNext = this.calcExpToNext();
+        this.hasEmblem = false;
+        this.statuses = [];
+        this.isDead = false;
+        this.stats = this.createFusionStats(sourceStats, nextClassLine.baseMovRange);
+        this.updatePortrait();
+        return true;
+    }
+
+    private createFusionStats(sourceStats: CharacterStats[], baseMov: number): CharacterStats {
+        const max = (key: keyof CharacterStats) => Math.max(...sourceStats.map((stats) => stats[key]));
+        const avg = (key: keyof CharacterStats) =>
+            sourceStats.reduce((sum, stats) => sum + stats[key], 0) / Math.max(1, sourceStats.length);
+        const rounded = (value: number) => Math.floor(value * 10) / 10;
+
+        const maxHp = Math.floor(max('maxHp') + avg('maxHp') * 0.22);
+        const maxMp = Math.floor(max('maxMp') + avg('maxMp') * 0.22);
+        return {
+            hp: maxHp,
+            maxHp,
+            mp: maxMp,
+            maxMp,
+            atk: rounded(max('atk') + avg('atk') * 0.16),
+            def: rounded(max('def') + avg('def') * 0.16),
+            magAtk: rounded(max('magAtk') + avg('magAtk') * 0.16),
+            magDef: rounded(max('magDef') + avg('magDef') * 0.16),
+            spd: rounded(max('spd') + avg('spd') * 0.12),
+            mov: baseMov,
+            hitRate: Math.min(100, Math.floor(max('hitRate') + 5)),
+            critRate: Math.min(50, Math.floor(max('critRate') + 3)),
+            actionLimit: Math.floor(max('actionLimit') + 3),
+            evasion: Math.min(60, Math.floor(max('evasion') + 3)),
+            magHit: Math.min(100, Math.floor(max('magHit') + 5)),
+            magEva: Math.min(60, Math.floor(max('magEva') + 3)),
+            cmdRange: Math.floor(max('cmdRange') + 1),
+            atkMod: rounded(max('atkMod')),
+            defMod: rounded(max('defMod')),
+        };
+    }
+}

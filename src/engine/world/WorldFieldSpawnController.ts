@@ -14,6 +14,10 @@ export interface StarterFieldContent {
     loot: LootObject[];
 }
 
+export interface StarterFieldContentOptions {
+    masterRealm?: boolean;
+}
+
 export class WorldFieldSpawnController {
     private readonly movement: WorldMovementController;
 
@@ -46,8 +50,15 @@ export class WorldFieldSpawnController {
         });
     }
 
-    public createStarterFieldContent(anchor: Player): StarterFieldContent {
-        const enemySeeds = [
+    public createStarterFieldContent(anchor: Player, options: StarterFieldContentOptions = {}): StarterFieldContent {
+        const enemySeeds = options.masterRealm ? [
+            { offset: { x: 7, y: 3 }, name: '성역 파수꾼', level: 8, color: '#8ae6ff', role: 'tank' as EnemyRole },
+            { offset: { x: 10, y: -2 }, name: '별빛 궁수', level: 8, color: '#c6a0ff', role: 'archer' as EnemyRole },
+            { offset: { x: -6, y: 6 }, name: '홍염 기사', level: 9, color: '#ff5e4a', role: 'bruiser' as EnemyRole },
+            { offset: { x: 12, y: 4 }, name: '성좌 사제', level: 9, color: '#8cffb8', role: 'healer' as EnemyRole },
+            { offset: { x: -9, y: -4 }, name: '균열 추적자', level: 8, color: '#ffd166', role: 'coward' as EnemyRole },
+            { offset: { x: -11, y: 5 }, name: '마스터 쉐이드', level: 10, color: '#9a7cff', role: 'support' as EnemyRole },
+        ] : [
             { offset: { x: 7, y: 3 }, name: '늑대인간', level: 1, color: '#d95763', role: 'bruiser' as EnemyRole },
             { offset: { x: 10, y: -2 }, name: '에우리티온', level: 2, color: '#ff8a4a', role: 'archer' as EnemyRole },
             { offset: { x: -6, y: 6 }, name: '미노타우로스', level: 1, color: '#b86cff', role: 'tank' as EnemyRole },

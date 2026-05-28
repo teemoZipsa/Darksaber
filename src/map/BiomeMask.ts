@@ -15,6 +15,8 @@ export type BiomeType =
     | 'special'
     | 'lava';
 
+export type WorldRealm = 'mortal' | 'master';
+
 export interface TownInfo {
     id: string;
     name: string;
@@ -22,6 +24,15 @@ export interface TownInfo {
     chunkX: number;
     chunkY: number;
     radius: number; // in chunks
+}
+
+export interface TempleInfo {
+    id: string;
+    name: string;
+    nameKr: string;
+    chunkX: number;
+    chunkY: number;
+    tileRadius: number;
 }
 
 /** Map dimensions in chunks */
@@ -52,7 +63,7 @@ interface SpecialZone {
 
 // Towns double as the strongest biome anchors, so local geography always
 // agrees with the town's identity.
-const TOWNS: TownInfo[] = [
+const MORTAL_TOWNS: TownInfo[] = [
     { id: 'nw_desert_city',   name: 'Desert Outpost',     nameKr: '사막의 전초기지', chunkX: 16, chunkY: 11, radius: 2 },
     { id: 'w_forest_village', name: 'Forest Village',     nameKr: '숲속 마을',       chunkX: 10, chunkY: 52, radius: 2 },
     { id: 'central_castle',   name: 'Central Fortress',   nameKr: '중앙 성채',       chunkX: 37, chunkY: 44, radius: 3 },
@@ -61,6 +72,20 @@ const TOWNS: TownInfo[] = [
     { id: 'e_outpost',        name: 'Eastern Outpost',    nameKr: '동부 전초기지',   chunkX: 64, chunkY: 23, radius: 2 },
     { id: 'e_stronghold',     name: 'Eastern Stronghold', nameKr: '동부 거점',       chunkX: 63, chunkY: 49, radius: 2 },
     { id: 'se_port',          name: 'Southeast Port',     nameKr: '남동 항구',       chunkX: 63, chunkY: 72, radius: 2 },
+];
+
+const MASTER_TOWNS: TownInfo[] = [
+    { id: 'master_sanctum',    name: 'Master Sanctum',     nameKr: '마스터 성역',     chunkX: 40, chunkY: 50, radius: 2 },
+    { id: 'astral_keep',       name: 'Astral Keep',        nameKr: '성좌 요새',       chunkX: 23, chunkY: 28, radius: 2 },
+    { id: 'ember_citadel',     name: 'Ember Citadel',      nameKr: '홍염 성채',       chunkX: 60, chunkY: 67, radius: 2 },
+];
+
+const MORTAL_TEMPLES: TempleInfo[] = [
+    { id: 'fusion_temple', name: 'Fusion Temple', nameKr: '융합의 신전', chunkX: 38, chunkY: 35, tileRadius: 4 },
+];
+
+const MASTER_TEMPLES: TempleInfo[] = [
+    { id: 'mortal_gate', name: 'Mortal Gate', nameKr: '현세의 문', chunkX: 40, chunkY: 50, tileRadius: 4 },
 ];
 
 const LAND_ANCHORS: InfluenceAnchor[] = [
@@ -134,11 +159,69 @@ const SPECIAL_ZONES: SpecialZone[] = [
     { cx: 62, cy: 48, r: 2 },
 ];
 
+const MASTER_LAND_ANCHORS: InfluenceAnchor[] = [
+    { cx: 40, cy: 50, radius: 27, weight: 1.22 },
+    { cx: 23, cy: 28, radius: 18, weight: 1.02 },
+    { cx: 60, cy: 67, radius: 19, weight: 1.02 },
+    { cx: 34, cy: 72, radius: 14, weight: 0.78 },
+    { cx: 57, cy: 31, radius: 13, weight: 0.72 },
+];
+
+const MASTER_OCEAN_CUTS: InfluenceAnchor[] = [
+    { cx: 41, cy: 18, radius: 9, weight: 0.7 },
+    { cx: 18, cy: 61, radius: 8, weight: 0.62 },
+    { cx: 63, cy: 46, radius: 7, weight: 0.58 },
+];
+
+const MASTER_BIOME_ANCHORS: BiomeAnchor[] = [
+    { cx: 40, cy: 50, biome: 'stone', weight: 1.9 },
+    { cx: 23, cy: 28, biome: 'snow', weight: 1.5 },
+    { cx: 60, cy: 67, biome: 'lava', weight: 1.5 },
+    { cx: 34, cy: 72, biome: 'forest', weight: 1.05 },
+    { cx: 57, cy: 31, biome: 'special', weight: 1.0 },
+];
+
+const MASTER_SPECIAL_ZONES: SpecialZone[] = [
+    { cx: 40, cy: 50, r: 2 },
+    { cx: 57, cy: 31, r: 3 },
+    { cx: 60, cy: 67, r: 2 },
+];
+
 export class BiomeMask {
     private grid: BiomeType[][] = [];
+    private readonly realm: WorldRealm;
 
-    constructor() {
+    constructor(realm: WorldRealm = 'mortal') {
+        this.realm = realm;
         this.generate();
+    }
+
+    public getRealm(): WorldRealm {
+        return this.realm;
+    }
+
+    private getTownDefinitions(): TownInfo[] {
+        return this.realm === 'master' ? MASTER_TOWNS : MORTAL_TOWNS;
+    }
+
+    private getTempleDefinitions(): TempleInfo[] {
+        return this.realm === 'master' ? MASTER_TEMPLES : MORTAL_TEMPLES;
+    }
+
+    private getLandAnchors(): InfluenceAnchor[] {
+        return this.realm === 'master' ? MASTER_LAND_ANCHORS : LAND_ANCHORS;
+    }
+
+    private getOceanCuts(): InfluenceAnchor[] {
+        return this.realm === 'master' ? MASTER_OCEAN_CUTS : OCEAN_CUTS;
+    }
+
+    private getBiomeAnchors(): BiomeAnchor[] {
+        return this.realm === 'master' ? MASTER_BIOME_ANCHORS : BIOME_ANCHORS;
+    }
+
+    private getSpecialZones(): SpecialZone[] {
+        return this.realm === 'master' ? MASTER_SPECIAL_ZONES : SPECIAL_ZONES;
     }
 
     private hash(x: number, y: number, salt: number = 0): number {
@@ -187,13 +270,13 @@ export class BiomeMask {
 
     private landScore(cx: number, cy: number): number {
         let score = -Infinity;
-        for (const anchor of LAND_ANCHORS) {
+        for (const anchor of this.getLandAnchors()) {
             const d = this.distance(cx, cy, anchor);
             const falloff = 1 - d / anchor.radius;
             score = Math.max(score, falloff * anchor.weight);
         }
 
-        for (const cut of OCEAN_CUTS) {
+        for (const cut of this.getOceanCuts()) {
             const d = this.distance(cx, cy, cut);
             if (d < cut.radius) {
                 const cutAmount = (1 - d / cut.radius) * cut.weight;
@@ -206,7 +289,7 @@ export class BiomeMask {
     }
 
     private isNearTown(cx: number, cy: number): TownInfo | null {
-        for (const town of TOWNS) {
+        for (const town of this.getTownDefinitions()) {
             const dx = cx - town.chunkX;
             const dy = cy - town.chunkY;
             if (Math.sqrt(dx * dx + dy * dy) <= town.radius) return town;
@@ -215,7 +298,7 @@ export class BiomeMask {
     }
 
     private isInSpecialZone(cx: number, cy: number): boolean {
-        return SPECIAL_ZONES.some((zone) => Math.hypot(cx - zone.cx, cy - zone.cy) <= zone.r);
+        return this.getSpecialZones().some((zone) => Math.hypot(cx - zone.cx, cy - zone.cy) <= zone.r);
     }
 
     private chooseAnchoredBiome(cx: number, cy: number): LandBiome {
@@ -224,9 +307,10 @@ export class BiomeMask {
         const px = cx + bendX;
         const py = cy + bendY;
 
-        let best = BIOME_ANCHORS[0];
+        const anchors = this.getBiomeAnchors();
+        let best = anchors[0];
         let bestScore = Infinity;
-        for (const anchor of BIOME_ANCHORS) {
+        for (const anchor of anchors) {
             const d = Math.hypot(px - anchor.cx, py - anchor.cy);
             const score = d / anchor.weight;
             if (score < bestScore) {
@@ -272,7 +356,12 @@ export class BiomeMask {
 
     /** Get all town infos */
     public getTowns(): TownInfo[] {
-        return [...TOWNS];
+        return [...this.getTownDefinitions()];
+    }
+
+    /** Get all temple/realm gate infos */
+    public getTemples(): TempleInfo[] {
+        return [...this.getTempleDefinitions()];
     }
 
     /** Check if a chunk coordinate is within map bounds */

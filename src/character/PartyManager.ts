@@ -148,6 +148,28 @@ export class PartyManager {
         return this.roster;
     }
 
+    public removeCharacters(characterIds: Set<string>): Character[] {
+        const removed: Character[] = [];
+        this.roster = this.roster.filter((character) => {
+            if (!characterIds.has(character.id)) return true;
+            removed.push(character);
+            return false;
+        });
+        this.activeParty = this.activeParty.filter((character) => !characterIds.has(character.id));
+        if (this.activeIndex >= this.activeParty.length) this.activeIndex = 0;
+        if (this.activeParty.length > 0 && this.activeParty[this.activeIndex]?.isDead) {
+            const next = this.getNextAlive();
+            this.activeIndex = next ?? 0;
+        }
+        return removed;
+    }
+
+    public makeOnlyActive(character: Character): void {
+        if (!this.roster.includes(character)) this.roster.push(character);
+        this.activeParty = [character];
+        this.activeIndex = 0;
+    }
+
     /** Swap two roster positions during drag and drop reorder */
     public swapRoster(indexA: number, indexB: number): boolean {
         if (indexA < 0 || indexA >= this.roster.length ||

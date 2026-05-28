@@ -26,6 +26,7 @@ export interface CombatEventSink {
     spawnKillEffect(enemy: Enemy): void;
     spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void;
     spawnLoot(enemy: Enemy): void;
+    awardExp?(actor: FieldActor, enemy: Enemy): void;
 }
 
 export interface ActorAttackInput {
@@ -241,10 +242,13 @@ export class WorldCombatController {
 
     private handleEnemyDefeated(actor: FieldActor, enemy: Enemy, result: CombatResult): void {
         result.killedEnemyIds.push(enemy.id);
-        this.sink.log(`${enemy.name} 처치! +${enemy.expReward} EXP`);
+        if (this.sink.awardExp) this.sink.awardExp(actor, enemy);
+        else {
+            this.sink.log(`${enemy.name} 처치! +${enemy.expReward} EXP`);
+            actor.character.gainExp(enemy.expReward);
+        }
         this.sink.spawnKillEffect(enemy);
         this.sink.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
-        actor.character.gainExp(enemy.expReward);
         enemy.isAggro = false;
         this.sink.spawnLoot(enemy);
     }

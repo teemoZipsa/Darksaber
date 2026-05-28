@@ -43,5 +43,6 @@ export interface WorldRenderModel {
     attackCues: AttackCue[];
     combatLog: string[];
     gold: number;
+    worldName: string;
     raid: WorldRaidRenderModel;
 }

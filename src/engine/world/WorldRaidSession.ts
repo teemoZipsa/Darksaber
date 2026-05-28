@@ -1,6 +1,6 @@
 import { shouldAdvanceRaidTimer } from '../../raid/RaidRules';
 
-export type WorldPhase = 'town' | 'raid' | 'lobby';
+export type WorldPhase = 'town' | 'raid' | 'lobby' | 'master';
 
 export interface RaidTimerGates {
     townVisible: boolean;

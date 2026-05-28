@@ -6,6 +6,7 @@ import type { WorldMap } from '../../map/WorldMap';
 import type { ActionMenuUI } from '../../ui/ActionMenuUI';
 import type { EntityInfoUI } from '../../ui/EntityInfoUI';
 import type { EffectManager } from '../../ui/EffectManager';
+import type { FusionTempleUI } from '../../ui/FusionTempleUI';
 import type { FloatingTextManager } from '../../ui/FloatingTextManager';
 import { SettingsManager } from '../SettingsManager';
 import type { Camera } from '../Camera';
@@ -28,6 +29,7 @@ export interface WorldRenderContext {
     worldMap: WorldMap;
     townSession: WorldTownSession;
     raidSession: WorldRaidSession;
+    fusionTempleUI: FusionTempleUI;
     actionMenuUI: ActionMenuUI;
     entityInfoUI: EntityInfoUI;
     effectManager: EffectManager;
@@ -103,6 +105,7 @@ export class WorldRenderController {
         this.context.tacticalController.render(ctx);
         this.context.magicController.render(ctx, uiW, uiH);
         if (this.context.townSession.isVisible()) this.context.townSession.render(ctx, uiW, uiH);
+        if (this.context.fusionTempleUI.isVisible()) this.context.fusionTempleUI.render(ctx, uiW, uiH);
         if (this.context.raidOutcomeController.isVisible()) this.context.raidOutcomeController.render(ctx, uiW, uiH);
         ctx.restore();
     }
@@ -149,6 +152,7 @@ export class WorldRenderController {
             attackCues: this.context.getAttackCues(),
             combatLog: this.context.getCombatLog(),
             gold: this.context.playerData.gold,
+            worldName: this.context.worldMap.getDisplayName(),
             raid: {
                 active: this.context.raidSession.active,
                 elapsedSeconds: this.context.raidSession.elapsedSeconds,
