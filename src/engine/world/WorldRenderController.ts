@@ -106,7 +106,11 @@ export class WorldRenderController {
         }
         this.context.tacticalController.render(ctx);
         this.context.magicController.render(ctx, uiW, uiH);
-        this.context.minimapUI.render(ctx, uiW, uiH);
+        this.context.minimapUI.render(ctx, uiW, uiH, {
+            gold: model.gold,
+            worldName: model.worldName,
+            terrainLines: model.terrainHoverLines,
+        });
         if (this.context.townSession.isVisible()) this.context.townSession.render(ctx, uiW, uiH);
         if (this.context.fusionTempleUI.isVisible()) this.context.fusionTempleUI.render(ctx, uiW, uiH);
         if (this.context.raidOutcomeController.isVisible()) this.context.raidOutcomeController.render(ctx, uiW, uiH);

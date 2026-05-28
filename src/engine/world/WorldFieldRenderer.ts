@@ -210,21 +210,23 @@ export class WorldFieldRenderer {
     }
 
     public static renderHudPanels(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number, vh: number): number {
-        // ── HUD column grid ────────────────────────────────────────
-        // All left-column panels share the same x, width, and gap so they
-        // read as one stack. Internal text uses two columns (left/right).
+        // ── HUD layout ─────────────────────────────────────────────
+        // LEFT column   : title logo + character status
+        // TOP-CENTER    : raid timer banner (only when raid active)
+        // TOP-RIGHT     : minimap + integrated info footer (rendered separately
+        //                 by MinimapUI; gold/world/coords/terrain live there)
+        // BOTTOM-RIGHT  : compact key-hint strip
         const HUD_X       = 16;
         const HUD_W       = 232;
         const TEXT_X      = HUD_X + 14;          // 30 — left text column
         const RIGHT_X     = HUD_X + HUD_W - 92;  // 156 — right text column
-        const PANEL_GAP   = 8;
 
         renderGameTitle(ctx, HUD_X, 12, { scale: 0.7, subtitle: '' });
 
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
 
-        // ── Panel 1: Character status ─────────────────────────────
+        // ── Character status (left column, single panel) ──────────
         const charY = 56;
         const charH = 100;
         if (model.activeCharacter) {
@@ -232,17 +234,14 @@ export class WorldFieldRenderer {
             const effective = getEffectiveStatsForCharacter(active);
             drawParchmentPanel(ctx, HUD_X, charY, HUD_W, charH, { headerH: 28 });
 
-            // Title row (on gold header band)
             ctx.fillStyle = Parchment.textDark;
             ctx.font = `bold 14px ${UI.fontPrimary}`;
             ctx.fillText(`${active.name}  T${active.currentTier} Lv.${active.level}`, TEXT_X, charY + 8);
 
-            // Tier name (just below header underline)
             ctx.fillStyle = Parchment.textMid;
             ctx.font = `12px ${UI.fontPrimary}`;
             ctx.fillText(`[ ${active.getTierName()} ]`, TEXT_X, charY + 34);
 
-            // Stats grid: 2 cols × 2 rows
             ctx.font = `bold 13px ${UI.fontPrimary}`;
             ctx.fillStyle = '#7a2030';
             ctx.fillText(`HP ${active.stats.hp}/${effective.maxHp}`, TEXT_X, charY + 56);
@@ -257,50 +256,15 @@ export class WorldFieldRenderer {
             ctx.fillText(`AP ${apText}`, RIGHT_X, charY + 76);
         }
 
-        // ── Panel 2: Gold + World ─────────────────────────────────
-        const goldY = charY + charH + PANEL_GAP;
-        const goldH = 46;
-        drawParchmentPanel(ctx, HUD_X, goldY, HUD_W, goldH, { shadow: false, compact: true });
-        ctx.fillStyle = '#7a5410';
-        ctx.font = `bold 14px ${UI.fontPrimary}`;
-        ctx.fillText(`${model.gold} G`, TEXT_X, goldY + 8);
-        ctx.fillStyle = Parchment.textMid;
-        ctx.font = `12px ${UI.fontPrimary}`;
-        ctx.fillText(model.worldName, TEXT_X, goldY + 26);
+        // infoY is where downstream UIs (selected entity info) anchor.
+        // No more gold/raid panels below — entity info sits right under the character panel.
+        const infoY = charY + charH + 6;
 
-        // ── Panel 3: Raid timer (conditional) ─────────────────────
-        let nextY = goldY + goldH + PANEL_GAP;
-        if (model.raid.active) {
-            const raidH = 68;
-            drawParchmentPanel(ctx, HUD_X, nextY, HUD_W, raidH, { headerH: 26 });
-            const remaining = Math.max(0, model.raid.limitSeconds - model.raid.elapsedSeconds);
-            ctx.fillStyle = model.raid.timerAdvancing ? '#a01818' : Parchment.textDark;
-            ctx.font = `bold 14px ${UI.fontPrimary}`;
-            ctx.fillText(`남은 시간 ${formatRaidTime(remaining)}`, TEXT_X, nextY + 7);
-            ctx.fillStyle = Parchment.textMid;
-            ctx.font = `12px ${UI.fontPrimary}`;
-            ctx.fillText(`출발 ${model.raid.departureTownId}`, TEXT_X, nextY + 36);
-            ctx.fillText('목표: 다른 마을 생환', TEXT_X, nextY + 52);
-            nextY += raidH + PANEL_GAP;
-        }
-
-        // Coord readout — small, low contrast, plain (no panel)
-        const infoY = nextY;
-        ctx.fillStyle = 'rgba(45, 31, 18, 0.65)';
-        ctx.font = `11px ${UI.fontPrimary}`;
-        ctx.fillText(`좌표 ${model.player.gridX}, ${model.player.gridY}`, HUD_X, infoY);
-
-        renderTerrainHoverInfo(ctx, model, vw);
+        renderRaidBanner(ctx, model, vw);
         renderActionModeHint(ctx, model, vw, vh);
         renderCombatLog(ctx, model, vw, vh);
+        renderKeyHintStrip(ctx, vw, vh);
 
-        const helpText = '캐릭터 클릭 행동 메뉴 | Tab 교체 | M 미니맵 | ESC 취소 | I 인벤토리';
-        ctx.font = `12px ${UI.fontPrimary}`;
-        const helpW = ctx.measureText(helpText).width + 22;
-        drawParchmentPanel(ctx, vw - helpW - 12, vh - 34, helpW, 26, { shadow: false, compact: true, radius: 4 });
-        ctx.fillStyle = Parchment.textDark;
-        ctx.textAlign = 'right';
-        ctx.fillText(helpText, vw - 22, vh - 17);
         ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
 
@@ -437,20 +401,98 @@ function renderHpBar(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
     ctx.fillRect(x, y, w * Math.max(0, Math.min(1, hp / Math.max(1, maxHp))), 5);
 }
 
-function renderTerrainHoverInfo(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number): void {
-    if (model.hoverTile.x < 0 || model.hoverTile.y < 0 || model.terrainHoverLines.length === 0) return;
-    const w = 248;
-    const h = 22 + model.terrainHoverLines.length * 18;
-    const x = Math.max(16, vw - w - 16);
-    const y = 248;
-    drawParchmentPanel(ctx, x, y, w, h, { shadow: false, compact: true });
-    ctx.fillStyle = Parchment.textDark;
+/**
+ * Top-center raid timer banner. Only renders when a raid is active.
+ * Positioned high so it doesn't fight with the title logo or character panel.
+ */
+function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number): void {
+    if (!model.raid.active) return;
+
+    const bannerW = 340;
+    const bannerH = 58;
+    const x = Math.floor((vw - bannerW) / 2);
+    const y = 16;
+    const urgent = model.raid.timerAdvancing;
+
+    ctx.save();
+    drawParchmentPanel(ctx, x, y, bannerW, bannerH, { radius: 8, headerH: 0 });
+
+    // Urgent state: red accent stripe along the top border.
+    if (urgent) {
+        ctx.fillStyle = '#a01818';
+        ctx.fillRect(x + 6, y + 2, bannerW - 12, 2);
+    }
+
+    const remaining = Math.max(0, model.raid.limitSeconds - model.raid.elapsedSeconds);
+
+    // Big timer
+    ctx.fillStyle = urgent ? '#a01818' : Parchment.textDark;
+    ctx.font = `bold 22px ${UI.fontPrimary}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(formatRaidTime(remaining), x + bannerW / 2, y + 22);
+
+    // Route subtitle
+    ctx.fillStyle = Parchment.textMid;
     ctx.font = `12px ${UI.fontPrimary}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    model.terrainHoverLines.forEach((line, index) => {
-        ctx.fillText(line, x + 12, y + 10 + index * 18);
+    ctx.fillText(`${model.raid.departureTownId}  →  다른 마을 생환`, x + bannerW / 2, y + bannerH - 14);
+
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
+    ctx.restore();
+}
+
+/**
+ * Compact bottom-right key-hint strip. Single thin line of inline `Key 설명`
+ * pairs — no parchment chrome, just text with a subtle shadow for readability.
+ */
+function renderKeyHintStrip(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
+    const segments: { key: string; label: string }[] = [
+        { key: 'Tab', label: '교체' },
+        { key: 'M',   label: '미니맵' },
+        { key: 'I',   label: '인벤' },
+        { key: 'ESC', label: '메뉴' },
+    ];
+
+    ctx.save();
+    ctx.font = `11px ${UI.fontPrimary}`;
+    ctx.textBaseline = 'alphabetic';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    ctx.shadowBlur = 3;
+    ctx.shadowOffsetY = 1;
+
+    // Measure total width to right-align cleanly.
+    const SEP = '   ';
+    let totalW = 0;
+    const measured = segments.map((s) => {
+        const keyW = ctx.measureText(s.key).width;
+        const labelW = ctx.measureText(s.label).width;
+        const segW = keyW + 4 + labelW;
+        totalW += segW;
+        return { ...s, keyW, labelW, segW };
     });
+    totalW += (segments.length - 1) * ctx.measureText(SEP).width;
+
+    const sepW = ctx.measureText(SEP).width;
+    let cursor = vw - 16 - totalW;
+    const baselineY = vh - 12;
+
+    for (let i = 0; i < measured.length; i++) {
+        const seg = measured[i];
+        // Key (gold/dark)
+        ctx.fillStyle = '#d4a050';
+        ctx.fillText(seg.key, cursor, baselineY);
+        cursor += seg.keyW + 4;
+        // Label (mid)
+        ctx.fillStyle = '#e8dcc0';
+        ctx.fillText(seg.label, cursor, baselineY);
+        cursor += seg.labelW;
+        if (i < measured.length - 1) cursor += sepW;
+    }
+
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.restore();
 }
 
 function renderActionModeHint(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number, vh: number): void {

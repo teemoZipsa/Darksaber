@@ -16,11 +16,23 @@ interface MinimapConfig {
     getLoot: () => { x: number; y: number; opened: boolean }[];
 }
 
-const MAP_SIZE = 148;
+/** Per-frame info shown in the panel footer below the map. */
+export interface MinimapFooter {
+    gold: number;
+    worldName: string;
+    /** Terrain hover lines, empty array when not hovering a tile. */
+    terrainLines: string[];
+}
+
+const MAP_SIZE = 152;
 const VIEW_RANGE = 26;
-const FRAME_PAD = 8;
+const FRAME_PAD = 10;
+const HEADER_H = 26;
+const FOOTER_INFO_H = 56;            // base footer height (gold/world + coords)
+const FOOTER_TERRAIN_LINE_H = 16;    // per terrain hover line
 const PANEL_W = MAP_SIZE + FRAME_PAD * 2;
-const PANEL_H = MAP_SIZE + FRAME_PAD * 2 + 22;
+const MARGIN_TOP = 16;
+const MARGIN_RIGHT = 16;
 
 const MINI_TILE_COLORS: Record<TileType, string> = {
     [TileType.GRASS]: '#4f8e58',
@@ -42,8 +54,7 @@ export class MinimapUI {
     private visible = true;
     private panelX = 0;
     private panelY = 0;
-    private closeX = 0;
-    private closeY = 0;
+    private currentHeight = 0;
 
     constructor(private readonly config: MinimapConfig) {}
 
@@ -55,58 +66,56 @@ export class MinimapUI {
         return this.visible;
     }
 
+    /** Click handler. Returns true if the click landed on the panel (so map clicks below it are suppressed). */
     public onClick(mx: number, my: number): boolean {
         if (!this.visible) return false;
-
-        if (Math.hypot(mx - this.closeX, my - this.closeY) <= 12) {
-            this.visible = false;
-            return true;
-        }
-
         return mx >= this.panelX
             && mx <= this.panelX + PANEL_W
             && my >= this.panelY
-            && my <= this.panelY + PANEL_H;
+            && my <= this.panelY + this.currentHeight;
     }
 
-    public render(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
+    /**
+     * Render the minimap with an integrated info footer (gold, world name,
+     * coords, and terrain hover lines). Snaps to the top-right corner with
+     * a natural margin.
+     */
+    public render(ctx: CanvasRenderingContext2D, vw: number, _vh: number, footer?: MinimapFooter): void {
         if (!this.visible) return;
 
-        this.panelX = Math.max(12, vw - PANEL_W - 16);
-        this.panelY = Math.max(52, Math.min(vh - PANEL_H - 52, 62));
-        this.closeX = this.panelX + PANEL_W - 18;
-        this.closeY = this.panelY + 18;
+        const terrainLineCount = footer?.terrainLines.length ?? 0;
+        const footerH = FOOTER_INFO_H + (terrainLineCount > 0 ? 6 + terrainLineCount * FOOTER_TERRAIN_LINE_H : 0);
+        const panelH = HEADER_H + 6 + MAP_SIZE + 8 + footerH + FRAME_PAD;
 
-        const player = this.config.getPlayerPos();
+        this.panelX = vw - PANEL_W - MARGIN_RIGHT;
+        this.panelY = MARGIN_TOP;
+        this.currentHeight = panelH;
+
         const mapX = this.panelX + FRAME_PAD;
-        const mapY = this.panelY + FRAME_PAD + 20;
+        const mapY = this.panelY + HEADER_H + 6;
         const tilePx = MAP_SIZE / (VIEW_RANGE * 2);
+        const player = this.config.getPlayerPos();
 
         ctx.save();
-        drawParchmentPanel(ctx, this.panelX, this.panelY, PANEL_W, PANEL_H, {
+        drawParchmentPanel(ctx, this.panelX, this.panelY, PANEL_W, panelH, {
             radius: 8,
-            headerH: 24,
+            headerH: HEADER_H,
         });
 
+        // Header label
         ctx.fillStyle = Parchment.textDark;
         ctx.font = `bold 13px ${UI.fontPrimary}`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.fillText('미니맵', this.panelX + 12, this.panelY + 15);
+        ctx.fillText('미니맵', this.panelX + 14, this.panelY + HEADER_H / 2);
 
-        ctx.fillStyle = 'rgba(58, 38, 24, 0.15)';
-        ctx.beginPath();
-        ctx.arc(this.closeX, this.closeY, 10, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = Parchment.borderDark;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.fillStyle = Parchment.textDark;
-        ctx.font = `bold 10px ${UI.fontMono}`;
-        ctx.textAlign = 'center';
-        ctx.fillText('X', this.closeX, this.closeY + 1);
+        // Header right hint
+        ctx.fillStyle = Parchment.textMid;
+        ctx.font = `11px ${UI.fontPrimary}`;
+        ctx.textAlign = 'right';
+        ctx.fillText('M 토글', this.panelX + PANEL_W - 14, this.panelY + HEADER_H / 2);
 
-        // Dark map background — the minimap interior should stay dark for tile color contrast
+        // ─── Map area ───────────────────────────────────────────
         ctx.fillStyle = '#1a140c';
         ctx.fillRect(mapX, mapY, MAP_SIZE, MAP_SIZE);
         ctx.strokeStyle = Parchment.borderDark;
@@ -142,6 +151,7 @@ export class MinimapUI {
             this.drawDot(ctx, mapX, mapY, tilePx, player, enemy.gridX, enemy.gridY, enemy.isBoss ? '#ff2d75' : '#ff6248', enemy.isBoss ? 4 : 3);
         }
 
+        // Player marker
         const cx = mapX + MAP_SIZE / 2;
         const cy = mapY + MAP_SIZE / 2;
         ctx.fillStyle = '#f8f06a';
@@ -156,11 +166,55 @@ export class MinimapUI {
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = `9px ${UI.fontMono}`;
-        ctx.textAlign = 'right';
+        // ─── Info footer ────────────────────────────────────────
+        const footerX = this.panelX + 14;
+        let footerY = mapY + MAP_SIZE + 14;
+
+        if (footer) {
+            // Gold + world name on one row
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = '#7a5410';
+            ctx.font = `bold 14px ${UI.fontPrimary}`;
+            const goldText = `${footer.gold} G`;
+            ctx.fillText(goldText, footerX, footerY);
+            const goldW = ctx.measureText(goldText).width;
+
+            ctx.fillStyle = Parchment.textMid;
+            ctx.font = `13px ${UI.fontPrimary}`;
+            ctx.fillText(`· ${footer.worldName}`, footerX + goldW + 6, footerY + 1);
+            footerY += 20;
+
+            // Coords
+            ctx.fillStyle = Parchment.textMid;
+            ctx.font = `12px ${UI.fontPrimary}`;
+            ctx.fillText(`좌표 ${player.x}, ${player.y}`, footerX, footerY);
+            footerY += 18;
+
+            // Terrain hover lines (only when hovering a tile)
+            if (footer.terrainLines.length > 0) {
+                // Divider
+                ctx.strokeStyle = Parchment.borderDark;
+                ctx.globalAlpha = 0.25;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(footerX, footerY + 2);
+                ctx.lineTo(this.panelX + PANEL_W - 14, footerY + 2);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+                footerY += 8;
+
+                ctx.fillStyle = Parchment.textDark;
+                ctx.font = `12px ${UI.fontPrimary}`;
+                for (const line of footer.terrainLines) {
+                    ctx.fillText(line, footerX, footerY);
+                    footerY += FOOTER_TERRAIN_LINE_H;
+                }
+            }
+        }
+
+        ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
-        ctx.fillText(`M 토글  ${player.x},${player.y}`, this.panelX + PANEL_W - 10, this.panelY + PANEL_H - 7);
         ctx.restore();
     }
 
