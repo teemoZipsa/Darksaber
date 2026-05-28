@@ -27,6 +27,7 @@ export interface CombatEventSink {
     spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void;
     spawnLoot(enemy: Enemy): void;
     awardExp?(actor: FieldActor, enemy: Enemy): void;
+    onEnemyDefeated?(enemy: Enemy): void;
 }
 
 export interface ActorAttackInput {
@@ -251,6 +252,7 @@ export class WorldCombatController {
         this.sink.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
         enemy.isAggro = false;
         this.sink.spawnLoot(enemy);
+        this.sink.onEnemyDefeated?.(enemy);
     }
 
     private logPhysicalTerrainEffect(result: { terrainMultiplier?: number; hitChance?: number }): void {

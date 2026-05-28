@@ -1,6 +1,6 @@
 import { Chunk, CHUNK_SIZE, TILE_SIZE } from './Chunk';
 import { TileType, TILE_PROPERTIES } from './Tile';
-import { LandmarkSpriteId, TileAssetManager } from './TileAssetManager';
+import { TileAssetManager, type LandmarkSpriteId } from './TileAssetManager';
 import { LootObject } from '../entity/LootObject';
 import { ExtractionZone } from '../entity/ExtractionZone';
 import { BiomeMask, BiomeType, MAP_HEIGHT, MAP_WIDTH, TempleInfo, TownInfo, WorldRealm } from './BiomeMask';
@@ -13,6 +13,25 @@ export interface TileBounds {
 export interface TilePoint {
     x: number;
     y: number;
+}
+
+export type WorldMapLandmarkKind = 'town' | 'temple' | 'dungeon';
+
+export interface WorldMapLandmark {
+    x: number;
+    y: number;
+    label: string;
+    kind: WorldMapLandmarkKind;
+}
+
+export interface WorldDungeonInfo {
+    id: string;
+    nameKr: string;
+    chunkX: number;
+    chunkY: number;
+    sprite: LandmarkSpriteId;
+    tileSpan: number;
+    tileRadius: number;
 }
 
 const BIOME_TILE: Record<BiomeType, TileType> = {
@@ -115,16 +134,11 @@ const RIVER_ROUTES: TileRoute[] = [
     },
 ];
 
-const DUNGEON_LANDMARKS: Array<{
-    nameKr: string;
-    chunkX: number;
-    chunkY: number;
-    sprite: LandmarkSpriteId;
-    tileSpan: number;
-}> = [
-    { nameKr: '초심자의 폐광', chunkX: 38, chunkY: 35, sprite: 'beginnerMine', tileSpan: 3 },
-    { nameKr: '초보자 유적', chunkX: 62, chunkY: 28, sprite: 'beginnerRuins', tileSpan: 3 },
-    { nameKr: '암흑 동굴', chunkX: 62, chunkY: 48, sprite: 'caveEntrance', tileSpan: 3 },
+const DUNGEON_LANDMARKS: WorldDungeonInfo[] = [
+    { id: 'beginner_mine', nameKr: '초심자의 폐광', chunkX: 38, chunkY: 35, sprite: 'beginnerMine', tileSpan: 3, tileRadius: 4 },
+    { id: 'beginner_ruins', nameKr: '초보자 유적', chunkX: 62, chunkY: 28, sprite: 'beginnerRuins', tileSpan: 3, tileRadius: 4 },
+    { id: 'dark_cave', nameKr: '암흑 동굴', chunkX: 62, chunkY: 48, sprite: 'caveEntrance', tileSpan: 3, tileRadius: 4 },
+    { id: 'burgos_castle', nameKr: '부르고스성', chunkX: 43, chunkY: 40, sprite: 'castle', tileSpan: 4, tileRadius: 4 },
 ];
 
 export class WorldMap {
@@ -367,6 +381,7 @@ export class WorldMap {
         if (!this.isChunkInBounds(chunkX, chunkY)) return TileType.DEEP_WATER;
 
         if (this.getTempleAtTile(tx, ty)) return TileType.DUNGEON_ENTRANCE;
+        if (this.getDungeonAtTile(tx, ty)) return TileType.DUNGEON_ENTRANCE;
 
         const biome = this.biomeMask.getBiome(chunkX, chunkY);
         if (biome === 'ocean') {
@@ -477,12 +492,56 @@ export class WorldMap {
         return this.biomeMask.getTemples();
     }
 
+    public getDungeons(): WorldDungeonInfo[] {
+        return DUNGEON_LANDMARKS;
+    }
+
+    public getMapLandmarks(): WorldMapLandmark[] {
+        const chunkCenter = (chunkX: number, chunkY: number): TilePoint => ({
+            x: chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+            y: chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+        });
+
+        return [
+            ...this.getTowns().map((town) => ({
+                ...chunkCenter(town.chunkX, town.chunkY),
+                label: town.nameKr,
+                kind: 'town' as const,
+            })),
+            ...this.getTemples().map((temple) => ({
+                ...chunkCenter(temple.chunkX, temple.chunkY),
+                label: temple.nameKr,
+                kind: 'temple' as const,
+            })),
+            ...this.getDungeons().map((dungeon) => ({
+                ...chunkCenter(dungeon.chunkX, dungeon.chunkY),
+                label: dungeon.nameKr,
+                kind: 'dungeon' as const,
+            })),
+        ];
+    }
+
     public getTempleAtTile(tx: number, ty: number): TempleInfo | null {
         for (const temple of this.getTemples()) {
             const center = this.getTempleCenterTile(temple);
             if (Math.hypot(tx - center.x, ty - center.y) <= temple.tileRadius) return temple;
         }
         return null;
+    }
+
+    public getDungeonAtTile(tx: number, ty: number): WorldDungeonInfo | null {
+        for (const dungeon of this.getDungeons()) {
+            const center = this.getDungeonEntranceTile(dungeon);
+            if (Math.hypot(tx - center.x, ty - center.y) <= dungeon.tileRadius) return dungeon;
+        }
+        return null;
+    }
+
+    public getDungeonEntranceTile(dungeon: WorldDungeonInfo): TilePoint {
+        return {
+            x: dungeon.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+            y: dungeon.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+        };
     }
 
     public getTempleCenterTile(temple: TempleInfo): TilePoint {
@@ -582,11 +641,12 @@ export class WorldMap {
             );
         }
 
-        for (const dungeon of DUNGEON_LANDMARKS) {
+        for (const dungeon of this.getDungeons()) {
+            const center = this.getDungeonEntranceTile(dungeon);
             this.renderLandmarkSprite(
                 ctx, cameraX, cameraY, vw, vh,
-                dungeon.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
-                dungeon.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+                center.x,
+                center.y,
                 dungeon.tileSpan,
                 dungeon.sprite,
                 dungeon.nameKr,

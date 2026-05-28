@@ -15,6 +15,7 @@ import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
 import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
 import { getClassAttackProfile } from '../data/AttackPatternProfiles';
+import { BURGOS_CASTLE_DUNGEON_ID } from '../data/MonsterCatalog';
 import {
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
@@ -28,7 +29,7 @@ import { FusionTempleUI } from '../ui/FusionTempleUI';
 import { FloatingTextManager } from '../ui/FloatingTextManager';
 import { MinimapUI } from '../ui/MinimapUI';
 import type { GameManager } from './GameManager';
-import { WorldMap } from '../map/WorldMap';
+import { WorldMap, type WorldDungeonInfo } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
 import { fuseActivePartyBranch, getFusionCandidates, hasActiveMasterCharacter } from '../character/FusionSystem';
 import type { MasterBranch } from '../data/ClassTree';
@@ -107,6 +108,7 @@ export class WorldEngine {
     private attackCues: AttackCue[] = [];
     private worldTime: number = 0;
     private dismissedTempleVisitKey: string | null = null;
+    private dismissedDungeonVisitKey: string | null = null;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -127,6 +129,8 @@ export class WorldEngine {
         this.minimapUI = new MinimapUI({
             getTile: (gx, gy) => this.worldMap.getTileAt(gx, gy),
             getPlayerPos: () => ({ x: this.player.gridX, y: this.player.gridY }),
+            getBounds: () => this.worldMap.getBoundsTiles(),
+            getLandmarks: () => this.worldMap.getMapLandmarks(),
             getEnemies: () => this.fieldEnemies.map((entry) => entry.enemy),
             getExtractionZones: () => this.worldMap.extractionZones,
             getLoot: () => this.worldMap.loot,
@@ -163,6 +167,7 @@ export class WorldEngine {
             spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
             spawnLoot: (enemy) => this.spawnEnemyLoot(enemy),
             awardExp: (actor, enemy) => this.awardDefeatExp(actor, enemy),
+            onEnemyDefeated: (enemy) => this.completeDungeonIfBossDefeated(enemy),
         });
         this.movementController = new WorldMovementController({
             getPartyActors: () => this.partyActors,
@@ -421,6 +426,7 @@ export class WorldEngine {
         this.updateRaidTimer(dt);
         this.checkRaidEndConditions();
         this.checkTempleArrival();
+        this.checkDungeonArrival();
 
         const controlled = this.getControlledActor();
         if (controlled) this.player = controlled.entity;
@@ -466,6 +472,7 @@ export class WorldEngine {
         const town = this.getCurrentHubTown();
         this.currentPhase = 'raid';
         this.raidSession.beginRaidFromTown(town.id);
+        this.dismissedDungeonVisitKey = null;
         this.party.resetForNewRaid();
         this.townSession.applyPendingRestForRaidStart();
         this.placePartyNear(this.worldMap.getTownExitTile(town));
@@ -539,6 +546,63 @@ export class WorldEngine {
         this.openFusionTemple();
     }
 
+    private checkDungeonArrival(): void {
+        if (!this.raidSession.active || this.raidOutcomeController.isVisible() || this.townSession.isVisible() || this.fusionTempleUI.isVisible()) {
+            return;
+        }
+
+        const actor = this.getControlledActor();
+        if (!actor) return;
+
+        const dungeon = this.worldMap.getDungeonAtTile(actor.entity.gridX, actor.entity.gridY);
+        if (!dungeon) {
+            this.dismissedDungeonVisitKey = null;
+            return;
+        }
+        if (dungeon.id !== BURGOS_CASTLE_DUNGEON_ID) return;
+
+        const key = this.getCurrentDungeonVisitKey(dungeon);
+        if (!key || this.dismissedDungeonVisitKey === key) return;
+        if (this.raidSession.activeDungeonId) {
+            this.dismissedDungeonVisitKey = key;
+            return;
+        }
+        if (this.raidSession.isDungeonCleared(dungeon.id)) {
+            this.dismissedDungeonVisitKey = key;
+            return;
+        }
+        if (this.isEntityMoving(actor.entity)) return;
+
+        const hostileActive = this.fieldEnemies.some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro);
+        if (hostileActive) {
+            this.addCombatLog('주변 전투를 정리해야 부르고스성에 들어갈 수 있습니다.');
+            this.dismissedDungeonVisitKey = key;
+            return;
+        }
+
+        this.enterBurgosCastle(dungeon);
+    }
+
+    private enterBurgosCastle(dungeon: WorldDungeonInfo): void {
+        this.closeFieldOverlays();
+        this.clearFieldTurnState();
+        this.fieldEnemies = [];
+        this.worldMap.loot = [];
+        this.raidSession.startDungeonEncounter(dungeon.id);
+
+        const entrance = this.worldMap.getDungeonEntranceTile(dungeon);
+        this.placePartyNear({ x: entrance.x - 6, y: entrance.y });
+        this.player = this.getControlledActor()?.entity ?? this.player;
+        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
+
+        const content = this.fieldSpawnController.createBurgosCastleEncounter(entrance);
+        this.fieldEnemies = content.enemies;
+        this.worldMap.loot = content.loot;
+        this.clearFieldTurnState();
+        this.dismissedDungeonVisitKey = this.getCurrentDungeonVisitKey(dungeon);
+        this.addCombatLog('부르고스성 진입. 보스를 쓰러뜨리면 던전이 종료됩니다.');
+    }
+
     private openFusionTemple(): void {
         this.closeFieldOverlays();
         this.clearFieldTurnState();
@@ -609,6 +673,12 @@ export class WorldEngine {
         const temple = this.worldMap.getTempleAtTile(actor.entity.gridX, actor.entity.gridY);
         if (!temple) return null;
         return `${this.worldMap.getRealm()}:${temple.id}:${actor.entity.gridX},${actor.entity.gridY}`;
+    }
+
+    private getCurrentDungeonVisitKey(dungeon: WorldDungeonInfo): string | null {
+        const actor = this.getControlledActor();
+        if (!actor) return null;
+        return `${this.worldMap.getRealm()}:${dungeon.id}:${actor.entity.gridX},${actor.entity.gridY}`;
     }
 
     private resolveFieldHitAt(tile: TilePoint) {
@@ -744,6 +814,17 @@ export class WorldEngine {
         this.selectionController.clearEnemyIfSelected(enemy.id);
 
         this.spawnEnemyLoot(enemy);
+        this.completeDungeonIfBossDefeated(enemy);
+    }
+
+    private completeDungeonIfBossDefeated(enemy: Enemy): void {
+        if (!enemy.isBoss || this.raidSession.activeDungeonId !== BURGOS_CASTLE_DUNGEON_ID) return;
+        this.raidSession.completeDungeonEncounter(BURGOS_CASTLE_DUNGEON_ID);
+        this.fieldEnemies = [];
+        this.worldMap.loot = [];
+        this.selectionController.clear();
+        this.clearFieldTurnState();
+        this.addCombatLog('부르고스성 클리어. 던전이 종료되었습니다.');
     }
 
     private awardDefeatExp(actor: FieldActor, enemy: Enemy): void {

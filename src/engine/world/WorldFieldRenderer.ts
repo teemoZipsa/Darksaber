@@ -134,7 +134,8 @@ export class WorldFieldRenderer {
     }
 
     public static renderEnemies(ctx: CanvasRenderingContext2D, model: WorldRenderModel, camX: number, camY: number): void {
-        for (const entry of model.fieldEnemies) {
+        const sortedEnemies = [...model.fieldEnemies].sort((a, b) => a.enemy.pixelY - b.enemy.pixelY);
+        for (const entry of sortedEnemies) {
             const enemy = entry.enemy;
             if (enemy.stats.hp <= 0) continue;
             const px = enemy.pixelX * TILE_SIZE - camX;
@@ -486,7 +487,7 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
 function renderKeyHintStrip(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
     const segments: { key: string; label: string }[] = [
         { key: 'Tab', label: '교체' },
-        { key: 'M',   label: '미니맵' },
+        { key: 'M',   label: '지도' },
         { key: 'I',   label: '인벤' },
         { key: 'ESC', label: '메뉴' },
     ];

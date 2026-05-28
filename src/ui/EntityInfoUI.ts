@@ -9,6 +9,16 @@ import { getStatusIconCell } from './DarksaberIconRegistry';
 import { DarksaberSpriteAtlas } from './DarksaberSpriteAtlas';
 import { UI, isCloseButtonHit, Parchment, drawParchmentPanel } from './UITheme';
 
+export interface EntityDisplaySpriteSheet {
+    image: HTMLImageElement;
+    loaded: boolean;
+    frameWidth: number;
+    frameHeight: number;
+    frameCount: number;
+    rowByFacing: Record<'up' | 'down' | 'left' | 'right', number>;
+    renderScale: number;
+}
+
 export interface EntityDisplayInfo {
     name: string;
     className?: string;
@@ -27,6 +37,7 @@ export interface EntityDisplayInfo {
     magAtk: number;
     magDef: number;
     spriteColor: string;
+    spriteSheet?: EntityDisplaySpriteSheet;
     spriteImage?: HTMLImageElement;  // character portrait image
 }
 
@@ -167,7 +178,10 @@ export class EntityInfoUI {
         // Character sprite in center of grid
         const spriteCenterX = gridX + (cols * cellSize) / 2;
         const spriteCenterY = gridY + (rows * cellSize) / 2;
-        if (info.spriteImage && info.spriteImage.complete && info.spriteImage.naturalWidth > 0) {
+        const spriteSheetDrawn = info.spriteSheet
+            ? this.drawSpriteSheetIdleFrame(ctx, info.spriteSheet, spriteCenterX, spriteCenterY, actualGridW - 8, actualGridH - 8)
+            : false;
+        if (!spriteSheetDrawn && info.spriteImage && info.spriteImage.complete && info.spriteImage.naturalWidth > 0) {
             // Draw character portrait image
             const imgSize = Math.min(cols * cellSize - 8, rows * cellSize - 8, 48);
             ctx.drawImage(
@@ -175,7 +189,7 @@ export class EntityInfoUI {
                 spriteCenterX - imgSize / 2, spriteCenterY - imgSize / 2,
                 imgSize, imgSize
             );
-        } else {
+        } else if (!spriteSheetDrawn) {
             // Fallback: colored square
             ctx.fillStyle = info.spriteColor;
             ctx.fillRect(spriteCenterX - 12, spriteCenterY - 12, 24, 24);
@@ -304,6 +318,42 @@ export class EntityInfoUI {
         ctx.textAlign = 'start';
 
         ctx.restore();
+    }
+
+    private drawSpriteSheetIdleFrame(
+        ctx: CanvasRenderingContext2D,
+        spriteSheet: EntityDisplaySpriteSheet,
+        centerX: number,
+        centerY: number,
+        maxWidth: number,
+        maxHeight: number
+    ): boolean {
+        if (!spriteSheet.loaded || !spriteSheet.image.complete || spriteSheet.image.naturalWidth <= 0) return false;
+
+        const frameCount = Math.max(1, spriteSheet.frameCount);
+        const frameIndex = Math.min(1, frameCount - 1);
+        const row = spriteSheet.rowByFacing.down ?? 0;
+        const targetSize = Math.min(
+            maxWidth,
+            maxHeight,
+            Math.max(40, 48 * Math.max(0.1, spriteSheet.renderScale))
+        );
+
+        const previousSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(
+            spriteSheet.image,
+            frameIndex * spriteSheet.frameWidth,
+            row * spriteSheet.frameHeight,
+            spriteSheet.frameWidth,
+            spriteSheet.frameHeight,
+            centerX - targetSize / 2,
+            centerY - targetSize / 2,
+            targetSize,
+            targetSize
+        );
+        ctx.imageSmoothingEnabled = previousSmoothing;
+        return true;
     }
 
     // Retro-styled bar with label on the left

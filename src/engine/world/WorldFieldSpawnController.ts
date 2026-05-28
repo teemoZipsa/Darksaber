@@ -1,5 +1,14 @@
 import type { Character } from '../../character/Character';
 import { getItemDef } from '../../data/ItemDB';
+import {
+    BURGOS_BOSS_MONSTER_ID,
+    BURGOS_GUARD_MONSTER_ID,
+    GENERAL_MONSTER_IDS,
+    MONSTER_ROW_BY_FACING,
+    MONSTER_SPRITE_PATH,
+    getMonsterDefinition,
+    type MonsterId,
+} from '../../data/MonsterCatalog';
 import { Enemy } from '../../entity/Enemy';
 import { LootObject } from '../../entity/LootObject';
 import { Player } from '../../entity/Player';
@@ -18,27 +27,42 @@ export interface StarterFieldContentOptions {
     masterRealm?: boolean;
 }
 
-interface EnemySeed {
+interface CustomEnemySeed {
     offset: TilePoint;
     name: string;
     level: number;
     color: string;
     role: EnemyRole;
-    sprite?: string;
+    aggroRange?: number;
 }
 
-const MONSTER_SPRITE_PATH = '/Image/Monster';
-const MONSTER_ROW_BY_FACING: Record<'up' | 'down' | 'left' | 'right', number> = {
-    up: 0,
-    down: 1,
-    left: 2,
-    right: 3,
-};
-const MONSTER_FRAME_SIZE = 32;
-const MONSTER_FRAME_COUNT = 3;
-const MONSTER_FPS = 8;
-const MONSTER_RENDER_SCALE = 1.12;
+interface CatalogEnemySeed {
+    offset: TilePoint;
+    monsterId: MonsterId;
+}
+
+type EnemySeed = CustomEnemySeed | CatalogEnemySeed;
+
 const PARTY_WALK_RENDER_SCALE = 1.16;
+
+const MORTAL_REALM_ENEMY_SEEDS: CatalogEnemySeed[] = [
+    { monsterId: '346R', offset: { x: 7, y: 3 } },
+    { monsterId: '302R', offset: { x: 10, y: -2 } },
+    { monsterId: '317R', offset: { x: -6, y: 6 } },
+    { monsterId: '307R', offset: { x: 12, y: 4 } },
+    { monsterId: '304R', offset: { x: -9, y: -4 } },
+    { monsterId: '409R', offset: { x: -11, y: 5 } },
+    { monsterId: '434R', offset: { x: 15, y: -5 } },
+    { monsterId: '303R', offset: { x: 17, y: 6 } },
+    { monsterId: '305R', offset: { x: 6, y: -9 } },
+    { monsterId: '308R', offset: { x: -13, y: -7 } },
+    { monsterId: '309R', offset: { x: 19, y: 0 } },
+    { monsterId: '311R', offset: { x: -16, y: 2 } },
+    { monsterId: '313R', offset: { x: 3, y: 12 } },
+    { monsterId: '314R', offset: { x: -5, y: 13 } },
+    { monsterId: '315R', offset: { x: 14, y: 11 } },
+    { monsterId: '435R', offset: { x: -18, y: -3 } },
+];
 
 export class WorldFieldSpawnController {
     private readonly movement: WorldMovementController;
@@ -91,35 +115,9 @@ export class WorldFieldSpawnController {
             { offset: { x: 12, y: 4 }, name: '성좌 사제', level: 9, color: '#8cffb8', role: 'healer' as EnemyRole },
             { offset: { x: -9, y: -4 }, name: '균열 추적자', level: 8, color: '#ffd166', role: 'coward' as EnemyRole },
             { offset: { x: -11, y: 5 }, name: '마스터 쉐이드', level: 10, color: '#9a7cff', role: 'support' as EnemyRole },
-        ] : [
-            { offset: { x: 7, y: 3 }, name: '초원 늑대', level: 1, color: '#c57945', role: 'bruiser' as EnemyRole, sprite: '346R.png' },
-            { offset: { x: 10, y: -2 }, name: '스켈레톤 궁수', level: 2, color: '#d4c4cc', role: 'archer' as EnemyRole, sprite: '302R.png' },
-            { offset: { x: -6, y: 6 }, name: '미노타우로스', level: 1, color: '#c07717', role: 'tank' as EnemyRole, sprite: '317R.png' },
-            { offset: { x: 12, y: 4 }, name: '하급 마족', level: 2, color: '#8f64c8', role: 'healer' as EnemyRole, sprite: '307R.png' },
-            { offset: { x: -9, y: -4 }, name: '쥐인간 도적', level: 1, color: '#7080c8', role: 'coward' as EnemyRole, sprite: '304R.png' },
-            { offset: { x: -11, y: 5 }, name: '동굴 박쥐', level: 2, color: '#7d6750', role: 'support' as EnemyRole, sprite: '409R.png' },
-        ];
+        ] : MORTAL_REALM_ENEMY_SEEDS;
 
-        const enemies = enemySeeds.map((seed, index) => {
-            const tile = this.movement.findNearbyWalkableTile({
-                x: anchor.gridX + seed.offset.x,
-                y: anchor.gridY + seed.offset.y,
-            }, `enemy_${index}`);
-            const enemy = new Enemy(`field_enemy_${index}`, tile.x, tile.y, seed.name, seed.level, seed.color, seed.role);
-            enemy.aggroRange = ENEMY_AGGRO_RANGE;
-            if (seed.sprite) {
-                enemy.setWalkSprite(
-                    `${MONSTER_SPRITE_PATH}/${seed.sprite}`,
-                    MONSTER_FRAME_SIZE,
-                    MONSTER_FRAME_SIZE,
-                    MONSTER_FRAME_COUNT,
-                    MONSTER_FPS,
-                    MONSTER_ROW_BY_FACING,
-                    MONSTER_RENDER_SCALE
-                );
-            }
-            return { enemy, home: tile, path: [] };
-        });
+        const enemies = enemySeeds.map((seed, index) => this.createEnemy(seed, anchor, `field_enemy_${index}`));
 
         const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
         const sword = getItemDef('short_sword');
@@ -139,4 +137,55 @@ export class WorldFieldSpawnController {
 
         return { enemies, loot };
     }
+
+    public createBurgosCastleEncounter(anchor: TilePoint): StarterFieldContent {
+        const seeds: CatalogEnemySeed[] = [
+            { monsterId: BURGOS_BOSS_MONSTER_ID, offset: { x: 0, y: 0 } },
+            { monsterId: BURGOS_GUARD_MONSTER_ID, offset: { x: -2, y: -2 } },
+            { monsterId: BURGOS_GUARD_MONSTER_ID, offset: { x: 2, y: -2 } },
+            { monsterId: BURGOS_GUARD_MONSTER_ID, offset: { x: 2, y: 2 } },
+            { monsterId: BURGOS_GUARD_MONSTER_ID, offset: { x: -2, y: 2 } },
+        ];
+        let guardIndex = 0;
+        const enemies = seeds.map((seed) => {
+            const id = seed.monsterId === BURGOS_BOSS_MONSTER_ID ? 'burgos_boss' : `burgos_guard_${guardIndex++}`;
+            return this.createEnemy(seed, anchor, id);
+        });
+        return { enemies, loot: [] };
+    }
+
+    private createEnemy(seed: EnemySeed, anchor: TilePoint | Player, id: string): FieldEnemy {
+        const anchorTile = 'gridX' in anchor
+            ? { x: anchor.gridX, y: anchor.gridY }
+            : anchor;
+        const tile = this.movement.findNearbyWalkableTile({
+            x: anchorTile.x + seed.offset.x,
+            y: anchorTile.y + seed.offset.y,
+        }, id);
+        const enemy = 'monsterId' in seed
+            ? this.createCatalogEnemy(seed.monsterId, id, tile)
+            : new Enemy(id, tile.x, tile.y, seed.name, seed.level, seed.color, seed.role);
+        if (!('monsterId' in seed)) enemy.aggroRange = seed.aggroRange ?? ENEMY_AGGRO_RANGE;
+        return { enemy, home: tile, path: [] };
+    }
+
+    private createCatalogEnemy(monsterId: MonsterId, id: string, tile: TilePoint): Enemy {
+        const definition = getMonsterDefinition(monsterId);
+        const enemy = new Enemy(id, tile.x, tile.y, definition.name, definition.level, definition.color, definition.role);
+        enemy.aggroRange = definition.aggroRange;
+        enemy.setWalkSprite(
+            `${MONSTER_SPRITE_PATH}/${definition.sprite}`,
+            definition.frameSize,
+            definition.frameSize,
+            definition.frameCount,
+            definition.framesPerSecond,
+            MONSTER_ROW_BY_FACING,
+            definition.renderScale
+        );
+        return enemy;
+    }
+}
+
+if (MORTAL_REALM_ENEMY_SEEDS.length !== GENERAL_MONSTER_IDS.length) {
+    throw new Error('Mortal field monster seed count must match the general monster catalog.');
 }

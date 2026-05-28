@@ -1,9 +1,10 @@
 import { getEffectiveStatsForCharacter, getEffectiveStatsForEnemy, getStatusIcons } from '../../combat/StatusEffects';
 import type { Enemy } from '../../entity/Enemy';
 import type { LootObject } from '../../entity/LootObject';
+import type { Entity } from '../../entity/Entity';
 import { getEnemyRoleLabel } from '../../field/FieldDisplay';
 import type { FieldActor } from '../../field/FieldTypes';
-import type { EntityDisplayInfo } from '../../ui/EntityInfoUI';
+import type { EntityDisplayInfo, EntityDisplaySpriteSheet } from '../../ui/EntityInfoUI';
 
 export interface WorldSelectionContext {
     getPartyActors: () => FieldActor[];
@@ -88,6 +89,7 @@ export class WorldSelectionController {
                 magAtk: stats.magAtk,
                 magDef: stats.magDef,
                 spriteColor: actor.entity.color,
+                spriteSheet: toDisplaySpriteSheet(actor.entity),
                 spriteImage: actor.character.portraitImage,
             };
         }
@@ -112,10 +114,19 @@ export class WorldSelectionController {
                 magAtk: stats.magAtk,
                 magDef: stats.magDef,
                 spriteColor: enemy.color,
+                spriteSheet: toDisplaySpriteSheet(enemy),
                 spriteImage: enemy.image,
             };
         }
 
         return null;
     }
+}
+
+function toDisplaySpriteSheet(entity: Entity): EntityDisplaySpriteSheet | undefined {
+    if (!entity.walkSprite) return undefined;
+    return {
+        ...entity.walkSprite,
+        loaded: entity.walkSpriteLoaded,
+    };
 }

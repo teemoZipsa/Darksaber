@@ -55,6 +55,8 @@ export class WorldInputController {
     }
 
     public process(input: InputManager, camera: Camera): void {
+        if (this.context.minimapUI.handleInput(input)) return;
+
         // Combat log claims wheel/drag inside its region first.
         const canvasSize = this.context.getCanvasSize();
         const logConsumed = CombatLogUI.update(

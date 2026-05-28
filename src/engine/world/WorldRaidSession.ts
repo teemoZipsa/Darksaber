@@ -20,7 +20,9 @@ export class WorldRaidSession {
     public readonly limitSeconds: number;
     public active = false;
     public kills = 0;
+    public activeDungeonId: string | null = null;
     public readonly downedCharacterIds: Set<string> = new Set();
+    public readonly clearedDungeonIds: Set<string> = new Set();
     private pendingTownAfterResultId: string | null = null;
     private lastDepartureBlockTownId: string | null = null;
 
@@ -32,6 +34,7 @@ export class WorldRaidSession {
 
     public enterTown(townId: string): void {
         this.active = false;
+        this.activeDungeonId = null;
         this.currentHubTownId = townId;
     }
 
@@ -40,7 +43,9 @@ export class WorldRaidSession {
         this.elapsedSeconds = 0;
         this.active = true;
         this.kills = 0;
+        this.activeDungeonId = null;
         this.downedCharacterIds.clear();
+        this.clearedDungeonIds.clear();
         this.lastDepartureBlockTownId = null;
         this.pendingTownAfterResultId = null;
     }
@@ -66,11 +71,13 @@ export class WorldRaidSession {
 
     public completeAtTown(townId: string): void {
         this.active = false;
+        this.activeDungeonId = null;
         this.currentHubTownId = townId;
     }
 
     public failBackToTown(townId: string): void {
         this.active = false;
+        this.activeDungeonId = null;
         this.currentHubTownId = townId;
     }
 
@@ -80,6 +87,20 @@ export class WorldRaidSession {
 
     public recordCharacterDown(characterId: string): void {
         this.downedCharacterIds.add(characterId);
+    }
+
+    public startDungeonEncounter(dungeonId: string): void {
+        if (!this.active) return;
+        this.activeDungeonId = dungeonId;
+    }
+
+    public completeDungeonEncounter(dungeonId: string): void {
+        if (this.activeDungeonId === dungeonId) this.activeDungeonId = null;
+        this.clearedDungeonIds.add(dungeonId);
+    }
+
+    public isDungeonCleared(dungeonId: string): boolean {
+        return this.clearedDungeonIds.has(dungeonId);
     }
 
     public clearDepartureBlock(): void {
