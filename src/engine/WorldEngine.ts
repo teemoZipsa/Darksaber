@@ -65,9 +65,11 @@ import { WorldSelectionController } from './world/WorldSelectionController';
 import { WorldFieldSpawnController } from './world/WorldFieldSpawnController';
 import { WorldRenderController } from './world/WorldRenderController';
 import { WorldInputController } from './world/WorldInputController';
+import { HitStop } from './world/HitStop';
 
 export class WorldEngine {
     private canvas: HTMLCanvasElement;
+    private camera: Camera;
     private party: PartyManager;
     private playerData: PlayerData;
     private gameManager: GameManager;
@@ -117,6 +119,7 @@ export class WorldEngine {
         gameManager: GameManager
     ) {
         this.canvas = canvas;
+        this.camera = camera;
         this.party = party;
         this.playerData = playerData;
         this.gameManager = gameManager;
@@ -147,8 +150,16 @@ export class WorldEngine {
             log: (message) => this.addCombatLog(message),
             spawnDamage: (x, y, amount, isCrit, isMiss) => this.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
             spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
-            spawnHitEffect: (x, y, isCrit) => this.effectManager.spawnHitEffect(x, y, isCrit),
-            spawnKillEffect: (enemy) => this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image),
+            spawnHitEffect: (x, y, isCrit) => {
+                this.effectManager.spawnHitEffect(x, y, isCrit);
+                this.applyHitFeel(isCrit);
+            },
+            spawnKillEffect: (enemy) => {
+                this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
+                // A kill is the strongest impact — bigger shake, longer pause.
+                this.camera.shake(16, 320);
+                HitStop.freeze(60);
+            },
             spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
             spawnLoot: (enemy) => this.spawnEnemyLoot(enemy),
             awardExp: (actor, enemy) => this.awardDefeatExp(actor, enemy),
@@ -214,7 +225,10 @@ export class WorldEngine {
                 spawnDamage: (x, y, amount, isCrit, isMiss) => this.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
                 spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
                 spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
-                spawnHitEffect: (x, y) => this.effectManager.spawnHitEffect(x, y),
+                spawnHitEffect: (x, y) => {
+                    this.effectManager.spawnHitEffect(x, y);
+                    this.applyHitFeel(false);
+                },
                 spawnBuffEffect: (x, y) => this.effectManager.spawnBuffEffect(x, y),
                 spawnDebuffEffect: (x, y) => this.effectManager.spawnDebuffEffect(x, y),
                 spawnElementEffect: (element, x, y) => this.effectManager.spawnByElement(element, x, y),
@@ -1131,6 +1145,17 @@ export class WorldEngine {
         this.combatLog.push(message);
         // Keep a generous history so drag-to-scroll can reach further back.
         if (this.combatLog.length > 200) this.combatLog.shift();
+    }
+
+    /** Apply screen-shake + hit-pause for a successful hit. Crit hits are stronger. */
+    private applyHitFeel(isCrit: boolean): void {
+        if (isCrit) {
+            this.camera.shake(14, 280);
+            HitStop.freeze(50);
+        } else {
+            this.camera.shake(6, 180);
+            HitStop.freeze(18);
+        }
     }
 
     private spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void {

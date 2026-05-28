@@ -6,6 +6,8 @@
  */
 
 import { TILE_SIZE } from '../map/Chunk';
+import { UI } from './UITheme';
+import { easeOutBack } from './Tween';
 
 export type FloatingTextType = 'damage' | 'heal' | 'miss' | 'crit' | 'status';
 
@@ -24,12 +26,14 @@ interface FloatingText {
 
 /** Style configuration per text type */
 const STYLE: Record<FloatingTextType, { color: string; outline: string; fontSize: number }> = {
-    damage: { color: '#ff3333', outline: '#440000', fontSize: 16 },
-    crit:   { color: '#ff8800', outline: '#441800', fontSize: 22 },
-    heal:   { color: '#ffdd00', outline: '#443300', fontSize: 16 },
-    miss:   { color: '#ffffff', outline: '#333333', fontSize: 14 },
-    status: { color: '#88ddff', outline: '#0d2633', fontSize: 14 },
+    damage: { color: '#ff3a3a', outline: '#3a0808', fontSize: 18 },
+    crit:   { color: '#ff9020', outline: '#3a1a08', fontSize: 26 },
+    heal:   { color: '#ffd400', outline: '#3a2a08', fontSize: 18 },
+    miss:   { color: '#f0e8d8', outline: '#1a1a1a', fontSize: 15 },
+    status: { color: '#7ddcff', outline: '#0a2030', fontSize: 15 },
 };
+
+const POP_DURATION = 0.18;       // seconds for scale-pop to settle
 
 const LIFETIME = 1.2;       // total duration in seconds
 const FADE_START = 0.3;     // start fading when this much time remains
@@ -119,17 +123,19 @@ export class FloatingTextManager {
                 alpha = Math.max(0, ft.timer / FADE_START);
             }
 
-            // Scale: crit pops in slightly then settles
+            // Scale: ease-out-back pop from 0 → peak → 1.0. Crit pops harder.
+            const age = LIFETIME - ft.timer;
             let scale = 1.0;
-            if (ft.type === 'crit') {
-                const age = LIFETIME - ft.timer;
-                if (age < 0.15) {
-                    scale = 1.0 + 0.4 * (1 - age / 0.15); // 1.4 → 1.0 over 0.15s
-                }
+            if (age < POP_DURATION) {
+                const t = age / POP_DURATION;
+                const eased = easeOutBack(t);
+                const peakOvershoot = ft.type === 'crit' ? 0.55 : 0.25;
+                // easeOutBack peaks just above 1; we map [0..1] eased -> 0 → peak → settle
+                scale = eased * (1 + peakOvershoot * (1 - t));
             }
 
             const fontSize = Math.round(style.fontSize * scale);
-            ctx.font = `bold ${fontSize}px "DOSMyungjo", sans-serif`;
+            ctx.font = `bold ${fontSize}px ${UI.fontPrimary}`;
             ctx.globalAlpha = alpha;
 
             // Outline (stroke) for readability

@@ -22,6 +22,7 @@ import { PartyUI } from '../ui/PartyUI';
 import { CharacterPanelUI } from '../character/CharacterPanelUI';
 import { TransitionManager } from '../ui/TransitionManager';
 import { PauseMenuUI } from '../ui/PauseMenuUI';
+import { HitStop } from './world/HitStop';
 
 export class GameManager {
     private canvas: HTMLCanvasElement;
@@ -151,8 +152,11 @@ export class GameManager {
 
     private loop(timestamp: number): void {
         if (!this.isRunning) return;
-        const dt = Math.min((timestamp - this.lastTime) / 1000, 0.1); // cap dt
+        const rawDt = Math.min((timestamp - this.lastTime) / 1000, 0.1); // cap dt
         this.lastTime = timestamp;
+
+        // Hit-pause freezes world time. Transitions and overlays keep their own clock.
+        const dt = rawDt * HitStop.timeScale;
 
         this.transitions.update(timestamp);
         this.update(dt);
