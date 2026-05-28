@@ -10,13 +10,14 @@ interface CharConfig {
     def: number;
     mag: number;
     imageSrc: string; // path to 128x128 portrait
+    portraitCrop: { x: number; y: number; w: number; h: number };
 }
 
 const CLASSES: CharConfig[] = [
-    { id: 'infantry', labelKey: 'create.fighter', hp: 0.8, atk: 0.7, def: 0.6, mag: 0.2, imageSrc: '/Image/Character/fighter.png' },
-    { id: 'cavalry', labelKey: 'create.knight', hp: 0.9, atk: 0.6, def: 0.9, mag: 0.3, imageSrc: '/Image/Character/knight.png' },
-    { id: 'cleric', labelKey: 'create.cleric', hp: 0.6, atk: 0.3, def: 0.4, mag: 0.7, imageSrc: '/Image/Character/cleric.png' },
-    { id: 'mage', labelKey: 'create.magician', hp: 0.4, atk: 0.3, def: 0.3, mag: 0.9, imageSrc: '/Image/Character/magician.png' },
+    { id: 'infantry', labelKey: 'create.fighter', hp: 0.8, atk: 0.7, def: 0.6, mag: 0.2, imageSrc: '/Image/Character/fighter.png', portraitCrop: { x: 21, y: 4, w: 85, h: 124 } },
+    { id: 'cavalry', labelKey: 'create.knight', hp: 0.9, atk: 0.6, def: 0.9, mag: 0.3, imageSrc: '/Image/Character/knight.png', portraitCrop: { x: 26, y: 5, w: 78, h: 119 } },
+    { id: 'cleric', labelKey: 'create.cleric', hp: 0.6, atk: 0.3, def: 0.4, mag: 0.7, imageSrc: '/Image/Character/cleric.png', portraitCrop: { x: 22, y: 5, w: 83, h: 118 } },
+    { id: 'mage', labelKey: 'create.magician', hp: 0.4, atk: 0.3, def: 0.3, mag: 0.9, imageSrc: '/Image/Character/magician.png', portraitCrop: { x: 24, y: 7, w: 81, h: 115 } },
 ];
 
 export class CharacterCreationUI {
@@ -282,7 +283,7 @@ export class CharacterCreationUI {
 
             // Draw Portrait Image
             if (this.classImagesLoaded[i]) {
-                ctx.drawImage(this.classImages[i], px, py, portraitSize, portraitSize);
+                this.drawClassPortrait(ctx, i, px, py, portraitSize);
             }
 
             // Class Name
@@ -429,5 +430,23 @@ export class CharacterCreationUI {
         // Reset text alignments
         ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
+    }
+
+    private drawClassPortrait(ctx: CanvasRenderingContext2D, index: number, x: number, y: number, size: number): void {
+        const crop = CLASSES[index].portraitCrop;
+        const padding = 6;
+        const targetSize = size - padding * 2;
+        const scale = Math.min(targetSize / crop.w, targetSize / crop.h);
+        const dw = crop.w * scale;
+        const dh = crop.h * scale;
+        const dx = x + (size - dw) / 2;
+        const dy = y + (size - dh) / 2;
+
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(
+            this.classImages[index],
+            crop.x, crop.y, crop.w, crop.h,
+            dx, dy, dw, dh
+        );
     }
 }

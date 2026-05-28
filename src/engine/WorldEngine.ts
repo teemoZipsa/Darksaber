@@ -873,6 +873,10 @@ export class WorldEngine {
 
     private resumeOrEndActiveTurn(actor: FieldActor): void {
         if (actor.id !== this.activeTurnActorId) return;
+        if (actor.character.isDead || actor.character.stats.hp <= 0) {
+            this.endActorTurn(actor, '행동 불능');
+            return;
+        }
         if (this.playerActionController.hasExecutableAction(actor)) {
             this.reopenActionMenu(actor);
             return;
@@ -882,6 +886,7 @@ export class WorldEngine {
 
     private reopenActionMenu(actor: FieldActor): void {
         if (actor.id !== this.activeTurnActorId) return;
+        if (actor.character.isDead || actor.character.stats.hp <= 0) return;
         this.selectionController.selectActor(actor.id);
         this.closeTacticalMenu();
         this.actionMenuUI.open(this.playerActionController.getAvailableTurnActions(actor));
@@ -908,6 +913,7 @@ export class WorldEngine {
     }
 
     private startNextReadyTurn(): void {
+        this.clearInvalidActiveTurn();
         if (this.activeTurnActorId || this.reservedAction) return;
 
         while (this.readyQueue.length > 0) {
@@ -924,6 +930,24 @@ export class WorldEngine {
             this.beginEnemyTurn(enemyEntry);
             if (this.activeTurnActorId) return;
         }
+    }
+
+    private clearInvalidActiveTurn(): void {
+        if (!this.activeTurnActorId) return;
+
+        const activePartyActor = this.partyActors.find((actor) => actor.id === this.activeTurnActorId);
+        if (activePartyActor && !activePartyActor.character.isDead && activePartyActor.character.stats.hp > 0) return;
+
+        const activeEnemy = this.fieldEnemies.find((entry) => entry.enemy.id === this.activeTurnActorId)?.enemy;
+        if (activeEnemy && activeEnemy.stats.hp > 0) return;
+
+        this.activeTurnActorId = null;
+        this.remainingActionPoints = 0;
+        this.reservedAction = null;
+        this.closeActionMenu();
+        this.closeTacticalMenu();
+        this.playerActionController.clearTargeting();
+        this.magicController.reset();
     }
 
     private processActorTurnStartStatuses(actor: FieldActor): boolean {

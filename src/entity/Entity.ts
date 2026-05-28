@@ -28,7 +28,7 @@ export class Entity {
     /** Optional static portrait image (128x128 single illustration) */
     public image?: HTMLImageElement;
     public imageLoaded: boolean = false;
-    /** Optional walking sprite sheet used only while this entity is moving */
+    /** Optional walking sprite sheet. Renderers may also use one frame while idle. */
     public walkSprite?: {
         image: HTMLImageElement;
         frameWidth: number;
@@ -36,6 +36,7 @@ export class Entity {
         frameCount: number;
         framesPerSecond: number;
         rowByFacing: Record<'up' | 'down' | 'left' | 'right', number>;
+        renderScale: number;
     };
     public walkSpriteLoaded: boolean = false;
 
@@ -79,11 +80,12 @@ export class Entity {
         frameHeight: number,
         frameCount: number,
         framesPerSecond: number = 8,
-        rowByFacing: Record<'up' | 'down' | 'left' | 'right', number> = Entity.WALK_ROW_BY_FACING
+        rowByFacing: Record<'up' | 'down' | 'left' | 'right', number> = Entity.WALK_ROW_BY_FACING,
+        renderScale: number = 1
     ): void {
         const image = new Image();
         this.walkSpriteLoaded = false;
-        this.walkSprite = { image, frameWidth, frameHeight, frameCount, framesPerSecond, rowByFacing };
+        this.walkSprite = { image, frameWidth, frameHeight, frameCount, framesPerSecond, rowByFacing, renderScale };
         image.onload = () => { this.walkSpriteLoaded = true; };
         image.onerror = () => {
             this.walkSpriteLoaded = false;

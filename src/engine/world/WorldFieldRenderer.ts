@@ -8,6 +8,8 @@ import type { Entity } from '../../entity/Entity';
 import type { TacticalMarker } from '../../field/TacticalMarkers';
 import type { WorldRenderModel } from './WorldRenderModel';
 
+const PARTY_ACTOR_IMAGE_RENDER_SCALE = 1.12;
+
 export class WorldFieldRenderer {
     public static renderPathPreview(ctx: CanvasRenderingContext2D, model: WorldRenderModel, camX: number, camY: number): void {
         const actor = model.controlledActor;
@@ -102,9 +104,9 @@ export class WorldFieldRenderer {
             const px = entity.pixelX * TILE_SIZE - camX;
             const py = entity.pixelY * TILE_SIZE - camY;
 
-            const walkSpriteRendered = renderWalkSprite(ctx, entity, model.worldTime, px, py);
+            const walkSpriteRendered = renderWalkSprite(ctx, entity, model.worldTime, px, py, { drawIdle: true });
             if (!walkSpriteRendered && entity.image && entity.imageLoaded) {
-                ctx.drawImage(entity.image, px, py, TILE_SIZE, TILE_SIZE);
+                drawScaledTileImage(ctx, entity.image, px, py, PARTY_ACTOR_IMAGE_RENDER_SCALE);
             } else if (!walkSpriteRendered) {
                 ctx.fillStyle = entity.color;
                 ctx.fillRect(px + 5, py + 5, TILE_SIZE - 10, TILE_SIZE - 10);
@@ -138,9 +140,10 @@ export class WorldFieldRenderer {
             const px = enemy.pixelX * TILE_SIZE - camX;
             const py = enemy.pixelY * TILE_SIZE - camY;
 
-            if (enemy.image && enemy.imageLoaded) {
+            const spriteRendered = renderWalkSprite(ctx, enemy, model.worldTime, px, py, { drawIdle: true });
+            if (!spriteRendered && enemy.image && enemy.imageLoaded) {
                 ctx.drawImage(enemy.image, px, py, TILE_SIZE, TILE_SIZE);
-            } else {
+            } else if (!spriteRendered) {
                 ctx.fillStyle = enemy.isAggro ? '#ff4d5e' : enemy.color;
                 ctx.fillRect(px + 7, py + 7, TILE_SIZE - 14, TILE_SIZE - 14);
             }
@@ -272,11 +275,33 @@ export class WorldFieldRenderer {
     }
 }
 
-function renderWalkSprite(ctx: CanvasRenderingContext2D, entity: Entity, worldTime: number, px: number, py: number): boolean {
-    const sprite = entity.walkSprite;
-    if (!sprite || !entity.walkSpriteLoaded || !isEntityMoving(entity)) return false;
+interface WalkSpriteRenderOptions {
+    drawIdle?: boolean;
+    idleFrame?: number;
+}
 
-    const frame = Math.floor(worldTime * sprite.framesPerSecond) % sprite.frameCount;
+function renderWalkSprite(
+    ctx: CanvasRenderingContext2D,
+    entity: Entity,
+    worldTime: number,
+    px: number,
+    py: number,
+    options: WalkSpriteRenderOptions = {}
+): boolean {
+    const sprite = entity.walkSprite;
+    if (!sprite || !entity.walkSpriteLoaded) return false;
+
+    const moving = isEntityMoving(entity);
+    if (!moving && !options.drawIdle) return false;
+
+    const frameCount = Math.max(1, sprite.frameCount);
+    const frame = moving
+        ? Math.floor(worldTime * sprite.framesPerSecond) % frameCount
+        : Math.min(options.idleFrame ?? 1, frameCount - 1);
+    const dw = TILE_SIZE * sprite.renderScale;
+    const dh = TILE_SIZE * sprite.renderScale;
+    const dx = px + (TILE_SIZE - dw) / 2;
+    const dy = py + (TILE_SIZE - dh) / 2;
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(
@@ -285,13 +310,25 @@ function renderWalkSprite(ctx: CanvasRenderingContext2D, entity: Entity, worldTi
         sprite.rowByFacing[entity.facing] * sprite.frameHeight,
         sprite.frameWidth,
         sprite.frameHeight,
-        px,
-        py,
-        TILE_SIZE,
-        TILE_SIZE
+        dx,
+        dy,
+        dw,
+        dh
     );
     ctx.restore();
     return true;
+}
+
+function drawScaledTileImage(
+    ctx: CanvasRenderingContext2D,
+    image: HTMLImageElement,
+    px: number,
+    py: number,
+    scale: number
+): void {
+    const dw = TILE_SIZE * scale;
+    const dh = TILE_SIZE * scale;
+    ctx.drawImage(image, px + (TILE_SIZE - dw) / 2, py + (TILE_SIZE - dh) / 2, dw, dh);
 }
 
 function isEntityMoving(entity: Entity): boolean {
