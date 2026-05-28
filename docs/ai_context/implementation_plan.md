@@ -16,8 +16,8 @@ Transform the current engine into a **Tarkov-inspired Extraction SRPG** set in a
 
 ## Proposed Changes
 
-### 4.1 The Lobby (Hideout / 은신처)
-The Lobby is an HTML/UI-driven state where the player organizes before a raid. It is themed as the player's personal Hideout.
+### 4.1 Town Preparation
+The town state is a canvas UI where the player organizes before a raid.
 - **Stash (창고 시스템)**: A massive grid inventory (e.g., 20x15) where the player stores items safely.
 - **Merchant / Shop**: An NPC interface to sell excess loot and buy basic gear/consumables.
 - **PC Roster System**: Similar to the Pokemon Box, all owned characters are stored here.
@@ -39,9 +39,9 @@ The actual gameplay state using our `GameEngine` and `WorldMap` chunk system.
 - **AP Management**: Running away or fighting costs Action Points. The player must carefully manage AP to survive.
 - **Visibility/Fog of War (Optional step)**: To add tension, players will only see a certain radius or line-of-sight.
 
-### 4.4 Flow Control & Data (`src/engine/GameModeManager.ts`)
-- [NEW] `GameModeManager.ts` / `GameState.ts`: State machine handling `LOBBY` ↔ `RAID`.
-- [NEW] `LobbyUI.ts`: The main menu for the Lobby state, linking the Roster and Shared Backpack.
+### 4.4 Flow Control & Data
+- `GameState.ts`: State machine handling title, character creation, and the unified world.
+- `TownUI.ts`: Town services and deployment flow.
 - [NEW] `LanguageManager.ts`: Stores EN/KO translation dictionaries.
 - [NEW] `ExtractionSystem.ts`: Handles the logic of successful extraction (moving backpack items to Stash) or death (clearing backpack and deleting 1 random equip per char).
 

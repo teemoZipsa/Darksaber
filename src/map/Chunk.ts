@@ -5,7 +5,7 @@
  * Subsequent frames simply blit the buffer to the main canvas.
  */
 
-import { TileType, TILE_PROPERTIES } from './Tile';
+import { TileType } from './Tile';
 import { SettingsManager } from '../engine/SettingsManager';
 import { TileAssetManager } from './TileAssetManager';
 
@@ -172,20 +172,6 @@ export class Chunk {
                     this.bufferCtx, tileType, px, py, TILE_SIZE,
                     n, ne, e, se, s, sw, w, nw
                 );
-            }
-        }
-
-        // ── Pass 5: World_B sprite overlay (objects) ──
-        for (let y = 0; y < CHUNK_SIZE; y++) {
-            for (let x = 0; x < CHUNK_SIZE; x++) {
-                const tileType = this.tiles[y][x];
-                const props = TILE_PROPERTIES[tileType];
-                if (props.worldBIndex !== undefined) {
-                    TileAssetManager.drawWorldBSprite(
-                        this.bufferCtx, props.worldBIndex,
-                        x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE
-                    );
-                }
             }
         }
 

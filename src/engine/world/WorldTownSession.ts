@@ -18,10 +18,12 @@ import {
     type StatusEffect,
 } from '../../combat/StatusEffects';
 
+type WorldTownSessionGameManager = Pick<GameManager, 'inventory' | 'stash'>;
+
 export interface WorldTownSessionOptions {
     party: PartyManager;
     playerData: PlayerData;
-    gameManager: GameManager;
+    gameManager: WorldTownSessionGameManager;
     onDeploy: () => void;
     log: (message: string) => void;
 }
@@ -30,7 +32,7 @@ export class WorldTownSession {
     public readonly ui: TownUI;
     private readonly party: PartyManager;
     private readonly playerData: PlayerData;
-    private readonly gameManager: GameManager;
+    private readonly gameManager: WorldTownSessionGameManager;
     private readonly log: (message: string) => void;
 
     constructor(options: WorldTownSessionOptions) {

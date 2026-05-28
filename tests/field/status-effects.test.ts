@@ -13,6 +13,7 @@ import {
     hasStatus,
     removeRestStatusesFromCarrier,
     resolveTurnStartStatuses,
+    type StatusCarrier,
 } from '../../src/combat/StatusEffects';
 import { advanceAtb } from '../../src/field/FieldCombat';
 import { createBaseStats } from '../../src/data/Stats';
@@ -104,7 +105,7 @@ test('effective stats apply status modifiers through one helper', () => {
 });
 
 test('maxHpUp and maxMpUp adjust current resources on apply and clamp on removal', () => {
-    const carrier = { stats: createBaseStats({ hp: 50, maxHp: 100, mp: 20, maxMp: 50 }) };
+    const carrier: StatusCarrier = { stats: createBaseStats({ hp: 50, maxHp: 100, mp: 20, maxMp: 50 }) };
 
     applyStatusToCarrier(carrier, createStatus('maxHpUp', { sourceType: 'rest', magnitude: 1.1 }));
     applyStatusToCarrier(carrier, createStatus('maxMpUp', { sourceType: 'rest', magnitude: 1.2 }));
@@ -125,7 +126,7 @@ test('maxHpUp and maxMpUp adjust current resources on apply and clamp on removal
 });
 
 test('rest statuses of the same kind replace across menus instead of stacking', () => {
-    const carrier = { stats: createBaseStats({ hp: 100, maxHp: 100 }) };
+    const carrier: StatusCarrier = { stats: createBaseStats({ hp: 100, maxHp: 100 }) };
 
     applyStatusToCarrier(carrier, createStatus('maxHpUp', {
         sourceType: 'rest',
@@ -143,7 +144,7 @@ test('rest statuses of the same kind replace across menus instead of stacking', 
 });
 
 test('replacing a rest menu removes an existing immediate rest effect', () => {
-    const carrier = { stats: createBaseStats({ hp: 100, maxHp: 100, critRate: 0 }) };
+    const carrier: StatusCarrier = { stats: createBaseStats({ hp: 100, maxHp: 100, critRate: 0 }) };
 
     applyStatusToCarrier(carrier, createStatus('maxHpUp', {
         sourceType: 'rest',
@@ -166,7 +167,7 @@ test('replacing a rest menu removes an existing immediate rest effect', () => {
 });
 
 test('injury applies once and lowers max HP by ten percent', () => {
-    const carrier = { stats: createBaseStats({ hp: 100, maxHp: 100 }) };
+    const carrier: StatusCarrier = { stats: createBaseStats({ hp: 100, maxHp: 100 }) };
 
     applyStatusToCarrier(carrier, createStatus('injury', { magnitude: 0.9, sourceType: 'injury' }));
     applyStatusToCarrier(carrier, createStatus('injury', { magnitude: 0.9, sourceType: 'injury' }));
@@ -177,7 +178,7 @@ test('injury applies once and lowers max HP by ten percent', () => {
 });
 
 test('stronger injury keeps the lower max HP magnitude', () => {
-    const carrier = { stats: createBaseStats({ hp: 100, maxHp: 100 }) };
+    const carrier: StatusCarrier = { stats: createBaseStats({ hp: 100, maxHp: 100 }) };
 
     applyStatusToCarrier(carrier, createStatus('injury', { magnitude: 0.9, sourceType: 'injury' }));
     applyStatusToCarrier(carrier, createStatus('injury', { magnitude: 0.8, sourceType: 'injury' }));

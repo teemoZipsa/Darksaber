@@ -46,7 +46,7 @@ export class Character {
     public age: number = 20;
     public gender: string = 'M';
 
-    // Current active status effects, including legacy buff skill effects.
+    // Current active status effects from skills, rests, and injuries.
     public statuses: StatusEffect[] = [];
     
     // Rogue-like raid state

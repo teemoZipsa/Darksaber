@@ -61,10 +61,8 @@
 | [ClassTree.ts](file:///c:/Users/arasoftGJ_01/companyWork/Darksaber/src/data/ClassTree.ts) | Full 10-tier × 9 class + 3 master fusions |
 | [ItemDB.ts](file:///c:/Users/arasoftGJ_01/companyWork/Darksaber/src/data/ItemDB.ts) | 14 items with Tarkov grid sizes |
 | [Character.ts](file:///c:/Users/arasoftGJ_01/companyWork/Darksaber/src/character/Character.ts) | Level/promote/fusion model |
-| [FusionSystem.ts](file:///c:/Users/arasoftGJ_01/companyWork/Darksaber/src/character/FusionSystem.ts) | 3-char merge logic |
 | [GridInventory.ts](file:///c:/Users/arasoftGJ_01/companyWork/Darksaber/src/inventory/GridInventory.ts) | Tarkov 2D grid backpack |
 | [InventoryUI.ts](file:///c:/Users/arasoftGJ_01/companyWork/Darksaber/src/inventory/InventoryUI.ts) | Canvas overlay UI |
-| [TurnManager.ts](file:///c:/Users/arasoftGJ_01/companyWork/Darksaber/src/combat/TurnManager.ts) | AP-based turn queue |
 | [CombatFormulas.ts](file:///c:/Users/arasoftGJ_01/companyWork/Darksaber/src/combat/CombatFormulas.ts) | Damage/hit/crit formulas |
-| [BuffSystem.ts](file:///c:/Users/arasoftGJ_01/companyWork/Darksaber/src/combat/BuffSystem.ts) | 4 core buffs |
+| [StatusEffects.ts](file:///c:/Users/arasoftGJ_01/companyWork/Darksaber/src/combat/StatusEffects.ts) | Active combat status and rest effects |
 | [Enemy.ts](file:///c:/Users/arasoftGJ_01/companyWork/Darksaber/src/entity/Enemy.ts) | Enemy AI |

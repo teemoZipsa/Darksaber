@@ -10,16 +10,14 @@
 
 ### 3.2 Character & Fusion
 - [x] `Character.ts` — full character model with level/promote/fusion
-- [x] `FusionSystem.ts` — 3-char merge logic
 
 ### 3.3 Tarkov-Style Inventory
 - [x] `GridInventory.ts` — 2D grid backpack
 - [x] `InventoryUI.ts` — canvas overlay with equipment slots + tooltips
 
 ### 3.4 Combat System
-- [x] `TurnManager.ts` — AP-based turn queue
 - [x] `CombatFormulas.ts` — damage/hit/crit/magic/heal formulas
-- [x] `BuffSystem.ts` — 어택/프로텍션/퀵/힐 buffs
+- [x] `StatusEffects.ts` — active combat status and rest effect handling
 
 ### 3.5 Enemy AI
 - [x] `Enemy.ts` — aggro + pathfinding AI
@@ -30,8 +28,8 @@
 - [x] Browser verification passed
 - [ ] Git commit & push Phase 3
 
-### 4.1 Lobby System & Roster
-- [x] `LobbyUI.ts` — Main menu / preparation screen (Hideout Theme)
+### 4.1 Town System & Roster
+- [x] `TownUI.ts` — In-world town services and deployment flow
 - [x] `StashInventory.ts` — Huge grid inventory for safe storage
 - [x] PC Roster System (Store unlimited characters)
 - [x] Raid Party System (Max 4 active characters)
@@ -56,7 +54,7 @@
 
 ### 4.4 Multiplayer
 - [x] WebSocket server (`server/index.ts`)
-- [x] NetworkManager client (`src/network/NetworkManager.ts`)
-- [x] Remote player rendering with interpolation
-- [x] Multiplayer lobby connection UI
-- [x] Boss kill sync between players
+- [ ] Client integration
+- [ ] Remote player rendering with interpolation
+- [ ] Multiplayer lobby connection UI
+- [ ] Boss kill sync between players

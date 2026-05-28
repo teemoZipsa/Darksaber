@@ -56,7 +56,7 @@ export class CharacterCreationUI {
             this.classImages.push(img);
         }
 
-        this.bgImage.src = 'public/assets/Start.jpg';
+        this.bgImage.src = '/assets/Start.jpg';
         this.bgImage.onload = () => { this.bgLoaded = true; };
 
         // Create hovering HTML input for Name
