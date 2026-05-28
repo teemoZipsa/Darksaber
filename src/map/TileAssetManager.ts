@@ -86,7 +86,7 @@ const BITMASK_TO_SHAPE: number[] = (() => {
     const diagShapes: [number, number][] = [
         [193,  16], // N+W+NW
         [197,  17], // N+E+W+NW
-        [209,  18], // N+S+W+NW (missing: wait, 209 = 128+64+16+1 = N+S+W+NW)
+        [209,  18], // N+S+W+NW
         [213,  19], // N+E+S+W+NW
         [7,    20], // N+NE+E
         [23,   21], // N+NE+E+S
@@ -100,19 +100,19 @@ const BITMASK_TO_SHAPE: number[] = (() => {
         [113,  29], // N+S+SW+W
         [116,  30], // E+S+SW+W
         [117,  31], // N+E+S+SW+W
-        [199,  32], // N+NE+E+W+NW (missing SE,SW → wait)
+        [199,  32], // N+NE+E+W+NW
         [31,   33], // N+NE+E+SE+S
         [241,  34], // N+S+SW+W+NW
-        [221,  35], // N+E+SE+S+W+NW (missing NE,SW)
-        [95,   36], // N+NE+E+S+SW+W (missing SE,NW)
-        [119,  37], // N+NE+E+S+SW+W (with SE? let me recalc)
-        [220,  38], // E+SE+S+SW+W
+        [221,  35], // N+E+SE+S+W+NW
+        [95,   36], // N+NE+E+SE+S+W
+        [119,  37], // N+NE+E+S+SW+W
+        [220,  38], // E+SE+S+W+NW
         [253,  39], // all except NE
-        [124,  40], // E+SE+S+SW+W+? → 4+8+16+32+64 = 124
+        [124,  40], // E+SE+S+SW+W
         [125,  41], // N+E+SE+S+SW+W = 1+4+8+16+32+64 = 125
         [245,  42], // N+E+S+SW+W+NW = 1+4+16+32+64+128 = 245
         [247,  43], // N+NE+E+S+SW+W+NW = 1+2+4+16+32+64+128 = 247
-        [215,  44], // N+NE+E+W+NW+S = wait... let me recalculate
+        [215,  44], // N+NE+E+S+W+NW
         [252,  45], // E+SE+S+SW+W+NW = 4+8+16+32+64+128 = 252
         [127,  46], // N+NE+E+SE+S+SW+W = 1+2+4+8+16+32+64 = 127
         [255,  47], // all 8 connected
@@ -150,7 +150,7 @@ const BITMASK_TO_SHAPE: number[] = (() => {
         if (w)              canonical |= 64;
         if (nw && n && w)   canonical |= 128;
 
-        stdTable[bits] = stdTable[canonical] || stdTable[bits];
+        if (canonical !== bits) stdTable[bits] = stdTable[canonical];
     }
 
     // Invert: World_A2 convention where shape 0=full, shape 47=isolated

@@ -175,7 +175,7 @@ export class Chunk {
             }
         }
 
-        // ── Pass 3: World_B sprite overlay (objects) ──
+        // ── Pass 5: World_B sprite overlay (objects) ──
         for (let y = 0; y < CHUNK_SIZE; y++) {
             for (let x = 0; x < CHUNK_SIZE; x++) {
                 const tileType = this.tiles[y][x];

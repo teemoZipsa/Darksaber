@@ -95,6 +95,7 @@ const LOWER_IS_STRONGER = new Set<StatusKind>([
     'attackDown',
     'defenseDown',
     'resistDown',
+    'injury',
 ]);
 
 const NEGATIVE_STATUSES = new Set<StatusKind>([
@@ -277,67 +278,89 @@ export function getEffectiveStatsForEnemy(enemy: StatusCarrier): CharacterStats 
 
 export function getEffectiveStats(stats: CharacterStats, statuses: StatusEffect[] | undefined = []): CharacterStats {
     const effective = { ...stats };
+    let atkMultiplier = 1;
+    let defMultiplier = 1;
+    let magDefMultiplier = 1;
+    let spdMultiplier = 1;
+    let hitRateMultiplier = 1;
+    let maxHpMultiplier = 1;
+    let maxMpMultiplier = 1;
+    let hitRatePenalty = 0;
+    let critRateBonus = 0;
+    let evasionBonus = 0;
+    let immobilized = false;
 
     for (const status of statuses) {
         switch (status.kind) {
             case 'slow':
-                effective.spd = Math.max(1, Math.floor(effective.spd * status.magnitude));
+                spdMultiplier *= status.magnitude;
                 break;
             case 'immobilize':
-                effective.mov = 0;
+                immobilized = true;
                 break;
             case 'blind':
-                effective.hitRate = Math.max(1, Math.floor(effective.hitRate * status.magnitude));
+                hitRateMultiplier *= status.magnitude;
                 break;
             case 'attackDown':
-                effective.atk = Math.max(1, Math.floor(effective.atk * status.magnitude));
+                atkMultiplier *= status.magnitude;
                 break;
             case 'defenseDown':
-                effective.def = Math.max(0, Math.floor(effective.def * status.magnitude));
+                defMultiplier *= status.magnitude;
                 break;
             case 'resistDown':
-                effective.magDef = Math.max(0, Math.floor(effective.magDef * status.magnitude));
+                magDefMultiplier *= status.magnitude;
                 break;
             case 'attackUp':
-                effective.atk = Math.max(1, Math.floor(effective.atk * status.magnitude));
+                atkMultiplier *= status.magnitude;
                 break;
             case 'defenseUp':
-                effective.def = Math.max(0, Math.floor(effective.def * status.magnitude));
+                defMultiplier *= status.magnitude;
                 break;
             case 'speedUp':
-                effective.spd = Math.max(1, Math.floor(effective.spd * status.magnitude));
+                spdMultiplier *= status.magnitude;
                 break;
             case 'resistUp':
-                effective.magDef = Math.max(0, Math.floor(effective.magDef * status.magnitude));
+                magDefMultiplier *= status.magnitude;
                 break;
             case 'allUp':
-                effective.atk = Math.max(1, Math.floor(effective.atk * status.magnitude));
-                effective.def = Math.max(0, Math.floor(effective.def * status.magnitude));
-                effective.spd = Math.max(1, Math.floor(effective.spd * status.magnitude));
-                effective.magDef = Math.max(0, Math.floor(effective.magDef * status.magnitude));
+                atkMultiplier *= status.magnitude;
+                defMultiplier *= status.magnitude;
+                spdMultiplier *= status.magnitude;
+                magDefMultiplier *= status.magnitude;
                 break;
             case 'maxHpUp':
-                effective.maxHp = Math.max(1, Math.floor(effective.maxHp * status.magnitude));
+                maxHpMultiplier *= status.magnitude;
                 break;
             case 'maxMpUp':
-                effective.maxMp = Math.max(0, Math.floor(effective.maxMp * status.magnitude));
+                maxMpMultiplier *= status.magnitude;
                 break;
             case 'critUp':
-                effective.critRate = Math.max(0, effective.critRate + status.magnitude);
+                critRateBonus += status.magnitude;
                 break;
             case 'evasionUp':
-                effective.evasion = Math.max(0, effective.evasion + status.magnitude);
+                evasionBonus += status.magnitude;
                 break;
             case 'hitDown':
-                effective.hitRate = Math.max(1, effective.hitRate - status.magnitude);
+                hitRatePenalty += status.magnitude;
                 break;
             case 'damageTakenDown':
                 break;
             case 'injury':
-                effective.maxHp = Math.max(1, Math.floor(effective.maxHp * status.magnitude));
+                maxHpMultiplier *= status.magnitude;
                 break;
         }
     }
+
+    effective.atk = Math.max(1, Math.floor(stats.atk * atkMultiplier));
+    effective.def = Math.max(0, Math.floor(stats.def * defMultiplier));
+    effective.magDef = Math.max(0, Math.floor(stats.magDef * magDefMultiplier));
+    effective.spd = Math.max(1, Math.floor(stats.spd * spdMultiplier));
+    effective.hitRate = Math.max(1, Math.floor(stats.hitRate * hitRateMultiplier) - hitRatePenalty);
+    effective.maxHp = Math.max(1, Math.floor(stats.maxHp * maxHpMultiplier));
+    effective.maxMp = Math.max(0, Math.floor(stats.maxMp * maxMpMultiplier));
+    effective.critRate = Math.max(0, stats.critRate + critRateBonus);
+    effective.evasion = Math.max(0, stats.evasion + evasionBonus);
+    if (immobilized) effective.mov = 0;
 
     return effective;
 }
@@ -391,7 +414,7 @@ function isSameStatusSlot(current: StatusEffect, next: StatusEffect): boolean {
     if (current.kind !== next.kind) return false;
     if (current.kind === 'injury' || next.kind === 'injury') return true;
     if (current.sourceType === 'rest' || next.sourceType === 'rest') {
-        return current.sourceType === next.sourceType && current.sourceRestMenuId === next.sourceRestMenuId;
+        return current.sourceType === next.sourceType;
     }
     return true;
 }

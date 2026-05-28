@@ -1,6 +1,8 @@
 /**
  * BuffSystem — 4 core buffs from Dark Saver:
  * 어택 (Attack Up), 프로텍션 (Defense Up), 퀵 (AP Cost Down), 힐 (HP Restore)
+ *
+ * @deprecated Field combat now uses StatusEffects as the single active buff/stat path.
  */
 
 import { CharacterStats } from '../data/Stats';
@@ -46,7 +48,7 @@ export class BuffSystem {
                     buffed.def += buff.value;
                     break;
                 case 'quick':
-                    // Quick reduces AP cost — handled in TurnManager
+                    // Legacy-only marker; current Quick skills apply StatusEffects.speedUp.
                     break;
                 case 'heal':
                     // Heal is instant, not a persistent buff

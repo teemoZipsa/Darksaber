@@ -426,6 +426,10 @@ export class WorldMap {
     }
 
     public getTileAt(tx: number, ty: number): TileType {
+        const { chunkX, chunkY, localX, localY } = this.tileToChunk(tx, ty);
+        const chunk = this.chunks.get(this.chunkKey(chunkX, chunkY));
+        if (chunk) return chunk.getTile(localX, localY);
+
         return this.computeTileAt(tx, ty);
     }
 

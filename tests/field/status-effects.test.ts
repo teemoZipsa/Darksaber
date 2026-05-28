@@ -124,6 +124,24 @@ test('maxHpUp and maxMpUp adjust current resources on apply and clamp on removal
     assert.equal(carrier.stats.mp, 50);
 });
 
+test('rest statuses of the same kind replace across menus instead of stacking', () => {
+    const carrier = { stats: createBaseStats({ hp: 100, maxHp: 100 }) };
+
+    applyStatusToCarrier(carrier, createStatus('maxHpUp', {
+        sourceType: 'rest',
+        sourceRestMenuId: 'hearty_breakfast',
+        magnitude: 1.1,
+    }));
+    applyStatusToCarrier(carrier, createStatus('maxHpUp', {
+        sourceType: 'rest',
+        sourceRestMenuId: 'shield_stew',
+        magnitude: 1.1,
+    }));
+
+    assert.equal(carrier.statuses?.filter((status) => status.kind === 'maxHpUp').length, 1);
+    assert.equal(getEffectiveStats(carrier.stats, carrier.statuses).maxHp, 110);
+});
+
 test('replacing a rest menu removes an existing immediate rest effect', () => {
     const carrier = { stats: createBaseStats({ hp: 100, maxHp: 100, critRate: 0 }) };
 
@@ -156,6 +174,32 @@ test('injury applies once and lowers max HP by ten percent', () => {
     assert.equal(carrier.statuses?.filter((status) => status.kind === 'injury').length, 1);
     assert.equal(getEffectiveStats(carrier.stats, carrier.statuses).maxHp, 90);
     assert.equal(carrier.stats.hp, 90);
+});
+
+test('stronger injury keeps the lower max HP magnitude', () => {
+    const carrier = { stats: createBaseStats({ hp: 100, maxHp: 100 }) };
+
+    applyStatusToCarrier(carrier, createStatus('injury', { magnitude: 0.9, sourceType: 'injury' }));
+    applyStatusToCarrier(carrier, createStatus('injury', { magnitude: 0.8, sourceType: 'injury' }));
+
+    assert.equal(carrier.statuses?.[0].magnitude, 0.8);
+    assert.equal(getEffectiveStats(carrier.stats, carrier.statuses).maxHp, 80);
+    assert.equal(carrier.stats.hp, 80);
+});
+
+test('multiplicative stat statuses are order independent', () => {
+    const stats = createBaseStats({ atk: 7, def: 7, spd: 7, magDef: 7 });
+    const upThenDown = getEffectiveStats(stats, [
+        createStatus('attackUp', { magnitude: 1.2 }),
+        createStatus('attackDown', { magnitude: 0.7 }),
+    ]);
+    const downThenUp = getEffectiveStats(stats, [
+        createStatus('attackDown', { magnitude: 0.7 }),
+        createStatus('attackUp', { magnitude: 1.2 }),
+    ]);
+
+    assert.equal(upThenDown.atk, 5);
+    assert.equal(downThenUp.atk, 5);
 });
 
 test('rest combat modifiers affect effective stats and incoming damage', () => {
