@@ -9,13 +9,19 @@ import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
 import { LootObject } from '../entity/LootObject';
 import { PartyManager } from '../character/PartyManager';
-import type { Character } from '../character/Character';
-import type { GridInventory } from '../inventory/GridInventory';
+import { Character } from '../character/Character';
+import { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
 import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
 import { getClassAttackProfile } from '../data/AttackPatternProfiles';
-import { BURGOS_CASTLE_DUNGEON_ID } from '../data/MonsterCatalog';
+import {
+    BURGOS_CASTLE_DUNGEON_ID,
+    MONSTER_ROW_BY_FACING,
+    MONSTER_SPRITE_PATH,
+    getMonsterDefinition,
+    type MonsterId,
+} from '../data/MonsterCatalog';
 import {
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
@@ -67,6 +73,17 @@ import { WorldFieldSpawnController } from './world/WorldFieldSpawnController';
 import { WorldRenderController } from './world/WorldRenderController';
 import { WorldInputController } from './world/WorldInputController';
 import { HitStop } from './world/HitStop';
+import { NetworkRaidClient } from '../net/NetworkRaidClient';
+import {
+    DEFAULT_WORLD_SERVER_URL,
+    type ActorSnapshot,
+    type CombatEventMessage,
+    type GridSnapshot,
+    type LootGrantMessage,
+    type LootSnapshot,
+    type RaidResultMessage,
+    type WorldSnapshot,
+} from '../net/WorldProtocol';
 
 export class WorldEngine {
     private canvas: HTMLCanvasElement;
@@ -78,6 +95,11 @@ export class WorldEngine {
     private player: Player;
     private partyActors: FieldActor[] = [];
     private fieldEnemies: FieldEnemy[] = [];
+    private remotePartyActors: Map<string, FieldActor> = new Map();
+    private networkRaidClient: NetworkRaidClient | null = null;
+    private isNetworkRaid = false;
+    private isNetworkRaidConnecting = false;
+    private networkPlayerId: string | null = null;
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
     private fusionTempleUI = new FusionTempleUI();
@@ -257,6 +279,8 @@ export class WorldEngine {
                 isEntityMoving: (entity) => this.isEntityMoving(entity),
                 isFieldPassable: (query) => this.movementController.isFieldPassable(query),
                 spendAp: (cost) => this.spendAp(cost),
+                submitMoveIntent: (actor, tile, path, apCost, pathCost) =>
+                    this.submitNetworkMoveIntent(actor, tile, path, apCost, pathCost),
                 tryActorAttack: (actor, enemy) => this.tryActorAttack(actor, enemy),
                 openLoot: (loot) => this.openLoot(loot),
                 openMagic: (actor) => this.magicController.open(actor),
@@ -362,6 +386,10 @@ export class WorldEngine {
             getCombatLog: () => this.combatLog,
             onUnhandledEscape: () => this.gameManager.openPauseMenu(),
         });
+        this.gameManager.inventoryUI.onRaidLootSecured = (_placed, source) => {
+            if (!this.isNetworkRaid || !this.networkRaidClient || !source || !this.selectionController.lootId) return;
+            this.networkRaidClient.sendLootPickup(this.selectionController.lootId, source.gridX, source.gridY);
+        };
 
         this.spawnPartyAtCurrentHub();
         this.player = this.getControlledActor()?.entity ?? new Player(0, 0);
@@ -395,6 +423,11 @@ export class WorldEngine {
             this.townSession.updateInput(input);
             camera.followTile(this.player.gridX, this.player.gridY);
             camera.update(dt);
+            return;
+        }
+
+        if (this.isNetworkRaid) {
+            this.updateNetworkRaid(dt, input, camera);
             return;
         }
 
@@ -460,27 +493,55 @@ export class WorldEngine {
     }
 
     private openTown(town: TownInfo): void {
+        if (this.isNetworkRaid) {
+            this.closeNetworkRaidClient(false);
+            this.isNetworkRaid = false;
+            this.networkPlayerId = null;
+        }
         this.closeFieldOverlays();
         this.currentPhase = 'town';
         this.raidSession.enterTown(town.id);
         this.townSession.show(town);
     }
 
-    private beginRaidFromCurrentHub(): void {
+    private async beginRaidFromCurrentHub(): Promise<void> {
+        if (this.isNetworkRaidConnecting) return;
         const town = this.getCurrentHubTown();
-        this.currentPhase = 'raid';
-        this.raidSession.beginRaidFromTown(town.id);
-        this.dismissedDungeonVisitKey = null;
-        this.party.resetForNewRaid();
-        this.townSession.applyPendingRestForRaidStart();
-        this.placePartyNear(this.worldMap.getTownExitTile(town));
-        this.player = this.getControlledActor()?.entity ?? this.player;
-        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-        this.fieldEnemies = [];
-        this.worldMap.loot = [];
-        this.spawnStarterFieldContent();
-        this.clearFieldTurnState();
-        this.addCombatLog(`${town.nameKr}에서 출격. 다른 마을로 생환하세요.`);
+        this.isNetworkRaidConnecting = true;
+        this.addCombatLog('월드 서버 접속 중...');
+
+        try {
+            this.closeNetworkRaidClient(false);
+            this.networkRaidClient = this.createNetworkRaidClient();
+            const welcome = await this.networkRaidClient.connectAndJoin({
+                originHubId: town.id,
+                partyComposition: this.createPartyCompositionSnapshot(town),
+            });
+
+            this.networkPlayerId = welcome.playerId;
+            this.isNetworkRaid = true;
+            this.currentPhase = 'raid';
+            this.raidSession.beginRaidFromTown(town.id);
+            this.dismissedDungeonVisitKey = null;
+            this.party.resetForNewRaid();
+            this.townSession.applyPendingRestForRaidStart();
+            this.placePartyNear(welcome.spawnTile);
+            this.player = this.getControlledActor()?.entity ?? this.player;
+            this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
+            this.fieldEnemies = [];
+            this.worldMap.loot = [];
+            this.clearFieldTurnState();
+            this.addCombatLog(`${town.nameKr}에서 네트워크 월드로 출격.`);
+        } catch (error) {
+            this.isNetworkRaid = false;
+            this.networkPlayerId = null;
+            this.closeNetworkRaidClient(false);
+            this.currentPhase = 'town';
+            this.openTown(town);
+            this.addCombatLog(`월드 서버 접속 실패: ${error instanceof Error ? error.message : 'unknown error'}`);
+        } finally {
+            this.isNetworkRaidConnecting = false;
+        }
     }
 
     private closeFieldOverlays(): void {
@@ -520,6 +581,284 @@ export class WorldEngine {
         });
         this.fieldEnemies = content.enemies;
         this.worldMap.loot = content.loot;
+    }
+
+    private createNetworkRaidClient(): NetworkRaidClient {
+        return new NetworkRaidClient({
+            url: DEFAULT_WORLD_SERVER_URL,
+            onSnapshot: (snapshot) => this.applyNetworkSnapshot(snapshot),
+            onCombatEvent: (event) => this.handleNetworkCombatEvent(event),
+            onLootGrant: (grant) => this.openNetworkLoot(grant),
+            onRaidResult: (result) => this.handleNetworkRaidResult(result),
+            onActionRejected: (rejection) => this.addCombatLog(`서버 거부: ${rejection.reason}`),
+            onErrorMessage: (error) => this.addCombatLog(`서버 오류(${error.code}): ${error.message}`),
+            onGraceExpired: () => this.handleNetworkGraceExpired(),
+        });
+    }
+
+    private createPartyCompositionSnapshot(town: TownInfo): ActorSnapshot[] {
+        const exit = this.worldMap.getTownExitTile(town);
+        return this.party.getCharacters().slice(0, this.party.MAX_ACTIVE_PARTY_SIZE).map((character, index) => ({
+            id: character.id,
+            localActorId: character.id,
+            name: character.name,
+            classLineId: character.classLineId,
+            level: character.level,
+            tile: {
+                x: exit.x + (index === 2 ? 1 : 0),
+                y: exit.y + (index === 1 ? 1 : 0),
+            },
+            stats: { ...character.stats },
+            statuses: character.statuses.map((status) => ({ ...status })),
+            actionGauge: 0,
+            remainingAp: 0,
+            facing: 'down',
+            isDead: character.isDead,
+        }));
+    }
+
+    private updateNetworkRaid(dt: number, input: InputManager, camera: Camera): void {
+        this.inputController.process(input, camera);
+        for (const actor of this.partyActors) actor.entity.update(dt);
+        for (const entry of this.fieldEnemies) entry.enemy.update(dt);
+        this.effectManager.update(dt);
+        this.floatingText.update(dt);
+        this.updateAttackCues(dt);
+        this.refreshLootState();
+
+        const controlled = this.getControlledActor();
+        if (controlled) this.player = controlled.entity;
+        camera.followTile(this.player.gridX, this.player.gridY);
+        camera.update(dt);
+    }
+
+    private applyNetworkSnapshot(snapshot: WorldSnapshot): void {
+        this.raidSession.elapsedSeconds = snapshot.raidTimer.elapsedSeconds;
+        const ownSnapshots = snapshot.partyActors.filter((actor) => actor.ownerPlayerId === this.networkPlayerId);
+        const remoteSnapshots = snapshot.partyActors.filter((actor) => actor.ownerPlayerId !== this.networkPlayerId);
+        const previousActors = this.partyActors;
+        const localCharacters = this.party.getCharacters();
+        const ownByLocalId = new Map(ownSnapshots.map((actor) => [actor.localActorId ?? actor.id, actor]));
+        const nextLocalActors: FieldActor[] = [];
+
+        for (const character of localCharacters) {
+            const actorSnapshot = ownByLocalId.get(character.id);
+            const existing = previousActors.find((actor) => actor.character === character);
+            if (!actorSnapshot) {
+                if (existing) nextLocalActors.push(existing);
+                continue;
+            }
+            const actor = existing ?? {
+                id: actorSnapshot.id,
+                character,
+                entity: new Player(actorSnapshot.tile.x, actorSnapshot.tile.y),
+                path: [],
+                queuedIntent: null,
+            };
+            this.applyActorSnapshot(actor, actorSnapshot);
+            nextLocalActors.push(actor);
+        }
+
+        const nextRemoteActors: FieldActor[] = [];
+        const seenRemoteIds = new Set<string>();
+        for (const actorSnapshot of remoteSnapshots) {
+            seenRemoteIds.add(actorSnapshot.id);
+            let actor = this.remotePartyActors.get(actorSnapshot.id);
+            if (!actor) {
+                const character = new Character(
+                    actorSnapshot.localActorId ?? actorSnapshot.id,
+                    actorSnapshot.name,
+                    actorSnapshot.classLineId
+                );
+                actor = {
+                    id: actorSnapshot.id,
+                    character,
+                    entity: new Player(actorSnapshot.tile.x, actorSnapshot.tile.y),
+                    path: [],
+                    queuedIntent: null,
+                };
+                this.remotePartyActors.set(actorSnapshot.id, actor);
+            }
+            this.applyActorSnapshot(actor, actorSnapshot);
+            nextRemoteActors.push(actor);
+        }
+        for (const actorId of [...this.remotePartyActors.keys()]) {
+            if (!seenRemoteIds.has(actorId)) this.remotePartyActors.delete(actorId);
+        }
+
+        this.partyActors = [...nextLocalActors, ...nextRemoteActors];
+        this.fieldEnemies = snapshot.enemies.map((enemySnapshot) => {
+            const existing = this.fieldEnemies.find((entry) => entry.enemy.id === enemySnapshot.id)?.enemy;
+            const enemy = existing ?? new Enemy(
+                enemySnapshot.id,
+                enemySnapshot.tile.x,
+                enemySnapshot.tile.y,
+                enemySnapshot.name,
+                enemySnapshot.level,
+                enemySnapshot.color,
+                enemySnapshot.role
+            );
+            enemy.gridX = enemySnapshot.tile.x;
+            enemy.gridY = enemySnapshot.tile.y;
+            enemy.stats = { ...enemySnapshot.stats };
+            enemy.statuses = enemySnapshot.statuses.map((status) => ({ ...status }));
+            enemy.actionGauge = enemySnapshot.actionGauge;
+            enemy.facing = enemySnapshot.facing;
+            enemy.isAggro = enemySnapshot.isAggro;
+            enemy.isBoss = enemySnapshot.isBoss;
+            enemy.color = enemySnapshot.color;
+            enemy.name = enemySnapshot.name;
+            if (enemySnapshot.monsterId && !enemy.walkSprite) this.applyMonsterSprite(enemy, enemySnapshot.monsterId);
+            return {
+                enemy,
+                home: { ...enemySnapshot.home },
+                path: [],
+            };
+        });
+        this.worldMap.loot = snapshot.loot.map((lootSnapshot) => this.createLootFromSnapshot(lootSnapshot));
+
+        const controlled = this.getControlledActor();
+        const ownReady = snapshot.readyActors.filter((actorId) => ownSnapshots.some((actor) => actor.id === actorId));
+        this.activeTurnActorId = controlled && ownReady.includes(controlled.id)
+            ? controlled.id
+            : ownReady[0] ?? null;
+        this.remainingActionPoints = this.activeTurnActorId
+            ? snapshot.remainingApByActor[this.activeTurnActorId] ?? 0
+            : 0;
+        if (controlled) {
+            this.player = controlled.entity;
+            if (!this.selectionController.hasSelection()) this.selectionController.selectActor(controlled.id);
+        }
+    }
+
+    private applyActorSnapshot(actor: FieldActor, snapshot: ActorSnapshot): void {
+        actor.id = snapshot.id;
+        actor.character.stats = { ...snapshot.stats };
+        actor.character.statuses = snapshot.statuses.map((status) => ({ ...status }));
+        actor.character.isDead = snapshot.isDead;
+        actor.character.level = snapshot.level;
+        actor.entity.gridX = snapshot.tile.x;
+        actor.entity.gridY = snapshot.tile.y;
+        actor.entity.actionGauge = snapshot.actionGauge;
+        actor.entity.facing = snapshot.facing;
+        actor.entity.label = snapshot.name;
+        actor.path = [];
+        actor.queuedIntent = null;
+    }
+
+    private applyMonsterSprite(enemy: Enemy, monsterId: string): void {
+        try {
+            const definition = getMonsterDefinition(monsterId as MonsterId);
+            enemy.setWalkSprite(
+                `${MONSTER_SPRITE_PATH}/${definition.sprite}`,
+                definition.frameSize,
+                definition.frameSize,
+                definition.frameCount,
+                definition.framesPerSecond,
+                MONSTER_ROW_BY_FACING,
+                definition.renderScale
+            );
+        } catch {
+            // Snapshot can still render with the fallback colored glyph.
+        }
+    }
+
+    private createLootFromSnapshot(snapshot: LootSnapshot): LootObject {
+        const loot = new LootObject(snapshot.id, snapshot.tile.x, snapshot.tile.y, [], {
+            sourceLabel: snapshot.sourceLabel,
+            kind: snapshot.kind,
+            gridW: snapshot.gridSnapshot.width,
+            gridH: snapshot.gridSnapshot.height,
+        });
+        loot.inventory = this.gridFromSnapshot(snapshot.gridSnapshot);
+        loot.opened = snapshot.opened;
+        return loot;
+    }
+
+    private gridFromSnapshot(snapshot: GridSnapshot): GridInventory {
+        const grid = new GridInventory(snapshot.width, snapshot.height);
+        for (const itemSnapshot of snapshot.items) {
+            const item = getItemDef(itemSnapshot.itemId);
+            if (!item) continue;
+            const placed = grid.place(item, itemSnapshot.gridX, itemSnapshot.gridY);
+            if (!placed) continue;
+            placed.durability = itemSnapshot.durability;
+            placed.quantity = itemSnapshot.quantity;
+            placed.acquiredInRaid = itemSnapshot.acquiredInRaid;
+            placed.sockets = itemSnapshot.sockets?.flatMap((itemId) => {
+                const socket = getItemDef(itemId);
+                return socket ? [socket] : [];
+            });
+        }
+        return grid;
+    }
+
+    private openNetworkLoot(grant: LootGrantMessage): void {
+        const grid = this.gridFromSnapshot(grant.gridSnapshot);
+        this.gameManager.inventoryUI.setExternalGrid(grid, `전리품 ${grant.lootId}`, { isRaidLoot: true });
+        if (!this.gameManager.inventoryUI.isVisible()) this.gameManager.inventoryUI.toggle();
+        this.selectionController.selectLoot(grant.lootId);
+    }
+
+    private handleNetworkCombatEvent(event: CombatEventMessage): void {
+        const targetEnemy = this.getEnemyById(event.targetId);
+        const targetActor = this.partyActors.find((actor) => actor.id === event.targetId);
+        const sourceActor = this.partyActors.find((actor) => actor.id === event.sourceId);
+        const sourceEnemy = this.getEnemyById(event.sourceId);
+
+        if (targetEnemy) {
+            if (event.kind === 'kill') this.effectManager.spawnKillEffect(targetEnemy.gridX, targetEnemy.gridY, targetEnemy.color, targetEnemy.expReward, targetEnemy.image);
+            else this.floatingText.spawnDamage(targetEnemy.gridX, targetEnemy.gridY, event.value ?? 0, false, event.kind === 'miss');
+        }
+        if (targetActor) {
+            this.floatingText.spawnDamage(targetActor.entity.gridX, targetActor.entity.gridY, event.value ?? 0, false, event.kind === 'miss');
+            if (event.kind === 'down') this.floatingText.spawnStatus(targetActor.entity.gridX, targetActor.entity.gridY, 'DOWN');
+        }
+        if (sourceActor && targetEnemy) this.spawnAttackCue(this.actorTile(sourceActor), this.enemyTile(targetEnemy), '#72e8ff');
+        if (sourceEnemy && targetActor) this.spawnAttackCue(this.enemyTile(sourceEnemy), this.actorTile(targetActor), '#ff8a55');
+        this.addCombatLog(this.formatNetworkCombatEvent(event));
+    }
+
+    private formatNetworkCombatEvent(event: CombatEventMessage): string {
+        if (event.kind === 'miss') return `${event.sourceId} → ${event.targetId} 빗나감`;
+        if (event.kind === 'kill') return `${event.sourceId} → ${event.targetId} 처치`;
+        if (event.kind === 'down') return `${event.sourceId} → ${event.targetId} 행동 불능`;
+        if (event.kind === 'status') return `${event.sourceId} → ${event.targetId} 상태 변화`;
+        return `${event.sourceId} → ${event.targetId} ${event.value ?? 0} 피해`;
+    }
+
+    private handleNetworkRaidResult(result: RaidResultMessage): void {
+        if (result.playerId !== this.networkPlayerId) return;
+        this.closeNetworkRaidClient(false);
+        this.isNetworkRaid = false;
+        this.networkPlayerId = null;
+        this.raidSession.elapsedSeconds = result.elapsedSeconds;
+        this.raidSession.kills = result.kills;
+        if (result.result === 'SURVIVED') {
+            const town = this.getTownById(result.extractionTownId) ?? this.getCurrentHubTown();
+            this.raidOutcomeController.completeSuccess(town);
+        } else if (result.result === 'DEAD' || result.result === 'MIA') {
+            this.raidOutcomeController.completeFailure(result.result);
+        } else {
+            this.raidSession.failBackToTown(this.raidSession.currentHubTownId);
+            this.openTown(this.getCurrentHubTown());
+        }
+    }
+
+    private handleNetworkGraceExpired(): void {
+        if (!this.isNetworkRaid || !this.raidSession.active) return;
+        this.addCombatLog('월드 서버 재접속 시간이 초과되었습니다.');
+        this.closeNetworkRaidClient(false);
+        this.isNetworkRaid = false;
+        this.networkPlayerId = null;
+        this.raidOutcomeController.completeFailure('MIA');
+    }
+
+    private closeNetworkRaidClient(sendLeave: boolean, reason: 'town' | 'wipe' | 'manual' = 'manual'): void {
+        if (!this.networkRaidClient) return;
+        if (sendLeave) this.networkRaidClient.leave(reason);
+        else this.networkRaidClient.close();
+        this.networkRaidClient = null;
     }
 
     private checkTempleArrival(): void {
@@ -773,7 +1112,18 @@ export class WorldEngine {
         this.worldMap.loot.push(loot);
     }
 
+    private submitNetworkMoveIntent(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean {
+        if (!this.isNetworkRaid || !this.networkRaidClient) return false;
+        this.networkRaidClient.sendIntent(actor.id, 'move', { tile, path, apCost, pathCost });
+        return true;
+    }
+
     private tryActorAttack(actor: FieldActor, enemy: Enemy): boolean {
+        if (this.isNetworkRaid) {
+            if (!this.networkRaidClient) return false;
+            this.networkRaidClient.sendIntent(actor.id, 'attack', { targetId: enemy.id });
+            return true;
+        }
         if (!this.canActorAttackTarget(actor, enemy)) return false;
         const profile = this.getActorAttackProfile(actor);
         const targetEnemies = this.getAttackPatternTargetEnemies(actor, enemy);
@@ -871,6 +1221,12 @@ export class WorldEngine {
     }
 
     private openLoot(loot: LootObject): void {
+        if (this.isNetworkRaid) {
+            this.selectionController.selectLoot(loot.id);
+            this.addCombatLog(`${loot.sourceLabel} 서버 점유 요청.`);
+            this.networkRaidClient?.sendIntent(this.requireControlledActor().id, 'interact', { lootId: loot.id });
+            return;
+        }
         this.selectionController.selectLoot(loot.id);
         this.addCombatLog(`${loot.sourceLabel} 검색 중.`);
         this.clearControlledPath();
@@ -974,6 +1330,9 @@ export class WorldEngine {
     }
 
     private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = 0): void {
+        if (this.isNetworkRaid && this.networkRaidClient && actor.id === this.activeTurnActorId) {
+            this.networkRaidClient.sendIntent(actor.id, 'endTurn', { reason });
+        }
         actor.entity.actionGauge = atbCarryover;
         this.activeTurnActorId = null;
         this.remainingActionPoints = 0;

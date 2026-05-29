@@ -1,0 +1,205 @@
+import type { StatusEffect } from '../combat/StatusEffects';
+import type { CharacterStats } from '../data/Stats';
+import type { EnemyRole } from '../field/EnemyAI';
+
+export const DEFAULT_WORLD_SERVER_URL = 'ws://localhost:8765';
+export const WORLD_PROTOCOL_VERSION = 'world-pve-v1';
+
+export interface NetTilePoint {
+    x: number;
+    y: number;
+}
+
+export type NetFacing = 'up' | 'down' | 'left' | 'right';
+
+export interface GridItemSnapshot {
+    itemId: string;
+    gridX: number;
+    gridY: number;
+    durability: number;
+    quantity: number;
+    acquiredInRaid?: boolean;
+    sockets?: string[];
+}
+
+export interface GridSnapshot {
+    width: number;
+    height: number;
+    items: GridItemSnapshot[];
+}
+
+export interface ActorSnapshot {
+    id: string;
+    ownerPlayerId?: string;
+    localActorId?: string;
+    name: string;
+    classLineId: string;
+    level: number;
+    tile: NetTilePoint;
+    stats: CharacterStats;
+    statuses: StatusEffect[];
+    actionGauge: number;
+    remainingAp: number;
+    facing: NetFacing;
+    isDead: boolean;
+    isGhost?: boolean;
+}
+
+export interface EnemySnapshot {
+    id: string;
+    monsterId?: string;
+    name: string;
+    role: EnemyRole;
+    level: number;
+    color: string;
+    tile: NetTilePoint;
+    home: NetTilePoint;
+    stats: CharacterStats;
+    statuses: StatusEffect[];
+    actionGauge: number;
+    facing: NetFacing;
+    isAggro: boolean;
+    isBoss: boolean;
+}
+
+export interface LootSnapshot {
+    id: string;
+    tile: NetTilePoint;
+    sourceLabel: string;
+    kind: 'chest' | 'corpse';
+    opened: boolean;
+    lockedByPlayerId?: string;
+    gridSnapshot: GridSnapshot;
+}
+
+export interface WorldPlayerSnapshot {
+    playerId: string;
+    originHubId: string;
+    isGhost: boolean;
+    actorIds: string[];
+}
+
+export interface RaidTimerSnapshot {
+    active: boolean;
+    elapsedSeconds: number;
+    limitSeconds: number;
+    departureTownId: string;
+}
+
+export interface WorldSnapshot {
+    seq: number;
+    serverTime: number;
+    players: WorldPlayerSnapshot[];
+    partyActors: ActorSnapshot[];
+    enemies: EnemySnapshot[];
+    loot: LootSnapshot[];
+    readyActors: string[];
+    remainingApByActor: Record<string, number>;
+    raidTimer: RaidTimerSnapshot;
+}
+
+export interface WorldJoinMessage {
+    type: 'WORLD_JOIN';
+    originHubId: string;
+    partyComposition: ActorSnapshot[];
+    clientVersion: string;
+    resumeToken?: string;
+}
+
+export interface ReconnectMessage {
+    type: 'RECONNECT';
+    resumeToken: string;
+}
+
+export interface WorldLeaveMessage {
+    type: 'WORLD_LEAVE';
+    reason: 'town' | 'wipe' | 'manual';
+}
+
+export type PlayerIntentKind = 'move' | 'attack' | 'interact' | 'useItem' | 'endTurn';
+
+export interface PlayerIntentMessage {
+    type: 'PLAYER_INTENT';
+    intentId: string;
+    actorId: string;
+    kind: PlayerIntentKind;
+    payload: unknown;
+}
+
+export interface LootPickupMessage {
+    type: 'LOOT_PICKUP';
+    intentId: string;
+    lootId: string;
+    gridX: number;
+    gridY: number;
+}
+
+export type WorldClientMessage =
+    | WorldJoinMessage
+    | ReconnectMessage
+    | WorldLeaveMessage
+    | PlayerIntentMessage
+    | LootPickupMessage;
+
+export interface WorldWelcomeMessage {
+    type: 'WORLD_WELCOME';
+    playerId: string;
+    sessionEpoch: number;
+    resumeToken: string;
+    spawnTile: NetTilePoint;
+}
+
+export interface WorldSnapshotMessage {
+    type: 'WORLD_SNAPSHOT';
+    snapshot: WorldSnapshot;
+}
+
+export interface ActionRejectedMessage {
+    type: 'ACTION_REJECTED';
+    intentId: string;
+    reason: string;
+}
+
+export interface LootGrantMessage {
+    type: 'LOOT_GRANT';
+    lootId: string;
+    gridSnapshot: GridSnapshot;
+}
+
+export interface CombatEventMessage {
+    type: 'COMBAT_EVENT';
+    kind: string;
+    sourceId: string;
+    targetId: string;
+    value?: number;
+    statusEffect?: StatusEffect;
+}
+
+export interface RaidResultMessage {
+    type: 'RAID_RESULT';
+    playerId: string;
+    result: 'SURVIVED' | 'DEAD' | 'MIA' | 'LEFT';
+    elapsedSeconds: number;
+    kills: number;
+    departureTownId: string;
+    extractionTownId: string;
+}
+
+export interface WorldErrorMessage {
+    type: 'ERROR';
+    code: string;
+    message: string;
+}
+
+export type WorldServerMessage =
+    | WorldWelcomeMessage
+    | WorldSnapshotMessage
+    | ActionRejectedMessage
+    | LootGrantMessage
+    | CombatEventMessage
+    | RaidResultMessage
+    | WorldErrorMessage;
+
+export function isWorldSnapshotMessage(message: WorldServerMessage): message is WorldSnapshotMessage {
+    return message.type === 'WORLD_SNAPSHOT';
+}

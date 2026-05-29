@@ -58,7 +58,7 @@ export class InventoryUI {
     private externalGridIsRaidLoot: boolean = false;
     private visible: boolean = false;
     private hideCloseBtn: boolean = false;
-    public onRaidLootSecured: ((placed: PlacedItem) => void) | null = null;
+    public onRaidLootSecured: ((placed: PlacedItem, source?: { gridX: number; gridY: number }) => void) | null = null;
 
     // Drag state
     private dragging: PlacedItem | null = null;
@@ -377,7 +377,7 @@ export class InventoryUI {
                     }
                     if (this.externalGridIsRaidLoot && this.dragSourceGrid === this.externalGrid) {
                         item.acquiredInRaid = true;
-                        this.onRaidLootSecured?.(item);
+                        this.onRaidLootSecured?.(item, { gridX: this.dragSourceX, gridY: this.dragSourceY });
                     }
                     this.activeChar.equipment.set(eqSlot, item);
                     placed = true;
@@ -435,7 +435,7 @@ export class InventoryUI {
     private markRaidLootIfNeeded(placed: PlacedItem, targetGrid: GridInventory): void {
         if (this.externalGridIsRaidLoot && this.dragSourceGrid === this.externalGrid && targetGrid === this.inventory) {
             placed.acquiredInRaid = true;
-            this.onRaidLootSecured?.(placed);
+            this.onRaidLootSecured?.(placed, { gridX: this.dragSourceX, gridY: this.dragSourceY });
         }
     }
 
@@ -453,7 +453,7 @@ export class InventoryUI {
             result.sockets = placed.sockets;
             if (this.externalGridIsRaidLoot) {
                 result.acquiredInRaid = true;
-                this.onRaidLootSecured?.(result);
+                this.onRaidLootSecured?.(result, { gridX: placed.gridX, gridY: placed.gridY });
             }
             this.externalGrid.remove(placed);
             moved++;

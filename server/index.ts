@@ -1,131 +1,120 @@
 /**
- * Sin Eater Multiplayer WebSocket Server
- * Simple room-based server: all connected clients share the same world.
- * Broadcasts player movements, combat events, and boss kills.
+ * Authoritative world PvE WebSocket server.
  *
- * Run with: npx tsx server/index.ts
+ * Run with: npm run server
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
-
-interface PlayerData {
-    id: string;
-    name: string;
-    x: number;
-    y: number;
-    ws: WebSocket;
-}
+import type {
+    WorldClientMessage,
+    WorldServerMessage,
+} from '../src/net/WorldProtocol';
+import { WorldSession, WORLD_TICK_MS } from './WorldSession';
 
 const PORT = 8765;
 const wss = new WebSocketServer({ port: PORT });
-const players: Map<string, PlayerData> = new Map();
-let nextId = 1;
+const session = new WorldSession();
+const playerBySocket = new Map<WebSocket, string>();
+const socketByPlayer = new Map<string, WebSocket>();
 
-console.log(`🌐 Sin Eater Multiplayer Server started on ws://localhost:${PORT}`);
+console.log(`Darksaber world server started on ws://localhost:${PORT}`);
 
 wss.on('connection', (ws: WebSocket) => {
-    const playerId = `player_${nextId++}`;
-    let playerData: PlayerData | null = null;
-
     ws.on('message', (data: Buffer) => {
-        try {
-            const msg = JSON.parse(data.toString());
+        const message = parseMessage(data);
+        if (!message) {
+            send(ws, { type: 'ERROR', code: 'BAD_JSON', message: 'Invalid JSON message.' });
+            return;
+        }
 
-            switch (msg.type) {
-                case 'PLAYER_JOIN': {
-                    playerData = {
-                        id: playerId,
-                        name: msg.playerName || `Player ${nextId}`,
-                        x: 0,
-                        y: 0,
-                        ws,
-                    };
-                    players.set(playerId, playerData);
+        if (message.type === 'WORLD_JOIN') {
+            const result = session.join(message);
+            bindPlayer(ws, result.playerId);
+            send(ws, result.welcome);
+            send(ws, { type: 'WORLD_SNAPSHOT', snapshot: session.createSnapshot(result.playerId) });
+            return;
+        }
 
-                    // Send WELCOME to the new player with existing players list
-                    const existingPlayers = Array.from(players.values())
-                        .filter(p => p.id !== playerId)
-                        .map(p => ({ id: p.id, name: p.name, x: p.x, y: p.y }));
-
-                    ws.send(JSON.stringify({
-                        type: 'WELCOME',
-                        playerId,
-                        players: existingPlayers,
-                    }));
-
-                    // Broadcast PLAYER_JOIN to all others
-                    broadcast({
-                        type: 'PLAYER_JOIN',
-                        playerId,
-                        playerName: playerData.name,
-                        x: 0,
-                        y: 0,
-                    }, playerId);
-
-                    console.log(`✅ ${playerData.name} (${playerId}) joined. Total: ${players.size}`);
-                    break;
-                }
-
-                case 'PLAYER_MOVE': {
-                    if (playerData) {
-                        playerData.x = msg.x ?? 0;
-                        playerData.y = msg.y ?? 0;
-
-                        broadcast({
-                            type: 'PLAYER_MOVE',
-                            playerId,
-                            x: playerData.x,
-                            y: playerData.y,
-                        }, playerId);
-                    }
-                    break;
-                }
-
-                case 'PLAYER_ATTACK': {
-                    broadcast({
-                        type: 'PLAYER_ATTACK',
-                        playerId,
-                        enemyId: msg.enemyId,
-                    }, playerId);
-                    break;
-                }
-
-                case 'BOSS_KILLED': {
-                    broadcast({
-                        type: 'BOSS_KILLED',
-                        playerId,
-                        enemyId: msg.enemyId,
-                    }, playerId);
-                    break;
-                }
+        if (message.type === 'RECONNECT') {
+            const result = session.reconnect(message.resumeToken);
+            if (!result) {
+                send(ws, { type: 'ERROR', code: 'RESUME_FAILED', message: 'Resume token is expired or unknown.' });
+                return;
             }
-        } catch (e) {
-            console.error('Failed to parse message:', e);
+            bindPlayer(ws, result.playerId);
+            send(ws, result.welcome);
+            send(ws, { type: 'WORLD_SNAPSHOT', snapshot: session.createSnapshot(result.playerId) });
+            return;
+        }
+
+        const playerId = playerBySocket.get(ws);
+        if (!playerId) {
+            send(ws, { type: 'ERROR', code: 'NOT_JOINED', message: 'WORLD_JOIN is required before gameplay messages.' });
+            return;
+        }
+
+        const result = session.handleMessage(playerId, message);
+        for (const reply of result.replies) send(ws, reply);
+        for (const broadcast of result.broadcasts) broadcastToActive(broadcast);
+        if (message.type === 'WORLD_LEAVE') {
+            playerBySocket.delete(ws);
+            socketByPlayer.delete(playerId);
         }
     });
 
     ws.on('close', () => {
-        if (playerData) {
-            console.log(`❌ ${playerData.name} (${playerId}) left. Total: ${players.size - 1}`);
-            players.delete(playerId);
-
-            broadcast({
-                type: 'PLAYER_LEAVE',
-                playerId,
-            });
-        }
+        const playerId = playerBySocket.get(ws);
+        if (!playerId) return;
+        playerBySocket.delete(ws);
+        if (socketByPlayer.get(playerId) === ws) socketByPlayer.delete(playerId);
+        session.disconnect(playerId);
     });
 
     ws.on('error', (error) => {
-        console.error(`WebSocket error for ${playerId}:`, error.message);
+        console.error('World socket error:', error.message);
     });
 });
 
-function broadcast(msg: object, excludeId?: string): void {
-    const data = JSON.stringify(msg);
-    for (const [id, player] of players) {
-        if (id !== excludeId && player.ws.readyState === WebSocket.OPEN) {
-            player.ws.send(data);
-        }
+setInterval(() => {
+    const result = session.tick(Date.now());
+    for (const event of result.events) broadcastToActive(event);
+    for (const entry of result.perPlayerMessages) {
+        const ws = socketByPlayer.get(entry.playerId);
+        if (ws) send(ws, entry.message);
+    }
+    for (const playerId of session.getActivePlayerIds()) {
+        const ws = socketByPlayer.get(playerId);
+        if (ws) send(ws, { type: 'WORLD_SNAPSHOT', snapshot: session.createSnapshot(playerId) });
+    }
+}, WORLD_TICK_MS);
+
+function bindPlayer(ws: WebSocket, playerId: string): void {
+    const previous = socketByPlayer.get(playerId);
+    if (previous && previous !== ws && previous.readyState === WebSocket.OPEN) {
+        previous.close();
+    }
+    playerBySocket.set(ws, playerId);
+    socketByPlayer.set(playerId, ws);
+}
+
+function parseMessage(data: Buffer): WorldClientMessage | null {
+    try {
+        const parsed = JSON.parse(data.toString()) as WorldClientMessage;
+        if (!parsed || typeof parsed !== 'object' || typeof parsed.type !== 'string') return null;
+        return parsed;
+    } catch {
+        return null;
+    }
+}
+
+function send(ws: WebSocket, message: WorldServerMessage): void {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify(message));
+}
+
+function broadcastToActive(message: WorldServerMessage): void {
+    for (const playerId of session.getActivePlayerIds()) {
+        const ws = socketByPlayer.get(playerId);
+        if (ws) send(ws, message);
     }
 }

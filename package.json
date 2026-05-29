@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "server": "npx tsx server/index.ts",
     "typecheck:test": "tsc -p tsconfig.test.json",
-    "test": "node --import tsx --test tests/raid/*.test.ts tests/field/*.test.ts",
+    "test": "node --import tsx --test tests/raid/*.test.ts tests/field/*.test.ts tests/net/*.test.ts",
     "test:raid": "node --import tsx --test tests/raid/*.test.ts",
     "test:field": "node --import tsx --test tests/field/*.test.ts"
   },
@@ -24,8 +24,12 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^25.9.1",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.22.3",
     "typescript": "^5.9.3",
     "vite": "^8.0.1"
+  },
+  "dependencies": {
+    "ws": "^8.21.0"
   }
 }

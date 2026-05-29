@@ -49,6 +49,7 @@ export interface WorldPlayerActionContext {
     isEntityMoving: (entity: FieldActor['entity'] | Enemy) => boolean;
     isFieldPassable: (query: FieldPassableQuery) => boolean;
     spendAp: (cost: number) => boolean;
+    submitMoveIntent?: (actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number) => boolean;
     tryActorAttack: (actor: FieldActor, enemy: Enemy) => boolean;
     openLoot: (loot: LootObject) => void;
     openMagic: (actor: FieldActor) => void;
@@ -348,6 +349,11 @@ export class WorldPlayerActionController {
         if (!this.context.spendAp(apCost)) {
             this.sink.log('이동할 행동력이 부족합니다.');
             return false;
+        }
+
+        if (this.context.submitMoveIntent?.(actor, tile, path, apCost, pathResult.cost)) {
+            this.context.closeActionMenu();
+            return true;
         }
 
         actor.path = path;
