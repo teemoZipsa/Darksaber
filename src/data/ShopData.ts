@@ -3,8 +3,9 @@
  */
 
 import { getItemDef, ItemDef } from './ItemDB';
+import { ORIGINAL_SHOP_TOWN_ITEM_IDS, type OriginalShopTownId } from './OriginalShopItems';
 
-export type ShopKind = 'equipment' | 'goods';
+export type ShopKind = 'weapon' | 'armor' | 'accessory' | 'consumable';
 
 export interface ShopItem {
     itemId: string;
@@ -13,39 +14,44 @@ export interface ShopItem {
     shopKind: ShopKind;
 }
 
-/** Items available for purchase at the merchant */
-export const SHOP_INVENTORY: ShopItem[] = [
-    // Weapons
-    { itemId: 'short_sword', stock: -1, buyPrice: 80, shopKind: 'equipment' },
-    { itemId: 'long_sword',  stock: -1, buyPrice: 200, shopKind: 'equipment' },
+const DEFAULT_SHOP_TOWN_ID: OriginalShopTownId = 'central_castle';
+const COMMON_CONSUMABLE_IDS = ['herb_cheap', 'herb_common', 'herb_rare', 'herb_legendary', 'mp_potion', 'repair_kit'];
 
-    // Tier 1 Armor (all branches)
-    { itemId: 'battle_t1_head',  stock: -1, buyPrice: 90, shopKind: 'equipment' },
-    { itemId: 'battle_t1_body',  stock: -1, buyPrice: 130, shopKind: 'equipment' },
-    { itemId: 'battle_t1_boots', stock: -1, buyPrice: 70, shopKind: 'equipment' },
-    { itemId: 'tactics_t1_body', stock: -1, buyPrice: 130, shopKind: 'equipment' },
-    { itemId: 'healer_t1_body',  stock: -1, buyPrice: 130, shopKind: 'equipment' },
-    { itemId: 'magic_t1_body',   stock: -1, buyPrice: 130, shopKind: 'equipment' },
+export function getShopKindForItem(item: ItemDef): ShopKind {
+    if (item.slot === 'weapon') return 'weapon';
+    if (item.slot === 'accessory' || item.slot === 'accessory2' || item.slot === 'gem' || item.slot === 'rune' || item.slot === 'sin_core') return 'accessory';
+    if (item.slot === 'consumable') return 'consumable';
+    return 'armor';
+}
 
-    // Tier 2 Armor (sample)
-    { itemId: 'battle_t2_body',  stock: 3, buyPrice: 210, shopKind: 'equipment' },
-    { itemId: 'magic_t2_body',   stock: 3, buyPrice: 210, shopKind: 'equipment' },
+function toShopItem(itemId: string, stock = -1): ShopItem {
+    const item = getItemDef(itemId);
+    return {
+        itemId,
+        stock,
+        buyPrice: item?.buyPrice ?? item?.baseValue ?? 10,
+        shopKind: item ? getShopKindForItem(item) : 'consumable',
+    };
+}
 
-    // Accessories
-    { itemId: 'sword_manual', stock: -1, buyPrice: 300, shopKind: 'equipment' },
-    { itemId: 'power_ring',   stock: 2,  buyPrice: 800, shopKind: 'equipment' },
-    { itemId: 'shell_ring',   stock: -1, buyPrice: 500, shopKind: 'equipment' },
-    { itemId: 'amulet',       stock: -1, buyPrice: 400, shopKind: 'equipment' },
-    { itemId: 'heal_ring',    stock: 1,  buyPrice: 5000, shopKind: 'equipment' },
+function buildTownInventory(townId: OriginalShopTownId): ShopItem[] {
+    return [
+        ...ORIGINAL_SHOP_TOWN_ITEM_IDS[townId].map((itemId) => toShopItem(itemId)),
+        ...COMMON_CONSUMABLE_IDS.map((itemId) => toShopItem(itemId)),
+    ];
+}
 
-    // Consumables (약초 시리즈)
-    { itemId: 'herb_cheap',     stock: -1, buyPrice: 10, shopKind: 'goods' },
-    { itemId: 'herb_common',    stock: -1, buyPrice: 50, shopKind: 'goods' },
-    { itemId: 'herb_rare',      stock: -1, buyPrice: 200, shopKind: 'goods' },
-    { itemId: 'herb_legendary', stock: -1, buyPrice: 500, shopKind: 'goods' },
-    { itemId: 'mp_potion',      stock: -1, buyPrice: 25, shopKind: 'goods' },
-    { itemId: 'repair_kit',     stock: -1, buyPrice: 50, shopKind: 'goods' },
-];
+/** Items available for purchase, grouped by the current town. */
+export const SHOP_INVENTORY_BY_TOWN: Record<OriginalShopTownId, ShopItem[]> = {
+    central_castle: buildTownInventory('central_castle'),
+    w_forest_village: buildTownInventory('w_forest_village'),
+    s_coast_town: buildTownInventory('s_coast_town'),
+    e_stronghold: buildTownInventory('e_stronghold'),
+    se_port: buildTownInventory('se_port'),
+};
+
+/** Backwards-compatible default inventory, used by non-town callers. */
+export const SHOP_INVENTORY: ShopItem[] = SHOP_INVENTORY_BY_TOWN[DEFAULT_SHOP_TOWN_ID];
 
 /** Sell price = 50% of buy price, falling back to normalized base value. */
 export function getSellPrice(item: ItemDef): number {
@@ -56,10 +62,19 @@ export function isSellableItem(item: ItemDef): boolean {
     return item.sellable !== false;
 }
 
-/** Get ShopItem with its full ItemDef resolved */
-export function getShopItems(shopKind?: ShopKind): Array<{ shopEntry: ShopItem; item: ItemDef }> {
+function isShopKind(value: string | undefined): value is ShopKind {
+    return value === 'weapon' || value === 'armor' || value === 'accessory' || value === 'consumable';
+}
+
+/** Get ShopItem with its full ItemDef resolved. */
+export function getShopItems(townId?: string, shopKind?: ShopKind): Array<{ shopEntry: ShopItem; item: ItemDef }> {
+    if (isShopKind(townId) && shopKind === undefined) {
+        shopKind = townId;
+        townId = undefined;
+    }
+    const inventory = SHOP_INVENTORY_BY_TOWN[(townId ?? DEFAULT_SHOP_TOWN_ID) as OriginalShopTownId] ?? SHOP_INVENTORY;
     const result: Array<{ shopEntry: ShopItem; item: ItemDef }> = [];
-    for (const entry of SHOP_INVENTORY) {
+    for (const entry of inventory) {
         if (shopKind && entry.shopKind !== shopKind) continue;
         const item = getItemDef(entry.itemId);
         if (item) {

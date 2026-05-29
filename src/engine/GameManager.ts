@@ -187,6 +187,17 @@ export class GameManager {
         return this.worldEngine.getTownSession();
     }
 
+    // ─── World inventory (DOM overlay) ────────────────────────────
+    /** The standalone world inventory is open (I/Tab), and not inside a town. */
+    public isWorldInventoryOpen(): boolean {
+        return this.state === GameState.WORLD
+            && this.inventoryUI.isVisible()
+            && !this.getTownSession()?.isVisible();
+    }
+    public closeWorldInventory(): void {
+        if (this.inventoryUI.isVisible()) this.inventoryUI.toggle();
+    }
+
     // ─── Character creation (DOM overlay) ─────────────────────────
     public isCharCreationState(): boolean { return this.state === GameState.CHARACTER_CREATION; }
 
@@ -347,13 +358,9 @@ export class GameManager {
                     if (this.charUI.isVisible() && this.partyUI.isVisible()) this.partyUI.toggle();
                 }
 
-                // Route input
-                if (this.inventoryUI.isVisible()) {
-                    this.inventoryUI.onMouseMove(smx, smy);
-                    if (this.input.mouseJustDown) this.inventoryUI.onMouseDown(smx, smy);
-                    if (this.input.mouseJustUp) this.inventoryUI.onMouseUp(smx, smy);
-                    break;
-                }
+                // Inventory is a React DOM overlay; it owns its own pointer handling.
+                // Freeze the world while it is open.
+                if (this.inventoryUI.isVisible()) break;
                 // The character panel is now a React DOM overlay (see ui/react).
                 // It owns its own pointer handling; the DOM panel sits above the
                 // canvas so clicks never reach InputManager. We only need to keep
@@ -375,7 +382,6 @@ export class GameManager {
     private render(): void {
         const w = this.canvas.width;
         const h = this.canvas.height;
-        const scale = SettingsManager.getUIScale();
 
         this.ctx.clearRect(0, 0, w, h);
 
@@ -390,13 +396,8 @@ export class GameManager {
 
             case GameState.WORLD:
                 this.worldEngine.render(this.ctx, this.camera, w, h);
-                this.ctx.save();
-                this.ctx.scale(scale, scale);
-                const vw_world = Math.floor(w / scale);
-                const vh_world = Math.floor(h / scale);
-                if (this.inventoryUI.isVisible()) this.inventoryUI.render(this.ctx, vw_world, vh_world);
-                // charUI + pauseMenu + settingsUI + partyUI are rendered by the React DOM overlay.
-                this.ctx.restore();
+                // inventoryUI + charUI + pauseMenu + settingsUI + partyUI are all
+                // rendered by the React DOM overlay now.
                 break;
 
         }

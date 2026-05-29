@@ -65,13 +65,13 @@ interface SpecialZone {
 // agrees with the town's identity.
 const MORTAL_TOWNS: TownInfo[] = [
     { id: 'nw_desert_city',   name: 'Desert Outpost',     nameKr: '사막의 전초기지', chunkX: 16, chunkY: 11, radius: 2 },
-    { id: 'w_forest_village', name: 'Forest Village',     nameKr: '숲속 마을',       chunkX: 10, chunkY: 52, radius: 2 },
-    { id: 'central_castle',   name: 'Central Fortress',   nameKr: '중앙 성채',       chunkX: 37, chunkY: 44, radius: 3 },
+    { id: 'w_forest_village', name: 'Belfuers',           nameKr: '벨퓌어스',        chunkX: 10, chunkY: 52, radius: 2 },
+    { id: 'central_castle',   name: 'Kaosia',             nameKr: '카오시아',        chunkX: 37, chunkY: 44, radius: 3 },
     { id: 'sw_hideout',       name: 'Southern Refuge',    nameKr: '남부 은신처',     chunkX: 12, chunkY: 79, radius: 2 },
-    { id: 's_coast_town',     name: 'Coastal Town',       nameKr: '남부 항구',       chunkX: 41, chunkY: 80, radius: 2 },
+    { id: 's_coast_town',     name: 'Sicilio',            nameKr: '시시리오',        chunkX: 41, chunkY: 80, radius: 2 },
     { id: 'e_outpost',        name: 'Eastern Outpost',    nameKr: '동부 전초기지',   chunkX: 64, chunkY: 23, radius: 2 },
-    { id: 'e_stronghold',     name: 'Eastern Stronghold', nameKr: '동부 거점',       chunkX: 63, chunkY: 49, radius: 2 },
-    { id: 'se_port',          name: 'Southeast Port',     nameKr: '남동 항구',       chunkX: 63, chunkY: 72, radius: 2 },
+    { id: 'e_stronghold',     name: 'Entria',             nameKr: '엔트리아',        chunkX: 63, chunkY: 49, radius: 2 },
+    { id: 'se_port',          name: 'Arikna',             nameKr: '아리크나',        chunkX: 63, chunkY: 72, radius: 2 },
 ];
 
 const MASTER_TOWNS: TownInfo[] = [

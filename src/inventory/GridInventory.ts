@@ -63,6 +63,34 @@ export class GridInventory {
         return placed;
     }
 
+    /**
+     * Place an EXISTING PlacedItem instance at the given position, preserving its
+     * durability / quantity / sockets / acquiredInRaid. Used by drag-and-drop moves
+     * so item state survives a grid→grid relocation. Returns false if blocked.
+     */
+    public placeExisting(placed: PlacedItem, gx: number, gy: number): boolean {
+        if (!this.canPlace(placed.item, gx, gy)) return false;
+        placed.gridX = gx;
+        placed.gridY = gy;
+        for (let dy = 0; dy < placed.item.gridH; dy++) {
+            for (let dx = 0; dx < placed.item.gridW; dx++) {
+                this.grid[gy + dy][gx + dx] = placed;
+            }
+        }
+        this.items.push(placed);
+        return true;
+    }
+
+    /** Auto-place an existing PlacedItem instance in the first free slot. */
+    public autoPlaceExisting(placed: PlacedItem): boolean {
+        for (let y = 0; y <= this.height - placed.item.gridH; y++) {
+            for (let x = 0; x <= this.width - placed.item.gridW; x++) {
+                if (this.canPlace(placed.item, x, y)) return this.placeExisting(placed, x, y);
+            }
+        }
+        return false;
+    }
+
     /** Remove an item from the grid */
     public remove(placed: PlacedItem): void {
         for (let dy = 0; dy < placed.item.gridH; dy++) {

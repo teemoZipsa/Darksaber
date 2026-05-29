@@ -32,15 +32,18 @@ export interface SellEntry {
 }
 
 export const SHOP_KIND_TABS: Array<{ id: ShopKind; labelKey: string; icon: string }> = [
-    { id: 'equipment', labelKey: 'shop.equipment', icon: '⚔️' },
-    { id: 'goods', labelKey: 'shop.goods', icon: '🧪' },
+    { id: 'weapon', labelKey: 'shop.weapon', icon: '⚔️' },
+    { id: 'armor', labelKey: 'shop.armor', icon: '🛡️' },
+    { id: 'accessory', labelKey: 'shop.accessory', icon: '💍' },
+    { id: 'consumable', labelKey: 'shop.consumable', icon: '🧪' },
 ];
 
 export class ShopUI {
     private visible = false;
     private entries: ShopEntry[] = [];
     private sellSources: ShopSellSource[] = [];
-    private activeKind: ShopKind = 'equipment';
+    private activeKind: ShopKind = 'weapon';
+    private townId: string | null = null;
 
     private buyScrollY = 0;
     private sellScrollY = 0;
@@ -80,12 +83,17 @@ export class ShopUI {
     }
 
     public refreshInventory(): void {
-        this.entries = getShopItems().map(({ shopEntry, item }) => ({
+        this.entries = getShopItems(this.townId ?? undefined).map(({ shopEntry, item }) => ({
             shopItem: shopEntry,
             item,
             remaining: shopEntry.stock,
         }));
         this.clampBuyScroll();
+    }
+
+    public setTownId(townId: string | null): void {
+        this.townId = townId;
+        this.refreshInventory();
     }
 
     public toggle(): void {

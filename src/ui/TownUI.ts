@@ -84,6 +84,7 @@ export class TownUI {
     }
 
     public getShopUI(): ShopUI { return this.shopUI; }
+    public getInventoryUI(): InventoryUI { return this.inventoryUI; }
 
     // ── React (DOM overlay) accessors / actions ────────────────────
     public getActiveTab(): TownTab { return this.activeTab; }
@@ -118,6 +119,7 @@ export class TownUI {
 
     public show(town: TownInfo): void {
         this.currentTown = town;
+        this.shopUI.setTownId(town.id);
         this.visible = true;
         this.activeTab = 'storage';
 
@@ -154,39 +156,19 @@ export class TownUI {
                 break;
             case 'shop':
                 this.syncShopSources();
+                this.shopUI.setTownId(this.currentTown?.id ?? null);
                 this.shopUI.show();
                 break;
             // rest / quest / rumors are rendered by the React overlay (no sub-UI).
         }
     }
 
-    // ── Input ──────────────────────────────────────────────────────
+    // ── Input / rendering ──────────────────────────────────────────
+    // The entire town screen — including the storage tab's inventory grid — is now
+    // rendered and input-handled by the React DOM overlay (TownScreen / InventoryPanel).
+    // These remain so the WorldEngine render/input pipeline can still call them.
 
-    public updateInput(input: InputManager): void {
-        if (!this.visible) return;
+    public updateInput(_input: InputManager): void { /* React owns town input */ }
 
-        // The DOM overlay (React TownScreen) owns the town chrome, tab bar, deploy
-        // button, and the shop/rest/quest/rumors tabs. Only the storage tab's
-        // canvas InventoryUI is still driven here.
-        if (this.activeTab !== 'storage') return;
-
-        if (input.uiMouseX !== undefined && input.uiMouseY !== undefined) {
-            this.inventoryUI.onMouseMove(input.uiMouseX, input.uiMouseY);
-        }
-        if (input.mouseJustDown) this.inventoryUI.onMouseDown(input.uiMouseX, input.uiMouseY);
-        if (input.mouseJustUp) this.inventoryUI.onMouseUp(input.uiMouseX, input.uiMouseY);
-    }
-
-    // ── Rendering ──────────────────────────────────────────────────
-
-    public render(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-        if (!this.visible || !this.currentTown) return;
-
-        // The DOM overlay draws the town chrome and all tabs except storage. The
-        // storage tab still uses the canvas InventoryUI (the inventory drag-grid
-        // migration is the final, separate step).
-        if (this.activeTab === 'storage') {
-            this.inventoryUI.render(ctx, w, h);
-        }
-    }
+    public render(_ctx: CanvasRenderingContext2D, _w: number, _h: number): void { /* React draws the town */ }
 }

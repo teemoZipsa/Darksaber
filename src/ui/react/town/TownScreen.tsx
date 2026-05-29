@@ -1,11 +1,9 @@
 /**
  * TownScreen — DD-styled DOM overlay for the town-visit screen.
  *
- * Owns the town chrome (header, tab bar, deploy button) and the shop/rest/quest/
- * rumors tabs. The storage tab keeps the canvas InventoryUI (inventory drag-grid
- * is the final migration step): on that tab the screen renders chrome only and
- * stays click-through in the centre so the canvas inventory shows and receives
- * input. Tab state lives in TownUI; React drives it through the store.
+ * Owns the town chrome (header, tab bar, deploy button) and every tab — storage
+ * (the DOM inventory grid), shop, rest, quest, rumors. Tab state lives in TownUI;
+ * React drives it through the store.
  */
 
 import type { CSSProperties } from 'react';
@@ -19,6 +17,7 @@ import { RestPanel } from './RestPanel';
 import { QuestPanel } from './QuestPanel';
 import { RumorsPanel } from './RumorsPanel';
 import { restIcon } from './restIcon';
+import { InventoryPanel } from '../inventory/InventoryPanel';
 
 export function TownScreen() {
     useUiVersion();
@@ -36,11 +35,11 @@ export function TownScreen() {
         { id: 'rumors', label: t('town.tab.rumors'), icon: '💬' },
     ];
 
-    const isStorage = tab === 'storage';
+    const townInv = store.getTownInventory();
     const scaleVar = { '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
 
     return (
-        <div className={`ds-town${isStorage ? ' is-storage' : ''}`}>
+        <div className="ds-town">
             <div className="ds-town__header" style={scaleVar}>
                 <span className="ds-town__name">🏰 {town.nameKr}</span>
                 <span className="ds-town__sub">{town.name}</span>
@@ -61,11 +60,11 @@ export function TownScreen() {
             </div>
 
             <div className="ds-town__content">
+                {tab === 'storage' && townInv && <InventoryPanel inv={townInv} embedded />}
                 {tab === 'shop' && <ShopPanel />}
                 {tab === 'rest' && <RestPanel />}
                 {tab === 'quest' && <QuestPanel />}
                 {tab === 'rumors' && <RumorsPanel />}
-                {/* storage → canvas InventoryUI renders through the transparent content */}
             </div>
 
             <div className="ds-town__footer" style={scaleVar}>

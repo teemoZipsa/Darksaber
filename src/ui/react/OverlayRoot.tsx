@@ -14,6 +14,7 @@ import { SettingsPanel } from './settings/SettingsPanel';
 import { PartyPanel } from './party/PartyPanel';
 import { TownScreen } from './town/TownScreen';
 import { CharacterCreation } from './charcreate/CharacterCreation';
+import { InventoryPanel } from './inventory/InventoryPanel';
 
 export function OverlayRoot() {
     const store = useStore();
@@ -23,6 +24,7 @@ export function OverlayRoot() {
     const partyOpen = useUiSelector((s) => s.isPartyOpen());
     const townOpen = useUiSelector((s) => s.isTownOpen());
     const charCreateOpen = useUiSelector((s) => s.isCharCreateOpen());
+    const inventoryOpen = useUiSelector((s) => s.isInventoryOpen());
 
     return (
         <>
@@ -44,6 +46,11 @@ export function OverlayRoot() {
             {partyOpen && (
                 <div className="ds-scrim" onClick={() => store.closeParty()}>
                     <PartyPanel />
+                </div>
+            )}
+            {inventoryOpen && (
+                <div className="ds-scrim" onClick={() => store.closeInventory()}>
+                    <InventoryPanel inv={store.getWorldInventory()} />
                 </div>
             )}
             {townOpen && <TownScreen />}

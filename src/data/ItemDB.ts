@@ -4,6 +4,7 @@
  */
 
 import { MasterBranch } from './ClassTree';
+import { ORIGINAL_SHOP_ITEMS } from './OriginalShopItems';
 
 export type ItemSlot = 'weapon' | 'shield' | 'head' | 'body' | 'boots' | 'accessory' | 'accessory2' | 'consumable' | 'material' | 'sin_core' | 'rune' | 'gem';
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legend' | 'unique';
@@ -40,6 +41,7 @@ export interface ItemDef {
     buyPrice?: number;     // gold cost to buy from shop
     sellable?: boolean;    // false for quest/bound items that cannot be sold
     requiredTier?: number; // minimum tier to equip (1-7)
+    requiredLevel?: number; // original Darksaber equipment level requirement
     branch?: MasterBranch; // which branch can equip (battle/tactics/healer/magic)
     useEffect?: ItemUseEffect;
     
@@ -377,6 +379,9 @@ const RAW_ITEMS: RawItemDef[] = [
         descriptionKr: '착용한 무기의 내구도를 수리합니다.',
         buyPrice: 50
     },
+
+    // ─── Original Darksaber town weapon shops ──────
+    ...ORIGINAL_SHOP_ITEMS,
 
     // ─── Accessories (다크세이버 장신구) ─────
     {

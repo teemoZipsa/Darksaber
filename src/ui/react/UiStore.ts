@@ -18,6 +18,7 @@ import type { TownTab } from '../../ui/TownUI';
 import type { ShopEntry, SellEntry } from '../../ui/ShopUI';
 import type { ShopKind } from '../../data/ShopData';
 import type { TownInfo } from '../../map/BiomeMask';
+import type { InventoryUI } from '../../inventory/InventoryUI';
 
 export class UiStore {
     private listeners = new Set<() => void>();
@@ -107,7 +108,7 @@ export class UiStore {
     getInjuredCount = (): number => this.townUi()?.getInjuredCount?.() ?? 0;
     isQuestDone = (questId: string): boolean => this.townUi()?.getQuestDone?.(questId) ?? false;
 
-    getShopKind = (): ShopKind => this.shop()?.getActiveKind() ?? 'equipment';
+    getShopKind = (): ShopKind => this.shop()?.getActiveKind() ?? 'weapon';
     getShopGold = (): number => this.shop()?.getGoldValue() ?? this.gm.playerData.gold;
     getShopBuyEntries = (): ShopEntry[] => this.shop()?.listBuyEntries() ?? [];
     getShopSellEntries = (): SellEntry[] => this.shop()?.listSellEntries() ?? [];
@@ -129,4 +130,13 @@ export class UiStore {
         this.gm.completeCharacterCreation(name, classId, gender);
         this.tick();
     };
+
+    // ─── Inventory (DOM overlay) ──────────────────────────────────
+    /** Standalone world inventory (I/Tab); town storage uses its own instance. */
+    isInventoryOpen = (): boolean => this.gm.isWorldInventoryOpen();
+    getWorldInventory = (): InventoryUI => this.gm.inventoryUI;
+    getTownInventory = (): InventoryUI | null => this.townUi()?.getInventoryUI() ?? null;
+    closeInventory = (): void => { this.gm.closeWorldInventory(); this.tick(); };
+    /** Re-render after a direct InventoryUI mutation (drag/drop, equip, sort…). */
+    refresh = (): void => { this.tick(); };
 }

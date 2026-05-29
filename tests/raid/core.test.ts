@@ -60,14 +60,25 @@ test('normalizeItemDef applies stable defaults to raw items', () => {
     assert.ok(normalized.baseValue > 0);
 });
 
-test('shop inventory is split into equipment and goods categories', () => {
-    const equipment = getShopItems('equipment');
-    const goods = getShopItems('goods');
+test('shop inventory is split into town-specific weapon armor accessory and consumable categories', () => {
+    const kaosiaWeapons = getShopItems('central_castle', 'weapon');
+    const belfuersWeapons = getShopItems('w_forest_village', 'weapon');
+    const sicilioArmor = getShopItems('s_coast_town', 'armor');
+    const consumables = getShopItems('central_castle', 'consumable');
+    const accessories = getShopItems('central_castle', 'accessory');
 
-    assert.ok(equipment.length > 0);
-    assert.ok(goods.length > 0);
-    assert.ok(equipment.every(({ shopEntry, item }) => shopEntry.shopKind === 'equipment' && item.slot !== 'consumable'));
-    assert.ok(goods.every(({ shopEntry, item }) => shopEntry.shopKind === 'goods' && item.slot === 'consumable'));
+    assert.ok(kaosiaWeapons.length > 0);
+    assert.ok(belfuersWeapons.length > kaosiaWeapons.length);
+    assert.ok(sicilioArmor.some(({ item }) => item.id === 'web_67_02'));
+    assert.ok(consumables.length > 0);
+    assert.equal(accessories.length, 0);
+    assert.ok(kaosiaWeapons.every(({ shopEntry, item }) => shopEntry.shopKind === 'weapon' && item.slot === 'weapon'));
+    assert.ok(sicilioArmor.every(({ shopEntry, item }) => shopEntry.shopKind === 'armor' && ['shield', 'head', 'body', 'boots'].includes(item.slot)));
+    assert.ok(consumables.every(({ shopEntry, item }) => shopEntry.shopKind === 'consumable' && item.slot === 'consumable'));
+    assert.notDeepEqual(
+        kaosiaWeapons.map(({ item }) => item.id),
+        belfuersWeapons.map(({ item }) => item.id),
+    );
 });
 
 test('sell price uses half buy price or half normalized base value', () => {
@@ -157,6 +168,17 @@ test('WorldMap exposes consistent town tile helpers', () => {
         assert.ok(world.isWalkable(spawn.x, spawn.y), `${town.id} spawn should be walkable`);
         assert.equal(world.getTownAtTile(spawn.x, spawn.y)?.id, town.id);
     }
+});
+
+test('WorldMap exposes original Darksaber town display names while keeping stable town ids', () => {
+    const world = new WorldMap();
+    const namesById = new Map(world.getTowns().map((town) => [town.id, town.nameKr]));
+
+    assert.equal(namesById.get('central_castle'), '카오시아');
+    assert.equal(namesById.get('w_forest_village'), '벨퓌어스');
+    assert.equal(namesById.get('s_coast_town'), '시시리오');
+    assert.equal(namesById.get('e_stronghold'), '엔트리아');
+    assert.equal(namesById.get('se_port'), '아리크나');
 });
 
 test('WorldMap exposes walkable non-town exits for every town', () => {
