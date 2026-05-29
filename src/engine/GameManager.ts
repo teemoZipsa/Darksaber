@@ -191,7 +191,8 @@ export class GameManager {
      * but this guard keeps correctness independent of DOM layering).
      */
     public isDomModalOpen(): boolean {
-        return this.charUI.isVisible() || this.pauseMenu.isVisible();
+        return this.charUI.isVisible() || this.pauseMenu.isVisible()
+            || this.settingsUI.isVisible() || this.partyUI.isVisible();
     }
 
     // ─── Pause menu (DOM overlay) ─────────────────────────────────
@@ -215,6 +216,15 @@ export class GameManager {
         AudioManager.playUi('ui.confirm');
         this.pauseMenu.close();
         this.transitionTo(GameState.TITLE);
+    }
+
+    // ─── Settings menu (DOM overlay) ──────────────────────────────
+    public isSettingsMenuOpen(): boolean { return this.settingsUI.isVisible(); }
+
+    public closeSettingsMenu(): void {
+        AudioManager.playUi('ui.cancel');
+        this.settingsUI.close();
+        this.pauseMenu.open(); // Settings is always opened from pause — return there.
     }
 
     /**
@@ -301,9 +311,9 @@ export class GameManager {
                 break;
 
             case GameState.WORLD:
-                // Settings modal sits on top of the pause menu when both are present.
+                // Settings is now a React DOM overlay; handle ESC-to-close, freeze world.
                 if (this.settingsUI.isVisible()) {
-                    this.settingsUI.updateInput(this.input);
+                    if (this.input.justPressed('Escape')) this.closeSettingsMenu();
                     break;
                 }
                 // Pause menu is a React DOM overlay; it owns its own clicks.
@@ -345,13 +355,8 @@ export class GameManager {
                 // It owns its own pointer handling; the DOM panel sits above the
                 // canvas so clicks never reach InputManager. We only need to keep
                 // the world frozen while it (or any DOM modal) is open.
-                if (this.partyUI.isVisible()) {
-                    this.partyUI.onMouseMove(smx, smy);
-                    if (this.input.mouseJustDown) this.partyUI.onMouseDown(smx, smy);
-                    if (this.input.mouseJustUp) this.partyUI.onMouseUp(smx, smy);
-                    break;
-                }
-
+                // partyUI is now a React DOM overlay (see ui/react/party); world
+                // input is frozen below via isDomModalOpen while it's open.
                 if (this.isDomModalOpen()) break;
 
                 this.worldEngine.update(dt, this.input, this.camera);
@@ -392,9 +397,7 @@ export class GameManager {
                 const vw_world = Math.floor(w / scale);
                 const vh_world = Math.floor(h / scale);
                 if (this.inventoryUI.isVisible()) this.inventoryUI.render(this.ctx, vw_world, vh_world);
-                if (this.partyUI.isVisible()) this.partyUI.render(this.ctx, vw_world, vh_world);
-                // charUI + pauseMenu are rendered by the React DOM overlay, not canvas.
-                if (this.settingsUI.isVisible()) this.settingsUI.render(this.ctx, vw_world, vh_world);
+                // charUI + pauseMenu + settingsUI + partyUI are rendered by the React DOM overlay.
                 this.ctx.restore();
                 break;
 

@@ -10,11 +10,15 @@
 import { useStore, useUiSelector } from './UiContext';
 import { CharacterPanel } from './character/CharacterPanel';
 import { PauseMenu } from './PauseMenu';
+import { SettingsPanel } from './settings/SettingsPanel';
+import { PartyPanel } from './party/PartyPanel';
 
 export function OverlayRoot() {
     const store = useStore();
     const charOpen = useUiSelector((s) => s.isCharPanelOpen());
     const pauseOpen = useUiSelector((s) => s.isPauseOpen());
+    const settingsOpen = useUiSelector((s) => s.isSettingsOpen());
+    const partyOpen = useUiSelector((s) => s.isPartyOpen());
 
     return (
         <>
@@ -26,6 +30,16 @@ export function OverlayRoot() {
             {pauseOpen && (
                 <div className="ds-scrim" onClick={() => store.pauseResume()}>
                     <PauseMenu />
+                </div>
+            )}
+            {settingsOpen && (
+                <div className="ds-scrim" onClick={() => store.closeSettings()}>
+                    <SettingsPanel />
+                </div>
+            )}
+            {partyOpen && (
+                <div className="ds-scrim" onClick={() => store.closeParty()}>
+                    <PartyPanel />
                 </div>
             )}
         </>

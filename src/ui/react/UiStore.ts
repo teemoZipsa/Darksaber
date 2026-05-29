@@ -39,10 +39,14 @@ export class UiStore {
     // ─── Selectors (read live from GameManager) ───────────────────
     getActiveCharacter = (): Character | undefined => this.gm.party.getActive();
     getActiveParty = (): Character[] => this.gm.party.getCharacters();
+    getRoster = (): Character[] => this.gm.party.getRoster();
     getActiveIndex = (): number => this.gm.party.getActiveIndex();
+    isPartyFull = (): boolean => this.gm.party.isFull();
     getGold = (): number => this.gm.playerData.gold;
     isCharPanelOpen = (): boolean => this.gm.charUI.isVisible();
     isPauseOpen = (): boolean => this.gm.isPauseMenuOpen();
+    isSettingsOpen = (): boolean => this.gm.isSettingsMenuOpen();
+    isPartyOpen = (): boolean => this.gm.partyUI.isVisible();
 
     // ─── Actions (delegate to GameManager; never mutate directly) ──
     /** Switch the active party member; syncs dependent UI (e.g. inventory). */
@@ -65,4 +69,22 @@ export class UiStore {
     pauseResume = (): void => { this.gm.pauseResume(); this.tick(); };
     pauseOpenSettings = (): void => { this.gm.pauseOpenSettings(); this.tick(); };
     pauseReturnToTitle = (): void => { this.gm.pauseReturnToTitle(); this.tick(); };
+
+    // ─── Settings actions ─────────────────────────────────────────
+    closeSettings = (): void => { this.gm.closeSettingsMenu(); this.tick(); };
+
+    // ─── Party actions ────────────────────────────────────────────
+    closeParty = (): void => {
+        if (this.gm.partyUI.isVisible()) { this.gm.partyUI.toggle(); this.tick(); }
+    };
+    partyDeploy = (char: Character): void => { this.gm.party.deployCharacter(char); this.afterPartyChange(); };
+    partyUndeploy = (charId: string): void => { this.gm.party.unDeployCharacter(charId); this.afterPartyChange(); };
+    partySwapActive = (a: number, b: number): void => { this.gm.party.swapActiveSlots(a, b); this.afterPartyChange(); };
+    partyReplaceActive = (slot: number, char: Character): void => { this.gm.party.replaceActiveSlot(slot, char); this.afterPartyChange(); };
+    partySwapRoster = (a: number, b: number): void => { this.gm.party.swapRoster(a, b); this.tick(); };
+
+    private afterPartyChange = (): void => {
+        this.gm.onActiveCharacterChanged();
+        this.tick();
+    };
 }
