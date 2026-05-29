@@ -44,6 +44,7 @@ import type { TownInfo } from '../src/map/BiomeMask';
 import {
     type ActorSnapshot,
     type ActionRejectedMessage,
+    type AutoLootGrantMessage,
     type CombatEventMessage,
     type GridSnapshot,
     type LootGrantMessage,
@@ -61,6 +62,7 @@ import {
 export const WORLD_TICK_MS = 100;
 export const DISCONNECT_GRACE_MS = 30_000;
 const RAID_LIMIT_SECONDS = 30 * 60;
+const AUTO_LOOT_RESPONSE_MS = 5_000;
 
 interface ServerActor {
     id: string;
@@ -101,6 +103,11 @@ interface ServerEnemy {
 interface LootLock {
     playerId: string;
     lastTouchedAt: number;
+}
+
+interface AutoLootPending {
+    playerId: string;
+    createdAt: number;
 }
 
 export interface WorldSessionTickResult {
@@ -152,6 +159,7 @@ export class WorldSession {
     private readonly enemies = new Map<string, ServerEnemy>();
     private readonly loot = new Map<string, LootObject>();
     private readonly lootLocks = new Map<string, LootLock>();
+    private readonly autoLootPending = new Map<string, AutoLootPending>();
     private seq = 0;
     private nextPlayerId = 1;
     private nextEnemyId = 1;
@@ -280,6 +288,8 @@ export class WorldSession {
                 return this.handleIntent(playerId, message, now);
             case 'LOOT_PICKUP':
                 return this.handleLootPickup(playerId, message.intentId, message.lootId, message.gridX, message.gridY, now);
+            case 'AUTO_LOOT_RESOLVE':
+                return this.handleAutoLootResolve(playerId, message.lootId, message.acceptedCells);
             case 'WORLD_LEAVE':
                 this.log(`leave player=${playerId} reason=${message.reason}`);
                 return {
@@ -335,6 +345,7 @@ export class WorldSession {
             }
         }
 
+        this.releaseExpiredAutoLoot(now);
         this.releaseExpiredLootLocks(now);
         for (const player of [...this.players.values()]) {
             if (!player.active || player.ghost) continue;
@@ -377,7 +388,9 @@ export class WorldSession {
                 isAggro: entry.enemy.isAggro,
                 isBoss: entry.enemy.isBoss,
             }));
-        const loot = [...this.loot.values()].map((lootObject) => this.toLootSnapshot(lootObject));
+        const loot = [...this.loot.values()]
+            .filter((lootObject) => !this.autoLootPending.has(lootObject.id))
+            .map((lootObject) => this.toLootSnapshot(lootObject));
         const readyActors = partyActors
             .filter((actor) => !actor.isDead && !actor.isGhost && actor.actionGauge >= 100)
             .map((actor) => actor.id);
@@ -440,7 +453,7 @@ export class WorldSession {
             case 'move':
                 return this.handleMoveIntent(actor!, message.intentId, message.payload);
             case 'attack':
-                return this.handleAttackIntent(actor!, message.intentId, message.payload);
+                return this.handleAttackIntent(actor!, message.intentId, message.payload, now);
             case 'interact':
                 return this.handleInteractIntent(playerId, actor!, message.intentId, message.payload, now);
             case 'endTurn':
@@ -493,7 +506,7 @@ export class WorldSession {
         return { replies: [], broadcasts: [] };
     }
 
-    private handleAttackIntent(actor: ServerActor, intentId: string, payload: unknown): WorldSessionMessageResult {
+    private handleAttackIntent(actor: ServerActor, intentId: string, payload: unknown, now: number): WorldSessionMessageResult {
         const targetId = readStringPayload(payload, 'targetId') ?? readStringPayload(payload, 'enemyId');
         if (!targetId) return reject(intentId, 'Attack payload must include targetId.');
         const target = this.enemies.get(targetId);
@@ -507,9 +520,9 @@ export class WorldSession {
 
         actor.remainingAp -= ATTACK_AP_COST;
         actor.facing = directionFromTo(actor.tile, targetTile);
-        const event = this.resolveActorAttack(actor, target);
+        const { event, autoLootGrant } = this.resolveActorAttack(actor, target, now);
         this.finishActorIfSpent(actor);
-        return { replies: [], broadcasts: [event] };
+        return { replies: autoLootGrant ? [autoLootGrant] : [], broadcasts: [event] };
     }
 
     private handleInteractIntent(
@@ -522,7 +535,7 @@ export class WorldSession {
         const lootId = readStringPayload(payload, 'lootId');
         if (!lootId) return reject(intentId, 'Interact payload must include lootId.');
         const lootObject = this.loot.get(lootId);
-        if (!lootObject || lootObject.opened) return reject(intentId, 'Loot is not available.');
+        if (!lootObject || lootObject.opened || this.autoLootPending.has(lootId)) return reject(intentId, 'Loot is not available.');
         if (actor.remainingAp < INTERACT_AP_COST) return reject(intentId, 'Not enough AP to inspect loot.');
         if (manhattan(actor.tile, { x: lootObject.x, y: lootObject.y }) > 1) return reject(intentId, 'Loot is too far away.');
 
@@ -551,7 +564,7 @@ export class WorldSession {
         now: number
     ): WorldSessionMessageResult {
         const lootObject = this.loot.get(lootId);
-        if (!lootObject) return reject(intentId, 'Loot does not exist.');
+        if (!lootObject || this.autoLootPending.has(lootId)) return reject(intentId, 'Loot does not exist.');
         const lock = this.lootLocks.get(lootId);
         if (!lock || lock.playerId !== playerId) return reject(intentId, 'Loot is not occupied by this player.');
 
@@ -572,7 +585,33 @@ export class WorldSession {
         };
     }
 
-    private resolveActorAttack(actor: ServerActor, target: ServerEnemy): CombatEventMessage {
+    private handleAutoLootResolve(
+        playerId: string,
+        lootId: string,
+        acceptedCells: Array<{ gridX: number; gridY: number }>
+    ): WorldSessionMessageResult {
+        const pending = this.autoLootPending.get(lootId);
+        const lootObject = this.loot.get(lootId);
+        if (!pending || pending.playerId !== playerId || !lootObject) return { replies: [], broadcasts: [] };
+
+        const removed = new Set<object>();
+        for (const cell of acceptedCells) {
+            const placed = lootObject.inventory.getAt(cell.gridX, cell.gridY);
+            if (!placed || removed.has(placed)) continue;
+            lootObject.inventory.remove(placed);
+            removed.add(placed);
+        }
+
+        this.autoLootPending.delete(lootId);
+        lootObject.opened = lootObject.inventory.items.length === 0;
+        if (lootObject.opened) {
+            this.loot.delete(lootId);
+            this.lootLocks.delete(lootId);
+        }
+        return { replies: [], broadcasts: [] };
+    }
+
+    private resolveActorAttack(actor: ServerActor, target: ServerEnemy, now: number): { event: CombatEventMessage; autoLootGrant?: AutoLootGrantMessage } {
         const enemy = target.enemy;
         const result = CombatFormulas.calcPhysicalDamage(
             getEffectiveStats(actor.stats, actor.statuses),
@@ -585,8 +624,11 @@ export class WorldSession {
             kind: result.isMiss ? 'miss' : 'damage',
             sourceId: actor.id,
             targetId: enemy.id,
+            sourceName: actor.name,
+            targetName: enemy.name,
             value: result.damage,
         };
+        let autoLootGrant: AutoLootGrantMessage | undefined;
         if (!result.isMiss) {
             enemy.takeDamage(result.damage);
             if (enemy.stats.hp <= 0) {
@@ -594,10 +636,13 @@ export class WorldSession {
                 this.enemies.delete(enemy.id);
                 const player = this.players.get(actor.ownerPlayerId);
                 if (player) player.kills += 1;
-                this.spawnEnemyLoot(enemy);
+                autoLootGrant = enemy.isBoss
+                    ? undefined
+                    : this.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
+                if (enemy.isBoss || !autoLootGrant) this.spawnEnemyLoot(enemy);
             }
         }
-        return event;
+        return { event, autoLootGrant };
     }
 
     private resolveEnemyTurn(entry: ServerEnemy, now: number): CombatEventMessage[] {
@@ -665,6 +710,8 @@ export class WorldSession {
                     kind: 'status',
                     sourceId: enemy.id,
                     targetId: enemy.id,
+                    sourceName: enemy.name,
+                    targetName: enemy.name,
                     statusEffect: createStatus('guard'),
                 }];
             case 'bossPattern': {
@@ -673,7 +720,15 @@ export class WorldSession {
                 if (decision.pattern === 'enrage') {
                     const status = createStatus('allUp', { durationTurns: 4, magnitude: 1.3 });
                     enemy.statuses = applyStatus(enemy.statuses, status);
-                    return [{ type: 'COMBAT_EVENT', kind: 'status', sourceId: enemy.id, targetId: enemy.id, statusEffect: status }];
+                    return [{
+                        type: 'COMBAT_EVENT',
+                        kind: 'status',
+                        sourceId: enemy.id,
+                        targetId: enemy.id,
+                        sourceName: enemy.name,
+                        targetName: enemy.name,
+                        statusEffect: status,
+                    }];
                 }
                 if (this.canEnemyAttack(enemy, actor, enemy.aiProfile.attackRange)) {
                     return [this.resolveEnemyAttack(enemy, actor, enemy.aiProfile.attackRange)];
@@ -707,6 +762,8 @@ export class WorldSession {
             kind: result.isMiss ? 'miss' : actor.isDead ? 'down' : 'damage',
             sourceId: enemy.id,
             targetId: actor.id,
+            sourceName: enemy.name,
+            targetName: actor.name,
             value: result.damage,
         };
     }
@@ -892,6 +949,25 @@ export class WorldSession {
         }));
     }
 
+    private spawnEnemyAutoLoot(enemy: Enemy, playerId: string, now: number): AutoLootGrantMessage | undefined {
+        const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
+        if (!herb) return undefined;
+
+        const id = `loot_${this.nextLootId++}`;
+        const loot = new LootObject(id, enemy.gridX, enemy.gridY, [herb], {
+            sourceLabel: `${enemy.name} 전리품`,
+            kind: 'corpse',
+        });
+        this.loot.set(id, loot);
+        this.autoLootPending.set(id, { playerId, createdAt: now });
+        return {
+            type: 'AUTO_LOOT_GRANT',
+            lootId: id,
+            sourceName: enemy.name,
+            gridSnapshot: gridToSnapshot(loot.inventory),
+        };
+    }
+
     private findNearbyWalkableTile(tile: TilePoint, actorId: string): TilePoint {
         if (this.isFieldPassable({ ...tile, actorId, intent: 'move' })) return tile;
         for (let radius = 1; radius <= 8; radius++) {
@@ -980,6 +1056,17 @@ export class WorldSession {
     private releaseLootLocksForPlayer(playerId: string): void {
         for (const [lootId, lock] of this.lootLocks) {
             if (lock.playerId === playerId) this.lootLocks.delete(lootId);
+        }
+    }
+
+    private releaseExpiredAutoLoot(now: number): void {
+        for (const [lootId, pending] of this.autoLootPending) {
+            if (now - pending.createdAt <= AUTO_LOOT_RESPONSE_MS) continue;
+            this.autoLootPending.delete(lootId);
+            const lootObject = this.loot.get(lootId);
+            if (!lootObject) continue;
+            lootObject.opened = lootObject.inventory.items.length === 0;
+            if (lootObject.opened) this.loot.delete(lootId);
         }
     }
 

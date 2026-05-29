@@ -134,12 +134,24 @@ export interface LootPickupMessage {
     gridY: number;
 }
 
+export interface AutoLootCell {
+    gridX: number;
+    gridY: number;
+}
+
+export interface AutoLootResolveMessage {
+    type: 'AUTO_LOOT_RESOLVE';
+    lootId: string;
+    acceptedCells: AutoLootCell[];
+}
+
 export type WorldClientMessage =
     | WorldJoinMessage
     | ReconnectMessage
     | WorldLeaveMessage
     | PlayerIntentMessage
-    | LootPickupMessage;
+    | LootPickupMessage
+    | AutoLootResolveMessage;
 
 export interface WorldWelcomeMessage {
     type: 'WORLD_WELCOME';
@@ -166,11 +178,20 @@ export interface LootGrantMessage {
     gridSnapshot: GridSnapshot;
 }
 
+export interface AutoLootGrantMessage {
+    type: 'AUTO_LOOT_GRANT';
+    lootId: string;
+    sourceName: string;
+    gridSnapshot: GridSnapshot;
+}
+
 export interface CombatEventMessage {
     type: 'COMBAT_EVENT';
     kind: string;
     sourceId: string;
     targetId: string;
+    sourceName?: string;
+    targetName?: string;
     value?: number;
     statusEffect?: StatusEffect;
 }
@@ -196,6 +217,7 @@ export type WorldServerMessage =
     | WorldSnapshotMessage
     | ActionRejectedMessage
     | LootGrantMessage
+    | AutoLootGrantMessage
     | CombatEventMessage
     | RaidResultMessage
     | WorldErrorMessage;

@@ -290,6 +290,8 @@ export const i18n = {
             'raid.failDesc': '배낭의 모든 아이템과 전원의 장비를 1개씩 잃었습니다.',
             'raid.return': '클릭하거나 Enter를 눌러 은신처로 귀환하세요.',
             'raid.bossLoot': '보스 처치! 전리품 획득: ',
+            'raid.autoLoot': '전리품 자동 획득',
+            'raid.autoLootFull': '배낭 공간 부족. 남은 전리품이 바닥에 떨어졌습니다.',
             'raid.bossSpawn': '강력한 적이 근처에 출현했습니다!',
             'raid.extraction': '🚁 탈출 지점 (20분 내 도달)',
 
@@ -624,6 +626,8 @@ export const i18n = {
             'raid.failDesc': 'You lost your backpack and 1 random item piece per character.',
             'raid.return': 'Click or press Enter to return to Hideout.',
             'raid.bossLoot': 'Boss killed! Loot acquired: ',
+            'raid.autoLoot': 'Loot auto-collected',
+            'raid.autoLootFull': 'Backpack full. Remaining loot dropped on the ground.',
             'raid.bossSpawn': 'A powerful enemy has appeared nearby!',
             'raid.extraction': '🚁 Extraction Point (reach within 20 min)',
 

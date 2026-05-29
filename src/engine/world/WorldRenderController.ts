@@ -130,7 +130,7 @@ export class WorldRenderController {
             )
             : [];
         const selectedLoot = this.context.selectionController.lootId
-            ? this.context.worldMap.loot.find((candidate) => candidate.id === this.context.selectionController.lootId) ?? null
+            ? this.context.worldMap.loot.find((candidate) => candidate.id === this.context.selectionController.lootId && !candidate.opened) ?? null
             : null;
 
         return {

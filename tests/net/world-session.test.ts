@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBaseStats } from '../../src/data/Stats';
-import type { ActorSnapshot, WorldJoinMessage } from '../../src/net/WorldProtocol';
+import type { ActorSnapshot, AutoLootGrantMessage, WorldJoinMessage } from '../../src/net/WorldProtocol';
 import { WorldMap } from '../../src/map/WorldMap';
 import { WorldSession } from '../../server/WorldSession';
 
@@ -190,4 +190,94 @@ test('loot contention grants one occupant and rejects the other', () => {
 
     assert.equal(grant.replies[0]?.type, 'LOOT_GRANT');
     assert.equal(reject.replies[0]?.type, 'ACTION_REJECTED');
+});
+
+test('network kills auto-grant normal enemy loot and include display names in combat events', () => {
+    const session = new WorldSession();
+    const joined = session.join({
+        ...joinMessage('central_castle', 'hero-a'),
+        partyComposition: [actor('hero-a', {
+            name: 'Hero Alpha',
+            stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const serverEnemyEntry = [...internals.enemies.values()][0];
+    assert.ok(serverActor);
+    assert.ok(serverEnemyEntry);
+    serverActor.actionGauge = 100;
+    serverActor.remainingAp = 80;
+    serverEnemyEntry.enemy.stats.hp = 1;
+    serverEnemyEntry.enemy.stats.def = 0;
+    serverEnemyEntry.enemy.stats.spd = 0;
+    serverActor.tile = { x: serverEnemyEntry.enemy.gridX - 1, y: serverEnemyEntry.enemy.gridY };
+
+    const result = session.handleMessage(joined.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'attack-auto-loot',
+        actorId: serverActor.id,
+        kind: 'attack',
+        payload: { targetId: serverEnemyEntry.enemy.id },
+    }, 1_000);
+
+    const event = result.broadcasts.find((message) => message.type === 'COMBAT_EVENT');
+    const grant = result.replies.find((message): message is AutoLootGrantMessage => message.type === 'AUTO_LOOT_GRANT');
+    assert.equal(event?.type, 'COMBAT_EVENT');
+    assert.equal(event?.kind, 'kill');
+    assert.equal(event?.sourceName, 'Hero Alpha');
+    assert.equal(event?.targetName, serverEnemyEntry.enemy.name);
+    assert.ok(grant);
+    assert.equal(grant.sourceName, serverEnemyEntry.enemy.name);
+    assert.equal(session.createSnapshot(joined.playerId, 1_000).loot.some((loot) => loot.id === grant.lootId), false);
+
+    session.handleMessage(joined.playerId, {
+        type: 'AUTO_LOOT_RESOLVE',
+        lootId: grant.lootId,
+        acceptedCells: grant.gridSnapshot.items.map((item) => ({ gridX: item.gridX, gridY: item.gridY })),
+    }, 1_050);
+
+    assert.equal(session.createSnapshot(joined.playerId, 1_050).loot.some((loot) => loot.id === grant.lootId), false);
+});
+
+test('network auto-loot exposes unaccepted leftovers on the field', () => {
+    const session = new WorldSession();
+    const joined = session.join({
+        ...joinMessage('central_castle', 'hero-a'),
+        partyComposition: [actor('hero-a', {
+            name: 'Hero Alpha',
+            stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const serverEnemyEntry = [...internals.enemies.values()][0];
+    assert.ok(serverActor);
+    assert.ok(serverEnemyEntry);
+    serverActor.actionGauge = 100;
+    serverActor.remainingAp = 80;
+    serverEnemyEntry.enemy.stats.hp = 1;
+    serverEnemyEntry.enemy.stats.def = 0;
+    serverEnemyEntry.enemy.stats.spd = 0;
+    serverActor.tile = { x: serverEnemyEntry.enemy.gridX - 1, y: serverEnemyEntry.enemy.gridY };
+
+    const result = session.handleMessage(joined.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'attack-leftover-loot',
+        actorId: serverActor.id,
+        kind: 'attack',
+        payload: { targetId: serverEnemyEntry.enemy.id },
+    }, 1_000);
+    const grant = result.replies.find((message): message is AutoLootGrantMessage => message.type === 'AUTO_LOOT_GRANT');
+    assert.ok(grant);
+
+    session.handleMessage(joined.playerId, {
+        type: 'AUTO_LOOT_RESOLVE',
+        lootId: grant.lootId,
+        acceptedCells: [],
+    }, 1_050);
+
+    const exposed = session.createSnapshot(joined.playerId, 1_050).loot.find((loot) => loot.id === grant.lootId);
+    assert.ok(exposed);
+    assert.equal(exposed.gridSnapshot.items.length, grant.gridSnapshot.items.length);
 });

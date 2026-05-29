@@ -82,6 +82,8 @@ import {
     DEFAULT_WORLD_SERVER_URL,
     type ActionRejectedMessage,
     type ActorSnapshot,
+    type AutoLootCell,
+    type AutoLootGrantMessage,
     type CombatEventMessage,
     type GridSnapshot,
     type LootGrantMessage,
@@ -645,6 +647,7 @@ export class WorldEngine {
             onSnapshot: (snapshot) => this.applyNetworkSnapshot(snapshot),
             onCombatEvent: (event) => this.handleNetworkCombatEvent(event),
             onLootGrant: (grant) => this.openNetworkLoot(grant),
+            onAutoLootGrant: (grant) => this.handleNetworkAutoLootGrant(grant),
             onRaidResult: (result) => this.handleNetworkRaidResult(result),
             onActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
             onErrorMessage: (error) => this.addCombatLog(`서버 오류(${error.code}): ${error.message}`),
@@ -876,6 +879,33 @@ export class WorldEngine {
         this.selectionController.selectLoot(grant.lootId);
     }
 
+    private handleNetworkAutoLootGrant(grant: AutoLootGrantMessage): void {
+        const grid = this.gridFromSnapshot(grant.gridSnapshot);
+        const bag = this.gameManager.inventoryUI.getBag();
+        const acceptedCells: AutoLootCell[] = [];
+        const acquiredNames: string[] = [];
+        let blocked = false;
+
+        for (const placed of [...grid.items]) {
+            const source = { gridX: placed.gridX, gridY: placed.gridY };
+            grid.remove(placed);
+            if (bag.autoPlaceExisting(placed)) {
+                placed.acquiredInRaid = true;
+                acceptedCells.push(source);
+                acquiredNames.push(placed.item.nameKr);
+            } else {
+                grid.placeExisting(placed, source.gridX, source.gridY);
+                blocked = true;
+            }
+        }
+
+        this.networkRaidClient?.sendAutoLootResolve(grant.lootId, acceptedCells);
+        if (acquiredNames.length > 0) {
+            this.addCombatLog(`${grant.sourceName} ${t('raid.autoLoot')}: ${acquiredNames.join(', ')}`);
+        }
+        if (blocked) this.addCombatLog(`${grant.sourceName}: ${t('raid.autoLootFull')}`);
+    }
+
     private handleNetworkActionRejected(rejection: ActionRejectedMessage): void {
         const pending = this.pendingLootPicks.get(rejection.intentId);
         if (pending) {
@@ -928,11 +958,21 @@ export class WorldEngine {
     }
 
     private formatNetworkCombatEvent(event: CombatEventMessage): string {
-        if (event.kind === 'miss') return `${event.sourceId} → ${event.targetId} 빗나감`;
-        if (event.kind === 'kill') return `${event.sourceId} → ${event.targetId} 처치`;
-        if (event.kind === 'down') return `${event.sourceId} → ${event.targetId} 행동 불능`;
-        if (event.kind === 'status') return `${event.sourceId} → ${event.targetId} 상태 변화`;
-        return `${event.sourceId} → ${event.targetId} ${event.value ?? 0} 피해`;
+        const sourceName = event.sourceName ?? this.getNetworkEntityName(event.sourceId);
+        const targetName = event.targetName ?? this.getNetworkEntityName(event.targetId);
+        if (event.kind === 'miss') return `${sourceName} → ${targetName} 빗나감`;
+        if (event.kind === 'kill') return `${sourceName} → ${targetName} 처치`;
+        if (event.kind === 'down') return `${sourceName} → ${targetName} 행동 불능`;
+        if (event.kind === 'status') return `${sourceName} → ${targetName} 상태 변화`;
+        return `${sourceName} → ${targetName} ${event.value ?? 0} 피해`;
+    }
+
+    private getNetworkEntityName(entityId: string): string {
+        const actor = this.partyActors.find((candidate) => candidate.id === entityId);
+        if (actor) return actor.character.name || actor.entity.label || entityId;
+        const enemy = this.getEnemyById(entityId);
+        if (enemy) return enemy.name || enemy.label || entityId;
+        return entityId;
     }
 
     private handleNetworkRaidResult(result: RaidResultMessage): void {
@@ -1217,6 +1257,34 @@ export class WorldEngine {
         const bossRune = enemy.isBoss ? rollBossRune(enemy.level) : null;
         const items = [bossRune, herb].filter((item): item is NonNullable<typeof item> => Boolean(item));
         if (items.length === 0) return;
+
+        if (!enemy.isBoss) {
+            const failedItems: typeof items = [];
+            const acquiredNames: string[] = [];
+            const bag = this.gameManager.inventoryUI.getBag();
+            for (const item of items) {
+                const placed = bag.autoPlace(item);
+                if (placed) {
+                    placed.acquiredInRaid = true;
+                    acquiredNames.push(item.nameKr);
+                } else {
+                    failedItems.push(item);
+                }
+            }
+            if (acquiredNames.length > 0) {
+                this.addCombatLog(`${enemy.name} ${t('raid.autoLoot')}: ${acquiredNames.join(', ')}`);
+            }
+            if (failedItems.length === 0) return;
+
+            this.addCombatLog(`${enemy.name}: ${t('raid.autoLootFull')}`);
+            const loot = new LootObject(`corpse_${enemy.id}`, enemy.gridX, enemy.gridY, failedItems, {
+                sourceLabel: `${enemy.name} 전리품`,
+                kind: 'corpse',
+            });
+            this.worldMap.loot.push(loot);
+            return;
+        }
+
         const loot = new LootObject(`corpse_${enemy.id}`, enemy.gridX, enemy.gridY, items, {
             sourceLabel: `${enemy.name} 전리품`,
             kind: 'corpse',

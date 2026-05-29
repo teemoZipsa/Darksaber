@@ -13,13 +13,16 @@ import {
     MONSTER_SPRITE_PATH,
     getMonsterDefinition,
 } from '../../src/data/MonsterCatalog';
+import { getItemDef } from '../../src/data/ItemDB';
 import { Enemy } from '../../src/entity/Enemy';
+import { LootObject } from '../../src/entity/LootObject';
 import { Player } from '../../src/entity/Player';
 import { WorldEngine } from '../../src/engine/WorldEngine';
 import { WorldFieldSpawnController } from '../../src/engine/world/WorldFieldSpawnController';
 import type { WorldMovementController } from '../../src/engine/world/WorldMovementController';
 import { WorldRaidSession } from '../../src/engine/world/WorldRaidSession';
 import { WorldSelectionController } from '../../src/engine/world/WorldSelectionController';
+import { GridInventory } from '../../src/inventory/GridInventory';
 import { WorldMap } from '../../src/map/WorldMap';
 import { TileType } from '../../src/map/Tile';
 
@@ -134,6 +137,63 @@ test('Burgos boss corpse loot includes a guaranteed rune', () => {
 
     assert.equal(engine.worldMap.loot.length, 1);
     assert.ok(engine.worldMap.loot[0].inventory.items.some((placed: { item: { slot: string } }) => placed.item.slot === 'rune'));
+});
+
+test('normal enemy loot is auto-collected into the backpack', () => {
+    const bag = new GridInventory(4, 4);
+    const logs: string[] = [];
+    const enemy = new Enemy('field_enemy_1', 10, 10, '부르고스 추격병', 1, '#d98a5a', 'bruiser');
+    const engine = Object.create(WorldEngine.prototype) as any;
+    engine.worldMap = { loot: [] };
+    engine.gameManager = { inventoryUI: { getBag: () => bag } };
+    engine.addCombatLog = (message: string) => logs.push(message);
+
+    engine.spawnEnemyLoot(enemy);
+
+    assert.equal(engine.worldMap.loot.length, 0);
+    assert.equal(bag.items.length, 1);
+    assert.equal(bag.items[0].acquiredInRaid, true);
+    assert.ok(logs.some((entry) => /전리품 자동 획득|Loot auto-collected/.test(entry)));
+});
+
+test('normal enemy loot drops to the field when the backpack is full', () => {
+    const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
+    assert.ok(herb);
+    const bag = new GridInventory(1, 1);
+    bag.autoPlace(herb);
+    const logs: string[] = [];
+    const enemy = new Enemy('field_enemy_2', 11, 10, '부르고스 추격병', 1, '#d98a5a', 'bruiser');
+    const engine = Object.create(WorldEngine.prototype) as any;
+    engine.worldMap = { loot: [] };
+    engine.gameManager = { inventoryUI: { getBag: () => bag } };
+    engine.addCombatLog = (message: string) => logs.push(message);
+
+    engine.spawnEnemyLoot(enemy);
+
+    assert.equal(bag.items.length, 1);
+    assert.equal(engine.worldMap.loot.length, 1);
+    assert.equal(engine.worldMap.loot[0].inventory.items.length, 1);
+    assert.ok(logs.some((entry) => /배낭 공간 부족|Backpack full/.test(entry)));
+});
+
+test('opened loot object renders nothing', () => {
+    const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
+    assert.ok(herb);
+    const loot = new LootObject('loot_empty', 1, 1, [herb]);
+    loot.opened = true;
+    const calls: string[] = [];
+    const ctx = {
+        fillRect: () => calls.push('fillRect'),
+        beginPath: () => calls.push('beginPath'),
+        arc: () => calls.push('arc'),
+        fill: () => calls.push('fill'),
+        stroke: () => calls.push('stroke'),
+        fillText: () => calls.push('fillText'),
+    } as unknown as CanvasRenderingContext2D;
+
+    loot.render(ctx, 0, 0, 32);
+
+    assert.deepEqual(calls, []);
 });
 
 test('enemy selection display info includes walk sprite sheet data', () => {

@@ -36,12 +36,7 @@ export class LootObject {
         const cx = screenX + size / 2;
         const cy = screenY + size / 2;
 
-        if (this.opened) {
-            // Draw empty bag / open chest
-            ctx.fillStyle = 'rgba(150, 150, 120, 0.5)';
-            ctx.fillRect(screenX + size * 0.2, screenY + size * 0.2, size * 0.6, size * 0.6);
-            return;
-        }
+        if (this.opened) return;
 
         // Draw Chest/Loot pile footprint
         ctx.fillStyle = '#aa8855';

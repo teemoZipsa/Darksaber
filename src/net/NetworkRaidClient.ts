@@ -3,6 +3,8 @@ import {
     WORLD_PROTOCOL_VERSION,
     type ActorSnapshot,
     type ActionRejectedMessage,
+    type AutoLootCell,
+    type AutoLootGrantMessage,
     type CombatEventMessage,
     type LootGrantMessage,
     type PlayerIntentKind,
@@ -28,6 +30,7 @@ export interface NetworkRaidClientOptions {
     onSnapshot?: (snapshot: WorldSnapshot) => void;
     onCombatEvent?: (event: CombatEventMessage) => void;
     onLootGrant?: (grant: LootGrantMessage) => void;
+    onAutoLootGrant?: (grant: AutoLootGrantMessage) => void;
     onRaidResult?: (result: RaidResultMessage) => void;
     onActionRejected?: (rejection: ActionRejectedMessage) => void;
     onErrorMessage?: (error: WorldErrorMessage) => void;
@@ -150,6 +153,14 @@ export class NetworkRaidClient {
         return intentId;
     }
 
+    public sendAutoLootResolve(lootId: string, acceptedCells: AutoLootCell[]): void {
+        this.send({
+            type: 'AUTO_LOOT_RESOLVE',
+            lootId,
+            acceptedCells,
+        });
+    }
+
     public leave(reason: WorldLeaveMessage['reason']): void {
         this.send({ type: 'WORLD_LEAVE', reason });
         this.close();
@@ -193,6 +204,9 @@ export class NetworkRaidClient {
                 break;
             case 'LOOT_GRANT':
                 this.options.onLootGrant?.(message);
+                break;
+            case 'AUTO_LOOT_GRANT':
+                this.options.onAutoLootGrant?.(message);
                 break;
             case 'RAID_RESULT':
                 this.clearStoredResumeToken();
