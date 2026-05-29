@@ -14,7 +14,7 @@ export interface MonsterDefinition {
     aggroRange: number;
 }
 
-export const MONSTER_SPRITE_PATH = '/Image/Monster';
+export const MONSTER_SPRITE_PATH = '/assets/images/monsters';
 export const MONSTER_ROW_BY_FACING: Record<'up' | 'down' | 'left' | 'right', number> = {
     up: 0,
     down: 1,

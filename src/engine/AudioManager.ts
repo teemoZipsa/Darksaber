@@ -45,40 +45,40 @@ interface CrossfadeOptions {
  */
 export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = {
     // UI
-    'ui.confirm':  { src: '/Sound/ui/confirm.ogg',  channel: 'ui' },
-    'ui.cancel':   { src: '/Sound/ui/cancel.ogg',   channel: 'ui' },
-    'ui.hover':    { src: '/Sound/ui/hover.ogg',    channel: 'ui' },
-    'ui.error':    { src: '/Sound/ui/error.ogg',    channel: 'ui' },
-    'ui.open':     { src: '/Sound/ui/open.ogg',     channel: 'ui' },
-    'ui.close':    { src: '/Sound/ui/close.ogg',    channel: 'ui' },
+    'ui.confirm':  { src: '/assets/sounds/ui/confirm.ogg',  channel: 'ui' },
+    'ui.cancel':   { src: '/assets/sounds/ui/cancel.ogg',   channel: 'ui' },
+    'ui.hover':    { src: '/assets/sounds/ui/hover.ogg',    channel: 'ui' },
+    'ui.error':    { src: '/assets/sounds/ui/error.ogg',    channel: 'ui' },
+    'ui.open':     { src: '/assets/sounds/ui/open.ogg',     channel: 'ui' },
+    'ui.close':    { src: '/assets/sounds/ui/close.ogg',    channel: 'ui' },
 
     // Combat
-    'sfx.swing':       { src: '/Sound/sfx/swing.ogg',       channel: 'sfx' },
-    'sfx.hit_flesh':   { src: '/Sound/sfx/hit_flesh.ogg',   channel: 'sfx' },
-    'sfx.hit_metal':   { src: '/Sound/sfx/hit_metal.ogg',   channel: 'sfx' },
-    'sfx.crit':        { src: '/Sound/sfx/crit.ogg',        channel: 'sfx' },
-    'sfx.miss':        { src: '/Sound/sfx/miss.ogg',        channel: 'sfx' },
-    'sfx.heal':        { src: '/Sound/sfx/heal.ogg',        channel: 'sfx' },
-    'sfx.levelup':     { src: '/Sound/sfx/levelup.ogg',     channel: 'sfx' },
-    'sfx.loot_pickup': { src: '/Sound/sfx/loot_pickup.ogg', channel: 'sfx' },
-    'sfx.coin':        { src: '/Sound/sfx/coin.ogg',        channel: 'sfx' },
+    'sfx.swing':       { src: '/assets/sounds/sfx/swing.ogg',       channel: 'sfx' },
+    'sfx.hit_flesh':   { src: '/assets/sounds/sfx/hit_flesh.ogg',   channel: 'sfx' },
+    'sfx.hit_metal':   { src: '/assets/sounds/sfx/hit_metal.ogg',   channel: 'sfx' },
+    'sfx.crit':        { src: '/assets/sounds/sfx/crit.ogg',        channel: 'sfx' },
+    'sfx.miss':        { src: '/assets/sounds/sfx/miss.ogg',        channel: 'sfx' },
+    'sfx.heal':        { src: '/assets/sounds/sfx/heal.ogg',        channel: 'sfx' },
+    'sfx.levelup':     { src: '/assets/sounds/sfx/levelup.ogg',     channel: 'sfx' },
+    'sfx.loot_pickup': { src: '/assets/sounds/sfx/loot_pickup.ogg', channel: 'sfx' },
+    'sfx.coin':        { src: '/assets/sounds/sfx/coin.ogg',        channel: 'sfx' },
 
     // World
-    'sfx.footstep_grass': { src: '/Sound/world/footstep_grass.ogg', channel: 'sfx' },
-    'sfx.footstep_stone': { src: '/Sound/world/footstep_stone.ogg', channel: 'sfx' },
-    'sfx.footstep_water': { src: '/Sound/world/footstep_water.ogg', channel: 'sfx' },
-    'sfx.door':           { src: '/Sound/world/door.ogg',           channel: 'sfx' },
-    'sfx.extract_start':  { src: '/Sound/world/extract_start.ogg',  channel: 'sfx' },
-    'sfx.extract_done':   { src: '/Sound/world/extract_done.ogg',   channel: 'sfx' },
+    'sfx.footstep_grass': { src: '/assets/sounds/world/footstep_grass.ogg', channel: 'sfx' },
+    'sfx.footstep_stone': { src: '/assets/sounds/world/footstep_stone.ogg', channel: 'sfx' },
+    'sfx.footstep_water': { src: '/assets/sounds/world/footstep_water.ogg', channel: 'sfx' },
+    'sfx.door':           { src: '/assets/sounds/world/door.ogg',           channel: 'sfx' },
+    'sfx.extract_start':  { src: '/assets/sounds/world/extract_start.ogg',  channel: 'sfx' },
+    'sfx.extract_done':   { src: '/assets/sounds/world/extract_done.ogg',   channel: 'sfx' },
 
     // Music
-    'bgm.title':   { src: '/Sound/bgm/title.ogg',   channel: 'bgm' },
-    'bgm.world':   { src: '/Sound/bgm/world.ogg',   channel: 'bgm' },
-    'bgm.town':    { src: '/Sound/bgm/town.ogg',    channel: 'bgm' },
-    'bgm.raid':    { src: '/Sound/bgm/raid.ogg',    channel: 'bgm' },
-    'bgm.boss':    { src: '/Sound/bgm/boss.ogg',    channel: 'bgm' },
-    'bgm.victory': { src: '/Sound/bgm/victory.ogg', channel: 'bgm' },
-    'bgm.gameover':{ src: '/Sound/bgm/gameover.ogg',channel: 'bgm' },
+    'bgm.title':   { src: '/assets/sounds/bgm/title.ogg',   channel: 'bgm' },
+    'bgm.world':   { src: '/assets/sounds/bgm/world.ogg',   channel: 'bgm' },
+    'bgm.town':    { src: '/assets/sounds/bgm/town.ogg',    channel: 'bgm' },
+    'bgm.raid':    { src: '/assets/sounds/bgm/raid.ogg',    channel: 'bgm' },
+    'bgm.boss':    { src: '/assets/sounds/bgm/boss.ogg',    channel: 'bgm' },
+    'bgm.victory': { src: '/assets/sounds/bgm/victory.ogg', channel: 'bgm' },
+    'bgm.gameover':{ src: '/assets/sounds/bgm/gameover.ogg',channel: 'bgm' },
 };
 
 class AudioManagerClass {

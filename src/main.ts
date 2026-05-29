@@ -14,7 +14,7 @@ async function init(): Promise<void> {
     // Explicitly preload DOSMyungjo for Canvas (Canvas doesn't trigger @font-face)
     const dosFont = new FontFace(
         'DOSMyungjo',
-        "url('/fonts/DOSMyungjo.ttf') format('truetype')"
+        "url('/assets/fonts/DOSMyungjo.ttf') format('truetype')"
     );
     try {
         const loaded = await dosFont.load();

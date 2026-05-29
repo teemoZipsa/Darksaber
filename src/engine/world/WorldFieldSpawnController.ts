@@ -84,11 +84,11 @@ export class WorldFieldSpawnController {
                 entity.image = character.portraitImage;
                 entity.imageLoaded = true;
             } else {
-                entity.setImage(character.portraitImage?.src || '/Image/Character/fighter.png');
+                entity.setImage(character.portraitImage?.src || '/assets/images/characters/darksaber/infantry_t1.png');
             }
             if (character.classLineId === 'infantry' && character.currentTier === 1) {
                 entity.setWalkSprite(
-                    '/Image/Character/fighter_walk_4_compact.png',
+                    '/assets/images/characters/animations/fighter_walk_4_compact.png',
                     128,
                     128,
                     4,

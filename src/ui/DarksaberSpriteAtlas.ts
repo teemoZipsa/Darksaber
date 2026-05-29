@@ -46,10 +46,10 @@ interface SliceInset {
 }
 
 const SHEET_SOURCES: Record<DarksaberSheetId, string> = {
-    board: '/Image/Etc/darksaber_board.png',
-    fx2: '/Image/Etc/darksaber_fx2.png',
-    fx: '/Image/Etc/darksaber_fx.png',
-    micon: '/Image/Etc/darksaber_micon.png',
+    board: '/assets/images/ui/darksaber_board.png',
+    fx2: '/assets/images/ui/darksaber_fx2.png',
+    fx: '/assets/images/ui/darksaber_fx.png',
+    micon: '/assets/images/ui/darksaber_micon.png',
 };
 
 const DAMAGE_GLYPHS = '1234567890+-';

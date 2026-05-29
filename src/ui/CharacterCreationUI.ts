@@ -14,10 +14,10 @@ interface CharConfig {
 }
 
 const CLASSES: CharConfig[] = [
-    { id: 'infantry', labelKey: 'create.fighter', hp: 0.8, atk: 0.7, def: 0.6, mag: 0.2, imageSrc: '/Image/Character/fighter.png', portraitCrop: { x: 21, y: 4, w: 85, h: 124 } },
-    { id: 'cavalry', labelKey: 'create.knight', hp: 0.9, atk: 0.6, def: 0.9, mag: 0.3, imageSrc: '/Image/Character/knight.png', portraitCrop: { x: 26, y: 5, w: 78, h: 119 } },
-    { id: 'cleric', labelKey: 'create.cleric', hp: 0.6, atk: 0.3, def: 0.4, mag: 0.7, imageSrc: '/Image/Character/cleric.png', portraitCrop: { x: 22, y: 5, w: 83, h: 118 } },
-    { id: 'mage', labelKey: 'create.magician', hp: 0.4, atk: 0.3, def: 0.3, mag: 0.9, imageSrc: '/Image/Character/magician.png', portraitCrop: { x: 24, y: 7, w: 81, h: 115 } },
+    { id: 'infantry', labelKey: 'create.fighter', hp: 0.8, atk: 0.7, def: 0.6, mag: 0.2, imageSrc: '/assets/images/characters/darksaber/infantry_t1.png', portraitCrop: { x: 21, y: 4, w: 85, h: 124 } },
+    { id: 'cavalry', labelKey: 'create.knight', hp: 0.9, atk: 0.6, def: 0.9, mag: 0.3, imageSrc: '/assets/images/characters/darksaber/cavalry_t1.png', portraitCrop: { x: 26, y: 5, w: 78, h: 119 } },
+    { id: 'cleric', labelKey: 'create.cleric', hp: 0.6, atk: 0.3, def: 0.4, mag: 0.7, imageSrc: '/assets/images/characters/darksaber/cleric_t1.png', portraitCrop: { x: 22, y: 5, w: 83, h: 118 } },
+    { id: 'mage', labelKey: 'create.magician', hp: 0.4, atk: 0.3, def: 0.3, mag: 0.9, imageSrc: '/assets/images/characters/darksaber/mage_t1.png', portraitCrop: { x: 24, y: 7, w: 81, h: 115 } },
 ];
 
 export class CharacterCreationUI {
@@ -57,7 +57,7 @@ export class CharacterCreationUI {
             this.classImages.push(img);
         }
 
-        this.bgImage.src = '/assets/Start.jpg';
+        this.bgImage.src = '/assets/images/backgrounds/start.jpg';
         this.bgImage.onload = () => { this.bgLoaded = true; };
 
         // Create hovering HTML input for Name

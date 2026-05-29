@@ -93,7 +93,7 @@ export class GameManager {
         this.charCreateUI = new CharacterCreationUI();
 
         // Title background image
-        this.titleBg.src = '/assets/Start.jpg';
+        this.titleBg.src = '/assets/images/backgrounds/start.jpg';
         this.titleBg.onload = () => { this.titleBgLoaded = true; };
 
         this.charCreateUI.onComplete = (name: string, classId: string, gender: string) => {

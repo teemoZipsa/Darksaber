@@ -17,12 +17,12 @@ const DARKSABER_TERRAIN_TEXTURES: Partial<Record<TileType, string>> = {
 };
 
 const DARKSABER_LANDMARK_SPRITES = {
-    village: '/Image/Landmarks/darksaber/village.png',
-    portTown: '/Image/Landmarks/darksaber/port_town.png',
-    castle: '/Image/Landmarks/darksaber/castle.png',
-    caveEntrance: '/Image/Landmarks/darksaber/cave_entrance.png',
-    beginnerRuins: '/Image/Landmarks/darksaber/beginner_ruins.png',
-    beginnerMine: '/Image/Landmarks/darksaber/beginner_mine.png',
+    village: '/assets/images/landmarks/darksaber/village.png',
+    portTown: '/assets/images/landmarks/darksaber/port_town.png',
+    castle: '/assets/images/landmarks/darksaber/castle.png',
+    caveEntrance: '/assets/images/landmarks/darksaber/cave_entrance.png',
+    beginnerRuins: '/assets/images/landmarks/darksaber/beginner_ruins.png',
+    beginnerMine: '/assets/images/landmarks/darksaber/beginner_mine.png',
 } as const;
 
 export type LandmarkSpriteId = keyof typeof DARKSABER_LANDMARK_SPRITES;
@@ -42,7 +42,7 @@ class TileAssetManagerClass {
     }
 
     private queueTilesetLoad(sheetName: string): void {
-        this.queueImageLoad(sheetName, `/Image/Tileset/${sheetName}`);
+        this.queueImageLoad(sheetName, `/assets/images/tilesets/${sheetName}`);
     }
 
     private queueImageLoad(key: string, src: string): void {

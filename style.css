@@ -11,17 +11,17 @@ body, html {
     color: #e0e0e0;
     font-family: "Pretendard", "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", "DOSMyungjo", system-ui, sans-serif;
     overflow: hidden;
-    cursor: url('/Image/Etc/cursor32.png') 0 0, auto;
+    cursor: url('/assets/images/ui/cursor32.png') 0 0, auto;
 }
 
 #game-container {
     position: relative;
     width: 100vw;
     height: 100vh;
-    cursor: url('/Image/Etc/cursor32.png') 0 0, auto;
+    cursor: url('/assets/images/ui/cursor32.png') 0 0, auto;
 }
 
 canvas {
     display: block;
-    cursor: url('/Image/Etc/cursor32.png') 0 0, auto;
+    cursor: url('/assets/images/ui/cursor32.png') 0 0, auto;
 }

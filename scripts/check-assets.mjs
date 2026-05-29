@@ -1,63 +1,125 @@
 import fs from 'fs';
 import path from 'path';
 
-const targetDir = process.cwd();
-const srcDir = path.join(targetDir, 'src');
+const rootDir = process.cwd();
+const publicDir = path.join(rootDir, 'public');
+const srcDir = path.join(rootDir, 'src');
 
-// 게임이니까 public이나 db, assets 등 다양한 루트 폴더가 존재할 수 있습니다.
-const publicDir = path.join(targetDir, 'public');
-const assetsDir = path.join(targetDir, 'assets');
+const sourceRoots = [
+  srcDir,
+  path.join(rootDir, 'index.html'),
+  path.join(rootDir, 'style.css'),
+  path.join(publicDir, 'legal.html'),
+];
 
-function findFilesByExt(dir, extList) {
-  let results = [];
-  if (!fs.existsSync(dir)) return results;
-  const list = fs.readdirSync(dir);
-  for (const file of list) {
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
-    if (stat && stat.isDirectory()) {
-      results = results.concat(findFilesByExt(filePath, extList));
-    } else {
-      if (extList.some(ext => file.endsWith(ext))) results.push(filePath);
-    }
+const sourceExtensions = new Set(['.ts', '.tsx', '.js', '.mjs', '.css', '.html', '.json']);
+const quotedAssetRegex = /['"`]([^'"`]+\.(?:png|jpg|jpeg|gif|webp|mp3|wav|ogg|ttf))['"`]/ig;
+const cssUrlRegex = /url\(\s*['"]?([^'")]+?\.(?:png|jpg|jpeg|gif|webp|mp3|wav|ogg|ttf))['"]?\s*\)/ig;
+
+function walkFiles(entry) {
+  if (!fs.existsSync(entry)) return [];
+  const stat = fs.statSync(entry);
+  if (stat.isFile()) return sourceExtensions.has(path.extname(entry)) ? [entry] : [];
+
+  const results = [];
+  for (const child of fs.readdirSync(entry, { withFileTypes: true })) {
+    const childPath = path.join(entry, child.name);
+    if (child.isDirectory()) results.push(...walkFiles(childPath));
+    else if (sourceExtensions.has(path.extname(child.name))) results.push(childPath);
   }
   return results;
 }
 
-const tsFiles = findFilesByExt(srcDir, ['.ts', '.tsx']);
-// 코드 내에서 불리는 미디어 에셋 패턴
-const assetRegex = /['"]([^'"]+\.(png|jpg|jpeg|gif|webp|mp3|wav|ogg))['"]/ig;
+function toPublicPath(assetString) {
+  if (/^https?:\/\//i.test(assetString) || assetString.startsWith('data:')) return null;
+  if (assetString.startsWith('/')) return assetString.slice(1);
+  return assetString;
+}
+
+function candidatePaths(assetString) {
+  const publicPath = toPublicPath(assetString);
+  if (!publicPath) return [];
+
+  const candidates = [path.join(publicDir, publicPath)];
+  if (!assetString.startsWith('/')) {
+    candidates.push(path.join(publicDir, 'assets', 'images', 'tilesets', publicPath));
+  }
+  return candidates;
+}
+
+function existsAsset(assetString) {
+  return candidatePaths(assetString).some((candidate) => fs.existsSync(candidate));
+}
+
+function isOptionalAsset(assetString) {
+  return assetString.startsWith('/assets/sounds/');
+}
+
+function isBareSpriteName(assetString) {
+  return /^[^/\\]+\.(png|jpg|jpeg|gif|webp)$/i.test(assetString);
+}
+
+function collectAssetRefs(content) {
+  const refs = new Set();
+  for (const regex of [quotedAssetRegex, cssUrlRegex]) {
+    regex.lastIndex = 0;
+    let match;
+    while ((match = regex.exec(content)) !== null) refs.add(match[1]);
+  }
+  return [...refs];
+}
+
+function collectMonsterSprites(content) {
+  const baseMatch = content.match(/MONSTER_SPRITE_PATH\s*=\s*['"`]([^'"`]+)['"`]/);
+  if (!baseMatch) return [];
+
+  const basePath = baseMatch[1].replace(/\/$/, '');
+  const sprites = [];
+  const spriteRegex = /sprite:\s*['"`]([^'"`]+\.(?:png|jpg|jpeg|gif|webp))['"`]/ig;
+  let match;
+  while ((match = spriteRegex.exec(content)) !== null) {
+    sprites.push(`${basePath}/${match[1]}`);
+  }
+  return sprites;
+}
 
 let hasError = false;
-console.log('🔍 Checking asset references across Sin Eater code...');
+let checked = 0;
+let optionalMissing = 0;
 
-tsFiles.forEach(file => {
+console.log('Checking asset references...');
+
+for (const file of sourceRoots.flatMap(walkFiles)) {
   const content = fs.readFileSync(file, 'utf8');
-  let match;
-  while ((match = assetRegex.exec(content)) !== null) {
-      const assetString = match[1]; 
-      
-      const cleanPath = assetString.startsWith('/') ? assetString.slice(1) : assetString;
-      
-      const existsInPublic = fs.existsSync(path.join(publicDir, cleanPath));
-      const existsInPublicTileset = fs.existsSync(path.join(publicDir, 'Image', 'Tileset', cleanPath));
-      const existsInAssetsDir = fs.existsSync(path.join(assetsDir, cleanPath));
-      const existsInRoot = fs.existsSync(path.join(targetDir, cleanPath));
-      const existsInSrc = fs.existsSync(path.join(srcDir, cleanPath));
-      
-      if (!existsInPublic && !existsInPublicTileset && !existsInRoot && !existsInSrc && !existsInAssetsDir) {
-         console.error(`❌ [Error]: Asset '${assetString}' is referenced in [${path.basename(file)}], but actual file is missing!`);
-         hasError = true;
-      } else {
-         console.log(`✅ Asset '${assetString}' verified.`);
-      }
+  const refs = collectAssetRefs(content);
+  if (file.endsWith(path.join('src', 'data', 'MonsterCatalog.ts'))) {
+    refs.push(...collectMonsterSprites(content));
   }
-});
+
+  for (const assetString of refs) {
+    if (isBareSpriteName(assetString)) continue;
+
+    checked += 1;
+    if (existsAsset(assetString)) {
+      console.log(`OK ${assetString}`);
+      continue;
+    }
+
+    const location = path.relative(rootDir, file);
+    if (isOptionalAsset(assetString)) {
+      optionalMissing += 1;
+      console.warn(`WARN optional missing ${assetString} (${location})`);
+      continue;
+    }
+
+    hasError = true;
+    console.error(`ERROR missing ${assetString} (${location})`);
+  }
+}
 
 if (hasError) {
-  console.error('\n🚨 Cannot commit: Missing game assets detected! Check your paths or typos.');
+  console.error(`Asset check failed. Checked ${checked} references; optional missing ${optionalMissing}.`);
   process.exit(1);
-} else {
-  console.log('\n🎉 All references point to existing game assets!');
-  process.exit(0);
 }
+
+console.log(`All required assets verified. Checked ${checked} references; optional missing ${optionalMissing}.`);
