@@ -13,6 +13,7 @@ import { PauseMenu } from './PauseMenu';
 import { SettingsPanel } from './settings/SettingsPanel';
 import { PartyPanel } from './party/PartyPanel';
 import { TownScreen } from './town/TownScreen';
+import { CharacterCreation } from './charcreate/CharacterCreation';
 
 export function OverlayRoot() {
     const store = useStore();
@@ -21,6 +22,7 @@ export function OverlayRoot() {
     const settingsOpen = useUiSelector((s) => s.isSettingsOpen());
     const partyOpen = useUiSelector((s) => s.isPartyOpen());
     const townOpen = useUiSelector((s) => s.isTownOpen());
+    const charCreateOpen = useUiSelector((s) => s.isCharCreateOpen());
 
     return (
         <>
@@ -45,6 +47,7 @@ export function OverlayRoot() {
                 </div>
             )}
             {townOpen && <TownScreen />}
+            {charCreateOpen && <CharacterCreation />}
         </>
     );
 }

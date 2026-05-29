@@ -13,7 +13,6 @@ import { PartyManager } from '../character/PartyManager';
 import { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
-import { CharacterCreationUI } from '../ui/CharacterCreationUI';
 import { ITEMS } from '../data/ItemDB';
 import { renderGameTitle } from '../ui/UITheme';
 import { t } from '../i18n/LanguageManager';
@@ -51,9 +50,6 @@ export class GameManager {
     public inventoryUI: InventoryUI;
     public partyUI: PartyUI;
     public charUI: CharacterPanelUI;
-
-    // Character creation
-    private charCreateUI!: CharacterCreationUI;
 
     // Title screen
     private titleBg = new Image();
@@ -94,24 +90,9 @@ export class GameManager {
         this.charUI = new CharacterPanelUI(this.party);
         this.charUI.getGold = () => this.playerData.gold;
 
-        // Character creation UI
-        this.charCreateUI = new CharacterCreationUI();
-
         // Title background image
         this.titleBg.src = '/assets/images/backgrounds/start.jpg';
         this.titleBg.onload = () => { this.titleBgLoaded = true; };
-
-        this.charCreateUI.onComplete = (name: string, classId: string, gender: string) => {
-            const charId = `player_${Date.now()}`;
-            const char = new Character(charId, name, classId);
-            char.gender = gender;
-            this.party.addToRoster(char);
-            this.party.deployCharacter(char);
-            this.party.switchTo(0);
-            this.inventoryUI.setActiveCharacter(char);
-            this.charCreateUI.destroy(); // Remove HTML name input from DOM
-            this.transitionTo(GameState.WORLD, () => this.initWorldEngine());
-        };
 
         this.pauseMenu.onResume = () => undefined;
         this.pauseMenu.onOpenSettings = () => this.settingsUI.open();
@@ -204,6 +185,21 @@ export class GameManager {
     public getTownSession(): WorldTownSession | null {
         if (this.state !== GameState.WORLD || !this.worldEngine) return null;
         return this.worldEngine.getTownSession();
+    }
+
+    // ─── Character creation (DOM overlay) ─────────────────────────
+    public isCharCreationState(): boolean { return this.state === GameState.CHARACTER_CREATION; }
+
+    /** Create the player character from the DOM creation screen and enter the world. */
+    public completeCharacterCreation(name: string, classId: string, gender: string): void {
+        const charId = `player_${Date.now()}`;
+        const char = new Character(charId, name.trim() || 'Hero', classId);
+        char.gender = gender;
+        this.party.addToRoster(char);
+        this.party.deployCharacter(char);
+        this.party.switchTo(0);
+        this.inventoryUI.setActiveCharacter(char);
+        this.transitionTo(GameState.WORLD, () => this.initWorldEngine());
     }
 
     // ─── Pause menu (DOM overlay) ─────────────────────────────────
@@ -314,11 +310,7 @@ export class GameManager {
                 break;
 
             case GameState.CHARACTER_CREATION:
-                this.charCreateUI.onMouseMove(smx, smy);
-                if (this.input.mouseJustDown) {
-                    this.charCreateUI.onMouseDown(smx, smy);
-                }
-                this.charCreateUI.updateInput(this.input);
+                // Rendered & handled by the React DOM overlay (CharacterCreation).
                 break;
 
             case GameState.WORLD:
@@ -393,12 +385,7 @@ export class GameManager {
                 break;
 
             case GameState.CHARACTER_CREATION:
-                this.ctx.save();
-                this.ctx.scale(scale, scale);
-                const vw = Math.floor(w / scale);
-                const vh = Math.floor(h / scale);
-                this.charCreateUI.render(this.ctx, vw, vh);
-                this.ctx.restore();
+                // Drawn by the React DOM overlay (CharacterCreation).
                 break;
 
             case GameState.WORLD:

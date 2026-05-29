@@ -122,4 +122,11 @@ export class UiStore {
 
     restPurchase = (menuId: string): boolean => { const ok = this.town()?.purchaseRestMenu(menuId) ?? false; this.tick(); return ok; };
     restTreat = (): boolean => { const ok = this.town()?.treatActivePartyInjuries() ?? false; this.tick(); return ok; };
+
+    // ─── Character creation (DOM overlay) ─────────────────────────
+    isCharCreateOpen = (): boolean => this.gm.isCharCreationState();
+    charCreateComplete = (name: string, classId: string, gender: string): void => {
+        this.gm.completeCharacterCreation(name, classId, gender);
+        this.tick();
+    };
 }

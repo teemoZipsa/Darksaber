@@ -109,6 +109,8 @@ export const i18n = {
             'create.namePrompt': '총 지휘관의 이름을 정하세요',
             'create.genderPrompt': '성별을 고르세요',
             'create.confirm': '확 인',
+            'create.male': '남',
+            'create.female': '여',
             
             // Shop
             'shop.title': '🏪 상점',
@@ -398,6 +400,8 @@ export const i18n = {
             'create.namePrompt': 'Enter your player nickname',
             'create.genderPrompt': 'Select gender',
             'create.confirm': 'Confirm',
+            'create.male': 'Male',
+            'create.female': 'Female',
             
             // Shop
             'shop.title': '🏪 Merchant',
