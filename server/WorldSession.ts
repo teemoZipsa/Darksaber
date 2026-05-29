@@ -571,13 +571,16 @@ export class WorldSession {
     private resolveEnemyTurn(entry: ServerEnemy, now: number): CombatEventMessage[] {
         const enemy = entry.enemy;
         const targets = this.getTargetableActors();
-        const closest = targets[0] ?? null;
+        const enemyTile = { x: enemy.gridX, y: enemy.gridY };
+        const closest = targets.reduce<ServerActor | null>((best, candidate) => {
+            if (!best) return candidate;
+            return manhattan(enemyTile, candidate.tile) < manhattan(enemyTile, best.tile) ? candidate : best;
+        }, null);
         if (!closest) {
             this.wanderEnemy(entry, now);
             return [];
         }
 
-        const enemyTile = { x: enemy.gridX, y: enemy.gridY };
         const distanceToTarget = manhattan(enemyTile, closest.tile);
         const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
         enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);

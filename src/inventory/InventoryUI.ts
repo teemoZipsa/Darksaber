@@ -432,6 +432,39 @@ export class InventoryUI {
         this.dragFromEquip = null;
     }
 
+    /**
+     * Roll back a raid-loot transfer the server rejected (lock lost, item gone, etc.).
+     * Pulls the item back out of the player's bag/equipment and restores it into the
+     * open loot grid so the client view matches the authoritative server state.
+     */
+    public revertRaidLoot(placed: PlacedItem, source: { gridX: number; gridY: number }): void {
+        let removed = false;
+        if (this.inventory.items.includes(placed)) {
+            this.inventory.remove(placed);
+            removed = true;
+        } else if (this.activeChar) {
+            for (const [slot, equipped] of this.activeChar.equipment) {
+                if (equipped === placed) {
+                    this.activeChar.equipment.delete(slot);
+                    removed = true;
+                    break;
+                }
+            }
+        }
+        if (!removed) return;
+        placed.acquiredInRaid = false;
+        if (this.externalGrid) {
+            const restored = this.externalGrid.place(placed.item, source.gridX, source.gridY)
+                ?? this.externalGrid.autoPlace(placed.item);
+            if (restored) {
+                restored.durability = placed.durability;
+                restored.quantity = placed.quantity;
+                restored.sockets = placed.sockets;
+            }
+        }
+        this.setFeedback('전리품 획득이 취소되었습니다.');
+    }
+
     private markRaidLootIfNeeded(placed: PlacedItem, targetGrid: GridInventory): void {
         if (this.externalGridIsRaidLoot && this.dragSourceGrid === this.externalGrid && targetGrid === this.inventory) {
             placed.acquiredInRaid = true;

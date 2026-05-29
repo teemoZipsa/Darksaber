@@ -10,7 +10,7 @@ import { Enemy } from '../entity/Enemy';
 import { LootObject } from '../entity/LootObject';
 import { PartyManager } from '../character/PartyManager';
 import { Character } from '../character/Character';
-import { GridInventory } from '../inventory/GridInventory';
+import { GridInventory, type PlacedItem } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
 import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
@@ -76,6 +76,7 @@ import { HitStop } from './world/HitStop';
 import { NetworkRaidClient } from '../net/NetworkRaidClient';
 import {
     DEFAULT_WORLD_SERVER_URL,
+    type ActionRejectedMessage,
     type ActorSnapshot,
     type CombatEventMessage,
     type GridSnapshot,
@@ -100,6 +101,7 @@ export class WorldEngine {
     private isNetworkRaid = false;
     private isNetworkRaidConnecting = false;
     private networkPlayerId: string | null = null;
+    private pendingLootPicks = new Map<string, { placed: PlacedItem; source: { gridX: number; gridY: number }; at: number }>();
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
     private fusionTempleUI = new FusionTempleUI();
@@ -386,9 +388,11 @@ export class WorldEngine {
             getCombatLog: () => this.combatLog,
             onUnhandledEscape: () => this.gameManager.openPauseMenu(),
         });
-        this.gameManager.inventoryUI.onRaidLootSecured = (_placed, source) => {
+        this.gameManager.inventoryUI.onRaidLootSecured = (placed, source) => {
             if (!this.isNetworkRaid || !this.networkRaidClient || !source || !this.selectionController.lootId) return;
-            this.networkRaidClient.sendLootPickup(this.selectionController.lootId, source.gridX, source.gridY);
+            const intentId = this.networkRaidClient.sendLootPickup(this.selectionController.lootId, source.gridX, source.gridY);
+            this.pendingLootPicks.set(intentId, { placed, source, at: Date.now() });
+            this.purgeStaleLootPicks();
         };
 
         this.spawnPartyAtCurrentHub();
@@ -494,7 +498,9 @@ export class WorldEngine {
 
     private openTown(town: TownInfo): void {
         if (this.isNetworkRaid) {
-            this.closeNetworkRaidClient(false);
+            // Reaching town while still flagged as a network raid means the player is
+            // abandoning the run client-side, so tell the server instead of going silent.
+            this.closeNetworkRaidClient(true);
             this.isNetworkRaid = false;
             this.networkPlayerId = null;
         }
@@ -590,7 +596,7 @@ export class WorldEngine {
             onCombatEvent: (event) => this.handleNetworkCombatEvent(event),
             onLootGrant: (grant) => this.openNetworkLoot(grant),
             onRaidResult: (result) => this.handleNetworkRaidResult(result),
-            onActionRejected: (rejection) => this.addCombatLog(`서버 거부: ${rejection.reason}`),
+            onActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
             onErrorMessage: (error) => this.addCombatLog(`서버 오류(${error.code}): ${error.message}`),
             onGraceExpired: () => this.handleNetworkGraceExpired(),
         });
@@ -800,6 +806,24 @@ export class WorldEngine {
         this.selectionController.selectLoot(grant.lootId);
     }
 
+    private handleNetworkActionRejected(rejection: ActionRejectedMessage): void {
+        const pending = this.pendingLootPicks.get(rejection.intentId);
+        if (pending) {
+            this.pendingLootPicks.delete(rejection.intentId);
+            this.gameManager.inventoryUI.revertRaidLoot(pending.placed, pending.source);
+            this.addCombatLog(`전리품 획득 실패: ${rejection.reason}`);
+            return;
+        }
+        this.addCombatLog(`서버 거부: ${rejection.reason}`);
+    }
+
+    private purgeStaleLootPicks(): void {
+        const now = Date.now();
+        for (const [intentId, pick] of this.pendingLootPicks) {
+            if (now - pick.at > 10_000) this.pendingLootPicks.delete(intentId);
+        }
+    }
+
     private handleNetworkCombatEvent(event: CombatEventMessage): void {
         const targetEnemy = this.getEnemyById(event.targetId);
         const targetActor = this.partyActors.find((actor) => actor.id === event.targetId);
@@ -855,6 +879,7 @@ export class WorldEngine {
     }
 
     private closeNetworkRaidClient(sendLeave: boolean, reason: 'town' | 'wipe' | 'manual' = 'manual'): void {
+        this.pendingLootPicks.clear();
         if (!this.networkRaidClient) return;
         if (sendLeave) this.networkRaidClient.leave(reason);
         else this.networkRaidClient.close();
@@ -1243,7 +1268,16 @@ export class WorldEngine {
     }
 
     private getControlledActor(): FieldActor | null {
-        return this.partyActors[this.party.getActiveIndex()] ?? this.partyActors.find((actor) => !actor.character.isDead) ?? null;
+        // partyActors may also hold remote players' actors during a network raid, so
+        // resolve the controlled actor by local Character identity rather than by raw
+        // index, which could otherwise point at someone else's unit.
+        const characters = this.party.getCharacters();
+        const activeChar = characters[this.party.getActiveIndex()];
+        const localActors = this.partyActors.filter((actor) => characters.includes(actor.character));
+        return localActors.find((actor) => actor.character === activeChar)
+            ?? localActors.find((actor) => !actor.character.isDead)
+            ?? localActors[0]
+            ?? null;
     }
 
     private getActivePartyTurnActor(): FieldActor | null {

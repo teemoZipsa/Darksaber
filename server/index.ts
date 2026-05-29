@@ -5,6 +5,7 @@
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
+import { WORLD_PROTOCOL_VERSION } from '../src/net/WorldProtocol';
 import type {
     WorldClientMessage,
     WorldServerMessage,
@@ -28,6 +29,14 @@ wss.on('connection', (ws: WebSocket) => {
         }
 
         if (message.type === 'WORLD_JOIN') {
+            if (playerBySocket.has(ws)) {
+                send(ws, { type: 'ERROR', code: 'ALREADY_JOINED', message: 'This connection already joined a raid.' });
+                return;
+            }
+            if (message.clientVersion !== WORLD_PROTOCOL_VERSION) {
+                send(ws, { type: 'ERROR', code: 'VERSION_MISMATCH', message: `Unsupported client version: ${message.clientVersion}` });
+                return;
+            }
             const result = session.join(message);
             bindPlayer(ws, result.playerId);
             send(ws, result.welcome);

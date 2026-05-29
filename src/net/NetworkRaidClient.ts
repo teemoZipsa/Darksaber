@@ -34,6 +34,7 @@ export interface NetworkRaidClientOptions {
 
 const RESUME_TOKEN_KEY = 'darksaber_world_resume_token';
 const GRACE_MS = 30_000;
+const RECONNECT_INTERVAL_MS = 2_000;
 
 export class NetworkRaidClient {
     private readonly url: string;
@@ -43,7 +44,10 @@ export class NetworkRaidClient {
     private playerId: string | null = null;
     private resumeToken: string | null = null;
     private manualClose = false;
-    private graceTimer: number | null = null;
+    private reconnecting = false;
+    private reconnectTimer: number | null = null;
+    private graceDeadline = 0;
+    private joinInput: NetworkRaidJoinInput | null = null;
     private pendingWelcome:
         | { resolve: (welcome: WorldWelcomeMessage) => void; reject: (error: Error) => void }
         | null = null;
@@ -51,7 +55,7 @@ export class NetworkRaidClient {
     constructor(options: NetworkRaidClientOptions = {}) {
         this.url = options.url ?? DEFAULT_WORLD_SERVER_URL;
         this.options = options;
-        this.resumeToken = options.url ? this.readStoredResumeToken() : this.readStoredResumeToken();
+        this.resumeToken = this.readStoredResumeToken();
     }
 
     public getPlayerId(): string | null {
@@ -68,36 +72,51 @@ export class NetworkRaidClient {
 
     public async connectAndJoin(input: NetworkRaidJoinInput): Promise<WorldWelcomeMessage> {
         this.manualClose = false;
-        this.clearGraceTimer();
-
-        const socket = new WebSocket(this.url);
-        this.socket = socket;
+        this.joinInput = input;
+        this.clearReconnect();
 
         const welcomePromise = new Promise<WorldWelcomeMessage>((resolve, reject) => {
             this.pendingWelcome = { resolve, reject };
         });
+        this.openSocket();
+        return welcomePromise;
+    }
 
-        socket.onopen = () => {
-            const resumeToken = input.resumeToken ?? this.resumeToken ?? undefined;
-            this.send({
-                type: 'WORLD_JOIN',
-                originHubId: input.originHubId,
-                partyComposition: input.partyComposition,
-                clientVersion: WORLD_PROTOCOL_VERSION,
-                resumeToken,
-            });
-        };
+    private openSocket(): void {
+        const socket = new WebSocket(this.url);
+        this.socket = socket;
+        socket.onopen = () => this.sendJoinOrReconnect();
         socket.onmessage = (event) => this.handleMessage(event.data);
         socket.onerror = () => {
-            this.rejectPendingWelcome(new Error(`Failed to connect to ${this.url}`));
+            if (this.pendingWelcome) this.rejectPendingWelcome(new Error(`Failed to connect to ${this.url}`));
         };
         socket.onclose = () => {
             this.socket = null;
-            this.rejectPendingWelcome(new Error('World server connection closed before welcome.'));
-            if (!this.manualClose) this.startGraceTimer();
+            if (this.pendingWelcome) {
+                this.rejectPendingWelcome(new Error('World server connection closed before welcome.'));
+                return;
+            }
+            // Only auto-reconnect once we have actually joined a session; a close before
+            // any welcome is an initial-connect failure the caller already handles.
+            if (!this.manualClose && this.playerId) this.scheduleReconnect();
         };
+    }
 
-        return welcomePromise;
+    private sendJoinOrReconnect(): void {
+        if (this.reconnecting && this.resumeToken) {
+            this.send({ type: 'RECONNECT', resumeToken: this.resumeToken });
+            return;
+        }
+        const input = this.joinInput;
+        if (!input) return;
+        const resumeToken = input.resumeToken ?? this.resumeToken ?? undefined;
+        this.send({
+            type: 'WORLD_JOIN',
+            originHubId: input.originHubId,
+            partyComposition: input.partyComposition,
+            clientVersion: WORLD_PROTOCOL_VERSION,
+            resumeToken,
+        });
     }
 
     public sendIntent(actorId: string, kind: PlayerIntentKind, payload: unknown, intentId: string = createIntentId()): string {
@@ -129,7 +148,7 @@ export class NetworkRaidClient {
 
     public close(): void {
         this.manualClose = true;
-        this.clearGraceTimer();
+        this.clearReconnect();
         if (this.socket && this.socket.readyState <= WebSocket.OPEN) this.socket.close();
         this.socket = null;
         this.pendingWelcome = null;
@@ -149,6 +168,7 @@ export class NetworkRaidClient {
                 this.playerId = message.playerId;
                 this.resumeToken = message.resumeToken;
                 this.storeResumeToken(message.resumeToken);
+                this.clearReconnect();
                 this.pendingWelcome?.resolve(message);
                 this.pendingWelcome = null;
                 break;
@@ -164,12 +184,14 @@ export class NetworkRaidClient {
                 this.options.onLootGrant?.(message);
                 break;
             case 'RAID_RESULT':
+                this.clearStoredResumeToken();
                 this.options.onRaidResult?.(message);
                 break;
             case 'ACTION_REJECTED':
                 this.options.onActionRejected?.(message);
                 break;
             case 'ERROR':
+                if (message.code === 'RESUME_FAILED') this.expireGrace();
                 this.options.onErrorMessage?.(message);
                 break;
         }
@@ -185,18 +207,46 @@ export class NetworkRaidClient {
         this.pendingWelcome = null;
     }
 
-    private startGraceTimer(): void {
-        this.clearGraceTimer();
-        this.graceTimer = window.setTimeout(() => {
-            this.graceTimer = null;
-            this.options.onGraceExpired?.();
-        }, GRACE_MS);
+    private scheduleReconnect(): void {
+        if (this.manualClose) return;
+        if (!this.resumeToken) {
+            this.expireGrace();
+            return;
+        }
+        if (this.graceDeadline === 0) this.graceDeadline = Date.now() + GRACE_MS;
+        if (Date.now() >= this.graceDeadline) {
+            this.expireGrace();
+            return;
+        }
+        this.reconnecting = true;
+        if (this.reconnectTimer !== null) return;
+        this.reconnectTimer = window.setTimeout(() => {
+            this.reconnectTimer = null;
+            if (this.manualClose || this.socket) return;
+            if (Date.now() >= this.graceDeadline) {
+                this.expireGrace();
+                return;
+            }
+            this.openSocket();
+        }, RECONNECT_INTERVAL_MS);
     }
 
-    private clearGraceTimer(): void {
-        if (this.graceTimer === null) return;
-        window.clearTimeout(this.graceTimer);
-        this.graceTimer = null;
+    private expireGrace(): void {
+        const wasReconnecting = this.reconnecting || this.graceDeadline !== 0;
+        this.clearReconnect();
+        this.manualClose = true;
+        if (this.socket && this.socket.readyState <= WebSocket.OPEN) this.socket.close();
+        this.socket = null;
+        if (wasReconnecting) this.options.onGraceExpired?.();
+    }
+
+    private clearReconnect(): void {
+        if (this.reconnectTimer !== null) {
+            window.clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+        this.reconnecting = false;
+        this.graceDeadline = 0;
     }
 
     private readStoredResumeToken(): string | null {
@@ -212,6 +262,15 @@ export class NetworkRaidClient {
             localStorage.setItem(RESUME_TOKEN_KEY, token);
         } catch {
             // Ignore storage failures; reconnect just starts fresh.
+        }
+    }
+
+    private clearStoredResumeToken(): void {
+        this.resumeToken = null;
+        try {
+            localStorage.removeItem(RESUME_TOKEN_KEY);
+        } catch {
+            // Ignore storage failures.
         }
     }
 }
