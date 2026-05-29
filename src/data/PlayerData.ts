@@ -14,6 +14,7 @@ export interface InventoryItem {
 export interface SaveData {
     gold: number;
     clearedStages: string[];
+    questItems?: string[];
     currentHubTownId: string;
     pendingRestMenuId: string | null;
     inventory: InventoryItem[];
@@ -26,6 +27,7 @@ const SAVE_KEY = 'sin_eater_save';
 export class PlayerData {
     public gold: number = 500;  // Starting gold
     public clearedStages: Set<string> = new Set();
+    public questItems: Set<string> = new Set();
     public currentHubTownId: string = 'central_castle';
     public pendingRestMenuId: string | null = null;
     public inventory: InventoryItem[] = [];
@@ -55,6 +57,14 @@ export class PlayerData {
         return this.clearedStages.has(stageId);
     }
 
+    public addQuestItem(itemId: string): void {
+        this.questItems.add(itemId);
+    }
+
+    public hasQuestItem(itemId: string): boolean {
+        return this.questItems.has(itemId);
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  Save / Load (localStorage for now, Firebase later)
     // ═══════════════════════════════════════════════════════════
@@ -63,6 +73,7 @@ export class PlayerData {
         const data: SaveData = {
             gold: this.gold,
             clearedStages: Array.from(this.clearedStages),
+            questItems: Array.from(this.questItems),
             currentHubTownId: this.currentHubTownId,
             pendingRestMenuId: this.pendingRestMenuId,
             inventory: this.inventory,
@@ -81,6 +92,7 @@ export class PlayerData {
             const data: SaveData = JSON.parse(raw);
             this.gold = data.gold ?? 500;
             this.clearedStages = new Set(data.clearedStages ?? []);
+            this.questItems = new Set(data.questItems ?? []);
             this.currentHubTownId = data.currentHubTownId ?? 'central_castle';
             this.pendingRestMenuId = data.pendingRestMenuId ?? null;
             this.inventory = data.inventory ?? [];

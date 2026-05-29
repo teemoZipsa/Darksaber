@@ -15,6 +15,7 @@ import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
 import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
 import { getClassAttackProfile } from '../data/AttackPatternProfiles';
+import { t } from '../i18n/LanguageManager';
 import {
     BURGOS_CASTLE_DUNGEON_ID,
     MONSTER_ROW_BY_FACING,
@@ -508,8 +509,14 @@ export class WorldEngine {
         return this.townSession.isVisible() || this.raidOutcomeController.isVisible() || this.fusionTempleUI.isVisible();
     }
 
+    public isQuestJournalAvailable(): boolean {
+        return !this.raidOutcomeController.isVisible() && !this.fusionTempleUI.isVisible();
+    }
+
     /** Town visit session (consumed by the React DOM overlay via GameManager). */
     public getTownSession(): WorldTownSession { return this.townSession; }
+
+    public getRaidSession(): WorldRaidSession { return this.raidSession; }
 
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
         this.renderController.render(ctx, camera, width, height);
@@ -592,6 +599,7 @@ export class WorldEngine {
         if (this.gameManager.inventoryUI.isVisible()) this.gameManager.inventoryUI.toggle();
         if (this.gameManager.partyUI.isVisible()) this.gameManager.partyUI.toggle();
         if (this.gameManager.charUI.isVisible()) this.gameManager.charUI.toggle();
+        this.gameManager.closeQuestJournal();
         this.gameManager.closePauseMenu();
         this.closeActionMenu();
         this.closeTacticalMenu();
@@ -1038,7 +1046,7 @@ export class WorldEngine {
         this.worldMap.loot = content.loot;
         this.clearFieldTurnState();
         this.dismissedDungeonVisitKey = this.getCurrentDungeonVisitKey(dungeon);
-        this.addCombatLog('부르고스성 진입. 보스를 쓰러뜨리면 던전이 종료됩니다.');
+        this.addCombatLog(t('story.ep01.enterDungeonLog'));
     }
 
     private openFusionTemple(): void {
@@ -1275,7 +1283,7 @@ export class WorldEngine {
         this.worldMap.loot = [];
         this.selectionController.clear();
         this.clearFieldTurnState();
-        this.addCombatLog('부르고스성 클리어. 던전이 종료되었습니다.');
+        this.addCombatLog(t('story.ep01.objectiveCompleteLog'));
     }
 
     private awardDefeatExp(actor: FieldActor, enemy: Enemy): void {

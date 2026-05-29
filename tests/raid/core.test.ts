@@ -119,6 +119,9 @@ test('sellable flag blocks bound or quest items from shop sale lists', () => {
 
     assert.equal(isSellableItem(bound), false);
     assert.equal(isSellableItem({ ...bound, sellable: undefined }), true);
+    const bomb = getItemDef('quest_bomb');
+    assert.ok(bomb);
+    assert.equal(isSellableItem(bomb), false);
 });
 
 test('raid failure loss clears backpack snapshots and skips empty equipment', () => {
@@ -229,6 +232,7 @@ test('pending rest menu id persists through PlayerData save and load', () => {
         player.gold = 321;
         player.currentHubTownId = 'w_forest_village';
         player.pendingRestMenuId = 'hearty_breakfast';
+        player.addQuestItem('quest_bomb');
         player.save();
 
         const loaded = new PlayerData();
@@ -237,6 +241,7 @@ test('pending rest menu id persists through PlayerData save and load', () => {
         assert.equal(loaded.gold, 321);
         assert.equal(loaded.currentHubTownId, 'w_forest_village');
         assert.equal(loaded.pendingRestMenuId, 'hearty_breakfast');
+        assert.equal(loaded.hasQuestItem('quest_bomb'), true);
     } finally {
         globalThis.localStorage = previousStorage;
     }

@@ -1,0 +1,102 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import type { PartyManager } from '../../src/character/PartyManager';
+import type { GameManager } from '../../src/engine/GameManager';
+import { WorldRaidOutcomeController, type WorldRaidOutcomeContext } from '../../src/engine/world/WorldRaidOutcomeController';
+import { WorldRaidSession } from '../../src/engine/world/WorldRaidSession';
+import type { WorldTownSession } from '../../src/engine/world/WorldTownSession';
+import { GridInventory } from '../../src/inventory/GridInventory';
+import type { TownInfo } from '../../src/map/BiomeMask';
+import type { RaidOutcome } from '../../src/raid/RaidOutcome';
+import { PlayerData } from '../../src/data/PlayerData';
+import { BURGOS_CASTLE_DUNGEON_ID } from '../../src/data/MonsterCatalog';
+import { MAIN_QUEST_EPISODE_01_ID, QUEST_BOMB_ITEM_ID } from '../../src/data/StoryQuestData';
+
+const DESTINATION_TOWN: TownInfo = {
+    id: 'w_forest_village',
+    name: 'Forest Village',
+    nameKr: '숲속 마을',
+    chunkX: 0,
+    chunkY: 0,
+    radius: 1,
+};
+
+function markBurgosObjectiveComplete(raidSession: WorldRaidSession): void {
+    raidSession.startDungeonEncounter(BURGOS_CASTLE_DUNGEON_ID);
+    raidSession.completeDungeonEncounter(BURGOS_CASTLE_DUNGEON_ID);
+}
+
+function createController() {
+    const playerData = new PlayerData();
+    playerData.markCleared('quest:first_survival');
+    const raidSession = new WorldRaidSession('central_castle');
+    const party = {
+        getCharacters: () => [],
+        resetForNewRaid: () => undefined,
+    } as unknown as PartyManager;
+    const townSession = {
+        clearRestStatusesFromParty: () => undefined,
+        applyRaidInjuries: (_downedCharacterIds: Set<string>) => undefined,
+        hide: () => undefined,
+    } as unknown as WorldTownSession;
+    const gameManager = {
+        inventory: new GridInventory(10, 6),
+        stash: new GridInventory(15, 10),
+    } as unknown as GameManager;
+    const context: WorldRaidOutcomeContext = {
+        party,
+        playerData,
+        gameManager,
+        raidSession,
+        townSession,
+        getTownById: () => DESTINATION_TOWN,
+        getCurrentHubTown: () => DESTINATION_TOWN,
+        placePartyAtTown: (_town: TownInfo) => undefined,
+        openTown: (_town: TownInfo) => undefined,
+        setPhase: () => undefined,
+        log: () => undefined,
+    };
+    const controller = new WorldRaidOutcomeController(context);
+    const getOutcome = (): RaidOutcome | null =>
+        (controller as unknown as { raidResultUI: { outcome: RaidOutcome | null } }).raidResultUI.outcome;
+
+    return { controller, playerData, raidSession, getOutcome };
+}
+
+test('Burgos objective grants episode 1 completion and bomb only after survival', () => {
+    const { controller, playerData, raidSession, getOutcome } = createController();
+    raidSession.beginRaidFromTown('central_castle');
+    markBurgosObjectiveComplete(raidSession);
+
+    controller.completeSuccess(DESTINATION_TOWN);
+
+    assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_01_ID), true);
+    assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), true);
+    assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('1화')));
+    assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('폭탄')));
+});
+
+test('completed episode 1 does not grant duplicate story rewards', () => {
+    const { controller, playerData, raidSession, getOutcome } = createController();
+    playerData.markCleared(MAIN_QUEST_EPISODE_01_ID);
+    playerData.addQuestItem(QUEST_BOMB_ITEM_ID);
+    raidSession.beginRaidFromTown('central_castle');
+    markBurgosObjectiveComplete(raidSession);
+
+    controller.completeSuccess(DESTINATION_TOWN);
+
+    assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), true);
+    assert.deepEqual(getOutcome()?.questRewards ?? [], []);
+});
+
+test('Burgos objective does not grant episode 1 reward on raid failure', () => {
+    const { controller, playerData, raidSession, getOutcome } = createController();
+    raidSession.beginRaidFromTown('central_castle');
+    markBurgosObjectiveComplete(raidSession);
+
+    controller.completeFailure('DEAD');
+
+    assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_01_ID), false);
+    assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), false);
+    assert.equal(getOutcome()?.questRewards, undefined);
+});

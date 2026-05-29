@@ -19,6 +19,7 @@ import type { ShopEntry, SellEntry } from '../../ui/ShopUI';
 import type { ShopKind } from '../../data/ShopData';
 import type { TownInfo } from '../../map/BiomeMask';
 import type { InventoryUI } from '../../inventory/InventoryUI';
+import { getStoryQuestViews as buildStoryQuestViews, type StoryQuestView } from '../../data/StoryQuestData';
 
 export class UiStore {
     private listeners = new Set<() => void>();
@@ -53,6 +54,8 @@ export class UiStore {
     isPauseOpen = (): boolean => this.gm.isPauseMenuOpen();
     isSettingsOpen = (): boolean => this.gm.isSettingsMenuOpen();
     isPartyOpen = (): boolean => this.gm.partyUI.isVisible();
+    isQuestJournalOpen = (): boolean => this.gm.isQuestJournalOpen();
+    getStoryQuestViews = (): StoryQuestView[] => buildStoryQuestViews(this.gm.playerData, this.gm.getRaidSession());
 
     // ─── Actions (delegate to GameManager; never mutate directly) ──
     /** Switch the active party member; syncs dependent UI (e.g. inventory). */
@@ -78,6 +81,9 @@ export class UiStore {
 
     // ─── Settings actions ─────────────────────────────────────────
     closeSettings = (): void => { this.gm.closeSettingsMenu(); this.tick(); };
+
+    // ─── Quest journal actions ───────────────────────────────────
+    closeQuestJournal = (): void => { this.gm.closeQuestJournal(); this.tick(); };
 
     // ─── Party actions ────────────────────────────────────────────
     closeParty = (): void => {

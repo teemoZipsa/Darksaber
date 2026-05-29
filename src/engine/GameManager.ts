@@ -26,6 +26,7 @@ import { HitStop } from './world/HitStop';
 import { AudioManager } from './AudioManager';
 import type { UiStore } from '../ui/react/UiStore';
 import type { WorldTownSession } from './world/WorldTownSession';
+import type { WorldRaidSession } from './world/WorldRaidSession';
 
 export class GameManager {
     private canvas: HTMLCanvasElement;
@@ -60,6 +61,7 @@ export class GameManager {
     private transitions = new TransitionManager();
     private pauseMenu = new PauseMenuUI();
     private settingsUI = new SettingsUI();
+    private questJournalOpen = false;
 
     // React DOM UI overlay bridge (attached after construction in main.ts)
     private uiStore?: UiStore;
@@ -174,7 +176,8 @@ export class GameManager {
      */
     public isDomModalOpen(): boolean {
         return this.charUI.isVisible() || this.pauseMenu.isVisible()
-            || this.settingsUI.isVisible() || this.partyUI.isVisible();
+            || this.settingsUI.isVisible() || this.partyUI.isVisible()
+            || this.questJournalOpen;
     }
 
     /**
@@ -185,6 +188,29 @@ export class GameManager {
     public getTownSession(): WorldTownSession | null {
         if (this.state !== GameState.WORLD || !this.worldEngine) return null;
         return this.worldEngine.getTownSession();
+    }
+
+    public getRaidSession(): WorldRaidSession | null {
+        if (this.state !== GameState.WORLD || !this.worldEngine) return null;
+        return this.worldEngine.getRaidSession();
+    }
+
+    public isQuestJournalOpen(): boolean {
+        return this.questJournalOpen;
+    }
+
+    public closeQuestJournal(): void {
+        this.questJournalOpen = false;
+    }
+
+    private toggleQuestJournal(): void {
+        if (!this.worldEngine?.isQuestJournalAvailable()) return;
+        if (!this.questJournalOpen) {
+            if (this.inventoryUI.isVisible()) this.inventoryUI.toggle();
+            if (this.charUI.isVisible()) this.charUI.toggle();
+            if (this.partyUI.isVisible()) this.partyUI.toggle();
+        }
+        this.questJournalOpen = !this.questJournalOpen;
     }
 
     // ─── World inventory (DOM overlay) ────────────────────────────
@@ -334,6 +360,14 @@ export class GameManager {
                 // We only handle ESC-to-resume here and freeze the world while open.
                 if (this.pauseMenu.isVisible()) {
                     if (this.input.justPressed('Escape')) this.pauseResume();
+                    break;
+                }
+
+                if (this.input.justPressed('KeyJ')) {
+                    this.toggleQuestJournal();
+                }
+                if (this.questJournalOpen) {
+                    if (this.input.justPressed('Escape')) this.closeQuestJournal();
                     break;
                 }
 

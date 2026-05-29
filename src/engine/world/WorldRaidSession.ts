@@ -35,6 +35,7 @@ export class WorldRaidSession {
     public enterTown(townId: string): void {
         this.active = false;
         this.activeDungeonId = null;
+        this.clearedDungeonIds.clear();
         this.currentHubTownId = townId;
     }
 
@@ -72,12 +73,14 @@ export class WorldRaidSession {
     public completeAtTown(townId: string): void {
         this.active = false;
         this.activeDungeonId = null;
+        this.clearedDungeonIds.clear();
         this.currentHubTownId = townId;
     }
 
     public failBackToTown(townId: string): void {
         this.active = false;
         this.activeDungeonId = null;
+        this.clearedDungeonIds.clear();
         this.currentHubTownId = townId;
     }
 

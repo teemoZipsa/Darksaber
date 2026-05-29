@@ -380,6 +380,20 @@ const RAW_ITEMS: RawItemDef[] = [
         buyPrice: 50
     },
 
+    // ─── Quest Items ──────
+    {
+        id: 'quest_bomb', name: 'Bomb', nameKr: '폭탄',
+        slot: 'material', gridW: 1, gridH: 1, color: '#c05032', icon: '●',
+        maxDurability: 1,
+        description: 'A story item recovered after clearing the Burgos Castle quest.',
+        descriptionKr: '부르고스성 퀘스트 클리어 후 획득하는 스토리 아이템입니다.',
+        rarity: 'unique',
+        weight: 0.4,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'material'
+    },
+
     // ─── Original Darksaber town weapon shops ──────
     ...ORIGINAL_SHOP_ITEMS,
 
