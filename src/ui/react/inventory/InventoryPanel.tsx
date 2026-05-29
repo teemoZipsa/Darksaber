@@ -5,7 +5,7 @@
  * around the character · RIGHT: Tarkov-style backpack grid.
  *
  * Interaction:
- *  - HTML5 drag-and-drop moves an item precisely (grid↔grid, grid↔equip, socketing).
+ *  - Pointer drag moves an item precisely (grid↔grid, grid↔equip, socketing).
  *    Drop cell = the grid cell under the cursor (top-left of the placement).
  *  - A plain click quick-transfers (bag→ext, ext→bag, equip→bag), mirroring the
  *    canvas "click without dragging" shortcut.
@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties, DragEvent } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
@@ -29,23 +29,35 @@ import {
     type InvDragSource,
     type InvGridKind,
 } from '../../../inventory/InventoryUI';
+import type { ItemSlot } from '../../../data/ItemDB';
 import { useStore, useUiVersion } from '../UiContext';
-import { itemName, statSummary } from '../town/itemView';
+import { ItemGlyph, itemName, statSummary } from '../town/itemView';
 
 const CELL = 40;
+const DRAG_THRESHOLD = 5;
 
-type DragState = { placed: PlacedItem; source: InvDragSource } | null;
+type DragState = {
+    placed: PlacedItem;
+    source: InvDragSource;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    x: number;
+    y: number;
+    isDragging: boolean;
+} | null;
+type DragPreview = { placed: PlacedItem; x: number; y: number } | null;
 
 function InvItem({
     placed,
     spanned,
-    onDragStart,
-    onClick,
+    dragging,
+    onPointerDown,
 }: {
     placed: PlacedItem;
     spanned: boolean; // true = positioned on a grid; false = fills an equip slot
-    onDragStart: (e: DragEvent) => void;
-    onClick: () => void;
+    dragging: boolean;
+    onPointerDown: (e: ReactPointerEvent) => void;
 }) {
     const it = placed.item;
     const posStyle: CSSProperties = spanned
@@ -55,15 +67,13 @@ function InvItem({
     const socketed = placed.sockets?.length ?? 0;
     return (
         <div
-            className="inv-item"
-            draggable
+            className={`inv-item${dragging ? ' is-dragging' : ''}`}
             style={{ ...posStyle, background: `${it.color}33`, borderColor: it.color }}
-            onDragStart={onDragStart}
-            onClick={onClick}
+            onPointerDown={onPointerDown}
             title={`${itemName(it)}\n${statSummary(it)}`}
             aria-label={itemName(it)}
         >
-            <span className="inv-item__icon">{it.icon}</span>
+            <ItemGlyph item={it} className="inv-item__icon" />
             {placed.quantity > 1 && <span className="inv-item__qty">{placed.quantity}</span>}
             {!!it.maxSockets && (
                 <span className="inv-item__sockets">
@@ -81,6 +91,7 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
     useUiVersion();
     const store = useStore();
     const drag = useRef<DragState>(null);
+    const [dragPreview, setDragPreview] = useState<DragPreview>(null);
 
     const bag = inv.getBag();
     const ext = inv.getExternalGrid();
@@ -96,50 +107,100 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
         return () => window.clearTimeout(id);
     }, [fb.id]);
 
-    const beginDrag = (placed: PlacedItem, source: InvDragSource) => (e: DragEvent) => {
-        drag.current = { placed, source };
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', placed.item.id);
-    };
-
-    const dropOnGrid = (kind: InvGridKind) => (e: DragEvent) => {
+    const beginPointerDrag = (placed: PlacedItem, source: InvDragSource) => (e: ReactPointerEvent) => {
+        if (e.button !== 0) return;
+        drag.current = {
+            placed,
+            source,
+            pointerId: e.pointerId,
+            startX: e.clientX,
+            startY: e.clientY,
+            x: e.clientX,
+            y: e.clientY,
+            isDragging: false,
+        };
+        e.currentTarget.setPointerCapture(e.pointerId);
         e.preventDefault();
-        const d = drag.current; drag.current = null;
-        if (!d) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const gx = Math.floor((e.clientX - rect.left) / CELL);
-        const gy = Math.floor((e.clientY - rect.top) / CELL);
-        if (inv.moveToCell(d.placed, d.source, kind, gx, gy)) AudioManager.playUi('ui.confirm');
-        store.refresh();
+        e.stopPropagation();
     };
 
-    const dropOnEquip = (slot: typeof EQUIP_SLOT_LIST[number]['slot']) => (e: DragEvent) => {
-        e.preventDefault();
-        const d = drag.current; drag.current = null;
-        if (!d) return;
-        if (inv.moveToEquip(d.placed, d.source, slot)) AudioManager.playUi('ui.confirm');
-        store.refresh();
-    };
+    useEffect(() => {
+        const finishDrop = (d: NonNullable<DragState>, clientX: number, clientY: number): boolean => {
+            const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+            const gridEl = target?.closest<HTMLElement>('[data-inv-grid]');
+            if (gridEl) {
+                const kind = gridEl.dataset.invGrid as InvGridKind | undefined;
+                if (!kind) return false;
+                const rect = gridEl.getBoundingClientRect();
+                const gx = Math.floor((clientX - rect.left) / CELL);
+                const gy = Math.floor((clientY - rect.top) / CELL);
+                return inv.moveToCell(d.placed, d.source, kind, gx, gy);
+            }
+            const equipEl = target?.closest<HTMLElement>('[data-inv-equip]');
+            if (equipEl) {
+                const slot = equipEl.dataset.invEquip as ItemSlot | undefined;
+                if (!slot) return false;
+                return inv.moveToEquip(d.placed, d.source, slot);
+            }
+            return false;
+        };
 
-    const quick = (placed: PlacedItem, source: InvDragSource) => () => {
-        if (inv.quickMove(placed, source)) AudioManager.playUi('ui.hover');
-        store.refresh();
-    };
+        const onPointerMove = (e: PointerEvent) => {
+            const d = drag.current;
+            if (!d || e.pointerId !== d.pointerId) return;
+            d.x = e.clientX;
+            d.y = e.clientY;
+            const dist = Math.hypot(e.clientX - d.startX, e.clientY - d.startY);
+            if (!d.isDragging && dist >= DRAG_THRESHOLD) d.isDragging = true;
+            if (d.isDragging) {
+                setDragPreview({ placed: d.placed, x: e.clientX, y: e.clientY });
+                e.preventDefault();
+            }
+        };
+
+        const onPointerUp = (e: PointerEvent) => {
+            const d = drag.current;
+            if (!d || e.pointerId !== d.pointerId) return;
+            drag.current = null;
+            setDragPreview(null);
+            const success = d.isDragging
+                ? finishDrop(d, e.clientX, e.clientY)
+                : inv.quickMove(d.placed, d.source);
+            if (success) AudioManager.playUi(d.isDragging ? 'ui.confirm' : 'ui.hover');
+            store.refresh();
+            e.preventDefault();
+        };
+
+        const onPointerCancel = (e: PointerEvent) => {
+            const d = drag.current;
+            if (!d || e.pointerId !== d.pointerId) return;
+            drag.current = null;
+            setDragPreview(null);
+        };
+
+        window.addEventListener('pointermove', onPointerMove, { passive: false });
+        window.addEventListener('pointerup', onPointerUp, { passive: false });
+        window.addEventListener('pointercancel', onPointerCancel);
+        return () => {
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerup', onPointerUp);
+            window.removeEventListener('pointercancel', onPointerCancel);
+        };
+    }, [inv, store]);
 
     const renderGrid = (grid: GridInventory, kind: InvGridKind) => (
         <div
             className="inv-grid"
             style={{ width: grid.width * CELL, height: grid.height * CELL } as CSSProperties}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={dropOnGrid(kind)}
+            data-inv-grid={kind}
         >
             {grid.items.map((placed) => (
                 <InvItem
                     key={`${placed.item.id}-${placed.gridX}-${placed.gridY}`}
                     placed={placed}
                     spanned
-                    onDragStart={beginDrag(placed, { kind: 'grid', grid: kind, gridX: placed.gridX, gridY: placed.gridY })}
-                    onClick={quick(placed, { kind: 'grid', grid: kind, gridX: placed.gridX, gridY: placed.gridY })}
+                    dragging={dragPreview?.placed === placed}
+                    onPointerDown={beginPointerDrag(placed, { kind: 'grid', grid: kind, gridX: placed.gridX, gridY: placed.gridY })}
                 />
             ))}
         </div>
@@ -180,16 +241,15 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                                 <div
                                     key={slot}
                                     className={`inv-eqslot inv-eqslot--${slot}`}
-                                    onDragOver={(e) => e.preventDefault()}
-                                    onDrop={dropOnEquip(slot)}
+                                    data-inv-equip={slot}
                                     title={t(labelKey)}
                                 >
                                     {equipped ? (
                                         <InvItem
                                             placed={equipped}
                                             spanned={false}
-                                            onDragStart={beginDrag(equipped, { kind: 'equip', slot })}
-                                            onClick={quick(equipped, { kind: 'equip', slot })}
+                                            dragging={dragPreview?.placed === equipped}
+                                            onPointerDown={beginPointerDrag(equipped, { kind: 'equip', slot })}
                                         />
                                     ) : (
                                         <span className="inv-eqslot__label">{t(labelKey)}</span>
@@ -213,6 +273,21 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
             </div>
 
             <div className="ds-inv__feedback">{feedback}</div>
+            {dragPreview && (
+                <div
+                    className="inv-drag-ghost"
+                    style={{
+                        left: dragPreview.x,
+                        top: dragPreview.y,
+                        width: dragPreview.placed.item.gridW * CELL,
+                        height: dragPreview.placed.item.gridH * CELL,
+                        background: `${dragPreview.placed.item.color}33`,
+                        borderColor: dragPreview.placed.item.color,
+                    } as CSSProperties}
+                >
+                    <ItemGlyph item={dragPreview.placed.item} className="inv-item__icon" />
+                </div>
+            )}
         </div>
     );
 }
