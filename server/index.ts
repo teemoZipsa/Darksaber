@@ -14,7 +14,9 @@ import { WorldSession, WORLD_TICK_MS } from './WorldSession';
 
 const PORT = 8765;
 const wss = new WebSocketServer({ port: PORT });
-const session = new WorldSession();
+const session = new WorldSession({
+    logger: (message) => console.log(`[WorldSession] ${message}`),
+});
 const playerBySocket = new Map<WebSocket, string>();
 const socketByPlayer = new Map<string, WebSocket>();
 
@@ -96,6 +98,13 @@ setInterval(() => {
         if (ws) send(ws, { type: 'WORLD_SNAPSHOT', snapshot: session.createSnapshot(playerId) });
     }
 }, WORLD_TICK_MS);
+
+setInterval(() => {
+    const counts = session.getDebugCounts();
+    console.log(
+        `[WorldSession] counts activePlayers=${counts.activePlayers} ghosts=${counts.ghostPlayers} enemies=${counts.enemies} lootLocks=${counts.lootLocks}`
+    );
+}, 5_000);
 
 function bindPlayer(ws: WebSocket, playerId: string): void {
     const previous = socketByPlayer.get(playerId);

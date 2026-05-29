@@ -1,0 +1,233 @@
+/*
+ * darksaber-ui.css — DOM design system for the React UI overlay.
+ *
+ * "Full-dark Darkest Dungeon": near-black warm backgrounds, aged-leather panels,
+ * bronze-gold filigree, BRIGHT GOLD as the primary accent (where DD uses red),
+ * and RED reserved strictly for danger (low HP, death, critical warnings).
+ *
+ * All tokens are scoped to #ui-overlay so they never bleed into the existing
+ * dark-blue body theme or the canvas-drawn panels still in use.
+ */
+
+#ui-overlay {
+    /* Backgrounds */
+    --ds-bg-0: #0f0d0a;
+    --ds-bg-1: #1a1410;
+    --ds-panel-0: #2a2018;
+    --ds-panel-1: #3a2c1c;
+    --ds-panel-inset: #221a12;
+
+    /* Borders / filigree */
+    --ds-border: #c8a36d;          /* bronze-gold */
+    --ds-border-shadow: #8a6e3c;   /* darker bronze */
+    --ds-hairline: rgba(200, 163, 109, 0.18);
+
+    /* Accent (the "DD red" slot, now gold) */
+    --ds-accent: #f0c050;
+    --ds-accent-bright: #ffd700;
+    --ds-accent-soft: rgba(240, 192, 80, 0.16);
+
+    /* Text */
+    --ds-text: #e8e0d0;
+    --ds-text-muted: #9a8a70;
+    --ds-text-dim: #6f6354;
+
+    /* Semantic */
+    --ds-danger: #e43f5a;
+    --ds-hp: #4ade80;
+    --ds-mp: #60a5fa;
+    --ds-exp: #a78bfa;
+    --ds-atb: #f97316;
+
+    /* Shape */
+    --ds-radius: 8px;
+    --ds-radius-sm: 4px;
+
+    /* UI scale (overwritten per-frame from SettingsManager via inline style) */
+    --ds-scale: 1;
+
+    font-family: inherit; /* Pretendard / Noto Sans KR, already loaded on body */
+    color: var(--ds-text);
+}
+
+/* ─── Scrim ─────────────────────────────────────────────────── */
+#ui-overlay .ds-scrim {
+    position: absolute;
+    inset: 0;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(
+        ellipse at center,
+        rgba(0, 0, 0, 0.45) 0%,
+        rgba(0, 0, 0, 0.72) 100%
+    );
+    animation: ds-fade-in 120ms ease-out;
+}
+
+/* ─── Panel ─────────────────────────────────────────────────── */
+#ui-overlay .ds-panel {
+    pointer-events: auto;
+    position: relative;
+    background:
+        linear-gradient(160deg, var(--ds-panel-1) 0%, var(--ds-panel-0) 55%, var(--ds-bg-1) 100%);
+    border: 2px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius);
+    /* Double-border filigree (inner bronze) + amber inset glow + strong drop shadow */
+    box-shadow:
+        inset 0 0 0 1px var(--ds-border),
+        inset 0 1px 0 rgba(255, 230, 170, 0.10),
+        inset 0 0 28px rgba(0, 0, 0, 0.55),
+        0 18px 48px rgba(0, 0, 0, 0.65);
+    color: var(--ds-text);
+    transform: scale(var(--ds-scale));
+    transform-origin: center center;
+    animation: ds-pop-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ─── Panel header ──────────────────────────────────────────── */
+#ui-overlay .ds-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 14px 20px 12px;
+    border-bottom: 1px solid var(--ds-border-shadow);
+    background: linear-gradient(180deg, var(--ds-accent-soft) 0%, rgba(0, 0, 0, 0) 100%);
+}
+
+#ui-overlay .ds-panel__title {
+    font-family: var(--ds-font-title, "DOSMyungjo", serif);
+    font-size: 20px;
+    letter-spacing: 2px;
+    color: var(--ds-accent);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6), 0 0 12px rgba(240, 192, 80, 0.25);
+}
+
+/* ─── Close button ──────────────────────────────────────────── */
+#ui-overlay .ds-close-btn {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--ds-border-shadow);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--ds-text-muted);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 120ms, background 120ms, border-color 120ms;
+}
+#ui-overlay .ds-close-btn:hover {
+    color: #fff;
+    background: var(--ds-danger);
+    border-color: var(--ds-danger);
+}
+
+/* ─── Buttons ───────────────────────────────────────────────── */
+#ui-overlay .ds-btn {
+    pointer-events: auto;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--ds-text);
+    background: linear-gradient(180deg, var(--ds-panel-1), var(--ds-panel-0));
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: border-color 120ms, color 120ms, background 120ms;
+}
+#ui-overlay .ds-btn:hover {
+    border-color: var(--ds-border);
+    color: var(--ds-accent);
+}
+#ui-overlay .ds-btn[aria-selected="true"],
+#ui-overlay .ds-btn.is-active {
+    border-color: var(--ds-accent);
+    color: var(--ds-accent-bright);
+    box-shadow: inset 0 0 0 1px var(--ds-accent-soft);
+}
+#ui-overlay .ds-btn:disabled {
+    color: var(--ds-text-dim);
+    border-color: rgba(138, 110, 60, 0.4);
+    cursor: default;
+}
+#ui-overlay .ds-btn--danger:hover {
+    border-color: var(--ds-danger);
+    color: var(--ds-danger);
+}
+
+/* ─── Bars (HP / MP / EXP) ──────────────────────────────────── */
+#ui-overlay .ds-bar {
+    position: relative;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--ds-panel-inset);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+#ui-overlay .ds-bar__fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 180ms ease-out;
+    background: var(--ds-bar-color, var(--ds-accent));
+    box-shadow: 0 0 8px var(--ds-bar-color, var(--ds-accent));
+}
+#ui-overlay .ds-bar--hp { --ds-bar-color: var(--ds-hp); }
+#ui-overlay .ds-bar--mp { --ds-bar-color: var(--ds-mp); }
+#ui-overlay .ds-bar--exp { --ds-bar-color: var(--ds-exp); }
+#ui-overlay .ds-bar--hp.is-low { --ds-bar-color: var(--ds-danger); }
+#ui-overlay .ds-bar__label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    font-size: 11px;
+    color: var(--ds-text);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* ─── Stat rows / grid ──────────────────────────────────────── */
+#ui-overlay .ds-stat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--ds-hairline);
+    font-size: 13px;
+}
+#ui-overlay .ds-stat-row__label { color: var(--ds-text-muted); }
+#ui-overlay .ds-stat-row__value { color: var(--ds-text); font-variant-numeric: tabular-nums; }
+
+/* ─── Equipment slot ────────────────────────────────────────── */
+#ui-overlay .ds-slot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    background: var(--ds-panel-inset);
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+    font-size: 12px;
+}
+#ui-overlay .ds-slot__label { color: var(--ds-text-muted); }
+#ui-overlay .ds-slot__item { color: var(--ds-accent); }
+#ui-overlay .ds-slot__item.is-empty { color: var(--ds-text-dim); }
+
+/* ─── Animations ────────────────────────────────────────────── */
+@keyframes ds-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes ds-pop-in {
+    from { opacity: 0; transform: scale(calc(var(--ds-scale) * 0.96)); }
+    to { opacity: 1; transform: scale(var(--ds-scale)); }
+}

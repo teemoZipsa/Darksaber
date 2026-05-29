@@ -15,6 +15,8 @@ import {
     type WorldWelcomeMessage,
 } from './WorldProtocol';
 
+export type NetworkRaidStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
+
 export interface NetworkRaidJoinInput {
     originHubId: string;
     partyComposition: ActorSnapshot[];
@@ -29,6 +31,7 @@ export interface NetworkRaidClientOptions {
     onRaidResult?: (result: RaidResultMessage) => void;
     onActionRejected?: (rejection: ActionRejectedMessage) => void;
     onErrorMessage?: (error: WorldErrorMessage) => void;
+    onStatusChange?: (status: NetworkRaidStatus) => void;
     onGraceExpired?: () => void;
 }
 
@@ -48,6 +51,7 @@ export class NetworkRaidClient {
     private reconnectTimer: number | null = null;
     private graceDeadline = 0;
     private joinInput: NetworkRaidJoinInput | null = null;
+    private status: NetworkRaidStatus = 'idle';
     private pendingWelcome:
         | { resolve: (welcome: WorldWelcomeMessage) => void; reject: (error: Error) => void }
         | null = null;
@@ -70,10 +74,15 @@ export class NetworkRaidClient {
         return this.socket?.readyState === WebSocket.OPEN;
     }
 
+    public getStatus(): NetworkRaidStatus {
+        return this.status;
+    }
+
     public async connectAndJoin(input: NetworkRaidJoinInput): Promise<WorldWelcomeMessage> {
         this.manualClose = false;
         this.joinInput = input;
         this.clearReconnect();
+        this.setStatus('connecting');
 
         const welcomePromise = new Promise<WorldWelcomeMessage>((resolve, reject) => {
             this.pendingWelcome = { resolve, reject };
@@ -152,6 +161,7 @@ export class NetworkRaidClient {
         if (this.socket && this.socket.readyState <= WebSocket.OPEN) this.socket.close();
         this.socket = null;
         this.pendingWelcome = null;
+        this.setStatus('disconnected');
     }
 
     private handleMessage(raw: unknown): void {
@@ -169,6 +179,7 @@ export class NetworkRaidClient {
                 this.resumeToken = message.resumeToken;
                 this.storeResumeToken(message.resumeToken);
                 this.clearReconnect();
+                this.setStatus('connected');
                 this.pendingWelcome?.resolve(message);
                 this.pendingWelcome = null;
                 break;
@@ -205,6 +216,7 @@ export class NetworkRaidClient {
     private rejectPendingWelcome(error: Error): void {
         this.pendingWelcome?.reject(error);
         this.pendingWelcome = null;
+        this.setStatus('disconnected');
     }
 
     private scheduleReconnect(): void {
@@ -219,6 +231,7 @@ export class NetworkRaidClient {
             return;
         }
         this.reconnecting = true;
+        this.setStatus('reconnecting');
         if (this.reconnectTimer !== null) return;
         this.reconnectTimer = window.setTimeout(() => {
             this.reconnectTimer = null;
@@ -237,6 +250,7 @@ export class NetworkRaidClient {
         this.manualClose = true;
         if (this.socket && this.socket.readyState <= WebSocket.OPEN) this.socket.close();
         this.socket = null;
+        this.setStatus('disconnected');
         if (wasReconnecting) this.options.onGraceExpired?.();
     }
 
@@ -247,6 +261,12 @@ export class NetworkRaidClient {
         }
         this.reconnecting = false;
         this.graceDeadline = 0;
+    }
+
+    private setStatus(status: NetworkRaidStatus): void {
+        if (this.status === status) return;
+        this.status = status;
+        this.options.onStatusChange?.(status);
     }
 
     private readStoredResumeToken(): string | null {

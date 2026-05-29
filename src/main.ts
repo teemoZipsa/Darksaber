@@ -7,6 +7,7 @@ import { GameManager } from './engine/GameManager';
 import { SettingsManager } from './engine/SettingsManager';
 import { TileAssetManager } from './map/TileAssetManager';
 import { DarksaberSpriteAtlas } from './ui/DarksaberSpriteAtlas';
+import { mountUiOverlay } from './ui/react/mountOverlay';
 
 async function init(): Promise<void> {
     SettingsManager.init();
@@ -35,6 +36,10 @@ async function init(): Promise<void> {
 
     const manager = new GameManager(canvas);
     manager.start();
+
+    // Mount the React DOM UI overlay and hand the store to the game loop.
+    const uiStore = mountUiOverlay(manager);
+    manager.attachUiStore(uiStore);
 
     console.log('🎮 Darksaber : Extraction started');
 }

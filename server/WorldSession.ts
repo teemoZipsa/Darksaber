@@ -113,6 +113,18 @@ export interface WorldSessionMessageResult {
     broadcasts: WorldServerMessage[];
 }
 
+export interface WorldSessionDebugCounts {
+    activePlayers: number;
+    ghostPlayers: number;
+    enemies: number;
+    lootLocks: number;
+}
+
+export interface WorldSessionOptions {
+    ghostGraceMs?: number;
+    logger?: (message: string) => void;
+}
+
 const ENEMY_SPAWN_OFFSETS: TilePoint[] = [
     { x: 7, y: 3 },
     { x: 10, y: -2 },
@@ -146,9 +158,11 @@ export class WorldSession {
     private nextLootId = 1;
     private lastTickAt: number | null = null;
     private readonly ghostGraceMs: number;
+    private readonly logger: (message: string) => void;
 
-    constructor(options: { ghostGraceMs?: number } = {}) {
+    constructor(options: WorldSessionOptions = {}) {
         this.ghostGraceMs = options.ghostGraceMs ?? DISCONNECT_GRACE_MS;
+        this.logger = options.logger ?? (() => undefined);
     }
 
     public join(message: WorldJoinMessage, now: number = Date.now()): { playerId: string; welcome: WorldWelcomeMessage } {
@@ -157,6 +171,7 @@ export class WorldSession {
             resumed.ghost = false;
             resumed.disconnectedAt = null;
             const spawnTile = this.firstActorTile(resumed) ?? this.getOriginExitTile(resumed.originHubId);
+            this.log(`reconnect player=${resumed.id} origin=${resumed.originHubId}`);
             return {
                 playerId: resumed.id,
                 welcome: {
@@ -214,6 +229,7 @@ export class WorldSession {
         });
 
         this.ensureContentNear(spawnTile);
+        this.log(`join player=${playerId} origin=${originHubId} actors=${player.actorIds.length}`);
         return {
             playerId,
             welcome: {
@@ -232,6 +248,7 @@ export class WorldSession {
         player.ghost = false;
         player.disconnectedAt = null;
         const spawnTile = this.firstActorTile(player) ?? this.getOriginExitTile(player.originHubId);
+        this.log(`reconnect player=${player.id} origin=${player.originHubId}`);
         return {
             playerId: player.id,
             welcome: {
@@ -254,6 +271,7 @@ export class WorldSession {
             if (actor) actor.remainingAp = 0;
         }
         this.releaseLootLocksForPlayer(playerId);
+        this.log(`ghost start player=${playerId} graceMs=${this.ghostGraceMs}`);
     }
 
     public handleMessage(playerId: string, message: WorldClientMessage, now: number = Date.now()): WorldSessionMessageResult {
@@ -263,6 +281,7 @@ export class WorldSession {
             case 'LOOT_PICKUP':
                 return this.handleLootPickup(playerId, message.intentId, message.lootId, message.gridX, message.gridY, now);
             case 'WORLD_LEAVE':
+                this.log(`leave player=${playerId} reason=${message.reason}`);
                 return {
                     replies: [this.finishPlayer(playerId, message.reason === 'wipe' ? 'DEAD' : message.reason === 'town' ? 'SURVIVED' : 'LEFT')],
                     broadcasts: [],
@@ -280,6 +299,7 @@ export class WorldSession {
         for (const player of [...this.players.values()]) {
             if (!player.active) continue;
             if (player.ghost && player.disconnectedAt !== null && now - player.disconnectedAt >= this.ghostGraceMs) {
+                this.log(`despawn player=${player.id} reason=ghost_expired`);
                 this.removePlayer(player.id);
                 continue;
             }
@@ -392,6 +412,18 @@ export class WorldSession {
 
     public getPlayerByResumeToken(resumeToken: string): ServerPlayer | null {
         return [...this.players.values()].find((player) => player.resumeToken === resumeToken) ?? null;
+    }
+
+    public getDebugCounts(): WorldSessionDebugCounts {
+        const activePlayers = [...this.players.values()].filter((player) => player.active && !player.ghost).length;
+        const ghostPlayers = [...this.players.values()].filter((player) => player.active && player.ghost).length;
+        const enemies = [...this.enemies.values()].filter((entry) => entry.enemy.stats.hp > 0).length;
+        return {
+            activePlayers,
+            ghostPlayers,
+            enemies,
+            lootLocks: this.lootLocks.size,
+        };
     }
 
     private handleIntent(
@@ -691,6 +723,7 @@ export class WorldSession {
             departureTownId: player?.departureTownId ?? 'central_castle',
             extractionTownId,
         };
+        this.log(`raid result player=${playerId} result=${result} kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
         this.removePlayer(playerId);
         return message;
     }
@@ -891,10 +924,15 @@ export class WorldSession {
         const player = [...this.players.values()].find((candidate) => candidate.resumeToken === resumeToken);
         if (!player || !player.active || !player.ghost || player.disconnectedAt === null) return null;
         if (now - player.disconnectedAt >= this.ghostGraceMs) {
+            this.log(`despawn player=${player.id} reason=resume_expired`);
             this.removePlayer(player.id);
             return null;
         }
         return player;
+    }
+
+    private log(message: string): void {
+        this.logger(message);
     }
 
     private consumeTickDelta(now: number): number {

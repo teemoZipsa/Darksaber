@@ -73,7 +73,7 @@ import { WorldFieldSpawnController } from './world/WorldFieldSpawnController';
 import { WorldRenderController } from './world/WorldRenderController';
 import { WorldInputController } from './world/WorldInputController';
 import { HitStop } from './world/HitStop';
-import { NetworkRaidClient } from '../net/NetworkRaidClient';
+import { NetworkRaidClient, type NetworkRaidStatus } from '../net/NetworkRaidClient';
 import {
     DEFAULT_WORLD_SERVER_URL,
     type ActionRejectedMessage,
@@ -285,8 +285,8 @@ export class WorldEngine {
                     this.submitNetworkMoveIntent(actor, tile, path, apCost, pathCost),
                 tryActorAttack: (actor, enemy) => this.tryActorAttack(actor, enemy),
                 openLoot: (loot) => this.openLoot(loot),
-                openMagic: (actor) => this.magicController.open(actor),
-                hasCastableFieldSkill: (actor) => this.magicController.hasCastableFieldSkill(actor.character),
+                openMagic: (actor) => this.openFieldMagic(actor),
+                hasCastableFieldSkill: (actor) => !this.isNetworkRaid && this.magicController.hasCastableFieldSkill(actor.character),
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 closeActionMenu: () => this.closeActionMenu(),
                 closeTacticalMenu: () => this.closeTacticalMenu(),
@@ -598,8 +598,28 @@ export class WorldEngine {
             onRaidResult: (result) => this.handleNetworkRaidResult(result),
             onActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
             onErrorMessage: (error) => this.addCombatLog(`서버 오류(${error.code}): ${error.message}`),
+            onStatusChange: (status) => this.handleNetworkStatusChange(status),
             onGraceExpired: () => this.handleNetworkGraceExpired(),
         });
+    }
+
+    private handleNetworkStatusChange(status: NetworkRaidStatus): void {
+        switch (status) {
+            case 'connecting':
+                this.addCombatLog('네트워크 상태: Connecting');
+                break;
+            case 'connected':
+                this.addCombatLog('네트워크 상태: Connected');
+                break;
+            case 'reconnecting':
+                this.addCombatLog('네트워크 상태: Reconnecting');
+                break;
+            case 'disconnected':
+                this.addCombatLog('네트워크 상태: Disconnected');
+                break;
+            case 'idle':
+                break;
+        }
     }
 
     private createPartyCompositionSnapshot(town: TownInfo): ActorSnapshot[] {
@@ -1261,6 +1281,15 @@ export class WorldEngine {
         if (!this.gameManager.inventoryUI.isVisible()) this.gameManager.inventoryUI.toggle();
     }
 
+    private openFieldMagic(actor: FieldActor): void {
+        if (this.isNetworkRaid) {
+            this.addCombatLog('네트워크 raid V1에서는 마법/아이템 사용이 비활성화되어 있습니다.');
+            this.reopenActionMenu(actor);
+            return;
+        }
+        this.magicController.open(actor);
+    }
+
     private refreshLootState(): void {
         for (const loot of this.worldMap.loot) {
             loot.opened = loot.inventory.items.length === 0;
@@ -1302,6 +1331,11 @@ export class WorldEngine {
     private switchToPartyMember(index: number): boolean {
         const actor = this.partyActors[index];
         if (!actor || actor.character.isDead) return false;
+        if (!this.party.getCharacters().includes(actor.character)) {
+            this.selectionController.selectActor(actor.id);
+            this.addCombatLog(`${actor.character.name}: 원격 플레이어는 표시 전용입니다.`);
+            return false;
+        }
         if (!this.party.switchTo(index)) return false;
         this.player = actor.entity;
         this.selectionController.selectActor(actor.id);

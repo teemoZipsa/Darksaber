@@ -25,3 +25,13 @@ canvas {
     display: block;
     cursor: url('/assets/images/ui/cursor32.png') 0 0, auto;
 }
+
+/* React DOM UI overlay — sits above the canvas. Clicks fall through by default;
+   only actual panels/scrim opt back into pointer events (see darksaber-ui.css). */
+#ui-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    cursor: url('/assets/images/ui/cursor32.png') 0 0, auto;
+}

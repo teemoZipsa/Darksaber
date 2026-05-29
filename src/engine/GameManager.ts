@@ -25,6 +25,7 @@ import { PauseMenuUI } from '../ui/PauseMenuUI';
 import { SettingsUI } from '../ui/SettingsUI';
 import { HitStop } from './world/HitStop';
 import { AudioManager } from './AudioManager';
+import type { UiStore } from '../ui/react/UiStore';
 
 export class GameManager {
     private canvas: HTMLCanvasElement;
@@ -62,6 +63,9 @@ export class GameManager {
     private transitions = new TransitionManager();
     private pauseMenu = new PauseMenuUI();
     private settingsUI = new SettingsUI();
+
+    // React DOM UI overlay bridge (attached after construction in main.ts)
+    private uiStore?: UiStore;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -161,6 +165,29 @@ export class GameManager {
         this.pauseMenu.close();
     }
 
+    /** Attach the React DOM overlay store (called once from main.ts after boot). */
+    public attachUiStore(store: UiStore): void {
+        this.uiStore = store;
+    }
+
+    /**
+     * True when a DOM-overlay modal owns the screen. The world engine must not
+     * process input while this is the case (the DOM scrim also absorbs clicks,
+     * but this guard keeps correctness independent of DOM layering).
+     */
+    public isDomModalOpen(): boolean {
+        return this.charUI.isVisible();
+    }
+
+    /**
+     * Called when the active party member changes (e.g. from the DOM character
+     * panel's tab switch) so dependent UI stays in sync.
+     */
+    public onActiveCharacterChanged(): void {
+        const active = this.party.getActive();
+        if (active) this.inventoryUI.setActiveCharacter(active);
+    }
+
     private loop(timestamp: number): void {
         if (!this.isRunning) return;
         const elapsedMs = timestamp - this.lastTime;
@@ -180,6 +207,9 @@ export class GameManager {
         this.update(dt);
         this.render();
         this.input.endFrame();
+        // Drive the React DOM overlay: one notification per frame so it reflects
+        // freshly-updated game state (gold, HP/MP, active character, etc.).
+        this.uiStore?.tick();
         requestAnimationFrame((frameTime) => this.loop(frameTime));
     }
 
@@ -272,22 +302,18 @@ export class GameManager {
                     if (this.input.mouseJustUp) this.inventoryUI.onMouseUp(smx, smy);
                     break;
                 }
-                if (this.charUI.isVisible()) {
-                    this.charUI.onMouseMove(smx, smy);
-                    if (this.input.mouseClicked) {
-                        if (this.charUI.onClick(smx, smy)) {
-                            const active = this.party.getActive();
-                            if (active) this.inventoryUI.setActiveCharacter(active);
-                        }
-                    }
-                    break;
-                }
+                // The character panel is now a React DOM overlay (see ui/react).
+                // It owns its own pointer handling; the DOM panel sits above the
+                // canvas so clicks never reach InputManager. We only need to keep
+                // the world frozen while it (or any DOM modal) is open.
                 if (this.partyUI.isVisible()) {
                     this.partyUI.onMouseMove(smx, smy);
                     if (this.input.mouseJustDown) this.partyUI.onMouseDown(smx, smy);
                     if (this.input.mouseJustUp) this.partyUI.onMouseUp(smx, smy);
                     break;
                 }
+
+                if (this.isDomModalOpen()) break;
 
                 this.worldEngine.update(dt, this.input, this.camera);
                 break;
@@ -328,7 +354,7 @@ export class GameManager {
                 const vh_world = Math.floor(h / scale);
                 if (this.inventoryUI.isVisible()) this.inventoryUI.render(this.ctx, vw_world, vh_world);
                 if (this.partyUI.isVisible()) this.partyUI.render(this.ctx, vw_world, vh_world);
-                if (this.charUI.isVisible()) this.charUI.render(this.ctx, vw_world, vh_world);
+                // charUI (character panel) is rendered by the React DOM overlay, not canvas.
                 if (this.pauseMenu.isVisible()) this.pauseMenu.render(this.ctx, vw_world, vh_world);
                 if (this.settingsUI.isVisible()) this.settingsUI.render(this.ctx, vw_world, vh_world);
                 this.ctx.restore();

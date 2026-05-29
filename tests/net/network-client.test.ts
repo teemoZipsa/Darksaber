@@ -35,3 +35,27 @@ test('client ignores snapshots with regressing seq', () => {
 
     assert.deepEqual(applied, [2, 3]);
 });
+
+test('client reports connection status changes from server messages', () => {
+    const statuses: string[] = [];
+    const client = new NetworkRaidClient({
+        onStatusChange: (status) => statuses.push(status),
+    });
+    const harness = client as unknown as { handleMessage(raw: string): void };
+
+    harness.handleMessage(JSON.stringify({
+        type: 'WORLD_WELCOME',
+        playerId: 'player_1',
+        sessionEpoch: 1,
+        resumeToken: 'resume_1',
+        spawnTile: { x: 0, y: 0 },
+    }));
+    harness.handleMessage(JSON.stringify({
+        type: 'ERROR',
+        code: 'RESUME_FAILED',
+        message: 'expired',
+    }));
+
+    assert.deepEqual(statuses, ['connected', 'disconnected']);
+    assert.equal(client.getStatus(), 'disconnected');
+});

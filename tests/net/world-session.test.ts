@@ -83,6 +83,52 @@ test('intent ownership rejects another player actor', () => {
     assert.equal(result.replies[0]?.type, 'ACTION_REJECTED');
 });
 
+test('unsupported useItem intent is rejected cleanly when actor is ready', () => {
+    const session = new WorldSession();
+    const a = session.join(joinMessage('central_castle', 'hero-a'), 0);
+    session.tick(0);
+    session.tick(1_000);
+    const actorId = session.createSnapshot(a.playerId, 1_000).partyActors.find((entry) => entry.ownerPlayerId === a.playerId)!.id;
+
+    const result = session.handleMessage(a.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'use-item',
+        actorId,
+        kind: 'useItem',
+        payload: { itemId: 'herb_common' },
+    }, 1_000);
+
+    assert.equal(result.replies[0]?.type, 'ACTION_REJECTED');
+    assert.match(result.replies[0]?.type === 'ACTION_REJECTED' ? result.replies[0].reason : '', /useItem/);
+});
+
+test('session logs lifecycle events and exposes debug counts', () => {
+    const logs: string[] = [];
+    const session = new WorldSession({ ghostGraceMs: 1_000, logger: (message) => logs.push(message) });
+    const first = session.join(joinMessage('central_castle', 'hero-a'), 0);
+
+    const initialCounts = session.getDebugCounts();
+    assert.equal(initialCounts.activePlayers, 1);
+    assert.equal(initialCounts.ghostPlayers, 0);
+    assert.ok(initialCounts.enemies > 0);
+    assert.equal(initialCounts.lootLocks, 0);
+
+    session.disconnect(first.playerId, 100);
+    assert.equal(session.getDebugCounts().ghostPlayers, 1);
+
+    const resumed = session.reconnect(first.welcome.resumeToken, 500);
+    assert.equal(resumed?.playerId, first.playerId);
+
+    const leave = session.handleMessage(first.playerId, { type: 'WORLD_LEAVE', reason: 'manual' }, 600);
+    assert.equal(leave.replies[0]?.type, 'RAID_RESULT');
+    assert.equal(session.getDebugCounts().activePlayers, 0);
+    assert.ok(logs.some((entry) => entry.startsWith('join player=')));
+    assert.ok(logs.some((entry) => entry.startsWith('ghost start player=')));
+    assert.ok(logs.some((entry) => entry.startsWith('reconnect player=')));
+    assert.ok(logs.some((entry) => entry.startsWith('leave player=')));
+    assert.ok(logs.some((entry) => entry.startsWith('raid result player=')));
+});
+
 test('disconnect grace resumes same actor before expiry and starts fresh after expiry', () => {
     const session = new WorldSession({ ghostGraceMs: 1_000 });
     const first = session.join(joinMessage('central_castle', 'hero-a'), 0);
