@@ -8,7 +8,7 @@
  * is migrated last). React reads state through the public accessors and drives
  * changes through `setTab` / `requestDeploy` and the ShopUI/session actions.
  *
- * Tabs: 창고(storage) / 상점(shop) / 휴식(rest) / 퀘스트(quest) / 소문(rumors).
+ * Tabs are the facilities exposed by TownFacilityData.
  */
 
 import { GridInventory } from '../inventory/GridInventory';
@@ -19,8 +19,9 @@ import { TownInfo } from '../map/BiomeMask';
 import type { Character } from '../character/Character';
 import { t } from '../i18n/LanguageManager';
 import { getRestFacility, type RestFacility } from '../data/RestFacilityData';
+import { getTownFacilities, isShopFacilityId, type TownFacilityId } from '../data/TownFacilityData';
 
-export type TownTab = 'storage' | 'shop' | 'rest' | 'quest' | 'rumors';
+export type TownTab = TownFacilityId;
 
 /** Random rumors per town, cycling for variety */
 export const RUMORS_KR: string[] = [
@@ -140,6 +141,10 @@ export class TownUI {
     public isVisible(): boolean { return this.visible; }
 
     private showTab(tab: TownTab): void {
+        const facilities = this.currentTown ? getTownFacilities(this.currentTown.id) : ['storage'];
+        if (!facilities.includes(tab)) {
+            tab = 'storage';
+        }
         if (tab === 'rest' && !this.getCurrentRestFacility()) {
             tab = 'storage';
         }
@@ -154,12 +159,18 @@ export class TownUI {
                 this.inventoryUI.setExternalGrid(this.stash, '🏰 마을 창고');
                 if (!this.inventoryUI.isVisible()) this.inventoryUI.toggle();
                 break;
-            case 'shop':
+            case 'weapon_shop':
+            case 'armor_shop':
+            case 'general_store':
+            case 'specialty_trader':
+            case 'blacksmith':
+            case 'shrine':
                 this.syncShopSources();
                 this.shopUI.setTownId(this.currentTown?.id ?? null);
+                this.shopUI.setFacilityId(isShopFacilityId(tab) ? tab : null);
                 this.shopUI.show();
                 break;
-            // rest / quest / rumors are rendered by the React overlay (no sub-UI).
+            // rest / healer / quest / rumors are rendered by the React overlay (no sub-UI).
         }
     }
 

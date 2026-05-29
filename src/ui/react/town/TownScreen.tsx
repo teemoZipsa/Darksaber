@@ -11,6 +11,7 @@ import { t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
 import type { TownTab } from '../../../ui/TownUI';
+import { getTownFacilities, getTownFacilityMeta, isShopFacilityId } from '../../../data/TownFacilityData';
 import { useStore, useUiVersion } from '../UiContext';
 import { ShopPanel } from './ShopPanel';
 import { RestPanel } from './RestPanel';
@@ -24,16 +25,19 @@ export function TownScreen() {
     const store = useStore();
     const town = store.getTownInfo();
     const tab = store.getTownTab();
-    const facility = store.getRestFacility();
+    const restFacility = store.getRestFacility();
     if (!town) return null;
 
-    const tabs: Array<{ id: TownTab; label: string; icon: string }> = [
-        { id: 'storage', label: t('town.tab.storage'), icon: '📦' },
-        { id: 'shop', label: t('town.tab.shop'), icon: '🛒' },
-        ...(facility ? [{ id: 'rest' as TownTab, label: t('tab.rest'), icon: restIcon(facility.type) }] : []),
-        { id: 'quest', label: t('town.tab.quest'), icon: '📜' },
-        { id: 'rumors', label: t('town.tab.rumors'), icon: '💬' },
-    ];
+    const facilities = getTownFacilities(town.id);
+    const tabs: Array<{ id: TownTab; label: string; icon: string }> = facilities.flatMap((facilityId) => {
+        if (facilityId === 'rest' && !restFacility) return [];
+        const meta = getTownFacilityMeta(facilityId);
+        return [{
+            id: facilityId,
+            label: facilityId === 'rest' && restFacility ? t(restFacility.nameKey) : t(meta.labelKey),
+            icon: facilityId === 'rest' && restFacility ? restIcon(restFacility.type) : meta.icon,
+        }];
+    });
 
     const townInv = store.getTownInventory();
     const scaleVar = { '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
@@ -61,8 +65,9 @@ export function TownScreen() {
 
             <div className="ds-town__content">
                 {tab === 'storage' && townInv && <InventoryPanel inv={townInv} embedded />}
-                {tab === 'shop' && <ShopPanel />}
-                {tab === 'rest' && <RestPanel />}
+                {isShopFacilityId(tab) && <ShopPanel />}
+                {tab === 'rest' && <RestPanel showMenus showTreatment={!facilities.includes('healer')} />}
+                {tab === 'healer' && <RestPanel showMenus={false} showTreatment />}
                 {tab === 'quest' && <QuestPanel />}
                 {tab === 'rumors' && <RumorsPanel />}
             </div>

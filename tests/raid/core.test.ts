@@ -10,6 +10,7 @@ import { TileType } from '../../src/map/Tile';
 import { getSellPrice, getShopItems, isSellableItem } from '../../src/data/ShopData';
 import { PlayerData } from '../../src/data/PlayerData';
 import { REST_FACILITIES, getRestFacility, getRestMenu } from '../../src/data/RestFacilityData';
+import { TOWN_FACILITIES, getTownFacilities, hasTownFacility } from '../../src/data/TownFacilityData';
 
 function placed(id: string): PlacedItem {
     const item = getItemDef(id);
@@ -60,25 +61,60 @@ test('normalizeItemDef applies stable defaults to raw items', () => {
     assert.ok(normalized.baseValue > 0);
 });
 
-test('shop inventory is split into town-specific weapon armor accessory and consumable categories', () => {
-    const kaosiaWeapons = getShopItems('central_castle', 'weapon');
-    const belfuersWeapons = getShopItems('w_forest_village', 'weapon');
-    const sicilioArmor = getShopItems('s_coast_town', 'armor');
-    const consumables = getShopItems('central_castle', 'consumable');
+test('town facilities cover mortal and master towns', () => {
+    const mortalTownIds = new WorldMap('mortal').getTowns().map((town) => town.id);
+    const masterTownIds = new WorldMap('master').getTowns().map((town) => town.id);
+    const expectedTownIds = [...mortalTownIds, ...masterTownIds].sort();
+
+    assert.deepEqual(Object.keys(TOWN_FACILITIES).sort(), expectedTownIds);
+    assert.deepEqual(getTownFacilities('central_castle'), ['storage', 'weapon_shop', 'general_store', 'rest', 'healer', 'quest', 'rumors']);
+    assert.equal(hasTownFacility('e_outpost', 'rest'), false);
+    assert.equal(hasTownFacility('e_stronghold', 'blacksmith'), true);
+    assert.equal(hasTownFacility('master_sanctum', 'shrine'), true);
+});
+
+test('shop inventory is split by town facility while legacy town calls still work', () => {
+    const kaosiaWeapons = getShopItems('central_castle', 'weapon_shop', 'weapon');
+    const belfuersWeapons = getShopItems('w_forest_village', 'weapon_shop', 'weapon');
+    const sicilioArmor = getShopItems('s_coast_town', 'armor_shop', 'armor');
+    const weaponConsumables = getShopItems('central_castle', 'weapon_shop', 'consumable');
+    const consumables = getShopItems('central_castle', 'general_store', 'consumable');
+    const legacyConsumables = getShopItems('central_castle', 'consumable');
     const accessories = getShopItems('central_castle', 'accessory');
 
     assert.ok(kaosiaWeapons.length > 0);
     assert.ok(belfuersWeapons.length > kaosiaWeapons.length);
     assert.ok(sicilioArmor.some(({ item }) => item.id === 'web_67_02'));
+    assert.equal(weaponConsumables.length, 0);
     assert.ok(consumables.length > 0);
-    assert.equal(accessories.length, 0);
+    assert.ok(legacyConsumables.some(({ item }) => item.id === 'herb_cheap'));
     assert.ok(kaosiaWeapons.every(({ shopEntry, item }) => shopEntry.shopKind === 'weapon' && item.slot === 'weapon'));
     assert.ok(sicilioArmor.every(({ shopEntry, item }) => shopEntry.shopKind === 'armor' && ['shield', 'head', 'body', 'boots'].includes(item.slot)));
     assert.ok(consumables.every(({ shopEntry, item }) => shopEntry.shopKind === 'consumable' && item.slot === 'consumable'));
+    assert.ok(accessories.every(({ shopEntry }) => shopEntry.shopKind === 'accessory'));
     assert.notDeepEqual(
         kaosiaWeapons.map(({ item }) => item.id),
         belfuersWeapons.map(({ item }) => item.id),
     );
+});
+
+test('consumables are restricted by town facility', () => {
+    for (const [townId, facilities] of Object.entries(TOWN_FACILITIES)) {
+        if (!facilities.includes('general_store')) continue;
+        const itemIds = getShopItems(townId, 'general_store', 'consumable').map(({ item }) => item.id);
+        assert.ok(itemIds.includes('herb_cheap'), `${townId} should sell cheap herb in the general store`);
+    }
+
+    assert.ok(getShopItems('central_castle', 'general_store', 'consumable').some(({ item }) => item.id === 'herb_common'));
+    assert.equal(getShopItems('e_outpost', 'general_store', 'consumable').some(({ item }) => item.id === 'herb_common'), false);
+    assert.ok(getShopItems('w_forest_village', 'specialty_trader', 'consumable').some(({ item }) => item.id === 'herb_rare'));
+    assert.ok(getShopItems('se_port', 'specialty_trader', 'consumable').some(({ item }) => item.id === 'herb_legendary'));
+    assert.ok(getShopItems('nw_desert_city', 'general_store', 'consumable').some(({ item }) => item.id === 'mp_potion'));
+    assert.ok(getShopItems('e_stronghold', 'blacksmith', 'consumable').some(({ item }) => item.id === 'repair_kit'));
+    assert.equal(getShopItems('central_castle', 'general_store', 'consumable').some(({ item }) => item.id === 'repair_kit'), false);
+    assert.ok(getShopItems('w_forest_village', 'general_store', 'consumable').some(({ item }) => item.id === 'antidote'));
+    assert.ok(getShopItems('nw_desert_city', 'general_store', 'consumable').some(({ item }) => item.id === 'fire_herb'));
+    assert.ok(getShopItems('sw_hideout', 'specialty_trader', 'consumable').some(({ item }) => item.id === 'ice_herb'));
 });
 
 test('sell price uses half buy price or half normalized base value', () => {
@@ -100,6 +136,20 @@ test('sell price uses half buy price or half normalized base value', () => {
         baseValue: 77,
     };
     assert.equal(getSellPrice(normalizeItemDef(raw)), 38);
+});
+
+test('trade goods sell for different prices by destination town', () => {
+    const resin = getItemDef('trade_forest_resin');
+    const herb = getItemDef('herb_common');
+    assert.ok(resin);
+    assert.ok(herb);
+
+    const forestSell = getSellPrice(resin, 'w_forest_village');
+    const coastSell = getSellPrice(resin, 's_coast_town');
+
+    assert.ok(coastSell > forestSell);
+    assert.ok(coastSell > (resin.buyPrice ?? resin.baseValue));
+    assert.equal(getSellPrice(herb, 's_coast_town'), 25);
 });
 
 test('sellable flag blocks bound or quest items from shop sale lists', () => {

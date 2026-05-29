@@ -15,7 +15,12 @@ import { getRestMenu, INJURY_TREATMENT_PRICE } from '../../../data/RestFacilityD
 import { useStore, useUiVersion } from '../UiContext';
 import { restIcon } from './restIcon';
 
-export function RestPanel() {
+interface RestPanelProps {
+    showMenus?: boolean;
+    showTreatment?: boolean;
+}
+
+export function RestPanel({ showMenus = true, showTreatment = true }: RestPanelProps) {
     useUiVersion();
     const store = useStore();
     const facility = store.getRestFacility();
@@ -30,7 +35,7 @@ export function RestPanel() {
         return () => window.clearTimeout(id);
     }, [feedback]);
 
-    if (!facility) return null;
+    if (!facility && !showTreatment) return null;
 
     const purchase = (menuId: string) => {
         const ok = store.restPurchase(menuId);
@@ -55,43 +60,51 @@ export function RestPanel() {
     return (
         <div className="ds-panel ds-rest" style={panelStyle} onClick={(e) => e.stopPropagation()}>
             <div className="ds-panel__header">
-                <span className="ds-panel__title">{restIcon(facility.type)} {t(facility.nameKey)}</span>
+                <span className="ds-panel__title">
+                    {facility && showMenus ? `${restIcon(facility.type)} ${t(facility.nameKey)}` : `✚ ${t('town.facility.healer')}`}
+                </span>
             </div>
 
             <div className="ds-rest__body">
-                <div className="ds-rest__current">
-                    {t('rest.current')}: <strong>{pendingId ? t(getRestMenu(pendingId)?.nameKey ?? '') : t('rest.none')}</strong>
-                </div>
-
-                <div className="ds-rest__menus">
-                    {facility.menu.map((menu) => {
-                        const isCurrent = pendingId === menu.id;
-                        return (
-                            <div key={menu.id} className={`ds-rest__card${isCurrent ? ' is-current' : ''}`}>
-                                <div className="ds-rest__cardname">{t(menu.nameKey)}</div>
-                                <div className="ds-rest__carddesc">{t(menu.descKey)}</div>
-                                <div className="ds-rest__cardfoot">
-                                    <span className="ds-rest__price">{menu.price}G</span>
-                                    <button className={`ds-btn${isCurrent ? ' is-active' : ''}`} onClick={() => clickMenu(menu.id)}>
-                                        {isCurrent ? t('rest.current') : t('rest.purchase')}
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                <div className="ds-rest__injury">
-                    <div>
-                        <div className="ds-rest__injurytitle">{t('rest.injuryTitle')}</div>
-                        <div className={`ds-rest__injurycount${injured > 0 ? ' is-injured' : ''}`}>
-                            {injured > 0
-                                ? `${t('rest.injuryCount')}: ${injured} (${injured * INJURY_TREATMENT_PRICE}G)`
-                                : t('rest.injuryNone')}
-                        </div>
+                {showMenus && facility && (
+                    <div className="ds-rest__current">
+                        {t('rest.current')}: <strong>{pendingId ? t(getRestMenu(pendingId)?.nameKey ?? '') : t('rest.none')}</strong>
                     </div>
-                    {injured > 0 && <button className="ds-btn is-active" onClick={treat}>{t('rest.treat')}</button>}
-                </div>
+                )}
+
+                {showMenus && facility && (
+                    <div className="ds-rest__menus">
+                        {facility.menu.map((menu) => {
+                            const isCurrent = pendingId === menu.id;
+                            return (
+                                <div key={menu.id} className={`ds-rest__card${isCurrent ? ' is-current' : ''}`}>
+                                    <div className="ds-rest__cardname">{t(menu.nameKey)}</div>
+                                    <div className="ds-rest__carddesc">{t(menu.descKey)}</div>
+                                    <div className="ds-rest__cardfoot">
+                                        <span className="ds-rest__price">{menu.price}G</span>
+                                        <button className={`ds-btn${isCurrent ? ' is-active' : ''}`} onClick={() => clickMenu(menu.id)}>
+                                            {isCurrent ? t('rest.current') : t('rest.purchase')}
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {showTreatment && (
+                    <div className="ds-rest__injury">
+                        <div>
+                            <div className="ds-rest__injurytitle">{t('rest.injuryTitle')}</div>
+                            <div className={`ds-rest__injurycount${injured > 0 ? ' is-injured' : ''}`}>
+                                {injured > 0
+                                    ? `${t('rest.injuryCount')}: ${injured} (${injured * INJURY_TREATMENT_PRICE}G)`
+                                    : t('rest.injuryNone')}
+                            </div>
+                        </div>
+                        {injured > 0 && <button className="ds-btn is-active" onClick={treat}>{t('rest.treat')}</button>}
+                    </div>
+                )}
 
                 <div className="ds-rest__feedback">{feedback}</div>
             </div>

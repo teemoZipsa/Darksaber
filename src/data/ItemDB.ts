@@ -379,6 +379,149 @@ const RAW_ITEMS: RawItemDef[] = [
         descriptionKr: '착용한 무기의 내구도를 수리합니다.',
         buyPrice: 50
     },
+    {
+        id: 'antidote', name: 'Antidote', nameKr: '해독제',
+        slot: 'consumable', gridW: 1, gridH: 1, color: '#7bdc65', icon: '⚗',
+        maxDurability: 1,
+        description: 'Neutralizes common poison. V1 shop consumable.',
+        descriptionKr: '일반 독을 중화하는 소모품. V1 상점 후보입니다.',
+        buyPrice: 35
+    },
+    {
+        id: 'fire_herb', name: 'Fire Herb', nameKr: '화염초',
+        slot: 'consumable', gridW: 1, gridH: 1, color: '#d95f3f', icon: '🔥',
+        maxDurability: 1,
+        description: 'A hot medicinal herb used by desert traders.',
+        descriptionKr: '사막 상인들이 다루는 뜨거운 약초입니다.',
+        buyPrice: 70
+    },
+    {
+        id: 'ice_herb', name: 'Ice Herb', nameKr: '빙결초',
+        slot: 'consumable', gridW: 1, gridH: 1, color: '#72bde8', icon: '❄',
+        maxDurability: 1,
+        description: 'A chilled medicinal herb valued in hot regions.',
+        descriptionKr: '더운 지역에서 귀하게 여기는 차가운 약초입니다.',
+        buyPrice: 70
+    },
+
+    // ─── Trade Goods (town economy V1) ──────
+    {
+        id: 'trade_forest_resin', name: 'Forest Resin', nameKr: '숲 수지',
+        slot: 'material', gridW: 1, gridH: 1, color: '#6f9f4a', icon: '◆',
+        maxDurability: 1,
+        description: 'A Belfuers forest trade good.',
+        descriptionKr: '벨퓌어스 숲에서 싸게 구할 수 있는 특산품입니다.',
+        buyPrice: 80,
+        itemCategory: 'material'
+    },
+    {
+        id: 'trade_mooncap_mushroom', name: 'Mooncap Mushroom', nameKr: '월광 버섯',
+        slot: 'material', gridW: 1, gridH: 1, color: '#8fcf7a', icon: '◇',
+        maxDurability: 1,
+        description: 'A rare forest mushroom used in tonics.',
+        descriptionKr: '강장제에 쓰이는 숲 특산 버섯입니다.',
+        buyPrice: 120,
+        itemCategory: 'material'
+    },
+    {
+        id: 'trade_sea_salt', name: 'Sicilio Sea Salt', nameKr: '시시리오 바다소금',
+        slot: 'material', gridW: 1, gridH: 1, color: '#d8eef0', icon: '□',
+        maxDurability: 1,
+        description: 'A coast town trade good.',
+        descriptionKr: '시시리오 항구에서 나는 해양 특산품입니다.',
+        buyPrice: 70,
+        itemCategory: 'material'
+    },
+    {
+        id: 'trade_tide_pearl', name: 'Tide Pearl', nameKr: '조수 진주',
+        slot: 'material', gridW: 1, gridH: 1, color: '#f0e4d8', icon: '○',
+        maxDurability: 1,
+        description: 'A small pearl popular with inland nobles.',
+        descriptionKr: '내륙 귀족들이 찾는 작은 진주입니다.',
+        buyPrice: 160,
+        itemCategory: 'material'
+    },
+    {
+        id: 'trade_desert_spice', name: 'Desert Spice', nameKr: '사막 향신료',
+        slot: 'material', gridW: 1, gridH: 1, color: '#d4a24a', icon: '✦',
+        maxDurability: 1,
+        description: 'A fragrant desert outpost trade good.',
+        descriptionKr: '사막 전초기지의 향이 강한 특산품입니다.',
+        buyPrice: 90,
+        itemCategory: 'material'
+    },
+    {
+        id: 'trade_sun_ore', name: 'Sun Ore', nameKr: '태양석 원광',
+        slot: 'material', gridW: 1, gridH: 1, color: '#e0b84a', icon: '◆',
+        maxDurability: 1,
+        description: 'A bright ore gathered near desert routes.',
+        descriptionKr: '사막 교역로 근처에서 나는 밝은 원광입니다.',
+        buyPrice: 140,
+        itemCategory: 'material'
+    },
+    {
+        id: 'trade_imported_silk', name: 'Imported Silk', nameKr: '수입 비단',
+        slot: 'material', gridW: 1, gridH: 1, color: '#c77ce0', icon: '▣',
+        maxDurability: 1,
+        description: 'An Arikna import favored by wealthy towns.',
+        descriptionKr: '아리크나에서 들여오는 고급 수입품입니다.',
+        buyPrice: 180,
+        itemCategory: 'material'
+    },
+    {
+        id: 'trade_eastern_incense', name: 'Eastern Incense', nameKr: '동방 향',
+        slot: 'material', gridW: 1, gridH: 1, color: '#b8794f', icon: '✧',
+        maxDurability: 1,
+        description: 'A fragrant import traded through Arikna.',
+        descriptionKr: '아리크나 교역망을 통해 들어오는 향입니다.',
+        buyPrice: 130,
+        itemCategory: 'material'
+    },
+    {
+        id: 'trade_contraband_relic', name: 'Contraband Relic', nameKr: '밀수 유물',
+        slot: 'material', gridW: 1, gridH: 1, color: '#684a7e', icon: '◇',
+        maxDurability: 1,
+        description: 'A black-market relic from the southern hideout.',
+        descriptionKr: '남부 은신처 암시장에서 유통되는 비정규 유물입니다.',
+        buyPrice: 220,
+        itemCategory: 'material'
+    },
+    {
+        id: 'trade_shadow_amber', name: 'Shadow Amber', nameKr: '그림자 호박',
+        slot: 'material', gridW: 1, gridH: 1, color: '#805d36', icon: '◆',
+        maxDurability: 1,
+        description: 'A dubious amber valued by collectors.',
+        descriptionKr: '수집가들이 은밀히 찾는 수상한 호박석입니다.',
+        buyPrice: 150,
+        itemCategory: 'material'
+    },
+    {
+        id: 'trade_sanctum_incense', name: 'Sanctum Incense', nameKr: '성역 향',
+        slot: 'material', gridW: 1, gridH: 1, color: '#d8c780', icon: '✧',
+        maxDurability: 1,
+        description: 'A master sanctum ceremonial good.',
+        descriptionKr: '마스터 성역 의식에 쓰이는 고급 특산품입니다.',
+        buyPrice: 260,
+        itemCategory: 'material'
+    },
+    {
+        id: 'trade_astral_sigil', name: 'Astral Sigil', nameKr: '성좌 표식',
+        slot: 'material', gridW: 1, gridH: 1, color: '#8aa8f0', icon: '✦',
+        maxDurability: 1,
+        description: 'A keepsake from Astral Keep.',
+        descriptionKr: '성좌 요새에서 제작되는 표식입니다.',
+        buyPrice: 300,
+        itemCategory: 'material'
+    },
+    {
+        id: 'trade_ember_core', name: 'Ember Core', nameKr: '홍염 핵',
+        slot: 'material', gridW: 1, gridH: 1, color: '#e8663e', icon: '◆',
+        maxDurability: 1,
+        description: 'A hot trade core from Ember Citadel.',
+        descriptionKr: '홍염 성채에서 다루는 뜨거운 교역품입니다.',
+        buyPrice: 320,
+        itemCategory: 'material'
+    },
 
     // ─── Original Darksaber town weapon shops ──────
     ...ORIGINAL_SHOP_ITEMS,
