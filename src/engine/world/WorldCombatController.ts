@@ -12,6 +12,8 @@ import type { TerrainActorTraits } from '../../field/TerrainRules';
 import { manhattan, type TilePoint } from '../../field/FieldPathing';
 import type { FieldActor } from '../../field/FieldTypes';
 import type { CombatFeedbackKind } from './CombatFeedback';
+import { damageDefensiveEquipment, damageEquippedWeapon } from '../../inventory/Socketing';
+import type { PlacedItem } from '../../inventory/GridInventory';
 
 let nextFeedbackGroupId = 1;
 
@@ -135,6 +137,7 @@ export class WorldCombatController {
             }
         }
 
+        this.logBrokenEquipment(input.actor.character.name, damageEquippedWeapon(input.actor.character));
         this.sink.flushFeedbackGroup?.(feedbackGroupId);
         if (counterTarget) mergeCombatResult(result, input.tryEnemyCounterAttack(counterTarget, input.actor));
         return result;
@@ -168,6 +171,7 @@ export class WorldCombatController {
         this.sink.log(`${enemy.name} → ${actor.character.name} ${guarded.damage} 피해${damageResult.isCrit ? ' 치명' : ''}`);
         if (guarded.guarded) this.sink.log(`${actor.character.name} 방어: 피해 감소`);
         this.logPhysicalTerrainEffect(damageResult);
+        if (guarded.damage > 0) this.logBrokenEquipment(actor.character.name, damageDefensiveEquipment(actor.character));
 
         if (guarded.damage > 0) mergeCombatResult(result, input.tryActorCounterAttack(actor, enemy));
         if (actor.character.stats.hp <= 0 && !actor.character.isDead) {
@@ -195,6 +199,7 @@ export class WorldCombatController {
             input.getTileAt(enemyTile(input.enemy)),
             { isRanged: manhattan(actorTile(input.actor), enemyTile(input.enemy)) > 1 }
         );
+        this.logBrokenEquipment(input.actor.character.name, damageEquippedWeapon(input.actor.character));
         if (damageResult.isMiss) {
             this.sink.spawnDamage(input.enemy.gridX, input.enemy.gridY, 0, false, true);
             this.sink.log(`${input.actor.character.name} 반격 빗나감: ${input.enemy.name}`);
@@ -247,6 +252,7 @@ export class WorldCombatController {
         this.sink.spawnDamage(input.actor.entity.gridX, input.actor.entity.gridY, damage, damageResult.isCrit, false);
         this.sink.spawnHitEffect(input.actor.entity.gridX, input.actor.entity.gridY, damageResult.isCrit, feedbackGroupId, damageResult.isCrit ? 'critical' : 'counter');
         this.sink.log(`${input.enemy.name} 반격 → ${input.actor.character.name} ${damage} 피해`);
+        if (damage > 0) this.logBrokenEquipment(input.actor.character.name, damageDefensiveEquipment(input.actor.character));
         if (input.actor.character.stats.hp <= 0 && !input.actor.character.isDead) result.downedCharacterIds.push(input.actor.character.id);
         this.sink.flushFeedbackGroup?.(feedbackGroupId);
         return result;
@@ -272,6 +278,12 @@ export class WorldCombatController {
             notes.push(`피해 -${Math.round((1 - result.terrainMultiplier) * 100)}%`);
         }
         if (notes.length > 0) this.sink.log(`지형 효과: ${notes.join(', ')}`);
+    }
+
+    private logBrokenEquipment(characterName: string, placed: PlacedItem | null): void {
+        if (placed?.durability === 0) {
+            this.sink.log(`${characterName}: ${placed.item.nameKr} 내구도 0 - 장비 효과 비활성`);
+        }
     }
 }
 

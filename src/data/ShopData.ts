@@ -2,7 +2,7 @@
  * ShopData — Defines merchant shop inventory and pricing.
  */
 
-import { getItemDef, ItemDef } from './ItemDB';
+import { CHIPPED_GEM_IDS, getItemDef, ItemDef } from './ItemDB';
 import { ORIGINAL_SHOP_TOWN_ITEM_IDS, type OriginalShopTownId } from './OriginalShopItems';
 import {
     SHOP_FACILITY_IDS,
@@ -49,6 +49,7 @@ const ARMOR_SHOP_EXTRAS: Partial<Record<TownId, StockSpec[]>> = {
         'tactics_t4_head',
         'tactics_t4_body',
         'tactics_t4_boots',
+        'repair_kit',
     ],
 };
 
@@ -61,10 +62,6 @@ const SPECIALTY_TRADER_ITEMS: Partial<Record<TownId, StockSpec[]>> = {
     master_sanctum: [['herb_legendary', 2], 'trade_sanctum_incense'],
     astral_keep: [['herb_legendary', 2], 'trade_astral_sigil'],
     ember_citadel: [['herb_legendary', 2], 'trade_ember_core'],
-};
-
-const BLACKSMITH_ITEMS: Partial<Record<TownId, StockSpec[]>> = {
-    e_stronghold: ['repair_kit', 'wooden_shield'],
 };
 
 const SHRINE_ITEMS: Partial<Record<TownId, StockSpec[]>> = {
@@ -167,7 +164,7 @@ const TRADE_GOOD_SELL_MULTIPLIERS: Partial<Record<string, Partial<Record<TownId,
 
 export function getShopKindForItem(item: ItemDef): ShopKind {
     if (item.slot === 'weapon') return 'weapon';
-    if (item.slot === 'accessory' || item.slot === 'accessory2' || item.slot === 'gem' || item.slot === 'rune' || item.slot === 'sin_core') return 'accessory';
+    if (item.slot === 'accessory' || item.slot === 'accessory2' || item.slot === 'gem') return 'accessory';
     if (item.slot === 'consumable' || item.slot === 'material') return 'consumable';
     return 'armor';
 }
@@ -175,7 +172,7 @@ export function getShopKindForItem(item: ItemDef): ShopKind {
 export function getDefaultShopKindForFacility(facilityId: ShopFacilityId): ShopKind {
     if (facilityId === 'weapon_shop') return 'weapon';
     if (facilityId === 'armor_shop') return 'armor';
-    if (facilityId === 'blacksmith' || facilityId === 'shrine') return 'accessory';
+    if (facilityId === 'shrine') return 'accessory';
     return 'consumable';
 }
 
@@ -241,14 +238,25 @@ function buildTownFacilityInventory(townId: TownId): FacilityInventory {
             ...toShopItems(SPECIALTY_TRADER_ITEMS[townId], 'specialty_trader'),
         ];
     }
-    if (townFacilities.includes('blacksmith')) {
-        inventory.blacksmith = toShopItems(BLACKSMITH_ITEMS[townId], 'blacksmith');
-    }
     if (townFacilities.includes('shrine')) {
         inventory.shrine = toShopItems(SHRINE_ITEMS[townId], 'shrine');
     }
+    const gemFacility = pickGemShopFacility(townFacilities);
+    if (gemFacility) {
+        inventory[gemFacility] = [
+            ...(inventory[gemFacility] ?? []),
+            ...toShopItems(CHIPPED_GEM_IDS, gemFacility),
+        ];
+    }
 
     return inventory;
+}
+
+function pickGemShopFacility(facilities: readonly TownFacilityId[]): ShopFacilityId | null {
+    for (const facility of ['specialty_trader', 'general_store', 'shrine', 'weapon_shop', 'armor_shop'] as const) {
+        if (facilities.includes(facility)) return facility;
+    }
+    return null;
 }
 
 function flattenFacilityInventory(inventory: FacilityInventory): ShopItem[] {
@@ -315,6 +323,8 @@ export function getShopItems(townId?: string, facilityOrKind?: TownFacilityId | 
     for (const entry of inventory) {
         if (resolvedShopKind && entry.shopKind !== resolvedShopKind) continue;
         const item = getItemDef(entry.itemId);
+        if (item?.slot === 'rune') continue;
+        if (item?.slot === 'gem' && !CHIPPED_GEM_IDS.includes(item.id)) continue;
         if (item) {
             result.push({ shopEntry: entry, item });
         }

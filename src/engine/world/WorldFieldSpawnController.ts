@@ -1,5 +1,6 @@
 import type { Character } from '../../character/Character';
 import { getItemDef } from '../../data/ItemDB';
+import { rollChestGem } from '../../data/SocketLoot';
 import {
     BURGOS_BOSS_MONSTER_ID,
     BURGOS_GUARD_MONSTER_ID,
@@ -66,9 +67,11 @@ const MORTAL_REALM_ENEMY_SEEDS: CatalogEnemySeed[] = [
 
 export class WorldFieldSpawnController {
     private readonly movement: WorldMovementController;
+    private readonly random: () => number;
 
-    constructor(movement: WorldMovementController) {
+    constructor(movement: WorldMovementController, random: () => number = Math.random) {
         this.movement = movement;
+        this.random = random;
     }
 
     public createPartyActors(anchorTile: TilePoint, members: Character[]): FieldActor[] {
@@ -121,18 +124,20 @@ export class WorldFieldSpawnController {
 
         const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
         const sword = getItemDef('short_sword');
+        const chestItems = [herb, rollChestGem(this.random, !!options.masterRealm)].filter((item): item is NonNullable<typeof item> => Boolean(item));
+        const packItems = [sword].filter((item): item is NonNullable<typeof item> => Boolean(item));
         const lootSeeds = [
-            { offset: { x: 3, y: 2 }, id: 'field_chest_1', label: '버려진 보급 상자', item: herb, kind: 'chest' as const },
-            { offset: { x: -3, y: 4 }, id: 'field_pack_1', label: '전사자의 배낭', item: sword, kind: 'corpse' as const },
+            { offset: { x: 3, y: 2 }, id: 'field_chest_1', label: '버려진 보급 상자', items: chestItems, kind: 'chest' as const },
+            { offset: { x: -3, y: 4 }, id: 'field_pack_1', label: '전사자의 배낭', items: packItems, kind: 'corpse' as const },
         ];
 
         const loot = lootSeeds.flatMap((seed) => {
-            if (!seed.item) return [];
+            if (seed.items.length === 0) return [];
             const tile = this.movement.findNearbyWalkableTile({
                 x: anchor.gridX + seed.offset.x,
                 y: anchor.gridY + seed.offset.y,
             }, seed.id);
-            return [new LootObject(seed.id, tile.x, tile.y, [seed.item], { sourceLabel: seed.label, kind: seed.kind })];
+            return [new LootObject(seed.id, tile.x, tile.y, seed.items, { sourceLabel: seed.label, kind: seed.kind })];
         });
 
         return { enemies, loot };

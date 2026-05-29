@@ -36,7 +36,6 @@ export type ShopFacilityId =
     | 'armor_shop'
     | 'general_store'
     | 'specialty_trader'
-    | 'blacksmith'
     | 'shrine';
 
 export interface TownFacilityMeta {
@@ -50,7 +49,7 @@ export const TOWN_FACILITY_META: Record<TownFacilityId, TownFacilityMeta> = {
     armor_shop: { labelKey: 'town.facility.armor_shop', icon: '🛡️' },
     general_store: { labelKey: 'town.facility.general_store', icon: '🧪' },
     specialty_trader: { labelKey: 'town.facility.specialty_trader', icon: '💎' },
-    blacksmith: { labelKey: 'town.facility.blacksmith', icon: '🔨' },
+    blacksmith: { labelKey: 'town.tab.blacksmith', icon: '🔨' },
     healer: { labelKey: 'town.facility.healer', icon: '✚' },
     rest: { labelKey: 'town.facility.rest', icon: '🍲' },
     quest: { labelKey: 'town.tab.quest', icon: '📜' },
@@ -63,22 +62,21 @@ export const SHOP_FACILITY_IDS: readonly ShopFacilityId[] = [
     'armor_shop',
     'general_store',
     'specialty_trader',
-    'blacksmith',
     'shrine',
 ];
 
 export const TOWN_FACILITIES: Record<TownId, TownFacilityId[]> = {
-    central_castle: ['storage', 'weapon_shop', 'general_store', 'rest', 'healer', 'quest', 'rumors'],
-    w_forest_village: ['storage', 'weapon_shop', 'general_store', 'rest', 'specialty_trader', 'rumors'],
-    s_coast_town: ['storage', 'weapon_shop', 'armor_shop', 'general_store', 'rest', 'specialty_trader', 'quest'],
+    central_castle: ['storage', 'weapon_shop', 'general_store', 'blacksmith', 'rest', 'healer', 'quest', 'rumors'],
+    w_forest_village: ['storage', 'weapon_shop', 'general_store', 'blacksmith', 'rest', 'specialty_trader', 'rumors'],
+    s_coast_town: ['storage', 'weapon_shop', 'armor_shop', 'general_store', 'blacksmith', 'rest', 'specialty_trader', 'quest'],
     e_stronghold: ['storage', 'weapon_shop', 'armor_shop', 'blacksmith', 'rest', 'healer'],
-    se_port: ['storage', 'weapon_shop', 'general_store', 'rest', 'specialty_trader'],
-    nw_desert_city: ['storage', 'general_store', 'rest', 'specialty_trader'],
-    sw_hideout: ['storage', 'specialty_trader', 'rest', 'healer'],
-    e_outpost: ['storage', 'general_store', 'healer', 'rumors'],
-    master_sanctum: ['storage', 'shrine', 'specialty_trader'],
-    astral_keep: ['storage', 'shrine', 'specialty_trader'],
-    ember_citadel: ['storage', 'shrine', 'specialty_trader'],
+    se_port: ['storage', 'weapon_shop', 'general_store', 'blacksmith', 'rest', 'specialty_trader'],
+    nw_desert_city: ['storage', 'general_store', 'blacksmith', 'rest', 'specialty_trader'],
+    sw_hideout: ['storage', 'specialty_trader', 'blacksmith', 'rest', 'healer'],
+    e_outpost: ['storage', 'general_store', 'blacksmith', 'healer', 'rumors'],
+    master_sanctum: ['storage', 'shrine', 'specialty_trader', 'blacksmith'],
+    astral_keep: ['storage', 'shrine', 'specialty_trader', 'blacksmith'],
+    ember_citadel: ['storage', 'shrine', 'specialty_trader', 'blacksmith'],
 };
 
 export function isTownId(value: string | undefined): value is TownId {

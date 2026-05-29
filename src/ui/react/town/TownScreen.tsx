@@ -14,6 +14,7 @@ import type { TownTab } from '../../../ui/TownUI';
 import { getTownFacilities, getTownFacilityMeta, isShopFacilityId } from '../../../data/TownFacilityData';
 import { useStore, useUiVersion } from '../UiContext';
 import { ShopPanel } from './ShopPanel';
+import { BlacksmithPanel } from './BlacksmithPanel';
 import { RestPanel } from './RestPanel';
 import { QuestPanel } from './QuestPanel';
 import { RumorsPanel } from './RumorsPanel';
@@ -66,6 +67,7 @@ export function TownScreen() {
             <div className="ds-town__content">
                 {tab === 'storage' && townInv && <InventoryPanel inv={townInv} embedded />}
                 {isShopFacilityId(tab) && <ShopPanel />}
+                {tab === 'blacksmith' && <BlacksmithPanel />}
                 {tab === 'rest' && <RestPanel showMenus showTreatment={!facilities.includes('healer')} />}
                 {tab === 'healer' && <RestPanel showMenus={false} showTreatment />}
                 {tab === 'quest' && <QuestPanel />}

@@ -24,7 +24,8 @@ export const MONSTER_ROW_BY_FACING: Record<'up' | 'down' | 'left' | 'right', num
 export const MONSTER_FRAME_COUNT = 3;
 export const MONSTER_FPS = 8;
 export const BURGOS_CASTLE_DUNGEON_ID = 'burgos_castle';
-export const BURGOS_BOSS_MONSTER_ID = '701R';
+export const BURGOS_BOSS_MONSTER_ID = 'burgos_wolf_boss';
+export const BURGOS_LEGACY_BOSS_MONSTER_ID = '701R';
 export const BURGOS_GUARD_MONSTER_ID = '303R';
 
 export const GENERAL_MONSTER_IDS = [
@@ -46,7 +47,7 @@ export const GENERAL_MONSTER_IDS = [
     '435R',
 ] as const;
 
-export const MONSTER_IDS = [...GENERAL_MONSTER_IDS, BURGOS_BOSS_MONSTER_ID] as const;
+export const MONSTER_IDS = [...GENERAL_MONSTER_IDS, BURGOS_BOSS_MONSTER_ID, BURGOS_LEGACY_BOSS_MONSTER_ID] as const;
 export type MonsterId = typeof MONSTER_IDS[number];
 
 const commonFrame = {
@@ -245,6 +246,18 @@ export const MONSTER_DEFINITIONS: Record<MonsterId, MonsterDefinition> = {
         frameSize: 32,
         renderScale: 1.12,
         aggroRange: 6,
+        ...commonFrame,
+    },
+    'burgos_wolf_boss': {
+        id: 'burgos_wolf_boss',
+        name: '부르고스 늑대왕',
+        sprite: '435R.png',
+        role: 'boss',
+        level: 3,
+        color: '#6676d8',
+        frameSize: 32,
+        renderScale: 1.75,
+        aggroRange: 9,
         ...commonFrame,
     },
     '701R': {

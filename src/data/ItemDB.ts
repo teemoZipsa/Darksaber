@@ -5,10 +5,13 @@
 
 import { MasterBranch } from './ClassTree';
 import { ORIGINAL_SHOP_ITEMS } from './OriginalShopItems';
+import type { CharacterStats } from './Stats';
 
-export type ItemSlot = 'weapon' | 'shield' | 'head' | 'body' | 'boots' | 'accessory' | 'accessory2' | 'consumable' | 'material' | 'sin_core' | 'rune' | 'gem';
+export type ItemSlot = 'weapon' | 'shield' | 'head' | 'body' | 'boots' | 'accessory' | 'accessory2' | 'consumable' | 'material' | 'rune' | 'gem';
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legend' | 'unique';
 export type ItemUseEffect = { type: 'recover'; hp?: number; mp?: number };
+export type SocketHostKind = 'weapon' | 'armor' | 'shield';
+export type SocketInsertKind = 'rune' | 'gem';
 export interface ItemIconSprite {
     col: number;
     row: number;
@@ -25,14 +28,7 @@ export interface ItemDef {
     icon: string;     // emoji/text icon
     iconSprite?: ItemIconSprite; // 32x32 cell in the original item atlas
     maxDurability: number;
-    stats?: {
-        atk?: number;
-        def?: number;
-        magAtk?: number;
-        magDef?: number;
-        hp?: number;
-        mp?: number;
-    };
+    stats?: Partial<CharacterStats>;
     description: string;
     descriptionKr?: string;
     rarity: ItemRarity;
@@ -46,9 +42,10 @@ export interface ItemDef {
     useEffect?: ItemUseEffect;
     
     // -- Sin Eater New Fields --
-    itemCategory?: 'divine_weapon' | 'normal_weapon' | 'armor' | 'accessory' | 'consumable' | 'material' | 'sin_core' | 'rune' | 'gem';
+    itemCategory?: 'divine_weapon' | 'normal_weapon' | 'armor' | 'accessory' | 'consumable' | 'material' | 'rune' | 'gem';
     maxSockets?: number;
-    socketTypes?: Array<'sin_core' | 'rune' | 'gem'>;
+    socketTypes?: SocketInsertKind[];
+    socketEffects?: Partial<Record<SocketHostKind, Partial<CharacterStats>>>;
 }
 
 export type RawItemDef = Omit<ItemDef, 'rarity' | 'weight' | 'baseValue'> & Partial<Pick<ItemDef, 'rarity' | 'weight' | 'baseValue'>>;
@@ -79,8 +76,7 @@ function inferWeight(item: RawItemDef): number {
         case 'accessory':
         case 'accessory2':
         case 'rune':
-        case 'gem':
-        case 'sin_core': return 0.1;
+        case 'gem': return 0.1;
         case 'consumable': return Number(Math.max(0.1, cells * 0.2).toFixed(1));
         default: return Number(Math.max(0.1, cells * 0.3).toFixed(1));
     }
@@ -103,12 +99,27 @@ function inferBaseValue(item: RawItemDef): number {
 }
 
 export function normalizeItemDef(item: RawItemDef): ItemDef {
+    const rarity = inferRarity(item);
+    const maxSockets = item.maxSockets ?? inferMaxSockets(item, rarity);
     return {
         ...item,
-        rarity: inferRarity(item),
+        rarity,
         weight: inferWeight(item),
         baseValue: inferBaseValue(item),
+        ...(maxSockets !== undefined ? { maxSockets } : {}),
+        ...(maxSockets ? { socketTypes: item.socketTypes ?? ['rune', 'gem'] } : {}),
     };
+}
+
+function inferMaxSockets(item: RawItemDef, rarity: ItemRarity): number | undefined {
+    if (!isSocketableHostSlot(item.slot)) return undefined;
+    if (rarity === 'common' || rarity === 'uncommon') return 1;
+    if (rarity === 'rare') return 2;
+    return 3;
+}
+
+function isSocketableHostSlot(slot: ItemSlot): boolean {
+    return slot === 'weapon' || slot === 'shield' || slot === 'head' || slot === 'body' || slot === 'boots';
 }
 
 export function isCombatRecoveryConsumable(item: ItemDef): boolean {
@@ -242,6 +253,271 @@ function generateBranchArmor(): RawItemDef[] {
 /** All generated branch armor */
 const BRANCH_ARMOR: RawItemDef[] = generateBranchArmor();
 
+const RUNE_ORDER = [
+    ['el', 'El', '엘'],
+    ['eld', 'Eld', '엘드'],
+    ['tir', 'Tir', '티르'],
+    ['nef', 'Nef', '네프'],
+    ['eth', 'Eth', '에드'],
+    ['ith', 'Ith', '아이드'],
+    ['tal', 'Tal', '탈'],
+    ['ral', 'Ral', '랄'],
+    ['ort', 'Ort', '오르트'],
+    ['thul', 'Thul', '주울'],
+    ['amn', 'Amn', '앰'],
+    ['sol', 'Sol', '솔'],
+    ['shael', 'Shael', '샤엘'],
+    ['dol', 'Dol', '돌'],
+    ['hel', 'Hel', '헬'],
+    ['io', 'Io', '이오'],
+    ['lum', 'Lum', '룸'],
+    ['ko', 'Ko', '코'],
+    ['fal', 'Fal', '팔'],
+    ['lem', 'Lem', '렘'],
+    ['pul', 'Pul', '풀'],
+    ['um', 'Um', '움'],
+    ['mal', 'Mal', '말'],
+    ['ist', 'Ist', '이스트'],
+    ['gul', 'Gul', '굴'],
+    ['vex', 'Vex', '벡스'],
+    ['ohm', 'Ohm', '오움'],
+    ['lo', 'Lo', '로'],
+    ['sur', 'Sur', '수르'],
+    ['ber', 'Ber', '베르'],
+    ['jah', 'Jah', '자'],
+    ['cham', 'Cham', '참'],
+    ['zod', 'Zod', '조드'],
+] as const;
+
+export const RUNE_ITEM_IDS = RUNE_ORDER.map(([id]) => `rune_${id}`);
+
+function runeRarity(rank: number): ItemRarity {
+    if (rank <= 6) return 'common';
+    if (rank <= 12) return 'uncommon';
+    if (rank <= 18) return 'rare';
+    if (rank <= 24) return 'epic';
+    if (rank <= 30) return 'legend';
+    return 'unique';
+}
+
+function runeEffects(rank: number): Partial<Record<SocketHostKind, Partial<CharacterStats>>> {
+    const power = Math.min(6, Math.ceil(rank / 6));
+    switch ((rank - 1) % 7) {
+        case 0:
+            return {
+                weapon: { atk: power + 1 },
+                armor: { def: power },
+                shield: { def: power + 1 },
+            };
+        case 1:
+            return {
+                weapon: { hitRate: power * 2 },
+                armor: { maxHp: power * 6 },
+                shield: { hitRate: power * 2 },
+            };
+        case 2:
+            return {
+                weapon: { critRate: power },
+                armor: { evasion: power },
+                shield: { evasion: power },
+            };
+        case 3:
+            return {
+                weapon: { magAtk: power + 1 },
+                armor: { magDef: power },
+                shield: { magDef: power + 1 },
+            };
+        case 4:
+            return {
+                weapon: { atkMod: power },
+                armor: { defMod: power },
+                shield: { defMod: power + 1 },
+            };
+        case 5:
+            return {
+                weapon: { magHit: power * 2 },
+                armor: { maxMp: power * 4 },
+                shield: { magEva: power },
+            };
+        default:
+            return {
+                weapon: { spd: Math.ceil(power / 2) },
+                armor: { actionLimit: Math.ceil(power / 2) },
+                shield: { cmdRange: power >= 4 ? 1 : 0 },
+            };
+    }
+}
+
+function generateRunes(): RawItemDef[] {
+    return RUNE_ORDER.map(([id, name, nameKr], index) => {
+        const rank = index + 1;
+        return {
+            id: `rune_${id}`,
+            name: `${name} Rune`,
+            nameKr: `${nameKr} 룬`,
+            slot: 'rune',
+            gridW: 1,
+            gridH: 1,
+            color: rank <= 12 ? '#d6b36a' : rank <= 24 ? '#e0d0ff' : '#ffcf6b',
+            icon: 'ᚱ',
+            maxDurability: 1,
+            description: `Socket rune ${rank}/33. Effects change by weapon, armor, or shield.`,
+            descriptionKr: `장비 부위에 따라 다른 효과를 주는 ${rank}번 룬입니다.`,
+            rarity: runeRarity(rank),
+            weight: 0.1,
+            baseValue: 40 + rank * 18,
+            sellable: true,
+            itemCategory: 'rune',
+            socketEffects: runeEffects(rank),
+        };
+    });
+}
+
+interface GemTierInfo {
+    id: 'chipped' | 'flawed' | 'normal' | 'flawless' | 'perfect';
+    name: string;
+    nameKr: string;
+    power: number;
+    rarity: ItemRarity;
+    baseValue: number;
+    buyPrice?: number;
+}
+
+interface GemTypeInfo {
+    id: 'amethyst' | 'diamond' | 'emerald' | 'ruby' | 'sapphire' | 'skull' | 'topaz';
+    name: string;
+    nameKr: string;
+    color: string;
+    icon: string;
+    effects: (power: number) => Partial<Record<SocketHostKind, Partial<CharacterStats>>>;
+}
+
+const GEM_TIERS: GemTierInfo[] = [
+    { id: 'chipped', name: 'Chipped', nameKr: '최하급', power: 1, rarity: 'common', baseValue: 25, buyPrice: 45 },
+    { id: 'flawed', name: 'Flawed', nameKr: '하급', power: 2, rarity: 'uncommon', baseValue: 60 },
+    { id: 'normal', name: 'Normal', nameKr: '일반', power: 3, rarity: 'rare', baseValue: 120 },
+    { id: 'flawless', name: 'Flawless', nameKr: '상급', power: 4, rarity: 'epic', baseValue: 240 },
+    { id: 'perfect', name: 'Perfect', nameKr: '최상급', power: 5, rarity: 'legend', baseValue: 480 },
+];
+
+const GEM_TYPES: GemTypeInfo[] = [
+    {
+        id: 'amethyst',
+        name: 'Amethyst',
+        nameKr: '자수정',
+        color: '#a66cff',
+        icon: '◆',
+        effects: (p) => ({
+            weapon: { atkMod: p },
+            armor: { actionLimit: p <= 2 ? 1 : p <= 4 ? 2 : 3 },
+            shield: { defMod: p },
+        }),
+    },
+    {
+        id: 'diamond',
+        name: 'Diamond',
+        nameKr: '다이아몬드',
+        color: '#dff7ff',
+        icon: '◇',
+        effects: (p) => ({
+            weapon: { atk: p, magAtk: p },
+            armor: { magDef: p + 1 },
+            shield: { def: p, magDef: p },
+        }),
+    },
+    {
+        id: 'emerald',
+        name: 'Emerald',
+        nameKr: '에메랄드',
+        color: '#35d07f',
+        icon: '◆',
+        effects: (p) => ({
+            weapon: { hitRate: p * 2 },
+            armor: { evasion: p },
+            shield: { magEva: p },
+        }),
+    },
+    {
+        id: 'ruby',
+        name: 'Ruby',
+        nameKr: '루비',
+        color: '#e3425a',
+        icon: '◆',
+        effects: (p) => ({
+            weapon: { atk: p },
+            armor: { maxHp: p * 8 },
+            shield: { def: p },
+        }),
+    },
+    {
+        id: 'sapphire',
+        name: 'Sapphire',
+        nameKr: '사파이어',
+        color: '#3a7cff',
+        icon: '◆',
+        effects: (p) => ({
+            weapon: { magAtk: p },
+            armor: { maxMp: p * 4 },
+            shield: { magDef: p },
+        }),
+    },
+    {
+        id: 'skull',
+        name: 'Skull',
+        nameKr: '해골',
+        color: '#d8d0c8',
+        icon: '☠',
+        effects: (p) => ({
+            weapon: { atk: Math.ceil(p / 2), magAtk: Math.ceil(p / 2) },
+            armor: { maxHp: p * 4, maxMp: p * 2 },
+            shield: { evasion: Math.ceil(p / 2), magEva: Math.ceil(p / 2) },
+        }),
+    },
+    {
+        id: 'topaz',
+        name: 'Topaz',
+        nameKr: '토파즈',
+        color: '#f0c050',
+        icon: '◆',
+        effects: (p) => ({
+            weapon: { critRate: p },
+            armor: { spd: p <= 2 ? 1 : p <= 4 ? 2 : 3 },
+            shield: { hitRate: p * 2 },
+        }),
+    },
+];
+
+export const GEM_ITEM_IDS = GEM_TIERS.flatMap((tier) => GEM_TYPES.map((gem) => `gem_${tier.id}_${gem.id}`));
+export const CHIPPED_GEM_IDS = GEM_TYPES.map((gem) => `gem_chipped_${gem.id}`);
+
+function generateGems(): RawItemDef[] {
+    return GEM_TIERS.flatMap((tier) => GEM_TYPES.map((gem) => ({
+        id: `gem_${tier.id}_${gem.id}`,
+        name: `${tier.name} ${gem.name}`,
+        nameKr: `${tier.nameKr} ${gem.nameKr}`,
+        slot: 'gem' as const,
+        gridW: 1,
+        gridH: 1,
+        color: gem.color,
+        icon: gem.icon,
+        maxDurability: 1,
+        description: `${tier.name} ${gem.name}. Socket into weapons, armor, or shields for a small flat bonus.`,
+        descriptionKr: `${tier.nameKr} ${gem.nameKr}. 무기/방어구/방패에 장착하면 낮은 고정 보너스를 줍니다.`,
+        rarity: tier.rarity,
+        weight: 0.1,
+        baseValue: tier.baseValue,
+        buyPrice: tier.buyPrice,
+        sellable: true,
+        itemCategory: 'gem' as const,
+        socketEffects: gem.effects(tier.power),
+    })));
+}
+
+const SOCKET_INSERTS: RawItemDef[] = [
+    ...generateRunes(),
+    ...generateGems(),
+];
+
 /** Item database — starting items */
 const RAW_ITEMS: RawItemDef[] = [
     // ─── Divine Weapon ─────────────────────
@@ -250,11 +526,11 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'weapon', gridW: 1, gridH: 3, color: '#ffd700', icon: '✨',
         maxDurability: 9999,
         stats: { atk: 25, magAtk: 25 },
-        description: 'A divine blade that absorbs the sins of the fallen. Only accepts Sin Cores.',
-        descriptionKr: '타락한 자들의 죄악을 흡수하는 신성한 검입니다. 오직 Sin Core만 장착할 수 있습니다.',
+        description: 'A divine blade that absorbs the sins of the fallen. A unique 3-socket weapon.',
+        descriptionKr: '타락한 자들의 죄악을 흡수하는 신성한 검입니다. 3소켓 고유 무기입니다.',
         itemCategory: 'divine_weapon',
         maxSockets: 3,
-        socketTypes: ['sin_core']
+        socketTypes: ['rune', 'gem']
     },
 
     // ─── Normal Weapons ─────────────────────
@@ -522,6 +798,23 @@ const RAW_ITEMS: RawItemDef[] = [
         buyPrice: 320,
         itemCategory: 'material'
     },
+
+    // ─── Quest Items ──────
+    {
+        id: 'quest_bomb', name: 'Bomb', nameKr: '폭탄',
+        slot: 'material', gridW: 1, gridH: 1, color: '#c05032', icon: '●',
+        maxDurability: 1,
+        description: 'A story item recovered after clearing the Burgos Castle quest.',
+        descriptionKr: '부르고스성 퀘스트 클리어 후 획득하는 스토리 아이템입니다.',
+        rarity: 'unique',
+        weight: 0.4,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'material'
+    },
+
+    // ─── Socket Inserts (Diablo II-style runes and gems) ──────
+    ...SOCKET_INSERTS,
 
     // ─── Original Darksaber town weapon shops ──────
     ...ORIGINAL_SHOP_ITEMS,

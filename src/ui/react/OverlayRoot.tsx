@@ -15,6 +15,7 @@ import { PartyPanel } from './party/PartyPanel';
 import { TownScreen } from './town/TownScreen';
 import { CharacterCreation } from './charcreate/CharacterCreation';
 import { InventoryPanel } from './inventory/InventoryPanel';
+import { StoryJournalPanel } from './quest/StoryJournalPanel';
 
 export function OverlayRoot() {
     const store = useStore();
@@ -25,6 +26,7 @@ export function OverlayRoot() {
     const townOpen = useUiSelector((s) => s.isTownOpen());
     const charCreateOpen = useUiSelector((s) => s.isCharCreateOpen());
     const inventoryOpen = useUiSelector((s) => s.isInventoryOpen());
+    const questJournalOpen = useUiSelector((s) => s.isQuestJournalOpen());
 
     return (
         <>
@@ -54,6 +56,11 @@ export function OverlayRoot() {
                 </div>
             )}
             {townOpen && <TownScreen />}
+            {questJournalOpen && (
+                <div className="ds-scrim" onClick={() => store.closeQuestJournal()}>
+                    <StoryJournalPanel />
+                </div>
+            )}
             {charCreateOpen && <CharacterCreation />}
         </>
     );

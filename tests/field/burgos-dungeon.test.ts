@@ -6,6 +6,7 @@ import {
     BURGOS_BOSS_MONSTER_ID,
     BURGOS_CASTLE_DUNGEON_ID,
     BURGOS_GUARD_MONSTER_ID,
+    BURGOS_LEGACY_BOSS_MONSTER_ID,
     GENERAL_MONSTER_IDS,
     MONSTER_DEFINITIONS,
     MONSTER_ROW_BY_FACING,
@@ -40,7 +41,7 @@ function makePassthroughMovement(): WorldMovementController {
     } as unknown as WorldMovementController;
 }
 
-test('monster catalog includes 16 general monsters and the Burgos boss sprites', () => {
+test('monster catalog includes 16 general monsters and the Burgos wolf boss sprites', () => {
     assert.equal(GENERAL_MONSTER_IDS.length, 16);
     assert.equal(new Set(GENERAL_MONSTER_IDS).size, 16);
 
@@ -53,8 +54,13 @@ test('monster catalog includes 16 general monsters and the Burgos boss sprites',
 
     const boss = getMonsterDefinition(BURGOS_BOSS_MONSTER_ID);
     assert.equal(boss.role, 'boss');
-    assert.equal(boss.frameSize, 64);
+    assert.equal(boss.sprite, '435R.png');
+    assert.equal(boss.frameSize, 32);
     assert.ok(existsSync(join(process.cwd(), ...MONSTER_PUBLIC_PATH, boss.sprite)));
+
+    const legacyBoss = getMonsterDefinition(BURGOS_LEGACY_BOSS_MONSTER_ID);
+    assert.equal(legacyBoss.frameSize, 64);
+    assert.ok(existsSync(join(process.cwd(), ...MONSTER_PUBLIC_PATH, legacyBoss.sprite)));
 });
 
 test('Burgos Castle is a world-map dungeon entrance landmark', () => {
@@ -83,7 +89,22 @@ test('starter field content attaches all 16 general monster walk sprites', () =>
     }
 });
 
-test('Burgos Castle encounter spawns boss center and four diagonal guards', () => {
+test('starter field chests roll low-tier gems through injected RNG', () => {
+    const mortalSpawner = new WorldFieldSpawnController(makePassthroughMovement(), () => 0);
+    const mortal = mortalSpawner.createStarterFieldContent(new Player(100, 100));
+    const mortalChest = mortal.loot.find((loot) => loot.id === 'field_chest_1');
+    assert.ok(mortalChest);
+    assert.ok(mortalChest.inventory.items.some((placed) => /^gem_(chipped|flawed)_/.test(placed.item.id)));
+
+    const rolls = [0, 0.99];
+    const masterSpawner = new WorldFieldSpawnController(makePassthroughMovement(), () => rolls.shift() ?? 0);
+    const master = masterSpawner.createStarterFieldContent(new Player(100, 100), { masterRealm: true });
+    const masterChest = master.loot.find((loot) => loot.id === 'field_chest_1');
+    assert.ok(masterChest);
+    assert.ok(masterChest.inventory.items.some((placed) => placed.item.id.startsWith('gem_normal_')));
+});
+
+test('Burgos Castle encounter spawns wolf boss center and four diagonal guards', () => {
     const spawner = new WorldFieldSpawnController(makePassthroughMovement());
     const content = spawner.createBurgosCastleEncounter({ x: 100, y: 100 });
     assert.equal(content.enemies.length, 5);
@@ -93,7 +114,7 @@ test('Burgos Castle encounter spawns boss center and four diagonal guards', () =
     assert.ok(boss);
     assert.equal(boss.name, getMonsterDefinition(BURGOS_BOSS_MONSTER_ID).name);
     assert.deepEqual({ x: boss.gridX, y: boss.gridY }, { x: 100, y: 100 });
-    assert.equal(boss.walkSprite?.frameWidth, 64);
+    assert.equal(boss.walkSprite?.frameWidth, 32);
 
     const guardName = getMonsterDefinition(BURGOS_GUARD_MONSTER_ID).name;
     const guardPositions = content.enemies
@@ -101,6 +122,18 @@ test('Burgos Castle encounter spawns boss center and four diagonal guards', () =
         .map((entry) => `${entry.enemy.gridX - 100},${entry.enemy.gridY - 100}`)
         .sort();
     assert.deepEqual(guardPositions, ['-2,-2', '-2,2', '2,-2', '2,2']);
+});
+
+test('Burgos boss corpse loot includes a guaranteed rune', () => {
+    const bossDef = getMonsterDefinition(BURGOS_BOSS_MONSTER_ID);
+    const boss = new Enemy('burgos_boss', 100, 100, bossDef.name, bossDef.level, bossDef.color, bossDef.role);
+    const engine = Object.create(WorldEngine.prototype) as any;
+    engine.worldMap = { loot: [] };
+
+    engine.spawnEnemyLoot(boss);
+
+    assert.equal(engine.worldMap.loot.length, 1);
+    assert.ok(engine.worldMap.loot[0].inventory.items.some((placed: { item: { slot: string } }) => placed.item.slot === 'rune'));
 });
 
 test('enemy selection display info includes walk sprite sheet data', () => {
@@ -132,7 +165,8 @@ test('enemy selection display info includes walk sprite sheet data', () => {
 });
 
 test('Burgos boss defeat clears only the dungeon encounter, not raid success', () => {
-    const boss = new Enemy('burgos_boss', 100, 100, '부르고스 궁의 몬스터', 3, '#ff7f8d', 'boss');
+    const bossDef = getMonsterDefinition(BURGOS_BOSS_MONSTER_ID);
+    const boss = new Enemy('burgos_boss', 100, 100, bossDef.name, bossDef.level, bossDef.color, bossDef.role);
     const guard = new Enemy('burgos_guard_0', 98, 98, '부르고스 경비병', 2, '#d98a5a', 'bruiser');
     const raidSession = new WorldRaidSession('central_castle');
     raidSession.beginRaidFromTown('central_castle');
@@ -160,9 +194,9 @@ test('Burgos boss defeat clears only the dungeon encounter, not raid success', (
     assert.equal(raidSession.activeDungeonId, null);
     assert.equal(raidSession.isDungeonCleared(BURGOS_CASTLE_DUNGEON_ID), true);
     assert.deepEqual(engine.fieldEnemies, []);
-    assert.deepEqual(engine.worldMap.loot, []);
+    assert.deepEqual(engine.worldMap.loot, [{ id: 'corpse_burgos_boss' }]);
     assert.equal(selectionCleared, true);
     assert.equal(turnStateCleared, true);
     assert.equal(raidSuccessShown, false);
-    assert.ok(logs.includes('부르고스성 클리어. 던전이 종료되었습니다.'));
+    assert.ok(logs.includes('부르고스성 목표 달성. 다른 마을로 생환하면 1화가 완료됩니다.'));
 });

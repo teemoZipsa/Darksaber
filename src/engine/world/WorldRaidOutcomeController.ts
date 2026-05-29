@@ -1,5 +1,8 @@
 import type { PartyManager } from '../../character/PartyManager';
+import { getItemDef } from '../../data/ItemDB';
 import type { PlayerData } from '../../data/PlayerData';
+import { STORY_QUESTS } from '../../data/StoryQuestData';
+import { t } from '../../i18n/LanguageManager';
 import type { TownInfo } from '../../map/BiomeMask';
 import {
     computeRaidFailureLoss,
@@ -69,6 +72,7 @@ export class WorldRaidOutcomeController {
             goldReward = 200;
             questRewards.push('퀘스트 완료: 첫 생환');
         }
+        questRewards.push(...this.completeStoryQuestRewards());
 
         raidSession.completeAtTown(destination.id);
         this.context.playerData.currentHubTownId = destination.id;
@@ -135,6 +139,24 @@ export class WorldRaidOutcomeController {
         };
         this.showRaidResult(outcome, returnTown);
         this.context.log(result === 'MIA' ? '시간 초과. 손실이 적용되었습니다.' : '전멸. 손실이 적용되었습니다.');
+    }
+
+    private completeStoryQuestRewards(): string[] {
+        const rewards: string[] = [];
+        for (const quest of STORY_QUESTS) {
+            if (!this.context.raidSession.isDungeonCleared(quest.dungeonId)) continue;
+            if (this.context.playerData.isCleared(quest.id)) continue;
+
+            this.context.playerData.markCleared(quest.id);
+            if (!this.context.playerData.hasQuestItem(quest.rewardItemId)) {
+                this.context.playerData.addQuestItem(quest.rewardItemId);
+            }
+
+            const rewardItem = getItemDef(quest.rewardItemId);
+            rewards.push(`${t('quest.completed')}: ${t(quest.titleKey)}`);
+            rewards.push(`${t('quest.rewardItem')}: ${rewardItem?.nameKr ?? quest.rewardItemId}`);
+        }
+        return rewards;
     }
 
     private showRaidResult(outcome: RaidOutcome, nextTown: TownInfo): void {

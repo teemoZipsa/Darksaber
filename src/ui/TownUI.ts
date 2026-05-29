@@ -19,7 +19,7 @@ import { TownInfo } from '../map/BiomeMask';
 import type { Character } from '../character/Character';
 import { t } from '../i18n/LanguageManager';
 import { getRestFacility, type RestFacility } from '../data/RestFacilityData';
-import { getTownFacilities, isShopFacilityId, type TownFacilityId } from '../data/TownFacilityData';
+import { getTownFacilities, type TownFacilityId } from '../data/TownFacilityData';
 
 export type TownTab = TownFacilityId;
 
@@ -163,11 +163,10 @@ export class TownUI {
             case 'armor_shop':
             case 'general_store':
             case 'specialty_trader':
-            case 'blacksmith':
             case 'shrine':
                 this.syncShopSources();
                 this.shopUI.setTownId(this.currentTown?.id ?? null);
-                this.shopUI.setFacilityId(isShopFacilityId(tab) ? tab : null);
+                this.shopUI.setFacilityId(tab);
                 this.shopUI.show();
                 break;
             // rest / healer / quest / rumors are rendered by the React overlay (no sub-UI).

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { BURGOS_CASTLE_DUNGEON_ID } from '../../src/data/MonsterCatalog';
 import { WorldRaidSession } from '../../src/engine/world/WorldRaidSession';
 
 test('world raid session advances, expires, and records raid events without combat dependencies', () => {
@@ -36,9 +37,14 @@ test('world raid session tracks town transition and pending result town', () => 
     raid.clearDepartureBlock();
     assert.equal(raid.shouldReportDepartureBlock('central_castle'), true);
 
+    raid.startDungeonEncounter(BURGOS_CASTLE_DUNGEON_ID);
+    raid.completeDungeonEncounter(BURGOS_CASTLE_DUNGEON_ID);
+    assert.equal(raid.isDungeonCleared(BURGOS_CASTLE_DUNGEON_ID), true);
+
     raid.completeAtTown('w_forest_village');
     assert.equal(raid.active, false);
     assert.equal(raid.currentHubTownId, 'w_forest_village');
+    assert.equal(raid.isDungeonCleared(BURGOS_CASTLE_DUNGEON_ID), false);
 
     raid.setPendingTownAfterResult('w_forest_village');
     assert.equal(raid.consumePendingTownAfterResultId(), 'w_forest_village');
