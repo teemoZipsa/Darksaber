@@ -497,6 +497,42 @@
 #ui-overlay .ds-shop__stock { color: var(--ds-text-dim); font-size: 11px; }
 #ui-overlay .ds-shop__feedback { text-align: center; color: var(--ds-accent); font-size: 12px; min-height: 18px; padding: 4px 0 10px; }
 
+/* ─── Blacksmith panel ─────────────────────────────────────── */
+#ui-overlay .ds-blacksmith { display: flex; flex-direction: column; max-height: 82vh; }
+#ui-overlay .ds-blacksmith__gold {
+    position: absolute; right: 18px; top: 50%; transform: translateY(-50%);
+    font-size: 14px; font-weight: 600; color: var(--ds-accent-bright);
+    font-variant-numeric: tabular-nums;
+}
+#ui-overlay .ds-blacksmith__body {
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 14px 18px 10px; min-height: 0;
+}
+#ui-overlay .ds-blacksmith__note {
+    color: var(--ds-text-dim);
+    font-size: 12px;
+    line-height: 1.4;
+}
+#ui-overlay .ds-blacksmith__list {
+    display: flex; flex-direction: column; gap: 6px;
+    overflow-y: auto; max-height: 54vh; min-height: 180px; padding: 2px 4px;
+}
+#ui-overlay .ds-blacksmith__empty { text-align: center; color: var(--ds-text-dim); font-size: 13px; padding: 32px 0; }
+#ui-overlay .ds-blacksmith__row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--ds-panel-inset);
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+    padding: 8px 10px;
+}
+#ui-overlay .ds-blacksmith__info { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+#ui-overlay .ds-blacksmith__name { color: var(--ds-text); font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#ui-overlay .ds-blacksmith__sub { color: var(--ds-text-dim); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#ui-overlay .ds-blacksmith__meta { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--ds-text-muted); font-size: 11px; }
+#ui-overlay .ds-blacksmith__actions { display: flex; flex-direction: column; gap: 6px; flex: none; }
+#ui-overlay .ds-blacksmith__actions .ds-btn { min-width: 112px; font-size: 11px; padding: 6px 10px; }
+#ui-overlay .ds-blacksmith__feedback { text-align: center; color: var(--ds-accent); font-size: 12px; min-height: 18px; }
+
 /* Item swatch (DOM icon tile) */
 #ui-overlay .ds-item-swatch {
     width: 38px; height: 38px; flex: none;
@@ -646,13 +682,15 @@
     color: var(--ds-accent);
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7), 0 0 16px rgba(240, 192, 80, 0.3);
 }
-#ui-overlay .cc__classes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; width: 100%; }
+#ui-overlay .cc__classes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; width: 100%; }
 #ui-overlay .cc-card {
     display: flex; flex-direction: column; align-items: center; gap: 10px;
     padding: 14px 12px; cursor: pointer;
     background: var(--ds-panel-inset);
     border: 1px solid var(--ds-border-shadow);
     border-radius: var(--ds-radius-sm);
+    box-sizing: border-box;
+    min-width: 0;
     transition: border-color 120ms, box-shadow 120ms, transform 80ms;
 }
 #ui-overlay .cc-card:hover { border-color: var(--ds-border); }
@@ -667,10 +705,10 @@
     border-radius: var(--ds-radius-sm);
 }
 #ui-overlay .cc-card__name { font-size: 16px; font-weight: 600; color: var(--ds-text); }
-#ui-overlay .cc-card__stats { display: flex; flex-direction: column; gap: 5px; width: 100%; }
-#ui-overlay .cc-stat { display: flex; align-items: center; gap: 7px; }
-#ui-overlay .cc-stat__label { font-size: 12px; color: var(--ds-text-muted); width: 22px; flex: none; }
-#ui-overlay .cc-stat__bar { flex: 1; height: 9px; border-radius: 999px; background: var(--ds-panel-0); overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5); }
+#ui-overlay .cc-card__stats { display: flex; flex-direction: column; gap: 6px; width: min(150px, 100%); }
+#ui-overlay .cc-stat { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; }
+#ui-overlay .cc-stat__label { font-size: 11px; line-height: 1; color: var(--ds-text-muted); width: 48px; flex: none; text-align: right; white-space: nowrap; }
+#ui-overlay .cc-stat__bar { flex: 1; min-width: 0; height: 9px; border-radius: 999px; background: var(--ds-panel-0); overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5); }
 #ui-overlay .cc-stat__fill { height: 100%; border-radius: 999px; transition: width 200ms ease-out; }
 
 #ui-overlay .cc__field { display: flex; align-items: center; gap: 14px; }

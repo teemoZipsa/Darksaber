@@ -44,7 +44,8 @@ export function slotAcceptsItem(uiSlot: ItemSlot, itemSlot: ItemSlot): boolean {
 /** Whether `itemDef` can be socketed into the already-placed `host`. */
 function canSocket(itemDef: ItemDef, host: PlacedItem): boolean {
     if (!host.item.maxSockets) return false;
-    const cat = (itemDef.itemCategory ?? itemDef.slot) as never;
+    const cat = itemDef.itemCategory ?? itemDef.slot;
+    if (cat !== 'rune' && cat !== 'gem') return false;
     if (!host.item.socketTypes?.includes(cat)) return false;
     return (host.sockets?.length ?? 0) < host.item.maxSockets;
 }

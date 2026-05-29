@@ -89,6 +89,21 @@ test('starter field content attaches all 16 general monster walk sprites', () =>
     }
 });
 
+test('starter field chests roll low-tier gems through injected RNG', () => {
+    const mortalSpawner = new WorldFieldSpawnController(makePassthroughMovement(), () => 0);
+    const mortal = mortalSpawner.createStarterFieldContent(new Player(100, 100));
+    const mortalChest = mortal.loot.find((loot) => loot.id === 'field_chest_1');
+    assert.ok(mortalChest);
+    assert.ok(mortalChest.inventory.items.some((placed) => /^gem_(chipped|flawed)_/.test(placed.item.id)));
+
+    const rolls = [0, 0.99];
+    const masterSpawner = new WorldFieldSpawnController(makePassthroughMovement(), () => rolls.shift() ?? 0);
+    const master = masterSpawner.createStarterFieldContent(new Player(100, 100), { masterRealm: true });
+    const masterChest = master.loot.find((loot) => loot.id === 'field_chest_1');
+    assert.ok(masterChest);
+    assert.ok(masterChest.inventory.items.some((placed) => placed.item.id.startsWith('gem_normal_')));
+});
+
 test('Burgos Castle encounter spawns wolf boss center and four diagonal guards', () => {
     const spawner = new WorldFieldSpawnController(makePassthroughMovement());
     const content = spawner.createBurgosCastleEncounter({ x: 100, y: 100 });
@@ -107,6 +122,18 @@ test('Burgos Castle encounter spawns wolf boss center and four diagonal guards',
         .map((entry) => `${entry.enemy.gridX - 100},${entry.enemy.gridY - 100}`)
         .sort();
     assert.deepEqual(guardPositions, ['-2,-2', '-2,2', '2,-2', '2,2']);
+});
+
+test('Burgos boss corpse loot includes a guaranteed rune', () => {
+    const bossDef = getMonsterDefinition(BURGOS_BOSS_MONSTER_ID);
+    const boss = new Enemy('burgos_boss', 100, 100, bossDef.name, bossDef.level, bossDef.color, bossDef.role);
+    const engine = Object.create(WorldEngine.prototype) as any;
+    engine.worldMap = { loot: [] };
+
+    engine.spawnEnemyLoot(boss);
+
+    assert.equal(engine.worldMap.loot.length, 1);
+    assert.ok(engine.worldMap.loot[0].inventory.items.some((placed: { item: { slot: string } }) => placed.item.slot === 'rune'));
 });
 
 test('enemy selection display info includes walk sprite sheet data', () => {
@@ -167,7 +194,7 @@ test('Burgos boss defeat clears only the dungeon encounter, not raid success', (
     assert.equal(raidSession.activeDungeonId, null);
     assert.equal(raidSession.isDungeonCleared(BURGOS_CASTLE_DUNGEON_ID), true);
     assert.deepEqual(engine.fieldEnemies, []);
-    assert.deepEqual(engine.worldMap.loot, []);
+    assert.deepEqual(engine.worldMap.loot, [{ id: 'corpse_burgos_boss' }]);
     assert.equal(selectionCleared, true);
     assert.equal(turnStateCleared, true);
     assert.equal(raidSuccessShown, false);

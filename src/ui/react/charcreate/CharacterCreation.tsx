@@ -25,11 +25,13 @@ const STAT_ROWS: Array<{ key: keyof Pick<CharConfig, 'hp' | 'atk' | 'def' | 'mag
 function ClassPortrait({ cfg, size }: { cfg: CharConfig; size: number }) {
     const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
     const crop = cfg.portraitCrop;
-    const scale = size / Math.max(crop.w, crop.h);
+    const inset = Math.max(6, Math.round(size * 0.07));
+    const fitSize = size - inset * 2;
+    const scale = (fitSize * (cfg.portraitScale ?? 1)) / Math.max(crop.w, crop.h);
     const dw = crop.w * scale;
     const dh = crop.h * scale;
-    const offsetX = (size - dw) / 2;
-    const offsetY = (size - dh) / 2;
+    const offsetX = inset + (fitSize - dw) / 2;
+    const offsetY = inset + (fitSize - dh) / 2;
     const imgStyle: CSSProperties = nat
         ? {
             position: 'absolute',

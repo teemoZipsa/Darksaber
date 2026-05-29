@@ -12,13 +12,43 @@ export function itemName(item: ItemDef): string {
 }
 
 export function statSummary(item: ItemDef): string {
-    const stats: string[] = [];
-    if (item.stats?.atk) stats.push(`ATK+${item.stats.atk}`);
-    if (item.stats?.def) stats.push(`DEF+${item.stats.def}`);
-    if (item.stats?.magAtk) stats.push(`MAG+${item.stats.magAtk}`);
-    if (item.stats?.hp) stats.push(`HP+${item.stats.hp}`);
-    if (stats.length > 0) return stats.join(' · ');
+    const stats = formatStats(item.stats);
+    if (stats) return stats;
+    const socketStats = socketSummary(item);
+    if (socketStats) return socketStats;
     return i18n.lang === 'ko' ? (item.descriptionKr ?? item.description) : item.description;
+}
+
+function formatStats(stats: ItemDef['stats'] | undefined): string {
+    if (!stats) return '';
+    const parts: string[] = [];
+    if (stats.atk) parts.push(`ATK+${stats.atk}`);
+    if (stats.def) parts.push(`DEF+${stats.def}`);
+    if (stats.magAtk) parts.push(`MAG+${stats.magAtk}`);
+    if (stats.magDef) parts.push(`MDEF+${stats.magDef}`);
+    if (stats.hp || stats.maxHp) parts.push(`HP+${stats.maxHp ?? stats.hp}`);
+    if (stats.mp || stats.maxMp) parts.push(`MP+${stats.maxMp ?? stats.mp}`);
+    if (stats.hitRate) parts.push(`HIT+${stats.hitRate}`);
+    if (stats.critRate) parts.push(`CRIT+${stats.critRate}`);
+    if (stats.evasion) parts.push(`EVA+${stats.evasion}`);
+    if (stats.spd) parts.push(`SPD+${stats.spd}`);
+    return parts.join(' · ');
+}
+
+function socketSummary(item: ItemDef): string {
+    if (!item.socketEffects) return '';
+    const labels: Array<[keyof NonNullable<ItemDef['socketEffects']>, string]> = [
+        ['weapon', 'W'],
+        ['armor', 'A'],
+        ['shield', 'S'],
+    ];
+    return labels
+        .map(([kind, label]) => {
+            const stats = formatStats(item.socketEffects?.[kind]);
+            return stats ? `${label}: ${stats}` : '';
+        })
+        .filter(Boolean)
+        .join(' · ');
 }
 
 export function ItemGlyph({ item, className = '' }: { item: ItemDef; className?: string }) {

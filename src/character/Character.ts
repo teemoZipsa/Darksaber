@@ -272,8 +272,9 @@ export class Character {
     }
 
     public tickBuffs(): void {
-        const result = resolveTurnStartStatuses(this.stats, this.statuses);
-        this.stats.hp = Math.max(0, Math.min(this.stats.maxHp, this.stats.hp + result.hpDelta));
+        const effective = getEffectiveStatsForCharacter(this);
+        const result = resolveTurnStartStatuses(effective, this.statuses);
+        this.stats.hp = Math.max(0, Math.min(effective.maxHp, this.stats.hp + result.hpDelta));
         this.statuses = result.statuses;
     }
 

@@ -8,6 +8,9 @@ export interface InventoryItem {
     itemId: string;      // Reference to ItemDB
     gridX: number;       // Grid position X
     gridY: number;       // Grid position Y
+    durability?: number;
+    quantity?: number;
+    acquiredInRaid?: boolean;
     sockets: string[];   // Array of itemId string that are slotted inside
 }
 

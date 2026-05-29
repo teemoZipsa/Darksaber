@@ -19,7 +19,20 @@ import type { ShopEntry, SellEntry } from '../../ui/ShopUI';
 import type { ShopKind } from '../../data/ShopData';
 import type { TownInfo } from '../../map/BiomeMask';
 import type { InventoryUI } from '../../inventory/InventoryUI';
+import type { ItemSlot } from '../../data/ItemDB';
+import type { GridInventory, PlacedItem } from '../../inventory/GridInventory';
+import { getRepairCost, getUnsocketCost, repairItem, unsocketAll } from '../../inventory/Socketing';
 import { getStoryQuestViews as buildStoryQuestViews, type StoryQuestView } from '../../data/StoryQuestData';
+
+export interface BlacksmithEntry {
+    id: string;
+    placed: PlacedItem;
+    source: 'equipment' | 'backpack' | 'stash';
+    sourceLabel: string;
+    slot?: ItemSlot;
+    repairCost: number;
+    unsocketCost: number;
+}
 
 export class UiStore {
     private listeners = new Set<() => void>();
@@ -118,6 +131,22 @@ export class UiStore {
     getShopGold = (): number => this.shop()?.getGoldValue() ?? this.gm.playerData.gold;
     getShopBuyEntries = (): ShopEntry[] => this.shop()?.listBuyEntries() ?? [];
     getShopSellEntries = (): SellEntry[] => this.shop()?.listSellEntries() ?? [];
+    getBlacksmithGold = (): number => this.gm.playerData.gold;
+    getBlacksmithEntries = (): BlacksmithEntry[] => {
+        const entries: BlacksmithEntry[] = [];
+        for (const character of this.gm.party.getCharacters()) {
+            for (const [slot, placed] of character.equipment) {
+                this.pushBlacksmithEntry(entries, placed, 'equipment', character.name, slot);
+            }
+        }
+        const townInv = this.getTownInventory();
+        if (townInv) {
+            this.pushGridBlacksmithEntries(entries, townInv.getBag(), 'backpack', 'blacksmith.source.backpack');
+            const ext = townInv.getExternalGrid();
+            if (ext) this.pushGridBlacksmithEntries(entries, ext, 'stash', 'blacksmith.source.stash');
+        }
+        return entries;
+    };
 
     // Town actions
     townSetTab = (tab: TownTab): void => { this.townUi()?.setTab(tab); this.tick(); };
@@ -126,6 +155,22 @@ export class UiStore {
     shopSetKind = (kind: ShopKind): void => { this.shop()?.setActiveKind(kind); this.tick(); };
     shopBuy = (entry: ShopEntry): boolean => { const ok = this.shop()?.buy(entry) ?? false; this.tick(); return ok; };
     shopSell = (entry: SellEntry): boolean => { const ok = this.shop()?.sell(entry) ?? false; this.tick(); return ok; };
+    blacksmithRepair = (entry: BlacksmithEntry): boolean => {
+        const result = repairItem(entry.placed, this.gm.playerData.gold);
+        if (!result.ok) { this.tick(); return false; }
+        if (result.cost > 0) this.gm.playerData.spendGold(result.cost);
+        this.gm.playerData.save();
+        this.tick();
+        return true;
+    };
+    blacksmithUnsocket = (entry: BlacksmithEntry): boolean => {
+        const result = unsocketAll(entry.placed, this.gm.inventory, this.gm.playerData.gold);
+        if (!result.ok) { this.tick(); return false; }
+        if (result.cost > 0) this.gm.playerData.spendGold(result.cost);
+        this.gm.playerData.save();
+        this.tick();
+        return true;
+    };
 
     restPurchase = (menuId: string): boolean => { const ok = this.town()?.purchaseRestMenu(menuId) ?? false; this.tick(); return ok; };
     restTreat = (): boolean => { const ok = this.town()?.treatActivePartyInjuries() ?? false; this.tick(); return ok; };
@@ -145,4 +190,36 @@ export class UiStore {
     closeInventory = (): void => { this.gm.closeWorldInventory(); this.tick(); };
     /** Re-render after a direct InventoryUI mutation (drag/drop, equip, sort…). */
     refresh = (): void => { this.tick(); };
+
+    private pushGridBlacksmithEntries(
+        entries: BlacksmithEntry[],
+        grid: GridInventory,
+        source: BlacksmithEntry['source'],
+        sourceLabel: string
+    ): void {
+        for (const placed of grid.items) {
+            this.pushBlacksmithEntry(entries, placed, source, sourceLabel);
+        }
+    }
+
+    private pushBlacksmithEntry(
+        entries: BlacksmithEntry[],
+        placed: PlacedItem,
+        source: BlacksmithEntry['source'],
+        sourceLabel: string,
+        slot?: ItemSlot
+    ): void {
+        const repairCost = getRepairCost(placed);
+        const unsocketCost = getUnsocketCost(placed);
+        if (repairCost <= 0 && unsocketCost <= 0) return;
+        entries.push({
+            id: `${source}:${sourceLabel}:${slot ?? 'grid'}:${placed.item.id}:${entries.length}`,
+            placed,
+            source,
+            sourceLabel,
+            slot,
+            repairCost,
+            unsocketCost,
+        });
+    }
 }

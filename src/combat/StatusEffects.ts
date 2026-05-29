@@ -1,5 +1,8 @@
 import type { Skill } from '../data/SkillDB';
 import type { CharacterStats } from '../data/Stats';
+import type { ItemSlot } from '../data/ItemDB';
+import type { PlacedItem } from '../inventory/GridInventory';
+import { applyEquipmentStatBonuses } from '../inventory/Socketing';
 
 export type StatusKind =
     | 'guard'
@@ -46,6 +49,7 @@ export interface StatusEffect {
 export interface StatusCarrier {
     stats: CharacterStats;
     statuses?: StatusEffect[];
+    equipment?: Map<ItemSlot, PlacedItem>;
 }
 
 export interface TurnStartStatusResult {
@@ -159,9 +163,9 @@ export function applyStatuses(statuses: StatusEffect[] | undefined, nextStatuses
 }
 
 export function applyStatusToCarrier(carrier: StatusCarrier, next: StatusEffect): void {
-    const before = getEffectiveStats(carrier.stats, carrier.statuses);
+    const before = getEffectiveStatsForCharacter(carrier);
     carrier.statuses = applyStatus(carrier.statuses, next);
-    adjustCurrentResources(carrier.stats, before, getEffectiveStats(carrier.stats, carrier.statuses));
+    adjustCurrentResources(carrier.stats, before, getEffectiveStatsForCharacter(carrier));
 }
 
 export function applyStatusesToCarrier(carrier: StatusCarrier, nextStatuses: StatusEffect[]): void {
@@ -176,9 +180,9 @@ export function removeStatusesFromCarrier(
     const removed = current.filter(predicate);
     if (removed.length === 0) return [];
 
-    const before = getEffectiveStats(carrier.stats, current);
+    const before = getEffectiveStatsForCharacter({ ...carrier, statuses: current });
     carrier.statuses = current.filter((status) => !predicate(status));
-    adjustCurrentResources(carrier.stats, before, getEffectiveStats(carrier.stats, carrier.statuses));
+    adjustCurrentResources(carrier.stats, before, getEffectiveStatsForCharacter(carrier));
     return removed;
 }
 
@@ -269,7 +273,7 @@ export function getStatusIcons(statuses: StatusEffect[] | undefined): string[] {
 }
 
 export function getEffectiveStatsForCharacter(character: StatusCarrier): CharacterStats {
-    return getEffectiveStats(character.stats, character.statuses);
+    return getEffectiveStats(applyEquipmentStatBonuses(character.stats, character.equipment), character.statuses);
 }
 
 export function getEffectiveStatsForEnemy(enemy: StatusCarrier): CharacterStats {

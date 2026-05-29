@@ -4,7 +4,8 @@
  */
 
 import { ItemDef } from '../data/ItemDB';
-import { getSellPrice, getShopItems, isSellableItem, ShopItem, type ShopKind } from '../data/ShopData';
+import { getDefaultShopKindForFacility, getSellPrice, getShopItems, isSellableItem, ShopItem, type ShopKind } from '../data/ShopData';
+import type { ShopFacilityId } from '../data/TownFacilityData';
 import { t, i18n } from '../i18n/LanguageManager';
 import { GridInventory, PlacedItem } from '../inventory/GridInventory';
 import { drawItemIcon } from './ItemIconRenderer';
@@ -44,6 +45,7 @@ export class ShopUI {
     private sellSources: ShopSellSource[] = [];
     private activeKind: ShopKind = 'weapon';
     private townId: string | null = null;
+    private facilityId: ShopFacilityId | null = null;
 
     private buyScrollY = 0;
     private sellScrollY = 0;
@@ -83,7 +85,10 @@ export class ShopUI {
     }
 
     public refreshInventory(): void {
-        this.entries = getShopItems(this.townId ?? undefined).map(({ shopEntry, item }) => ({
+        const shopItems = this.facilityId
+            ? getShopItems(this.townId ?? undefined, this.facilityId)
+            : getShopItems(this.townId ?? undefined);
+        this.entries = shopItems.map(({ shopEntry, item }) => ({
             shopItem: shopEntry,
             item,
             remaining: shopEntry.stock,
@@ -92,7 +97,16 @@ export class ShopUI {
     }
 
     public setTownId(townId: string | null): void {
+        if (this.townId === townId) return;
         this.townId = townId;
+        this.refreshInventory();
+    }
+
+    public setFacilityId(facilityId: ShopFacilityId | null): void {
+        if (this.facilityId === facilityId) return;
+        this.facilityId = facilityId;
+        if (facilityId) this.activeKind = getDefaultShopKindForFacility(facilityId);
+        this.buyScrollY = 0;
         this.refreshInventory();
     }
 
@@ -266,7 +280,7 @@ export class ShopUI {
                 entries.push({
                     source,
                     placed,
-                    price: getSellPrice(placed.item) * Math.max(1, placed.quantity),
+                    price: getSellPrice(placed.item, this.townId ?? undefined) * Math.max(1, placed.quantity),
                 });
             }
         }
