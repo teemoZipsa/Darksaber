@@ -41,6 +41,13 @@ export interface EntityDisplayInfo {
     spriteImage?: HTMLImageElement;  // character portrait image
 }
 
+export function getEntityInfoHeaderLines(info: EntityDisplayInfo): { title: string; subtitle: string } {
+    return {
+        title: info.name,
+        subtitle: info.className ? `${info.className} · 레벨 ${info.level}` : `[ 레벨 ${info.level} ]`,
+    };
+}
+
 // ─── LIGHT PARCHMENT (unified) ───────────────────────────
 const TEXT_DARK    = Parchment.textDark;
 const GRID_BG      = '#1a1a2e';
@@ -114,13 +121,14 @@ export class EntityInfoUI {
         ctx.textAlign = 'start';
 
         // ── Header: Name & Level ──
+        const header = getEntityInfoHeaderLines(info);
         ctx.fillStyle = Parchment.textDark;
         ctx.font = `bold 15px ${UI.fontPrimary}`;
         ctx.textBaseline = 'top';
-        ctx.fillText(info.className || info.name, this.x + 12, this.y + 10);
+        ctx.fillText(header.title, this.x + 12, this.y + 10);
         ctx.font = `12px ${UI.fontMono}`;
         ctx.fillStyle = Parchment.textMid;
-        ctx.fillText(`[ 레벨 ${info.level} ]`, this.x + 12, this.y + 28);
+        ctx.fillText(header.subtitle, this.x + 12, this.y + 28);
 
         // ── Portrait Grid (dark grid — classic feel) ──
         const cellSize = 24;
