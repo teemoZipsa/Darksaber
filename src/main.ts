@@ -41,6 +41,10 @@ async function init(): Promise<void> {
     const uiStore = mountUiOverlay(manager);
     manager.attachUiStore(uiStore);
 
+    // DEV-only debug handle — lets tooling drive/inspect the game in a headless
+    // preview (paired with GameManager's hidden-tab loop fallback). Stripped in prod.
+    if (import.meta.env.DEV) (window as unknown as { __gm: GameManager }).__gm = manager;
+
     console.log('🎮 Darksaber : Extraction started');
 }
 

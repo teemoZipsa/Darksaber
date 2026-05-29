@@ -42,6 +42,7 @@ export class UiStore {
     getActiveIndex = (): number => this.gm.party.getActiveIndex();
     getGold = (): number => this.gm.playerData.gold;
     isCharPanelOpen = (): boolean => this.gm.charUI.isVisible();
+    isPauseOpen = (): boolean => this.gm.isPauseMenuOpen();
 
     // ─── Actions (delegate to GameManager; never mutate directly) ──
     /** Switch the active party member; syncs dependent UI (e.g. inventory). */
@@ -59,4 +60,9 @@ export class UiStore {
             this.tick();
         }
     };
+
+    // ─── Pause menu actions ───────────────────────────────────────
+    pauseResume = (): void => { this.gm.pauseResume(); this.tick(); };
+    pauseOpenSettings = (): void => { this.gm.pauseOpenSettings(); this.tick(); };
+    pauseReturnToTitle = (): void => { this.gm.pauseReturnToTitle(); this.tick(); };
 }

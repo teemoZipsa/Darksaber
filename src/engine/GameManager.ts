@@ -139,7 +139,22 @@ export class GameManager {
         this.lastTime = performance.now();
         this.transitions.fadeInFromBlack(500);
         AudioManager.init();
-        requestAnimationFrame((frameTime) => this.loop(frameTime));
+        this.scheduleFrame();
+    }
+
+    /**
+     * Schedule the next frame. Normally uses requestAnimationFrame. In DEV only,
+     * when the tab is hidden (e.g. the headless preview), rAF is paused by the
+     * browser — so we fall back to a timer to keep the loop alive for verification.
+     * Hidden-tab timers are clamped to ~1s by Chrome, i.e. ~1fps, which is enough
+     * to drive state and capture. No effect in production builds.
+     */
+    private scheduleFrame(): void {
+        if (import.meta.env.DEV && typeof document !== 'undefined' && document.hidden) {
+            setTimeout(() => this.loop(performance.now()), 16);
+        } else {
+            requestAnimationFrame((frameTime) => this.loop(frameTime));
+        }
     }
 
     /**
@@ -176,7 +191,30 @@ export class GameManager {
      * but this guard keeps correctness independent of DOM layering).
      */
     public isDomModalOpen(): boolean {
-        return this.charUI.isVisible();
+        return this.charUI.isVisible() || this.pauseMenu.isVisible();
+    }
+
+    // ─── Pause menu (DOM overlay) ─────────────────────────────────
+    public isPauseMenuOpen(): boolean { return this.pauseMenu.isVisible(); }
+
+    public pauseResume(): void {
+        if (!this.pauseMenu.isVisible()) return;
+        AudioManager.playUi('ui.cancel');
+        this.pauseMenu.close();
+    }
+
+    public pauseOpenSettings(): void {
+        AudioManager.playUi('ui.confirm');
+        // Settings is still a canvas modal; close the DOM pause first so its scrim
+        // doesn't sit above the canvas Settings panel. settingsUI.onClose reopens pause.
+        this.pauseMenu.close();
+        this.settingsUI.open();
+    }
+
+    public pauseReturnToTitle(): void {
+        AudioManager.playUi('ui.confirm');
+        this.pauseMenu.close();
+        this.transitionTo(GameState.TITLE);
     }
 
     /**
@@ -193,7 +231,7 @@ export class GameManager {
         const elapsedMs = timestamp - this.lastTime;
         const frameInterval = SettingsManager.getFrameInterval();
         if (frameInterval > 0 && elapsedMs < frameInterval) {
-            requestAnimationFrame((frameTime) => this.loop(frameTime));
+            this.scheduleFrame();
             return;
         }
 
@@ -210,7 +248,7 @@ export class GameManager {
         // Drive the React DOM overlay: one notification per frame so it reflects
         // freshly-updated game state (gold, HP/MP, active character, etc.).
         this.uiStore?.tick();
-        requestAnimationFrame((frameTime) => this.loop(frameTime));
+        this.scheduleFrame();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -268,9 +306,10 @@ export class GameManager {
                     this.settingsUI.updateInput(this.input);
                     break;
                 }
-                // Pause menu takes priority over everything else in WORLD.
+                // Pause menu is a React DOM overlay; it owns its own clicks.
+                // We only handle ESC-to-resume here and freeze the world while open.
                 if (this.pauseMenu.isVisible()) {
-                    this.pauseMenu.updateInput(this.input);
+                    if (this.input.justPressed('Escape')) this.pauseResume();
                     break;
                 }
 
@@ -354,8 +393,7 @@ export class GameManager {
                 const vh_world = Math.floor(h / scale);
                 if (this.inventoryUI.isVisible()) this.inventoryUI.render(this.ctx, vw_world, vh_world);
                 if (this.partyUI.isVisible()) this.partyUI.render(this.ctx, vw_world, vh_world);
-                // charUI (character panel) is rendered by the React DOM overlay, not canvas.
-                if (this.pauseMenu.isVisible()) this.pauseMenu.render(this.ctx, vw_world, vh_world);
+                // charUI + pauseMenu are rendered by the React DOM overlay, not canvas.
                 if (this.settingsUI.isVisible()) this.settingsUI.render(this.ctx, vw_world, vh_world);
                 this.ctx.restore();
                 break;

@@ -9,16 +9,25 @@
 
 import { useStore, useUiSelector } from './UiContext';
 import { CharacterPanel } from './character/CharacterPanel';
+import { PauseMenu } from './PauseMenu';
 
 export function OverlayRoot() {
     const store = useStore();
     const charOpen = useUiSelector((s) => s.isCharPanelOpen());
-
-    if (!charOpen) return null;
+    const pauseOpen = useUiSelector((s) => s.isPauseOpen());
 
     return (
-        <div className="ds-scrim" onClick={() => store.closeCharPanel()}>
-            <CharacterPanel />
-        </div>
+        <>
+            {charOpen && (
+                <div className="ds-scrim" onClick={() => store.closeCharPanel()}>
+                    <CharacterPanel />
+                </div>
+            )}
+            {pauseOpen && (
+                <div className="ds-scrim" onClick={() => store.pauseResume()}>
+                    <PauseMenu />
+                </div>
+            )}
+        </>
     );
 }

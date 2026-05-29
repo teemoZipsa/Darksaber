@@ -29,8 +29,8 @@
 
     /* Text */
     --ds-text: #e8e0d0;
-    --ds-text-muted: #9a8a70;
-    --ds-text-dim: #6f6354;
+    --ds-text-muted: #cbb992;  /* labels — brightened for readability on dark panels */
+    --ds-text-dim: #8a7c64;
 
     /* Semantic */
     --ds-danger: #e43f5a;
