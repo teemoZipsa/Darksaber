@@ -5,7 +5,7 @@ import type { Player } from '../entity/Player';
 import type { TilePoint } from './FieldPathing';
 
 export interface FieldIntent {
-    kind: 'move' | 'attack' | 'interact' | 'magic' | 'rest' | 'defend' | 'counter';
+    kind: 'move' | 'attack' | 'interact' | 'magic' | 'tool' | 'rest' | 'defend';
     tile?: TilePoint;
     path?: TilePoint[];
     enemyId?: string;

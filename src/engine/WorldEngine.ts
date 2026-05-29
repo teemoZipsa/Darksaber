@@ -66,6 +66,7 @@ import { WorldMovementController } from './world/WorldMovementController';
 import { WorldEnemyTurnController } from './world/WorldEnemyTurnController';
 import { WorldMagicController } from './world/WorldMagicController';
 import { WorldPlayerActionController } from './world/WorldPlayerActionController';
+import { WorldToolController } from './world/WorldToolController';
 import { WorldRaidOutcomeController } from './world/WorldRaidOutcomeController';
 import { WorldTacticalController } from './world/WorldTacticalController';
 import { WorldSelectionController } from './world/WorldSelectionController';
@@ -73,6 +74,7 @@ import { WorldFieldSpawnController } from './world/WorldFieldSpawnController';
 import { WorldRenderController } from './world/WorldRenderController';
 import { WorldInputController } from './world/WorldInputController';
 import { HitStop } from './world/HitStop';
+import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
 import { NetworkRaidClient, type NetworkRaidStatus } from '../net/NetworkRaidClient';
 import {
     DEFAULT_WORLD_SERVER_URL,
@@ -113,6 +115,7 @@ export class WorldEngine {
     private movementController: WorldMovementController;
     private enemyTurnController: WorldEnemyTurnController;
     private magicController: WorldMagicController;
+    private toolController: WorldToolController;
     private playerActionController: WorldPlayerActionController;
     private raidOutcomeController: WorldRaidOutcomeController;
     private tacticalController: WorldTacticalController;
@@ -126,6 +129,7 @@ export class WorldEngine {
     private reservedAction: FieldIntent | null = null;
     private hoverTile: TilePoint = { x: -1, y: -1 };
     private combatLog: string[] = [];
+    private feedbackGroups = new Map<string, CombatFeedbackKind>();
     private followRepathTimer: number = 0;
     private floatingText = new FloatingTextManager();
     private effectManager = new EffectManager();
@@ -178,18 +182,19 @@ export class WorldEngine {
             log: (message) => this.addCombatLog(message),
             spawnDamage: (x, y, amount, isCrit, isMiss) => this.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
             spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
-            spawnHitEffect: (x, y, isCrit) => {
+            spawnHitEffect: (x, y, isCrit, feedbackGroupId, feedbackKind) => {
                 this.effectManager.spawnHitEffect(x, y, isCrit);
-                this.applyHitFeel(isCrit);
+                this.registerCombatFeedback(feedbackKind ?? (isCrit ? 'critical' : 'normal'), feedbackGroupId);
             },
-            spawnKillEffect: (enemy) => {
+            spawnKillEffect: (enemy, feedbackGroupId) => {
                 this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
-                this.applyKillFeel();
+                this.registerCombatFeedback('kill', feedbackGroupId);
             },
             spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
             spawnLoot: (enemy) => this.spawnEnemyLoot(enemy),
             awardExp: (actor, enemy) => this.awardDefeatExp(actor, enemy),
             onEnemyDefeated: (enemy) => this.completeDungeonIfBossDefeated(enemy),
+            flushFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
         });
         this.movementController = new WorldMovementController({
             getPartyActors: () => this.partyActors,
@@ -222,8 +227,13 @@ export class WorldEngine {
                 spawnBuffEffect: (x, y) => this.effectManager.spawnBuffEffect(x, y),
                 spawnDebuffEffect: (x, y) => this.effectManager.spawnDebuffEffect(x, y),
                 spawnDarkEffect: (x, y) => this.effectManager.spawnDarkEffect(x, y),
-                spawnElementEffect: (element, x, y) => this.effectManager.spawnByElement(element, x, y),
+                spawnElementEffect: (element, x, y, feedbackGroupId) => {
+                    this.effectManager.spawnByElement(element, x, y);
+                    this.registerCombatFeedback('normal', feedbackGroupId);
+                },
                 spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
+                beginFeedbackGroup: () => this.beginCombatFeedbackGroup(),
+                flushFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
             }
         );
         this.selectionController = new WorldSelectionController({
@@ -243,8 +253,7 @@ export class WorldEngine {
                 spendAp: (cost) => this.spendAp(cost),
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
-                handleEnemyDefeated: (actor, enemy) => this.handleEnemyDefeated(actor, enemy),
-                tryEnemyCounterAttack: (enemy, actor) => this.tryEnemyCounterAttack(enemy, actor),
+                handleEnemyDefeated: (actor, enemy, feedbackGroupId) => this.handleEnemyDefeated(actor, enemy, feedbackGroupId),
             },
             {
                 log: (message) => this.addCombatLog(message),
@@ -252,13 +261,35 @@ export class WorldEngine {
                 spawnDamage: (x, y, amount, isCrit, isMiss) => this.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
                 spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
                 spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
-                spawnHitEffect: (x, y) => {
+                spawnHitEffect: (x, y, feedbackGroupId, feedbackKind) => {
                     this.effectManager.spawnHitEffect(x, y);
-                    this.applyHitFeel(false);
+                    this.registerCombatFeedback(feedbackKind ?? 'normal', feedbackGroupId);
                 },
                 spawnBuffEffect: (x, y) => this.effectManager.spawnBuffEffect(x, y),
                 spawnDebuffEffect: (x, y) => this.effectManager.spawnDebuffEffect(x, y),
-                spawnElementEffect: (element, x, y) => this.effectManager.spawnByElement(element, x, y),
+                spawnElementEffect: (element, x, y, feedbackGroupId) => {
+                    this.effectManager.spawnByElement(element, x, y);
+                    this.registerCombatFeedback('normal', feedbackGroupId);
+                },
+                beginFeedbackGroup: () => this.beginCombatFeedbackGroup(),
+                flushFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
+            }
+        );
+        this.toolController = new WorldToolController(
+            {
+                getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
+                getRemainingActionPoints: () => this.remainingActionPoints,
+                getInventoryItems: () => this.gameManager.inventory.items,
+                removeInventoryItem: (placed) => this.gameManager.inventory.remove(placed),
+                spendAp: (cost) => this.spendAp(cost),
+                reopenActionMenu: (actor) => this.reopenActionMenu(actor),
+                resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
+            },
+            {
+                log: (message) => this.addCombatLog(message),
+                spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
+                spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
+                spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
             }
         );
         this.playerActionController = new WorldPlayerActionController(
@@ -286,7 +317,9 @@ export class WorldEngine {
                 tryActorAttack: (actor, enemy) => this.tryActorAttack(actor, enemy),
                 openLoot: (loot) => this.openLoot(loot),
                 openMagic: (actor) => this.openFieldMagic(actor),
+                openTool: (actor) => this.openFieldTool(actor),
                 hasCastableFieldSkill: (actor) => !this.isNetworkRaid && this.magicController.hasCastableFieldSkill(actor.character),
+                hasUsableCombatTool: (actor) => !this.isNetworkRaid && this.toolController.hasUsableCombatTool(actor),
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 closeActionMenu: () => this.closeActionMenu(),
                 closeTacticalMenu: () => this.closeTacticalMenu(),
@@ -342,6 +375,7 @@ export class WorldEngine {
             floatingText: this.floatingText,
             minimapUI: this.minimapUI,
             magicController: this.magicController,
+            toolController: this.toolController,
             playerActionController: this.playerActionController,
             raidOutcomeController: this.raidOutcomeController,
             tacticalController: this.tacticalController,
@@ -364,6 +398,7 @@ export class WorldEngine {
             actionMenuUI: this.actionMenuUI,
             entityInfoUI: this.entityInfoUI,
             magicController: this.magicController,
+            toolController: this.toolController,
             minimapUI: this.minimapUI,
             playerActionController: this.playerActionController,
             selectionController: this.selectionController,
@@ -558,6 +593,7 @@ export class WorldEngine {
         this.closeActionMenu();
         this.closeTacticalMenu();
         this.magicController.reset();
+        this.toolController?.reset();
         this.playerActionController.clearTargeting();
     }
 
@@ -567,6 +603,8 @@ export class WorldEngine {
         this.remainingActionPoints = 0;
         this.reservedAction = null;
         this.closeActionMenu();
+        this.magicController.reset();
+        this.toolController?.reset();
         for (const actor of this.partyActors) {
             actor.path = [];
             actor.queuedIntent = null;
@@ -849,17 +887,31 @@ export class WorldEngine {
         const targetActor = this.partyActors.find((actor) => actor.id === event.targetId);
         const sourceActor = this.partyActors.find((actor) => actor.id === event.sourceId);
         const sourceEnemy = this.getEnemyById(event.sourceId);
+        const feedbackGroupId = this.beginCombatFeedbackGroup();
 
         if (targetEnemy) {
-            if (event.kind === 'kill') this.effectManager.spawnKillEffect(targetEnemy.gridX, targetEnemy.gridY, targetEnemy.color, targetEnemy.expReward, targetEnemy.image);
-            else this.floatingText.spawnDamage(targetEnemy.gridX, targetEnemy.gridY, event.value ?? 0, false, event.kind === 'miss');
+            if (event.kind === 'kill') {
+                this.effectManager.spawnKillEffect(targetEnemy.gridX, targetEnemy.gridY, targetEnemy.color, targetEnemy.expReward, targetEnemy.image);
+                this.registerCombatFeedback('kill', feedbackGroupId);
+            } else {
+                this.floatingText.spawnDamage(targetEnemy.gridX, targetEnemy.gridY, event.value ?? 0, false, event.kind === 'miss');
+                if (event.kind !== 'miss' && (event.value ?? 0) > 0) {
+                    this.effectManager.spawnHitEffect(targetEnemy.gridX, targetEnemy.gridY);
+                    this.registerCombatFeedback('normal', feedbackGroupId);
+                }
+            }
         }
         if (targetActor) {
             this.floatingText.spawnDamage(targetActor.entity.gridX, targetActor.entity.gridY, event.value ?? 0, false, event.kind === 'miss');
+            if (event.kind !== 'miss' && (event.value ?? 0) > 0) {
+                this.effectManager.spawnHitEffect(targetActor.entity.gridX, targetActor.entity.gridY);
+                this.registerCombatFeedback(event.kind === 'down' ? 'kill' : 'normal', feedbackGroupId);
+            }
             if (event.kind === 'down') this.floatingText.spawnStatus(targetActor.entity.gridX, targetActor.entity.gridY, 'DOWN');
         }
         if (sourceActor && targetEnemy) this.spawnAttackCue(this.actorTile(sourceActor), this.enemyTile(targetEnemy), '#72e8ff');
         if (sourceEnemy && targetActor) this.spawnAttackCue(this.enemyTile(sourceEnemy), this.actorTile(targetActor), '#ff8a55');
+        this.flushCombatFeedbackGroup(feedbackGroupId);
         this.addCombatLog(this.formatNetworkCombatEvent(event));
     }
 
@@ -1102,6 +1154,7 @@ export class WorldEngine {
         if (this.actionMenuUI.getIsOpen() || this.playerActionController.getMode()) return true;
         if (this.tacticalController.isOpen()) return true;
         if (this.magicController.isActive()) return true;
+        if (this.toolController?.isActive()) return true;
         return this.partyActors.some((actor) => actor.queuedIntent || actor.path.length > 0);
     }
 
@@ -1199,11 +1252,11 @@ export class WorldEngine {
         return result.executed;
     }
 
-    private handleEnemyDefeated(actor: FieldActor, enemy: Enemy): void {
+    private handleEnemyDefeated(actor: FieldActor, enemy: Enemy, feedbackGroupId?: string): void {
         this.awardDefeatExp(actor, enemy);
         this.raidSession.recordKill();
         this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
-        this.applyKillFeel();
+        this.registerCombatFeedback('kill', feedbackGroupId);
         this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
         enemy.isAggro = false;
         this.selectionController.clearEnemyIfSelected(enemy.id);
@@ -1288,6 +1341,15 @@ export class WorldEngine {
             return;
         }
         this.magicController.open(actor);
+    }
+
+    private openFieldTool(actor: FieldActor): void {
+        if (this.isNetworkRaid) {
+            this.addCombatLog('네트워크 raid V1에서는 마법/아이템 사용이 비활성화되어 있습니다.');
+            this.reopenActionMenu(actor);
+            return;
+        }
+        this.toolController.open(actor);
     }
 
     private refreshLootState(): void {
@@ -1410,6 +1472,7 @@ export class WorldEngine {
         this.closeTacticalMenu();
         this.playerActionController.clearTargeting();
         this.magicController.reset();
+        this.toolController?.reset();
         this.addCombatLog(`${actor.character.name} 턴 종료: ${reason}`);
     }
 
@@ -1456,6 +1519,7 @@ export class WorldEngine {
         this.closeTacticalMenu();
         this.playerActionController.clearTargeting();
         this.magicController.reset();
+        this.toolController?.reset();
     }
 
     private processActorTurnStartStatuses(actor: FieldActor): boolean {
@@ -1661,6 +1725,7 @@ export class WorldEngine {
         this.closeTacticalMenu();
         this.playerActionController.clearTargeting();
         this.magicController.reset();
+        this.toolController?.reset();
     }
 
     private clearActorIntent(actor: FieldActor): void {
@@ -1679,21 +1744,32 @@ export class WorldEngine {
         if (this.combatLog.length > 200) this.combatLog.shift();
     }
 
-    /** Apply screen-shake + hit-pause for a successful hit. Crit hits are stronger. */
-    private applyHitFeel(isCrit: boolean): void {
-        if (isCrit) {
-            this.camera.shake(14, 280);
-            HitStop.freeze(50);
-        } else {
-            this.camera.shake(6, 180);
-            HitStop.freeze(18);
-        }
+    private beginCombatFeedbackGroup(): string {
+        const id = `world:${this.worldTime}:${this.feedbackGroups.size + 1}:${Math.random().toString(36).slice(2, 8)}`;
+        this.feedbackGroups.set(id, 'status');
+        return id;
     }
 
-    /** A kill is the strongest combat impact. */
-    private applyKillFeel(): void {
-        this.camera.shake(16, 320);
-        HitStop.freeze(60);
+    private registerCombatFeedback(kind: CombatFeedbackKind, feedbackGroupId?: string): void {
+        if (!feedbackGroupId) {
+            this.applyCombatFeedback(kind);
+            return;
+        }
+        const current = this.feedbackGroups.get(feedbackGroupId);
+        this.feedbackGroups.set(feedbackGroupId, strongerCombatFeedback(current, kind));
+    }
+
+    private flushCombatFeedbackGroup(feedbackGroupId: string): void {
+        const kind = this.feedbackGroups.get(feedbackGroupId);
+        if (!kind) return;
+        this.feedbackGroups.delete(feedbackGroupId);
+        this.applyCombatFeedback(kind);
+    }
+
+    private applyCombatFeedback(kind: CombatFeedbackKind): void {
+        const feedback = HIT_FEEDBACK[kind];
+        if (feedback.shake > 0) this.camera.shake(feedback.shake, feedback.shakeMs);
+        if (feedback.hitstopMs > 0) HitStop.freeze(feedback.hitstopMs);
     }
 
     private spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void {

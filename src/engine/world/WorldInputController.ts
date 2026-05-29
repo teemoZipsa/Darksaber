@@ -10,6 +10,7 @@ import type { FieldActor, FieldHitParty, FieldIntent } from '../../field/FieldTy
 import type { FieldHit } from '../../field/FieldInteraction';
 import { getRightClickDisposition, type WorldInteractionMode } from '../../field/WorldInteractionMode';
 import type { WorldMagicController } from './WorldMagicController';
+import type { WorldToolController } from './WorldToolController';
 import type { WorldPlayerActionController } from './WorldPlayerActionController';
 import type { WorldSelectionController } from './WorldSelectionController';
 import type { WorldTacticalController } from './WorldTacticalController';
@@ -22,6 +23,7 @@ export interface WorldInputContext {
     actionMenuUI: ActionMenuUI;
     entityInfoUI: EntityInfoUI;
     magicController: WorldMagicController;
+    toolController: WorldToolController;
     minimapUI: MinimapUI;
     playerActionController: WorldPlayerActionController;
     selectionController: WorldSelectionController;
@@ -67,7 +69,7 @@ export class WorldInputController {
         );
         if (logConsumed) return;
 
-        if (input.mouseWheelDelta !== 0 && !this.context.magicController.isVisible()) {
+        if (input.mouseWheelDelta !== 0 && !this.context.magicController.isVisible() && !this.context.toolController.isVisible()) {
             if (input.mouseWheelDelta > 0) camera.zoomOut();
             else camera.zoomIn();
         }
@@ -78,6 +80,7 @@ export class WorldInputController {
         this.context.entityInfoUI.onMouseMove(input.mouseScreenX, input.mouseScreenY);
         this.context.actionMenuUI.onMouseMove(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
         this.context.magicController.onMouseMove(input.mouseScreenX, input.mouseScreenY);
+        this.context.toolController.onMouseMove(input.mouseScreenX, input.mouseScreenY);
         this.context.tacticalController.onMouseMove(input.uiMouseX, input.uiMouseY);
         this.context.magicController.updateHoverPreview(hoverTile);
 
@@ -92,11 +95,12 @@ export class WorldInputController {
             return;
         }
 
-        if (input.mouseRightJustDown && !this.context.magicController.isVisible()) {
+        if (input.mouseRightJustDown && !this.context.magicController.isVisible() && !this.context.toolController.isVisible()) {
             this.handleFieldRightClick(hoverTile, input);
         } else if (input.justPressed('Escape')) {
             if (this.context.tacticalController.isOpen()) this.context.closeTacticalMenu();
             else if (this.context.magicController.isActive()) this.context.magicController.reset();
+            else if (this.context.toolController.isActive()) this.context.toolController.reset();
             else if (this.context.actionMenuUI.getIsOpen()) this.context.closeActionMenu();
             else if (this.context.getReservedAction()) this.context.clearIntent();
             else this.context.onUnhandledEscape();
@@ -109,6 +113,12 @@ export class WorldInputController {
                 this.context.magicController.handleMenuMouseDown(input.mouseScreenX, input.mouseScreenY);
             }
             if (input.mouseJustUp) this.context.magicController.onMouseUp();
+        } else if (this.context.toolController.isVisible()) {
+            if (input.mouseWheelDelta !== 0) this.context.toolController.onScroll(input.mouseWheelDelta);
+            if (input.mouseJustDown) {
+                this.context.toolController.handleMenuMouseDown(input.mouseScreenX, input.mouseScreenY);
+            }
+            if (input.mouseJustUp) this.context.toolController.onMouseUp();
         } else if (this.context.magicController.getState().mode === 'targeting') {
             if (input.mouseJustDown) this.context.magicController.handleTargetClick(this.context.getHoverTile());
         } else {
@@ -132,7 +142,6 @@ export class WorldInputController {
                 return;
             }
             this.context.closeActionMenu();
-            return;
         }
 
         if (this.context.playerActionController.getMode()) {

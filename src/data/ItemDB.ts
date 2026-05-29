@@ -7,6 +7,7 @@ import { MasterBranch } from './ClassTree';
 
 export type ItemSlot = 'weapon' | 'shield' | 'head' | 'body' | 'boots' | 'accessory' | 'accessory2' | 'consumable' | 'material' | 'sin_core' | 'rune' | 'gem';
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legend' | 'unique';
+export type ItemUseEffect = { type: 'recover'; hp?: number; mp?: number };
 export interface ItemDef {
     id: string;
     name: string;
@@ -34,6 +35,7 @@ export interface ItemDef {
     sellable?: boolean;    // false for quest/bound items that cannot be sold
     requiredTier?: number; // minimum tier to equip (1-7)
     branch?: MasterBranch; // which branch can equip (battle/tactics/healer/magic)
+    useEffect?: ItemUseEffect;
     
     // -- Sin Eater New Fields --
     itemCategory?: 'divine_weapon' | 'normal_weapon' | 'armor' | 'accessory' | 'consumable' | 'material' | 'sin_core' | 'rune' | 'gem';
@@ -98,6 +100,19 @@ export function normalizeItemDef(item: RawItemDef): ItemDef {
         rarity: inferRarity(item),
         weight: inferWeight(item),
         baseValue: inferBaseValue(item),
+    };
+}
+
+export function isCombatRecoveryConsumable(item: ItemDef): boolean {
+    if (item.slot !== 'consumable' || item.useEffect?.type !== 'recover') return false;
+    return Number(item.useEffect.hp ?? 0) > 0 || Number(item.useEffect.mp ?? 0) > 0;
+}
+
+export function getCombatRecovery(item: ItemDef): { hp: number; mp: number } {
+    if (!isCombatRecoveryConsumable(item)) return { hp: 0, mp: 0 };
+    return {
+        hp: Math.max(0, Math.floor(item.useEffect?.hp ?? 0)),
+        mp: Math.max(0, Math.floor(item.useEffect?.mp ?? 0)),
     };
 }
 // ─── Armor Generation ─────────────────────────────────────────
@@ -298,6 +313,7 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'consumable', gridW: 1, gridH: 1, color: '#8fbc8f', icon: '🌿',
         maxDurability: 1,
         stats: { hp: 50 },
+        useEffect: { type: 'recover', hp: 50 },
         description: 'A cheap, common herb. Restores 50 HP.',
         descriptionKr: '어디서나 쉽게 구할 수 있는 싸구려 약초. HP 50 회복.',
         buyPrice: 10
@@ -307,6 +323,7 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'consumable', gridW: 1, gridH: 1, color: '#3cb371', icon: '🌿',
         maxDurability: 1,
         stats: { hp: 150 },
+        useEffect: { type: 'recover', hp: 150 },
         description: 'A commonly found herb. Restores 150 HP.',
         descriptionKr: '그럭저럭 쓸만한 흔한 약초. HP 150 회복.',
         buyPrice: 50
@@ -316,6 +333,7 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'consumable', gridW: 1, gridH: 1, color: '#2e8b57', icon: '🍀',
         maxDurability: 1,
         stats: { hp: 500 },
+        useEffect: { type: 'recover', hp: 500 },
         description: 'A precious herb with strong healing properties. Restores 500 HP.',
         descriptionKr: '치유 효과가 뛰어난 귀한 약초. HP 500 회복.',
         buyPrice: 200
@@ -325,6 +343,7 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'consumable', gridW: 1, gridH: 1, color: '#006400', icon: '🍀',
         maxDurability: 1,
         stats: { hp: 999 },
+        useEffect: { type: 'recover', hp: 999 },
         description: 'An extremely rare herb. Restores 999 HP. ...supposedly rare.',
         descriptionKr: '매우 희귀하다고 적혀있으나 실상은 지극히 흔한 약초. HP 999 회복.',
         buyPrice: 500
@@ -334,6 +353,7 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'consumable', gridW: 1, gridH: 1, color: '#4488ff', icon: '🧪',
         maxDurability: 1,
         stats: { mp: 30 },
+        useEffect: { type: 'recover', mp: 30 },
         description: 'Restores 30 MP.',
         descriptionKr: '마나를 30 회복합니다.',
         buyPrice: 25

@@ -21,11 +21,12 @@ import {
     INTERACT_AP_COST,
     MAGIC_AP_COST,
     MOVE_AP_PER_TILE,
+    getActionApCost,
     hasExecutableFieldAction,
 } from '../../field/FieldActionEconomy';
 import { canAffordTerrainCost, terrainCostToApCost } from '../../field/TerrainRules';
 import { getSelectableTiles, type AttackPatternProfile, type PatternContext } from '../../field/TargetPatterns';
-import type { ActionType } from '../../ui/ActionMenuUI';
+import { normalizeLegacyActionType, type ActionType } from '../../ui/ActionMenuUI';
 import type { resolveFieldHit } from '../../field/FieldInteraction';
 
 type FieldHit = ReturnType<typeof resolveFieldHit>;
@@ -53,7 +54,9 @@ export interface WorldPlayerActionContext {
     tryActorAttack: (actor: FieldActor, enemy: Enemy) => boolean;
     openLoot: (loot: LootObject) => void;
     openMagic: (actor: FieldActor) => void;
+    openTool: (actor: FieldActor) => void;
     hasCastableFieldSkill: (actor: FieldActor) => boolean;
+    hasUsableCombatTool: (actor: FieldActor) => boolean;
     reopenActionMenu: (actor: FieldActor) => void;
     closeActionMenu: () => void;
     closeTacticalMenu: () => void;
@@ -97,7 +100,13 @@ export class WorldPlayerActionController {
         this.actionTiles.clear();
     }
 
-    public execute(action: ActionType): void {
+    public execute(action: ActionType | string): void {
+        const normalizedAction = normalizeLegacyActionType(action);
+        if (!normalizedAction) {
+            this.sink.log('아직 필드에서 사용할 수 없는 행동입니다.');
+            return;
+        }
+
         const actor = this.context.getActivePartyTurnActor();
         if (!actor) return;
 
@@ -110,7 +119,7 @@ export class WorldPlayerActionController {
         this.context.closeActionMenu();
         this.clearTargeting();
 
-        switch (action) {
+        switch (normalizedAction) {
             case 'move':
                 if (hasStatus(actor.character.statuses, 'immobilize')) {
                     this.sink.log('이동불가 상태입니다.');
@@ -140,6 +149,10 @@ export class WorldPlayerActionController {
                 this.context.closeTacticalMenu();
                 this.context.openMagic(actor);
                 break;
+            case 'tool':
+                this.context.closeTacticalMenu();
+                this.context.openTool(actor);
+                break;
             case 'open':
                 if (this.context.getRemainingActionPoints() < INTERACT_AP_COST || !this.hasExecutableInteract(actor)) {
                     this.sink.log('조사할 수 있는 대상이 없습니다.');
@@ -155,17 +168,11 @@ export class WorldPlayerActionController {
                 break;
             case 'defend':
                 actor.character.statuses = applyStatus(actor.character.statuses, createStatus('guard'));
+                actor.character.statuses = applyStatus(actor.character.statuses, createStatus('counterReady'));
                 this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'GUARD');
                 this.sink.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
-                this.sink.log('방어 태세: 다음 피격 피해 감소');
+                this.sink.log('방어 태세: 다음 직접 공격 피해 감소 및 약한 반격 준비');
                 this.context.endActorTurn(actor, '방어');
-                break;
-            case 'counter':
-                actor.character.statuses = applyStatus(actor.character.statuses, createStatus('counterReady'));
-                this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'COUNTER');
-                this.sink.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
-                this.sink.log('반격 태세: 다음 피격 시 반격 준비');
-                this.context.endActorTurn(actor, '반격 태세');
                 break;
             default:
                 this.sink.log('아직 필드에서 사용할 수 없는 행동입니다.');
@@ -240,8 +247,9 @@ export class WorldPlayerActionController {
         if (this.hasExecutableMove(actor)) available.push('move');
         if (this.hasExecutableAttack(actor)) available.push('attack');
         if (this.hasExecutableMagic(actor)) available.push('magic');
+        if (this.hasExecutableTool(actor)) available.push('tool');
         if (this.hasExecutableInteract(actor)) available.push('open');
-        available.push('defend', 'counter', 'rest');
+        available.push('defend', 'rest');
         return available;
     }
 
@@ -252,6 +260,7 @@ export class WorldPlayerActionController {
             hasAttackTarget: this.hasExecutableAttack(actor),
             hasInteractTarget: this.hasExecutableInteract(actor),
             hasMagicAvailable: this.hasExecutableMagic(actor),
+            hasToolAvailable: this.hasExecutableTool(actor),
         });
     }
 
@@ -274,6 +283,10 @@ export class WorldPlayerActionController {
     public hasExecutableMagic(actor: FieldActor): boolean {
         if (hasStatus(actor.character.statuses, 'silence')) return false;
         return this.context.getRemainingActionPoints() >= MAGIC_AP_COST && this.context.hasCastableFieldSkill(actor);
+    }
+
+    public hasExecutableTool(actor: FieldActor): boolean {
+        return this.context.getRemainingActionPoints() >= getActionApCost('tool') && this.context.hasUsableCombatTool(actor);
     }
 
     private rest(actor: FieldActor): void {

@@ -39,8 +39,10 @@ export interface WorldEnemyEventSink {
     spawnBuffEffect(x: number, y: number): void;
     spawnDebuffEffect(x: number, y: number): void;
     spawnDarkEffect(x: number, y: number): void;
-    spawnElementEffect(element: EnemySpellElement, x: number, y: number): void;
+    spawnElementEffect(element: EnemySpellElement, x: number, y: number, feedbackGroupId?: string): void;
     spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void;
+    beginFeedbackGroup?(): string;
+    flushFeedbackGroup?(feedbackGroupId: string): void;
 }
 
 export interface WorldEnemyTurnContext {
@@ -163,11 +165,12 @@ export class WorldEnemyTurnController {
         }
     }
 
-    private enemyAttack(enemy: Enemy, actor: FieldActor, range: number): CombatResult {
+    private enemyAttack(enemy: Enemy, actor: FieldActor, range: number, feedbackGroupId?: string): CombatResult {
         return this.combat.enemyAttack({
             enemy,
             actor,
             range,
+            feedbackGroupId,
             getTileAt: (tile) => this.context.getTileAt(tile),
             getActorTerrainTraits: (targetActor) => this.context.getActorTerrainTraits(targetActor),
             directionFromTo: (from, to) => this.context.directionFromTo(from, to),
@@ -236,7 +239,9 @@ export class WorldEnemyTurnController {
                     return result;
                 }
                 this.sink.log(`${enemy.name}: 암흑 파동 (${victims.length}명)`);
-                for (const victim of victims) mergeCombatResult(result, this.enemySpellDamage(enemy, victim, 0.7, 'dark'));
+                const feedbackGroupId = this.sink.beginFeedbackGroup?.();
+                for (const victim of victims) mergeCombatResult(result, this.enemySpellDamage(enemy, victim, 0.7, 'dark', feedbackGroupId));
+                if (feedbackGroupId) this.sink.flushFeedbackGroup?.(feedbackGroupId);
                 return result;
             }
             case 'cleave': {
@@ -244,7 +249,9 @@ export class WorldEnemyTurnController {
                     !actor.character.isDead && manhattan(this.enemyTile(enemy), this.actorTile(actor)) <= 1
                 );
                 this.sink.log(`${enemy.name}: 휩쓸기`);
-                for (const victim of victims) mergeCombatResult(result, this.enemyAttack(enemy, victim, 1));
+                const feedbackGroupId = this.sink.beginFeedbackGroup?.();
+                for (const victim of victims) mergeCombatResult(result, this.enemyAttack(enemy, victim, 1, feedbackGroupId));
+                if (feedbackGroupId) this.sink.flushFeedbackGroup?.(feedbackGroupId);
                 return result;
             }
             case 'voidBolt':
@@ -254,7 +261,7 @@ export class WorldEnemyTurnController {
         }
     }
 
-    private enemySpellDamage(enemy: Enemy, actor: FieldActor, power: number, element: EnemySpellElement): CombatResult {
+    private enemySpellDamage(enemy: Enemy, actor: FieldActor, power: number, element: EnemySpellElement, feedbackGroupId?: string): CombatResult {
         const result = createCombatResult(true);
         const attacker = getEffectiveStatsForEnemy(enemy);
         const defender = getEffectiveStatsForCharacter(actor.character);
@@ -263,7 +270,7 @@ export class WorldEnemyTurnController {
         actor.character.statuses = guarded.statuses;
         const damage = guarded.damage;
         actor.character.stats.hp = Math.max(0, actor.character.stats.hp - damage);
-        this.sink.spawnElementEffect(element, actor.entity.gridX, actor.entity.gridY);
+        this.sink.spawnElementEffect(element, actor.entity.gridX, actor.entity.gridY, damage > 0 ? feedbackGroupId : undefined);
         this.sink.spawnDamage(actor.entity.gridX, actor.entity.gridY, damage, false, false);
         this.sink.log(`${enemy.name} → ${actor.character.name} ${damage} 마법 피해`);
         if (actor.character.stats.hp <= 0 && !actor.character.isDead) result.downedCharacterIds.push(actor.character.id);

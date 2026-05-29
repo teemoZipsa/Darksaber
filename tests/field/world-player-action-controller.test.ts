@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Character } from '../../src/character/Character';
+import { hasStatus } from '../../src/combat/StatusEffects';
 import { Enemy } from '../../src/entity/Enemy';
 import { Player } from '../../src/entity/Player';
-import { ATTACK_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE } from '../../src/field/FieldActionEconomy';
+import { ATTACK_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, getActionApCost } from '../../src/field/FieldActionEconomy';
 import type { FieldActor, FieldEnemy } from '../../src/field/FieldTypes';
 import { WorldPlayerActionController, type WorldPlayerActionContext } from '../../src/engine/world/WorldPlayerActionController';
 
@@ -37,6 +38,7 @@ function makeEnemyEntry(id: string, x: number, y: number): FieldEnemy {
 interface ControllerOptions {
     fieldEnemies?: FieldEnemy[];
     hasCastableFieldSkill?: boolean;
+    hasUsableCombatTool?: boolean;
     getActorAttackTargetFailure?: WorldPlayerActionContext['getActorAttackTargetFailure'];
 }
 
@@ -63,7 +65,9 @@ function makeController(actor: FieldActor, remainingAp: number, options: Control
         tryActorAttack: () => false,
         openLoot: () => undefined,
         openMagic: () => undefined,
+        openTool: () => undefined,
         hasCastableFieldSkill: () => options.hasCastableFieldSkill ?? false,
+        hasUsableCombatTool: () => options.hasUsableCombatTool ?? false,
         reopenActionMenu: () => undefined,
         closeActionMenu: () => undefined,
         closeTacticalMenu: () => undefined,
@@ -121,4 +125,28 @@ test('available action menu hides magic until AP and a castable field skill are 
     assert.equal(lowApController.getAvailableTurnActions(actor).includes('magic'), false);
     assert.equal(noSkillController.getAvailableTurnActions(actor).includes('magic'), false);
     assert.equal(readyController.getAvailableTurnActions(actor).includes('magic'), true);
+});
+
+test('available action menu hides tool until AP and an effective combat tool are both present', () => {
+    const actor = makeActor('hero', 0, 0);
+    const toolApCost = getActionApCost('tool');
+    const lowApController = makeController(actor, toolApCost - 1, { hasUsableCombatTool: true });
+    const noToolController = makeController(actor, toolApCost, { hasUsableCombatTool: false });
+    const readyController = makeController(actor, toolApCost, { hasUsableCombatTool: true });
+
+    assert.equal(lowApController.getAvailableTurnActions(actor).includes('tool'), false);
+    assert.equal(noToolController.getAvailableTurnActions(actor).includes('tool'), false);
+    assert.equal(readyController.getAvailableTurnActions(actor).includes('tool'), true);
+});
+
+test('defend applies guard and the integrated counter readiness', () => {
+    const actor = makeActor('hero', 0, 0);
+    actor.entity.actionGauge = 100;
+    const controller = makeController(actor, 0);
+
+    controller.execute('defend');
+
+    assert.equal(hasStatus(actor.character.statuses, 'guard'), true);
+    assert.equal(hasStatus(actor.character.statuses, 'counterReady'), true);
+    assert.equal((controller.getAvailableTurnActions(actor) as string[]).includes('counter'), false);
 });

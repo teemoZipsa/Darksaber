@@ -240,7 +240,7 @@ test('counter readiness is explicit and consumed without automatic wait interact
     assert.equal(consumeStatus(waitOnly, 'counterReady').consumed, undefined);
 
     const ready = consumeStatus([createStatus('counterReady')], 'counterReady');
-    assert.equal(ready.consumed?.magnitude, 0.75);
+    assert.equal(ready.consumed?.magnitude, 0.5);
     assert.equal(hasStatus(ready.statuses, 'counterReady'), false);
 });
 

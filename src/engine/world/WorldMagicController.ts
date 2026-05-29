@@ -26,6 +26,7 @@ import { getEffectTiles, getSelectableTiles, type PatternContext } from '../../f
 import { getSkillAttackProfile } from '../../data/AttackPatternProfiles';
 import { isTerrainLineOfSightBlocking } from '../../field/TerrainRules';
 import { MagicUI } from '../../ui/MagicUI';
+import type { CombatFeedbackKind } from './CombatFeedback';
 
 export interface WorldMagicContext {
     getActivePartyTurnActor: () => FieldActor | null;
@@ -38,8 +39,7 @@ export interface WorldMagicContext {
     spendAp: (cost: number) => boolean;
     reopenActionMenu: (actor: FieldActor) => void;
     resumeOrEndActiveTurn: (actor: FieldActor) => void;
-    handleEnemyDefeated: (actor: FieldActor, enemy: Enemy) => void;
-    tryEnemyCounterAttack: (enemy: Enemy, actor: FieldActor) => boolean;
+    handleEnemyDefeated: (actor: FieldActor, enemy: Enemy, feedbackGroupId?: string) => void;
 }
 
 export interface WorldMagicEventSink {
@@ -48,10 +48,12 @@ export interface WorldMagicEventSink {
     spawnDamage(x: number, y: number, amount: number, isCrit: boolean, isMiss: boolean): void;
     spawnStatus(x: number, y: number, text: string): void;
     spawnHealEffect(x: number, y: number): void;
-    spawnHitEffect(x: number, y: number): void;
+    spawnHitEffect(x: number, y: number, feedbackGroupId?: string, feedbackKind?: CombatFeedbackKind): void;
     spawnBuffEffect(x: number, y: number): void;
     spawnDebuffEffect(x: number, y: number): void;
-    spawnElementEffect(element: Skill['element'], x: number, y: number): void;
+    spawnElementEffect(element: Skill['element'], x: number, y: number, feedbackGroupId?: string): void;
+    beginFeedbackGroup?(): string;
+    flushFeedbackGroup?(feedbackGroupId: string): void;
 }
 
 export class WorldMagicController {
@@ -289,7 +291,7 @@ export class WorldMagicController {
             this.sink.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
         }
 
-        let counterTriggered = false;
+        const feedbackGroupId = effect.enemyResults.length > 0 ? this.sink.beginFeedbackGroup?.() : undefined;
         for (const enemyResult of effect.enemyResults) {
             const enemy = this.context.getEnemyById(enemyResult.enemyId);
             if (!enemy) continue;
@@ -306,19 +308,19 @@ export class WorldMagicController {
                 this.sink.spawnDebuffEffect(enemy.gridX, enemy.gridY);
             }
 
-            if (skill.element !== 'none' && skill.element !== 'physical') {
-                this.sink.spawnElementEffect(skill.element, enemy.gridX, enemy.gridY);
-            } else {
-                this.sink.spawnHitEffect(enemy.gridX, enemy.gridY);
-            }
             const guarded = applyGuardToDamage(enemy.statuses, enemyResult.damage);
             enemy.statuses = guarded.statuses;
             const dead = enemy.takeDamage(guarded.damage);
+            if (skill.element !== 'none' && skill.element !== 'physical') {
+                this.sink.spawnElementEffect(skill.element, enemy.gridX, enemy.gridY, guarded.damage > 0 ? feedbackGroupId : undefined);
+            } else {
+                this.sink.spawnHitEffect(enemy.gridX, enemy.gridY, guarded.damage > 0 ? feedbackGroupId : undefined);
+            }
             this.sink.spawnDamage(enemy.gridX, enemy.gridY, guarded.damage, false, false);
             if (guarded.guarded) this.sink.log(`${enemy.name} 방어: 피해 감소`);
-            if (dead) this.context.handleEnemyDefeated(actor, enemy);
-            else if (!guarded.guarded && !counterTriggered && this.context.tryEnemyCounterAttack(enemy, actor)) counterTriggered = true;
+            if (dead) this.context.handleEnemyDefeated(actor, enemy, feedbackGroupId);
         }
+        if (feedbackGroupId) this.sink.flushFeedbackGroup?.(feedbackGroupId);
 
         for (const log of effect.logs) this.sink.log(log);
     }

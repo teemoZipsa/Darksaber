@@ -11,6 +11,9 @@ import type { AttackPatternProfile } from '../../field/TargetPatterns';
 import type { TerrainActorTraits } from '../../field/TerrainRules';
 import { manhattan, type TilePoint } from '../../field/FieldPathing';
 import type { FieldActor } from '../../field/FieldTypes';
+import type { CombatFeedbackKind } from './CombatFeedback';
+
+let nextFeedbackGroupId = 1;
 
 export interface CombatResult {
     executed: boolean;
@@ -22,10 +25,11 @@ export interface CombatEventSink {
     log(message: string): void;
     spawnDamage(x: number, y: number, amount: number, isCrit: boolean, isMiss: boolean): void;
     spawnStatus(x: number, y: number, text: string): void;
-    spawnHitEffect(x: number, y: number, isCrit: boolean): void;
-    spawnKillEffect(enemy: Enemy): void;
+    spawnHitEffect(x: number, y: number, isCrit: boolean, feedbackGroupId?: string, feedbackKind?: CombatFeedbackKind): void;
+    spawnKillEffect(enemy: Enemy, feedbackGroupId?: string): void;
     spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void;
     spawnLoot(enemy: Enemy): void;
+    flushFeedbackGroup?(feedbackGroupId: string): void;
     awardExp?(actor: FieldActor, enemy: Enemy): void;
     onEnemyDefeated?(enemy: Enemy): void;
 }
@@ -48,6 +52,7 @@ export interface EnemyAttackInput {
     getActorTerrainTraits: (actor: FieldActor) => TerrainActorTraits;
     directionFromTo: (from: TilePoint, to: TilePoint) => 'up' | 'down' | 'left' | 'right';
     tryActorCounterAttack: (actor: FieldActor, enemy: Enemy) => CombatResult;
+    feedbackGroupId?: string;
 }
 
 export interface ActorCounterAttackInput {
@@ -80,7 +85,8 @@ export class WorldCombatController {
         input.actor.entity.facing = input.directionFromTo(start, enemyTile(input.selectedEnemy));
         this.sink.spawnAttackCue(start, enemyTile(input.selectedEnemy), '#72e8ff');
 
-        let counterTriggered = false;
+        const feedbackGroupId = createFeedbackGroupId('actorAttack');
+        let counterTarget: Enemy | null = null;
         for (const target of input.targetEnemies) {
             const targetTile = enemyTile(target);
             const isRanged = manhattan(start, targetTile) > 1;
@@ -115,7 +121,7 @@ export class WorldCombatController {
             const dealtDamage = guarded.damage;
             const dead = target.takeDamage(dealtDamage);
             this.sink.spawnDamage(target.gridX, target.gridY, dealtDamage, damageResult.isCrit, false);
-            this.sink.spawnHitEffect(target.gridX, target.gridY, damageResult.isCrit);
+            this.sink.spawnHitEffect(target.gridX, target.gridY, damageResult.isCrit, feedbackGroupId);
             const critText = damageResult.isCrit ? ' 치명' : '';
             const dirText = dirBonus.label ? ` ${dirBonus.label}` : '';
             this.sink.log(`${input.actor.character.name} → ${target.name} ${dealtDamage} 피해${critText}${dirText}`);
@@ -123,13 +129,14 @@ export class WorldCombatController {
             this.logPhysicalTerrainEffect(damageResult);
 
             if (dead) {
-                this.handleEnemyDefeated(input.actor, target, result);
-            } else if (!guarded.guarded && !counterTriggered) {
-                mergeCombatResult(result, input.tryEnemyCounterAttack(target, input.actor));
-                counterTriggered = true;
+                this.handleEnemyDefeated(input.actor, target, result, feedbackGroupId);
+            } else if (!counterTarget && dealtDamage > 0) {
+                counterTarget = target;
             }
         }
 
+        this.sink.flushFeedbackGroup?.(feedbackGroupId);
+        if (counterTarget) mergeCombatResult(result, input.tryEnemyCounterAttack(counterTarget, input.actor));
         return result;
     }
 
@@ -157,16 +164,16 @@ export class WorldCombatController {
         actor.character.statuses = guarded.statuses;
         actor.character.stats.hp = Math.max(0, actor.character.stats.hp - guarded.damage);
         this.sink.spawnDamage(actor.entity.gridX, actor.entity.gridY, guarded.damage, damageResult.isCrit, false);
-        this.sink.spawnHitEffect(actor.entity.gridX, actor.entity.gridY, damageResult.isCrit);
+        this.sink.spawnHitEffect(actor.entity.gridX, actor.entity.gridY, damageResult.isCrit, input.feedbackGroupId);
         this.sink.log(`${enemy.name} → ${actor.character.name} ${guarded.damage} 피해${damageResult.isCrit ? ' 치명' : ''}`);
         if (guarded.guarded) this.sink.log(`${actor.character.name} 방어: 피해 감소`);
         this.logPhysicalTerrainEffect(damageResult);
 
+        if (guarded.damage > 0) mergeCombatResult(result, input.tryActorCounterAttack(actor, enemy));
         if (actor.character.stats.hp <= 0 && !actor.character.isDead) {
             result.downedCharacterIds.push(actor.character.id);
             return result;
         }
-        if (!guarded.guarded) mergeCombatResult(result, input.tryActorCounterAttack(actor, enemy));
         return result;
     }
 
@@ -194,13 +201,15 @@ export class WorldCombatController {
             return result;
         }
 
-        const damage = Math.max(1, Math.floor(damageResult.damage * (consumed.consumed.magnitude || 0.75)));
+        const damage = Math.max(1, Math.floor(damageResult.damage * (consumed.consumed.magnitude || 0.5)));
         const dead = input.enemy.takeDamage(damage);
+        const feedbackGroupId = createFeedbackGroupId('actorCounter');
         this.sink.spawnAttackCue(actorTile(input.actor), enemyTile(input.enemy), '#9ff6ff');
         this.sink.spawnDamage(input.enemy.gridX, input.enemy.gridY, damage, damageResult.isCrit, false);
-        this.sink.spawnHitEffect(input.enemy.gridX, input.enemy.gridY, damageResult.isCrit);
+        this.sink.spawnHitEffect(input.enemy.gridX, input.enemy.gridY, damageResult.isCrit, feedbackGroupId, damageResult.isCrit ? 'critical' : 'counter');
         this.sink.log(`${input.actor.character.name} 반격 → ${input.enemy.name} ${damage} 피해`);
-        if (dead) this.handleEnemyDefeated(input.actor, input.enemy, result);
+        if (dead) this.handleEnemyDefeated(input.actor, input.enemy, result, feedbackGroupId);
+        this.sink.flushFeedbackGroup?.(feedbackGroupId);
         return result;
     }
 
@@ -228,27 +237,29 @@ export class WorldCombatController {
             return result;
         }
 
-        const baseDamage = Math.max(1, Math.floor(damageResult.damage * (consumed.consumed.magnitude || 0.75)));
+        const baseDamage = Math.max(1, Math.floor(damageResult.damage * (consumed.consumed.magnitude || 0.5)));
         const guarded = applyGuardToDamage(input.actor.character.statuses, baseDamage);
         input.actor.character.statuses = guarded.statuses;
         const damage = guarded.damage;
         input.actor.character.stats.hp = Math.max(0, input.actor.character.stats.hp - damage);
+        const feedbackGroupId = createFeedbackGroupId('enemyCounter');
         this.sink.spawnAttackCue(enemyTile(input.enemy), actorTile(input.actor), '#ff9b66');
         this.sink.spawnDamage(input.actor.entity.gridX, input.actor.entity.gridY, damage, damageResult.isCrit, false);
-        this.sink.spawnHitEffect(input.actor.entity.gridX, input.actor.entity.gridY, damageResult.isCrit);
+        this.sink.spawnHitEffect(input.actor.entity.gridX, input.actor.entity.gridY, damageResult.isCrit, feedbackGroupId, damageResult.isCrit ? 'critical' : 'counter');
         this.sink.log(`${input.enemy.name} 반격 → ${input.actor.character.name} ${damage} 피해`);
         if (input.actor.character.stats.hp <= 0 && !input.actor.character.isDead) result.downedCharacterIds.push(input.actor.character.id);
+        this.sink.flushFeedbackGroup?.(feedbackGroupId);
         return result;
     }
 
-    private handleEnemyDefeated(actor: FieldActor, enemy: Enemy, result: CombatResult): void {
+    private handleEnemyDefeated(actor: FieldActor, enemy: Enemy, result: CombatResult, feedbackGroupId?: string): void {
         result.killedEnemyIds.push(enemy.id);
         if (this.sink.awardExp) this.sink.awardExp(actor, enemy);
         else {
             this.sink.log(`${enemy.name} 처치! +${enemy.expReward} EXP`);
             actor.character.gainExp(enemy.expReward);
         }
-        this.sink.spawnKillEffect(enemy);
+        this.sink.spawnKillEffect(enemy, feedbackGroupId);
         this.sink.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
         enemy.isAggro = false;
         this.sink.spawnLoot(enemy);
@@ -262,6 +273,10 @@ export class WorldCombatController {
         }
         if (notes.length > 0) this.sink.log(`지형 효과: ${notes.join(', ')}`);
     }
+}
+
+function createFeedbackGroupId(prefix: string): string {
+    return `${prefix}:${nextFeedbackGroupId++}`;
 }
 
 export function createCombatResult(executed: boolean = false): CombatResult {

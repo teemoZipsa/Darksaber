@@ -19,6 +19,7 @@ import type { WorldRenderModel } from './WorldRenderModel';
 import type { WorldPhase, WorldRaidSession } from './WorldRaidSession';
 import type { WorldTownSession } from './WorldTownSession';
 import type { WorldMagicController } from './WorldMagicController';
+import type { WorldToolController } from './WorldToolController';
 import type { WorldPlayerActionController } from './WorldPlayerActionController';
 import type { WorldRaidOutcomeController } from './WorldRaidOutcomeController';
 import type { WorldSelectionController } from './WorldSelectionController';
@@ -37,6 +38,7 @@ export interface WorldRenderContext {
     floatingText: FloatingTextManager;
     minimapUI: MinimapUI;
     magicController: WorldMagicController;
+    toolController: WorldToolController;
     playerActionController: WorldPlayerActionController;
     raidOutcomeController: WorldRaidOutcomeController;
     tacticalController: WorldTacticalController;
@@ -106,6 +108,7 @@ export class WorldRenderController {
         }
         this.context.tacticalController.render(ctx);
         this.context.magicController.render(ctx, uiW, uiH);
+        this.context.toolController.render(ctx, uiW, uiH);
         this.context.minimapUI.render(ctx, uiW, uiH, {
             gold: model.gold,
             worldName: model.worldName,

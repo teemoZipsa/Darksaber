@@ -1,5 +1,5 @@
 /**
- * ActionMenuUI — Modern radial action menu with circular glass-style slots.
+ * ActionMenuUI — lightweight radial action menu with fixed icon slots.
  * Appears around the player character when clicked during raid.
  * Icons are colored when ATB is full, subtly muted when not.
  */
@@ -9,7 +9,23 @@ import { ACTION_ICON_CELLS } from './DarksaberIconRegistry';
 import { DarksaberSpriteAtlas } from './DarksaberSpriteAtlas';
 import { UI, Parchment } from './UITheme';
 
-export type ActionType = 'tool' | 'attack' | 'emote' | 'rest' | 'defend' | 'counter' | 'magic' | 'move' | 'open';
+export type ActionType = 'tool' | 'attack' | 'rest' | 'defend' | 'magic' | 'move' | 'open';
+
+export function normalizeLegacyActionType(action: string): ActionType | null {
+    if (action === 'counter') return 'defend';
+    if (
+        action === 'tool' ||
+        action === 'attack' ||
+        action === 'rest' ||
+        action === 'defend' ||
+        action === 'magic' ||
+        action === 'move' ||
+        action === 'open'
+    ) {
+        return action;
+    }
+    return null;
+}
 
 interface ActionSlot {
     type: ActionType;
@@ -22,8 +38,9 @@ export class ActionMenuUI {
     private isOpen = false;
     private slots: ActionSlot[];
     private activeSlots: ActionSlot[] = [];
-    private menuRadius = 52;
-    private iconRadius = 18;
+    private readonly menuRadius = 58;
+    private readonly iconRadius = 18;
+    private readonly hitRadius = 22;
 
     private centerX = 0;
     private centerY = 0;
@@ -32,15 +49,13 @@ export class ActionMenuUI {
     constructor() {
         const TAU = Math.PI * 2;
         this.slots = [
-            { type: 'tool',   label: '도구', angle: 0,           iconDraw: this.drawToolIcon },
-            { type: 'attack', label: '공격', angle: TAU / 6,     iconDraw: this.drawAttackIcon },
-            { type: 'emote',  label: '감정', angle: TAU * 2 / 6, iconDraw: this.drawEmoteIcon },
-            { type: 'rest',   label: '휴식', angle: TAU * 3 / 6, iconDraw: this.drawRestIcon },
-            { type: 'defend', label: '방어', angle: TAU * 3 / 6, iconDraw: this.drawDefendIcon },
-            { type: 'counter', label: '반격', angle: TAU * 3 / 6, iconDraw: this.drawCounterIcon },
-            { type: 'magic',  label: '마법', angle: TAU * 4 / 6, iconDraw: this.drawMagicIcon },
-            { type: 'move',   label: '이동', angle: TAU * 5 / 6, iconDraw: this.drawMoveIcon },
-            { type: 'open',   label: '조사', angle: 0,           iconDraw: this.drawOpenIcon },
+            { type: 'attack', label: '공격', angle: TAU / 4,     iconDraw: this.drawAttackIcon },
+            { type: 'magic',  label: '마법', angle: TAU / 8,     iconDraw: this.drawMagicIcon },
+            { type: 'tool',   label: '도구', angle: TAU * 3 / 8, iconDraw: this.drawToolIcon },
+            { type: 'open',   label: '조사', angle: TAU / 2,     iconDraw: this.drawOpenIcon },
+            { type: 'rest',   label: '휴식', angle: TAU * 5 / 8, iconDraw: this.drawRestIcon },
+            { type: 'defend', label: '방어', angle: TAU * 3 / 4, iconDraw: this.drawDefendIcon },
+            { type: 'move',   label: '이동', angle: TAU * 7 / 8, iconDraw: this.drawMoveIcon },
         ];
         this.activeSlots = [...this.slots];
     }
@@ -50,16 +65,8 @@ export class ActionMenuUI {
         if (available && available.length > 0) {
             this.activeSlots = this.slots.filter(s => available.includes(s.type));
         } else {
-            // Default: all except 'open'
-            this.activeSlots = this.slots.filter(s => s.type !== 'open');
+            this.activeSlots = this.slots;
         }
-        
-        // Distribute angles evenly
-        const TAU = Math.PI * 2;
-        const count = this.activeSlots.length;
-        this.activeSlots.forEach((s, idx) => {
-            s.angle = (TAU / count) * idx;
-        });
     }
 
     public close(): void { this.isOpen = false; this.hoveredSlot = null; }
@@ -75,7 +82,7 @@ export class ActionMenuUI {
         for (const slot of this.activeSlots) {
             const ix = this.centerX + Math.sin(slot.angle) * this.menuRadius;
             const iy = this.centerY - Math.cos(slot.angle) * this.menuRadius;
-            if (Math.hypot(mx - ix, my - iy) <= this.iconRadius + 4) {
+            if (Math.hypot(mx - ix, my - iy) <= this.hitRadius) {
                 this.hoveredSlot = slot.type;
                 break;
             }
@@ -87,7 +94,7 @@ export class ActionMenuUI {
         for (const slot of this.activeSlots) {
             const ix = this.centerX + Math.sin(slot.angle) * this.menuRadius;
             const iy = this.centerY - Math.cos(slot.angle) * this.menuRadius;
-            if (Math.hypot(mx - ix, my - iy) <= this.iconRadius + 4) {
+            if (Math.hypot(mx - ix, my - iy) <= this.hitRadius) {
                 return slot.type;
             }
         }
@@ -107,48 +114,31 @@ export class ActionMenuUI {
 
         ctx.save();
 
-        // Parchment-tinted backdrop circle (warm beige with dark border)
-        const outerR = this.menuRadius + this.iconRadius + 12;
-        ctx.beginPath();
-        ctx.arc(this.centerX, this.centerY, outerR, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(58, 38, 24, 0.55)';
-        ctx.fill();
-        ctx.strokeStyle = Parchment.borderDark;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(this.centerX, this.centerY, outerR - 3, 0, Math.PI * 2);
-        ctx.strokeStyle = Parchment.borderLight;
-        ctx.globalAlpha = 0.5;
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-
         // Draw each slot
         for (const slot of this.activeSlots) {
             const ix = this.centerX + Math.sin(slot.angle) * this.menuRadius;
             const iy = this.centerY - Math.cos(slot.angle) * this.menuRadius;
             const isHovered = this.hoveredSlot === slot.type;
-            const r = isHovered ? this.iconRadius + 2 : this.iconRadius;
+            const r = this.iconRadius;
 
             ctx.beginPath();
             ctx.arc(ix, iy, r, 0, Math.PI * 2);
 
             if (isReady) {
                 if (isHovered) {
-                    ctx.fillStyle = Parchment.panelBgLight;
+                    ctx.fillStyle = 'rgba(36, 31, 24, 0.92)';
                     ctx.shadowColor = Parchment.borderGold;
-                    ctx.shadowBlur = 10;
+                    ctx.shadowBlur = 9;
                 } else {
-                    ctx.fillStyle = Parchment.panelBg;
+                    ctx.fillStyle = 'rgba(18, 20, 24, 0.82)';
                 }
                 ctx.fill();
-                ctx.strokeStyle = isHovered ? Parchment.borderGold : Parchment.borderDark;
+                ctx.strokeStyle = isHovered ? Parchment.borderGold : 'rgba(245, 232, 204, 0.82)';
                 ctx.lineWidth = isHovered ? 2 : 1.5;
             } else {
-                ctx.fillStyle = 'rgba(120, 100, 70, 0.35)';
+                ctx.fillStyle = 'rgba(18, 20, 24, 0.5)';
                 ctx.fill();
-                ctx.strokeStyle = 'rgba(58, 38, 24, 0.35)';
+                ctx.strokeStyle = 'rgba(245, 232, 204, 0.32)';
                 ctx.lineWidth = 1;
             }
             ctx.shadowBlur = 0;
@@ -157,24 +147,16 @@ export class ActionMenuUI {
             // Draw icon
             slot.iconDraw(ctx, ix, iy, r * 0.5, isReady);
 
-            // Label — only on hover (parchment-style floating tooltip)
-            if (isHovered) {
-                ctx.font = `bold 12px ${UI.fontPrimary}`;
-                const labelW = ctx.measureText(slot.label).width + 14;
-                const labelX = ix - labelW / 2;
-                const labelY = iy + r + 4;
-                ctx.fillStyle = Parchment.panelBg;
-                ctx.fillRect(labelX, labelY, labelW, 16);
-                ctx.strokeStyle = Parchment.borderDark;
-                ctx.lineWidth = 1;
-                ctx.strokeRect(labelX, labelY, labelW, 16);
-                ctx.fillStyle = isReady ? Parchment.textDark : Parchment.textMuted;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(slot.label, ix, labelY + 8);
-                ctx.textAlign = 'start';
-                ctx.textBaseline = 'alphabetic';
-            }
+            ctx.font = `bold 11px ${UI.fontPrimary}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.82)';
+            ctx.strokeText(slot.label, ix, iy + r + 10);
+            ctx.fillStyle = isHovered ? '#ffe3a0' : '#f7ead2';
+            ctx.fillText(slot.label, ix, iy + r + 10);
+            ctx.textAlign = 'start';
+            ctx.textBaseline = 'alphabetic';
         }
 
         ctx.restore();
@@ -258,14 +240,6 @@ export class ActionMenuUI {
         ctx.restore();
     }
 
-    private drawEmoteIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
-        if (ActionMenuUI.drawActionIconCell(ctx, 'emote', cx, cy, s, ready)) return;
-        ctx.fillStyle = ready ? '#f0c080' : 'rgba(255,255,255,0.25)';
-        ctx.fillRect(cx - s * 0.2, cy, s * 0.4, s * 0.4);
-        ctx.fillRect(cx - s * 0.2, cy - s * 0.7, s * 0.12, s * 0.7);
-        ctx.fillRect(cx + s * 0.08, cy - s * 0.7, s * 0.12, s * 0.7);
-    }
-
     private drawRestIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
         ctx.fillStyle = ready ? '#88ccff' : 'rgba(255,255,255,0.25)';
         ctx.font = `bold ${s * 1.2}px ${UI.fontMono}`;
@@ -293,22 +267,6 @@ export class ActionMenuUI {
         ctx.strokeStyle = ready ? '#eaf6ff' : 'rgba(255,255,255,0.2)';
         ctx.lineWidth = Math.max(1, s * 0.12);
         ctx.stroke();
-    }
-
-    private drawCounterIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
-        if (ActionMenuUI.drawActionIconCell(ctx, 'counter', cx, cy, s, ready)) return;
-        ctx.strokeStyle = ready ? '#ffcc66' : 'rgba(255,255,255,0.25)';
-        ctx.lineWidth = Math.max(1, s * 0.16);
-        ctx.beginPath();
-        ctx.arc(cx, cy, s * 0.55, Math.PI * 0.25, Math.PI * 1.65);
-        ctx.stroke();
-        ctx.fillStyle = ready ? '#ffcc66' : 'rgba(255,255,255,0.25)';
-        ctx.beginPath();
-        ctx.moveTo(cx - s * 0.58, cy - s * 0.18);
-        ctx.lineTo(cx - s * 0.85, cy - s * 0.22);
-        ctx.lineTo(cx - s * 0.68, cy + s * 0.02);
-        ctx.closePath();
-        ctx.fill();
     }
 
     private drawMagicIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
