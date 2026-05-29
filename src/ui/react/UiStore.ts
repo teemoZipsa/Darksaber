@@ -13,6 +13,11 @@
 
 import type { GameManager } from '../../engine/GameManager';
 import type { Character } from '../../character/Character';
+import type { WorldTownSession } from '../../engine/world/WorldTownSession';
+import type { TownTab } from '../../ui/TownUI';
+import type { ShopEntry, SellEntry } from '../../ui/ShopUI';
+import type { ShopKind } from '../../data/ShopData';
+import type { TownInfo } from '../../map/BiomeMask';
 
 export class UiStore {
     private listeners = new Set<() => void>();
@@ -87,4 +92,34 @@ export class UiStore {
         this.gm.onActiveCharacterChanged();
         this.tick();
     };
+
+    // ─── Town visit (DOM overlay) ─────────────────────────────────
+    private town = (): WorldTownSession | null => this.gm.getTownSession();
+    private townUi = () => this.town()?.ui ?? null;
+    private shop = () => this.townUi()?.getShopUI() ?? null;
+
+    isTownOpen = (): boolean => this.town()?.isVisible() ?? false;
+    getTownTab = (): TownTab => this.townUi()?.getActiveTab() ?? 'storage';
+    getTownInfo = (): TownInfo | null => this.townUi()?.getCurrentTown() ?? null;
+    getTownRumors = (): string[] => this.townUi()?.getRumors() ?? [];
+    getRestFacility = () => this.townUi()?.getRestFacilityPublic() ?? null;
+    getPendingRestMenuId = (): string | null => this.townUi()?.getPendingRestMenuId?.() ?? null;
+    getInjuredCount = (): number => this.townUi()?.getInjuredCount?.() ?? 0;
+    isQuestDone = (questId: string): boolean => this.townUi()?.getQuestDone?.(questId) ?? false;
+
+    getShopKind = (): ShopKind => this.shop()?.getActiveKind() ?? 'equipment';
+    getShopGold = (): number => this.shop()?.getGoldValue() ?? this.gm.playerData.gold;
+    getShopBuyEntries = (): ShopEntry[] => this.shop()?.listBuyEntries() ?? [];
+    getShopSellEntries = (): SellEntry[] => this.shop()?.listSellEntries() ?? [];
+
+    // Town actions
+    townSetTab = (tab: TownTab): void => { this.townUi()?.setTab(tab); this.tick(); };
+    townDeploy = (): void => { this.townUi()?.requestDeploy(); this.tick(); };
+
+    shopSetKind = (kind: ShopKind): void => { this.shop()?.setActiveKind(kind); this.tick(); };
+    shopBuy = (entry: ShopEntry): boolean => { const ok = this.shop()?.buy(entry) ?? false; this.tick(); return ok; };
+    shopSell = (entry: SellEntry): boolean => { const ok = this.shop()?.sell(entry) ?? false; this.tick(); return ok; };
+
+    restPurchase = (menuId: string): boolean => { const ok = this.town()?.purchaseRestMenu(menuId) ?? false; this.tick(); return ok; };
+    restTreat = (): boolean => { const ok = this.town()?.treatActivePartyInjuries() ?? false; this.tick(); return ok; };
 }

@@ -508,6 +508,9 @@ export class WorldEngine {
         return this.townSession.isVisible() || this.raidOutcomeController.isVisible() || this.fusionTempleUI.isVisible();
     }
 
+    /** Town visit session (consumed by the React DOM overlay via GameManager). */
+    public getTownSession(): WorldTownSession { return this.townSession; }
+
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
         this.renderController.render(ctx, camera, width, height);
     }

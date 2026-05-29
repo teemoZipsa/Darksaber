@@ -178,6 +178,18 @@ export const i18n = {
             'tab.inventory': '인벤토리',
             'tab.shop': '상점',
             'tab.party': '파티',
+
+            // Town screen (DOM overlay)
+            'town.tab.storage': '창고',
+            'town.tab.shop': '상점',
+            'town.tab.quest': '퀘스트',
+            'town.tab.rumors': '소문',
+            'town.deploy': '출격',
+            'quest.board': '퀘스트 게시판',
+            'quest.reward': '보상',
+            'quest.sessionNote': '※ 전리품 창고 저장은 현재 세션 한정입니다.',
+            'rumors.footer': '주민들의 이야기',
+            'shop.stock': '재고',
             
             // Character Panel
             'char.partyTitle': '👤 캐릭터 파티',
@@ -455,6 +467,18 @@ export const i18n = {
             'tab.inventory': 'Inventory',
             'tab.shop': 'Shop',
             'tab.party': 'Party',
+
+            // Town screen (DOM overlay)
+            'town.tab.storage': 'Storage',
+            'town.tab.shop': 'Shop',
+            'town.tab.quest': 'Quest',
+            'town.tab.rumors': 'Rumors',
+            'town.deploy': 'Deploy',
+            'quest.board': 'Quest Board',
+            'quest.reward': 'Reward',
+            'quest.sessionNote': '※ Stash storage is limited to the current session.',
+            'rumors.footer': 'tales from the townsfolk',
+            'shop.stock': 'Stock',
             
             // Character Panel
             'char.partyTitle': '👤 Character Party',

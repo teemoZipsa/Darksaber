@@ -26,6 +26,7 @@ import { SettingsUI } from '../ui/SettingsUI';
 import { HitStop } from './world/HitStop';
 import { AudioManager } from './AudioManager';
 import type { UiStore } from '../ui/react/UiStore';
+import type { WorldTownSession } from './world/WorldTownSession';
 
 export class GameManager {
     private canvas: HTMLCanvasElement;
@@ -193,6 +194,16 @@ export class GameManager {
     public isDomModalOpen(): boolean {
         return this.charUI.isVisible() || this.pauseMenu.isVisible()
             || this.settingsUI.isVisible() || this.partyUI.isVisible();
+    }
+
+    /**
+     * The active town-visit session, or null when not in a town. Consumed by the
+     * React DOM overlay (TownScreen). The world is already frozen while a town is
+     * visible (see WorldEngine.isModalOverlayVisible), so this needs no extra guard.
+     */
+    public getTownSession(): WorldTownSession | null {
+        if (this.state !== GameState.WORLD || !this.worldEngine) return null;
+        return this.worldEngine.getTownSession();
     }
 
     // ─── Pause menu (DOM overlay) ─────────────────────────────────

@@ -12,6 +12,7 @@ import { CharacterPanel } from './character/CharacterPanel';
 import { PauseMenu } from './PauseMenu';
 import { SettingsPanel } from './settings/SettingsPanel';
 import { PartyPanel } from './party/PartyPanel';
+import { TownScreen } from './town/TownScreen';
 
 export function OverlayRoot() {
     const store = useStore();
@@ -19,6 +20,7 @@ export function OverlayRoot() {
     const pauseOpen = useUiSelector((s) => s.isPauseOpen());
     const settingsOpen = useUiSelector((s) => s.isSettingsOpen());
     const partyOpen = useUiSelector((s) => s.isPartyOpen());
+    const townOpen = useUiSelector((s) => s.isTownOpen());
 
     return (
         <>
@@ -42,6 +44,7 @@ export function OverlayRoot() {
                     <PartyPanel />
                 </div>
             )}
+            {townOpen && <TownScreen />}
         </>
     );
 }

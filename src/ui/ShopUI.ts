@@ -13,7 +13,7 @@ const CELL = 42;
 const ROW_H = 54;
 const SLOT_FRAME = 'rgba(160, 130, 60, 0.7)';
 
-interface ShopEntry {
+export interface ShopEntry {
     shopItem: ShopItem;
     item: ItemDef;
     remaining: number;
@@ -25,13 +25,13 @@ export interface ShopSellSource {
     grid: GridInventory;
 }
 
-interface SellEntry {
+export interface SellEntry {
     source: ShopSellSource;
     placed: PlacedItem;
     price: number;
 }
 
-const SHOP_KIND_TABS: Array<{ id: ShopKind; labelKey: string; icon: string }> = [
+export const SHOP_KIND_TABS: Array<{ id: ShopKind; labelKey: string; icon: string }> = [
     { id: 'equipment', labelKey: 'shop.equipment', icon: '⚔️' },
     { id: 'goods', labelKey: 'shop.goods', icon: '🧪' },
 ];
@@ -95,6 +95,34 @@ export class ShopUI {
     }
 
     public isVisible(): boolean { return this.visible; }
+
+    // ── React (DOM overlay) accessors / actions ────────────────────
+    /** Live gold value via the injected getter. */
+    public getGoldValue(): number { return this.getGold ? this.getGold() : 0; }
+
+    public getActiveKind(): ShopKind { return this.activeKind; }
+    public setActiveKind(kind: ShopKind): void { this.activeKind = kind; }
+
+    /** Buy entries for the active category (live). */
+    public listBuyEntries(): ShopEntry[] { return this.getBuyEntries(); }
+    /** All sellable entries across the registered sell sources (live). */
+    public listSellEntries(): SellEntry[] { return this.getSellEntries(); }
+
+    public canSell(entry: SellEntry): boolean { return isSellableItem(entry.placed.item); }
+
+    /** Attempt a purchase; decrements remaining stock on success. */
+    public buy(entry: ShopEntry): boolean {
+        if (entry.remaining === 0) return false;
+        const success = this.onBuy?.(entry.item, entry.shopItem.buyPrice) ?? false;
+        if (success && entry.remaining > 0) entry.remaining--;
+        return success;
+    }
+
+    /** Attempt a sale; validates the item still lives in its source grid. */
+    public sell(entry: SellEntry): boolean {
+        if (!entry.source.grid.items.includes(entry.placed)) return false;
+        return this.onSell?.(entry.placed, entry.source.grid, entry.price) ?? false;
+    }
 
     public show(): void {
         this.visible = true;
