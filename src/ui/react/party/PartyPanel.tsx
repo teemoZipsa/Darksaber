@@ -98,12 +98,13 @@ export function PartyPanel() {
     };
 
     const panelStyle = { width: 660, '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
+    const rosterEmptyStyle: CSSProperties = { gridColumn: '1 / -1', textAlign: 'center', color: 'var(--ds-text-dim)', fontSize: 12, padding: '12px 0' };
 
     return (
         <div className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
             <div className="ds-panel__header">
                 <span className="ds-panel__title">{t('party.title')}</span>
-                <button className="ds-close-btn" onClick={() => store.closeParty()} aria-label="Close">✕</button>
+                <button className="ds-close-btn" onClick={() => store.closeParty()} aria-label={t('ui.close')} title={t('ui.close')}>✕</button>
             </div>
 
             <div className="ds-party">
@@ -121,8 +122,9 @@ export function PartyPanel() {
                                         onDragOver={(e) => { e.preventDefault(); setOverSlot(i); }}
                                         onDragLeave={() => setOverSlot(null)}
                                         onDrop={dropOnSlot(i)}
+                                        aria-label={t('party.emptySlot')}
                                     >
-                                        빈 슬롯
+                                        {t('party.emptySlot')}
                                     </div>
                                 );
                             }
@@ -145,12 +147,13 @@ export function PartyPanel() {
                                     onDrop={dropOnSlot(i)}
                                     onClick={() => undeploy(i, ch.id)}
                                     title={`${ch.name} · Lv.${ch.level}`}
+                                    aria-label={`${ch.name} · ${t('char.level')} ${ch.level}`}
                                 >
                                     {i === 0 && <span className="ds-leader-tag">★ {t('party.leader')}</span>}
                                     <Portrait char={ch} />
                                     <div className="ds-cardinfo">
                                         <span className="ds-cardinfo__name">{ch.name}</span>
-                                        <span className="ds-cardinfo__lv">레벨 {ch.level}</span>
+                                        <span className="ds-cardinfo__lv">{t('char.level')} {ch.level}</span>
                                         <MiniBar ratio={hpRatio} color={hpRatio < 0.3 ? 'var(--ds-danger)' : 'var(--ds-hp)'} />
                                         <MiniBar ratio={ch.stats.mp / ch.stats.maxMp} color="var(--ds-mp)" />
                                     </div>
@@ -177,16 +180,17 @@ export function PartyPanel() {
                                     onDrop={dropOnRosterCard(fullIdx)}
                                     onClick={clickRoster(ch)}
                                     title={`${ch.name} · Lv.${ch.level}`}
+                                    aria-label={`${ch.name} · ${t('char.level')} ${ch.level}`}
                                 >
                                     <Portrait char={ch} />
                                     <span className="ds-pcard__name">{ch.name}</span>
-                                    <span className="ds-cardinfo__lv">레벨 {ch.level}</span>
+                                    <span className="ds-cardinfo__lv">{t('char.level')} {ch.level}</span>
                                 </div>
                             );
                         })}
                         {available.length === 0 && (
-                            <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--ds-text-dim)', fontSize: 12, padding: '12px 0' }}>
-                                —
+                            <div style={rosterEmptyStyle}>
+                                {t('party.rosterEmpty')}
                             </div>
                         )}
                     </div>

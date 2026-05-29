@@ -46,7 +46,28 @@ export const i18n = {
             'settings.on': '켜기',
             'settings.off': '끄기',
             'settings.close': '닫기',
-            
+
+            // Settings panel (DOM overlay)
+            'settings.sound': '사운드',
+            'settings.muteBGM': 'BGM 음소거',
+            'settings.muteSFX': 'SFX 음소거',
+            'settings.bgmVolume': 'BGM 볼륨',
+            'settings.sfxVolume': 'SFX 볼륨',
+            'settings.uiVolume': 'UI 볼륨',
+            'settings.screen': '화면',
+            'settings.uiScale': 'UI 크기',
+            'settings.fpsLimit': 'FPS 제한',
+            'settings.showGridRow': '격자 표시',
+            'settings.showFPSRow': 'FPS 표시',
+            'settings.accessibility': '접근성',
+            'settings.motionReduce': '모션 감소',
+            'settings.languageSection': '언어 / Language',
+
+            // Shared UI hints
+            'ui.close': '닫기',
+            'ui.closeHint': 'ESC 또는 ✕ 로 닫기',
+            'pause.closeHint': 'ESC 또는 이어하기를 눌러 복귀',
+
             // Lobby
             'lobby.title': '은신처',
             'lobby.stash': '창고',
@@ -67,6 +88,8 @@ export const i18n = {
             'party.leader': '리더',
             'party.cannotRemoveLead': '리더는 제외할 수 없습니다.',
             'party.full': '출격조가 가득 찼습니다.',
+            'party.emptySlot': '빈 슬롯',
+            'party.rosterEmpty': '대기 중인 캐릭터가 없습니다.',
             'inv.body': '갑옷',
             'inv.weapon': '무기',
             'inv.shield': '방패',
@@ -300,7 +323,28 @@ export const i18n = {
             'settings.on': 'ON',
             'settings.off': 'OFF',
             'settings.close': 'Close (X)',
-            
+
+            // Settings panel (DOM overlay)
+            'settings.sound': 'Sound',
+            'settings.muteBGM': 'Mute BGM',
+            'settings.muteSFX': 'Mute SFX',
+            'settings.bgmVolume': 'BGM Volume',
+            'settings.sfxVolume': 'SFX Volume',
+            'settings.uiVolume': 'UI Volume',
+            'settings.screen': 'Display',
+            'settings.uiScale': 'UI Scale',
+            'settings.fpsLimit': 'FPS Limit',
+            'settings.showGridRow': 'Show Grid',
+            'settings.showFPSRow': 'Show FPS',
+            'settings.accessibility': 'Accessibility',
+            'settings.motionReduce': 'Reduce Motion',
+            'settings.languageSection': 'Language',
+
+            // Shared UI hints
+            'ui.close': 'Close',
+            'ui.closeHint': 'Press ESC or ✕ to close',
+            'pause.closeHint': 'Press ESC or Resume to return',
+
             // Lobby
             'lobby.title': 'HIDEOUT',
             'lobby.stash': 'Stash',
@@ -321,6 +365,8 @@ export const i18n = {
             'party.leader': 'Leader',
             'party.cannotRemoveLead': 'Cannot remove the leader.',
             'party.full': 'Active squad is full.',
+            'party.emptySlot': 'Empty Slot',
+            'party.rosterEmpty': 'No characters available.',
             'inv.body': 'Body',
             'inv.weapon': 'Weapon',
             'inv.shield': 'Shield',
