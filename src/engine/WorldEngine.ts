@@ -28,6 +28,7 @@ import {
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
     hasStatus,
+    removeStatusesFromCarrier,
     resolveTurnStartStatuses,
 } from '../combat/StatusEffects';
 import { ActionMenuUI } from '../ui/ActionMenuUI';
@@ -130,7 +131,9 @@ export class WorldEngine {
     private activeTurnActorId: string | null = null;
     private readyQueue: string[] = [];
     private remainingActionPoints = 0;
+    private majorActionUsedThisTurn = false;
     private reservedAction: FieldIntent | null = null;
+    private restingRecoveryTimers = new Map<string, number>();
     private hoverTile: TilePoint = { x: -1, y: -1 };
     private combatLog: string[] = [];
     private feedbackGroups = new Map<string, CombatFeedbackKind>();
@@ -255,6 +258,8 @@ export class WorldEngine {
                 getBoundsTiles: () => this.worldMap.getBoundsTiles(),
                 hasFieldLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to),
                 spendAp: (cost) => this.spendAp(cost),
+                isMajorActionUsed: () => this.majorActionUsedThisTurn,
+                markMajorActionUsed: () => this.markMajorActionUsed(),
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
                 handleEnemyDefeated: (actor, enemy, feedbackGroupId) => this.handleEnemyDefeated(actor, enemy, feedbackGroupId),
@@ -286,6 +291,8 @@ export class WorldEngine {
                 getInventoryItems: () => this.gameManager.inventory.items,
                 removeInventoryItem: (placed) => this.gameManager.inventory.remove(placed),
                 spendAp: (cost) => this.spendAp(cost),
+                isMajorActionUsed: () => this.majorActionUsedThisTurn,
+                markMajorActionUsed: () => this.markMajorActionUsed(),
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
             },
@@ -316,6 +323,8 @@ export class WorldEngine {
                 isEntityMoving: (entity) => this.isEntityMoving(entity),
                 isFieldPassable: (query) => this.movementController.isFieldPassable(query),
                 spendAp: (cost) => this.spendAp(cost),
+                isMajorActionUsed: () => this.majorActionUsedThisTurn,
+                markMajorActionUsed: () => this.markMajorActionUsed(),
                 submitMoveIntent: (actor, tile, path, apCost, pathCost) =>
                     this.submitNetworkMoveIntent(actor, tile, path, apCost, pathCost),
                 tryActorAttack: (actor, enemy) => this.tryActorAttack(actor, enemy),
@@ -324,6 +333,9 @@ export class WorldEngine {
                 openTool: (actor) => this.openFieldTool(actor),
                 hasCastableFieldSkill: (actor) => !this.isNetworkRaid && this.magicController.hasCastableFieldSkill(actor.character),
                 hasUsableCombatTool: (actor) => !this.isNetworkRaid && this.toolController.hasUsableCombatTool(actor),
+                getCombatToolAvailability: (actor) => this.isNetworkRaid
+                    ? { hasRecoveryConsumable: false, hasEffectiveRecovery: false }
+                    : this.toolController.getCombatToolAvailability(actor),
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 closeActionMenu: () => this.closeActionMenu(),
                 closeTacticalMenu: () => this.closeTacticalMenu(),
@@ -392,6 +404,7 @@ export class WorldEngine {
             getFieldEnemies: () => this.fieldEnemies,
             getActiveTurnActorId: () => this.activeTurnActorId,
             getRemainingActionPoints: () => this.remainingActionPoints,
+            getMajorActionUsedThisTurn: () => this.majorActionUsedThisTurn,
             getHoverTile: () => this.hoverTile,
             getAttackCues: () => this.attackCues,
             getCombatLog: () => this.combatLog,
@@ -490,6 +503,7 @@ export class WorldEngine {
             activeTurnActorId: this.activeTurnActorId,
         });
         for (const enemyId of enemyMovement.readyEnemyIds) enqueueReadyActor(this.readyQueue, enemyId);
+        this.updateRestingActors(dt);
         this.effectManager.update(dt);
         this.floatingText.update(dt);
         this.updateAttackCues(dt);
@@ -615,7 +629,9 @@ export class WorldEngine {
         this.activeTurnActorId = null;
         this.readyQueue = [];
         this.remainingActionPoints = 0;
+        this.majorActionUsedThisTurn = false;
         this.reservedAction = null;
+        this.restingRecoveryTimers.clear();
         this.closeActionMenu();
         this.magicController.reset();
         this.toolController?.reset();
@@ -623,6 +639,7 @@ export class WorldEngine {
             actor.path = [];
             actor.queuedIntent = null;
             actor.entity.actionGauge = 0;
+            removeStatusesFromCarrier(actor.character, (status) => status.kind === 'resting');
         }
         for (const entry of this.fieldEnemies) {
             entry.path = [];
@@ -691,6 +708,7 @@ export class WorldEngine {
             statuses: character.statuses.map((status) => ({ ...status })),
             actionGauge: 0,
             remainingAp: 0,
+            majorActionUsed: false,
             facing: 'down',
             isDead: character.isDead,
         }));
@@ -804,6 +822,9 @@ export class WorldEngine {
         this.remainingActionPoints = this.activeTurnActorId
             ? snapshot.remainingApByActor[this.activeTurnActorId] ?? 0
             : 0;
+        this.majorActionUsedThisTurn = this.activeTurnActorId
+            ? Boolean(ownSnapshots.find((actor) => actor.id === this.activeTurnActorId)?.majorActionUsed)
+            : false;
         if (controlled) {
             this.player = controlled.entity;
             if (!this.selectionController.hasSelection()) this.selectionController.selectActor(controlled.id);
@@ -1186,6 +1207,77 @@ export class WorldEngine {
         this.tacticalController.close();
     }
 
+    private markMajorActionUsed(): void {
+        if (this.activeTurnActorId) this.majorActionUsedThisTurn = true;
+    }
+
+    private updateRestingActors(dt: number): void {
+        for (const actor of this.partyActors) {
+            if (actor.character.isDead || actor.character.stats.hp <= 0) {
+                this.restingRecoveryTimers.delete(actor.id);
+                continue;
+            }
+            if (!hasStatus(actor.character.statuses, 'resting')) {
+                this.restingRecoveryTimers.delete(actor.id);
+                continue;
+            }
+
+            const effective = getEffectiveStatsForCharacter(actor.character);
+            if (actor.character.stats.hp >= effective.maxHp && actor.character.stats.mp >= effective.maxMp) {
+                this.stopResting(actor, `${actor.character.name}: 휴식 완료`);
+                continue;
+            }
+
+            let timer = (this.restingRecoveryTimers.get(actor.id) ?? 0) + dt;
+            const ticks = Math.floor(timer);
+            if (ticks <= 0) {
+                this.restingRecoveryTimers.set(actor.id, timer);
+                continue;
+            }
+            timer -= ticks;
+            this.restingRecoveryTimers.set(actor.id, timer);
+
+            const hpPerTick = Math.max(2, Math.floor(effective.maxHp * 0.03));
+            const mpPerTick = effective.maxMp > 0 ? Math.max(1, Math.floor(effective.maxMp * 0.03)) : 0;
+            const beforeHp = actor.character.stats.hp;
+            const beforeMp = actor.character.stats.mp;
+            actor.character.stats.hp = Math.min(effective.maxHp, actor.character.stats.hp + hpPerTick * ticks);
+            actor.character.stats.mp = Math.min(effective.maxMp, actor.character.stats.mp + mpPerTick * ticks);
+            const hpGain = actor.character.stats.hp - beforeHp;
+            const mpGain = actor.character.stats.mp - beforeMp;
+
+            if (hpGain > 0) this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, hpGain);
+            if (mpGain > 0) this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, `MP+${mpGain}`);
+            if (hpGain > 0 || mpGain > 0) this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
+
+            if (actor.character.stats.hp >= effective.maxHp && actor.character.stats.mp >= effective.maxMp) {
+                this.stopResting(actor, `${actor.character.name}: 휴식 완료`);
+            }
+        }
+    }
+
+    private stopResting(actor: FieldActor, logMessage?: string): void {
+        const removed = removeStatusesFromCarrier(actor.character, (status) => status.kind === 'resting');
+        this.restingRecoveryTimers.delete(actor.id);
+        if (removed.length === 0) return;
+        this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'REST END');
+        if (logMessage) this.addCombatLog(logMessage);
+    }
+
+    private snapshotPartyHp(): Map<string, number> {
+        return new Map(this.partyActors.map((actor) => [actor.id, actor.character.stats.hp]));
+    }
+
+    private interruptRestingForDamage(beforeHpByActorId: Map<string, number>): void {
+        for (const actor of this.partyActors) {
+            const beforeHp = beforeHpByActorId.get(actor.id);
+            if (beforeHp === undefined) continue;
+            if (actor.character.stats.hp < beforeHp) {
+                this.stopResting(actor, `${actor.character.name}: 피해로 휴식 중단`);
+            }
+        }
+    }
+
     private updateRaidTimer(dt: number): void {
         const result = this.raidSession.advanceTimer(dt, {
             townVisible: this.townSession.isVisible(),
@@ -1307,6 +1399,7 @@ export class WorldEngine {
         if (!this.canActorAttackTarget(actor, enemy)) return false;
         const profile = this.getActorAttackProfile(actor);
         const targetEnemies = this.getAttackPatternTargetEnemies(actor, enemy);
+        const beforeHpByActorId = this.snapshotPartyHp();
         const result = this.combatController.tryActorAttack({
             actor,
             selectedEnemy: enemy,
@@ -1320,10 +1413,12 @@ export class WorldEngine {
             },
         });
         this.applyCombatResult(result);
+        this.interruptRestingForDamage(beforeHpByActorId);
         return result.executed;
     }
 
     private tryEnemyCounterAttack(enemy: Enemy, actor: FieldActor): boolean {
+        const beforeHpByActorId = this.snapshotPartyHp();
         const result = this.combatController.tryEnemyCounterAttack({
             enemy,
             actor,
@@ -1331,6 +1426,7 @@ export class WorldEngine {
             getActorTerrainTraits: (targetActor) => this.getActorTerrainTraits(targetActor),
         });
         this.applyCombatResult(result);
+        this.interruptRestingForDamage(beforeHpByActorId);
         return result.executed;
     }
 
@@ -1506,8 +1602,7 @@ export class WorldEngine {
         }
 
         this.closeTacticalMenu();
-        const available = this.playerActionController.getAvailableTurnActions(actor);
-        this.actionMenuUI.open(available);
+        this.actionMenuUI.open(this.playerActionController.getTurnActionStates(actor));
     }
 
     private closeActionMenu(): void {
@@ -1538,7 +1633,7 @@ export class WorldEngine {
         if (actor.character.isDead || actor.character.stats.hp <= 0) return;
         this.selectionController.selectActor(actor.id);
         this.closeTacticalMenu();
-        this.actionMenuUI.open(this.playerActionController.getAvailableTurnActions(actor));
+        this.actionMenuUI.open(this.playerActionController.getTurnActionStates(actor));
     }
 
     private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = 0): void {
@@ -1548,6 +1643,7 @@ export class WorldEngine {
         actor.entity.actionGauge = atbCarryover;
         this.activeTurnActorId = null;
         this.remainingActionPoints = 0;
+        this.majorActionUsedThisTurn = false;
         this.reservedAction = null;
         this.clearActorIntent(actor);
         this.closeActionMenu();
@@ -1562,6 +1658,7 @@ export class WorldEngine {
         enemy.actionGauge = 0;
         this.activeTurnActorId = null;
         this.remainingActionPoints = 0;
+        this.majorActionUsedThisTurn = false;
         this.reservedAction = null;
     }
 
@@ -1596,6 +1693,7 @@ export class WorldEngine {
 
         this.activeTurnActorId = null;
         this.remainingActionPoints = 0;
+        this.majorActionUsedThisTurn = false;
         this.reservedAction = null;
         this.closeActionMenu();
         this.closeTacticalMenu();
@@ -1612,6 +1710,7 @@ export class WorldEngine {
             this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, result.poisonDamage, false, false);
             this.effectManager.spawnDebuffEffect(actor.entity.gridX, actor.entity.gridY);
             this.addCombatLog(`${actor.character.name}: 독 ${result.poisonDamage} 피해`);
+            this.stopResting(actor, `${actor.character.name}: 피해로 휴식 중단`);
         }
         if (result.regenHealing > 0) {
             this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, result.regenHealing);
@@ -1659,6 +1758,7 @@ export class WorldEngine {
         if (index >= 0) this.switchToPartyMember(index);
         this.activeTurnActorId = actor.id;
         this.remainingActionPoints = Math.max(1, Math.floor(actor.character.stats.actionLimit || 15));
+        this.majorActionUsedThisTurn = false;
         actor.entity.actionGauge = 100;
         this.selectionController.selectActor(actor.id);
         if (!this.processActorTurnStartStatuses(actor)) {
@@ -1670,7 +1770,7 @@ export class WorldEngine {
         if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
         else {
             this.closeTacticalMenu();
-            this.actionMenuUI.open(this.playerActionController.getAvailableTurnActions(actor));
+            this.actionMenuUI.open(this.playerActionController.getTurnActionStates(actor));
         }
     }
 
@@ -1684,7 +1784,9 @@ export class WorldEngine {
             return;
         }
 
+        const beforeHpByActorId = this.snapshotPartyHp();
         this.applyCombatResult(this.enemyTurnController.beginEnemyTurn(entry));
+        this.interruptRestingForDamage(beforeHpByActorId);
         this.endEnemyTurn(enemy);
     }
 

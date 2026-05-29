@@ -12,9 +12,12 @@ import { WorldMap } from '../../src/map/WorldMap';
 import { CHUNK_SIZE } from '../../src/map/Chunk';
 import { TileType } from '../../src/map/Tile';
 import { getSellPrice, getShopItems, isSellableItem } from '../../src/data/ShopData';
+import { BUY_PRESSURE_CAP, LocalMarketService, MARKET_DRIFT_CAP, SELL_PRESSURE_CAP } from '../../src/data/MarketService';
+import { marketStateKey } from '../../src/data/MarketData';
 import { PlayerData } from '../../src/data/PlayerData';
 import { REST_FACILITIES, getRestFacility, getRestMenu } from '../../src/data/RestFacilityData';
 import { TOWN_FACILITIES, getTownFacilities, hasTownFacility } from '../../src/data/TownFacilityData';
+import { TownUI } from '../../src/ui/TownUI';
 
 function placed(id: string): PlacedItem {
     const item = getItemDef(id);
@@ -239,6 +242,99 @@ test('trade goods sell for different prices by destination town', () => {
     assert.ok(coastSell > forestSell);
     assert.ok(coastSell > (resin.buyPrice ?? resin.baseValue));
     assert.equal(getSellPrice(herb, 's_coast_town'), 25);
+});
+
+test('local market prices adjust trade goods while leaving ordinary items alone', () => {
+    const player = new PlayerData();
+    const market = new LocalMarketService(player, () => 0.99);
+    const resin = getItemDef('trade_forest_resin');
+    const herb = getItemDef('herb_common');
+    assert.ok(resin);
+    assert.ok(herb);
+
+    const baseBuy = resin.buyPrice ?? resin.baseValue;
+    const baseSell = getSellPrice(resin, 's_coast_town');
+    const herbBuy = herb.buyPrice ?? herb.baseValue;
+    const herbSell = getSellPrice(herb, 's_coast_town');
+
+    assert.equal(market.getBuyPrice(resin, baseBuy, 'w_forest_village'), baseBuy);
+    assert.equal(market.getSellPrice(resin, baseSell, 's_coast_town'), baseSell);
+
+    market.recordBuy('w_forest_village', resin.id, 20);
+    const pressuredBuy = market.getBuyPrice(resin, baseBuy, 'w_forest_village');
+    assert.ok(pressuredBuy > baseBuy);
+    assert.ok(pressuredBuy <= Math.floor(baseBuy * (1 + BUY_PRESSURE_CAP + MARKET_DRIFT_CAP)));
+
+    market.recordSell('s_coast_town', resin.id, 20);
+    const pressuredSell = market.getSellPrice(resin, baseSell, 's_coast_town');
+    assert.ok(pressuredSell < baseSell);
+    assert.ok(pressuredSell >= Math.floor(baseSell * (1 - SELL_PRESSURE_CAP - MARKET_DRIFT_CAP)));
+
+    assert.equal(market.getBuyPrice(herb, herbBuy, 'w_forest_village'), herbBuy);
+    assert.equal(market.getSellPrice(herb, herbSell, 's_coast_town'), herbSell);
+});
+
+test('market drift rolls on town visits within the configured cap', () => {
+    const player = new PlayerData();
+    const rolls = [0, 0.5, 0.9];
+    const market = new LocalMarketService(player, () => rolls.shift() ?? 0.99);
+
+    market.rollTownVisit('w_forest_village');
+
+    const state = player.marketState[marketStateKey('w_forest_village', 'trade_forest_resin')];
+    assert.ok(state);
+    assert.ok(state.drift > 0);
+    assert.ok(state.drift <= MARKET_DRIFT_CAP);
+});
+
+test('market state persists and old saves load with a default market state', () => {
+    const previousStorage = globalThis.localStorage;
+    const store = new Map<string, string>();
+    globalThis.localStorage = {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => { store.set(key, value); },
+        removeItem: (key: string) => { store.delete(key); },
+        clear: () => { store.clear(); },
+        key: (index: number) => Array.from(store.keys())[index] ?? null,
+        get length() { return store.size; },
+    };
+
+    try {
+        const player = new PlayerData();
+        const market = new LocalMarketService(player, () => 0.99);
+        market.recordBuy('w_forest_village', 'trade_forest_resin', 2);
+        market.recordSell('s_coast_town', 'trade_forest_resin', 3);
+        player.save();
+
+        const loaded = new PlayerData();
+        loaded.load();
+        assert.equal(loaded.marketState[marketStateKey('w_forest_village', 'trade_forest_resin')]?.buyPressure, 2);
+        assert.equal(loaded.marketState[marketStateKey('s_coast_town', 'trade_forest_resin')]?.sellPressure, 3);
+
+        store.set('sin_eater_save', JSON.stringify({ gold: 12, clearedStages: [], inventory: [], equipped: {}, lastSaved: '' }));
+        const oldSave = new PlayerData();
+        oldSave.load();
+        assert.deepEqual(oldSave.marketState, {});
+    } finally {
+        globalThis.localStorage = previousStorage;
+    }
+});
+
+test('market rumors are limited to rumor facilities and reflect cooled demand', () => {
+    const player = new PlayerData();
+    const market = new LocalMarketService(player, () => 0.99);
+    market.recordSell('central_castle', 'trade_forest_resin', 3);
+    const rumor = market.getMarketRumor('central_castle');
+    assert.ok(rumor?.includes('숲 수지'));
+    assert.ok(rumor?.includes('값이 식었다'));
+
+    const ui = new TownUI(new GridInventory(5, 5), new GridInventory(5, 5));
+    ui.getMarketRumor = () => '시장 소문';
+    ui.show({ id: 'central_castle', name: 'Kaosia', nameKr: '카오시아', chunkX: 0, chunkY: 0, radius: 1 });
+    assert.equal(ui.getRumors().filter((entry) => entry === '시장 소문').length, 1);
+
+    ui.show({ id: 'e_stronghold', name: 'Entria', nameKr: '엔트리아', chunkX: 0, chunkY: 0, radius: 1 });
+    assert.equal(ui.getRumors().includes('시장 소문'), false);
 });
 
 test('sellable flag blocks bound or quest items from shop sale lists', () => {

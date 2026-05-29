@@ -136,9 +136,13 @@ export class WorldInputController {
         }
 
         if (this.context.actionMenuUI.getIsOpen()) {
-            const action = this.context.actionMenuUI.onClick(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
-            if (action) {
-                this.context.playerActionController.execute(action);
+            const result = this.context.actionMenuUI.onClick(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
+            if (result) {
+                if (result.enabled) {
+                    this.context.playerActionController.execute(result.type);
+                } else {
+                    this.context.log(result.disabledReason ?? '지금 사용할 수 없는 행동입니다.');
+                }
                 return;
             }
             this.context.closeActionMenu();

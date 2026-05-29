@@ -51,6 +51,7 @@ export interface WorldRenderContext {
     getFieldEnemies: () => FieldEnemy[];
     getActiveTurnActorId: () => string | null;
     getRemainingActionPoints: () => number;
+    getMajorActionUsedThisTurn: () => boolean;
     getHoverTile: () => TilePoint;
     getAttackCues: () => AttackCue[];
     getCombatLog: () => string[];
@@ -143,6 +144,7 @@ export class WorldRenderController {
             fieldEnemies: this.context.getFieldEnemies(),
             activeTurnActorId: this.context.getActiveTurnActorId(),
             remainingActionPoints: this.context.getRemainingActionPoints(),
+            majorActionUsedThisTurn: this.context.getMajorActionUsedThisTurn(),
             selectedActorId: this.context.selectionController.actorId,
             selectedEnemyId: this.context.selectionController.enemyId,
             selectedLootId: this.context.selectionController.lootId,

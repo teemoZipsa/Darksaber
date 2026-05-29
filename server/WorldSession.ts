@@ -76,6 +76,7 @@ interface ServerActor {
     statuses: StatusEffect[];
     actionGauge: number;
     remainingAp: number;
+    majorActionUsed: boolean;
     facing: NetFacing;
     isDead: boolean;
 }
@@ -229,6 +230,7 @@ export class WorldSession {
                 statuses: cloneStatuses(snapshot.statuses),
                 actionGauge: 0,
                 remainingAp: 0,
+                majorActionUsed: false,
                 facing: 'down',
                 isDead: snapshot.isDead,
             };
@@ -329,6 +331,7 @@ export class WorldSession {
                     if (actor.actionGauge >= 100) {
                         actor.actionGauge = 100;
                         actor.remainingAp = getActorActionLimit(actor);
+                        actor.majorActionUsed = false;
                     }
                 }
             }
@@ -511,6 +514,7 @@ export class WorldSession {
         if (!targetId) return reject(intentId, 'Attack payload must include targetId.');
         const target = this.enemies.get(targetId);
         if (!target || target.enemy.stats.hp <= 0) return reject(intentId, 'Target is not alive.');
+        if (actor.majorActionUsed) return reject(intentId, 'Major action already used this turn.');
         if (actor.remainingAp < ATTACK_AP_COST) return reject(intentId, 'Not enough AP for attack.');
 
         const range = getClassLine(actor.classLineId)?.attackRange ?? 1;
@@ -519,6 +523,7 @@ export class WorldSession {
         if (range > 1 && !this.hasFieldLineOfSight(actor.tile, targetTile)) return reject(intentId, 'Line of sight is blocked.');
 
         actor.remainingAp -= ATTACK_AP_COST;
+        actor.majorActionUsed = true;
         actor.facing = directionFromTo(actor.tile, targetTile);
         const { event, autoLootGrant } = this.resolveActorAttack(actor, target, now);
         this.finishActorIfSpent(actor);
@@ -755,6 +760,7 @@ export class WorldSession {
                 actor.isDead = true;
                 actor.remainingAp = 0;
                 actor.actionGauge = 0;
+                actor.majorActionUsed = false;
             }
         }
         return {
@@ -900,6 +906,7 @@ export class WorldSession {
     private endActorTurn(actor: ServerActor): void {
         actor.remainingAp = 0;
         actor.actionGauge = 0;
+        actor.majorActionUsed = false;
     }
 
     private ensureContentNear(spawnTile: TilePoint): void {
@@ -1035,6 +1042,7 @@ export class WorldSession {
             statuses: cloneStatuses(actor.statuses),
             actionGauge: actor.actionGauge,
             remainingAp: actor.remainingAp,
+            majorActionUsed: actor.majorActionUsed,
             facing: actor.facing,
             isDead: actor.isDead,
             isGhost: player?.ghost ?? false,
@@ -1208,6 +1216,7 @@ function createFallbackActorSnapshot(): ActorSnapshot {
         statuses: [],
         actionGauge: 0,
         remainingAp: 0,
+        majorActionUsed: false,
         facing: 'down',
         isDead: false,
     };

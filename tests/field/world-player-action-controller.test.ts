@@ -39,6 +39,9 @@ interface ControllerOptions {
     fieldEnemies?: FieldEnemy[];
     hasCastableFieldSkill?: boolean;
     hasUsableCombatTool?: boolean;
+    hasRecoveryConsumable?: boolean;
+    hasEffectiveRecovery?: boolean;
+    majorActionUsed?: { value: boolean };
     getActorAttackTargetFailure?: WorldPlayerActionContext['getActorAttackTargetFailure'];
 }
 
@@ -62,12 +65,20 @@ function makeController(actor: FieldActor, remainingAp: number, options: Control
         isEntityMoving: () => false,
         isFieldPassable: () => true,
         spendAp: () => true,
+        isMajorActionUsed: () => options.majorActionUsed?.value ?? false,
+        markMajorActionUsed: () => {
+            if (options.majorActionUsed) options.majorActionUsed.value = true;
+        },
         tryActorAttack: () => false,
         openLoot: () => undefined,
         openMagic: () => undefined,
         openTool: () => undefined,
         hasCastableFieldSkill: () => options.hasCastableFieldSkill ?? false,
         hasUsableCombatTool: () => options.hasUsableCombatTool ?? false,
+        getCombatToolAvailability: () => ({
+            hasRecoveryConsumable: options.hasRecoveryConsumable ?? options.hasUsableCombatTool ?? false,
+            hasEffectiveRecovery: options.hasEffectiveRecovery ?? options.hasUsableCombatTool ?? false,
+        }),
         reopenActionMenu: () => undefined,
         closeActionMenu: () => undefined,
         closeTacticalMenu: () => undefined,
@@ -127,16 +138,40 @@ test('available action menu hides magic until AP and a castable field skill are 
     assert.equal(readyController.getAvailableTurnActions(actor).includes('magic'), true);
 });
 
-test('available action menu hides tool until AP and an effective combat tool are both present', () => {
+test('turn action states always expose tool with disabled reasons', () => {
     const actor = makeActor('hero', 0, 0);
     const toolApCost = getActionApCost('tool');
     const lowApController = makeController(actor, toolApCost - 1, { hasUsableCombatTool: true });
-    const noToolController = makeController(actor, toolApCost, { hasUsableCombatTool: false });
+    const noToolController = makeController(actor, toolApCost, { hasRecoveryConsumable: false, hasEffectiveRecovery: false });
+    const noEffectController = makeController(actor, toolApCost, { hasRecoveryConsumable: true, hasEffectiveRecovery: false });
     const readyController = makeController(actor, toolApCost, { hasUsableCombatTool: true });
 
     assert.equal(lowApController.getAvailableTurnActions(actor).includes('tool'), false);
     assert.equal(noToolController.getAvailableTurnActions(actor).includes('tool'), false);
     assert.equal(readyController.getAvailableTurnActions(actor).includes('tool'), true);
+    assert.equal(lowApController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.disabledReason, '도구 AP 부족');
+    assert.equal(noToolController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.disabledReason, '회복 도구 없음');
+    assert.equal(noEffectController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.disabledReason, '회복 효과 없음');
+    assert.equal(readyController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.enabled, true);
+});
+
+test('major action use disables attack, magic, and tool but keeps movement available', () => {
+    const actor = makeActor('hero', 0, 0);
+    const enemy = makeEnemyEntry('enemy', 1, 0);
+    const used = { value: true };
+    const controller = makeController(actor, MAGIC_AP_COST, {
+        fieldEnemies: [enemy],
+        hasCastableFieldSkill: true,
+        hasUsableCombatTool: true,
+        majorActionUsed: used,
+    });
+    const states = controller.getTurnActionStates(actor);
+
+    assert.equal(states.find((state) => state.type === 'attack')?.enabled, false);
+    assert.equal(states.find((state) => state.type === 'magic')?.enabled, false);
+    assert.equal(states.find((state) => state.type === 'tool')?.enabled, false);
+    assert.equal(states.find((state) => state.type === 'move')?.enabled, true);
+    assert.equal(states.find((state) => state.type === 'attack')?.disabledReason, '이번 턴 주요 행동 사용됨');
 });
 
 test('defend applies guard and the integrated counter readiness', () => {

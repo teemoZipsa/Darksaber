@@ -34,7 +34,7 @@ export function ShopPanel() {
 
     const buy = (entry: ShopEntry) => {
         if (entry.remaining === 0) return;
-        if (gold < entry.shopItem.buyPrice) { setFeedback(t('shop.noGold')); AudioManager.playUi('ui.cancel'); return; }
+        if (gold < entry.price) { setFeedback(t('shop.noGold')); AudioManager.playUi('ui.cancel'); return; }
         if (store.shopBuy(entry)) { AudioManager.playUi('ui.confirm'); setFeedback(''); }
         else { setFeedback(t('shop.backpackFull')); AudioManager.playUi('ui.cancel'); }
     };
@@ -76,7 +76,7 @@ export function ShopPanel() {
                         {buyEntries.length === 0 && <div className="ds-shop__empty">{t('shop.emptyBuy')}</div>}
                         {buyEntries.map((entry, i) => {
                             const soldOut = entry.remaining === 0;
-                            const afford = gold >= entry.shopItem.buyPrice;
+                            const afford = gold >= entry.price;
                             return (
                                 <button
                                     key={`${entry.item.id}-${i}`}
@@ -84,7 +84,7 @@ export function ShopPanel() {
                                     disabled={soldOut}
                                     onClick={() => buy(entry)}
                                     title={statSummary(entry.item)}
-                                    aria-label={`${itemName(entry.item)} · ${entry.shopItem.buyPrice}G`}
+                                    aria-label={`${itemName(entry.item)} · ${entry.price}G`}
                                 >
                                     <ItemSwatch item={entry.item} dim={soldOut} />
                                     <div className="ds-shop__rowinfo">
@@ -92,7 +92,7 @@ export function ShopPanel() {
                                         <span className="ds-shop__sub">{statSummary(entry.item)}</span>
                                     </div>
                                     <div className="ds-shop__rowright">
-                                        <span className={`ds-shop__price${afford || soldOut ? '' : ' is-poor'}`}>{entry.shopItem.buyPrice}G</span>
+                                        <span className={`ds-shop__price${afford || soldOut ? '' : ' is-poor'}`}>{entry.price}G</span>
                                         <span className="ds-shop__stock">
                                             {soldOut ? t('shop.soldOut') : entry.remaining > 0 ? `x${entry.remaining}` : ''}
                                         </span>

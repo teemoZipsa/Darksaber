@@ -7,6 +7,7 @@ import { applyEquipmentStatBonuses } from '../inventory/Socketing';
 export type StatusKind =
     | 'guard'
     | 'counterReady'
+    | 'resting'
     | 'poison'
     | 'regen'
     | 'slow'
@@ -69,6 +70,7 @@ export interface GuardDamageResult {
 const DEFAULT_STATUS: Record<StatusKind, Omit<StatusEffect, 'kind'>> = {
     guard: { icon: '🛡️', durationTurns: 1, magnitude: 0.5, charges: 1 },
     counterReady: { icon: '↩', durationTurns: 1, magnitude: 0.5, charges: 1 },
+    resting: { icon: 'Zz', magnitude: 1 },
     poison: { icon: '☠️', durationTurns: 3, magnitude: 0.08 },
     regen: { icon: '🍀', durationTurns: 5, magnitude: 0.1 },
     slow: { icon: '🐌', durationTurns: 3, magnitude: 0.6 },

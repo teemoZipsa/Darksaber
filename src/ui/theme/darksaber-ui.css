@@ -835,6 +835,203 @@
 #ui-overlay .ds-inv__action, #ui-overlay .ds-inv__sortbtn { font-size: 11px; padding: 4px 10px; }
 #ui-overlay .ds-inv__feedback { text-align: center; color: var(--ds-accent); font-size: 12px; min-height: 16px; padding-bottom: 8px; }
 
+/* ─── Pause class tier chart ────────────────────────────────── */
+#ui-overlay .ds-pause {
+    width: min(1180px, calc(100vw - 36px));
+    max-height: calc(100vh - 36px);
+    display: flex;
+    flex-direction: column;
+}
+#ui-overlay .ds-pause__body {
+    display: grid;
+    grid-template-columns: 178px minmax(0, 1fr);
+    gap: 16px;
+    min-height: 0;
+    padding: 16px;
+    overflow: hidden;
+}
+#ui-overlay .ds-pause__menu {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    padding: 12px;
+    background: rgba(15, 13, 10, 0.42);
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+}
+#ui-overlay .ds-pause__footer {
+    margin-top: auto;
+    color: var(--ds-text-dim);
+    font-size: 12px;
+    line-height: 1.35;
+    text-align: center;
+}
+#ui-overlay .ds-tier-chart {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+#ui-overlay .ds-tier-chart__topline {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 14px;
+    min-width: 0;
+}
+#ui-overlay .ds-tier-chart__title {
+    font-family: var(--ds-font-title, "DOSMyungjo", serif);
+    font-size: 18px;
+    color: var(--ds-accent);
+}
+#ui-overlay .ds-tier-chart__hint {
+    margin-top: 4px;
+    color: var(--ds-text-dim);
+    font-size: 12px;
+    line-height: 1.35;
+}
+#ui-overlay .ds-tier-chart__legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+}
+#ui-overlay .ds-tier-chart__legenditem {
+    --tier-branch: var(--ds-border);
+    padding: 3px 7px;
+    color: var(--ds-text-muted);
+    font-size: 11px;
+    line-height: 1;
+    border: 1px solid color-mix(in srgb, var(--tier-branch) 70%, #000);
+    border-radius: var(--ds-radius-sm);
+    background: color-mix(in srgb, var(--tier-branch) 16%, transparent);
+}
+#ui-overlay .ds-tier-chart__scroll {
+    min-height: 0;
+    overflow: auto;
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+    background:
+        linear-gradient(180deg, rgba(240, 192, 80, 0.06), transparent 120px),
+        rgba(15, 13, 10, 0.62);
+}
+#ui-overlay .ds-tier-chart__grid {
+    display: grid;
+    grid-template-columns: 42px repeat(12, 76px);
+    grid-template-rows: 32px repeat(10, 72px);
+    gap: 2px;
+    min-width: 972px;
+    padding: 8px;
+}
+#ui-overlay .ds-tier-chart__corner,
+#ui-overlay .ds-tier-chart__tierhead,
+#ui-overlay .ds-tier-chart__linehead {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    padding: 0 4px;
+    color: var(--ds-text-muted);
+    font-size: 11px;
+    line-height: 1.15;
+    text-align: center;
+    background: rgba(34, 26, 18, 0.9);
+    border: 1px solid rgba(138, 110, 60, 0.62);
+    box-sizing: border-box;
+}
+#ui-overlay .ds-tier-chart__linehead {
+    --tier-branch: var(--ds-border);
+    color: var(--ds-text);
+    border-color: color-mix(in srgb, var(--tier-branch) 68%, #000);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--tier-branch) 26%, var(--ds-panel-0)), var(--ds-panel-inset));
+    overflow-wrap: anywhere;
+}
+#ui-overlay .ds-tier-chart__tierhead {
+    color: var(--ds-accent);
+    font-variant-numeric: tabular-nums;
+}
+#ui-overlay .ds-tier-card {
+    --tier-branch: var(--ds-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+    padding: 5px 4px 4px;
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--tier-branch) 18%, var(--ds-panel-0)), var(--ds-panel-inset));
+    border: 1px solid color-mix(in srgb, var(--tier-branch) 64%, #000);
+    border-radius: 3px;
+    box-shadow: inset 0 0 0 1px rgba(255, 230, 170, 0.04);
+    box-sizing: border-box;
+}
+#ui-overlay .ds-tier-card.is-master {
+    justify-content: center;
+    gap: 3px;
+    background:
+        radial-gradient(circle at top, color-mix(in srgb, var(--tier-branch) 26%, transparent), transparent 60%),
+        linear-gradient(180deg, var(--ds-panel-1), var(--ds-panel-inset));
+    border-color: color-mix(in srgb, var(--tier-branch) 82%, var(--ds-accent));
+}
+#ui-overlay .ds-tier-card__img {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.75));
+}
+#ui-overlay .ds-tier-card.is-master .ds-tier-card__img {
+    width: 38px;
+    height: 38px;
+}
+#ui-overlay .ds-tier-card__name {
+    width: 100%;
+    min-height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ds-text);
+    font-size: 10px;
+    line-height: 1.1;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+#ui-overlay .ds-tier-card.is-master .ds-tier-card__name {
+    color: var(--ds-accent-bright);
+    font-size: 11px;
+}
+#ui-overlay .ds-tier-chart .is-battle { --tier-branch: #d6a85a; }
+#ui-overlay .ds-tier-chart .is-tactics { --tier-branch: #62aeb6; }
+#ui-overlay .ds-tier-chart .is-healer { --tier-branch: #9fbd72; }
+#ui-overlay .ds-tier-chart .is-magic { --tier-branch: #b28ad6; }
+
+@media (max-width: 760px) {
+    #ui-overlay .ds-pause {
+        width: calc(100vw - 18px);
+        max-height: calc(100vh - 18px);
+    }
+    #ui-overlay .ds-pause__body {
+        grid-template-columns: minmax(0, 1fr);
+        overflow: auto;
+    }
+    #ui-overlay .ds-pause__menu {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    #ui-overlay .ds-pause__footer {
+        grid-column: 1 / -1;
+        margin-top: 0;
+    }
+    #ui-overlay .ds-tier-chart__topline {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    #ui-overlay .ds-tier-chart__legend {
+        justify-content: flex-start;
+    }
+}
+
 /* ─── Animations ────────────────────────────────────────────── */
 @keyframes ds-fade-in {
     from { opacity: 0; }

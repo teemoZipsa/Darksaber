@@ -37,6 +37,8 @@ export interface WorldMagicContext {
     getBoundsTiles: () => { width: number; height: number };
     hasFieldLineOfSight: (from: TilePoint, to: TilePoint) => boolean;
     spendAp: (cost: number) => boolean;
+    isMajorActionUsed: () => boolean;
+    markMajorActionUsed: () => void;
     reopenActionMenu: (actor: FieldActor) => void;
     resumeOrEndActiveTurn: (actor: FieldActor) => void;
     handleEnemyDefeated: (actor: FieldActor, enemy: Enemy, feedbackGroupId?: string) => void;
@@ -111,6 +113,11 @@ export class WorldMagicController {
     public open(actor: FieldActor): void {
         if (hasStatus(actor.character.statuses, 'silence')) {
             this.sink.log('침묵 상태로 마법을 사용할 수 없습니다.');
+            this.context.reopenActionMenu(actor);
+            return;
+        }
+        if (this.context.isMajorActionUsed()) {
+            this.sink.log('이번 턴에는 공격/마법/도구를 이미 사용했습니다.');
             this.context.reopenActionMenu(actor);
             return;
         }
@@ -209,6 +216,12 @@ export class WorldMagicController {
             this.context.reopenActionMenu(actor);
             return;
         }
+        if (this.context.isMajorActionUsed()) {
+            this.sink.log('이번 턴에는 공격/마법/도구를 이미 사용했습니다.');
+            this.reset();
+            this.context.reopenActionMenu(actor);
+            return;
+        }
 
         if (actor.character.stats.mp < skill.mpCost) {
             this.sink.log(`MP 부족! (${skill.mpCost} 필요)`);
@@ -230,6 +243,11 @@ export class WorldMagicController {
     private cast(actor: FieldActor, skill: Skill, targetEnemy?: Enemy): void {
         if (this.context.getRemainingActionPoints() < MAGIC_AP_COST) {
             this.sink.log('마법을 사용할 행동력이 부족합니다.');
+            this.context.reopenActionMenu(actor);
+            return;
+        }
+        if (this.context.isMajorActionUsed()) {
+            this.sink.log('이번 턴에는 공격/마법/도구를 이미 사용했습니다.');
             this.context.reopenActionMenu(actor);
             return;
         }
@@ -259,6 +277,7 @@ export class WorldMagicController {
             this.context.reopenActionMenu(actor);
             return;
         }
+        this.context.markMajorActionUsed();
 
         this.applySkillEffect(actor, skill, effect);
         this.reset();

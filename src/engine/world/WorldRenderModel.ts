@@ -26,6 +26,7 @@ export interface WorldRenderModel {
     fieldEnemies: FieldEnemy[];
     activeTurnActorId: string | null;
     remainingActionPoints: number;
+    majorActionUsedThisTurn: boolean;
     selectedActorId: string | null;
     selectedEnemyId: string | null;
     selectedLootId: string | null;

@@ -40,6 +40,7 @@ export interface ActorSnapshot {
     statuses: StatusEffect[];
     actionGauge: number;
     remainingAp: number;
+    majorActionUsed?: boolean;
     facing: NetFacing;
     isDead: boolean;
     isGhost?: boolean;

@@ -1,7 +1,9 @@
 import { t } from '../../i18n/LanguageManager';
 import type { PartyManager } from '../../character/PartyManager';
 import type { PlayerData } from '../../data/PlayerData';
+import { LocalMarketService } from '../../data/MarketService';
 import { getRestMenu, INJURY_TREATMENT_PRICE, type RestMenu } from '../../data/RestFacilityData';
+import { getSellPrice as getBaseSellPrice } from '../../data/ShopData';
 import type { GameManager } from '../GameManager';
 import type { InputManager } from '../InputManager';
 import type { TownInfo } from '../../map/BiomeMask';
@@ -33,12 +35,14 @@ export class WorldTownSession {
     private readonly party: PartyManager;
     private readonly playerData: PlayerData;
     private readonly gameManager: WorldTownSessionGameManager;
+    private readonly marketService: LocalMarketService;
     private readonly log: (message: string) => void;
 
     constructor(options: WorldTownSessionOptions) {
         this.party = options.party;
         this.playerData = options.playerData;
         this.gameManager = options.gameManager;
+        this.marketService = new LocalMarketService(this.playerData);
         this.log = options.log;
         this.ui = new TownUI(this.gameManager.inventory, this.gameManager.stash);
         this.configureTownUI(options.onDeploy);
@@ -50,6 +54,7 @@ export class WorldTownSession {
 
     public show(town: TownInfo): void {
         this.applyPendingRestPreview();
+        this.marketService.rollTownVisit(town.id);
         this.ui.show(town);
     }
 
@@ -164,8 +169,14 @@ export class WorldTownSession {
 
     private configureTownUI(onDeploy: () => void): void {
         this.ui.getQuestDone = (questId) => this.playerData.isCleared(questId);
+        this.ui.getMarketRumor = (townId) => this.marketService.getMarketRumor(townId);
         this.ui.onDeploy(onDeploy);
         this.ui.getShopUI().getGold = () => this.playerData.gold;
+        this.ui.getShopUI().getBuyPrice = (item, shopItem, townId) => this.marketService.getBuyPrice(item, shopItem.buyPrice, townId);
+        this.ui.getShopUI().getSellPriceForItem = (placed, _source, townId) => {
+            const basePrice = getBaseSellPrice(placed.item, townId ?? undefined);
+            return this.marketService.getSellPrice(placed.item, basePrice, townId);
+        };
         this.ui.getShopUI().onBuy = (item, price) => {
             if (!this.playerData.spendGold(price)) {
                 this.log('골드가 부족합니다.');
@@ -177,14 +188,17 @@ export class WorldTownSession {
                 this.log('배낭 공간이 부족합니다.');
                 return false;
             }
+            this.marketService.recordBuy(this.ui.getCurrentTown()?.id, item.id);
             this.playerData.save();
             this.log(`${item.nameKr} 구매`);
             return true;
         };
         this.ui.getShopUI().onSell = (placed, sourceGrid, price) => {
             if (!sourceGrid.items.includes(placed)) return false;
+            const quantity = Math.max(1, placed.quantity);
             sourceGrid.remove(placed);
             this.playerData.addGold(price);
+            this.marketService.recordSell(this.ui.getCurrentTown()?.id, placed.item.id, quantity);
             this.playerData.save();
             this.log(`${placed.item.nameKr} 판매 +${price}G`);
             return true;

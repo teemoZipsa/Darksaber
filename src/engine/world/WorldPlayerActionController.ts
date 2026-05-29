@@ -1,7 +1,6 @@
 import {
     applyStatus,
     createStatus,
-    getEffectiveStatsForCharacter,
     hasStatus,
 } from '../../combat/StatusEffects';
 import type { Enemy } from '../../entity/Enemy';
@@ -26,10 +25,15 @@ import {
 } from '../../field/FieldActionEconomy';
 import { canAffordTerrainCost, terrainCostToApCost } from '../../field/TerrainRules';
 import { getSelectableTiles, type AttackPatternProfile, type PatternContext } from '../../field/TargetPatterns';
-import { normalizeLegacyActionType, type ActionType } from '../../ui/ActionMenuUI';
+import { normalizeLegacyActionType, type ActionMenuSlotState, type ActionType } from '../../ui/ActionMenuUI';
 import type { resolveFieldHit } from '../../field/FieldInteraction';
 
 type FieldHit = ReturnType<typeof resolveFieldHit>;
+
+export interface CombatToolAvailability {
+    hasRecoveryConsumable: boolean;
+    hasEffectiveRecovery: boolean;
+}
 
 export interface WorldPlayerActionContext {
     getActivePartyTurnActor: () => FieldActor | null;
@@ -50,6 +54,8 @@ export interface WorldPlayerActionContext {
     isEntityMoving: (entity: FieldActor['entity'] | Enemy) => boolean;
     isFieldPassable: (query: FieldPassableQuery) => boolean;
     spendAp: (cost: number) => boolean;
+    isMajorActionUsed: () => boolean;
+    markMajorActionUsed: () => void;
     submitMoveIntent?: (actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number) => boolean;
     tryActorAttack: (actor: FieldActor, enemy: Enemy) => boolean;
     openLoot: (loot: LootObject) => void;
@@ -57,6 +63,7 @@ export interface WorldPlayerActionContext {
     openTool: (actor: FieldActor) => void;
     hasCastableFieldSkill: (actor: FieldActor) => boolean;
     hasUsableCombatTool: (actor: FieldActor) => boolean;
+    getCombatToolAvailability: (actor: FieldActor) => CombatToolAvailability;
     reopenActionMenu: (actor: FieldActor) => void;
     closeActionMenu: () => void;
     closeTacticalMenu: () => void;
@@ -116,6 +123,13 @@ export class WorldPlayerActionController {
             return;
         }
 
+        const actionState = this.getActionState(actor, normalizedAction);
+        if (!actionState.enabled) {
+            this.sink.log(actionState.disabledReason ?? '지금 사용할 수 없는 행동입니다.');
+            this.context.reopenActionMenu(actor);
+            return;
+        }
+
         this.context.closeActionMenu();
         this.clearTargeting();
 
@@ -136,14 +150,9 @@ export class WorldPlayerActionController {
                 this.sink.log('이동할 타일을 클릭하세요.');
                 break;
             case 'attack':
-                if (this.context.getRemainingActionPoints() < ATTACK_AP_COST) {
-                    this.sink.log('공격할 행동력이 부족합니다.');
-                    this.context.reopenActionMenu(actor);
-                    break;
-                }
                 this.actionMode = 'attack';
                 this.actionTiles = this.computeAttackableTiles(actor);
-                this.sink.log(this.hasExecutableAttack(actor) ? '공격할 적을 클릭하세요.' : '사거리 안의 적을 선택하세요.');
+                this.sink.log('공격할 적을 클릭하세요. 공격/마법/도구는 턴당 1회입니다. (AP 6)');
                 break;
             case 'magic':
                 this.context.closeTacticalMenu();
@@ -243,14 +252,21 @@ export class WorldPlayerActionController {
     }
 
     public getAvailableTurnActions(actor: FieldActor): ActionType[] {
-        const available: ActionType[] = [];
-        if (this.hasExecutableMove(actor)) available.push('move');
-        if (this.hasExecutableAttack(actor)) available.push('attack');
-        if (this.hasExecutableMagic(actor)) available.push('magic');
-        if (this.hasExecutableTool(actor)) available.push('tool');
-        if (this.hasExecutableInteract(actor)) available.push('open');
-        available.push('defend', 'rest');
-        return available;
+        return this.getTurnActionStates(actor)
+            .filter((state) => state.enabled)
+            .map((state) => state.type);
+    }
+
+    public getTurnActionStates(actor: FieldActor): ActionMenuSlotState[] {
+        return [
+            this.getActionState(actor, 'attack'),
+            this.getActionState(actor, 'magic'),
+            this.getActionState(actor, 'tool'),
+            this.getActionState(actor, 'open'),
+            this.getActionState(actor, 'rest'),
+            this.getActionState(actor, 'defend'),
+            this.getActionState(actor, 'move'),
+        ];
     }
 
     public hasExecutableAction(actor: FieldActor): boolean {
@@ -270,6 +286,7 @@ export class WorldPlayerActionController {
     }
 
     public hasExecutableAttack(actor: FieldActor): boolean {
+        if (this.context.isMajorActionUsed()) return false;
         if (this.context.getRemainingActionPoints() < ATTACK_AP_COST) return false;
         return this.context.getFieldEnemies().some((entry) =>
             entry.enemy.stats.hp > 0 && this.context.getActorAttackTargetFailure(actor, entry.enemy) === null
@@ -281,21 +298,77 @@ export class WorldPlayerActionController {
     }
 
     public hasExecutableMagic(actor: FieldActor): boolean {
+        if (this.context.isMajorActionUsed()) return false;
         if (hasStatus(actor.character.statuses, 'silence')) return false;
         return this.context.getRemainingActionPoints() >= MAGIC_AP_COST && this.context.hasCastableFieldSkill(actor);
     }
 
     public hasExecutableTool(actor: FieldActor): boolean {
+        if (this.context.isMajorActionUsed()) return false;
         return this.context.getRemainingActionPoints() >= getActionApCost('tool') && this.context.hasUsableCombatTool(actor);
     }
 
+    private getActionState(actor: FieldActor, type: ActionType): ActionMenuSlotState {
+        const remainingAp = this.context.getRemainingActionPoints();
+        const majorUsed = this.context.isMajorActionUsed();
+        switch (type) {
+            case 'attack': {
+                const targetAvailable = this.context.getFieldEnemies().some((entry) =>
+                    entry.enemy.stats.hp > 0 && this.context.getActorAttackTargetFailure(actor, entry.enemy) === null
+                );
+                return this.buildState(type, !majorUsed && remainingAp >= ATTACK_AP_COST && targetAvailable,
+                    majorUsed ? '이번 턴 주요 행동 사용됨'
+                        : remainingAp < ATTACK_AP_COST ? '공격 AP 부족'
+                            : '공격 가능한 적 없음',
+                    '6 AP');
+            }
+            case 'magic':
+                return this.buildState(type, !majorUsed && !hasStatus(actor.character.statuses, 'silence') && remainingAp >= MAGIC_AP_COST && this.context.hasCastableFieldSkill(actor),
+                    majorUsed ? '이번 턴 주요 행동 사용됨'
+                        : hasStatus(actor.character.statuses, 'silence') ? '침묵 상태'
+                            : remainingAp < MAGIC_AP_COST ? '마법 AP 부족'
+                                : '사용 가능한 마법 없음',
+                    '8 AP');
+            case 'tool': {
+                const tool = this.context.getCombatToolAvailability(actor);
+                return this.buildState(type, !majorUsed && remainingAp >= getActionApCost('tool') && tool.hasEffectiveRecovery,
+                    majorUsed ? '이번 턴 주요 행동 사용됨'
+                        : remainingAp < getActionApCost('tool') ? '도구 AP 부족'
+                            : !tool.hasRecoveryConsumable ? '회복 도구 없음'
+                                : '회복 효과 없음',
+                    '4 AP');
+            }
+            case 'move':
+                return this.buildState(type, this.hasExecutableMove(actor),
+                    hasStatus(actor.character.statuses, 'immobilize') ? '이동불가 상태'
+                        : remainingAp < MOVE_AP_PER_TILE ? '이동 AP 부족'
+                            : '이동할 타일 없음',
+                    '2/tile');
+            case 'open':
+                return this.buildState(type, this.hasExecutableInteract(actor),
+                    remainingAp < INTERACT_AP_COST ? '조사 AP 부족' : '조사 대상 없음',
+                    '4 AP');
+            case 'defend':
+                return { type, enabled: true, costLabel: '0 AP' };
+            case 'rest':
+                return { type, enabled: true, costLabel: '0 AP' };
+        }
+    }
+
+    private buildState(type: ActionType, enabled: boolean, disabledReason: string, costLabel: string): ActionMenuSlotState {
+        return {
+            type,
+            enabled,
+            costLabel,
+            disabledReason: enabled ? undefined : disabledReason,
+        };
+    }
+
     private rest(actor: FieldActor): void {
-        const effective = getEffectiveStatsForCharacter(actor.character);
-        actor.character.stats.hp = Math.min(effective.maxHp, actor.character.stats.hp + 5);
-        actor.character.stats.mp = Math.min(effective.maxMp, actor.character.stats.mp + 3);
-        this.sink.spawnHeal(actor.entity.gridX, actor.entity.gridY, 5);
+        actor.character.statuses = applyStatus(actor.character.statuses, createStatus('resting'));
+        this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'REST');
         this.sink.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
-        this.sink.log('휴식: HP +5, MP +3 회복. 다음 행동 게이지는 보존되지 않습니다.');
+        this.sink.log('휴식 중: 체력과 마나가 천천히 회복됩니다. 피해를 받으면 해제됩니다.');
         this.context.endActorTurn(actor, '휴식');
     }
 
@@ -318,6 +391,7 @@ export class WorldPlayerActionController {
             return;
         }
         if (this.context.spendAp(ATTACK_AP_COST) && this.context.tryActorAttack(actor, enemy)) {
+            this.context.markMajorActionUsed();
             this.context.resumeOrEndActiveTurn(actor);
         }
     }

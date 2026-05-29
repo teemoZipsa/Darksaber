@@ -70,7 +70,7 @@ const SHRINE_ITEMS: Partial<Record<TownId, StockSpec[]>> = {
     ember_citadel: [['power_ring', 1]],
 };
 
-const TRADE_GOOD_SELL_MULTIPLIERS: Partial<Record<string, Partial<Record<TownId, number>>>> = {
+export const TRADE_GOOD_SELL_MULTIPLIERS: Partial<Record<string, Partial<Record<TownId, number>>>> = {
     trade_forest_resin: {
         w_forest_village: 0.8,
         central_castle: 1.7,
@@ -270,6 +270,14 @@ function resolveTownId(townId: string | undefined): TownId {
 function getTradeSellMultiplier(itemId: string, townId: string | undefined): number {
     const resolvedTownId = resolveTownId(townId);
     return TRADE_GOOD_SELL_MULTIPLIERS[itemId]?.[resolvedTownId] ?? 1;
+}
+
+export function getTradeGoodSellMultiplier(itemId: string, townId: string | undefined): number {
+    return getTradeSellMultiplier(itemId, townId);
+}
+
+export function isTradeGoodItemId(itemId: string): boolean {
+    return itemId.startsWith('trade_');
 }
 
 /** Items available for purchase, grouped by town and facility. */

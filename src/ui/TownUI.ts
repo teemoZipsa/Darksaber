@@ -61,6 +61,7 @@ export class TownUI {
     public getQuestDone: ((questId: string) => boolean) | null = null;
     public getPendingRestMenuId: (() => string | null) | null = null;
     public getInjuredCount: (() => number) | null = null;
+    public getMarketRumor: ((townId: string) => string | null) | null = null;
     public onPurchaseRestMenu: ((menuId: string) => boolean) | null = null;
     public onTreatInjuries: (() => boolean) | null = null;
 
@@ -126,7 +127,12 @@ export class TownUI {
 
         // Pick 3 random rumors for this visit
         const shuffled = [...RUMORS_KR].sort(() => Math.random() - 0.5);
-        this.currentRumors = shuffled.slice(0, 3);
+        const marketRumor = getTownFacilities(town.id).includes('rumors')
+            ? this.getMarketRumor?.(town.id) ?? null
+            : null;
+        this.currentRumors = marketRumor
+            ? [marketRumor, ...shuffled.slice(0, 2)]
+            : shuffled.slice(0, 3);
 
         this.showTab('storage');
     }

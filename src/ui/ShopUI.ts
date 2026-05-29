@@ -18,6 +18,7 @@ export interface ShopEntry {
     shopItem: ShopItem;
     item: ItemDef;
     remaining: number;
+    price: number;
 }
 
 export interface ShopSellSource {
@@ -73,6 +74,8 @@ export class ShopUI {
 
     public onBuy: ((item: ItemDef, price: number) => boolean) | null = null;
     public onSell: ((placed: PlacedItem, sourceGrid: GridInventory, price: number) => boolean) | null = null;
+    public getBuyPrice: ((item: ItemDef, shopItem: ShopItem, townId: string | null) => number) | null = null;
+    public getSellPriceForItem: ((placed: PlacedItem, source: ShopSellSource, townId: string | null) => number) | null = null;
     public getGold: (() => number) | null = null;
 
     constructor() {
@@ -92,6 +95,7 @@ export class ShopUI {
             shopItem: shopEntry,
             item,
             remaining: shopEntry.stock,
+            price: this.resolveBuyPrice(item, shopEntry),
         }));
         this.clampBuyScroll();
     }
@@ -135,7 +139,8 @@ export class ShopUI {
     /** Attempt a purchase; decrements remaining stock on success. */
     public buy(entry: ShopEntry): boolean {
         if (entry.remaining === 0) return false;
-        const success = this.onBuy?.(entry.item, entry.shopItem.buyPrice) ?? false;
+        entry.price = this.resolveBuyPrice(entry.item, entry.shopItem);
+        const success = this.onBuy?.(entry.item, entry.price) ?? false;
         if (success && entry.remaining > 0) entry.remaining--;
         return success;
     }
@@ -201,7 +206,8 @@ export class ShopUI {
         if (buyIndex >= 0) {
             const entry = this.getBuyEntries()[buyIndex];
             if (!entry || entry.remaining === 0) return;
-            const success = this.onBuy?.(entry.item, entry.shopItem.buyPrice) ?? false;
+            entry.price = this.resolveBuyPrice(entry.item, entry.shopItem);
+            const success = this.onBuy?.(entry.item, entry.price) ?? false;
             if (success && entry.remaining > 0) entry.remaining--;
             return;
         }
@@ -269,6 +275,9 @@ export class ShopUI {
     }
 
     private getBuyEntries(): ShopEntry[] {
+        for (const entry of this.entries) {
+            entry.price = this.resolveBuyPrice(entry.item, entry.shopItem);
+        }
         return this.entries.filter((entry) => entry.shopItem.shopKind === this.activeKind);
     }
 
@@ -280,11 +289,19 @@ export class ShopUI {
                 entries.push({
                     source,
                     placed,
-                    price: getSellPrice(placed.item, this.townId ?? undefined) * Math.max(1, placed.quantity),
+                    price: this.resolveSellPrice(placed, source) * Math.max(1, placed.quantity),
                 });
             }
         }
         return entries;
+    }
+
+    private resolveBuyPrice(item: ItemDef, shopItem: ShopItem): number {
+        return this.getBuyPrice?.(item, shopItem, this.townId) ?? shopItem.buyPrice;
+    }
+
+    private resolveSellPrice(placed: PlacedItem, source: ShopSellSource): number {
+        return this.getSellPriceForItem?.(placed, source, this.townId) ?? getSellPrice(placed.item, this.townId ?? undefined);
     }
 
     private commitPendingSell(): void {
@@ -415,7 +432,7 @@ export class ShopUI {
 
     private renderBuyRow(ctx: CanvasRenderingContext2D, entry: ShopEntry, x: number, w: number, y: number, index: number, hover: boolean): void {
         const soldOut = entry.remaining === 0;
-        const canAfford = (this.getGold ? this.getGold() : 0) >= entry.shopItem.buyPrice;
+        const canAfford = (this.getGold ? this.getGold() : 0) >= entry.price;
         this.renderRowBase(ctx, x, w, y, index, hover && !soldOut);
         this.renderItemIcon(ctx, entry.item, x + 8, y + 5, soldOut ? 0.35 : 1);
 
@@ -436,7 +453,7 @@ export class ShopUI {
         ctx.fillStyle = soldOut ? '#555' : (canAfford ? '#ffd700' : '#cc4444');
         ctx.font = 'bold 13px DOSMyungjo, sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText(`${entry.shopItem.buyPrice}G`, x + w - 10, y + 21);
+        ctx.fillText(`${entry.price}G`, x + w - 10, y + 21);
         if (hover && !soldOut && canAfford) {
             ctx.fillStyle = 'rgba(80, 200, 80, 0.78)';
             ctx.font = 'bold 11px DOSMyungjo, sans-serif';

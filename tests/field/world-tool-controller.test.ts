@@ -31,7 +31,7 @@ function makeActor(): FieldActor {
     };
 }
 
-function makeController(actor: FieldActor, inventory: GridInventory, ap: { value: number }, events: string[] = []): WorldToolController {
+function makeController(actor: FieldActor, inventory: GridInventory, ap: { value: number }, events: string[] = [], majorUsed: { value: boolean } = { value: false }): WorldToolController {
     return new WorldToolController(
         {
             getActivePartyTurnActor: () => actor,
@@ -42,6 +42,11 @@ function makeController(actor: FieldActor, inventory: GridInventory, ap: { value
                 if (ap.value < cost) return false;
                 ap.value -= cost;
                 return true;
+            },
+            isMajorActionUsed: () => majorUsed.value,
+            markMajorActionUsed: () => {
+                majorUsed.value = true;
+                events.push('major');
             },
             reopenActionMenu: () => events.push('reopen'),
             resumeOrEndActiveTurn: () => events.push('resume'),
@@ -73,7 +78,29 @@ test('combat tool use recovers, spends AP, and removes one item atomically', () 
     assert.equal(ap.value, 0);
     assert.equal(inventory.items.length, 0);
     assert.ok(events.includes('heal:50'));
+    assert.ok(events.includes('major'));
     assert.ok(events.includes('resume'));
+});
+
+test('combat tool use marks the turn major action and blocks a second tool', () => {
+    const actor = makeActor();
+    const inventory = new GridInventory(4, 4);
+    const herb = getItemDef('herb_cheap');
+    assert.ok(herb);
+    inventory.autoPlace(herb);
+    inventory.autoPlace(herb);
+    const ap = { value: getActionApCost('tool') * 2 };
+    const events: string[] = [];
+    const majorUsed = { value: false };
+    const controller = makeController(actor, inventory, ap, events, majorUsed);
+
+    controller.useTool('herb_cheap');
+    controller.useTool('herb_cheap');
+
+    assert.equal(majorUsed.value, true);
+    assert.equal(ap.value, getActionApCost('tool'));
+    assert.equal(inventory.items.length, 1);
+    assert.ok(events.includes('이번 턴에는 공격/마법/도구를 이미 사용했습니다.'));
 });
 
 test('combat tool fails without AP and does not mutate HP or inventory', () => {

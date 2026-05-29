@@ -11,6 +11,19 @@ import { UI, Parchment } from './UITheme';
 
 export type ActionType = 'tool' | 'attack' | 'rest' | 'defend' | 'magic' | 'move' | 'open';
 
+export interface ActionMenuSlotState {
+    type: ActionType;
+    enabled: boolean;
+    costLabel?: string;
+    disabledReason?: string;
+}
+
+export interface ActionMenuClickResult {
+    type: ActionType;
+    enabled: boolean;
+    disabledReason?: string;
+}
+
 export function normalizeLegacyActionType(action: string): ActionType | null {
     if (action === 'counter') return 'defend';
     if (
@@ -37,7 +50,7 @@ interface ActionSlot {
 export class ActionMenuUI {
     private isOpen = false;
     private slots: ActionSlot[];
-    private activeSlots: ActionSlot[] = [];
+    private slotStates = new Map<ActionType, ActionMenuSlotState>();
     private readonly menuRadius = 58;
     private readonly iconRadius = 18;
     private readonly hitRadius = 22;
@@ -57,29 +70,50 @@ export class ActionMenuUI {
             { type: 'defend', label: '방어', angle: TAU * 3 / 4, iconDraw: this.drawDefendIcon },
             { type: 'move',   label: '이동', angle: TAU * 7 / 8, iconDraw: this.drawMoveIcon },
         ];
-        this.activeSlots = [...this.slots];
+        this.setDefaultSlotStates();
     }
 
-    public open(available?: ActionType[]): void {
+    public open(states?: ActionMenuSlotState[] | ActionType[]): void {
         this.isOpen = true;
-        if (available && available.length > 0) {
-            this.activeSlots = this.slots.filter(s => available.includes(s.type));
-        } else {
-            this.activeSlots = this.slots;
+        if (!states || states.length === 0) {
+            this.setDefaultSlotStates();
+            return;
+        }
+
+        if (typeof states[0] === 'string') {
+            const available = new Set(states as ActionType[]);
+            this.slotStates.clear();
+            for (const slot of this.slots) {
+                this.slotStates.set(slot.type, {
+                    type: slot.type,
+                    enabled: available.has(slot.type),
+                });
+            }
+            return;
+        }
+
+        this.slotStates.clear();
+        for (const state of states as ActionMenuSlotState[]) {
+            this.slotStates.set(state.type, { ...state });
+        }
+        for (const slot of this.slots) {
+            if (!this.slotStates.has(slot.type)) {
+                this.slotStates.set(slot.type, { type: slot.type, enabled: true });
+            }
         }
     }
 
     public close(): void { this.isOpen = false; this.hoveredSlot = null; }
-    public toggle(available?: ActionType[]): void { 
+    public toggle(states?: ActionMenuSlotState[] | ActionType[]): void {
         if (this.isOpen) this.close();
-        else this.open(available);
+        else this.open(states);
     }
     public getIsOpen(): boolean { return this.isOpen; }
 
     public onMouseMove(mx: number, my: number): void {
         if (!this.isOpen) { this.hoveredSlot = null; return; }
         this.hoveredSlot = null;
-        for (const slot of this.activeSlots) {
+        for (const slot of this.slots) {
             const ix = this.centerX + Math.sin(slot.angle) * this.menuRadius;
             const iy = this.centerY - Math.cos(slot.angle) * this.menuRadius;
             if (Math.hypot(mx - ix, my - iy) <= this.hitRadius) {
@@ -89,13 +123,18 @@ export class ActionMenuUI {
         }
     }
 
-    public onClick(mx: number, my: number): ActionType | null {
+    public onClick(mx: number, my: number): ActionMenuClickResult | null {
         if (!this.isOpen) return null;
-        for (const slot of this.activeSlots) {
+        for (const slot of this.slots) {
             const ix = this.centerX + Math.sin(slot.angle) * this.menuRadius;
             const iy = this.centerY - Math.cos(slot.angle) * this.menuRadius;
             if (Math.hypot(mx - ix, my - iy) <= this.hitRadius) {
-                return slot.type;
+                const state = this.getSlotState(slot.type);
+                return {
+                    type: slot.type,
+                    enabled: state.enabled,
+                    disabledReason: state.disabledReason,
+                };
             }
         }
         return null;
@@ -115,7 +154,9 @@ export class ActionMenuUI {
         ctx.save();
 
         // Draw each slot
-        for (const slot of this.activeSlots) {
+        for (const slot of this.slots) {
+            const state = this.getSlotState(slot.type);
+            const enabled = isReady && state.enabled;
             const ix = this.centerX + Math.sin(slot.angle) * this.menuRadius;
             const iy = this.centerY - Math.cos(slot.angle) * this.menuRadius;
             const isHovered = this.hoveredSlot === slot.type;
@@ -124,7 +165,7 @@ export class ActionMenuUI {
             ctx.beginPath();
             ctx.arc(ix, iy, r, 0, Math.PI * 2);
 
-            if (isReady) {
+            if (enabled) {
                 if (isHovered) {
                     ctx.fillStyle = 'rgba(36, 31, 24, 0.92)';
                     ctx.shadowColor = Parchment.borderGold;
@@ -136,16 +177,27 @@ export class ActionMenuUI {
                 ctx.strokeStyle = isHovered ? Parchment.borderGold : 'rgba(245, 232, 204, 0.82)';
                 ctx.lineWidth = isHovered ? 2 : 1.5;
             } else {
-                ctx.fillStyle = 'rgba(18, 20, 24, 0.5)';
+                ctx.fillStyle = isHovered ? 'rgba(40, 30, 28, 0.68)' : 'rgba(18, 20, 24, 0.5)';
                 ctx.fill();
-                ctx.strokeStyle = 'rgba(245, 232, 204, 0.32)';
-                ctx.lineWidth = 1;
+                ctx.strokeStyle = isHovered ? 'rgba(228, 63, 90, 0.6)' : 'rgba(245, 232, 204, 0.32)';
+                ctx.lineWidth = isHovered ? 1.5 : 1;
             }
             ctx.shadowBlur = 0;
             ctx.stroke();
 
             // Draw icon
-            slot.iconDraw(ctx, ix, iy, r * 0.5, isReady);
+            slot.iconDraw(ctx, ix, iy, r * 0.5, enabled);
+
+            if (state.costLabel) {
+                ctx.font = `bold 9px ${UI.fontMono}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.82)';
+                ctx.strokeText(state.costLabel, ix, iy - r - 8);
+                ctx.fillStyle = enabled ? '#f0c050' : 'rgba(245, 232, 204, 0.42)';
+                ctx.fillText(state.costLabel, ix, iy - r - 8);
+            }
 
             ctx.font = `bold 11px ${UI.fontPrimary}`;
             ctx.textAlign = 'center';
@@ -153,11 +205,15 @@ export class ActionMenuUI {
             ctx.lineWidth = 3;
             ctx.strokeStyle = 'rgba(0, 0, 0, 0.82)';
             ctx.strokeText(slot.label, ix, iy + r + 10);
-            ctx.fillStyle = isHovered ? '#ffe3a0' : '#f7ead2';
+            ctx.fillStyle = enabled
+                ? (isHovered ? '#ffe3a0' : '#f7ead2')
+                : (isHovered ? '#f0a0a8' : 'rgba(247, 234, 210, 0.46)');
             ctx.fillText(slot.label, ix, iy + r + 10);
             ctx.textAlign = 'start';
             ctx.textBaseline = 'alphabetic';
         }
+
+        this.renderHoveredDisabledReason(ctx);
 
         ctx.restore();
     }
@@ -194,6 +250,41 @@ export class ActionMenuUI {
     }
 
     // ─── ICON DRAWING FUNCTIONS ────────────────────────────────
+
+    private setDefaultSlotStates(): void {
+        this.slotStates.clear();
+        for (const slot of this.slots) {
+            this.slotStates.set(slot.type, { type: slot.type, enabled: true });
+        }
+    }
+
+    private getSlotState(type: ActionType): ActionMenuSlotState {
+        return this.slotStates.get(type) ?? { type, enabled: true };
+    }
+
+    private renderHoveredDisabledReason(ctx: CanvasRenderingContext2D): void {
+        if (!this.hoveredSlot) return;
+        const state = this.getSlotState(this.hoveredSlot);
+        if (state.enabled || !state.disabledReason) return;
+
+        ctx.font = `bold 11px ${UI.fontPrimary}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const text = state.disabledReason;
+        const w = Math.min(210, ctx.measureText(text).width + 18);
+        const x = this.centerX - w / 2;
+        const y = this.centerY + this.menuRadius + 38;
+
+        ctx.fillStyle = 'rgba(18, 12, 12, 0.88)';
+        ctx.fillRect(x, y, w, 24);
+        ctx.strokeStyle = 'rgba(228, 63, 90, 0.72)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, w, 24);
+        ctx.fillStyle = '#ffd6d6';
+        ctx.fillText(text, this.centerX, y + 12);
+        ctx.textAlign = 'start';
+        ctx.textBaseline = 'alphabetic';
+    }
 
     private static drawActionIconCell(
         ctx: CanvasRenderingContext2D,

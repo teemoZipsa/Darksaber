@@ -67,6 +67,13 @@ export const i18n = {
             'ui.close': '닫기',
             'ui.closeHint': 'ESC 또는 ✕ 로 닫기',
             'pause.closeHint': 'ESC 또는 이어하기를 눌러 복귀',
+            'tierChart.title': '전직 티어표',
+            'tierChart.tier': '단계',
+            'tierChart.masterHint': '각 계열의 최종 직업을 완성하면 마스터 전직으로 이어집니다.',
+            'tierChart.branch.battle': '배틀',
+            'tierChart.branch.tactics': '택틱스',
+            'tierChart.branch.healer': '힐러',
+            'tierChart.branch.magic': '매직',
 
             // Lobby
             'lobby.title': '은신처',
@@ -139,6 +146,9 @@ export const i18n = {
             'shop.emptyBuy': '이 상점에 상품이 없습니다.',
             'shop.emptySell': '판매할 아이템이 없습니다.',
             'shop.cannotSell': '이 아이템은 판매할 수 없습니다.',
+            'market.rumor.export': '{origin}의 {item}은 {town}에서 값을 더 쳐준다고 합니다.',
+            'market.rumor.hot': '{town} 상인들이 요즘 {item}을 더 찾는다고 합니다.',
+            'market.rumor.cooling': '{town}에는 {item} 물량이 풀려 값이 식었다고 합니다.',
 
             // Rest facilities
             'tab.rest': '휴식',
@@ -403,6 +413,13 @@ export const i18n = {
             'ui.close': 'Close',
             'ui.closeHint': 'Press ESC or ✕ to close',
             'pause.closeHint': 'Press ESC or Resume to return',
+            'tierChart.title': 'Class Tier Chart',
+            'tierChart.tier': 'Tier',
+            'tierChart.masterHint': 'Finishing each branch line opens its master promotion path.',
+            'tierChart.branch.battle': 'Battle',
+            'tierChart.branch.tactics': 'Tactics',
+            'tierChart.branch.healer': 'Healer',
+            'tierChart.branch.magic': 'Magic',
 
             // Lobby
             'lobby.title': 'HIDEOUT',
@@ -475,6 +492,9 @@ export const i18n = {
             'shop.emptyBuy': 'No goods in this shop.',
             'shop.emptySell': 'No items to sell.',
             'shop.cannotSell': 'This item cannot be sold.',
+            'market.rumor.export': '{item} from {origin} fetches a better price in {town}.',
+            'market.rumor.hot': 'Merchants in {town} are looking for more {item}.',
+            'market.rumor.cooling': '{item} has flooded {town}, cooling its price.',
 
             // Rest facilities
             'tab.rest': 'Rest',
@@ -701,9 +721,20 @@ export const i18n = {
     t(key: string): string {
         const dict = this.strings[this.lang] as Record<string, string>;
         return dict[key] || key;
+    },
+
+    format(key: string, vars: Record<string, string | number>): string {
+        return this.t(key).replace(/\{(\w+)\}/g, (_, name: string) => {
+            const value = vars[name];
+            return value === undefined ? `{${name}}` : String(value);
+        });
     }
 };
 
 export function t(key: string): string {
     return i18n.t(key);
+}
+
+export function formatT(key: string, vars: Record<string, string | number>): string {
+    return i18n.format(key, vars);
 }

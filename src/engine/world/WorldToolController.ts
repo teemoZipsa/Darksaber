@@ -15,12 +15,19 @@ interface ToolUseCandidate {
     effectiveMp: number;
 }
 
+export interface CombatToolAvailability {
+    hasRecoveryConsumable: boolean;
+    hasEffectiveRecovery: boolean;
+}
+
 export interface WorldToolContext {
     getActivePartyTurnActor: () => FieldActor | null;
     getRemainingActionPoints: () => number;
     getInventoryItems: () => PlacedItem[];
     removeInventoryItem: (placed: PlacedItem) => void;
     spendAp: (cost: number) => boolean;
+    isMajorActionUsed: () => boolean;
+    markMajorActionUsed: () => void;
     reopenActionMenu: (actor: FieldActor) => void;
     resumeOrEndActiveTurn: (actor: FieldActor) => void;
 }
@@ -75,6 +82,11 @@ export class WorldToolController {
     }
 
     public open(actor: FieldActor): void {
+        if (this.context.isMajorActionUsed()) {
+            this.sink.log('이번 턴에는 공격/마법/도구를 이미 사용했습니다.');
+            this.context.reopenActionMenu(actor);
+            return;
+        }
         if (this.context.getRemainingActionPoints() < getActionApCost('tool')) {
             this.sink.log('도구를 사용할 행동력이 부족합니다.');
             this.context.reopenActionMenu(actor);
@@ -97,7 +109,19 @@ export class WorldToolController {
     }
 
     public hasUsableCombatTool(actor: FieldActor): boolean {
-        return this.getToolCandidates(actor).length > 0;
+        return this.getCombatToolAvailability(actor).hasEffectiveRecovery;
+    }
+
+    public getCombatToolAvailability(actor: FieldActor): CombatToolAvailability {
+        const recoveryConsumables = this.context.getInventoryItems()
+            .filter((placed) => placed.quantity > 0 && isCombatRecoveryConsumable(placed.item));
+        return {
+            hasRecoveryConsumable: recoveryConsumables.length > 0,
+            hasEffectiveRecovery: recoveryConsumables.some((placed) => {
+                const recovery = this.getEffectiveRecovery(actor, placed.item);
+                return recovery.effectiveHp > 0 || recovery.effectiveMp > 0;
+            }),
+        };
     }
 
     public useTool(itemId: string): void {
@@ -113,6 +137,12 @@ export class WorldToolController {
 
         if (!this.context.getInventoryItems().includes(candidate.placed) || candidate.placed.quantity <= 0) {
             this.sink.log('도구를 찾을 수 없습니다.');
+            this.context.reopenActionMenu(actor);
+            return;
+        }
+
+        if (this.context.isMajorActionUsed()) {
+            this.sink.log('이번 턴에는 공격/마법/도구를 이미 사용했습니다.');
             this.context.reopenActionMenu(actor);
             return;
         }
@@ -134,6 +164,7 @@ export class WorldToolController {
             this.context.reopenActionMenu(actor);
             return;
         }
+        this.context.markMajorActionUsed();
 
         actor.character.stats.hp += candidate.effectiveHp;
         actor.character.stats.mp += candidate.effectiveMp;

@@ -232,7 +232,7 @@ export class WorldFieldRenderer {
 
         // ── Character status (left column, single panel) ──────────
         const charY = 56;
-        const charH = 100;
+        const charH = 116;
         if (model.activeCharacter) {
             const active = model.activeCharacter;
             const effective = getEffectiveStatsForCharacter(active);
@@ -258,6 +258,12 @@ export class WorldFieldRenderer {
                 : `-/${active.stats.actionLimit}`;
             ctx.fillStyle = '#5c3a08';
             ctx.fillText(`AP ${apText}`, RIGHT_X, charY + 76);
+            if (model.controlledActor?.id === model.activeTurnActorId) {
+                ctx.fillStyle = model.majorActionUsedThisTurn ? '#8f2f3d' : '#3f6f38';
+                ctx.fillText(model.majorActionUsedThisTurn ? '주요 사용됨' : '주요 가능', TEXT_X, charY + 94);
+                ctx.fillStyle = Parchment.textMid;
+                ctx.fillText('주요 1회', RIGHT_X, charY + 94);
+            }
         }
 
         // infoY is where downstream UIs (selected entity info) anchor.
@@ -535,17 +541,17 @@ function renderKeyHintStrip(ctx: CanvasRenderingContext2D, vw: number, vh: numbe
 
 function renderActionModeHint(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number, vh: number): void {
     if (model.fieldMagicState.mode === 'targeting') {
-        renderCenterHint(ctx, vw, vh, '마법 대상을 클릭 (ESC 취소)', 'rgba(116, 52, 160, 0.88)', '#f2d6ff');
+        renderCenterHint(ctx, vw, vh, '마법 대상을 클릭 - 8 AP, 주요 행동 1회 (ESC 취소)', 'rgba(116, 52, 160, 0.88)', '#f2d6ff');
         return;
     }
 
     if (!model.actionMode) return;
 
     const text = model.actionMode === 'move'
-        ? '이동할 타일을 클릭 (ESC 취소)'
+        ? '이동할 타일을 클릭 - 2 AP/tile (ESC 취소)'
         : model.actionMode === 'attack'
-            ? '공격할 적을 클릭 (ESC 취소)'
-            : '조사할 대상을 클릭 (ESC 취소)';
+            ? '공격할 적을 클릭 - 6 AP, 주요 행동 1회 (ESC 취소)'
+            : '조사할 대상을 클릭 - 4 AP (ESC 취소)';
     const bg = model.actionMode === 'attack'
         ? 'rgba(116, 28, 28, 0.9)'
         : model.actionMode === 'interact'

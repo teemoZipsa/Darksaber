@@ -3,6 +3,8 @@
  * Provides a SaveManager interface for localStorage (later Firebase).
  */
 
+import { createDefaultMarketState, normalizeMarketState, type MarketState } from './MarketData';
+
 export interface InventoryItem {
     uid: string;         // Unique ID for this specific instance
     itemId: string;      // Reference to ItemDB
@@ -18,6 +20,7 @@ export interface SaveData {
     gold: number;
     clearedStages: string[];
     questItems?: string[];
+    marketState?: MarketState;
     currentHubTownId: string;
     pendingRestMenuId: string | null;
     inventory: InventoryItem[];
@@ -31,6 +34,7 @@ export class PlayerData {
     public gold: number = 500;  // Starting gold
     public clearedStages: Set<string> = new Set();
     public questItems: Set<string> = new Set();
+    public marketState: MarketState = createDefaultMarketState();
     public currentHubTownId: string = 'central_castle';
     public pendingRestMenuId: string | null = null;
     public inventory: InventoryItem[] = [];
@@ -77,6 +81,7 @@ export class PlayerData {
             gold: this.gold,
             clearedStages: Array.from(this.clearedStages),
             questItems: Array.from(this.questItems),
+            marketState: this.marketState,
             currentHubTownId: this.currentHubTownId,
             pendingRestMenuId: this.pendingRestMenuId,
             inventory: this.inventory,
@@ -96,6 +101,7 @@ export class PlayerData {
             this.gold = data.gold ?? 500;
             this.clearedStages = new Set(data.clearedStages ?? []);
             this.questItems = new Set(data.questItems ?? []);
+            this.marketState = normalizeMarketState(data.marketState);
             this.currentHubTownId = data.currentHubTownId ?? 'central_castle';
             this.pendingRestMenuId = data.pendingRestMenuId ?? null;
             this.inventory = data.inventory ?? [];
