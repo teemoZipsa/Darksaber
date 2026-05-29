@@ -3,7 +3,14 @@
  * Provides a SaveManager interface for localStorage (later Firebase).
  */
 
-import { createDefaultMarketState, normalizeMarketState, type MarketState } from './MarketData';
+import {
+    createDefaultMarketState,
+    normalizeMarketContracts,
+    normalizeMarketCycle,
+    normalizeMarketState,
+    type MarketContract,
+    type MarketState,
+} from './MarketData';
 
 export interface InventoryItem {
     uid: string;         // Unique ID for this specific instance
@@ -21,6 +28,8 @@ export interface SaveData {
     clearedStages: string[];
     questItems?: string[];
     marketState?: MarketState;
+    marketCycle?: number;
+    marketContracts?: MarketContract[];
     currentHubTownId: string;
     pendingRestMenuId: string | null;
     inventory: InventoryItem[];
@@ -35,6 +44,8 @@ export class PlayerData {
     public clearedStages: Set<string> = new Set();
     public questItems: Set<string> = new Set();
     public marketState: MarketState = createDefaultMarketState();
+    public marketCycle: number = 0;
+    public marketContracts: MarketContract[] = [];
     public currentHubTownId: string = 'central_castle';
     public pendingRestMenuId: string | null = null;
     public inventory: InventoryItem[] = [];
@@ -82,6 +93,8 @@ export class PlayerData {
             clearedStages: Array.from(this.clearedStages),
             questItems: Array.from(this.questItems),
             marketState: this.marketState,
+            marketCycle: this.marketCycle,
+            marketContracts: this.marketContracts,
             currentHubTownId: this.currentHubTownId,
             pendingRestMenuId: this.pendingRestMenuId,
             inventory: this.inventory,
@@ -102,6 +115,8 @@ export class PlayerData {
             this.clearedStages = new Set(data.clearedStages ?? []);
             this.questItems = new Set(data.questItems ?? []);
             this.marketState = normalizeMarketState(data.marketState);
+            this.marketCycle = normalizeMarketCycle(data.marketCycle);
+            this.marketContracts = normalizeMarketContracts(data.marketContracts, this.marketCycle);
             this.currentHubTownId = data.currentHubTownId ?? 'central_castle';
             this.pendingRestMenuId = data.pendingRestMenuId ?? null;
             this.inventory = data.inventory ?? [];

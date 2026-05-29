@@ -1,7 +1,8 @@
 import { t } from '../../i18n/LanguageManager';
 import type { PartyManager } from '../../character/PartyManager';
 import type { PlayerData } from '../../data/PlayerData';
-import { LocalMarketService } from '../../data/MarketService';
+import { HybridMarketService } from '../../data/HybridMarketService';
+import type { MarketService } from '../../data/MarketService';
 import { getRestMenu, INJURY_TREATMENT_PRICE, type RestMenu } from '../../data/RestFacilityData';
 import { getSellPrice as getBaseSellPrice } from '../../data/ShopData';
 import type { GameManager } from '../GameManager';
@@ -35,14 +36,14 @@ export class WorldTownSession {
     private readonly party: PartyManager;
     private readonly playerData: PlayerData;
     private readonly gameManager: WorldTownSessionGameManager;
-    private readonly marketService: LocalMarketService;
+    private readonly marketService: MarketService;
     private readonly log: (message: string) => void;
 
     constructor(options: WorldTownSessionOptions) {
         this.party = options.party;
         this.playerData = options.playerData;
         this.gameManager = options.gameManager;
-        this.marketService = new LocalMarketService(this.playerData);
+        this.marketService = new HybridMarketService(this.playerData);
         this.log = options.log;
         this.ui = new TownUI(this.gameManager.inventory, this.gameManager.stash);
         this.configureTownUI(options.onDeploy);
@@ -176,6 +177,10 @@ export class WorldTownSession {
         this.ui.getShopUI().getSellPriceForItem = (placed, _source, townId) => {
             const basePrice = getBaseSellPrice(placed.item, townId ?? undefined);
             return this.marketService.getSellPrice(placed.item, basePrice, townId);
+        };
+        this.ui.getShopUI().getSellQuoteForItem = (placed, _source, townId, quantity) => {
+            const basePrice = getBaseSellPrice(placed.item, townId ?? undefined);
+            return this.marketService.getSellQuote(placed.item, basePrice, townId, quantity);
         };
         this.ui.getShopUI().onBuy = (item, price) => {
             if (!this.playerData.spendGold(price)) {

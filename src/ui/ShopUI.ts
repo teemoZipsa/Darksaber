@@ -4,6 +4,7 @@
  */
 
 import { ItemDef } from '../data/ItemDB';
+import type { MarketSellQuote } from '../data/MarketData';
 import { getDefaultShopKindForFacility, getSellPrice, getShopItems, isSellableItem, ShopItem, type ShopKind } from '../data/ShopData';
 import type { ShopFacilityId } from '../data/TownFacilityData';
 import { t, i18n } from '../i18n/LanguageManager';
@@ -31,6 +32,9 @@ export interface SellEntry {
     source: ShopSellSource;
     placed: PlacedItem;
     price: number;
+    basePrice: number;
+    bonusPrice: number;
+    contractQuantity?: number;
 }
 
 export const SHOP_KIND_TABS: Array<{ id: ShopKind; labelKey: string; icon: string }> = [
@@ -76,6 +80,7 @@ export class ShopUI {
     public onSell: ((placed: PlacedItem, sourceGrid: GridInventory, price: number) => boolean) | null = null;
     public getBuyPrice: ((item: ItemDef, shopItem: ShopItem, townId: string | null) => number) | null = null;
     public getSellPriceForItem: ((placed: PlacedItem, source: ShopSellSource, townId: string | null) => number) | null = null;
+    public getSellQuoteForItem: ((placed: PlacedItem, source: ShopSellSource, townId: string | null, quantity: number) => MarketSellQuote) | null = null;
     public getGold: (() => number) | null = null;
 
     constructor() {
@@ -148,6 +153,11 @@ export class ShopUI {
     /** Attempt a sale; validates the item still lives in its source grid. */
     public sell(entry: SellEntry): boolean {
         if (!entry.source.grid.items.includes(entry.placed)) return false;
+        const quote = this.resolveSellQuote(entry.placed, entry.source);
+        entry.basePrice = quote.basePrice;
+        entry.bonusPrice = quote.bonusPrice;
+        entry.price = quote.totalPrice;
+        entry.contractQuantity = quote.contractQuantity;
         return this.onSell?.(entry.placed, entry.source.grid, entry.price) ?? false;
     }
 
@@ -286,10 +296,14 @@ export class ShopUI {
         for (const source of this.sellSources) {
             for (const placed of source.grid.items) {
                 if (!isSellableItem(placed.item)) continue;
+                const quote = this.resolveSellQuote(placed, source);
                 entries.push({
                     source,
                     placed,
-                    price: this.resolveSellPrice(placed, source) * Math.max(1, placed.quantity),
+                    price: quote.totalPrice,
+                    basePrice: quote.basePrice,
+                    bonusPrice: quote.bonusPrice,
+                    contractQuantity: quote.contractQuantity,
                 });
             }
         }
@@ -302,6 +316,13 @@ export class ShopUI {
 
     private resolveSellPrice(placed: PlacedItem, source: ShopSellSource): number {
         return this.getSellPriceForItem?.(placed, source, this.townId) ?? getSellPrice(placed.item, this.townId ?? undefined);
+    }
+
+    private resolveSellQuote(placed: PlacedItem, source: ShopSellSource): MarketSellQuote {
+        const quantity = Math.max(1, placed.quantity);
+        if (this.getSellQuoteForItem) return this.getSellQuoteForItem(placed, source, this.townId, quantity);
+        const basePrice = this.resolveSellPrice(placed, source) * quantity;
+        return { basePrice, bonusPrice: 0, totalPrice: basePrice };
     }
 
     private commitPendingSell(): void {
@@ -479,6 +500,11 @@ export class ShopUI {
         ctx.font = 'bold 13px DOSMyungjo, sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(`${entry.price}G`, x + w - 10, y + 21);
+        if (entry.bonusPrice > 0) {
+            ctx.fillStyle = '#80d890';
+            ctx.font = 'bold 10px DOSMyungjo, sans-serif';
+            ctx.fillText(`${t('shop.contractBonus')} +${entry.bonusPrice}G`, x + w - 10, y + 38);
+        }
         if (hover) {
             ctx.fillStyle = 'rgba(230, 165, 76, 0.78)';
             ctx.font = 'bold 11px DOSMyungjo, sans-serif';

@@ -1,6 +1,20 @@
 import { formatT, i18n } from '../i18n/LanguageManager';
 import { getItemDef, type ItemDef } from './ItemDB';
-import { marketStateKey, type MarketEntryState } from './MarketData';
+import {
+    advanceMarketCycle,
+    applyMarketContractSale,
+    calculateMarketBuyPrice,
+    calculateMarketSellPrice,
+    ensureMarketContracts,
+    getActiveMarketContracts,
+    getOrCreateMarketEntry,
+    MARKET_DRIFT_CAP,
+    quoteMarketContractBonus,
+    type MarketContract,
+    type MarketEntryState,
+    type MarketSellQuote,
+    type MarketSnapshot,
+} from './MarketData';
 import type { PlayerData } from './PlayerData';
 import {
     getSellPrice as getBaseSellPrice,
@@ -13,18 +27,17 @@ import type { TownId } from './TownFacilityData';
 export interface MarketService {
     getBuyPrice(item: ItemDef, basePrice: number, townId: string | null | undefined): number;
     getSellPrice(item: ItemDef, basePrice: number, townId: string | null | undefined): number;
+    getSellQuote(item: ItemDef, baseUnitPrice: number, townId: string | null | undefined, quantity?: number): MarketSellQuote;
     recordBuy(townId: string | null | undefined, itemId: string, quantity?: number): void;
     recordSell(townId: string | null | undefined, itemId: string, quantity?: number): void;
     rollTownVisit(townId: string): void;
     getMarketRumor(townId: string): string | null;
+    getActiveContracts(townId?: string): MarketContract[];
+    advanceMarketCycle(): void;
 }
 
-export const BUY_PRESSURE_CAP = 0.2;
-export const SELL_PRESSURE_CAP = 0.25;
-export const MARKET_DRIFT_CAP = 0.08;
+export { BUY_PRESSURE_CAP, MARKET_DRIFT_CAP, SELL_PRESSURE_CAP } from './MarketData';
 
-const BUY_PRESSURE_STEP = 0.04;
-const SELL_PRESSURE_STEP = 0.05;
 const DRIFT_ROLL_CHANCE = 0.28;
 
 const TOWN_LABELS: Record<TownId, { ko: string; en: string }> = {
@@ -49,38 +62,52 @@ export class LocalMarketService implements MarketService {
 
     public getBuyPrice(item: ItemDef, basePrice: number, townId: string | null | undefined): number {
         if (!townId || !isTradeGoodItemId(item.id)) return basePrice;
-        const entry = this.getEntryState(townId, item.id);
-        const pressure = Math.min(BUY_PRESSURE_CAP, entry.buyPressure * BUY_PRESSURE_STEP);
-        const multiplier = clamp(1 + pressure + entry.drift, 1 - MARKET_DRIFT_CAP, 1 + BUY_PRESSURE_CAP + MARKET_DRIFT_CAP);
-        return Math.max(1, Math.floor(basePrice * multiplier));
+        return calculateMarketBuyPrice(basePrice, this.getEntryState(townId, item.id));
     }
 
     public getSellPrice(item: ItemDef, basePrice: number, townId: string | null | undefined): number {
         if (!townId || !isTradeGoodItemId(item.id)) return basePrice;
-        const entry = this.getEntryState(townId, item.id);
-        const pressure = Math.min(SELL_PRESSURE_CAP, entry.sellPressure * SELL_PRESSURE_STEP);
-        const multiplier = clamp(1 - pressure + entry.drift, 1 - SELL_PRESSURE_CAP - MARKET_DRIFT_CAP, 1 + MARKET_DRIFT_CAP);
-        return Math.max(1, Math.floor(basePrice * multiplier));
+        return calculateMarketSellPrice(basePrice, this.getEntryState(townId, item.id));
+    }
+
+    public getSellQuote(item: ItemDef, baseUnitPrice: number, townId: string | null | undefined, quantity: number = 1): MarketSellQuote {
+        const unitPrice = this.getSellPrice(item, baseUnitPrice, townId);
+        const safeQuantity = Math.max(1, Math.floor(quantity));
+        const basePrice = unitPrice * safeQuantity;
+        if (!townId || !isTradeGoodItemId(item.id)) {
+            return { basePrice, bonusPrice: 0, totalPrice: basePrice };
+        }
+        const bonus = quoteMarketContractBonus(this.snapshot(), townId, item.id, safeQuantity);
+        return {
+            basePrice,
+            bonusPrice: bonus.bonusPrice,
+            totalPrice: basePrice + bonus.bonusPrice,
+            contractId: bonus.contractId,
+            contractQuantity: bonus.contractQuantity,
+        };
     }
 
     public recordBuy(townId: string | null | undefined, itemId: string, quantity: number = 1): void {
         if (!townId || !isTradeGoodItemId(itemId)) return;
-        const entry = this.getEntryState(townId, itemId);
+        const snapshot = this.snapshot();
+        const entry = getOrCreateMarketEntry(snapshot, townId, itemId);
         entry.buyPressure = Math.max(0, entry.buyPressure + Math.max(1, quantity));
+        this.applySnapshot(snapshot);
         this.playerData.save();
     }
 
     public recordSell(townId: string | null | undefined, itemId: string, quantity: number = 1): void {
         if (!townId || !isTradeGoodItemId(itemId)) return;
-        const entry = this.getEntryState(townId, itemId);
+        const snapshot = this.snapshot();
+        const entry = getOrCreateMarketEntry(snapshot, townId, itemId);
         entry.sellPressure = Math.max(0, entry.sellPressure + Math.max(1, quantity));
+        applyMarketContractSale(snapshot, townId, itemId, quantity);
+        this.applySnapshot(snapshot);
         this.playerData.save();
     }
 
     public rollTownVisit(townId: string): void {
         const relevant = tradeGoodIds().filter((itemId) => getTradeGoodSellMultiplier(itemId, townId) !== 1);
-        if (relevant.length === 0) return;
-
         let changed = false;
         for (const itemId of relevant) {
             if (this.random() > DRIFT_ROLL_CHANCE) continue;
@@ -92,6 +119,7 @@ export class LocalMarketService implements MarketService {
             this.adjustDrift(townId, itemId);
             changed = true;
         }
+        this.advanceMarketCycle();
         if (changed) this.playerData.save();
     }
 
@@ -113,6 +141,18 @@ export class LocalMarketService implements MarketService {
             });
         }
 
+        const contract = this.pickContractRumor(townId);
+        if (contract) {
+            const item = getItemDef(contract.itemId);
+            if (item) {
+                return formatT('market.rumor.contract', {
+                    town: townLabel(contract.targetTownId),
+                    item: itemLabel(item),
+                    price: `${contract.bonusPerUnit}`,
+                });
+            }
+        }
+
         const hot = this.pickHotRumor(townId);
         if (!hot) return null;
         return formatT('market.rumor.hot', {
@@ -121,10 +161,19 @@ export class LocalMarketService implements MarketService {
         });
     }
 
+    public getActiveContracts(townId?: string): MarketContract[] {
+        return getActiveMarketContracts(this.snapshot(), townId);
+    }
+
+    public advanceMarketCycle(): void {
+        const snapshot = this.snapshot();
+        advanceMarketCycle(snapshot, this.random);
+        this.applySnapshot(snapshot);
+        this.playerData.save();
+    }
+
     public getEntryState(townId: string, itemId: string): MarketEntryState {
-        const key = marketStateKey(townId, itemId);
-        this.playerData.marketState[key] ??= { buyPressure: 0, sellPressure: 0, drift: 0 };
-        return this.playerData.marketState[key];
+        return getOrCreateMarketEntry(this.snapshot(), townId, itemId);
     }
 
     private adjustDrift(townId: string, itemId: string): void {
@@ -142,6 +191,16 @@ export class LocalMarketService implements MarketService {
             })
             .sort((a, b) => b.state.sellPressure - a.state.sellPressure);
         return candidates[0] ? { item: candidates[0].item } : null;
+    }
+
+    private pickContractRumor(townId: string): MarketContract | null {
+        const contracts = this.getActiveContracts()
+            .sort((a, b) => {
+                const aLocal = a.targetTownId === townId ? 1 : 0;
+                const bLocal = b.targetTownId === townId ? 1 : 0;
+                return bLocal - aLocal || b.bonusPerUnit - a.bonusPerUnit || a.expiresCycle - b.expiresCycle;
+            });
+        return contracts[0] ?? null;
     }
 
     private pickExportRumor(townId: string): { item: ItemDef; targetTownId: string } | null {
@@ -181,6 +240,23 @@ export class LocalMarketService implements MarketService {
             }))
             .sort((a, b) => b.price - a.price);
         return candidates[0]?.townId ?? null;
+    }
+
+    private snapshot(): MarketSnapshot {
+        const snapshot: MarketSnapshot = {
+            marketState: this.playerData.marketState,
+            marketCycle: this.playerData.marketCycle,
+            marketContracts: this.playerData.marketContracts,
+        };
+        ensureMarketContracts(snapshot, this.random);
+        this.applySnapshot(snapshot);
+        return snapshot;
+    }
+
+    private applySnapshot(snapshot: MarketSnapshot): void {
+        this.playerData.marketState = snapshot.marketState;
+        this.playerData.marketCycle = snapshot.marketCycle;
+        this.playerData.marketContracts = snapshot.marketContracts;
     }
 }
 

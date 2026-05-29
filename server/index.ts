@@ -5,17 +5,22 @@
  */
 
 import { WebSocketServer, WebSocket } from 'ws';
-import { WORLD_PROTOCOL_VERSION } from '../src/net/WorldProtocol';
+import { fileURLToPath } from 'node:url';
+import { isMarketClientMessage, WORLD_PROTOCOL_VERSION } from '../src/net/WorldProtocol';
 import type {
     WorldClientMessage,
     WorldServerMessage,
 } from '../src/net/WorldProtocol';
+import { ServerMarketSession } from './ServerMarketSession';
 import { WorldSession, WORLD_TICK_MS } from './WorldSession';
 
 const PORT = 8765;
 const wss = new WebSocketServer({ port: PORT });
 const session = new WorldSession({
     logger: (message) => console.log(`[WorldSession] ${message}`),
+});
+const marketSession = new ServerMarketSession({
+    persistPath: fileURLToPath(new URL('./.runtime/market-state.json', import.meta.url)),
 });
 const playerBySocket = new Map<WebSocket, string>();
 const socketByPlayer = new Map<string, WebSocket>();
@@ -27,6 +32,12 @@ wss.on('connection', (ws: WebSocket) => {
         const message = parseMessage(data);
         if (!message) {
             send(ws, { type: 'ERROR', code: 'BAD_JSON', message: 'Invalid JSON message.' });
+            return;
+        }
+
+        if (isMarketClientMessage(message)) {
+            const replies = marketSession.handleMessage(message);
+            for (const reply of replies) send(ws, reply);
             return;
         }
 
@@ -87,6 +98,9 @@ wss.on('connection', (ws: WebSocket) => {
 });
 
 setInterval(() => {
+    const marketUpdate = marketSession.tick(Date.now());
+    if (marketUpdate) broadcastToAll(marketUpdate);
+
     const result = session.tick(Date.now());
     for (const event of result.events) broadcastToActive(event);
     for (const entry of result.perPlayerMessages) {
@@ -134,5 +148,11 @@ function broadcastToActive(message: WorldServerMessage): void {
     for (const playerId of session.getActivePlayerIds()) {
         const ws = socketByPlayer.get(playerId);
         if (ws) send(ws, message);
+    }
+}
+
+function broadcastToAll(message: WorldServerMessage): void {
+    for (const client of wss.clients) {
+        send(client, message);
     }
 }

@@ -490,6 +490,7 @@
 #ui-overlay .ds-shop__rowinfo { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 #ui-overlay .ds-shop__name { color: var(--ds-text); font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #ui-overlay .ds-shop__sub { color: var(--ds-text-dim); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#ui-overlay .ds-shop__bonus { color: #80d890; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #ui-overlay .ds-shop__rowright { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; }
 #ui-overlay .ds-shop__price { color: var(--ds-accent-bright); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 #ui-overlay .ds-shop__price.is-poor { color: var(--ds-danger); }

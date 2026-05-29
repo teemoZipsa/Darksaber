@@ -120,6 +120,12 @@ export function ShopPanel() {
                                     <div className="ds-shop__rowinfo">
                                         <span className="ds-shop__name">{itemName(entry.placed.item)}{qty > 1 ? ` x${qty}` : ''}</span>
                                         <span className="ds-shop__sub">{entry.source.label}</span>
+                                        {entry.bonusPrice > 0 && (
+                                            <span className="ds-shop__bonus">
+                                                {t('shop.contractBonus')} +{entry.bonusPrice}G
+                                                {entry.contractQuantity ? ` · x${entry.contractQuantity}` : ''}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="ds-shop__rowright">
                                         <span className="ds-shop__price is-sell">{entry.price}G</span>
@@ -140,6 +146,11 @@ export function ShopPanel() {
                         <div className="ds-modal__line">
                             {itemName(pendingSell.placed.item)} → <strong>{pendingSell.price}G</strong>
                         </div>
+                        {pendingSell.bonusPrice > 0 && (
+                            <div className="ds-modal__line">
+                                {pendingSell.basePrice}G + {t('shop.contractBonus')} {pendingSell.bonusPrice}G
+                            </div>
+                        )}
                         <div className="ds-modal__btns">
                             <button className="ds-btn is-active" onClick={confirmSell}>{t('shop.sell')}</button>
                             <button className="ds-btn" onClick={() => setPendingSell(null)}>{t('shop.cancel')}</button>

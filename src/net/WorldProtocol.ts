@@ -1,4 +1,5 @@
 import type { StatusEffect } from '../combat/StatusEffects';
+import type { MarketSnapshot } from '../data/MarketData';
 import type { CharacterStats } from '../data/Stats';
 import type { EnemyRole } from '../field/EnemyAI';
 
@@ -146,13 +147,54 @@ export interface AutoLootResolveMessage {
     acceptedCells: AutoLootCell[];
 }
 
+export interface MarketHelloMessage {
+    type: 'MARKET_HELLO';
+    clientId: string;
+    clientVersion: string;
+}
+
+export interface MarketSnapshotRequestMessage {
+    type: 'MARKET_SNAPSHOT_REQUEST';
+    clientId: string;
+}
+
+export interface MarketRecordBuyMessage {
+    type: 'MARKET_RECORD_BUY';
+    clientId: string;
+    townId: string;
+    itemId: string;
+    quantity: number;
+}
+
+export interface MarketRecordSellMessage {
+    type: 'MARKET_RECORD_SELL';
+    clientId: string;
+    townId: string;
+    itemId: string;
+    quantity: number;
+}
+
+export interface MarketTouchTownMessage {
+    type: 'MARKET_TOUCH_TOWN';
+    clientId: string;
+    townId: string;
+}
+
+export type MarketClientMessage =
+    | MarketHelloMessage
+    | MarketSnapshotRequestMessage
+    | MarketRecordBuyMessage
+    | MarketRecordSellMessage
+    | MarketTouchTownMessage;
+
 export type WorldClientMessage =
     | WorldJoinMessage
     | ReconnectMessage
     | WorldLeaveMessage
     | PlayerIntentMessage
     | LootPickupMessage
-    | AutoLootResolveMessage;
+    | AutoLootResolveMessage
+    | MarketClientMessage;
 
 export interface WorldWelcomeMessage {
     type: 'WORLD_WELCOME';
@@ -213,6 +255,23 @@ export interface WorldErrorMessage {
     message: string;
 }
 
+export interface MarketSnapshotMessage {
+    type: 'MARKET_SNAPSHOT';
+    serverTime: number;
+    snapshot: MarketSnapshot;
+}
+
+export interface MarketRecordAckMessage {
+    type: 'MARKET_RECORD_ACK';
+    kind: 'hello' | 'request' | 'buy' | 'sell' | 'touch';
+    accepted: boolean;
+    snapshot: MarketSnapshot;
+}
+
+export type MarketServerMessage =
+    | MarketSnapshotMessage
+    | MarketRecordAckMessage;
+
 export type WorldServerMessage =
     | WorldWelcomeMessage
     | WorldSnapshotMessage
@@ -221,8 +280,17 @@ export type WorldServerMessage =
     | AutoLootGrantMessage
     | CombatEventMessage
     | RaidResultMessage
-    | WorldErrorMessage;
+    | WorldErrorMessage
+    | MarketServerMessage;
 
 export function isWorldSnapshotMessage(message: WorldServerMessage): message is WorldSnapshotMessage {
     return message.type === 'WORLD_SNAPSHOT';
+}
+
+export function isMarketClientMessage(message: WorldClientMessage): message is MarketClientMessage {
+    return message.type === 'MARKET_HELLO'
+        || message.type === 'MARKET_SNAPSHOT_REQUEST'
+        || message.type === 'MARKET_RECORD_BUY'
+        || message.type === 'MARKET_RECORD_SELL'
+        || message.type === 'MARKET_TOUCH_TOWN';
 }

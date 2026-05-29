@@ -320,6 +320,60 @@ test('market state persists and old saves load with a default market state', () 
     }
 });
 
+test('market cycle recovery decays pressure and keeps contracts safe', () => {
+    const player = new PlayerData();
+    const market = new LocalMarketService(player, () => 0.99);
+    const key = marketStateKey('s_coast_town', 'trade_forest_resin');
+    player.marketState[key] = { buyPressure: 2, sellPressure: 3, drift: 0.08 };
+    player.marketContracts = [{
+        id: 'expired-contract',
+        targetTownId: 's_coast_town',
+        itemId: 'trade_forest_resin',
+        remainingQuantity: 2,
+        bonusPerUnit: 10,
+        expiresCycle: 1,
+    }];
+    player.marketCycle = 1;
+
+    market.advanceMarketCycle();
+
+    assert.equal(player.marketCycle, 2);
+    assert.equal(player.marketState[key].buyPressure, 1);
+    assert.equal(player.marketState[key].sellPressure, 2);
+    assert.ok(player.marketState[key].drift > 0);
+    assert.ok(player.marketState[key].drift < 0.08);
+    assert.equal(player.marketContracts.some((contract) => contract.id === 'expired-contract'), false);
+});
+
+test('trade contracts add sell bonuses and only consume matching quantities', () => {
+    const player = new PlayerData();
+    const market = new LocalMarketService(player, () => 0.99);
+    const resin = getItemDef('trade_forest_resin');
+    assert.ok(resin);
+    player.marketCycle = 1;
+    player.marketContracts = [{
+        id: 'coast-resin-contract',
+        targetTownId: 's_coast_town',
+        itemId: resin.id,
+        remainingQuantity: 2,
+        bonusPerUnit: 11,
+        expiresCycle: 5,
+    }];
+
+    const baseUnit = getSellPrice(resin, 's_coast_town');
+    const quote = market.getSellQuote(resin, baseUnit, 's_coast_town', 3);
+    assert.equal(quote.basePrice, baseUnit * 3);
+    assert.equal(quote.bonusPrice, 22);
+    assert.equal(quote.totalPrice, baseUnit * 3 + 22);
+    assert.equal(quote.contractQuantity, 2);
+
+    market.recordSell('s_coast_town', resin.id, 3);
+
+    assert.equal(player.marketContracts.some((contract) => contract.id === 'coast-resin-contract'), false);
+    const wrongTownQuote = market.getSellQuote(resin, baseUnit, 'central_castle', 1);
+    assert.equal(wrongTownQuote.bonusPrice, 0);
+});
+
 test('market rumors are limited to rumor facilities and reflect cooled demand', () => {
     const player = new PlayerData();
     const market = new LocalMarketService(player, () => 0.99);
