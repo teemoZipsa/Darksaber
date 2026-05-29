@@ -18,8 +18,8 @@ export const MONSTER_SPRITE_PATH = '/Image/Monster';
 export const MONSTER_ROW_BY_FACING: Record<'up' | 'down' | 'left' | 'right', number> = {
     up: 0,
     down: 1,
-    left: 2,
-    right: 3,
+    right: 2,
+    left: 3,
 };
 export const MONSTER_FRAME_COUNT = 3;
 export const MONSTER_FPS = 8;

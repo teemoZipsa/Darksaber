@@ -9,6 +9,7 @@ import {
     GENERAL_MONSTER_IDS,
     MONSTER_DEFINITIONS,
     MONSTER_ROW_BY_FACING,
+    MONSTER_SPRITE_PATH,
     getMonsterDefinition,
 } from '../../src/data/MonsterCatalog';
 import { Enemy } from '../../src/entity/Enemy';
@@ -31,6 +32,8 @@ class ImageStub {
 
 (globalThis as unknown as { Image: typeof ImageStub }).Image = ImageStub;
 
+const MONSTER_PUBLIC_PATH = ['public', ...MONSTER_SPRITE_PATH.split('/').filter(Boolean)];
+
 function makePassthroughMovement(): WorldMovementController {
     return {
         findNearbyWalkableTile: (tile: { x: number; y: number }) => tile,
@@ -45,13 +48,13 @@ test('monster catalog includes 16 general monsters and the Burgos boss sprites',
         const definition = getMonsterDefinition(id);
         assert.equal(definition.id, id);
         assert.equal(definition.frameCount, 3);
-        assert.ok(existsSync(join(process.cwd(), 'public', 'Image', 'Monster', definition.sprite)), `${id} sprite missing`);
+        assert.ok(existsSync(join(process.cwd(), ...MONSTER_PUBLIC_PATH, definition.sprite)), `${id} sprite missing`);
     }
 
     const boss = getMonsterDefinition(BURGOS_BOSS_MONSTER_ID);
     assert.equal(boss.role, 'boss');
     assert.equal(boss.frameSize, 64);
-    assert.ok(existsSync(join(process.cwd(), 'public', 'Image', 'Monster', boss.sprite)));
+    assert.ok(existsSync(join(process.cwd(), ...MONSTER_PUBLIC_PATH, boss.sprite)));
 });
 
 test('Burgos Castle is a world-map dungeon entrance landmark', () => {
@@ -124,6 +127,8 @@ test('enemy selection display info includes walk sprite sheet data', () => {
     assert.equal(info?.spriteSheet?.loaded, true);
     assert.equal(info?.spriteSheet?.frameCount, 3);
     assert.equal(info?.spriteSheet?.rowByFacing.down, 1);
+    assert.equal(info?.spriteSheet?.rowByFacing.right, 2);
+    assert.equal(info?.spriteSheet?.rowByFacing.left, 3);
 });
 
 test('Burgos boss defeat clears only the dungeon encounter, not raid success', () => {
