@@ -8,6 +8,11 @@ import { MasterBranch } from './ClassTree';
 export type ItemSlot = 'weapon' | 'shield' | 'head' | 'body' | 'boots' | 'accessory' | 'accessory2' | 'consumable' | 'material' | 'sin_core' | 'rune' | 'gem';
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legend' | 'unique';
 export type ItemUseEffect = { type: 'recover'; hp?: number; mp?: number };
+export interface ItemIconSprite {
+    col: number;
+    row: number;
+}
+
 export interface ItemDef {
     id: string;
     name: string;
@@ -17,6 +22,7 @@ export interface ItemDef {
     gridH: number;    // height in inventory cells
     color: string;    // display color in inventory
     icon: string;     // emoji/text icon
+    iconSprite?: ItemIconSprite; // 32x32 cell in the original item atlas
     maxDurability: number;
     stats?: {
         atk?: number;
@@ -309,8 +315,9 @@ const RAW_ITEMS: RawItemDef[] = [
 
     // ─── Consumables (약초 시리즈) ──────
     {
-        id: 'herb_cheap', name: 'Cheap Herb', nameKr: '싸구려약초',
+        id: 'herb_cheap', name: 'Cheap Herb', nameKr: '싸구려 약초',
         slot: 'consumable', gridW: 1, gridH: 1, color: '#8fbc8f', icon: '🌿',
+        iconSprite: { col: 83, row: 0 },
         maxDurability: 1,
         stats: { hp: 50 },
         useEffect: { type: 'recover', hp: 50 },
@@ -319,8 +326,9 @@ const RAW_ITEMS: RawItemDef[] = [
         buyPrice: 10
     },
     {
-        id: 'herb_common', name: 'Common Herb', nameKr: '흔한약초',
+        id: 'herb_common', name: 'Common Herb', nameKr: '흔한 약초',
         slot: 'consumable', gridW: 1, gridH: 1, color: '#3cb371', icon: '🌿',
+        iconSprite: { col: 84, row: 0 },
         maxDurability: 1,
         stats: { hp: 150 },
         useEffect: { type: 'recover', hp: 150 },
@@ -329,8 +337,9 @@ const RAW_ITEMS: RawItemDef[] = [
         buyPrice: 50
     },
     {
-        id: 'herb_rare', name: 'Precious Herb', nameKr: '귀한약초',
+        id: 'herb_rare', name: 'Precious Herb', nameKr: '귀한 약초',
         slot: 'consumable', gridW: 1, gridH: 1, color: '#2e8b57', icon: '🍀',
+        iconSprite: { col: 85, row: 0 },
         maxDurability: 1,
         stats: { hp: 500 },
         useEffect: { type: 'recover', hp: 500 },
@@ -339,8 +348,9 @@ const RAW_ITEMS: RawItemDef[] = [
         buyPrice: 200
     },
     {
-        id: 'herb_legendary', name: 'Legendary Herb', nameKr: '희귀한약초',
+        id: 'herb_legendary', name: 'Legendary Herb', nameKr: '희귀한 약초',
         slot: 'consumable', gridW: 1, gridH: 1, color: '#006400', icon: '🍀',
+        iconSprite: { col: 86, row: 0 },
         maxDurability: 1,
         stats: { hp: 999 },
         useEffect: { type: 'recover', hp: 999 },
@@ -351,6 +361,7 @@ const RAW_ITEMS: RawItemDef[] = [
     {
         id: 'mp_potion', name: 'MP Potion', nameKr: 'MP 포션',
         slot: 'consumable', gridW: 1, gridH: 1, color: '#4488ff', icon: '🧪',
+        iconSprite: { col: 82, row: 0 },
         maxDurability: 1,
         stats: { mp: 30 },
         useEffect: { type: 'recover', mp: 30 },

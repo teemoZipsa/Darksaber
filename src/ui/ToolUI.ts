@@ -1,8 +1,12 @@
 import { UI, Parchment, drawParchmentPanel } from './UITheme';
+import type { ItemIconSprite } from '../data/ItemDB';
+import { drawItemIcon } from './ItemIconRenderer';
 
 export interface ToolOptionView {
     itemId: string;
     icon: string;
+    iconSprite?: ItemIconSprite;
+    color: string;
     name: string;
     count: number;
     recoverHp: number;
@@ -165,9 +169,11 @@ export class ToolUI {
                 ctx.fillRect(px + 2, rowY, this.PANEL_W - 4, this.ROW_H);
             }
 
-            ctx.font = `18px ${UI.fontPrimary}`;
-            ctx.fillStyle = Parchment.textDark;
-            ctx.fillText(option.icon, px + 10, rowY + 24);
+            ctx.fillStyle = option.color + '55';
+            ctx.fillRect(px + 9, rowY + 7, 24, 24);
+            ctx.strokeStyle = 'rgba(58, 38, 24, 0.28)';
+            ctx.strokeRect(px + 9, rowY + 7, 24, 24);
+            drawItemIcon(ctx, option, px + 9, rowY + 7, 24, 24, { fontSize: 16 });
 
             ctx.font = `bold 13px ${UI.fontPrimary}`;
             ctx.fillStyle = Parchment.textDark;

@@ -1,4 +1,4 @@
-export type DarksaberSheetId = 'board' | 'fx2' | 'fx' | 'micon';
+export type DarksaberSheetId = 'board' | 'fx2' | 'fx' | 'micon' | 'items';
 
 export interface SpriteRect {
     sheet: DarksaberSheetId;
@@ -50,10 +50,12 @@ const SHEET_SOURCES: Record<DarksaberSheetId, string> = {
     fx2: '/assets/images/ui/darksaber_fx2.png',
     fx: '/assets/images/ui/darksaber_fx.png',
     micon: '/assets/images/ui/darksaber_micon.png',
+    items: '/assets/images/items/darksaber_items.png',
 };
 
 const DAMAGE_GLYPHS = '1234567890+-';
 export const MICON_CELL_SIZE = 32;
+export const ITEM_CELL_SIZE = 32;
 
 const NUMBER_ROWS: Record<DamageNumberVariant, NumberRow> = {
     damage: { x: 235, y: 418, charW: 8, charH: 14 },
@@ -136,6 +138,32 @@ class DarksaberSpriteAtlasClass {
                 y: row * MICON_CELL_SIZE,
                 w: MICON_CELL_SIZE,
                 h: MICON_CELL_SIZE,
+            },
+            x,
+            y,
+            size,
+            size,
+            options
+        );
+    }
+
+    public drawItemCell(
+        ctx: CanvasRenderingContext2D,
+        col: number,
+        row: number,
+        x: number,
+        y: number,
+        size: number,
+        options: DrawSpriteOptions = {}
+    ): boolean {
+        return this.drawSprite(
+            ctx,
+            {
+                sheet: 'items',
+                x: col * ITEM_CELL_SIZE,
+                y: row * ITEM_CELL_SIZE,
+                w: ITEM_CELL_SIZE,
+                h: ITEM_CELL_SIZE,
             },
             x,
             y,

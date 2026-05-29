@@ -179,6 +179,8 @@ export class WorldToolController {
             .map(({ item, count, hp, mp }) => ({
                 itemId: item.id,
                 icon: item.icon,
+                iconSprite: item.iconSprite,
+                color: item.color,
                 name: item.nameKr,
                 count,
                 recoverHp: hp,

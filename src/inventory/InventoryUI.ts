@@ -10,6 +10,7 @@ import { GridInventory, PlacedItem } from './GridInventory';
 import { ItemDef, ItemSlot } from '../data/ItemDB';
 import { Character } from '../character/Character';
 import { t, i18n } from '../i18n/LanguageManager';
+import { drawItemIcon } from '../ui/ItemIconRenderer';
 
 const CELL = 40;
 const PAD = 12;
@@ -892,9 +893,7 @@ export class InventoryUI {
             if (equipped) {
                 ctx.fillStyle = equipped.item.color + '88';
                 ctx.fillRect(slotX + 3, slotY + 3, def.w - 6, def.h - 6);
-                ctx.font = '22px serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(equipped.item.icon, slotX + def.w / 2, slotY + def.h / 2 + 7);
+                drawItemIcon(ctx, equipped.item, slotX + 6, slotY + 6, def.w - 12, def.h - 12, { fontSize: 22 });
 
                 // Render Sockets on Equipped items
                 if (equipped.item.maxSockets) {
@@ -1076,9 +1075,7 @@ export class InventoryUI {
         ctx.lineWidth = 1;
         ctx.strokeRect(ix + 2, iy + 2, iw - 4, ih - 4);
 
-        ctx.font = '18px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(placed.item.icon, ix + iw / 2, iy + ih / 2 + 6);
+        drawItemIcon(ctx, placed.item, ix + 4, iy + 4, iw - 8, ih - 8, { fontSize: 18 });
         ctx.textAlign = 'start';
 
         if (placed.item.maxDurability > 1) {
@@ -1135,9 +1132,7 @@ export class InventoryUI {
         ctx.lineWidth = 2;
         ctx.strokeRect(dx, dy, iw, ih);
 
-        ctx.font = '20px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(item.icon, dx + iw / 2, dy + ih / 2 + 6);
+        drawItemIcon(ctx, item, dx + 4, dy + 4, iw - 8, ih - 8, { fontSize: 20 });
         ctx.textAlign = 'start';
         ctx.globalAlpha = 1;
     }
@@ -1174,7 +1169,8 @@ export class InventoryUI {
         ctx.fillStyle = item.color || '#c8a84e';
         ctx.font = 'bold 13px DOSMyungjo, sans-serif';
         const itemName = i18n.lang === 'ko' ? item.nameKr : item.name;
-        ctx.fillText(`${item.icon} ${itemName}`, tx + 8, ty + 20);
+        drawItemIcon(ctx, item, tx + 8, ty + 6, 20, 20, { fontSize: 13 });
+        ctx.fillText(itemName, tx + 34, ty + 20);
 
         ctx.fillStyle = '#888';
         ctx.font = '10px DOSMyungjo, sans-serif';

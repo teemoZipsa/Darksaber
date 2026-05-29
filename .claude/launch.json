@@ -4,8 +4,8 @@
     {
       "name": "darksaber-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "5740", "--strictPort"],
-      "port": 5740
+      "runtimeArgs": ["run", "dev", "--", "--port", "5742", "--strictPort"],
+      "port": 5742
     }
   ]
 }

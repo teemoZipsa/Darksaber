@@ -7,6 +7,7 @@ import { ItemDef } from '../data/ItemDB';
 import { getSellPrice, getShopItems, isSellableItem, ShopItem, type ShopKind } from '../data/ShopData';
 import { t, i18n } from '../i18n/LanguageManager';
 import { GridInventory, PlacedItem } from '../inventory/GridInventory';
+import { drawItemIcon } from './ItemIconRenderer';
 
 const CELL = 42;
 const ROW_H = 54;
@@ -437,9 +438,7 @@ export class ShopUI {
         ctx.strokeStyle = SLOT_FRAME;
         ctx.lineWidth = 1;
         ctx.strokeRect(x, y, CELL - 4, CELL - 4);
-        ctx.font = '18px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(item.icon, x + (CELL - 4) / 2, y + 26);
+        drawItemIcon(ctx, item, x + 4, y + 4, CELL - 12, CELL - 12, { fontSize: 18 });
         ctx.restore();
     }
 
