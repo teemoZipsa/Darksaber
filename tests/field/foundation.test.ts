@@ -318,7 +318,7 @@ test('field AP continuation requires affordable and executable actions', () => {
         remainingAp: MOVE_AP_PER_TILE - 1,
         hasReachableMove: true,
         hasAttackTarget: true,
-        hasInteractTarget: true,
+        hasInteractTarget: false,
         hasMagicAvailable: true,
     }), false);
 

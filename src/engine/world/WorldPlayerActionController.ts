@@ -347,7 +347,7 @@ export class WorldPlayerActionController {
             case 'open':
                 return this.buildState(type, this.hasExecutableInteract(actor),
                     remainingAp < INTERACT_AP_COST ? '조사 AP 부족' : '조사 대상 없음',
-                    '4 AP');
+                    '0 AP');
             case 'defend':
                 return { type, enabled: true, costLabel: '0 AP' };
             case 'rest':

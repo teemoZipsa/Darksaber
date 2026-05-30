@@ -1,6 +1,6 @@
 export const MOVE_AP_PER_TILE = 2;
 export const ATTACK_AP_COST = 6;
-export const INTERACT_AP_COST = 4;
+export const INTERACT_AP_COST = 0;
 export const MAGIC_AP_COST = 8;
 const TOOL_AP_COST = 4;
 

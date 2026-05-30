@@ -114,6 +114,10 @@ export class ActionMenuUI {
         if (!this.isOpen) { this.hoveredSlot = null; return; }
         this.hoveredSlot = null;
         for (const slot of this.slots) {
+            const state = this.getSlotState(slot.type);
+            if (slot.type === 'open' && !state.enabled) {
+                continue;
+            }
             const ix = this.centerX + Math.sin(slot.angle) * this.menuRadius;
             const iy = this.centerY - Math.cos(slot.angle) * this.menuRadius;
             if (Math.hypot(mx - ix, my - iy) <= this.hitRadius) {
@@ -126,10 +130,13 @@ export class ActionMenuUI {
     public onClick(mx: number, my: number): ActionMenuClickResult | null {
         if (!this.isOpen) return null;
         for (const slot of this.slots) {
+            const state = this.getSlotState(slot.type);
+            if (slot.type === 'open' && !state.enabled) {
+                continue;
+            }
             const ix = this.centerX + Math.sin(slot.angle) * this.menuRadius;
             const iy = this.centerY - Math.cos(slot.angle) * this.menuRadius;
             if (Math.hypot(mx - ix, my - iy) <= this.hitRadius) {
-                const state = this.getSlotState(slot.type);
                 return {
                     type: slot.type,
                     enabled: state.enabled,
@@ -156,6 +163,9 @@ export class ActionMenuUI {
         // Draw each slot
         for (const slot of this.slots) {
             const state = this.getSlotState(slot.type);
+            if (slot.type === 'open' && !state.enabled) {
+                continue;
+            }
             const enabled = isReady && state.enabled;
             const ix = this.centerX + Math.sin(slot.angle) * this.menuRadius;
             const iy = this.centerY - Math.cos(slot.angle) * this.menuRadius;
