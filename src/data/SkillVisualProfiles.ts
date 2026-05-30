@@ -170,43 +170,74 @@ const VISUAL_OVERRIDES: Record<string, Partial<SkillVisualProfile>> = {
 };
 
 export function getSkillVisualProfile(skill: Skill): SkillVisualProfile {
-    const byType = TYPE_DEFAULTS[skill.type];
+    const byType = TYPE_DEFAULTS[skill.type] ?? TYPE_DEFAULTS.damage;
     const spriteEffect = ELEMENT_SPRITES[skill.element] ?? byType.spriteEffect;
     const motion = getDefaultMotion(skill);
-    const tierScale = 1 + Math.max(0, skill.tier - 1) * 0.08;
-    const areaScale = 1 + Math.max(0, skill.aoeRadius) * 0.14;
+    const tier = finiteAtLeast(skill.tier, 1, 1);
+    const aoeRadius = finiteAtLeast(skill.aoeRadius, 0, 0);
+    const power = Number.isFinite(skill.power) ? skill.power : 0;
+    const tierScale = 1 + Math.max(0, tier - 1) * 0.08;
+    const areaScale = 1 + aoeRadius * 0.14;
     const base: SkillVisualProfile = {
         skillId: skill.id,
-        visualKey: `${skill.id}:${skill.type}:${skill.element}:${skill.tier}`,
+        visualKey: `${skill.id}:${skill.type}:${skill.element}:${tier}`,
         spriteEffect,
         motion,
-        palette: ELEMENT_PALETTES[skill.element],
+        palette: ELEMENT_PALETTES[skill.element] ?? ELEMENT_PALETTES.none,
         glyph: skill.icon,
         particleCount: Math.round((skill.type === 'aoe' ? 20 : 12) * tierScale * areaScale),
-        ringCount: skill.type === 'aoe' || skill.power >= 3 ? 2 : 1,
+        ringCount: skill.type === 'aoe' || power >= 3 ? 2 : 1,
         spriteSize: Math.round((skill.type === 'aoe' ? 88 : 68) * tierScale * areaScale),
-        duration: Math.min(1.35, 0.55 + skill.tier * 0.05 + skill.aoeRadius * 0.08),
+        duration: Math.min(1.35, 0.55 + tier * 0.05 + aoeRadius * 0.08),
     };
+    const override = VISUAL_OVERRIDES[skill.id];
+    const resolvedMotion = override?.motion ?? base.motion;
+    const resolvedSpriteEffect = override?.spriteEffect ?? base.spriteEffect;
+    const resolvedPalette = override?.palette ?? base.palette;
+    const resolvedParticleCount = override?.particleCount ?? base.particleCount;
+    const resolvedRingCount = override?.ringCount ?? base.ringCount;
+    const resolvedSpriteSize = override?.spriteSize ?? base.spriteSize;
+    const resolvedDuration = override?.duration ?? base.duration;
 
     return {
         ...base,
-        ...VISUAL_OVERRIDES[skill.id],
+        ...override,
         skillId: skill.id,
-        visualKey: `${skill.id}:${(VISUAL_OVERRIDES[skill.id]?.motion ?? base.motion)}:${(VISUAL_OVERRIDES[skill.id]?.spriteEffect ?? base.spriteEffect)}`,
-        glyph: VISUAL_OVERRIDES[skill.id]?.glyph ?? skill.icon,
+        visualKey: [
+            skill.id,
+            skill.type,
+            skill.element,
+            tier,
+            resolvedMotion,
+            resolvedSpriteEffect,
+            resolvedPalette.join(','),
+            resolvedParticleCount,
+            resolvedRingCount,
+            resolvedSpriteSize,
+            resolvedDuration,
+        ].join(':'),
+        glyph: override?.glyph ?? skill.icon,
     };
 }
 
 function getDefaultMotion(skill: Skill): SkillVisualMotion {
+    const byType = TYPE_DEFAULTS[skill.type] ?? TYPE_DEFAULTS.damage;
+    const aoeRadius = finiteAtLeast(skill.aoeRadius, 0, 0);
+    const range = finiteAtLeast(skill.range, 1, 1);
+
     if (skill.type === 'heal' || skill.type === 'buff') return 'ward';
     if (skill.type === 'debuff') return 'mist';
-    if (skill.aoeRadius >= 2) return skill.element === 'earth' ? 'quake' : 'nova';
+    if (aoeRadius >= 2) return skill.element === 'earth' ? 'quake' : 'nova';
     if (skill.type === 'aoe') return skill.element === 'lightning' || skill.element === 'ice' ? 'rain' : 'nova';
     if (skill.element === 'physical') {
-        if (skill.range >= 2) return 'pierce';
+        if (range >= 2) return 'pierce';
         return 'slash';
     }
     if (skill.element === 'wind') return 'spiral';
     if (skill.element === 'dark') return 'drain';
-    return TYPE_DEFAULTS[skill.type].motion;
+    return byType.motion;
+}
+
+function finiteAtLeast(value: number, min: number, fallback: number): number {
+    return Number.isFinite(value) ? Math.max(min, value) : fallback;
 }

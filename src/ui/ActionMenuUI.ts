@@ -9,6 +9,9 @@ import { ACTION_ICON_CELLS } from './DarksaberIconRegistry';
 import { DarksaberSpriteAtlas } from './DarksaberSpriteAtlas';
 import { UI, Parchment } from './UITheme';
 
+const ACTION_ICON_ANIMATION_ROWS = 5;
+const ACTION_ICON_ANIMATION_MS = 280;
+
 export type ActionType = 'tool' | 'attack' | 'rest' | 'defend' | 'magic' | 'move' | 'open';
 
 export interface ActionMenuSlotState {
@@ -303,16 +306,24 @@ export class ActionMenuUI {
         const iconCell = ACTION_ICON_CELLS[type];
         if (!iconCell) return false;
 
+        const frame = Math.floor(ActionMenuUI.getAnimationTime() / ACTION_ICON_ANIMATION_MS) % 2;
+        const row = iconCell.row < ACTION_ICON_ANIMATION_ROWS
+            ? iconCell.row + frame * ACTION_ICON_ANIMATION_ROWS
+            : iconCell.row;
         const iconSize = Math.max(18, s * 2.35);
         return DarksaberSpriteAtlas.drawIconCell(
             ctx,
             iconCell.col,
-            iconCell.row,
+            row,
             cx - iconSize / 2,
             cy - iconSize / 2,
             iconSize,
             { alpha: ready ? 1 : 0.35 }
         );
+    }
+
+    private static getAnimationTime(): number {
+        return typeof performance !== 'undefined' ? performance.now() : Date.now();
     }
 
     private drawToolIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {

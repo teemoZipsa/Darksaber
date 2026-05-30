@@ -6,7 +6,7 @@
  *
  * Interaction:
  *  - Pointer drag moves an item precisely (grid↔grid, grid↔equip, socketing).
- *    Drop cell = the grid cell under the cursor (top-left of the placement).
+ *    Drop cell = the grid cell under the dragged item's visible top-left.
  *  - A plain click quick-transfers (bag→ext, ext→bag, equip→bag), mirroring the
  *    canvas "click without dragging" shortcut.
  * All placement rules live in InventoryUI (moveToCell / moveToEquip / quickMove);
@@ -46,6 +46,8 @@ type DragState = {
     startY: number;
     x: number;
     y: number;
+    offsetX: number;
+    offsetY: number;
     isDragging: boolean;
 } | null;
 type DragPreview = { placed: PlacedItem; x: number; y: number } | null;
@@ -121,14 +123,23 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
 
     const beginPointerDrag = (placed: PlacedItem, source: InvDragSource) => (e: ReactPointerEvent) => {
         if (e.button !== 0) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const offsetX = source.kind === 'grid'
+            ? e.clientX - rect.left
+            : (placed.item.gridW * CELL) / 2;
+        const offsetY = source.kind === 'grid'
+            ? e.clientY - rect.top
+            : (placed.item.gridH * CELL) / 2;
         drag.current = {
             placed,
             source,
             pointerId: e.pointerId,
             startX: e.clientX,
             startY: e.clientY,
-            x: e.clientX,
-            y: e.clientY,
+            x: e.clientX - offsetX,
+            y: e.clientY - offsetY,
+            offsetX,
+            offsetY,
             isDragging: false,
         };
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -137,6 +148,11 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
     };
 
     useEffect(() => {
+        const clearDrag = () => {
+            drag.current = null;
+            setDragPreview(null);
+        };
+
         const finishDrop = (d: NonNullable<DragState>, clientX: number, clientY: number): boolean => {
             const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
             const gridEl = target?.closest<HTMLElement>('[data-inv-grid]');
@@ -144,8 +160,8 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                 const kind = gridEl.dataset.invGrid as InvGridKind | undefined;
                 if (!kind) return false;
                 const rect = gridEl.getBoundingClientRect();
-                const gx = Math.floor((clientX - rect.left) / CELL);
-                const gy = Math.floor((clientY - rect.top) / CELL);
+                const gx = Math.floor((clientX - d.offsetX - rect.left) / CELL);
+                const gy = Math.floor((clientY - d.offsetY - rect.top) / CELL);
                 return inv.moveToCell(d.placed, d.source, kind, gx, gy);
             }
             const equipEl = target?.closest<HTMLElement>('[data-inv-equip]');
@@ -157,47 +173,85 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
             return false;
         };
 
+        const finishActiveDrag = (clientX: number, clientY: number) => {
+            const d = drag.current;
+            if (!d) return;
+            clearDrag();
+            const success = d.isDragging
+                ? finishDrop(d, clientX, clientY)
+                : inv.quickMove(d.placed, d.source);
+            if (success) AudioManager.playUi(d.isDragging ? 'ui.confirm' : 'ui.hover');
+            if (success) setMutationSeq((seq) => seq + 1);
+            store.refresh();
+        };
+
         const onPointerMove = (e: PointerEvent) => {
             const d = drag.current;
             if (!d || e.pointerId !== d.pointerId) return;
-            d.x = e.clientX;
-            d.y = e.clientY;
+            if (d.isDragging && e.buttons === 0) {
+                clearDrag();
+                store.refresh();
+                return;
+            }
+            d.x = e.clientX - d.offsetX;
+            d.y = e.clientY - d.offsetY;
             const dist = Math.hypot(e.clientX - d.startX, e.clientY - d.startY);
             if (!d.isDragging && dist >= DRAG_THRESHOLD) d.isDragging = true;
             if (d.isDragging) {
-                setDragPreview({ placed: d.placed, x: e.clientX, y: e.clientY });
+                setDragPreview({ placed: d.placed, x: d.x, y: d.y });
                 e.preventDefault();
             }
         };
 
         const onPointerUp = (e: PointerEvent) => {
             const d = drag.current;
-            if (!d || e.pointerId !== d.pointerId) return;
-            drag.current = null;
-            setDragPreview(null);
-            const success = d.isDragging
-                ? finishDrop(d, e.clientX, e.clientY)
-                : inv.quickMove(d.placed, d.source);
-            if (success) AudioManager.playUi(d.isDragging ? 'ui.confirm' : 'ui.hover');
-            if (success) setMutationSeq((seq) => seq + 1);
-            store.refresh();
+            if (!d) return;
+            if (e.pointerId !== d.pointerId) {
+                clearDrag();
+                store.refresh();
+                return;
+            }
+            finishActiveDrag(e.clientX, e.clientY);
             e.preventDefault();
         };
 
         const onPointerCancel = (e: PointerEvent) => {
             const d = drag.current;
             if (!d || e.pointerId !== d.pointerId) return;
-            drag.current = null;
-            setDragPreview(null);
+            clearDrag();
+            store.refresh();
+        };
+
+        const onMouseUp = (e: MouseEvent) => {
+            if (!drag.current) return;
+            finishActiveDrag(e.clientX, e.clientY);
+            e.preventDefault();
+        };
+
+        const onAbortDrag = () => {
+            if (!drag.current) return;
+            clearDrag();
+            store.refresh();
+        };
+
+        const onVisibilityChange = () => {
+            if (document.hidden) onAbortDrag();
         };
 
         window.addEventListener('pointermove', onPointerMove, { passive: false });
         window.addEventListener('pointerup', onPointerUp, { passive: false });
         window.addEventListener('pointercancel', onPointerCancel);
+        window.addEventListener('mouseup', onMouseUp, { passive: false });
+        window.addEventListener('blur', onAbortDrag);
+        document.addEventListener('visibilitychange', onVisibilityChange);
         return () => {
             window.removeEventListener('pointermove', onPointerMove);
             window.removeEventListener('pointerup', onPointerUp);
             window.removeEventListener('pointercancel', onPointerCancel);
+            window.removeEventListener('mouseup', onMouseUp);
+            window.removeEventListener('blur', onAbortDrag);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            clearDrag();
         };
     }, [inv, store]);
 
@@ -300,6 +354,7 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                     style={{
                         left: dragPreview.x,
                         top: dragPreview.y,
+                        transform: 'none',
                         width: dragPreview.placed.item.gridW * CELL,
                         height: dragPreview.placed.item.gridH * CELL,
                         background: `${dragPreview.placed.item.color}33`,

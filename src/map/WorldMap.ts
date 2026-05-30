@@ -603,20 +603,37 @@ export class WorldMap {
         const centerX = town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
         const centerY = town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
         const searchRadius = Math.max(8, town.radius * CHUNK_SIZE + CHUNK_SIZE);
+        let bestRoadExit: { tile: TilePoint; score: number } | null = null;
+        let bestAdjacentExit: { tile: TilePoint; score: number } | null = null;
 
-        for (let radius = town.radius * CHUNK_SIZE; radius <= searchRadius; radius++) {
-            for (let dy = -radius; dy <= radius; dy++) {
-                for (let dx = -radius; dx <= radius; dx++) {
-                    if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
-                    const tx = centerX + dx;
-                    const ty = centerY + dy;
-                    if (this.isWalkable(tx, ty) && this.getTownAtTile(tx, ty)?.id !== town.id) {
-                        return { x: tx, y: ty };
-                    }
+        for (let dy = -searchRadius; dy <= searchRadius; dy++) {
+            for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+                const tx = centerX + dx;
+                const ty = centerY + dy;
+                if (!this.isWalkable(tx, ty) || this.getTownAtTile(tx, ty)?.id === town.id) continue;
+                const isAdjacentToTown = [
+                    { x: tx + 1, y: ty },
+                    { x: tx - 1, y: ty },
+                    { x: tx, y: ty + 1 },
+                    { x: tx, y: ty - 1 },
+                    { x: tx + 1, y: ty + 1 },
+                    { x: tx - 1, y: ty - 1 },
+                    { x: tx + 1, y: ty - 1 },
+                    { x: tx - 1, y: ty + 1 },
+                ].some((tile) => this.getTownAtTile(tile.x, tile.y)?.id === town.id);
+                if (!isAdjacentToTown) continue;
+
+                const score = dx * dx + dy * dy;
+                const candidate = { tile: { x: tx, y: ty }, score };
+                if (!bestAdjacentExit || score < bestAdjacentExit.score) bestAdjacentExit = candidate;
+                if (this.getTileAt(tx, ty) === TileType.ROAD && (!bestRoadExit || score < bestRoadExit.score)) {
+                    bestRoadExit = candidate;
                 }
             }
         }
 
+        if (bestRoadExit) return bestRoadExit.tile;
+        if (bestAdjacentExit) return bestAdjacentExit.tile;
         return this.getTownSpawnTile(town);
     }
 

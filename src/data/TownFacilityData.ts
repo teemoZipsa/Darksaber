@@ -79,20 +79,29 @@ export const TOWN_FACILITIES: Record<TownId, TownFacilityId[]> = {
     ember_citadel: ['storage', 'shrine', 'specialty_trader', 'blacksmith'],
 };
 
+function hasOwnKey<T extends object>(
+    obj: T,
+    key: string | undefined,
+): key is Extract<keyof T, string> {
+    return key !== undefined && Object.prototype.hasOwnProperty.call(obj, key);
+}
+
 export function isTownId(value: string | undefined): value is TownId {
-    return value !== undefined && value in TOWN_FACILITIES;
+    return hasOwnKey(TOWN_FACILITIES, value);
 }
 
 export function isTownFacilityId(value: string | undefined): value is TownFacilityId {
-    return value !== undefined && value in TOWN_FACILITY_META;
+    return hasOwnKey(TOWN_FACILITY_META, value);
 }
 
 export function isShopFacilityId(value: string | undefined): value is ShopFacilityId {
-    return SHOP_FACILITY_IDS.includes(value as ShopFacilityId);
+    return value !== undefined && SHOP_FACILITY_IDS.includes(value as ShopFacilityId);
 }
 
 export function getTownFacilities(townId: string): TownFacilityId[] {
-    return isTownId(townId) ? TOWN_FACILITIES[townId] : ['storage', 'general_store', 'rumors'];
+    return isTownId(townId)
+        ? [...TOWN_FACILITIES[townId]]
+        : ['storage', 'general_store', 'rumors'];
 }
 
 export function hasTownFacility(townId: string, facilityId: TownFacilityId): boolean {

@@ -9,7 +9,7 @@ export const FORMATION_OFFSETS: TilePoint[] = [
     { x: 1, y: 0 },
 ];
 
-export const FIELD_ATB_SCALE = 10;
+export const FIELD_ATB_SCALE = 6;
 export const ENEMY_AGGRO_RANGE = 6;
 export const ENEMY_EXIT_RANGE = 10;
 export const ENEMY_LEASH_RANGE = 16;

@@ -93,14 +93,10 @@ export class GridInventory {
 
     /** Remove an item from the grid */
     public remove(placed: PlacedItem): void {
-        for (let dy = 0; dy < placed.item.gridH; dy++) {
-            for (let dx = 0; dx < placed.item.gridW; dx++) {
-                const cy = placed.gridY + dy;
-                const cx = placed.gridX + dx;
-                if (cy < this.height && cx < this.width) {
-                    if (this.grid[cy][cx] === placed) {
-                        this.grid[cy][cx] = null;
-                    }
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                if (this.grid[y][x] === placed) {
+                    this.grid[y][x] = null;
                 }
             }
         }

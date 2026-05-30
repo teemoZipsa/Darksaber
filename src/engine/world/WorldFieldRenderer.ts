@@ -2,7 +2,6 @@ import { TILE_SIZE } from '../../map/Chunk';
 import { getEffectiveStatsForCharacter } from '../../combat/StatusEffects';
 import { UI, Parchment, drawParchmentPanel, renderGameTitle } from '../../ui/UITheme';
 import { CombatLogUI } from '../../ui/CombatLogUI';
-import { ENEMY_ROLE_GLYPHS } from '../../field/FieldConfig';
 import { formatRaidTime, getTacticalMarkerColor } from '../../field/FieldDisplay';
 import type { Entity } from '../../entity/Entity';
 import type { TacticalMarker } from '../../field/TacticalMarkers';
@@ -155,7 +154,6 @@ export class WorldFieldRenderer {
                 ctx.strokeRect(px + 3, py + 3, TILE_SIZE - 6, TILE_SIZE - 6);
             }
 
-            renderEnemyRoleBadge(ctx, enemy.role, enemy.isBoss, px, py);
             renderGauge(ctx, px + 5, py - 7, TILE_SIZE - 10, enemy.actionGauge / 100, '#ffb84d');
             renderHpBar(ctx, px + 5, py + TILE_SIZE + 3, TILE_SIZE - 10, enemy.stats.hp, enemy.stats.maxHp);
             if (enemy.actionGauge >= 100 || enemy.id === model.activeTurnActorId) {
@@ -402,24 +400,6 @@ function renderTacticalMarker(ctx: CanvasRenderingContext2D, marker: TacticalMar
         ctx.lineTo(cx, cy + r + 3);
         ctx.stroke();
     }
-}
-
-function renderEnemyRoleBadge(ctx: CanvasRenderingContext2D, role: keyof typeof ENEMY_ROLE_GLYPHS, isBoss: boolean, px: number, py: number): void {
-    const glyph = ENEMY_ROLE_GLYPHS[role] ?? 'M';
-    ctx.fillStyle = isBoss ? 'rgba(80, 0, 45, 0.88)' : 'rgba(10, 14, 24, 0.78)';
-    ctx.strokeStyle = isBoss ? '#ff4ea3' : 'rgba(255,255,255,0.5)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(px + TILE_SIZE - 8, py + 8, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold 9px ${UI.fontMono}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(glyph, px + TILE_SIZE - 8, py + 8);
-    ctx.textAlign = 'start';
-    ctx.textBaseline = 'alphabetic';
 }
 
 function renderReadyRing(ctx: CanvasRenderingContext2D, worldTime: number, px: number, py: number, color: string): void {

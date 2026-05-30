@@ -15,6 +15,7 @@ import { getSellPrice, getShopItems, isSellableItem } from '../../src/data/ShopD
 import { BUY_PRESSURE_CAP, LocalMarketService, MARKET_DRIFT_CAP, SELL_PRESSURE_CAP } from '../../src/data/MarketService';
 import { marketStateKey } from '../../src/data/MarketData';
 import { PlayerData } from '../../src/data/PlayerData';
+import { TileType } from '../../src/map/Tile';
 import { REST_FACILITIES, getRestFacility, getRestMenu } from '../../src/data/RestFacilityData';
 import { TOWN_FACILITIES, getTownFacilities, hasTownFacility } from '../../src/data/TownFacilityData';
 import { TownUI } from '../../src/ui/TownUI';
@@ -481,6 +482,11 @@ test('WorldMap exposes walkable non-town exits for every town', () => {
         assert.ok(world.isWalkable(exit.x, exit.y), `${town.id} exit should be walkable`);
         assert.notEqual(world.getTownAtTile(exit.x, exit.y)?.id, town.id, `${town.id} exit should leave town radius`);
     }
+
+    const kaosia = world.getTowns().find((town) => town.id === 'central_castle');
+    assert.ok(kaosia);
+    const kaosiaExit = world.getTownExitTile(kaosia);
+    assert.equal(world.getTileAt(kaosiaExit.x, kaosiaExit.y), TileType.ROAD);
 });
 
 test('rest facility data matches every world town and keeps menu ids unique', () => {
