@@ -5,7 +5,7 @@
  */
 
 import { Entity } from './Entity';
-import { TileType, TILE_PROPERTIES } from '../map/Tile';
+import { TILE_PROPERTIES, type TileType } from '../map/Tile';
 
 export class Player extends Entity {
     public moveRange: number = 4; // Manhattan distance per turn
@@ -19,18 +19,33 @@ export class Player extends Entity {
     public tryMove(
         newX: number,
         newY: number,
-        getTile: (x: number, y: number) => TileType
+        getTile: (x: number, y: number) => TileType,
+        isOccupied?: (x: number, y: number) => boolean
     ): boolean {
+        if (!Number.isFinite(newX) || !Number.isFinite(newY)) return false;
+
+        const distance = Math.abs(newX - this.gridX) + Math.abs(newY - this.gridY);
+        if (distance === 0 || distance > this.moveRange) return false;
+        if (isOccupied?.(newX, newY)) return false;
+
         const tile = getTile(newX, newY);
         const props = TILE_PROPERTIES[tile];
 
-        if (!props.walkable) return false;
+        if (!props?.walkable) return false;
+
+        const oldX = this.gridX;
+        const oldY = this.gridY;
 
         // Store past position for follow logic
-        this.pastPositions.push({ x: this.gridX, y: this.gridY });
+        this.pastPositions.push({ x: oldX, y: oldY });
         if (this.pastPositions.length > 5) {
             this.pastPositions.shift(); // Keep only recent history
         }
+
+        if (newX > oldX) this.facing = 'right';
+        else if (newX < oldX) this.facing = 'left';
+        else if (newY > oldY) this.facing = 'down';
+        else if (newY < oldY) this.facing = 'up';
 
         this.gridX = newX;
         this.gridY = newY;

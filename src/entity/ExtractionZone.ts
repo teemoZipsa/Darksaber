@@ -21,9 +21,8 @@ export class ExtractionZone {
         return dx <= this.radius && dy <= this.radius;
     }
 
-    public update(dt: number) {
-        this.pulseTimer += dt;
-        if (this.pulseTimer > 2) this.pulseTimer -= 2;
+    public update(dt: number): void {
+        this.pulseTimer = (this.pulseTimer + Math.max(0, dt)) % 2;
     }
 
     public render(ctx: CanvasRenderingContext2D, getScreenPos: (gx: number, gy: number) => {x: number, y: number}, tileSize: number): void {
@@ -32,23 +31,29 @@ export class ExtractionZone {
         const minY = this.y - this.radius;
         const maxY = this.y + this.radius;
 
-        // Draw a highlighted zone
-        for (let gy = minY; gy <= maxY; gy++) {
-            for (let gx = minX; gx <= maxX; gx++) {
-                const pos = getScreenPos(gx, gy);
-                if (pos.x < -tileSize || pos.x > window.innerWidth || pos.y < -tileSize || pos.y > window.innerHeight) continue;
+        const canvasWidth = ctx.canvas.width;
+        const canvasHeight = ctx.canvas.height;
 
-                // Pulsing green extraction effect
-                const alpha = 0.2 + (Math.sin(this.pulseTimer * Math.PI) + 1) * 0.15;
-                ctx.fillStyle = `rgba(50, 255, 100, ${alpha})`;
-                ctx.fillRect(pos.x, pos.y, tileSize, tileSize);
-                
-                ctx.strokeStyle = `rgba(100, 255, 150, ${alpha * 2})`;
-                ctx.lineWidth = 2;
-                ctx.strokeRect(pos.x + 2, pos.y + 2, tileSize - 4, tileSize - 4);
+        ctx.save();
+        try {
+            // Draw a highlighted zone
+            for (let gy = minY; gy <= maxY; gy++) {
+                for (let gx = minX; gx <= maxX; gx++) {
+                    const pos = getScreenPos(gx, gy);
+                    if (pos.x < -tileSize || pos.x > canvasWidth || pos.y < -tileSize || pos.y > canvasHeight) continue;
+
+                    // Pulsing green extraction effect
+                    const alpha = 0.2 + (Math.sin(this.pulseTimer * Math.PI) + 1) * 0.15;
+                    ctx.fillStyle = `rgba(50, 255, 100, ${alpha})`;
+                    ctx.fillRect(pos.x, pos.y, tileSize, tileSize);
+                    
+                    ctx.strokeStyle = `rgba(100, 255, 150, ${alpha * 2})`;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(pos.x + 2, pos.y + 2, tileSize - 4, tileSize - 4);
+                }
             }
+        } finally {
+            ctx.restore();
         }
-
-        ctx.textAlign = 'start';
     }
 }

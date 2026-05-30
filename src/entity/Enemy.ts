@@ -3,8 +3,8 @@
  */
 
 import { Entity } from './Entity';
-import { CharacterStats, createBaseStats } from '../data/Stats';
-import { TileType, TILE_PROPERTIES } from '../map/Tile';
+import { createBaseStats, type CharacterStats } from '../data/Stats';
+import { TILE_PROPERTIES, type TileType } from '../map/Tile';
 import type { StatusEffect } from '../combat/StatusEffects';
 import { createEnemyAIProfile, type EnemyAIProfile, type EnemyRole } from '../field/EnemyAI';
 
@@ -31,6 +31,7 @@ export class Enemy extends Entity {
         cooldowns: {},
     };
     private tunedRole: EnemyRole | null = null;
+    private readonly baseStats: CharacterStats;
 
     constructor(
         id: string,
@@ -50,7 +51,7 @@ export class Enemy extends Entity {
         this.aiProfile = createEnemyAIProfile(role);
 
         // Scale stats by level (tuned for balanced early game)
-        this.stats = createBaseStats({
+        this.baseStats = createBaseStats({
             maxHp: 30 + level * 8,
             hp: 30 + level * 8,
             maxMp: 10 + level * 3,
@@ -62,14 +63,21 @@ export class Enemy extends Entity {
             spd: 2 + level * 0.3,
             mov: 2,
         });
+        this.stats = { ...this.baseStats };
         this.applyRoleTuning(role);
     }
 
     public setRole(role: EnemyRole): void {
+        const hpRatio = this.stats.maxHp > 0 ? this.stats.hp / this.stats.maxHp : 1;
+        const mpRatio = this.stats.maxMp > 0 ? this.stats.mp / this.stats.maxMp : 1;
         this.role = role;
         this.aiProfile = createEnemyAIProfile(role);
+        this.tunedRole = null;
+        this.isBoss = role === 'boss';
+        this.stats = { ...this.baseStats };
+        this.stats.hp = Math.max(0, Math.min(this.stats.maxHp, Math.floor(this.stats.maxHp * hpRatio)));
+        this.stats.mp = Math.max(0, Math.min(this.stats.maxMp, Math.floor(this.stats.maxMp * mpRatio)));
         this.applyRoleTuning(role);
-        if (role === 'boss') this.isBoss = true;
     }
 
     /** Check if player is within aggro range (Manhattan distance) */
@@ -88,6 +96,7 @@ export class Enemy extends Entity {
     ): boolean {
         const dx = targetX - this.gridX;
         const dy = targetY - this.gridY;
+        if (dx === 0 && dy === 0) return false;
 
         // Prefer axis with greater distance
         let newX = this.gridX;
@@ -100,7 +109,7 @@ export class Enemy extends Entity {
         }
 
         const tile = getTile(newX, newY);
-        const walkable = TILE_PROPERTIES[tile] && TILE_PROPERTIES[tile].walkable;
+        const walkable = !!TILE_PROPERTIES[tile]?.walkable;
         if (walkable && (!isOccupied || !isOccupied(newX, newY))) {
             // Update facing BEFORE changing position
             if (newX > this.gridX) this.facing = 'right';
@@ -123,7 +132,7 @@ export class Enemy extends Entity {
 
         if (newX !== this.gridX || newY !== this.gridY) {
             const tile2 = getTile(newX, newY);
-            const walk2 = TILE_PROPERTIES[tile2] && TILE_PROPERTIES[tile2].walkable;
+            const walk2 = !!TILE_PROPERTIES[tile2]?.walkable;
             if (walk2 && (!isOccupied || !isOccupied(newX, newY))) {
                 // Update facing BEFORE changing position
                 if (newX > this.gridX) this.facing = 'right';
@@ -145,7 +154,8 @@ export class Enemy extends Entity {
     }
 
     public takeDamage(amount: number): boolean {
-        this.stats.hp = Math.max(0, this.stats.hp - amount);
+        const damage = Number.isFinite(amount) ? Math.max(0, amount) : 0;
+        this.stats.hp = Math.max(0, Math.min(this.stats.maxHp, this.stats.hp - damage));
         return this.stats.hp <= 0; // returns true if dead
     }
 
@@ -207,8 +217,9 @@ export class Enemy extends Entity {
 
     private scaleMaxHp(multiplier: number): void {
         const previousMax = Math.max(1, this.stats.maxHp);
-        const pct = this.stats.hp / previousMax;
+        const wasDead = this.stats.hp <= 0;
+        const pct = Math.max(0, Math.min(1, this.stats.hp / previousMax));
         this.stats.maxHp = Math.max(1, Math.floor(this.stats.maxHp * multiplier));
-        this.stats.hp = Math.max(1, Math.floor(this.stats.maxHp * pct));
+        this.stats.hp = wasDead ? 0 : Math.max(1, Math.floor(this.stats.maxHp * pct));
     }
 }

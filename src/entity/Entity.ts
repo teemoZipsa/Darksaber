@@ -68,10 +68,18 @@ export class Entity {
 
     /** Load a single static image for this entity */
     public setImage(src: string): void {
-        this.image = new Image();
-        this.image.onload = () => { this.imageLoaded = true; };
-        this.image.onerror = () => { this.imageLoaded = false; };
-        this.image.src = src;
+        const image = new Image();
+        this.imageLoaded = false;
+        this.image = image;
+        image.onload = () => {
+            if (this.image !== image) return;
+            this.imageLoaded = true;
+        };
+        image.onerror = () => {
+            if (this.image !== image) return;
+            this.imageLoaded = false;
+        };
+        image.src = src;
     }
 
     public setWalkSprite(
@@ -84,14 +92,33 @@ export class Entity {
         renderScale: number = 1
     ): void {
         const image = new Image();
+        const sprite = { image, frameWidth, frameHeight, frameCount, framesPerSecond, rowByFacing, renderScale };
         this.walkSpriteLoaded = false;
-        this.walkSprite = { image, frameWidth, frameHeight, frameCount, framesPerSecond, rowByFacing, renderScale };
-        image.onload = () => { this.walkSpriteLoaded = true; };
+        this.walkSprite = sprite;
+        image.onload = () => {
+            if (this.walkSprite !== sprite) return;
+            this.walkSpriteLoaded = true;
+        };
         image.onerror = () => {
+            if (this.walkSprite !== sprite) return;
             this.walkSpriteLoaded = false;
             this.walkSprite = undefined;
         };
         image.src = src;
+    }
+
+    public setGridPosition(gridX: number, gridY: number, instant = false): void {
+        this.gridX = gridX;
+        this.gridY = gridY;
+
+        if (!instant) return;
+
+        this.pixelX = gridX;
+        this.pixelY = gridY;
+        this.stepTargetX = gridX;
+        this.stepTargetY = gridY;
+        this.stepping = false;
+        this.settlePause = 0;
     }
 
     public update(dt: number): void {
