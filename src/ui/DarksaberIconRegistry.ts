@@ -12,6 +12,7 @@ export const ACTION_ICON_CELLS: Partial<Record<ActionType, IconCell>> = {
     move: cell(15, 1),
     open: cell(19, 1),
     tool: cell(3, 0),
+    rest: cell(8, 0),
 };
 
 export const STATUS_KIND_ICON_CELLS: Record<StatusKind, IconCell> = {

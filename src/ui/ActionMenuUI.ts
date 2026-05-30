@@ -332,6 +332,7 @@ export class ActionMenuUI {
     }
 
     private drawRestIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
+        if (ActionMenuUI.drawActionIconCell(ctx, 'rest', cx, cy, s, ready)) return;
         ctx.fillStyle = ready ? '#88ccff' : 'rgba(255,255,255,0.25)';
         ctx.font = `bold ${s * 1.2}px ${UI.fontMono}`;
         ctx.textAlign = 'center';
