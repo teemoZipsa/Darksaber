@@ -23,6 +23,7 @@ import type { WorldMovementController } from '../../src/engine/world/WorldMoveme
 import { WorldRaidSession } from '../../src/engine/world/WorldRaidSession';
 import { WorldSelectionController } from '../../src/engine/world/WorldSelectionController';
 import { GridInventory } from '../../src/inventory/GridInventory';
+import { BURGOS_CASTLE_HMAP_ROWS, BURGOS_CASTLE_HMAP_SIZE } from '../../src/map/BurgosCastleHmap';
 import { WorldMap } from '../../src/map/WorldMap';
 import { TileType } from '../../src/map/Tile';
 
@@ -75,6 +76,22 @@ test('Burgos Castle is a world-map dungeon entrance landmark', () => {
     assert.equal(world.getDungeonAtTile(entrance.x, entrance.y)?.id, BURGOS_CASTLE_DUNGEON_ID);
     assert.equal(world.getTileAt(entrance.x, entrance.y), TileType.DUNGEON_ENTRANCE);
     assert.ok(world.getMapLandmarks().some((landmark) => landmark.kind === 'dungeon' && landmark.label === '부르고스성'));
+});
+
+test('Burgos Castle uses the original 01hmap footprint around its entrance', () => {
+    const world = new WorldMap();
+    const dungeon = world.getDungeons().find((candidate) => candidate.id === BURGOS_CASTLE_DUNGEON_ID);
+    assert.ok(dungeon);
+
+    assert.equal(BURGOS_CASTLE_HMAP_ROWS.length, BURGOS_CASTLE_HMAP_SIZE);
+    assert.ok(BURGOS_CASTLE_HMAP_ROWS.every((row) => row.length === BURGOS_CASTLE_HMAP_SIZE));
+
+    const entrance = world.getDungeonEntranceTile(dungeon);
+    assert.equal(world.getTileAt(entrance.x, entrance.y), TileType.DUNGEON_ENTRANCE);
+    assert.equal(world.getTileAt(entrance.x, entrance.y + 24), TileType.ROAD);
+    assert.equal(world.getTileAt(entrance.x, entrance.y + 51), TileType.WATER);
+    assert.equal(world.getTileAt(entrance.x - 54, entrance.y - 54), TileType.SAND);
+    assert.equal(world.getTileAt(entrance.x - 69, entrance.y - 69), TileType.FOREST);
 });
 
 test('starter field content attaches all 16 general monster walk sprites', () => {

@@ -4,6 +4,7 @@ import { TileAssetManager, type LandmarkSpriteId } from './TileAssetManager';
 import { LootObject } from '../entity/LootObject';
 import { ExtractionZone } from '../entity/ExtractionZone';
 import { BiomeMask, BiomeType, MAP_HEIGHT, MAP_WIDTH, TempleInfo, TownInfo, WorldRealm } from './BiomeMask';
+import { getBurgosCastleHmapTileAt } from './BurgosCastleHmap';
 
 export interface TileBounds {
     width: number;
@@ -140,6 +141,8 @@ const DUNGEON_LANDMARKS: WorldDungeonInfo[] = [
     { id: 'dark_cave', nameKr: '암흑 동굴', chunkX: 62, chunkY: 48, sprite: 'caveEntrance', tileSpan: 3, tileRadius: 4 },
     { id: 'burgos_castle', nameKr: '부르고스성', chunkX: 43, chunkY: 40, sprite: 'castle', tileSpan: 4, tileRadius: 4 },
 ];
+
+const BURGOS_CASTLE_DUNGEON = DUNGEON_LANDMARKS.find((dungeon) => dungeon.id === 'burgos_castle');
 
 export class WorldMap {
     private chunks: Map<string, Chunk> = new Map();
@@ -380,6 +383,9 @@ export class WorldMap {
         const { chunkX, chunkY, localX, localY } = this.tileToChunk(tx, ty);
         if (!this.isChunkInBounds(chunkX, chunkY)) return TileType.DEEP_WATER;
 
+        const burgosCastleTile = this.getBurgosCastleHmapTile(tx, ty);
+        if (burgosCastleTile !== null) return burgosCastleTile;
+
         if (this.getTempleAtTile(tx, ty)) return TileType.DUNGEON_ENTRANCE;
         if (this.getDungeonAtTile(tx, ty)) return TileType.DUNGEON_ENTRANCE;
 
@@ -406,6 +412,11 @@ export class WorldMap {
 
         const base = BIOME_TILE[biome];
         return this.varyBiomeTile(base, tx, ty);
+    }
+
+    private getBurgosCastleHmapTile(tx: number, ty: number): TileType | null {
+        if (!BURGOS_CASTLE_DUNGEON) return null;
+        return getBurgosCastleHmapTileAt(tx, ty, this.getDungeonEntranceTile(BURGOS_CASTLE_DUNGEON));
     }
 
     private generateChunk(chunkX: number, chunkY: number): Chunk {
