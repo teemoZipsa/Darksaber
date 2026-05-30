@@ -62,8 +62,8 @@ export class ActionMenuUI {
     constructor() {
         const TAU = Math.PI * 2;
         this.slots = [
-            { type: 'attack', label: '공격', angle: TAU / 4,     iconDraw: this.drawAttackIcon },
-            { type: 'magic',  label: '마법', angle: TAU / 8,     iconDraw: this.drawMagicIcon },
+            { type: 'attack', label: '공격', angle: TAU / 8,     iconDraw: this.drawAttackIcon },
+            { type: 'magic',  label: '마법', angle: TAU / 4,     iconDraw: this.drawMagicIcon },
             { type: 'tool',   label: '도구', angle: TAU * 3 / 8, iconDraw: this.drawToolIcon },
             { type: 'open',   label: '조사', angle: TAU / 2,     iconDraw: this.drawOpenIcon },
             { type: 'rest',   label: '휴식', angle: TAU * 5 / 8, iconDraw: this.drawRestIcon },

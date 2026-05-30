@@ -7,9 +7,9 @@ const cell = (col: number, row: number): IconCell => ({ col, row });
 
 export const ACTION_ICON_CELLS: Partial<Record<ActionType, IconCell>> = {
     attack: cell(1, 0),
-    magic: cell(13, 1),
+    magic: cell(2, 0),
     defend: cell(2, 2),
-    move: cell(15, 1),
+    move: cell(0, 0),
     open: cell(19, 1),
     tool: cell(3, 0),
     rest: cell(8, 0),
