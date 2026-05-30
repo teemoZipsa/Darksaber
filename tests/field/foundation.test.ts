@@ -312,7 +312,7 @@ test('field AP continuation requires affordable and executable actions', () => {
         hasReachableMove: false,
         hasAttackTarget: true,
         hasInteractTarget: true,
-    }), true);
+    }), false);
 
     assert.equal(hasExecutableFieldAction({
         remainingAp: MOVE_AP_PER_TILE - 1,

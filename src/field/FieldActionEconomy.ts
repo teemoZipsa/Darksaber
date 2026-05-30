@@ -41,7 +41,6 @@ export function hasExecutableFieldAction(state: ExecutableActionState): boolean 
     return (
         (state.remainingAp >= MOVE_AP_PER_TILE && state.hasReachableMove) ||
         (state.remainingAp >= ATTACK_AP_COST && state.hasAttackTarget) ||
-        (state.remainingAp >= INTERACT_AP_COST && state.hasInteractTarget) ||
         (state.remainingAp >= MAGIC_AP_COST && Boolean(state.hasMagicAvailable)) ||
         (state.remainingAp >= getActionApCost('tool') && Boolean(state.hasToolAvailable))
     );
