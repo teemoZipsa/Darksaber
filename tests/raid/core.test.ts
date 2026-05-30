@@ -15,7 +15,6 @@ import { getSellPrice, getShopItems, isSellableItem } from '../../src/data/ShopD
 import { BUY_PRESSURE_CAP, LocalMarketService, MARKET_DRIFT_CAP, SELL_PRESSURE_CAP } from '../../src/data/MarketService';
 import { marketStateKey } from '../../src/data/MarketData';
 import { PlayerData } from '../../src/data/PlayerData';
-import { TileType } from '../../src/map/Tile';
 import { REST_FACILITIES, getRestFacility, getRestMenu } from '../../src/data/RestFacilityData';
 import { TOWN_FACILITIES, getTownFacilities, hasTownFacility } from '../../src/data/TownFacilityData';
 import { TownUI } from '../../src/ui/TownUI';
