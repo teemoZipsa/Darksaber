@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Character } from '../../src/character/Character';
 import { createStatus, hasStatus } from '../../src/combat/StatusEffects';
 import { Player } from '../../src/entity/Player';
+import { getActionApCost } from '../../src/field/FieldActionEconomy';
 import type { FieldActor } from '../../src/field/FieldTypes';
 import { WorldEngine } from '../../src/engine/WorldEngine';
 
@@ -37,10 +38,16 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
     engine.partyActors = [actor];
     engine.fieldEnemies = [];
     engine.combatLog = [];
-    engine.actionMenuUI = { close: () => calls.push('closeActionMenu') };
+    engine.actionMenuUI = {
+        close: () => calls.push('closeActionMenu'),
+        getIsOpen: () => false,
+        open: () => calls.push('openActionMenu'),
+    };
     engine.tacticalController = { close: () => calls.push('closeTacticalMenu') };
     engine.playerActionController = {
         hasExecutableAction: () => true,
+        getTurnActionStates: () => [],
+        getMode: () => null,
         clearTargeting: () => calls.push('clearTargeting'),
     };
     engine.magicController = { reset: () => calls.push('resetMagic') };
@@ -93,6 +100,38 @@ test('major action flag is set explicitly and cleared on turn end', () => {
 
     engine.endActorTurn(actor, 'test');
     assert.equal(engine.majorActionUsedThisTurn, false);
+});
+
+test('spending AP falls back to active actor gauge when remaining turn gauge is stale', () => {
+    const actor = makeActor('hero');
+    actor.entity.actionGauge = 100;
+    const { engine } = makeEngineHarness(actor);
+    engine.remainingActionPoints = 0;
+
+    assert.equal(engine.spendAp(getActionApCost('move')), true);
+    assert.equal(engine.remainingActionPoints, 80);
+    assert.equal(actor.entity.actionGauge, 80);
+});
+
+test('network snapshot resolves zero remaining gauge from ready actor action gauge', () => {
+    const actor = makeActor('hero');
+    const { engine } = makeEngineHarness(actor);
+
+    assert.equal(engine.resolveSnapshotRemainingGauge(0, 100), 100);
+    assert.equal(engine.resolveSnapshotRemainingGauge(0, 10), 0);
+    assert.equal(engine.resolveSnapshotRemainingGauge(25, 80), 25);
+});
+
+test('network move reopens the action menu when the server confirms the moved tile and ATB remains', () => {
+    const actor = makeActor('hero');
+    const { engine, calls } = makeEngineHarness(actor);
+    engine.remainingActionPoints = 80;
+    engine.pendingNetworkMoveReopen = { intentId: 'move-1', actorId: actor.id, tile: { x: 1, y: 0 } };
+
+    engine.reopenPendingNetworkMoveMenu([{ id: actor.id, tile: { x: 1, y: 0 } }]);
+
+    assert.equal(engine.pendingNetworkMoveReopen, null);
+    assert.ok(calls.includes('openActionMenu'));
 });
 
 test('resting status recovers over time and clears at full resources', () => {

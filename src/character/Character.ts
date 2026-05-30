@@ -219,10 +219,13 @@ export class Character {
 
     /** Update portrait image based on current tier */
     public updatePortrait(): void {
+        this.loadPortraitSrc(this.getPortraitSrc());
+    }
+
+    public getPortraitSrc(): string {
         const tierMap = Character.TIER_PORTRAITS[this.classLineId];
         if (!tierMap) {
-            this.loadPortraitSrc('/assets/images/characters/darksaber/infantry_t1.png');
-            return;
+            return '/assets/images/characters/darksaber/infantry_t1.png';
         }
 
         // Find best matching image: current tier, or closest lower tier
@@ -236,7 +239,7 @@ export class Character {
             bestSrc = keys.length > 0 ? tierMap[keys[0]] : '/assets/images/characters/darksaber/infantry_t1.png';
         }
 
-        this.loadPortraitSrc(bestSrc);
+        return bestSrc;
     }
 
     private loadPortraitSrc(src: string): void {

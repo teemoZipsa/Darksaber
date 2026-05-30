@@ -78,11 +78,10 @@ test('combat tool use recovers, spends AP, and removes one item atomically', () 
     assert.equal(ap.value, 0);
     assert.equal(inventory.items.length, 0);
     assert.ok(events.includes('heal:50'));
-    assert.ok(events.includes('major'));
     assert.ok(events.includes('resume'));
 });
 
-test('combat tool use marks the turn major action and blocks a second tool', () => {
+test('combat tool can be used again while enough partial ATB and effective recovery remain', () => {
     const actor = makeActor();
     const inventory = new GridInventory(4, 4);
     const herb = getItemDef('herb_cheap');
@@ -97,10 +96,11 @@ test('combat tool use marks the turn major action and blocks a second tool', () 
     controller.useTool('herb_cheap');
     controller.useTool('herb_cheap');
 
-    assert.equal(majorUsed.value, true);
-    assert.equal(ap.value, getActionApCost('tool'));
-    assert.equal(inventory.items.length, 1);
-    assert.ok(events.includes('이번 턴에는 공격/마법/도구를 이미 사용했습니다.'));
+    assert.equal(majorUsed.value, false);
+    assert.equal(actor.character.stats.hp, 100);
+    assert.equal(ap.value, 0);
+    assert.equal(inventory.items.length, 0);
+    assert.equal(events.filter((event) => event.startsWith('heal:')).length, 2);
 });
 
 test('combat tool fails without AP and does not mutate HP or inventory', () => {

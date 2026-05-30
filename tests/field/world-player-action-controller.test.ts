@@ -4,7 +4,7 @@ import { Character } from '../../src/character/Character';
 import { hasStatus } from '../../src/combat/StatusEffects';
 import { Enemy } from '../../src/entity/Enemy';
 import { Player } from '../../src/entity/Player';
-import { ATTACK_AP_COST, MAGIC_AP_COST, MOVE_AP_PER_TILE, getActionApCost } from '../../src/field/FieldActionEconomy';
+import { ATTACK_AP_COST, MAGIC_AP_COST, getActionApCost } from '../../src/field/FieldActionEconomy';
 import type { FieldActor, FieldEnemy } from '../../src/field/FieldTypes';
 import { WorldPlayerActionController, type WorldPlayerActionContext } from '../../src/engine/world/WorldPlayerActionController';
 
@@ -100,14 +100,14 @@ function makeController(actor: FieldActor, remainingAp: number, options: Control
 
 test('player turn continuation ends when remaining AP cannot pay for movement', () => {
     const actor = makeActor('hero', 0, 0);
-    const controller = makeController(actor, MOVE_AP_PER_TILE - 1);
+    const controller = makeController(actor, getActionApCost('move') - 1);
 
     assert.equal(controller.hasExecutableAction(actor), false);
 });
 
 test('player turn continuation remains active when movement is affordable', () => {
     const actor = makeActor('hero', 0, 0);
-    const controller = makeController(actor, MOVE_AP_PER_TILE);
+    const controller = makeController(actor, getActionApCost('move'));
 
     assert.equal(controller.hasExecutableAction(actor), true);
 });
@@ -149,13 +149,13 @@ test('turn action states always expose tool with disabled reasons', () => {
     assert.equal(lowApController.getAvailableTurnActions(actor).includes('tool'), false);
     assert.equal(noToolController.getAvailableTurnActions(actor).includes('tool'), false);
     assert.equal(readyController.getAvailableTurnActions(actor).includes('tool'), true);
-    assert.equal(lowApController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.disabledReason, '도구 AP 부족');
+    assert.equal(lowApController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.disabledReason, 'ATB 부족');
     assert.equal(noToolController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.disabledReason, '회복 도구 없음');
     assert.equal(noEffectController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.disabledReason, '회복 효과 없음');
     assert.equal(readyController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.enabled, true);
 });
 
-test('major action use disables attack, magic, and tool but keeps movement available', () => {
+test('partial ATB keeps attack, magic, tool, and movement available when costs can be paid', () => {
     const actor = makeActor('hero', 0, 0);
     const enemy = makeEnemyEntry('enemy', 1, 0);
     const used = { value: true };
@@ -167,17 +167,17 @@ test('major action use disables attack, magic, and tool but keeps movement avail
     });
     const states = controller.getTurnActionStates(actor);
 
-    assert.equal(states.find((state) => state.type === 'attack')?.enabled, false);
-    assert.equal(states.find((state) => state.type === 'magic')?.enabled, false);
-    assert.equal(states.find((state) => state.type === 'tool')?.enabled, false);
+    assert.equal(states.find((state) => state.type === 'attack')?.enabled, true);
+    assert.equal(states.find((state) => state.type === 'magic')?.enabled, true);
+    assert.equal(states.find((state) => state.type === 'tool')?.enabled, true);
     assert.equal(states.find((state) => state.type === 'move')?.enabled, true);
-    assert.equal(states.find((state) => state.type === 'attack')?.disabledReason, '이번 턴 주요 행동 사용됨');
+    assert.equal(states.find((state) => state.type === 'attack')?.costLabel, 'ATB -25%');
 });
 
 test('defend applies guard and the integrated counter readiness', () => {
     const actor = makeActor('hero', 0, 0);
     actor.entity.actionGauge = 100;
-    const controller = makeController(actor, 0);
+    const controller = makeController(actor, getActionApCost('defend'));
 
     controller.execute('defend');
 

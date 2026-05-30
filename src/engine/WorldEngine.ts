@@ -44,7 +44,7 @@ import { fuseActivePartyBranch, getFusionCandidates, hasActiveMasterCharacter } 
 import type { MasterBranch } from '../data/ClassTree';
 import { TilePoint, manhattan, tileKey } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
-import { FIELD_MAX_ACTION_GAUGE, enqueueReadyActor } from '../field/FieldActionEconomy';
+import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST, enqueueReadyActor } from '../field/FieldActionEconomy';
 import { hasLineOfSight } from '../field/LineOfSight';
 import {
     AttackPatternProfile,
@@ -108,6 +108,7 @@ export class WorldEngine {
     private isNetworkRaid = false;
     private isNetworkRaidConnecting = false;
     private networkPlayerId: string | null = null;
+    private pendingNetworkMoveReopen: { intentId: string; actorId: string; tile: TilePoint } | null = null;
     private pendingLootPicks = new Map<string, { placed: PlacedItem; source: { gridX: number; gridY: number }; at: number }>();
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
@@ -254,7 +255,7 @@ export class WorldEngine {
                 getPartyActors: () => this.partyActors,
                 getFieldEnemies: () => this.fieldEnemies,
                 getEnemyById: (enemyId) => this.getEnemyById(enemyId),
-                getRemainingActionPoints: () => this.remainingActionPoints,
+                getRemainingActionPoints: () => this.getSpendableActionGauge(),
                 getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
                 getBoundsTiles: () => this.worldMap.getBoundsTiles(),
                 hasFieldLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to),
@@ -295,7 +296,7 @@ export class WorldEngine {
         this.toolController = new WorldToolController(
             {
                 getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
-                getRemainingActionPoints: () => this.remainingActionPoints,
+                getRemainingActionPoints: () => this.getSpendableActionGauge(),
                 getInventoryItems: () => this.gameManager.inventory.items,
                 removeInventoryItem: (placed) => this.gameManager.inventory.remove(placed),
                 spendAp: (cost) => this.spendAp(cost),
@@ -316,7 +317,7 @@ export class WorldEngine {
                 getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
                 getPartyActors: () => this.partyActors,
                 getFieldEnemies: () => this.fieldEnemies,
-                getRemainingActionPoints: () => this.remainingActionPoints,
+                getRemainingActionPoints: () => this.getSpendableActionGauge(),
                 getReservedAction: () => this.reservedAction,
                 getActiveTurnActorId: () => this.activeTurnActorId,
                 getActorTerrainMovementBudget: (actor) => this.getActorTerrainMovementBudget(actor),
@@ -411,7 +412,7 @@ export class WorldEngine {
             getPartyActors: () => this.partyActors,
             getFieldEnemies: () => this.fieldEnemies,
             getActiveTurnActorId: () => this.activeTurnActorId,
-            getRemainingActionPoints: () => this.remainingActionPoints,
+                getRemainingActionPoints: () => this.getSpendableActionGauge(),
             getMajorActionUsedThisTurn: () => this.majorActionUsedThisTurn,
             getHoverTile: () => this.hoverTile,
             getAttackCues: () => this.attackCues,
@@ -602,6 +603,8 @@ export class WorldEngine {
             this.dismissedDungeonVisitKey = null;
             this.party.resetForNewRaid();
             this.townSession.applyPendingRestForRaidStart();
+            this.remotePartyActors.clear();
+            this.partyActors = [];
             this.placePartyNear(welcome.spawnTile);
             this.player = this.getControlledActor()?.entity ?? this.player;
             this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
@@ -754,7 +757,6 @@ export class WorldEngine {
             const actorSnapshot = ownByLocalId.get(character.id);
             const existing = previousActors.find((actor) => actor.character === character);
             if (!actorSnapshot) {
-                if (existing) nextLocalActors.push(existing);
                 continue;
             }
             const actor = existing ?? {
@@ -832,7 +834,10 @@ export class WorldEngine {
             ? controlled.id
             : ownReady[0] ?? null;
         this.remainingActionPoints = this.activeTurnActorId
-            ? snapshot.remainingApByActor[this.activeTurnActorId] ?? 0
+            ? this.resolveSnapshotRemainingGauge(
+                snapshot.remainingApByActor[this.activeTurnActorId] ?? 0,
+                ownSnapshots.find((actor) => actor.id === this.activeTurnActorId)?.actionGauge ?? 0
+            )
             : 0;
         this.majorActionUsedThisTurn = this.activeTurnActorId
             ? Boolean(ownSnapshots.find((actor) => actor.id === this.activeTurnActorId)?.majorActionUsed)
@@ -841,6 +846,7 @@ export class WorldEngine {
             this.player = controlled.entity;
             if (!this.selectionController.hasSelection()) this.selectionController.selectActor(controlled.id);
         }
+        this.reopenPendingNetworkMoveMenu(ownSnapshots);
     }
 
     private applyActorSnapshot(actor: FieldActor, snapshot: ActorSnapshot): void {
@@ -940,6 +946,9 @@ export class WorldEngine {
     }
 
     private handleNetworkActionRejected(rejection: ActionRejectedMessage): void {
+        if (this.pendingNetworkMoveReopen?.intentId === rejection.intentId) {
+            this.pendingNetworkMoveReopen = null;
+        }
         const pending = this.pendingLootPicks.get(rejection.intentId);
         if (pending) {
             this.pendingLootPicks.delete(rejection.intentId);
@@ -1037,6 +1046,7 @@ export class WorldEngine {
 
     private closeNetworkRaidClient(sendLeave: boolean, reason: 'town' | 'wipe' | 'manual' = 'manual'): void {
         this.pendingLootPicks.clear();
+        this.remotePartyActors.clear();
         if (!this.networkRaidClient) return;
         if (sendLeave) this.networkRaidClient.leave(reason);
         else this.networkRaidClient.close();
@@ -1398,7 +1408,8 @@ export class WorldEngine {
 
     private submitNetworkMoveIntent(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean {
         if (!this.isNetworkRaid || !this.networkRaidClient) return false;
-        this.networkRaidClient.sendIntent(actor.id, 'move', { tile, path, apCost, pathCost });
+        const intentId = this.networkRaidClient.sendIntent(actor.id, 'move', { tile, path, apCost, pathCost });
+        this.pendingNetworkMoveReopen = { intentId, actorId: actor.id, tile: { ...tile } };
         return true;
     }
 
@@ -1603,6 +1614,10 @@ export class WorldEngine {
         if (!actor) return;
         this.selectionController.selectActor(actor.id);
 
+        if (!this.activeTurnActorId && actor.entity.actionGauge >= FIELD_MAX_ACTION_GAUGE) {
+            this.beginActorTurn(actor);
+        }
+
         if (actor.id !== this.activeTurnActorId) {
             this.addCombatLog('아직 행동 순서가 아닙니다.');
             return;
@@ -1622,6 +1637,7 @@ export class WorldEngine {
     }
 
     private spendAp(cost: number): boolean {
+        if (this.remainingActionPoints <= 0) this.remainingActionPoints = this.getSpendableActionGauge();
         if (cost < 0 || this.remainingActionPoints < cost) return false;
         this.remainingActionPoints -= cost;
         const actor = this.getActivePartyTurnActor();
@@ -1632,7 +1648,7 @@ export class WorldEngine {
     private resumeOrEndActiveTurn(actor: FieldActor): void {
         if (actor.id !== this.activeTurnActorId) return;
         if (actor.character.isDead || actor.character.stats.hp <= 0) {
-            this.endActorTurn(actor, '행동 불능');
+            this.endActorTurn(actor, '행동 불능', 0);
             return;
         }
         if (this.playerActionController.hasExecutableAction(actor)) {
@@ -1645,6 +1661,9 @@ export class WorldEngine {
     private reopenActionMenu(actor: FieldActor): void {
         if (actor.id !== this.activeTurnActorId) return;
         if (actor.character.isDead || actor.character.stats.hp <= 0) return;
+        if (this.remainingActionPoints <= 0 && actor.entity.actionGauge >= MIN_FIELD_ACTION_GAUGE_COST) {
+            this.remainingActionPoints = Math.floor(actor.entity.actionGauge);
+        }
         this.selectionController.selectActor(actor.id);
         this.closeTacticalMenu();
         this.actionMenuUI.open(this.playerActionController.getTurnActionStates(actor));
@@ -1873,6 +1892,37 @@ export class WorldEngine {
 
     private getActorTerrainStepCost(actor: FieldActor, tile: TilePoint): number {
         return getTerrainMoveCost(this.worldMap.getTileAt(tile.x, tile.y), this.getActorTerrainTraits(actor));
+    }
+
+    private getSpendableActionGauge(): number {
+        const actor = this.getActivePartyTurnActor();
+        if (!actor) return this.remainingActionPoints;
+        return Math.max(this.remainingActionPoints, Math.floor(actor.entity.actionGauge));
+    }
+
+    private resolveSnapshotRemainingGauge(remainingGauge: number, actionGauge: number): number {
+        if (remainingGauge > 0) return remainingGauge;
+        return actionGauge >= MIN_FIELD_ACTION_GAUGE_COST ? Math.floor(actionGauge) : 0;
+    }
+
+    private reopenPendingNetworkMoveMenu(ownSnapshots: ActorSnapshot[]): void {
+        const pending = this.pendingNetworkMoveReopen;
+        if (!pending) return;
+
+        const actorSnapshot = ownSnapshots.find((actor) => actor.id === pending.actorId);
+        if (!actorSnapshot) {
+            this.pendingNetworkMoveReopen = null;
+            return;
+        }
+        if (actorSnapshot.tile.x !== pending.tile.x || actorSnapshot.tile.y !== pending.tile.y) return;
+
+        this.pendingNetworkMoveReopen = null;
+        const actor = this.partyActors.find((entry) => entry.id === pending.actorId);
+        if (!actor || actor.id !== this.activeTurnActorId) return;
+        if (this.remainingActionPoints < MIN_FIELD_ACTION_GAUGE_COST) return;
+        if (this.actionMenuUI.getIsOpen()) return;
+        if (this.playerActionController.getMode() !== null) return;
+        if (this.playerActionController.hasExecutableAction(actor)) this.reopenActionMenu(actor);
     }
 
     private hasFieldLineOfSight(from: TilePoint, to: TilePoint): boolean {

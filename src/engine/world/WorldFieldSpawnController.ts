@@ -83,11 +83,12 @@ export class WorldFieldSpawnController {
             const entity = new Player(tile.x, tile.y);
             entity.color = ACTOR_COLORS[index % ACTOR_COLORS.length];
             entity.label = character.name;
+            character.updatePortrait();
             if (character.portraitImage && character.portraitLoaded) {
                 entity.image = character.portraitImage;
                 entity.imageLoaded = true;
             } else {
-                entity.setImage(character.portraitImage?.src || '/assets/images/characters/darksaber/infantry_t1.png');
+                entity.setImage(character.getPortraitSrc());
             }
             if (character.classLineId === 'infantry' && character.currentTier === 1) {
                 entity.setWalkSprite(

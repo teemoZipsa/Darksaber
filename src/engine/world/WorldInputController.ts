@@ -84,6 +84,10 @@ export class WorldInputController {
         this.context.tacticalController.onMouseMove(input.uiMouseX, input.uiMouseY);
         this.context.magicController.updateHoverPreview(hoverTile);
 
+        if (input.mouseJustDown && this.context.actionMenuUI.getIsOpen()) {
+            if (this.handleActionMenuClick(input, camera)) return;
+        }
+
         if (this.isInputLockedByReservation()) return;
 
         if (input.justPressed('KeyM')) {
@@ -136,16 +140,7 @@ export class WorldInputController {
         }
 
         if (this.context.actionMenuUI.getIsOpen()) {
-            const result = this.context.actionMenuUI.onClick(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
-            if (result) {
-                if (result.enabled) {
-                    this.context.playerActionController.execute(result.type);
-                } else {
-                    this.context.log(result.disabledReason ?? '지금 사용할 수 없는 행동입니다.');
-                }
-                return;
-            }
-            this.context.closeActionMenu();
+            if (this.handleActionMenuClick(input, camera)) return;
         }
 
         if (this.context.playerActionController.getMode()) {
@@ -177,6 +172,20 @@ export class WorldInputController {
                 this.context.log('갈 수 없는 위치입니다.');
                 break;
         }
+    }
+
+    private handleActionMenuClick(input: InputManager, camera: Camera): boolean {
+        const result = this.context.actionMenuUI.onClick(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
+        if (result) {
+            if (result.enabled) {
+                this.context.playerActionController.execute(result.type);
+            } else {
+                this.context.log(result.disabledReason ?? '지금 사용할 수 없는 행동입니다.');
+            }
+            return true;
+        }
+        this.context.closeActionMenu();
+        return false;
     }
 
     private handleFieldRightClick(tile: TilePoint, input: InputManager): void {

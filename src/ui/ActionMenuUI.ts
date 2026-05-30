@@ -120,7 +120,7 @@ export class ActionMenuUI {
             }
             const ix = this.centerX + Math.sin(slot.angle) * this.menuRadius;
             const iy = this.centerY - Math.cos(slot.angle) * this.menuRadius;
-            if (Math.hypot(mx - ix, my - iy) <= this.hitRadius) {
+            if (this.isSlotHit(mx, my, ix, iy)) {
                 this.hoveredSlot = slot.type;
                 break;
             }
@@ -136,7 +136,7 @@ export class ActionMenuUI {
             }
             const ix = this.centerX + Math.sin(slot.angle) * this.menuRadius;
             const iy = this.centerY - Math.cos(slot.angle) * this.menuRadius;
-            if (Math.hypot(mx - ix, my - iy) <= this.hitRadius) {
+            if (this.isSlotHit(mx, my, ix, iy)) {
                 return {
                     type: slot.type,
                     enabled: state.enabled,
@@ -261,6 +261,11 @@ export class ActionMenuUI {
 
     private getSlotState(type: ActionType): ActionMenuSlotState {
         return this.slotStates.get(type) ?? { type, enabled: true };
+    }
+
+    private isSlotHit(mx: number, my: number, ix: number, iy: number): boolean {
+        if (Math.hypot(mx - ix, my - iy) <= this.hitRadius) return true;
+        return Math.abs(mx - ix) <= 30 && my >= iy + this.iconRadius + 2 && my <= iy + this.iconRadius + 24;
     }
 
     private renderHoveredDisabledReason(ctx: CanvasRenderingContext2D): void {

@@ -151,14 +151,14 @@ test('assist AI only helps controlled targets inside leash', () => {
 });
 
 test('field AP movement cost excludes the starting tile', () => {
-    assert.equal(MOVE_AP_PER_TILE, 2);
+    assert.equal(MOVE_AP_PER_TILE, 1);
     assert.equal(getMoveApCost(0), 0);
-    assert.equal(getMoveApCost(3), 6);
-    assert.equal(getMoveApCost(5), 10);
+    assert.equal(getMoveApCost(3), 20);
+    assert.equal(getMoveApCost(5), 20);
 });
 
-test('rest ends a turn without an AP cost', () => {
-    assert.equal(getActionApCost('rest'), 0);
+test('rest spends partial ATB like other field actions', () => {
+    assert.equal(getActionApCost('rest'), 20);
 });
 
 test('terrain rules cover every TileType and battle stage adapter stays shared', () => {
@@ -188,9 +188,9 @@ test('weighted pathing uses the same terrain cost and AP rounding for reach and 
     const forest = reachable.get('2,0');
     assert.ok(forest);
     assert.equal(forest.cost, 2.8);
-    assert.equal(terrainCostToApCost(forest.cost), 6);
-    assert.equal(canAffordTerrainCost(forest.cost, 6), true);
-    assert.equal(canAffordTerrainCost(forest.cost, 5), false);
+    assert.equal(terrainCostToApCost(forest.cost), 3);
+    assert.equal(canAffordTerrainCost(forest.cost, 3), true);
+    assert.equal(canAffordTerrainCost(forest.cost, 2), false);
     assert.equal(reachable.has('3,0'), false);
 
     const path = findPathWithCost({ x: 0, y: 0 }, { x: 2, y: 0 }, passable, stepCost, { maxCost: 3 });
@@ -294,7 +294,7 @@ test('ready queue is FIFO and rejects duplicate actors', () => {
 
 test('field AP continuation requires affordable and executable actions', () => {
     assert.equal(hasExecutableFieldAction({
-        remainingAp: ATTACK_AP_COST,
+        remainingAp: INTERACT_AP_COST - 1,
         hasReachableMove: false,
         hasAttackTarget: false,
         hasInteractTarget: false,
@@ -311,11 +311,18 @@ test('field AP continuation requires affordable and executable actions', () => {
         remainingAp: INTERACT_AP_COST,
         hasReachableMove: false,
         hasAttackTarget: true,
-        hasInteractTarget: true,
+        hasInteractTarget: false,
     }), false);
 
     assert.equal(hasExecutableFieldAction({
-        remainingAp: MOVE_AP_PER_TILE - 1,
+        remainingAp: INTERACT_AP_COST,
+        hasReachableMove: false,
+        hasAttackTarget: false,
+        hasInteractTarget: true,
+    }), true);
+
+    assert.equal(hasExecutableFieldAction({
+        remainingAp: getActionApCost('move') - 1,
         hasReachableMove: true,
         hasAttackTarget: true,
         hasInteractTarget: false,

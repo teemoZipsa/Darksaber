@@ -809,6 +809,7 @@
 }
 
 #ui-overlay .inv-equip {
+    position: relative;
     display: grid; gap: 8px;
     grid-template-columns: repeat(3, 52px);
     grid-template-rows: repeat(3, 52px);
@@ -817,12 +818,26 @@
         "weap body   shld"
         ".    boots  .";
 }
+#ui-overlay .inv-equip::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 50% 52%, rgba(240, 192, 80, 0.12), transparent 58%),
+        url('/assets/images/ui/equipment_silhouette.png') center / contain no-repeat;
+    opacity: 0.42;
+    filter: sepia(0.25) saturate(0.75) brightness(0.82);
+}
 #ui-overlay .inv-eqslot {
     position: relative;
-    background: var(--ds-panel-inset);
+    z-index: 1;
+    background: rgba(13, 14, 18, 0.58);
     border: 1px dashed var(--ds-border-shadow);
     border-radius: var(--ds-radius-sm);
     display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(0.5px);
 }
 #ui-overlay .inv-eqslot__label { font-size: 10px; color: var(--ds-text-dim); text-align: center; }
 #ui-overlay .inv-eqslot--head { grid-area: head; }

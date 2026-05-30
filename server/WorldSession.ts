@@ -327,9 +327,12 @@ export class WorldSession {
             for (const actorId of player.actorIds) {
                 const actor = this.actors.get(actorId);
                 if (!actor || actor.isDead) continue;
-                if (actor.actionGauge < 100) {
+                if (actor.actionGauge >= FIELD_MAX_ACTION_GAUGE && actor.remainingAp <= 0) {
+                    actor.remainingAp = FIELD_MAX_ACTION_GAUGE;
+                    actor.majorActionUsed = false;
+                } else if (actor.actionGauge < FIELD_MAX_ACTION_GAUGE) {
                     actor.actionGauge = advanceAtb(actor.actionGauge, getEffectiveStats(actor.stats, actor.statuses).spd, dt, FIELD_ATB_SCALE);
-                    if (actor.actionGauge >= 100) {
+                    if (actor.actionGauge >= FIELD_MAX_ACTION_GAUGE) {
                         actor.actionGauge = FIELD_MAX_ACTION_GAUGE;
                         actor.remainingAp = FIELD_MAX_ACTION_GAUGE;
                         actor.majorActionUsed = false;

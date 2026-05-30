@@ -24,6 +24,7 @@ import type { WorldPlayerActionController } from './WorldPlayerActionController'
 import type { WorldRaidOutcomeController } from './WorldRaidOutcomeController';
 import type { WorldSelectionController } from './WorldSelectionController';
 import type { WorldTacticalController } from './WorldTacticalController';
+import { MIN_FIELD_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
 
 export interface WorldRenderContext {
     party: PartyManager;
@@ -185,7 +186,10 @@ export class WorldRenderController {
 
         const px = actor.entity.pixelX * TILE_SIZE - camX;
         const py = actor.entity.pixelY * TILE_SIZE - camY;
-        const ready = actor.entity.actionGauge >= 100;
+        const active = actor.id === this.context.getActiveTurnActorId();
+        const ready = active
+            ? this.context.getRemainingActionPoints() >= MIN_FIELD_ACTION_GAUGE_COST
+            : actor.entity.actionGauge >= 100;
         if (this.context.actionMenuUI.getIsOpen()) {
             this.context.actionMenuUI.render(ctx, px, py, ready);
         } else if (ready) {

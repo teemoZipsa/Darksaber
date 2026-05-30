@@ -35,6 +35,8 @@ import { ItemGlyph, itemName, statSummary } from '../town/itemView';
 
 const CELL = 40;
 const DRAG_THRESHOLD = 5;
+const placedItemKeys = new WeakMap<PlacedItem, number>();
+let nextPlacedItemKey = 1;
 
 type DragState = {
     placed: PlacedItem;
@@ -47,6 +49,15 @@ type DragState = {
     isDragging: boolean;
 } | null;
 type DragPreview = { placed: PlacedItem; x: number; y: number } | null;
+
+function placedItemKey(placed: PlacedItem): number {
+    let key = placedItemKeys.get(placed);
+    if (!key) {
+        key = nextPlacedItemKey++;
+        placedItemKeys.set(placed, key);
+    }
+    return key;
+}
 
 function InvItem({
     placed,
@@ -92,6 +103,7 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
     const store = useStore();
     const drag = useRef<DragState>(null);
     const [dragPreview, setDragPreview] = useState<DragPreview>(null);
+    const [mutationSeq, setMutationSeq] = useState(0);
 
     const bag = inv.getBag();
     const ext = inv.getExternalGrid();
@@ -167,6 +179,7 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                 ? finishDrop(d, e.clientX, e.clientY)
                 : inv.quickMove(d.placed, d.source);
             if (success) AudioManager.playUi(d.isDragging ? 'ui.confirm' : 'ui.hover');
+            if (success) setMutationSeq((seq) => seq + 1);
             store.refresh();
             e.preventDefault();
         };
@@ -188,15 +201,22 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
         };
     }, [inv, store]);
 
+    const mutateInventory = (action: () => void) => {
+        action();
+        setMutationSeq((seq) => seq + 1);
+        store.refresh();
+    };
+
     const renderGrid = (grid: GridInventory, kind: InvGridKind) => (
         <div
+            key={`${kind}-${mutationSeq}`}
             className="inv-grid"
             style={{ width: grid.width * CELL, height: grid.height * CELL } as CSSProperties}
             data-inv-grid={kind}
         >
             {grid.items.map((placed) => (
                 <InvItem
-                    key={`${placed.item.id}-${placed.gridX}-${placed.gridY}`}
+                    key={`${kind}-${placedItemKey(placed)}`}
                     placed={placed}
                     spanned
                     dragging={dragPreview?.placed === placed}
@@ -224,7 +244,7 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                         <div className="ds-inv__coltitle">{inv.getExternalTitle()}</div>
                         {renderGrid(ext, 'ext')}
                         {inv.isExternalRaidLoot() && (
-                            <button className="ds-btn ds-inv__action" onClick={() => { setFeedback(inv.takeAll()); store.refresh(); }}>
+                            <button className="ds-btn ds-inv__action" onClick={() => mutateInventory(() => setFeedback(inv.takeAll()))}>
                                 {t('inv.takeAll')}
                             </button>
                         )}
@@ -247,6 +267,7 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                                     {equipped ? (
                                         <InvItem
                                             placed={equipped}
+                                            key={`equip-${slot}-${placedItemKey(equipped)}`}
                                             spanned={false}
                                             dragging={dragPreview?.placed === equipped}
                                             onPointerDown={beginPointerDrag(equipped, { kind: 'equip', slot })}
@@ -264,7 +285,7 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                 <div className="ds-inv__col">
                     <div className="ds-inv__coltitle">
                         <span>{t('inv.backpack')}</span>
-                        <button className="ds-btn ds-inv__sortbtn" onClick={() => { setFeedback(inv.sortBag()); store.refresh(); }}>
+                        <button className="ds-btn ds-inv__sortbtn" onClick={() => mutateInventory(() => setFeedback(inv.sortBag()))}>
                             {t('inv.sort')}
                         </button>
                     </div>
