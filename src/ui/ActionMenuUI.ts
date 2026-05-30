@@ -198,16 +198,7 @@ export class ActionMenuUI {
             // Draw icon
             slot.iconDraw(ctx, ix, iy, r * 0.5, enabled);
 
-            if (state.costLabel) {
-                ctx.font = `bold 9px ${UI.fontMono}`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.lineWidth = 3;
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.82)';
-                ctx.strokeText(state.costLabel, ix, iy - r - 8);
-                ctx.fillStyle = enabled ? '#f0c050' : 'rgba(245, 232, 204, 0.42)';
-                ctx.fillText(state.costLabel, ix, iy - r - 8);
-            }
+
 
             ctx.font = `bold 11px ${UI.fontPrimary}`;
             ctx.textAlign = 'center';
