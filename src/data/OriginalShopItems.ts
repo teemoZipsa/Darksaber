@@ -1,4 +1,7 @@
 import type { ItemSlot, RawItemDef } from './ItemDB';
+
+type ItemCategory = NonNullable<RawItemDef['itemCategory']>;
+
 export type OriginalShopTownId = 'central_castle' | 'w_forest_village' | 's_coast_town' | 'e_stronghold' | 'se_port';
 interface OriginalShopRecord {
     id: string;
@@ -2841,11 +2844,13 @@ function calculateOriginalShopBuyPrice(record: OriginalShopRecord): number {
     return Math.max(minimum, roundGold(raw));
 }
 
-function itemCategoryFor(slot: ItemSlot): RawItemDef['itemCategory'] {
+function itemCategoryFor(slot: ItemSlot): ItemCategory {
     if (slot === 'weapon') return 'normal_weapon';
     if (slot === 'accessory' || slot === 'accessory2') return 'accessory';
     if (slot === 'consumable') return 'consumable';
     if (slot === 'head' || slot === 'body' || slot === 'boots' || slot === 'shield') return 'armor';
+    if (slot === 'rune') return 'rune';
+    if (slot === 'gem') return 'gem';
     return 'material';
 }
 
@@ -2893,11 +2898,15 @@ function buildDescription(record: OriginalShopRecord): string {
 
 function toRawItem(record: OriginalShopRecord): RawItemDef {
     const grid = gridFor(record);
-    const stats = {
+    const stats: RawItemDef['stats'] = {
         ...(record.atk ? { atk: record.atk } : {}),
         ...(record.def ? { def: record.def } : {}),
         ...(record.magAtk ? { magAtk: record.magAtk } : {}),
         ...(record.magDef ? { magDef: record.magDef } : {}),
+        ...(record.move ? { mov: record.move } : {}),
+        ...(record.commandRange ? { cmdRange: record.commandRange } : {}),
+        ...(record.hitRate ? { hitRate: record.hitRate } : {}),
+        ...(record.evasion ? { evasion: record.evasion } : {}),
     };
 
     return {
@@ -2912,6 +2921,8 @@ function toRawItem(record: OriginalShopRecord): RawItemDef {
         iconSprite: record.iconSprite,
         maxDurability: record.maxDurability,
         stats,
+        ...(record.attackRange ? { attackRange: record.attackRange } : {}),
+        ...(record.magicRange ? { magicRange: record.magicRange } : {}),
         description: buildDescription(record),
         descriptionKr: buildDescription(record),
         buyPrice: calculateOriginalShopBuyPrice(record),

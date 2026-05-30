@@ -277,3 +277,11 @@ export const MONSTER_DEFINITIONS: Record<MonsterId, MonsterDefinition> = {
 export function getMonsterDefinition(id: MonsterId): MonsterDefinition {
     return MONSTER_DEFINITIONS[id];
 }
+
+export function isMonsterId(value: string | undefined): value is MonsterId {
+    return value !== undefined && Object.prototype.hasOwnProperty.call(MONSTER_DEFINITIONS, value);
+}
+
+export function getMonsterDefinitionSafe(id: string | undefined): MonsterDefinition | null {
+    return isMonsterId(id) ? MONSTER_DEFINITIONS[id] : null;
+}

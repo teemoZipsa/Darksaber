@@ -2,7 +2,7 @@
  * ShopData — Defines merchant shop inventory and pricing.
  */
 
-import { CHIPPED_GEM_IDS, getItemDef, ItemDef } from './ItemDB';
+import { CHIPPED_GEM_IDS, getItemDef, type ItemDef } from './ItemDB';
 import { ORIGINAL_SHOP_TOWN_ITEM_IDS, type OriginalShopTownId } from './OriginalShopItems';
 import {
     SHOP_FACILITY_IDS,
@@ -188,26 +188,34 @@ function readStockSpec(spec: StockSpec): { itemId: string; stock: number } {
     return Array.isArray(spec) ? { itemId: spec[0], stock: spec[1] } : { itemId: spec, stock: -1 };
 }
 
-function toShopItem(spec: StockSpec, facilityId: ShopFacilityId): ShopItem {
+function toShopItem(spec: StockSpec, facilityId: ShopFacilityId): ShopItem | null {
     const { itemId, stock } = readStockSpec(spec);
     const item = getItemDef(itemId);
+    if (!item) {
+        console.warn(`[ShopData] Unknown shop item id: ${itemId} in ${facilityId}`);
+        return null;
+    }
+
     return {
         itemId,
         stock,
-        buyPrice: item?.buyPrice ?? item?.baseValue ?? 10,
-        shopKind: item ? getShopKindForItem(item) : 'consumable',
+        buyPrice: item.buyPrice ?? item.baseValue ?? 10,
+        shopKind: getShopKindForItem(item),
         facilityId,
     };
 }
 
 function toShopItems(specs: readonly StockSpec[] | undefined, facilityId: ShopFacilityId): ShopItem[] {
-    return (specs ?? []).map((spec) => toShopItem(spec, facilityId));
+    return (specs ?? [])
+        .map((spec) => toShopItem(spec, facilityId))
+        .filter((item): item is ShopItem => item !== null);
 }
 
 function originalShopItemsFor(townId: TownId, facilityId: ShopFacilityId): ShopItem[] {
     if (!isOriginalShopTownId(townId)) return [];
     return ORIGINAL_SHOP_TOWN_ITEM_IDS[townId]
         .map((itemId) => toShopItem(itemId, facilityId))
+        .filter((entry): entry is ShopItem => entry !== null)
         .filter((entry) => {
             if (facilityId === 'weapon_shop') return entry.shopKind === 'weapon';
             if (facilityId === 'armor_shop') return entry.shopKind === 'armor';
@@ -253,7 +261,7 @@ function buildTownFacilityInventory(townId: TownId): FacilityInventory {
 }
 
 function pickGemShopFacility(facilities: readonly TownFacilityId[]): ShopFacilityId | null {
-    for (const facility of ['specialty_trader', 'general_store', 'shrine', 'weapon_shop', 'armor_shop'] as const) {
+    for (const facility of ['shrine', 'specialty_trader', 'general_store', 'weapon_shop', 'armor_shop'] as const) {
         if (facilities.includes(facility)) return facility;
     }
     return null;
@@ -295,8 +303,9 @@ export const SHOP_INVENTORY: ShopItem[] = SHOP_INVENTORY_BY_TOWN[DEFAULT_SHOP_TO
 
 /** Sell price = 50% base, with town multipliers for trade goods only. */
 export function getSellPrice(item: ItemDef, townId?: string): number {
+    if (item.sellable === false) return 0;
+
     const basePrice = Math.floor((item.buyPrice ?? item.baseValue ?? 10) * 0.5);
-    if (item.sellable === false) return basePrice;
     return Math.floor(basePrice * getTradeSellMultiplier(item.id, townId));
 }
 

@@ -29,6 +29,8 @@ export interface ItemDef {
     iconSprite?: ItemIconSprite; // 32x32 cell in the original item atlas
     maxDurability: number;
     stats?: Partial<CharacterStats>;
+    attackRange?: number;
+    magicRange?: number;
     description: string;
     descriptionKr?: string;
     rarity: ItemRarity;

@@ -3,8 +3,10 @@
  * Shared by the React character-creation screen; stats are 0..1 bar ratios.
  */
 
+export type StartingClassId = 'infantry' | 'cavalry' | 'cleric' | 'mage';
+
 export interface CharConfig {
-    id: string; // e.g. 'infantry'
+    id: StartingClassId;
     labelKey: string;
     hp: number; // 0.0 to 1.0 (bar length)
     atk: number;

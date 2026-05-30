@@ -1,4 +1,5 @@
 import type { StatusActivation, StatusKind } from '../combat/StatusEffects';
+import { hasTownFacility, type TownId } from './TownFacilityData';
 
 export type RestFacilityType = 'inn' | 'tavern' | 'tea_house' | 'shrine' | 'barracks';
 
@@ -26,7 +27,7 @@ export interface RestFacility {
 
 export const INJURY_TREATMENT_PRICE = 50;
 
-export const REST_FACILITIES: Record<string, RestFacility | null> = {
+export const REST_FACILITIES: Partial<Record<TownId, RestFacility | null>> = {
     central_castle: {
         type: 'barracks',
         nameKey: 'rest.facility.central_barracks',
@@ -139,7 +140,8 @@ export const REST_FACILITIES: Record<string, RestFacility | null> = {
 };
 
 export function getRestFacility(townId: string): RestFacility | null {
-    return REST_FACILITIES[townId] ?? null;
+    if (!hasTownFacility(townId, 'rest')) return null;
+    return REST_FACILITIES[townId as TownId] ?? null;
 }
 
 export function getRestMenu(menuId: string): RestMenu | null {

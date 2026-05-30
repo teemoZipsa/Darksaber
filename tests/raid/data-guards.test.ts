@@ -1,8 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { CHAR_CLASSES } from '../../src/data/characterClasses';
 import { getMasterClass, isMasterClassLineId } from '../../src/data/ClassTree';
 import { getItemDef, ITEMS } from '../../src/data/ItemDB';
+import { getMonsterDefinitionSafe, isMonsterId } from '../../src/data/MonsterCatalog';
+import { ORIGINAL_SHOP_ITEMS } from '../../src/data/OriginalShopItems';
 import { PlayerData } from '../../src/data/PlayerData';
+import { getRestFacility, REST_FACILITIES } from '../../src/data/RestFacilityData';
+import { getSellPrice, getShopItems, SHOP_INVENTORY_BY_TOWN_FACILITY } from '../../src/data/ShopData';
 import { rollBossRune, rollChestGem } from '../../src/data/SocketLoot';
 import { getSkill } from '../../src/data/SkillDB';
 import { getSkillVisualProfile } from '../../src/data/SkillVisualProfiles';
@@ -48,6 +53,47 @@ test('item normalization keeps consumable rarity and generated armor metadata st
     assert.equal(getItemDef('battle_t1_head')?.itemCategory, 'armor');
     assert.equal(Object.prototype.hasOwnProperty.call(getItemDef('gem_flawed_ruby') ?? {}, 'buyPrice'), false);
     assert.equal(ITEMS.some((item) => item.itemCategory === 'armor' && item.slot === 'head'), true);
+});
+
+test('shop and original item data expose guarded equipment fields', () => {
+    const crossbow = ORIGINAL_SHOP_ITEMS.find((item) => item.id === 'web_66_23');
+    assert.ok(crossbow);
+    assert.equal(crossbow.attackRange, 6);
+    assert.equal(crossbow.stats?.hitRate, 10);
+    assert.equal(crossbow.itemCategory, 'normal_weapon');
+
+    const staff = ORIGINAL_SHOP_ITEMS.find((item) => item.id === 'web_69_08');
+    assert.ok(staff);
+    assert.equal(staff.magicRange, 1);
+
+    const questBomb = getItemDef('quest_bomb');
+    assert.ok(questBomb);
+    assert.equal(getSellPrice(questBomb), 0);
+
+    for (const inventory of Object.values(SHOP_INVENTORY_BY_TOWN_FACILITY)) {
+        for (const entries of Object.values(inventory)) {
+            for (const entry of entries ?? []) {
+                assert.ok(getItemDef(entry.itemId), `missing item ${entry.itemId}`);
+            }
+        }
+    }
+
+    assert.equal(getShopItems('master_sanctum', 'shrine').some(({ item }) => item.slot === 'gem'), true);
+    assert.equal(getShopItems('master_sanctum', 'specialty_trader').some(({ item }) => item.slot === 'gem'), false);
+});
+
+test('rest, monster, and starting class data reject unknown ids', () => {
+    assert.equal(Object.prototype.hasOwnProperty.call(REST_FACILITIES, 'central_castel'), false);
+    assert.ok(getRestFacility('central_castle'));
+    assert.equal(getRestFacility('e_outpost'), null);
+    assert.equal(getRestFacility('__missing__'), null);
+
+    assert.equal(isMonsterId('302R'), true);
+    assert.equal(isMonsterId('__missing__'), false);
+    assert.equal(getMonsterDefinitionSafe('302R')?.id, '302R');
+    assert.equal(getMonsterDefinitionSafe('__missing__'), null);
+
+    assert.deepEqual(CHAR_CLASSES.map((cfg) => cfg.id), ['infantry', 'cavalry', 'cleric', 'mage']);
 });
 
 test('player data guards gold and normalizes old save shapes', () => {
