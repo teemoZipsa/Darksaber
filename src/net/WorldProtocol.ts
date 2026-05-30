@@ -3,7 +3,7 @@ import type { MarketSnapshot } from '../data/MarketData';
 import type { CharacterStats } from '../data/Stats';
 import type { EnemyRole } from '../field/EnemyAI';
 
-export const DEFAULT_WORLD_SERVER_URL = 'ws://localhost:8765';
+export const DEFAULT_WORLD_SERVER_URL = import.meta.env?.VITE_WORLD_SERVER_URL ?? 'ws://localhost:8765';
 export const WORLD_PROTOCOL_VERSION = 'world-pve-v1';
 
 export interface NetTilePoint {

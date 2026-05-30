@@ -7,6 +7,8 @@ import {
     type AutoLootGrantMessage,
     type CombatEventMessage,
     type LootGrantMessage,
+    type MarketRecordAckMessage,
+    type MarketSnapshotMessage,
     type PlayerIntentKind,
     type RaidResultMessage,
     type WorldClientMessage,
@@ -32,6 +34,8 @@ export interface NetworkRaidClientOptions {
     onLootGrant?: (grant: LootGrantMessage) => void;
     onAutoLootGrant?: (grant: AutoLootGrantMessage) => void;
     onRaidResult?: (result: RaidResultMessage) => void;
+    onMarketSnapshot?: (message: MarketSnapshotMessage) => void;
+    onMarketRecordAck?: (message: MarketRecordAckMessage) => void;
     onActionRejected?: (rejection: ActionRejectedMessage) => void;
     onErrorMessage?: (error: WorldErrorMessage) => void;
     onStatusChange?: (status: NetworkRaidStatus) => void;
@@ -55,6 +59,7 @@ export class NetworkRaidClient {
     private graceDeadline = 0;
     private joinInput: NetworkRaidJoinInput | null = null;
     private status: NetworkRaidStatus = 'idle';
+    private sessionEpoch: number | null = null;
     private pendingWelcome:
         | { resolve: (welcome: WorldWelcomeMessage) => void; reject: (error: Error) => void }
         | null = null;
@@ -82,12 +87,22 @@ export class NetworkRaidClient {
     }
 
     public async connectAndJoin(input: NetworkRaidJoinInput): Promise<WorldWelcomeMessage> {
-        this.manualClose = false;
-        if (!input.resumeToken) {
-            this.resumeToken = null;
-            this.clearStoredResumeToken();
+        if (this.pendingWelcome) {
+            this.rejectPendingWelcome(new Error('Previous join request was superseded.'));
         }
-        this.joinInput = input;
+        if (this.socket && this.socket.readyState <= WebSocket.OPEN) {
+            this.socket.close();
+        }
+
+        const resumeToken = input.resumeToken ?? this.resumeToken ?? undefined;
+
+        this.socket = null;
+        this.playerId = null;
+        this.latestSeq = -1;
+        this.sessionEpoch = null;
+        this.manualClose = false;
+        this.resumeToken = resumeToken ?? null;
+        this.joinInput = { ...input, resumeToken };
         this.clearReconnect();
         this.setStatus('connecting');
 
@@ -101,12 +116,20 @@ export class NetworkRaidClient {
     private openSocket(): void {
         const socket = new WebSocket(this.url);
         this.socket = socket;
-        socket.onopen = () => this.sendJoinOrReconnect();
-        socket.onmessage = (event) => this.handleMessage(event.data);
+        socket.onopen = () => {
+            if (this.socket !== socket) return;
+            this.sendJoinOrReconnect();
+        };
+        socket.onmessage = (event) => {
+            if (this.socket !== socket) return;
+            this.handleMessage(event.data);
+        };
         socket.onerror = () => {
+            if (this.socket !== socket) return;
             if (this.pendingWelcome) this.rejectPendingWelcome(new Error(`Failed to connect to ${this.url}`));
         };
         socket.onclose = () => {
+            if (this.socket !== socket) return;
             this.socket = null;
             if (this.pendingWelcome) {
                 this.rejectPendingWelcome(new Error('World server connection closed before welcome.'));
@@ -172,23 +195,40 @@ export class NetworkRaidClient {
     public close(): void {
         this.manualClose = true;
         this.clearReconnect();
+        if (this.pendingWelcome) {
+            this.rejectPendingWelcome(new Error('Connection closed by client.'));
+        }
         if (this.socket && this.socket.readyState <= WebSocket.OPEN) this.socket.close();
         this.socket = null;
-        this.pendingWelcome = null;
+        this.playerId = null;
         this.setStatus('disconnected');
     }
 
     private handleMessage(raw: unknown): void {
-        let message: WorldServerMessage;
+        let parsed: unknown;
         try {
-            message = JSON.parse(String(raw)) as WorldServerMessage;
+            parsed = JSON.parse(String(raw));
         } catch {
             this.options.onErrorMessage?.({ type: 'ERROR', code: 'BAD_JSON', message: 'Invalid server message.' });
             return;
         }
+        if (!isRecord(parsed) || typeof parsed.type !== 'string') {
+            this.options.onErrorMessage?.({ type: 'ERROR', code: 'BAD_MESSAGE', message: 'Malformed server message.' });
+            return;
+        }
+
+        const message = parsed as unknown as WorldServerMessage;
 
         switch (message.type) {
             case 'WORLD_WELCOME':
+                if (!isWorldWelcomeMessage(message)) {
+                    this.reportBadMessage('Malformed WORLD_WELCOME message.');
+                    return;
+                }
+                if (this.sessionEpoch !== null && this.sessionEpoch !== message.sessionEpoch) {
+                    this.latestSeq = -1;
+                }
+                this.sessionEpoch = message.sessionEpoch;
                 this.playerId = message.playerId;
                 this.resumeToken = message.resumeToken;
                 this.storeResumeToken(message.resumeToken);
@@ -198,7 +238,11 @@ export class NetworkRaidClient {
                 this.pendingWelcome = null;
                 break;
             case 'WORLD_SNAPSHOT':
-                if (message.snapshot.seq < this.latestSeq) return;
+                if (!isWorldSnapshotPayload(message)) {
+                    this.reportBadMessage('Malformed WORLD_SNAPSHOT message.');
+                    return;
+                }
+                if (message.snapshot.seq <= this.latestSeq) return;
                 this.latestSeq = message.snapshot.seq;
                 this.options.onSnapshot?.(message.snapshot);
                 break;
@@ -212,22 +256,51 @@ export class NetworkRaidClient {
                 this.options.onAutoLootGrant?.(message);
                 break;
             case 'RAID_RESULT':
+                if (!isRaidResultMessage(message)) {
+                    this.reportBadMessage('Malformed RAID_RESULT message.');
+                    return;
+                }
                 this.clearStoredResumeToken();
+                this.manualClose = true;
+                this.clearReconnect();
                 this.options.onRaidResult?.(message);
+                if (this.socket && this.socket.readyState <= WebSocket.OPEN) this.socket.close();
+                this.socket = null;
+                this.playerId = null;
+                this.setStatus('disconnected');
                 break;
             case 'ACTION_REJECTED':
                 this.options.onActionRejected?.(message);
                 break;
+            case 'MARKET_SNAPSHOT':
+                this.options.onMarketSnapshot?.(message);
+                break;
+            case 'MARKET_RECORD_ACK':
+                this.options.onMarketRecordAck?.(message);
+                break;
             case 'ERROR':
+                if (!isWorldErrorMessage(message)) {
+                    this.reportBadMessage('Malformed ERROR message.');
+                    return;
+                }
+                if (this.pendingWelcome) this.rejectPendingWelcome(new Error(message.message));
                 if (message.code === 'RESUME_FAILED') this.expireGrace();
                 this.options.onErrorMessage?.(message);
                 break;
         }
     }
 
-    private send(message: WorldClientMessage): void {
-        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    private send(message: WorldClientMessage): boolean {
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+            this.options.onErrorMessage?.({
+                type: 'ERROR',
+                code: 'SOCKET_NOT_OPEN',
+                message: 'Cannot send message because the world socket is not open.',
+            });
+            return false;
+        }
         this.socket.send(JSON.stringify(message));
+        return true;
     }
 
     private rejectPendingWelcome(error: Error): void {
@@ -267,8 +340,17 @@ export class NetworkRaidClient {
         this.manualClose = true;
         if (this.socket && this.socket.readyState <= WebSocket.OPEN) this.socket.close();
         this.socket = null;
+        this.playerId = null;
         this.setStatus('disconnected');
         if (wasReconnecting) this.options.onGraceExpired?.();
+    }
+
+    private reportBadMessage(message: string): void {
+        this.options.onErrorMessage?.({
+            type: 'ERROR',
+            code: 'BAD_MESSAGE',
+            message,
+        });
     }
 
     private clearReconnect(): void {
@@ -314,4 +396,44 @@ export class NetworkRaidClient {
 
 function createIntentId(): string {
     return `intent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
+
+function isWorldWelcomeMessage(message: unknown): message is WorldWelcomeMessage {
+    if (!isRecord(message)) return false;
+    return message.type === 'WORLD_WELCOME'
+        && typeof message.playerId === 'string'
+        && typeof message.sessionEpoch === 'number'
+        && typeof message.resumeToken === 'string'
+        && isRecord(message.spawnTile)
+        && typeof message.spawnTile.x === 'number'
+        && typeof message.spawnTile.y === 'number';
+}
+
+function isWorldSnapshotPayload(message: unknown): message is { type: 'WORLD_SNAPSHOT'; snapshot: WorldSnapshot } {
+    if (!isRecord(message)) return false;
+    return message.type === 'WORLD_SNAPSHOT'
+        && isRecord(message.snapshot)
+        && typeof message.snapshot.seq === 'number';
+}
+
+function isRaidResultMessage(message: unknown): message is RaidResultMessage {
+    if (!isRecord(message)) return false;
+    return message.type === 'RAID_RESULT'
+        && typeof message.playerId === 'string'
+        && typeof message.result === 'string'
+        && typeof message.elapsedSeconds === 'number'
+        && typeof message.kills === 'number'
+        && typeof message.departureTownId === 'string'
+        && typeof message.extractionTownId === 'string';
+}
+
+function isWorldErrorMessage(message: unknown): message is WorldErrorMessage {
+    if (!isRecord(message)) return false;
+    return message.type === 'ERROR'
+        && typeof message.code === 'string'
+        && typeof message.message === 'string';
 }
