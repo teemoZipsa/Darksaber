@@ -28,7 +28,7 @@ export interface CharacterStats {
 
 /** Default starting stats for a level 1 character */
 export function createBaseStats(overrides?: Partial<CharacterStats>): CharacterStats {
-    return {
+    const stats: CharacterStats = {
         hp: 100, maxHp: 100,
         mp: 30,  maxMp: 30,
         atk: 10, def: 5,
@@ -40,6 +40,13 @@ export function createBaseStats(overrides?: Partial<CharacterStats>): CharacterS
         cmdRange: 6, atkMod: 0, defMod: 0,
         ...overrides
     };
+
+    stats.maxHp = Math.max(1, Math.floor(finiteOr(stats.maxHp, 100)));
+    stats.maxMp = Math.max(0, Math.floor(finiteOr(stats.maxMp, 30)));
+    stats.hp = clamp(Math.floor(finiteOr(stats.hp, stats.maxHp)), 0, stats.maxHp);
+    stats.mp = clamp(Math.floor(finiteOr(stats.mp, stats.maxMp)), 0, stats.maxMp);
+
+    return stats;
 }
 
 /** Get specific baseline stats for a class 1st tier */
@@ -58,9 +65,18 @@ export function getBaseStatsForClass(classId: string, baseMov: number): Partial<
         'shrine':    { hp: 85,  maxHp: 85,  mp: 35, maxMp: 35, atk: 6,  def: 6, magAtk: 7, magDef: 7 },
         'alchemist': { hp: 70,  maxHp: 70,  mp: 35, maxMp: 35, atk: 5,  def: 5, magAtk: 8, magDef: 5 }
     };
-    const overrides = map[classId] || {};
-    overrides.mov = baseMov; // Ensure MOV is set from ClassTree
-    return overrides;
+    return {
+        ...(map[classId] ?? {}),
+        mov: Math.max(0, Math.floor(finiteOr(baseMov, 0))), // Ensure MOV is set from ClassTree
+    };
+}
+
+function finiteOr(value: number, fallback: number): number {
+    return Number.isFinite(value) ? value : fallback;
+}
+
+function clamp(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
 }
 
 /** Per-level stat growth rates per class archetype */

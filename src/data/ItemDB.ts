@@ -3,7 +3,7 @@
  * Each item has a width × height in inventory grid cells.
  */
 
-import { MasterBranch } from './ClassTree';
+import type { MasterBranch } from './ClassTree';
 import { ORIGINAL_SHOP_ITEMS } from './OriginalShopItems';
 import type { CharacterStats } from './Stats';
 
@@ -56,7 +56,9 @@ function inferRarity(item: RawItemDef): ItemRarity {
     if (item.id === 'heal_ring' || item.id === 'void_crystal') return 'legend';
     if (item.id === 'corrupted_blade' || item.id === 'shadow_cloak') return 'epic';
     const price = item.buyPrice ?? 0;
-    const statTotal = Object.values(item.stats ?? {}).reduce((sum, value) => sum + (value ?? 0), 0);
+    const statTotal = item.slot === 'consumable'
+        ? 0
+        : Object.values(item.stats ?? {}).reduce((sum, value) => sum + (value ?? 0), 0);
     if (price >= 5000 || statTotal >= 40) return 'legend';
     if (price >= 1000 || statTotal >= 25) return 'epic';
     if (price >= 300 || statTotal >= 12) return 'rare';
@@ -243,6 +245,7 @@ function generateBranchArmor(): RawItemDef[] {
                     buyPrice: 50 + tier.tier * 80,
                     requiredTier: tier.tier,
                     branch: branchInfo.branch,
+                    itemCategory: 'armor',
                 });
             }
         }
@@ -506,7 +509,7 @@ function generateGems(): RawItemDef[] {
         rarity: tier.rarity,
         weight: 0.1,
         baseValue: tier.baseValue,
-        buyPrice: tier.buyPrice,
+        ...(tier.buyPrice !== undefined ? { buyPrice: tier.buyPrice } : {}),
         sellable: true,
         itemCategory: 'gem' as const,
         socketEffects: gem.effects(tier.power),

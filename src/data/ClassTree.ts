@@ -11,7 +11,7 @@
  */
 
 import {
-    GrowthRates,
+    type GrowthRates,
     GROWTH_MELEE, GROWTH_CAVALRY, GROWTH_FLYING,
     GROWTH_NAVAL, GROWTH_LANCE, GROWTH_ARCHER,
     GROWTH_CLERIC, GROWTH_PRIEST, GROWTH_MAGE, GROWTH_CULTIST,
@@ -388,13 +388,22 @@ export const MASTER_CLASSES: MasterClass[] = [
     }
 ];
 
+const MASTER_CLASS_BY_BRANCH: Record<MasterBranch, MasterClass> = {
+    battle: MASTER_CLASSES[0]!,
+    tactics: MASTER_CLASSES[1]!,
+    healer: MASTER_CLASSES[2]!,
+    magic: MASTER_CLASSES[3]!,
+};
+
+const MASTER_CLASS_LINE_IDS = new Set(['master_battle', 'master_tactics', 'master_healer', 'master_magic']);
+
 const MASTER_BATTLE: ClassLine = {
     id: 'master_battle', branch: 'battle',
     nameKr: '배틀마스터', nameEn: 'Battle Master',
     growth: combineGrowth([GROWTH_MELEE, GROWTH_CAVALRY, GROWTH_FLYING], 1.18),
     baseMovRange: 8, attackRange: 2,
     ignoresTerrain: false, waterBonus: false,
-    tiers: MASTER_CLASSES[0].tiers,
+    tiers: MASTER_CLASS_BY_BRANCH.battle.tiers,
     skillUnlocks: {
         8: ['og_attack', 'og_protection'],
         9: ['og_thunderstorm', 'og_tornado'],
@@ -408,7 +417,7 @@ const MASTER_TACTICS: ClassLine = {
     growth: combineGrowth([GROWTH_NAVAL, GROWTH_LANCE, GROWTH_ARCHER], 1.18),
     baseMovRange: 7, attackRange: 4,
     ignoresTerrain: false, waterBonus: true,
-    tiers: MASTER_CLASSES[1].tiers,
+    tiers: MASTER_CLASS_BY_BRANCH.tactics.tiers,
     skillUnlocks: {
         8: ['og_quick', 'og_resist'],
         9: ['og_windcutter', 'og_blizzard'],
@@ -422,7 +431,7 @@ const MASTER_HEALER: ClassLine = {
     growth: combineGrowth([GROWTH_CLERIC, GROWTH_PRIEST, GROWTH_SHRINE], 1.18),
     baseMovRange: 5, attackRange: 1,
     ignoresTerrain: false, waterBonus: false,
-    tiers: MASTER_CLASSES[2].tiers,
+    tiers: MASTER_CLASS_BY_BRANCH.healer.tiers,
     skillUnlocks: {
         8: ['og_heal', 'og_cure', 'og_forceheal'],
         9: ['og_resist', 'og_antiresist'],
@@ -436,7 +445,7 @@ const MASTER_MAGIC: ClassLine = {
     growth: combineGrowth([GROWTH_MAGE, GROWTH_CULTIST, GROWTH_ALCHEMIST], 1.18),
     baseMovRange: 6, attackRange: 3,
     ignoresTerrain: false, waterBonus: false,
-    tiers: MASTER_CLASSES[3].tiers,
+    tiers: MASTER_CLASS_BY_BRANCH.magic.tiers,
     skillUnlocks: {
         8: ['og_fire', 'og_freeze', 'og_poison'],
         9: ['og_hpdrain', 'og_mpdrain', 'og_earthquake'],
@@ -465,7 +474,7 @@ export function getClassLine(id: string): ClassLine | undefined {
 
 /** Get the master class for a given branch */
 export function getMasterClass(branch: MasterBranch): MasterClass | undefined {
-    return MASTER_CLASSES.find(m => m.branch === branch);
+    return MASTER_CLASS_BY_BRANCH[branch];
 }
 
 export function getMasterClassLineId(branch: MasterBranch): string {
@@ -473,5 +482,5 @@ export function getMasterClassLineId(branch: MasterBranch): string {
 }
 
 export function isMasterClassLineId(classLineId: string): boolean {
-    return classLineId.startsWith('master_');
+    return MASTER_CLASS_LINE_IDS.has(classLineId);
 }

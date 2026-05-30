@@ -1,8 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { getMasterClass, isMasterClassLineId } from '../../src/data/ClassTree';
+import { getItemDef, ITEMS } from '../../src/data/ItemDB';
+import { PlayerData } from '../../src/data/PlayerData';
 import { rollBossRune, rollChestGem } from '../../src/data/SocketLoot';
 import { getSkill } from '../../src/data/SkillDB';
 import { getSkillVisualProfile } from '../../src/data/SkillVisualProfiles';
+import { createBaseStats, getBaseStatsForClass } from '../../src/data/Stats';
 import type { Skill } from '../../src/data/SkillDB';
 import {
     TOWN_FACILITIES,
@@ -22,6 +26,78 @@ test('town facility guards reject prototype keys and return copies', () => {
     const fallbackFacilities = getTownFacilities('__missing__');
     fallbackFacilities.push('shrine');
     assert.deepEqual(getTownFacilities('__missing__'), ['storage', 'general_store', 'rumors']);
+});
+
+test('class and stat guards reject loose ids and clamp resources', () => {
+    assert.equal(isMasterClassLineId('master_battle'), true);
+    assert.equal(isMasterClassLineId('master_fake'), false);
+    assert.equal(getMasterClass('battle')?.branch, 'battle');
+
+    const stats = createBaseStats({ hp: 150, maxHp: 100, mp: Number.NaN, maxMp: 10 });
+    assert.equal(stats.hp, 100);
+    assert.equal(stats.mp, 10);
+
+    const base = getBaseStatsForClass('unknown', Number.NaN);
+    assert.deepEqual(base, { mov: 0 });
+});
+
+test('item normalization keeps consumable rarity and generated armor metadata stable', () => {
+    assert.equal(getItemDef('herb_cheap')?.rarity, 'common');
+    assert.equal(getItemDef('herb_common')?.rarity, 'uncommon');
+    assert.equal(getItemDef('mp_potion')?.rarity, 'common');
+    assert.equal(getItemDef('battle_t1_head')?.itemCategory, 'armor');
+    assert.equal(Object.prototype.hasOwnProperty.call(getItemDef('gem_flawed_ruby') ?? {}, 'buyPrice'), false);
+    assert.equal(ITEMS.some((item) => item.itemCategory === 'armor' && item.slot === 'head'), true);
+});
+
+test('player data guards gold and normalizes old save shapes', () => {
+    const previousStorage = globalThis.localStorage;
+    const store = new Map<string, string>();
+    globalThis.localStorage = {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => { store.set(key, value); },
+        removeItem: (key: string) => { store.delete(key); },
+        clear: () => { store.clear(); },
+        key: (index: number) => Array.from(store.keys())[index] ?? null,
+        get length() { return store.size; },
+    };
+
+    try {
+        const player = new PlayerData();
+        player.addGold(-100);
+        player.addGold(Number.NaN);
+        assert.equal(player.gold, 500);
+        assert.equal(player.spendGold(-100), false);
+        assert.equal(player.gold, 500);
+        assert.equal(player.spendGold(25.9), true);
+        assert.equal(player.gold, 475);
+
+        store.set('sin_eater_save', JSON.stringify({
+            gold: -10,
+            clearedStages: ['stage-a', 42],
+            questItems: ['quest_bomb', null],
+            inventory: [
+                { uid: 'u1', itemId: 'short_sword', gridX: 1.8, gridY: Number.NaN },
+                { uid: 'bad' },
+            ],
+            equipped: {
+                weapon: { uid: 'w1', itemId: 'short_sword', gridX: 0, gridY: 0, sockets: ['rune_el', 5] },
+            },
+            lastSaved: '',
+        }));
+
+        const loaded = new PlayerData();
+        loaded.load();
+        assert.equal(loaded.gold, 0);
+        assert.deepEqual([...loaded.clearedStages], ['stage-a']);
+        assert.equal(loaded.hasQuestItem('quest_bomb'), true);
+        assert.equal(loaded.inventory.length, 1);
+        assert.deepEqual(loaded.inventory[0].sockets, []);
+        assert.deepEqual(loaded.equipped.weapon?.sockets, ['rune_el']);
+        assert.equal(Object.prototype.hasOwnProperty.call(loaded.equipped, 'accessory2'), true);
+    } finally {
+        globalThis.localStorage = previousStorage;
+    }
 });
 
 test('socket loot handles injected random values outside Math.random range', () => {
