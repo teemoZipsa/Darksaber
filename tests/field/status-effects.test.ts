@@ -28,6 +28,49 @@ test('status application refreshes duration and keeps the stronger magnitude', (
     assert.equal(statuses[0].magnitude, 0.7);
 });
 
+test('same-kind skill buffs keep separate sources without extending stronger buffs', () => {
+    let statuses = [
+        createStatus('attackUp', { durationTurns: 2, magnitude: 1.25, sourceSkillId: 'pri_victory_prayer' }),
+    ];
+    statuses = applyStatus(statuses, createStatus('attackUp', {
+        durationTurns: 3,
+        magnitude: 1.15,
+        sourceSkillId: 'pri_battle_chant',
+    }));
+
+    assert.equal(statuses.length, 2);
+    assert.equal(getEffectiveStats(createBaseStats({ atk: 100 }), statuses).atk, 125);
+
+    const firstTurn = resolveTurnStartStatuses(createBaseStats({ atk: 100 }), statuses).statuses;
+    assert.equal(getEffectiveStats(createBaseStats({ atk: 100 }), firstTurn).atk, 125);
+
+    const secondTurn = resolveTurnStartStatuses(createBaseStats({ atk: 100 }), firstTurn).statuses;
+    assert.deepEqual(secondTurn.map((status) => [status.sourceSkillId, status.durationTurns]), [
+        ['pri_battle_chant', 1],
+    ]);
+    assert.equal(getEffectiveStats(createBaseStats({ atk: 100 }), secondTurn).atk, Math.floor(100 * 1.15));
+});
+
+test('reaction statuses keep one strongest slot instead of source stacks', () => {
+    let statuses = [createStatus('guard', { magnitude: 0.5, sourceSkillId: 'lan_spear_wall' })];
+    statuses = applyStatus(statuses, createStatus('guard', {
+        magnitude: 0.45,
+        sourceSkillId: 'inf_guard_stance',
+    }));
+
+    assert.equal(statuses.length, 1);
+    assert.equal(statuses[0].magnitude, 0.45);
+
+    statuses = [createStatus('counterReady', { magnitude: 0.45, sourceSkillId: 'inf_iron_defense' })];
+    statuses = applyStatus(statuses, createStatus('counterReady', {
+        magnitude: 0.7,
+        sourceSkillId: 'lan_intercept_order',
+    }));
+
+    assert.equal(statuses.length, 1);
+    assert.equal(statuses[0].magnitude, 0.7);
+});
+
 test('turn start resolves poison, regen, duration, and reaction stance expiry', () => {
     const stats = createBaseStats({ hp: 50, maxHp: 100 });
     const result = resolveTurnStartStatuses(stats, [
@@ -233,6 +276,18 @@ test('guard consumes once and halves incoming damage', () => {
 
     const zero = applyGuardToDamage([createStatus('damageTakenDown')], 0);
     assert.equal(zero.damage, 0);
+});
+
+test('damage reduction uses the strongest source and guard waits for real damage', () => {
+    const reduced = applyGuardToDamage([
+        createStatus('damageTakenDown', { magnitude: 0.8, sourceSkillId: 'inf_iron_defense' }),
+        createStatus('damageTakenDown', { magnitude: 0.9, sourceSkillId: 'shr_guardian_aura' }),
+    ], 100);
+    assert.equal(reduced.damage, 80);
+
+    const guardedZero = applyGuardToDamage([createStatus('guard', { magnitude: 0.45 })], 0);
+    assert.equal(guardedZero.guarded, false);
+    assert.equal(hasStatus(guardedZero.statuses, 'guard'), true);
 });
 
 test('counter readiness is explicit and consumed without automatic wait interaction', () => {

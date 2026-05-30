@@ -16,14 +16,17 @@ import {
 import type { FieldActor, FieldEnemy, FieldIntent } from '../../field/FieldTypes';
 import { getAttackFailureMessage, type AttackTargetFailure } from '../../field/FieldTargeting';
 import {
-    ATTACK_AP_COST,
-    INTERACT_AP_COST,
-    MAGIC_AP_COST,
-    MOVE_AP_PER_TILE,
+    ATTACK_ACTION_GAUGE_COST,
+    DEFEND_ACTION_GAUGE_COST,
+    INTERACT_ACTION_GAUGE_COST,
+    MAGIC_ACTION_GAUGE_COST,
+    MIN_FIELD_ACTION_GAUGE_COST,
+    MOVE_ACTION_GAUGE_COST,
+    REST_ACTION_GAUGE_COST,
+    TOOL_ACTION_GAUGE_COST,
     getActionApCost,
     hasExecutableFieldAction,
 } from '../../field/FieldActionEconomy';
-import { canAffordTerrainCost, terrainCostToApCost } from '../../field/TerrainRules';
 import { getSelectableTiles, type AttackPatternProfile, type PatternContext } from '../../field/TargetPatterns';
 import { normalizeLegacyActionType, type ActionMenuSlotState, type ActionType } from '../../ui/ActionMenuUI';
 import type { resolveFieldHit } from '../../field/FieldInteraction';
@@ -117,7 +120,7 @@ export class WorldPlayerActionController {
         const actor = this.context.getActivePartyTurnActor();
         if (!actor) return;
 
-        if (actor.entity.actionGauge < 100 || this.context.getActiveTurnActorId() !== actor.id) {
+        if (this.context.getActiveTurnActorId() !== actor.id) {
             this.sink.log('행동 게이지가 차지 않았습니다.');
             this.context.closeActionMenu();
             return;
@@ -140,7 +143,7 @@ export class WorldPlayerActionController {
                     this.context.reopenActionMenu(actor);
                     break;
                 }
-                if (this.context.getRemainingActionPoints() < MOVE_AP_PER_TILE || !this.hasExecutableMove(actor)) {
+                if (!this.hasActionGauge(MOVE_ACTION_GAUGE_COST) || !this.hasExecutableMove(actor)) {
                     this.sink.log('이동할 행동력이 부족합니다.');
                     this.context.reopenActionMenu(actor);
                     break;
@@ -152,7 +155,7 @@ export class WorldPlayerActionController {
             case 'attack':
                 this.actionMode = 'attack';
                 this.actionTiles = this.computeAttackableTiles(actor);
-                this.sink.log('공격할 적을 클릭하세요. 공격/마법/도구는 턴당 1회입니다. (AP 6)');
+                this.sink.log(`공격할 적을 클릭하세요. ATB -${ATTACK_ACTION_GAUGE_COST}%`);
                 break;
             case 'magic':
                 this.context.closeTacticalMenu();
@@ -163,7 +166,7 @@ export class WorldPlayerActionController {
                 this.context.openTool(actor);
                 break;
             case 'open':
-                if (this.context.getRemainingActionPoints() < INTERACT_AP_COST || !this.hasExecutableInteract(actor)) {
+                if (!this.hasActionGauge(INTERACT_ACTION_GAUGE_COST) || !this.hasExecutableInteract(actor)) {
                     this.sink.log('조사할 수 있는 대상이 없습니다.');
                     this.context.reopenActionMenu(actor);
                     break;
@@ -176,12 +179,17 @@ export class WorldPlayerActionController {
                 this.rest(actor);
                 break;
             case 'defend':
+                if (!this.spendActionCost(DEFEND_ACTION_GAUGE_COST)) {
+                    this.sink.log('방어할 행동 게이지가 부족합니다.');
+                    this.context.reopenActionMenu(actor);
+                    break;
+                }
                 actor.character.statuses = applyStatus(actor.character.statuses, createStatus('guard'));
                 actor.character.statuses = applyStatus(actor.character.statuses, createStatus('counterReady'));
                 this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'GUARD');
                 this.sink.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
                 this.sink.log('방어 태세: 다음 직접 공격 피해 감소 및 약한 반격 준비');
-                this.context.endActorTurn(actor, '방어');
+                this.context.resumeOrEndActiveTurn(actor);
                 break;
             default:
                 this.sink.log('아직 필드에서 사용할 수 없는 행동입니다.');
@@ -282,76 +290,68 @@ export class WorldPlayerActionController {
 
     public hasExecutableMove(actor: FieldActor): boolean {
         if (hasStatus(actor.character.statuses, 'immobilize')) return false;
-        return this.context.getRemainingActionPoints() >= MOVE_AP_PER_TILE && this.computeWalkableTiles(actor).size > 0;
+        return this.hasActionGauge(MOVE_ACTION_GAUGE_COST) && this.computeWalkableTiles(actor).size > 0;
     }
 
     public hasExecutableAttack(actor: FieldActor): boolean {
-        if (this.context.isMajorActionUsed()) return false;
-        if (this.context.getRemainingActionPoints() < ATTACK_AP_COST) return false;
+        if (!this.hasActionGauge(ATTACK_ACTION_GAUGE_COST)) return false;
         return this.context.getFieldEnemies().some((entry) =>
             entry.enemy.stats.hp > 0 && this.context.getActorAttackTargetFailure(actor, entry.enemy) === null
         );
     }
 
     public hasExecutableInteract(actor: FieldActor): boolean {
-        return this.context.getRemainingActionPoints() >= INTERACT_AP_COST && this.hasAdjacentLoot(actor);
+        return this.hasActionGauge(INTERACT_ACTION_GAUGE_COST) && this.hasAdjacentLoot(actor);
     }
 
     public hasExecutableMagic(actor: FieldActor): boolean {
-        if (this.context.isMajorActionUsed()) return false;
         if (hasStatus(actor.character.statuses, 'silence')) return false;
-        return this.context.getRemainingActionPoints() >= MAGIC_AP_COST && this.context.hasCastableFieldSkill(actor);
+        return this.hasActionGauge(MAGIC_ACTION_GAUGE_COST) && this.context.hasCastableFieldSkill(actor);
     }
 
     public hasExecutableTool(actor: FieldActor): boolean {
-        if (this.context.isMajorActionUsed()) return false;
-        return this.context.getRemainingActionPoints() >= getActionApCost('tool') && this.context.hasUsableCombatTool(actor);
+        return this.hasActionGauge(TOOL_ACTION_GAUGE_COST) && this.context.hasUsableCombatTool(actor);
     }
 
     private getActionState(actor: FieldActor, type: ActionType): ActionMenuSlotState {
         const remainingAp = this.context.getRemainingActionPoints();
-        const majorUsed = this.context.isMajorActionUsed();
         switch (type) {
             case 'attack': {
                 const targetAvailable = this.context.getFieldEnemies().some((entry) =>
                     entry.enemy.stats.hp > 0 && this.context.getActorAttackTargetFailure(actor, entry.enemy) === null
                 );
-                return this.buildState(type, !majorUsed && remainingAp >= ATTACK_AP_COST && targetAvailable,
-                    majorUsed ? '이번 턴 주요 행동 사용됨'
-                        : remainingAp < ATTACK_AP_COST ? '공격 AP 부족'
-                            : '공격 가능한 적 없음',
-                    '6 AP');
+                return this.buildState(type, remainingAp >= ATTACK_ACTION_GAUGE_COST && targetAvailable,
+                    remainingAp < ATTACK_ACTION_GAUGE_COST ? 'ATB 부족' : '공격 가능한 적 없음',
+                    this.costLabel(ATTACK_ACTION_GAUGE_COST));
             }
             case 'magic':
-                return this.buildState(type, !majorUsed && !hasStatus(actor.character.statuses, 'silence') && remainingAp >= MAGIC_AP_COST && this.context.hasCastableFieldSkill(actor),
-                    majorUsed ? '이번 턴 주요 행동 사용됨'
-                        : hasStatus(actor.character.statuses, 'silence') ? '침묵 상태'
-                            : remainingAp < MAGIC_AP_COST ? '마법 AP 부족'
-                                : '사용 가능한 마법 없음',
-                    '8 AP');
+                return this.buildState(type, !hasStatus(actor.character.statuses, 'silence') && remainingAp >= MAGIC_ACTION_GAUGE_COST && this.context.hasCastableFieldSkill(actor),
+                    hasStatus(actor.character.statuses, 'silence') ? '침묵 상태'
+                        : remainingAp < MAGIC_ACTION_GAUGE_COST ? 'ATB 부족'
+                            : '사용 가능한 마법 없음',
+                    this.costLabel(MAGIC_ACTION_GAUGE_COST));
             case 'tool': {
                 const tool = this.context.getCombatToolAvailability(actor);
-                return this.buildState(type, !majorUsed && remainingAp >= getActionApCost('tool') && tool.hasEffectiveRecovery,
-                    majorUsed ? '이번 턴 주요 행동 사용됨'
-                        : remainingAp < getActionApCost('tool') ? '도구 AP 부족'
-                            : !tool.hasRecoveryConsumable ? '회복 도구 없음'
-                                : '회복 효과 없음',
-                    '4 AP');
+                return this.buildState(type, remainingAp >= TOOL_ACTION_GAUGE_COST && tool.hasEffectiveRecovery,
+                    remainingAp < TOOL_ACTION_GAUGE_COST ? 'ATB 부족'
+                        : !tool.hasRecoveryConsumable ? '회복 도구 없음'
+                            : '회복 효과 없음',
+                    this.costLabel(TOOL_ACTION_GAUGE_COST));
             }
             case 'move':
                 return this.buildState(type, this.hasExecutableMove(actor),
                     hasStatus(actor.character.statuses, 'immobilize') ? '이동불가 상태'
-                        : remainingAp < MOVE_AP_PER_TILE ? '이동 AP 부족'
+                        : remainingAp < MOVE_ACTION_GAUGE_COST ? 'ATB 부족'
                             : '이동할 타일 없음',
-                    '2/tile');
+                    this.costLabel(MOVE_ACTION_GAUGE_COST));
             case 'open':
                 return this.buildState(type, this.hasExecutableInteract(actor),
-                    remainingAp < INTERACT_AP_COST ? '조사 AP 부족' : '조사 대상 없음',
-                    '0 AP');
+                    remainingAp < INTERACT_ACTION_GAUGE_COST ? 'ATB 부족' : '조사 대상 없음',
+                    this.costLabel(INTERACT_ACTION_GAUGE_COST));
             case 'defend':
-                return { type, enabled: true, costLabel: '0 AP' };
+                return this.buildState(type, remainingAp >= DEFEND_ACTION_GAUGE_COST, 'ATB 부족', this.costLabel(DEFEND_ACTION_GAUGE_COST));
             case 'rest':
-                return { type, enabled: true, costLabel: '0 AP' };
+                return this.buildState(type, remainingAp >= REST_ACTION_GAUGE_COST, 'ATB 부족', this.costLabel(REST_ACTION_GAUGE_COST));
         }
     }
 
@@ -365,11 +365,16 @@ export class WorldPlayerActionController {
     }
 
     private rest(actor: FieldActor): void {
+        if (!this.spendActionCost(REST_ACTION_GAUGE_COST)) {
+            this.sink.log('휴식할 행동 게이지가 부족합니다.');
+            this.context.reopenActionMenu(actor);
+            return;
+        }
         actor.character.statuses = applyStatus(actor.character.statuses, createStatus('resting'));
         this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'REST');
         this.sink.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
         this.sink.log('휴식 중: 체력과 마나가 천천히 회복됩니다. 피해를 받으면 해제됩니다.');
-        this.context.endActorTurn(actor, '휴식');
+        this.context.resumeOrEndActiveTurn(actor);
     }
 
     private handleAttackTarget(actor: FieldActor, hit: FieldHit): void {
@@ -390,8 +395,7 @@ export class WorldPlayerActionController {
             this.sink.log(getAttackFailureMessage(failure));
             return;
         }
-        if (this.context.spendAp(ATTACK_AP_COST) && this.context.tryActorAttack(actor, enemy)) {
-            this.context.markMajorActionUsed();
+        if (this.spendActionCost(ATTACK_ACTION_GAUGE_COST) && this.context.tryActorAttack(actor, enemy)) {
             this.context.resumeOrEndActiveTurn(actor);
         }
     }
@@ -409,7 +413,7 @@ export class WorldPlayerActionController {
         }
 
         this.context.selectLoot(loot.id);
-        if (!this.context.spendAp(INTERACT_AP_COST)) {
+        if (!this.spendActionCost(INTERACT_ACTION_GAUGE_COST)) {
             this.sink.log('조사할 행동력이 부족합니다.');
             return;
         }
@@ -432,8 +436,8 @@ export class WorldPlayerActionController {
             return false;
         }
 
-        const apCost = terrainCostToApCost(pathResult.cost);
-        if (!this.context.spendAp(apCost)) {
+        const apCost = getActionApCost('move');
+        if (!this.spendActionCost(MOVE_ACTION_GAUGE_COST)) {
             this.sink.log('이동할 행동력이 부족합니다.');
             return false;
         }
@@ -454,10 +458,7 @@ export class WorldPlayerActionController {
         const result = new Set<string>();
         const start = this.actorTile(actor);
         const movementBudget = this.context.getActorTerrainMovementBudget(actor);
-        const maxCost = Math.min(
-            movementBudget,
-            this.context.getRemainingActionPoints() / MOVE_AP_PER_TILE
-        );
+        const maxCost = this.hasActionGauge(MOVE_ACTION_GAUGE_COST) ? movementBudget : 0;
         if (maxCost <= 0) return result;
 
         const reachable = findReachableTilesByCost(
@@ -469,10 +470,7 @@ export class WorldPlayerActionController {
         );
 
         for (const [key, reachableTile] of reachable) {
-            if (
-                reachableTile.cost <= movementBudget + 1e-9 &&
-                canAffordTerrainCost(reachableTile.cost, this.context.getRemainingActionPoints())
-            ) {
+            if (reachableTile.cost <= movementBudget + 1e-9) {
                 result.add(key);
             }
         }
@@ -504,6 +502,18 @@ export class WorldPlayerActionController {
         return this.context.getLoot().some((loot) =>
             !loot.opened && manhattan(actorTile, { x: loot.x, y: loot.y }) <= 1
         );
+    }
+
+    private hasActionGauge(cost: number = MIN_FIELD_ACTION_GAUGE_COST): boolean {
+        return this.context.getRemainingActionPoints() >= cost;
+    }
+
+    private spendActionCost(cost: number): boolean {
+        return this.context.spendAp(cost);
+    }
+
+    private costLabel(cost: number): string {
+        return `ATB -${cost}%`;
     }
 
     private actorTile(actor: FieldActor): TilePoint {

@@ -60,7 +60,7 @@ function combineGrowth(rates: GrowthRates[], multiplier: number = 1): GrowthRate
 const INFANTRY: ClassLine = {
     id: 'infantry', branch: 'battle',
     nameKr: '보병', nameEn: 'Infantry',
-    growth: GROWTH_MELEE, baseMovRange: 3, attackRange: 1,
+    growth: GROWTH_MELEE, baseMovRange: 5, attackRange: 1,
     ignoresTerrain: false, waterBonus: false,
     tiers: [
         { tier: 1, nameKr: '파이터', nameEn: 'Fighter' },
@@ -85,7 +85,7 @@ const INFANTRY: ClassLine = {
 const CAVALRY: ClassLine = {
     id: 'cavalry', branch: 'battle',
     nameKr: '기병', nameEn: 'Cavalry',
-    growth: GROWTH_CAVALRY, baseMovRange: 4, attackRange: 2,
+    growth: GROWTH_CAVALRY, baseMovRange: 8, attackRange: 2,
     ignoresTerrain: false, waterBonus: false,
     tiers: [
         { tier: 1, nameKr: '나이트', nameEn: 'Knight' },
@@ -110,7 +110,7 @@ const CAVALRY: ClassLine = {
 const FLYING: ClassLine = {
     id: 'flying', branch: 'battle',
     nameKr: '비병', nameEn: 'Flying',
-    growth: GROWTH_FLYING, baseMovRange: 5, attackRange: 1,
+    growth: GROWTH_FLYING, baseMovRange: 9, attackRange: 1,
     ignoresTerrain: true, waterBonus: false,
     tiers: [
         { tier: 2, nameKr: '호크나이트', nameEn: 'Hawk Knight' },
@@ -135,7 +135,7 @@ const FLYING: ClassLine = {
 const NAVAL: ClassLine = {
     id: 'naval', branch: 'tactics',
     nameKr: '수병', nameEn: 'Naval',
-    growth: GROWTH_NAVAL, baseMovRange: 3, attackRange: 1,
+    growth: GROWTH_NAVAL, baseMovRange: 6, attackRange: 1,
     ignoresTerrain: false, waterBonus: true,
     tiers: [
         { tier: 2, nameKr: '캡틴', nameEn: 'Captain' },
@@ -158,7 +158,7 @@ const NAVAL: ClassLine = {
 const LANCER: ClassLine = {
     id: 'lancer', branch: 'tactics',
     nameKr: '창병', nameEn: 'Lancer',
-    growth: GROWTH_LANCE, baseMovRange: 3, attackRange: 2,
+    growth: GROWTH_LANCE, baseMovRange: 5, attackRange: 2,
     ignoresTerrain: false, waterBonus: false,
     tiers: [
         { tier: 2, nameKr: '로드', nameEn: 'Lord' },
@@ -181,7 +181,7 @@ const LANCER: ClassLine = {
 const ARCHER: ClassLine = {
     id: 'archer', branch: 'tactics',
     nameKr: '궁병', nameEn: 'Archer',
-    growth: GROWTH_ARCHER, baseMovRange: 3, attackRange: 4,
+    growth: GROWTH_ARCHER, baseMovRange: 6, attackRange: 4,
     ignoresTerrain: false, waterBonus: false,
     tiers: [
         { tier: 2, nameKr: '스나이퍼', nameEn: 'Sniper' },
@@ -231,7 +231,7 @@ const CLERIC: ClassLine = {
 const PRIEST: ClassLine = {
     id: 'priest', branch: 'healer',
     nameKr: '신관', nameEn: 'Priest',
-    growth: GROWTH_PRIEST, baseMovRange: 3, attackRange: 1,
+    growth: GROWTH_PRIEST, baseMovRange: 4, attackRange: 1,
     ignoresTerrain: false, waterBonus: false,
     tiers: [
         { tier: 2, nameKr: '몽크', nameEn: 'Monk' },
@@ -254,7 +254,7 @@ const PRIEST: ClassLine = {
 const SHRINE: ClassLine = {
     id: 'shrine', branch: 'healer',
     nameKr: '무녀', nameEn: 'Shrine Maiden',
-    growth: GROWTH_SHRINE, baseMovRange: 3, attackRange: 1,
+    growth: GROWTH_SHRINE, baseMovRange: 5, attackRange: 1,
     ignoresTerrain: false, waterBonus: false,
     tiers: [
         { tier: 2, nameKr: '무녀', nameEn: 'Shrine Maiden' },
@@ -279,7 +279,7 @@ const SHRINE: ClassLine = {
 const MAGE: ClassLine = {
     id: 'mage', branch: 'magic',
     nameKr: '마법사', nameEn: 'Mage',
-    growth: GROWTH_MAGE, baseMovRange: 3, attackRange: 3,
+    growth: GROWTH_MAGE, baseMovRange: 4, attackRange: 3,
     ignoresTerrain: false, waterBonus: false,
     tiers: [
         { tier: 1, nameKr: '매지션', nameEn: 'Magician' },
@@ -304,7 +304,7 @@ const MAGE: ClassLine = {
 const CULTIST: ClassLine = {
     id: 'cultist', branch: 'magic',
     nameKr: '사교', nameEn: 'Cultist',
-    growth: GROWTH_CULTIST, baseMovRange: 3, attackRange: 3,
+    growth: GROWTH_CULTIST, baseMovRange: 4, attackRange: 3,
     ignoresTerrain: false, waterBonus: false,
     tiers: [
         { tier: 2, nameKr: '셔먼', nameEn: 'Shaman' },
@@ -327,7 +327,7 @@ const CULTIST: ClassLine = {
 const ALCHEMIST: ClassLine = {
     id: 'alchemist', branch: 'magic',
     nameKr: '연금술사', nameEn: 'Alchemist',
-    growth: GROWTH_ALCHEMIST, baseMovRange: 3, attackRange: 2,
+    growth: GROWTH_ALCHEMIST, baseMovRange: 5, attackRange: 2,
     ignoresTerrain: false, waterBonus: false,
     tiers: [
         { tier: 1, nameKr: '연금술사', nameEn: 'Alchemist' },
@@ -392,7 +392,7 @@ const MASTER_BATTLE: ClassLine = {
     id: 'master_battle', branch: 'battle',
     nameKr: '배틀마스터', nameEn: 'Battle Master',
     growth: combineGrowth([GROWTH_MELEE, GROWTH_CAVALRY, GROWTH_FLYING], 1.18),
-    baseMovRange: 4, attackRange: 2,
+    baseMovRange: 8, attackRange: 2,
     ignoresTerrain: false, waterBonus: false,
     tiers: MASTER_CLASSES[0].tiers,
     skillUnlocks: {
@@ -406,7 +406,7 @@ const MASTER_TACTICS: ClassLine = {
     id: 'master_tactics', branch: 'tactics',
     nameKr: '택틱스마스터', nameEn: 'Tactics Master',
     growth: combineGrowth([GROWTH_NAVAL, GROWTH_LANCE, GROWTH_ARCHER], 1.18),
-    baseMovRange: 3, attackRange: 4,
+    baseMovRange: 7, attackRange: 4,
     ignoresTerrain: false, waterBonus: true,
     tiers: MASTER_CLASSES[1].tiers,
     skillUnlocks: {
@@ -420,7 +420,7 @@ const MASTER_HEALER: ClassLine = {
     id: 'master_healer', branch: 'healer',
     nameKr: '힐러마스터', nameEn: 'Healer Master',
     growth: combineGrowth([GROWTH_CLERIC, GROWTH_PRIEST, GROWTH_SHRINE], 1.18),
-    baseMovRange: 3, attackRange: 1,
+    baseMovRange: 5, attackRange: 1,
     ignoresTerrain: false, waterBonus: false,
     tiers: MASTER_CLASSES[2].tiers,
     skillUnlocks: {
@@ -434,7 +434,7 @@ const MASTER_MAGIC: ClassLine = {
     id: 'master_magic', branch: 'magic',
     nameKr: '매직마스터', nameEn: 'Magic Master',
     growth: combineGrowth([GROWTH_MAGE, GROWTH_CULTIST, GROWTH_ALCHEMIST], 1.18),
-    baseMovRange: 3, attackRange: 3,
+    baseMovRange: 6, attackRange: 3,
     ignoresTerrain: false, waterBonus: false,
     tiers: MASTER_CLASSES[3].tiers,
     skillUnlocks: {

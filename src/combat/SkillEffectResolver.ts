@@ -17,12 +17,15 @@ export interface SkillEffectEnemyInput {
 export interface SkillEffectEnemyResult {
     enemyId: string;
     damage: number;
+    mpDamage?: number;
     killed: boolean;
     isHit: boolean;
     isMiss: boolean;
     hitChance?: number;
     terrainMultiplier?: number;
     statusEffects?: StatusEffect[];
+    casterHpRestore?: number;
+    casterMpRestore?: number;
 }
 
 export interface SkillEffectResult {
@@ -68,7 +71,8 @@ export function resolveSkillEffect(input: ResolveSkillEffectInput): SkillEffectR
     switch (skill.type) {
         case 'heal':
             resolveHeal(skill, casterStats, casterCombatStats, result);
-            if (skill.id === 'shr_t1') result.cleansesCasterStatuses = true;
+            if (doesSkillCleanseCaster(skill)) result.cleansesCasterStatuses = true;
+            result.casterStatusEffects = getCasterStatusEffects(skill);
             break;
         case 'buff':
             result.casterStatusEffects = getStatusEffectsForSkill(skill);
@@ -90,6 +94,7 @@ export function resolveSkillEffect(input: ResolveSkillEffectInput): SkillEffectR
             } else {
                 result.logs.push(`${skill.icon} ${skill.nameKr}: ${result.enemyResults.length}체 대상!`);
             }
+            appendResourceDrainLogs(skill, result);
             break;
         case 'debuff':
             if (!targetEnemy) {
@@ -124,11 +129,21 @@ export function resolveSkillEffect(input: ResolveSkillEffectInput): SkillEffectR
             if (result.enemyResults.some((enemyResult) => hasTerrainMultiplier(enemyResult))) {
                 result.logs.push('지형 마법 상성 적용');
             }
+            appendResourceDrainLogs(skill, result);
             break;
         }
     }
 
     return result;
+}
+
+function doesSkillCleanseCaster(skill: Skill): boolean {
+    return skill.id === 'shr_t1' || skill.id === 'shr_t7' || skill.id === 'og_cure';
+}
+
+function getCasterStatusEffects(skill: Skill): StatusEffect[] | undefined {
+    const statuses = getStatusEffectsForSkill(skill);
+    return statuses.length > 0 ? statuses : undefined;
 }
 
 function getResolvedTargets(input: ResolveSkillEffectInput, fallbackTarget: SkillEffectEnemyInput): SkillEffectEnemyInput[] {
@@ -187,16 +202,28 @@ function resolveDamageToEnemy(
     const isPhysical = skill.element === 'physical';
     const baseAtk = isPhysical ? casterCombatStats.atk : casterCombatStats.magAtk;
     const baseDef = isPhysical ? enemy.stats.def : enemy.stats.magDef;
+    const rule = getSpecialDamageRule(skill.id);
+    const defenseScale = rule.defenseScale ?? 0.5;
     const terrainMultiplier = getEnemyTerrainMultiplier(skill, enemy, terrainContext);
-    const damage = Math.max(1, Math.floor((baseAtk * skill.power - baseDef * 0.5) * terrainMultiplier));
+    const hpDamage = rule.mpOnly
+        ? 0
+        : Math.max(1, Math.floor((baseAtk * skill.power - baseDef * defenseScale) * terrainMultiplier));
+    const mpDamage = rule.mpDrainRatio
+        ? Math.max(1, Math.min(enemy.stats.mp, Math.floor(baseAtk * skill.power * rule.mpDrainRatio)))
+        : undefined;
+    const statusEffects = getOffensiveStatusEffects(skill);
     return {
         enemyId: enemy.id,
-        damage,
-        killed: enemy.stats.hp - damage <= 0,
+        damage: hpDamage,
+        mpDamage,
+        killed: hpDamage > 0 && enemy.stats.hp - hpDamage <= 0,
         isHit: true,
         isMiss: false,
         hitChance: hit.hitChance,
         terrainMultiplier,
+        statusEffects,
+        casterHpRestore: rule.hpDrainRatio ? Math.max(1, Math.floor(hpDamage * rule.hpDrainRatio)) : undefined,
+        casterMpRestore: mpDamage !== undefined ? mpDamage : undefined,
     };
 }
 
@@ -212,6 +239,7 @@ function resolveDebuffToEnemy(
 
     const terrainMultiplier = getEnemyTerrainMultiplier(skill, enemy, terrainContext);
     const damage = Math.max(1, Math.floor(casterCombatStats.magAtk * 0.5 * terrainMultiplier));
+    const statusEffects = getOffensiveStatusEffects(skill);
     return {
         enemyId: enemy.id,
         damage,
@@ -220,8 +248,44 @@ function resolveDebuffToEnemy(
         isMiss: false,
         hitChance: hit.hitChance,
         terrainMultiplier,
-        statusEffects: getStatusEffectsForSkill(skill),
+        statusEffects,
     };
+}
+
+function getOffensiveStatusEffects(skill: Skill): StatusEffect[] | undefined {
+    if (skill.type === 'buff' || skill.type === 'heal') return undefined;
+    const statuses = getStatusEffectsForSkill(skill);
+    return statuses.length > 0 ? statuses : undefined;
+}
+
+interface SpecialDamageRule {
+    defenseScale?: number;
+    hpDrainRatio?: number;
+    mpDrainRatio?: number;
+    mpOnly?: boolean;
+}
+
+const SPECIAL_DAMAGE_RULES: Record<string, SpecialDamageRule> = {
+    inf_t5: { defenseScale: 0 },
+    cav_t5: { defenseScale: 0.2 },
+    lan_t2: { defenseScale: 0 },
+    lan_t5: { defenseScale: 0 },
+    lan_t7: { defenseScale: 0.2 },
+    arc_t3: { defenseScale: 0 },
+    cul_t3: { hpDrainRatio: 0.5 },
+    og_hpdrain: { hpDrainRatio: 0.75 },
+    og_mpdrain: { mpOnly: true, mpDrainRatio: 1 },
+};
+
+function getSpecialDamageRule(skillId: string): SpecialDamageRule {
+    return SPECIAL_DAMAGE_RULES[skillId] ?? {};
+}
+
+function appendResourceDrainLogs(skill: Skill, result: SkillEffectResult): void {
+    const hpRestore = result.enemyResults.reduce((sum, enemy) => sum + (enemy.casterHpRestore ?? 0), 0);
+    const mpRestore = result.enemyResults.reduce((sum, enemy) => sum + (enemy.casterMpRestore ?? 0), 0);
+    if (hpRestore > 0) result.logs.push(`${skill.icon} ${skill.nameKr}: HP ${hpRestore} 흡수`);
+    if (mpRestore > 0) result.logs.push(`${skill.icon} ${skill.nameKr}: MP ${mpRestore} 흡수`);
 }
 
 function rollSkillHit(

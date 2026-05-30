@@ -19,7 +19,9 @@ import { LootObject } from '../src/entity/LootObject';
 import {
     ATTACK_AP_COST,
     INTERACT_AP_COST,
-    MOVE_AP_PER_TILE,
+    FIELD_MAX_ACTION_GAUGE,
+    MIN_FIELD_ACTION_GAUGE_COST,
+    MOVE_ACTION_GAUGE_COST,
 } from '../src/field/FieldActionEconomy';
 import { FIELD_ATB_SCALE, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, ENEMY_LEASH_RANGE } from '../src/field/FieldConfig';
 import { decideEnemyAction, type EnemyAIDecision, type EnemyAIUnit } from '../src/field/EnemyAI';
@@ -37,7 +39,6 @@ import {
     getTerrainMoveCost,
     isTerrainLineOfSightBlocking,
     isTerrainPassable,
-    terrainCostToApCost,
 } from '../src/field/TerrainRules';
 import { WorldMap } from '../src/map/WorldMap';
 import type { TownInfo } from '../src/map/BiomeMask';
@@ -226,7 +227,7 @@ export class WorldSession {
                 classLineId: snapshot.classLineId,
                 level: snapshot.level,
                 tile,
-                stats: cloneStats(snapshot.stats),
+                    stats: syncStatsMovementToClass(snapshot.stats, snapshot.classLineId),
                 statuses: cloneStatuses(snapshot.statuses),
                 actionGauge: 0,
                 remainingAp: 0,
@@ -329,8 +330,8 @@ export class WorldSession {
                 if (actor.actionGauge < 100) {
                     actor.actionGauge = advanceAtb(actor.actionGauge, getEffectiveStats(actor.stats, actor.statuses).spd, dt, FIELD_ATB_SCALE);
                     if (actor.actionGauge >= 100) {
-                        actor.actionGauge = 100;
-                        actor.remainingAp = getActorActionLimit(actor);
+                        actor.actionGauge = FIELD_MAX_ACTION_GAUGE;
+                        actor.remainingAp = FIELD_MAX_ACTION_GAUGE;
                         actor.majorActionUsed = false;
                     }
                 }
@@ -395,7 +396,7 @@ export class WorldSession {
             .filter((lootObject) => !this.autoLootPending.has(lootObject.id))
             .map((lootObject) => this.toLootSnapshot(lootObject));
         const readyActors = partyActors
-            .filter((actor) => !actor.isDead && !actor.isGhost && actor.actionGauge >= 100)
+            .filter((actor) => !actor.isDead && !actor.isGhost && actor.remainingAp >= MIN_FIELD_ACTION_GAUGE_COST)
             .map((actor) => actor.id);
         const remainingApByActor: Record<string, number> = {};
         for (const actor of partyActors) remainingApByActor[actor.id] = actor.remainingAp;
@@ -449,6 +450,10 @@ export class WorldSession {
     ): WorldSessionMessageResult {
         const actor = this.actors.get(message.actorId);
         const player = this.players.get(playerId);
+        if (message.kind === 'endTurn' && actor && player?.active && actor.ownerPlayerId === player.id) {
+            this.endActorTurn(actor);
+            return { replies: [], broadcasts: [] };
+        }
         const validationError = this.validateActorIntent(player, actor);
         if (validationError) return reject(message.intentId, validationError);
 
@@ -460,7 +465,6 @@ export class WorldSession {
             case 'interact':
                 return this.handleInteractIntent(playerId, actor!, message.intentId, message.payload, now);
             case 'endTurn':
-                this.endActorTurn(actor!);
                 return { replies: [], broadcasts: [] };
             case 'useItem':
                 return reject(message.intentId, 'useItem is not available in network raid V1.');
@@ -473,7 +477,7 @@ export class WorldSession {
         if (!actor) return 'Actor does not exist.';
         if (actor.ownerPlayerId !== player.id) return 'Actor is not owned by this player.';
         if (actor.isDead || actor.stats.hp <= 0) return 'Actor is down.';
-        if (actor.actionGauge < 100) return 'Actor action gauge is not ready.';
+        if (actor.remainingAp < MIN_FIELD_ACTION_GAUGE_COST) return 'Actor action gauge is not ready.';
         return null;
     }
 
@@ -496,10 +500,9 @@ export class WorldSession {
         );
         if (pathResult.path.length === 0 && manhattan(actor.tile, tile) > 0) return reject(intentId, 'No valid path.');
 
-        const apCost = terrainCostToApCost(pathResult.cost);
-        if (apCost > actor.remainingAp) return reject(intentId, 'Not enough AP for movement.');
+        if (actor.remainingAp < MOVE_ACTION_GAUGE_COST) return reject(intentId, 'No action available for movement.');
 
-        actor.remainingAp -= apCost;
+        this.spendActorGauge(actor, MOVE_ACTION_GAUGE_COST);
         if (pathResult.path.length > 0) {
             const next = pathResult.path[pathResult.path.length - 1];
             actor.facing = directionFromTo(actor.tile, next);
@@ -514,16 +517,14 @@ export class WorldSession {
         if (!targetId) return reject(intentId, 'Attack payload must include targetId.');
         const target = this.enemies.get(targetId);
         if (!target || target.enemy.stats.hp <= 0) return reject(intentId, 'Target is not alive.');
-        if (actor.majorActionUsed) return reject(intentId, 'Major action already used this turn.');
-        if (actor.remainingAp < ATTACK_AP_COST) return reject(intentId, 'Not enough AP for attack.');
+        if (actor.remainingAp < ATTACK_AP_COST) return reject(intentId, 'No action available for attack.');
 
         const range = getClassLine(actor.classLineId)?.attackRange ?? 1;
         const targetTile = { x: target.enemy.gridX, y: target.enemy.gridY };
         if (manhattan(actor.tile, targetTile) > range) return reject(intentId, 'Target is out of range.');
         if (range > 1 && !this.hasFieldLineOfSight(actor.tile, targetTile)) return reject(intentId, 'Line of sight is blocked.');
 
-        actor.remainingAp -= ATTACK_AP_COST;
-        actor.majorActionUsed = true;
+        this.spendActorGauge(actor, ATTACK_AP_COST);
         actor.facing = directionFromTo(actor.tile, targetTile);
         const { event, autoLootGrant } = this.resolveActorAttack(actor, target, now);
         this.finishActorIfSpent(actor);
@@ -541,13 +542,13 @@ export class WorldSession {
         if (!lootId) return reject(intentId, 'Interact payload must include lootId.');
         const lootObject = this.loot.get(lootId);
         if (!lootObject || lootObject.opened || this.autoLootPending.has(lootId)) return reject(intentId, 'Loot is not available.');
-        if (actor.remainingAp < INTERACT_AP_COST) return reject(intentId, 'Not enough AP to inspect loot.');
+        if (actor.remainingAp < INTERACT_AP_COST) return reject(intentId, 'No action available to inspect loot.');
         if (manhattan(actor.tile, { x: lootObject.x, y: lootObject.y }) > 1) return reject(intentId, 'Loot is too far away.');
 
         const lock = this.lootLocks.get(lootId);
         if (lock && lock.playerId !== playerId) return reject(intentId, 'Loot is already occupied.');
 
-        actor.remainingAp -= INTERACT_AP_COST;
+        this.spendActorGauge(actor, INTERACT_AP_COST);
         this.lootLocks.set(lootId, { playerId, lastTouchedAt: now });
         this.finishActorIfSpent(actor);
         return {
@@ -899,14 +900,19 @@ export class WorldSession {
     }
 
     private finishActorIfSpent(actor: ServerActor): void {
-        if (actor.remainingAp >= MOVE_AP_PER_TILE) return;
+        if (actor.remainingAp >= MIN_FIELD_ACTION_GAUGE_COST) return;
         this.endActorTurn(actor);
     }
 
     private endActorTurn(actor: ServerActor): void {
+        actor.actionGauge = Math.max(0, Math.min(FIELD_MAX_ACTION_GAUGE, actor.remainingAp));
         actor.remainingAp = 0;
-        actor.actionGauge = 0;
         actor.majorActionUsed = false;
+    }
+
+    private spendActorGauge(actor: ServerActor, cost: number): void {
+        actor.remainingAp = Math.max(0, actor.remainingAp - cost);
+        actor.actionGauge = actor.remainingAp;
     }
 
     private ensureContentNear(spawnTile: TilePoint): void {
@@ -1117,6 +1123,13 @@ function cloneStats(stats: CharacterStats): CharacterStats {
     return { ...stats };
 }
 
+function syncStatsMovementToClass(stats: CharacterStats, classLineId: string): CharacterStats {
+    const synced = cloneStats(stats);
+    const baseMovRange = getClassLine(classLineId)?.baseMovRange;
+    if (baseMovRange !== undefined) synced.mov = baseMovRange;
+    return synced;
+}
+
 function cloneStatuses(statuses: StatusEffect[] | undefined): StatusEffect[] {
     return (statuses ?? []).map((status) => ({ ...status }));
 }
@@ -1132,10 +1145,6 @@ function formationOffset(index: number): TilePoint {
         { x: 1, y: 0 },
     ];
     return offsets[index % offsets.length] ?? { x: 0, y: 0 };
-}
-
-function getActorActionLimit(actor: ServerActor): number {
-    return Math.max(1, Math.floor(actor.stats.actionLimit || 15));
 }
 
 function directionFromTo(from: TilePoint, to: TilePoint): NetFacing {
@@ -1202,7 +1211,7 @@ function createFallbackActorSnapshot(): ActorSnapshot {
             magAtk: 5,
             magDef: 3,
             spd: 5,
-            mov: 3,
+            mov: getClassLine('infantry')?.baseMovRange ?? 5,
             hitRate: 80,
             critRate: 5,
             actionLimit: 15,

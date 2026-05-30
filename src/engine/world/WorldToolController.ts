@@ -1,5 +1,5 @@
 import { getEffectiveStatsForCharacter } from '../../combat/StatusEffects';
-import { getActionApCost } from '../../field/FieldActionEconomy';
+import { TOOL_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
 import type { FieldActor } from '../../field/FieldTypes';
 import {
     getCombatRecovery,
@@ -82,12 +82,7 @@ export class WorldToolController {
     }
 
     public open(actor: FieldActor): void {
-        if (this.context.isMajorActionUsed()) {
-            this.sink.log('이번 턴에는 공격/마법/도구를 이미 사용했습니다.');
-            this.context.reopenActionMenu(actor);
-            return;
-        }
-        if (this.context.getRemainingActionPoints() < getActionApCost('tool')) {
+        if (this.context.getRemainingActionPoints() < TOOL_ACTION_GAUGE_COST) {
             this.sink.log('도구를 사용할 행동력이 부족합니다.');
             this.context.reopenActionMenu(actor);
             return;
@@ -141,13 +136,7 @@ export class WorldToolController {
             return;
         }
 
-        if (this.context.isMajorActionUsed()) {
-            this.sink.log('이번 턴에는 공격/마법/도구를 이미 사용했습니다.');
-            this.context.reopenActionMenu(actor);
-            return;
-        }
-
-        if (this.context.getRemainingActionPoints() < getActionApCost('tool')) {
+        if (this.context.getRemainingActionPoints() < TOOL_ACTION_GAUGE_COST) {
             this.sink.log('도구를 사용할 행동력이 부족합니다.');
             this.context.reopenActionMenu(actor);
             return;
@@ -159,12 +148,11 @@ export class WorldToolController {
             return;
         }
 
-        if (!this.context.spendAp(getActionApCost('tool'))) {
+        if (!this.context.spendAp(TOOL_ACTION_GAUGE_COST)) {
             this.sink.log('도구를 사용할 행동력이 부족합니다.');
             this.context.reopenActionMenu(actor);
             return;
         }
-        this.context.markMajorActionUsed();
 
         actor.character.stats.hp += candidate.effectiveHp;
         actor.character.stats.mp += candidate.effectiveMp;

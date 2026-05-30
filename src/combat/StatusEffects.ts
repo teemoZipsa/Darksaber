@@ -101,7 +101,13 @@ const LOWER_IS_STRONGER = new Set<StatusKind>([
     'attackDown',
     'defenseDown',
     'resistDown',
+    'damageTakenDown',
     'injury',
+]);
+
+const REACTION_STATUSES = new Set<StatusKind>([
+    'guard',
+    'counterReady',
 ]);
 
 const NEGATIVE_STATUSES = new Set<StatusKind>([
@@ -217,13 +223,20 @@ export function consumeStatus(statuses: StatusEffect[] | undefined, kind: Status
 
 export function applyGuardToDamage(statuses: StatusEffect[] | undefined, damage: number): GuardDamageResult {
     const guard = getStatus(statuses, 'guard');
-    const damageTakenMultiplier = (statuses ?? [])
-        .filter((status) => status.kind === 'damageTakenDown')
-        .reduce((multiplier, status) => multiplier * status.magnitude, 1);
+    const damageTakenMultiplier = getBestMagnitude(statuses, 'damageTakenDown', 1);
+    const reducedDamage = scaleIncomingDamage(damage, damageTakenMultiplier);
+
+    if (reducedDamage <= 0) {
+        return {
+            damage: 0,
+            statuses: statuses ?? [],
+            guarded: false,
+        };
+    }
 
     if (!guard) {
         return {
-            damage: scaleIncomingDamage(damage, damageTakenMultiplier),
+            damage: reducedDamage,
             statuses: statuses ?? [],
             guarded: false,
         };
@@ -231,7 +244,7 @@ export function applyGuardToDamage(statuses: StatusEffect[] | undefined, damage:
 
     const consumed = consumeStatus(statuses, 'guard');
     return {
-        damage: scaleIncomingDamage(damage, guard.magnitude * damageTakenMultiplier),
+        damage: scaleIncomingDamage(reducedDamage, guard.magnitude),
         statuses: consumed.statuses,
         guarded: true,
     };
@@ -241,6 +254,8 @@ export function resolveTurnStartStatuses(stats: CharacterStats, statuses: Status
     let hpDelta = 0;
     let poisonDamage = 0;
     let regenHealing = 0;
+    let poisonMagnitude: number | undefined;
+    let regenMagnitude: number | undefined;
     const expiredReaction = hasStatus(statuses, 'guard') || hasStatus(statuses, 'counterReady');
     const nextStatuses: StatusEffect[] = [];
 
@@ -248,9 +263,9 @@ export function resolveTurnStartStatuses(stats: CharacterStats, statuses: Status
         if (status.kind === 'guard' || status.kind === 'counterReady') continue;
 
         if (status.kind === 'poison') {
-            poisonDamage += Math.max(1, Math.floor(stats.maxHp * status.magnitude));
+            poisonMagnitude = Math.max(poisonMagnitude ?? 0, status.magnitude);
         } else if (status.kind === 'regen') {
-            regenHealing += Math.max(1, Math.floor(stats.maxHp * status.magnitude));
+            regenMagnitude = Math.max(regenMagnitude ?? 0, status.magnitude);
         }
 
         if (status.durationTurns === undefined) {
@@ -262,6 +277,8 @@ export function resolveTurnStartStatuses(stats: CharacterStats, statuses: Status
         if (durationTurns > 0) nextStatuses.push({ ...status, durationTurns });
     }
 
+    if (poisonMagnitude !== undefined) poisonDamage = Math.max(1, Math.floor(stats.maxHp * poisonMagnitude));
+    if (regenMagnitude !== undefined) regenHealing = Math.max(1, Math.floor(stats.maxHp * regenMagnitude));
     hpDelta = regenHealing - poisonDamage;
     return { statuses: nextStatuses, hpDelta, poisonDamage, regenHealing, expiredReaction };
 }
@@ -284,81 +301,34 @@ export function getEffectiveStatsForEnemy(enemy: StatusCarrier): CharacterStats 
 
 export function getEffectiveStats(stats: CharacterStats, statuses: StatusEffect[] | undefined = []): CharacterStats {
     const effective = { ...stats };
-    let atkMultiplier = 1;
-    let defMultiplier = 1;
-    let magDefMultiplier = 1;
-    let spdMultiplier = 1;
-    let hitRateMultiplier = 1;
-    let maxHpMultiplier = 1;
-    let maxMpMultiplier = 1;
-    let hitRatePenalty = 0;
-    let critRateBonus = 0;
-    let evasionBonus = 0;
-    let immobilized = false;
-
-    for (const status of statuses) {
-        switch (status.kind) {
-            case 'slow':
-                spdMultiplier *= status.magnitude;
-                break;
-            case 'immobilize':
-                immobilized = true;
-                break;
-            case 'blind':
-                hitRateMultiplier *= status.magnitude;
-                break;
-            case 'attackDown':
-                atkMultiplier *= status.magnitude;
-                break;
-            case 'defenseDown':
-                defMultiplier *= status.magnitude;
-                break;
-            case 'resistDown':
-                magDefMultiplier *= status.magnitude;
-                break;
-            case 'attackUp':
-                atkMultiplier *= status.magnitude;
-                break;
-            case 'defenseUp':
-                defMultiplier *= status.magnitude;
-                break;
-            case 'speedUp':
-                spdMultiplier *= status.magnitude;
-                break;
-            case 'resistUp':
-                magDefMultiplier *= status.magnitude;
-                break;
-            case 'allUp':
-                atkMultiplier *= status.magnitude;
-                defMultiplier *= status.magnitude;
-                spdMultiplier *= status.magnitude;
-                magDefMultiplier *= status.magnitude;
-                break;
-            case 'maxHpUp':
-                maxHpMultiplier *= status.magnitude;
-                break;
-            case 'maxMpUp':
-                maxMpMultiplier *= status.magnitude;
-                break;
-            case 'critUp':
-                critRateBonus += status.magnitude;
-                break;
-            case 'evasionUp':
-                evasionBonus += status.magnitude;
-                break;
-            case 'hitDown':
-                hitRatePenalty += status.magnitude;
-                break;
-            case 'damageTakenDown':
-                break;
-            case 'injury':
-                maxHpMultiplier *= status.magnitude;
-                break;
-        }
-    }
+    const allUpMultiplier = getBestMagnitude(statuses, 'allUp', 1);
+    const atkMultiplier = allUpMultiplier
+        * getBestMagnitude(statuses, 'attackUp', 1)
+        * getBestMagnitude(statuses, 'attackDown', 1);
+    const defMultiplier = allUpMultiplier
+        * getBestMagnitude(statuses, 'defenseUp', 1)
+        * getBestMagnitude(statuses, 'defenseDown', 1);
+    const magAtkMultiplier = hasStatus(statuses, 'silence')
+        ? 0
+        : allUpMultiplier;
+    const magDefMultiplier = allUpMultiplier
+        * getBestMagnitude(statuses, 'resistUp', 1)
+        * getBestMagnitude(statuses, 'resistDown', 1);
+    const spdMultiplier = allUpMultiplier
+        * getBestMagnitude(statuses, 'speedUp', 1)
+        * getBestMagnitude(statuses, 'slow', 1);
+    const hitRateMultiplier = getBestMagnitude(statuses, 'blind', 1);
+    const maxHpMultiplier = getBestMagnitude(statuses, 'maxHpUp', 1)
+        * getBestMagnitude(statuses, 'injury', 1);
+    const maxMpMultiplier = getBestMagnitude(statuses, 'maxMpUp', 1);
+    const hitRatePenalty = getBestMagnitude(statuses, 'hitDown', 0);
+    const critRateBonus = getBestMagnitude(statuses, 'critUp', 0);
+    const evasionBonus = getBestMagnitude(statuses, 'evasionUp', 0);
+    const immobilized = hasStatus(statuses, 'immobilize');
 
     effective.atk = Math.max(1, Math.floor(stats.atk * atkMultiplier));
     effective.def = Math.max(0, Math.floor(stats.def * defMultiplier));
+    effective.magAtk = Math.max(0, Math.floor(stats.magAtk * magAtkMultiplier));
     effective.magDef = Math.max(0, Math.floor(stats.magDef * magDefMultiplier));
     effective.spd = Math.max(1, Math.floor(stats.spd * spdMultiplier));
     effective.hitRate = Math.max(1, Math.floor(stats.hitRate * hitRateMultiplier) - hitRatePenalty);
@@ -373,21 +343,110 @@ export function getEffectiveStats(stats: CharacterStats, statuses: StatusEffect[
 
 export function getStatusEffectsForSkill(skill: Skill): StatusEffect[] {
     switch (skill.id) {
+        case 'nav_t2':
+            return [skillStatus(skill, 'slow', { magnitude: skill.power, durationTurns: 3 })];
+        case 'inf_guard_stance':
+            return [
+                skillStatus(skill, 'guard', { magnitude: 0.45, durationTurns: 1 }),
+                skillStatus(skill, 'defenseUp', { magnitude: 1.15, durationTurns: 1 }),
+            ];
+        case 'inf_iron_defense':
+            return [
+                skillStatus(skill, 'damageTakenDown', { magnitude: 0.8, durationTurns: 2 }),
+                skillStatus(skill, 'counterReady', { magnitude: 0.45, durationTurns: 2 }),
+            ];
+        case 'cav_mobile_stance':
+            return [
+                skillStatus(skill, 'speedUp', { magnitude: 1.25, durationTurns: 3 }),
+                skillStatus(skill, 'evasionUp', { magnitude: 8, durationTurns: 3 }),
+            ];
+        case 'lan_spear_wall':
+            return [skillStatus(skill, 'guard', { magnitude: 0.5, durationTurns: 1 })];
+        case 'lan_intercept_order':
+            return [
+                skillStatus(skill, 'counterReady', { magnitude: 0.7, durationTurns: 2 }),
+                skillStatus(skill, 'defenseUp', { magnitude: 1.15, durationTurns: 2 }),
+            ];
+        case 'cle_life_prayer':
+            return [skillStatus(skill, 'regen', { magnitude: 0.08, durationTurns: 3 })];
+        case 'cle_healing_bell':
+            return [
+                skillStatus(skill, 'regen', { magnitude: 0.12, durationTurns: 3 }),
+                skillStatus(skill, 'defenseUp', { magnitude: 1.15, durationTurns: 3 }),
+            ];
+        case 'pri_battle_chant':
+            return [
+                skillStatus(skill, 'attackUp', { magnitude: 1.15, durationTurns: 3 }),
+                skillStatus(skill, 'defenseUp', { magnitude: 1.15, durationTurns: 3 }),
+            ];
+        case 'pri_victory_prayer':
+            return [
+                skillStatus(skill, 'attackUp', { magnitude: 1.25, durationTurns: 2 }),
+                skillStatus(skill, 'critUp', { magnitude: 10, durationTurns: 2 }),
+            ];
+        case 'shr_guardian_aura':
+            return [
+                skillStatus(skill, 'resistUp', { magnitude: 1.2, durationTurns: 3 }),
+                skillStatus(skill, 'damageTakenDown', { magnitude: 0.9, durationTurns: 3 }),
+            ];
+        case 'shr_sanctuary_dance':
+            return [
+                skillStatus(skill, 'regen', { magnitude: 0.1, durationTurns: 4 }),
+                skillStatus(skill, 'resistUp', { magnitude: 1.25, durationTurns: 4 }),
+            ];
+        case 'lan_t5':
+            return [skillStatus(skill, 'defenseDown', { magnitude: 0.75, durationTurns: 3 })];
+        case 'cul_t2':
+            return [
+                skillStatus(skill, 'attackDown', { magnitude: skill.power, durationTurns: 3 }),
+                skillStatus(skill, 'defenseDown', { magnitude: skill.power, durationTurns: 3 }),
+            ];
+        case 'alc_t2':
+            return [skillStatus(skill, 'poison', { durationTurns: 4, magnitude: 0.1 })];
+        case 'og_freeze':
+            return [skillStatus(skill, 'slow', { magnitude: 0.7, durationTurns: 2 })];
         case 'og_poison':
             return [
-                createStatus('poison', { sourceSkillId: skill.id }),
-                createStatus('attackDown', { sourceSkillId: skill.id }),
+                skillStatus(skill, 'poison'),
+                skillStatus(skill, 'attackDown', { magnitude: skill.power }),
             ];
         case 'og_slow':
-            return [createStatus('slow', { sourceSkillId: skill.id })];
+            return [skillStatus(skill, 'slow', { magnitude: skill.power })];
         case 'og_demove':
-            return [createStatus('immobilize', { sourceSkillId: skill.id })];
+            return [skillStatus(skill, 'immobilize')];
         case 'og_deattack':
-            return [createStatus('attackDown', { sourceSkillId: skill.id })];
+            return [skillStatus(skill, 'attackDown', { magnitude: skill.power })];
         case 'og_mute':
-            return [createStatus('silence', { sourceSkillId: skill.id })];
+            return [skillStatus(skill, 'silence')];
         case 'og_antiresist':
-            return [createStatus('resistDown', { sourceSkillId: skill.id })];
+            return [skillStatus(skill, 'resistDown', { magnitude: skill.power })];
+        case 'pri_t2':
+            return [
+                skillStatus(skill, 'attackUp', { magnitude: skill.power, durationTurns: skill.buffDuration ?? 3 }),
+                skillStatus(skill, 'defenseUp', { magnitude: skill.power, durationTurns: skill.buffDuration ?? 3 }),
+            ];
+        case 'pri_t6':
+            return [
+                skillStatus(skill, 'defenseUp', { magnitude: 1.6, durationTurns: skill.buffDuration ?? 5 }),
+                skillStatus(skill, 'resistUp', { magnitude: 1.6, durationTurns: skill.buffDuration ?? 5 }),
+            ];
+        case 'shr_t3':
+            return [
+                skillStatus(skill, 'resistUp', { magnitude: skill.power, durationTurns: skill.buffDuration ?? 3 }),
+                skillStatus(skill, 'damageTakenDown', { magnitude: 0.85, durationTurns: skill.buffDuration ?? 3 }),
+            ];
+        case 'shr_t5':
+            return [
+                skillStatus(skill, 'defenseUp', { magnitude: skill.power, durationTurns: skill.buffDuration ?? 5 }),
+                skillStatus(skill, 'resistUp', { magnitude: skill.power, durationTurns: skill.buffDuration ?? 5 }),
+                skillStatus(skill, 'damageTakenDown', { magnitude: 0.5, durationTurns: skill.buffDuration ?? 5 }),
+            ];
+        case 'shr_t7':
+            return [
+                skillStatus(skill, 'allUp', { magnitude: 1.35, durationTurns: 5 }),
+                skillStatus(skill, 'regen', { durationTurns: 5, magnitude: 0.12 }),
+                skillStatus(skill, 'damageTakenDown', { magnitude: 0.75, durationTurns: 5 }),
+            ];
     }
 
     if (skill.type !== 'buff') return [];
@@ -395,20 +454,32 @@ export function getStatusEffectsForSkill(skill: Skill): StatusEffect[] {
     const durationTurns = skill.buffDuration ?? 3;
     switch (skill.buffStat) {
         case 'atk':
-            return [createStatus('attackUp', { icon: skill.icon, durationTurns, magnitude: skill.power, sourceSkillId: skill.id })];
+            return [skillStatus(skill, 'attackUp', { durationTurns, magnitude: skill.power })];
         case 'def':
-            return [createStatus('defenseUp', { icon: skill.icon, durationTurns, magnitude: skill.power, sourceSkillId: skill.id })];
+            return [skillStatus(skill, 'defenseUp', { durationTurns, magnitude: skill.power })];
         case 'spd':
-            return [createStatus('speedUp', { icon: skill.icon, durationTurns, magnitude: skill.power, sourceSkillId: skill.id })];
+            return [skillStatus(skill, 'speedUp', { durationTurns, magnitude: skill.power })];
         case 'mdef':
-            return [createStatus('resistUp', { icon: skill.icon, durationTurns, magnitude: skill.power, sourceSkillId: skill.id })];
+            return [skillStatus(skill, 'resistUp', { durationTurns, magnitude: skill.power })];
         case 'regen':
-            return [createStatus('regen', { icon: skill.icon, durationTurns, sourceSkillId: skill.id })];
+            return [skillStatus(skill, 'regen', { durationTurns })];
         case 'all':
-            return [createStatus('allUp', { icon: skill.icon, durationTurns, magnitude: skill.power, sourceSkillId: skill.id })];
+            return [skillStatus(skill, 'allUp', { durationTurns, magnitude: skill.power })];
         default:
-            return [createStatus('allUp', { icon: skill.icon, durationTurns, magnitude: skill.power, sourceSkillId: skill.id })];
+            return [skillStatus(skill, 'allUp', { durationTurns, magnitude: skill.power })];
     }
+}
+
+function skillStatus(
+    skill: Skill,
+    kind: StatusKind,
+    overrides: Partial<Omit<StatusEffect, 'kind'>> = {}
+): StatusEffect {
+    return createStatus(kind, {
+        icon: skill.icon,
+        sourceSkillId: skill.id,
+        ...overrides,
+    });
 }
 
 function chooseStrongerMagnitude(kind: StatusKind, current: number, next: number): number {
@@ -418,11 +489,12 @@ function chooseStrongerMagnitude(kind: StatusKind, current: number, next: number
 
 function isSameStatusSlot(current: StatusEffect, next: StatusEffect): boolean {
     if (current.kind !== next.kind) return false;
+    if (REACTION_STATUSES.has(current.kind)) return true;
     if (current.kind === 'injury' || next.kind === 'injury') return true;
     if (current.sourceType === 'rest' || next.sourceType === 'rest') {
         return current.sourceType === next.sourceType;
     }
-    return true;
+    return current.sourceSkillId === next.sourceSkillId;
 }
 
 function maxOptional(a: number | undefined, b: number | undefined): number | undefined {
@@ -441,6 +513,14 @@ function adjustCurrentResources(stats: CharacterStats, before: CharacterStats, a
 
     stats.hp = Math.max(0, Math.min(after.maxHp, stats.hp));
     stats.mp = Math.max(0, Math.min(after.maxMp, stats.mp));
+}
+
+function getBestMagnitude(statuses: StatusEffect[] | undefined, kind: StatusKind, fallback: number): number {
+    const matches = (statuses ?? []).filter((status) => status.kind === kind);
+    if (matches.length === 0) return fallback;
+    return matches
+        .map((status) => status.magnitude)
+        .reduce((best, next) => chooseStrongerMagnitude(kind, best, next));
 }
 
 function scaleIncomingDamage(damage: number, multiplier: number): number {

@@ -5,14 +5,20 @@
  * Supports drag-to-move by grabbing the header.
  */
 
-import { Skill, getLearnedSkills } from '../data/SkillDB';
+import { Skill, SkillGroup, getLearnedSkills, getSkillGroup } from '../data/SkillDB';
+import { i18n, t } from '../i18n/LanguageManager';
 import { getSkillIconCell } from './DarksaberIconRegistry';
 import { DarksaberSpriteAtlas } from './DarksaberSpriteAtlas';
 import { UI, drawParchmentPanel, Parchment } from './UITheme';
 
+type MagicUiRow =
+    | { kind: 'section'; group: SkillGroup }
+    | { kind: 'skill'; skill: Skill };
+
 export class MagicUI {
     private visible = false;
     private skills: Skill[] = [];
+    private rows: MagicUiRow[] = [];
     private hoveredIndex = -1;
     private scrollOffset = 0;
     private currentMp = 0;
@@ -40,6 +46,7 @@ export class MagicUI {
 
     public show(classId: string, characterTier: number, mp: number, maxMp: number, unlockedSkillIds?: string[]): void {
         this.skills = getLearnedSkills(classId, characterTier, unlockedSkillIds);
+        this.rows = this.buildRows(this.skills);
         this.currentMp = mp;
         this.maxMp = maxMp;
         this.hoveredIndex = -1;
@@ -77,7 +84,7 @@ export class MagicUI {
             my >= listY && my <= listY + this.MAX_VISIBLE * this.ROW_H) {
             const row = Math.floor((my - listY) / this.ROW_H);
             const idx = row + this.scrollOffset;
-            if (idx >= 0 && idx < this.skills.length) {
+            if (idx >= 0 && idx < this.rows.length && this.rows[idx].kind === 'skill') {
                 this.hoveredIndex = idx;
             }
         }
@@ -112,8 +119,10 @@ export class MagicUI {
         }
 
         // Skill row click
-        if (this.hoveredIndex >= 0 && this.hoveredIndex < this.skills.length) {
-            const skill = this.skills[this.hoveredIndex];
+        if (this.hoveredIndex >= 0 && this.hoveredIndex < this.rows.length) {
+            const row = this.rows[this.hoveredIndex];
+            if (row.kind !== 'skill') return true;
+            const skill = row.skill;
             if (this.currentMp >= skill.mpCost) {
                 if (this.onSkillSelect) {
                     this.onSkillSelect(skill);
@@ -132,7 +141,7 @@ export class MagicUI {
 
     public onScroll(delta: number): boolean {
         if (!this.visible) return false;
-        const maxScroll = Math.max(0, this.skills.length - this.MAX_VISIBLE);
+        const maxScroll = Math.max(0, this.rows.length - this.MAX_VISIBLE);
         this.scrollOffset = Math.max(0, Math.min(maxScroll, this.scrollOffset + (delta > 0 ? 1 : -1)));
         return true;
     }
@@ -144,7 +153,7 @@ export class MagicUI {
             return;
         }
 
-        const visibleCount = Math.min(this.skills.length, this.MAX_VISIBLE);
+        const visibleCount = Math.min(this.rows.length, this.MAX_VISIBLE);
         this.panelH = this.HEADER_H + visibleCount * this.ROW_H + 12;
 
         // Center panel on first open (if not dragged before)
@@ -174,7 +183,7 @@ export class MagicUI {
         ctx.fillStyle = Parchment.textDark;
         ctx.font = `bold 15px ${UI.fontPrimary}`;
         ctx.textAlign = 'left';
-        ctx.fillText('✦ 마법', px + 14, py + 22);
+        ctx.fillText(t('magic.title'), px + 14, py + 22);
 
         // MP indicator (dark on gold header for contrast)
         ctx.fillStyle = Parchment.textDark;
@@ -195,10 +204,20 @@ export class MagicUI {
 
         for (let i = 0; i < visibleCount; i++) {
             const idx = i + this.scrollOffset;
-            if (idx >= this.skills.length) break;
+            if (idx >= this.rows.length) break;
 
-            const skill = this.skills[idx];
+            const row = this.rows[idx];
             const rowY = listY + i * this.ROW_H;
+            if (row.kind === 'section') {
+                ctx.fillStyle = 'rgba(58, 38, 24, 0.14)';
+                ctx.fillRect(px + 2, rowY + 4, this.PANEL_W - 4, this.ROW_H - 8);
+                ctx.fillStyle = Parchment.textMuted;
+                ctx.font = `bold 11px ${UI.fontPrimary}`;
+                ctx.fillText(this.getGroupLabel(row.group), px + 12, rowY + 23);
+                continue;
+            }
+
+            const skill = row.skill;
             const canCast = this.currentMp >= skill.mpCost;
             const isHovered = idx === this.hoveredIndex;
 
@@ -230,7 +249,7 @@ export class MagicUI {
             ctx.fillStyle = canCast
                 ? Parchment.textDark
                 : Parchment.textMuted;
-            ctx.fillText(skill.nameKr, px + 34, rowY + 16);
+            ctx.fillText(this.getSkillName(skill), px + 34, rowY + 16);
 
             // Tier badge
             ctx.font = `11px ${UI.fontPrimary}`;
@@ -268,10 +287,10 @@ export class MagicUI {
         }
 
         // ── Scroll indicator ──
-        if (this.skills.length > this.MAX_VISIBLE) {
+        if (this.rows.length > this.MAX_VISIBLE) {
             const totalH = visibleCount * this.ROW_H;
-            const thumbH = Math.max(16, totalH * (this.MAX_VISIBLE / this.skills.length));
-            const maxScroll = this.skills.length - this.MAX_VISIBLE;
+            const thumbH = Math.max(16, totalH * (this.MAX_VISIBLE / this.rows.length));
+            const maxScroll = this.rows.length - this.MAX_VISIBLE;
             const thumbY = listY + (this.scrollOffset / maxScroll) * (totalH - thumbH);
 
             ctx.fillStyle = 'rgba(58, 38, 24, 0.35)';
@@ -279,8 +298,11 @@ export class MagicUI {
         }
 
         // ── Tooltip on hover ──
-        if (this.hoveredIndex >= 0 && this.hoveredIndex < this.skills.length) {
-            const skill = this.skills[this.hoveredIndex];
+        const hoveredRow = this.hoveredIndex >= 0 && this.hoveredIndex < this.rows.length
+            ? this.rows[this.hoveredIndex]
+            : undefined;
+        if (hoveredRow?.kind === 'skill') {
+            const skill = hoveredRow.skill;
             const tipW = 200;
             const tipH = 44;
             let tipX = px + this.PANEL_W + 6;
@@ -294,17 +316,41 @@ export class MagicUI {
 
             ctx.fillStyle = Parchment.textDark;
             ctx.font = `12px ${UI.fontPrimary}`;
-            ctx.fillText(skill.descKr, tipX + 8, tipY + 16);
+            ctx.fillText(this.getSkillDesc(skill), tipX + 8, tipY + 16);
 
             ctx.fillStyle = Parchment.textDark;
             ctx.font = `11px ${UI.fontPrimary}`;
-            ctx.fillText(`범위: ${skill.range} | 반경: ${skill.aoeRadius} | 위력: ×${skill.power}`, tipX + 8, tipY + 32);
+            ctx.fillText(`${t('magic.range')}: ${skill.range} | ${t('magic.radius')}: ${skill.aoeRadius} | ${t('magic.power')}: ×${skill.power}`, tipX + 8, tipY + 32);
         }
 
         ctx.restore();
     }
 
     // ─── Helper functions ───
+
+    private buildRows(skills: Skill[]): MagicUiRow[] {
+        const order: SkillGroup[] = ['classSkill', 'classStance', 'classCommand', 'classAura', 'commonMagic'];
+        const rows: MagicUiRow[] = [];
+        for (const group of order) {
+            const groupSkills = skills.filter((skill) => getSkillGroup(skill) === group);
+            if (groupSkills.length === 0) continue;
+            rows.push({ kind: 'section', group });
+            rows.push(...groupSkills.map((skill) => ({ kind: 'skill' as const, skill })));
+        }
+        return rows;
+    }
+
+    private getSkillName(skill: Skill): string {
+        return i18n.lang === 'en' ? skill.nameEn : skill.nameKr;
+    }
+
+    private getSkillDesc(skill: Skill): string {
+        return i18n.lang === 'en' ? skill.descEn : skill.descKr;
+    }
+
+    private getGroupLabel(group: SkillGroup): string {
+        return t(`magic.group.${group}`);
+    }
 
     private getTierColor(tier: number): string {
         const colors = ['#aaa', '#8bc', '#6d8', '#cc8', '#da6', '#e66', '#f4f'];
@@ -321,19 +367,10 @@ export class MagicUI {
     }
 
     private getElementLabel(el: string): string {
-        const map: Record<string, string> = {
-            fire: '화', ice: '빙', lightning: '뇌',
-            holy: '성', dark: '암', earth: '지',
-            wind: '풍', physical: '물', none: '-'
-        };
-        return map[el] || '-';
+        return t(`magic.element.${el}`);
     }
 
     private getTypeLabel(type: string): string {
-        const map: Record<string, string> = {
-            damage: '공격', heal: '회복', buff: '버프',
-            debuff: '디버프', aoe: '범위'
-        };
-        return map[type] || type;
+        return t(`magic.type.${type}`);
     }
 }

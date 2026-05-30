@@ -55,7 +55,7 @@ export class WorldMovementController {
 
         for (const actor of this.context.getPartyActors()) {
             if (actor.character.isDead) continue;
-            if (actor.id !== input.activeTurnActorId && !hasStatus(actor.character.statuses, 'resting')) {
+            if (actor.id !== input.activeTurnActorId) {
                 actor.entity.actionGauge = advanceAtb(
                     actor.entity.actionGauge,
                     getEffectiveStatsForCharacter(actor.character).spd,

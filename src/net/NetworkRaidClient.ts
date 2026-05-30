@@ -83,6 +83,10 @@ export class NetworkRaidClient {
 
     public async connectAndJoin(input: NetworkRaidJoinInput): Promise<WorldWelcomeMessage> {
         this.manualClose = false;
+        if (!input.resumeToken) {
+            this.resumeToken = null;
+            this.clearStoredResumeToken();
+        }
         this.joinInput = input;
         this.clearReconnect();
         this.setStatus('connecting');
@@ -121,13 +125,12 @@ export class NetworkRaidClient {
         }
         const input = this.joinInput;
         if (!input) return;
-        const resumeToken = input.resumeToken ?? this.resumeToken ?? undefined;
         this.send({
             type: 'WORLD_JOIN',
             originHubId: input.originHubId,
             partyComposition: input.partyComposition,
             clientVersion: WORLD_PROTOCOL_VERSION,
-            resumeToken,
+            resumeToken: input.resumeToken,
         });
     }
 

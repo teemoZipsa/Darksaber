@@ -4,6 +4,7 @@ import {
     consumeStatus,
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
+    getStatus,
 } from '../../combat/StatusEffects';
 import type { Enemy } from '../../entity/Enemy';
 import type { TileType } from '../../map/Tile';
@@ -183,15 +184,18 @@ export class WorldCombatController {
 
     public tryActorCounterAttack(input: ActorCounterAttackInput): CombatResult {
         const result = createCombatResult(false);
-        const consumed = consumeStatus(input.actor.character.statuses, 'counterReady');
-        if (!consumed.consumed) return result;
-        result.executed = true;
-        input.actor.character.statuses = consumed.statuses;
+        const ready = getStatus(input.actor.character.statuses, 'counterReady');
+        if (!ready) return result;
         if (input.actor.character.isDead || input.actor.character.stats.hp <= 0 || input.enemy.stats.hp <= 0) return result;
         if (!input.canActorAttackTarget(input.actor, input.enemy)) {
             this.sink.log(`${input.actor.character.name} 반격 실패: 사거리 밖`);
             return result;
         }
+
+        const consumed = consumeStatus(input.actor.character.statuses, 'counterReady');
+        if (!consumed.consumed) return result;
+        result.executed = true;
+        input.actor.character.statuses = consumed.statuses;
 
         const damageResult = CombatFormulas.calcPhysicalDamage(
             input.actor.character.getCombatStats(),
@@ -220,15 +224,18 @@ export class WorldCombatController {
 
     public tryEnemyCounterAttack(input: EnemyCounterAttackInput): CombatResult {
         const result = createCombatResult(false);
-        const consumed = consumeStatus(input.enemy.statuses, 'counterReady');
-        if (!consumed.consumed) return result;
-        result.executed = true;
-        input.enemy.statuses = consumed.statuses;
+        const ready = getStatus(input.enemy.statuses, 'counterReady');
+        if (!ready) return result;
         if (input.enemy.stats.hp <= 0 || input.actor.character.isDead || input.actor.character.stats.hp <= 0) return result;
         if (manhattan(enemyTile(input.enemy), actorTile(input.actor)) > 1) {
             this.sink.log(`${input.enemy.name} 반격 실패: 사거리 밖`);
             return result;
         }
+
+        const consumed = consumeStatus(input.enemy.statuses, 'counterReady');
+        if (!consumed.consumed) return result;
+        result.executed = true;
+        input.enemy.statuses = consumed.statuses;
 
         const damageResult = CombatFormulas.calcPhysicalDamage(
             getEffectiveStatsForEnemy(input.enemy),

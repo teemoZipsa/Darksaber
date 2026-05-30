@@ -4,6 +4,8 @@
  */
 
 import { Camera } from '../engine/Camera';
+import type { Skill } from '../data/SkillDB';
+import { getSkillVisualProfile, type SkillVisualPhase, type SkillVisualProfile } from '../data/SkillVisualProfiles';
 import { DarksaberSpriteAtlas, type DarksaberSheetId, type SpriteRect } from './DarksaberSpriteAtlas';
 
 const TILE_SIZE = 48;
@@ -23,6 +25,14 @@ interface ActiveEffect {
     particles: Particle[];
     timer: number;              // elapsed seconds
     duration: number;           // total seconds
+    glyph?: {
+        text: string;
+        color: string;
+        gridX: number;
+        gridY: number;
+        size: number;
+        offsetY: number;
+    };
 }
 
 interface SpriteEffectFrame {
@@ -209,6 +219,26 @@ export class EffectManager {
                     ctx.textBaseline = 'middle';
                     ctx.fillText('✦', sx, sy);
                 }
+            }
+
+            if (eff.glyph) {
+                const progress = eff.duration > 0 ? eff.timer / eff.duration : 1;
+                const alpha = progress < 0.18
+                    ? progress / 0.18
+                    : progress > 0.72
+                        ? Math.max(0, 1 - (progress - 0.72) / 0.28)
+                        : 1;
+                const sx = eff.glyph.gridX * TILE_SIZE + TILE_SIZE / 2 - camera.x;
+                const sy = eff.glyph.gridY * TILE_SIZE + TILE_SIZE / 2 - camera.y + eff.glyph.offsetY - progress * 14;
+                ctx.globalAlpha = alpha;
+                ctx.font = `bold ${Math.floor(eff.glyph.size)}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
+                ctx.lineWidth = Math.max(3, eff.glyph.size * 0.1);
+                ctx.strokeText(eff.glyph.text, sx, sy);
+                ctx.fillStyle = eff.glyph.color;
+                ctx.fillText(eff.glyph.text, sx, sy);
             }
         }
 
@@ -549,6 +579,161 @@ export class EffectManager {
             });
         }
         this.effects.push({ particles, timer: 0, duration: 0.8 });
+    }
+
+    public spawnSkillEffect(skill: Skill, gridX: number, gridY: number, phase: SkillVisualPhase = 'impact'): void {
+        const profile = getSkillVisualProfile(skill);
+        const phaseScale = phase === 'cast' ? 0.72 : 1;
+        const spriteFrames = SPRITE_EFFECTS[profile.spriteEffect] ?? SPRITE_EFFECTS.hit;
+        this.spawnSpriteEffect(gridX, gridY, spriteFrames, Math.max(42, Math.round(profile.spriteSize * phaseScale)));
+
+        const particles = this.createSkillParticles(profile, gridX, gridY, phaseScale);
+        for (let i = 0; i < Math.max(0, Math.round(profile.ringCount * phaseScale)); i++) {
+            particles.push({
+                x: gridX * TILE_SIZE + TILE_SIZE / 2,
+                y: gridY * TILE_SIZE + TILE_SIZE / 2,
+                vx: 0,
+                vy: 0,
+                life: profile.duration * (0.45 + i * 0.12),
+                maxLife: profile.duration * (0.45 + i * 0.12),
+                size: TILE_SIZE * (0.45 + i * 0.18 + skill.aoeRadius * 0.1) * phaseScale,
+                color: profile.palette[i % profile.palette.length] ?? '#ffffff',
+                alpha: 1,
+                kind: 'ring',
+            });
+        }
+
+        this.effects.push({
+            particles,
+            timer: 0,
+            duration: profile.duration,
+            glyph: {
+                text: profile.glyph,
+                color: profile.palette[0] ?? '#ffffff',
+                gridX,
+                gridY,
+                size: Math.max(18, Math.round((skill.type === 'aoe' ? 28 : 22) * phaseScale)),
+                offsetY: phase === 'cast' ? -24 : -32,
+            },
+        });
+    }
+
+    private createSkillParticles(profile: SkillVisualProfile, gridX: number, gridY: number, scale: number): Particle[] {
+        const cx = gridX * TILE_SIZE + TILE_SIZE / 2;
+        const cy = gridY * TILE_SIZE + TILE_SIZE / 2;
+        const count = Math.max(4, Math.round(profile.particleCount * scale));
+        const particles: Particle[] = [];
+        const color = (index: number) => profile.palette[index % profile.palette.length] ?? '#ffffff';
+
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 * i) / count + Math.random() * 0.45;
+            const speed = (35 + Math.random() * 70) * scale;
+            let x = cx + (Math.random() - 0.5) * 14;
+            let y = cy + (Math.random() - 0.5) * 14;
+            let vx = Math.cos(angle) * speed;
+            let vy = Math.sin(angle) * speed;
+            let kind: Particle['kind'] = 'circle';
+            let size = (3 + Math.random() * 4) * scale;
+            let life = 0.32 + Math.random() * 0.38;
+
+            switch (profile.motion) {
+                case 'slash':
+                    x = cx - TILE_SIZE * 0.35 + Math.random() * TILE_SIZE * 0.7;
+                    y = cy - TILE_SIZE * 0.22 + (x - cx) * 0.45 + (Math.random() - 0.5) * 10;
+                    vx = 90 * scale + Math.random() * 70;
+                    vy = 35 * scale + Math.random() * 35;
+                    kind = 'spark';
+                    size = (3 + Math.random() * 3) * scale;
+                    life = 0.18 + Math.random() * 0.2;
+                    break;
+                case 'pierce':
+                    x = cx - TILE_SIZE * 0.48 + Math.random() * TILE_SIZE * 0.18;
+                    y = cy + (Math.random() - 0.5) * 14;
+                    vx = (110 + Math.random() * 90) * scale;
+                    vy = (Math.random() - 0.5) * 18;
+                    kind = 'spark';
+                    life = 0.22 + Math.random() * 0.22;
+                    break;
+                case 'charge':
+                    x = cx - TILE_SIZE * 0.6 + Math.random() * TILE_SIZE * 0.25;
+                    y = cy + (Math.random() - 0.5) * 26;
+                    vx = (80 + Math.random() * 90) * scale;
+                    vy = (Math.random() - 0.5) * 28;
+                    kind = i % 3 === 0 ? 'spark' : 'circle';
+                    break;
+                case 'rain':
+                    x = cx + (Math.random() - 0.5) * TILE_SIZE * 1.45;
+                    y = cy - TILE_SIZE * (0.9 + Math.random() * 0.7);
+                    vx = (Math.random() - 0.5) * 30;
+                    vy = (95 + Math.random() * 110) * scale;
+                    kind = i % 2 === 0 ? 'spark' : 'star';
+                    life = 0.35 + Math.random() * 0.32;
+                    size = (8 + Math.random() * 7) * scale;
+                    break;
+                case 'spiral':
+                    x = cx + Math.cos(angle) * (8 + Math.random() * 18);
+                    y = cy + Math.sin(angle) * (8 + Math.random() * 18);
+                    vx = Math.cos(angle + Math.PI / 2) * speed;
+                    vy = Math.sin(angle + Math.PI / 2) * speed - 12;
+                    kind = i % 4 === 0 ? 'star' : 'circle';
+                    size = (5 + Math.random() * 7) * scale;
+                    break;
+                case 'ward':
+                    x = cx + (Math.random() - 0.5) * TILE_SIZE * 0.8;
+                    y = cy + TILE_SIZE * 0.3;
+                    vx = (Math.random() - 0.5) * 24;
+                    vy = (-45 - Math.random() * 55) * scale;
+                    kind = 'star';
+                    size = (10 + Math.random() * 8) * scale;
+                    life = 0.48 + Math.random() * 0.45;
+                    break;
+                case 'drain':
+                    x = cx + Math.cos(angle) * (TILE_SIZE * (0.55 + Math.random() * 0.25));
+                    y = cy + Math.sin(angle) * (TILE_SIZE * (0.55 + Math.random() * 0.25));
+                    vx = (cx - x) * (1.7 + Math.random());
+                    vy = (cy - y) * (1.7 + Math.random()) - 16;
+                    kind = i % 5 === 0 ? 'star' : 'circle';
+                    break;
+                case 'mist':
+                    x = cx + (Math.random() - 0.5) * TILE_SIZE;
+                    y = cy - TILE_SIZE * 0.45 + Math.random() * TILE_SIZE * 0.5;
+                    vx = (Math.random() - 0.5) * 22;
+                    vy = (15 + Math.random() * 45) * scale;
+                    kind = 'circle';
+                    size = (5 + Math.random() * 8) * scale;
+                    life = 0.5 + Math.random() * 0.45;
+                    break;
+                case 'quake':
+                    x = cx + (Math.random() - 0.5) * TILE_SIZE;
+                    y = cy + TILE_SIZE * 0.25 + Math.random() * 8;
+                    vx = (Math.random() - 0.5) * 85 * scale;
+                    vy = (-30 - Math.random() * 90) * scale;
+                    kind = i % 4 === 0 ? 'spark' : 'circle';
+                    size = (4 + Math.random() * 6) * scale;
+                    break;
+                case 'nova':
+                case 'burst':
+                default:
+                    kind = i % 4 === 0 ? 'star' : i % 3 === 0 ? 'spark' : 'circle';
+                    size = (profile.motion === 'nova' ? 5 : 3) + Math.random() * 6;
+                    break;
+            }
+
+            particles.push({
+                x,
+                y,
+                vx,
+                vy,
+                life,
+                maxLife: life,
+                size,
+                color: color(i),
+                alpha: 1,
+                kind,
+            });
+        }
+
+        return particles;
     }
 
     /** Spawn effect by element string */

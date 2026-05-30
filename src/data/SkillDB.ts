@@ -6,6 +6,8 @@
 
 export type SkillType = 'damage' | 'heal' | 'buff' | 'debuff' | 'aoe';
 export type SkillElement = 'fire' | 'ice' | 'lightning' | 'holy' | 'dark' | 'earth' | 'wind' | 'physical' | 'none';
+export type SkillTargetScope = 'self' | 'selfAndNearbyAllies';
+export type SkillGroup = 'classSkill' | 'classStance' | 'classCommand' | 'classAura' | 'commonMagic';
 
 export interface Skill {
     id: string;
@@ -25,6 +27,9 @@ export interface Skill {
     buffStat?: 'atk' | 'def' | 'spd' | 'mdef' | 'regen' | 'all'; // specifically which stat to boost
     buffDuration?: number; // duration in turns
     hitBonus?: number;     // flat hit chance bonus in percentage points
+    targetScope?: SkillTargetScope;
+    allyRadius?: number;
+    skillGroup?: SkillGroup;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -52,6 +57,17 @@ const INFANTRY_SKILLS: Skill[] = [
         buffStat: 'def', buffDuration: 3
     },
     {
+        id: 'inf_guard_stance', nameKr: '방패태세', nameEn: 'Shield Stance',
+        classId: 'infantry', tier: 2, mpCost: 8,
+        type: 'buff', element: 'physical', power: 1.15,
+        range: 0, aoeRadius: 0, icon: '🛡️',
+        descKr: '방패를 세워 1턴 동안 피해를 크게 줄이고 방어력 증가',
+        descEn: 'Raise shield, sharply reduce one hit and gain DEF for 1 turn',
+        buffStat: 'def', buffDuration: 1,
+        targetScope: 'self',
+        skillGroup: 'classStance',
+    },
+    {
         id: 'inf_t3', nameKr: '파워슬래시', nameEn: 'Power Slash',
         classId: 'infantry', tier: 3, mpCost: 10,
         type: 'damage', element: 'physical', power: 1.8,
@@ -74,6 +90,17 @@ const INFANTRY_SKILLS: Skill[] = [
         range: 1, aoeRadius: 0, icon: '🗡️',
         descKr: '적의 방어를 무시하는 2.2배 관통 공격',
         descEn: 'Defense-piercing 2.2x physical attack',
+    },
+    {
+        id: 'inf_iron_defense', nameKr: '철벽수비', nameEn: 'Iron Defense',
+        classId: 'infantry', tier: 5, mpCost: 18,
+        type: 'buff', element: 'physical', power: 0.8,
+        range: 0, aoeRadius: 0, icon: '▣',
+        descKr: '2턴 동안 피해를 줄이고 반격 태세를 갖춤',
+        descEn: 'Reduce incoming damage and prepare a counter for 2 turns',
+        buffStat: 'def', buffDuration: 2,
+        targetScope: 'self',
+        skillGroup: 'classStance',
     },
     {
         id: 'inf_t6', nameKr: '바디블로', nameEn: 'Body Blow',
@@ -112,6 +139,17 @@ const CAVALRY_SKILLS: Skill[] = [
         descEn: 'Lance-forward charge, 1.7x damage',
     },
     {
+        id: 'cav_mobile_stance', nameKr: '기동태세', nameEn: 'Mobile Stance',
+        classId: 'cavalry', tier: 2, mpCost: 9,
+        type: 'buff', element: 'physical', power: 1.25,
+        range: 0, aoeRadius: 0, icon: '💨',
+        descKr: '3턴 동안 속도와 회피 증가',
+        descEn: 'Increase SPD and evasion for 3 turns',
+        buffStat: 'spd', buffDuration: 3,
+        targetScope: 'self',
+        skillGroup: 'classStance',
+    },
+    {
         id: 'cav_t3', nameKr: '기마돌격', nameEn: 'Mounted Rush',
         classId: 'cavalry', tier: 3, mpCost: 12,
         type: 'damage', element: 'physical', power: 2.0,
@@ -134,6 +172,16 @@ const CAVALRY_SKILLS: Skill[] = [
         range: 2, aoeRadius: 0, icon: '🐉',
         descKr: '용의 이빨 같은 2.6배 관통공격',
         descEn: 'Dragon fang piercing 2.6x attack',
+    },
+    {
+        id: 'cav_long_breakthrough', nameKr: '장거리 돌파', nameEn: 'Long Breakthrough',
+        classId: 'cavalry', tier: 5, mpCost: 24,
+        type: 'damage', element: 'physical', power: 2.1,
+        range: 3, aoeRadius: 0, icon: '🏇',
+        descKr: '긴 사거리로 돌파하여 2.1배 물리 피해',
+        descEn: 'Break through from range, dealing 2.1x physical damage',
+        hitBonus: 10,
+        skillGroup: 'classSkill',
     },
     {
         id: 'cav_t6', nameKr: '임페리얼', nameEn: 'Imperial Strike',
@@ -304,6 +352,18 @@ const LANCER_SKILLS: Skill[] = [
         descEn: 'Spear dance AoE 1.5x damage',
     },
     {
+        id: 'lan_spear_wall', nameKr: '창벽진', nameEn: 'Spear Wall',
+        classId: 'lancer', tier: 3, mpCost: 14,
+        type: 'buff', element: 'physical', power: 0.5,
+        range: 0, aoeRadius: 0, icon: '🔱',
+        descKr: '반경 1 아군에게 1턴 방어 태세 부여',
+        descEn: 'Grant a 1-turn guard stance to allies within radius 1',
+        buffDuration: 1,
+        targetScope: 'selfAndNearbyAllies',
+        allyRadius: 1,
+        skillGroup: 'classCommand',
+    },
+    {
         id: 'lan_t4', nameKr: '스피어스톰', nameEn: 'Spear Storm',
         classId: 'lancer', tier: 4, mpCost: 16,
         type: 'aoe', element: 'physical', power: 1.8,
@@ -326,6 +386,18 @@ const LANCER_SKILLS: Skill[] = [
         range: 2, aoeRadius: 0, icon: '✨',
         descKr: '성스러운 창격 2.8배 피해',
         descEn: 'Holy spear, 2.8x holy damage',
+    },
+    {
+        id: 'lan_intercept_order', nameKr: '요격태세', nameEn: 'Intercept Order',
+        classId: 'lancer', tier: 6, mpCost: 24,
+        type: 'buff', element: 'physical', power: 1.15,
+        range: 0, aoeRadius: 0, icon: '↩',
+        descKr: '반경 1 아군에게 2턴 반격 태세와 방어력 증가 부여',
+        descEn: 'Grant counter stance and DEF to allies within radius 1 for 2 turns',
+        buffStat: 'def', buffDuration: 2,
+        targetScope: 'selfAndNearbyAllies',
+        allyRadius: 1,
+        skillGroup: 'classCommand',
     },
     {
         id: 'lan_t7', nameKr: '용살창', nameEn: 'Dragon Slayer',
@@ -429,6 +501,18 @@ const CLERIC_SKILLS: Skill[] = [
         descEn: 'Major HP restore, 2.5x magic attack',
     },
     {
+        id: 'cle_life_prayer', nameKr: '생명의 기도', nameEn: 'Life Prayer',
+        classId: 'cleric', tier: 3, mpCost: 12,
+        type: 'buff', element: 'holy', power: 0.08,
+        range: 0, aoeRadius: 0, icon: '🍀',
+        descKr: '반경 1 아군에게 3턴 재생 부여',
+        descEn: 'Grant regen to allies within radius 1 for 3 turns',
+        buffStat: 'regen', buffDuration: 3,
+        targetScope: 'selfAndNearbyAllies',
+        allyRadius: 1,
+        skillGroup: 'classAura',
+    },
+    {
         id: 'cle_t4', nameKr: '하이큐어', nameEn: 'High Cure',
         classId: 'cleric', tier: 4, mpCost: 18,
         type: 'heal', element: 'holy', power: 3.0,
@@ -451,6 +535,18 @@ const CLERIC_SKILLS: Skill[] = [
         range: 0, aoeRadius: 0, icon: '🕊️',
         descKr: 'HP를 완전히 회복',
         descEn: 'Fully restore HP',
+    },
+    {
+        id: 'cle_healing_bell', nameKr: '회복의 종소리', nameEn: 'Healing Bell',
+        classId: 'cleric', tier: 6, mpCost: 24,
+        type: 'buff', element: 'holy', power: 1.15,
+        range: 0, aoeRadius: 0, icon: '🔔',
+        descKr: '반경 2 아군에게 3턴 재생과 방어력 증가 부여',
+        descEn: 'Grant regen and DEF to allies within radius 2 for 3 turns',
+        buffStat: 'def', buffDuration: 3,
+        targetScope: 'selfAndNearbyAllies',
+        allyRadius: 2,
+        skillGroup: 'classAura',
     },
     {
         id: 'cle_t7', nameKr: '신의축복', nameEn: 'God\'s Blessing',
@@ -492,6 +588,18 @@ const PRIEST_SKILLS: Skill[] = [
         buffStat: 'spd', buffDuration: 3
     },
     {
+        id: 'pri_battle_chant', nameKr: '전투성가', nameEn: 'Battle Chant',
+        classId: 'priest', tier: 3, mpCost: 14,
+        type: 'buff', element: 'holy', power: 1.15,
+        range: 0, aoeRadius: 0, icon: '🎵',
+        descKr: '반경 2 아군에게 3턴 공격력/방어력 증가 부여',
+        descEn: 'Grant ATK/DEF to allies within radius 2 for 3 turns',
+        buffStat: 'all', buffDuration: 3,
+        targetScope: 'selfAndNearbyAllies',
+        allyRadius: 2,
+        skillGroup: 'classAura',
+    },
+    {
         id: 'pri_t4', nameKr: '프로텍트', nameEn: 'Protect',
         classId: 'priest', tier: 4, mpCost: 14,
         type: 'buff', element: 'holy', power: 1.3,
@@ -517,6 +625,18 @@ const PRIEST_SKILLS: Skill[] = [
         descKr: '물리/마법 방어 대폭 증가 (5턴)',
         descEn: 'Massive DEF/MDEF boost for 5 turns',
         buffStat: 'mdef', buffDuration: 5
+    },
+    {
+        id: 'pri_victory_prayer', nameKr: '승전기도', nameEn: 'Victory Prayer',
+        classId: 'priest', tier: 6, mpCost: 26,
+        type: 'buff', element: 'holy', power: 1.25,
+        range: 0, aoeRadius: 0, icon: '✦',
+        descKr: '반경 2 아군에게 2턴 공격력과 치명 증가 부여',
+        descEn: 'Grant ATK and critical chance to allies within radius 2 for 2 turns',
+        buffStat: 'atk', buffDuration: 2,
+        targetScope: 'selfAndNearbyAllies',
+        allyRadius: 2,
+        skillGroup: 'classCommand',
     },
     {
         id: 'pri_t7', nameKr: '홀리오라', nameEn: 'Holy Aura',
@@ -558,6 +678,18 @@ const SHRINE_SKILLS: Skill[] = [
         buffStat: 'mdef', buffDuration: 3
     },
     {
+        id: 'shr_guardian_aura', nameKr: '수호오라', nameEn: 'Guardian Aura',
+        classId: 'shrine', tier: 3, mpCost: 14,
+        type: 'buff', element: 'holy', power: 1.2,
+        range: 0, aoeRadius: 0, icon: '🔰',
+        descKr: '반경 2 아군에게 3턴 마법 저항과 피해 감소 부여',
+        descEn: 'Grant resistance and damage reduction to allies within radius 2 for 3 turns',
+        buffStat: 'mdef', buffDuration: 3,
+        targetScope: 'selfAndNearbyAllies',
+        allyRadius: 2,
+        skillGroup: 'classAura',
+    },
+    {
         id: 'shr_t4', nameKr: '신무', nameEn: 'Sacred Dance',
         classId: 'shrine', tier: 4, mpCost: 14,
         type: 'damage', element: 'holy', power: 2.0,
@@ -581,6 +713,18 @@ const SHRINE_SKILLS: Skill[] = [
         range: 2, aoeRadius: 0, icon: '📿',
         descKr: '퇴마 봉인! 언데드에 3배 피해',
         descEn: 'Exorcism! 3x damage vs undead',
+    },
+    {
+        id: 'shr_sanctuary_dance', nameKr: '성역무도', nameEn: 'Sanctuary Dance',
+        classId: 'shrine', tier: 6, mpCost: 26,
+        type: 'buff', element: 'holy', power: 1.25,
+        range: 0, aoeRadius: 0, icon: '💃',
+        descKr: '반경 2 아군에게 4턴 재생과 마법 저항 증가 부여',
+        descEn: 'Grant regen and resistance to allies within radius 2 for 4 turns',
+        buffStat: 'mdef', buffDuration: 4,
+        targetScope: 'selfAndNearbyAllies',
+        allyRadius: 2,
+        skillGroup: 'classAura',
     },
     {
         id: 'shr_t7', nameKr: '신녀의기도', nameEn: 'Maiden\'s Prayer',
@@ -1022,6 +1166,12 @@ export const ALL_SKILLS: Skill[] = [
 /** Get all skills for a specific class */
 export function getSkillsForClass(classId: string): Skill[] {
     return ALL_SKILLS.filter(s => s.classId === classId);
+}
+
+/** Resolve the display/behavior group for old and new skills. */
+export function getSkillGroup(skill: Skill): SkillGroup {
+    if (skill.skillGroup) return skill.skillGroup;
+    return skill.classId === 'shared' ? 'commonMagic' : 'classSkill';
 }
 
 /**

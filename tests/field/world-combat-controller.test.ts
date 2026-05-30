@@ -188,3 +188,38 @@ test('missed direct hit does not consume counter readiness', () => {
         Math.random = previousRandom;
     }
 });
+
+test('out-of-range actor counter does not consume counter readiness', () => {
+    const character = new Character('hero-1', 'Hero', 'infantry');
+    character.statuses = [createStatus('counterReady', { magnitude: 0.7 })];
+    const actor: FieldActor = {
+        id: character.id,
+        character,
+        entity: new Player(0, 0),
+        path: [],
+        queuedIntent: null,
+    };
+
+    const enemy = new Enemy('enemy-1', 5, 0, 'Enemy', 1);
+    const events: string[] = [];
+    const controller = new WorldCombatController({
+        log: (message) => events.push(message),
+        spawnDamage: () => undefined,
+        spawnStatus: () => undefined,
+        spawnHitEffect: () => undefined,
+        spawnKillEffect: () => undefined,
+        spawnAttackCue: () => undefined,
+        spawnLoot: () => undefined,
+    });
+
+    const result = controller.tryActorCounterAttack({
+        actor,
+        enemy,
+        canActorAttackTarget: () => false,
+        getTileAt: () => TileType.GRASS,
+    });
+
+    assert.equal(result.executed, false);
+    assert.equal(hasStatus(actor.character.statuses, 'counterReady'), true);
+    assert.ok(events.some((message) => message.includes('사거리 밖')));
+});

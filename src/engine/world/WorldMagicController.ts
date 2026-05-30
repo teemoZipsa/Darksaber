@@ -2,6 +2,7 @@ import type { Character } from '../../character/Character';
 import {
     applyGuardToDamage,
     applyStatuses,
+    applyStatusesToCarrier,
     cleanseNegativeStatuses,
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
@@ -10,13 +11,14 @@ import {
 import type { Skill } from '../../data/SkillDB';
 import { getLearnedSkills } from '../../data/SkillDB';
 import { getClassLine } from '../../data/ClassTree';
+import type { SkillVisualPhase } from '../../data/SkillVisualProfiles';
 import type { Enemy } from '../../entity/Enemy';
 import type { TileType } from '../../map/Tile';
 import type { SkillEffectEnemyInput, SkillEffectResult, SkillTerrainContext } from '../../combat/SkillEffectResolver';
 import { resolveSkillEffect } from '../../combat/SkillEffectResolver';
-import { MAGIC_AP_COST } from '../../field/FieldActionEconomy';
+import { MAGIC_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
 import type { TilePoint } from '../../field/FieldPathing';
-import { tileKey } from '../../field/FieldPathing';
+import { manhattan, tileKey } from '../../field/FieldPathing';
 import type { FieldActor, FieldEnemy, FieldMagicState } from '../../field/FieldTypes';
 import {
     buildSkillTerrainContext,
@@ -30,6 +32,7 @@ import type { CombatFeedbackKind } from './CombatFeedback';
 
 export interface WorldMagicContext {
     getActivePartyTurnActor: () => FieldActor | null;
+    getPartyActors: () => FieldActor[];
     getFieldEnemies: () => FieldEnemy[];
     getEnemyById: (enemyId: string) => Enemy | null;
     getRemainingActionPoints: () => number;
@@ -54,6 +57,7 @@ export interface WorldMagicEventSink {
     spawnBuffEffect(x: number, y: number): void;
     spawnDebuffEffect(x: number, y: number): void;
     spawnElementEffect(element: Skill['element'], x: number, y: number, feedbackGroupId?: string): void;
+    spawnSkillEffect(skill: Skill, x: number, y: number, phase: SkillVisualPhase, feedbackGroupId?: string): void;
     beginFeedbackGroup?(): string;
     flushFeedbackGroup?(feedbackGroupId: string): void;
 }
@@ -116,12 +120,7 @@ export class WorldMagicController {
             this.context.reopenActionMenu(actor);
             return;
         }
-        if (this.context.isMajorActionUsed()) {
-            this.sink.log('이번 턴에는 공격/마법/도구를 이미 사용했습니다.');
-            this.context.reopenActionMenu(actor);
-            return;
-        }
-        if (this.context.getRemainingActionPoints() < MAGIC_AP_COST) {
+        if (this.context.getRemainingActionPoints() < MAGIC_ACTION_GAUGE_COST) {
             this.sink.log('마법을 사용할 행동력이 부족합니다.');
             this.context.reopenActionMenu(actor);
             return;
@@ -210,14 +209,8 @@ export class WorldMagicController {
         const actor = this.context.getActivePartyTurnActor();
         if (!actor) return;
 
-        if (this.context.getRemainingActionPoints() < MAGIC_AP_COST) {
+        if (this.context.getRemainingActionPoints() < MAGIC_ACTION_GAUGE_COST) {
             this.sink.log('마법을 사용할 행동력이 부족합니다.');
-            this.reset();
-            this.context.reopenActionMenu(actor);
-            return;
-        }
-        if (this.context.isMajorActionUsed()) {
-            this.sink.log('이번 턴에는 공격/마법/도구를 이미 사용했습니다.');
             this.reset();
             this.context.reopenActionMenu(actor);
             return;
@@ -241,13 +234,8 @@ export class WorldMagicController {
     }
 
     private cast(actor: FieldActor, skill: Skill, targetEnemy?: Enemy): void {
-        if (this.context.getRemainingActionPoints() < MAGIC_AP_COST) {
+        if (this.context.getRemainingActionPoints() < MAGIC_ACTION_GAUGE_COST) {
             this.sink.log('마법을 사용할 행동력이 부족합니다.');
-            this.context.reopenActionMenu(actor);
-            return;
-        }
-        if (this.context.isMajorActionUsed()) {
-            this.sink.log('이번 턴에는 공격/마법/도구를 이미 사용했습니다.');
             this.context.reopenActionMenu(actor);
             return;
         }
@@ -272,12 +260,11 @@ export class WorldMagicController {
             terrainContext: this.getSkillTerrainContext(actor, targetEnemies, targetEnemy),
         });
 
-        if (!this.context.spendAp(MAGIC_AP_COST)) {
+        if (!this.context.spendAp(MAGIC_ACTION_GAUGE_COST)) {
             this.sink.log('마법을 사용할 행동력이 부족합니다.');
             this.context.reopenActionMenu(actor);
             return;
         }
-        this.context.markMajorActionUsed();
 
         this.applySkillEffect(actor, skill, effect);
         this.reset();
@@ -285,6 +272,13 @@ export class WorldMagicController {
     }
 
     private applySkillEffect(actor: FieldActor, skill: Skill, effect: SkillEffectResult): void {
+        this.sink.spawnSkillEffect(
+            skill,
+            actor.entity.gridX,
+            actor.entity.gridY,
+            skill.type === 'heal' || skill.type === 'buff' ? 'impact' : 'cast'
+        );
+
         const effective = getEffectiveStatsForCharacter(actor.character);
         actor.character.stats.mp = Math.max(0, Math.min(effective.maxMp, actor.character.stats.mp + effect.casterMpDelta));
         actor.character.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.character.stats.hp + effect.casterHpDelta));
@@ -301,9 +295,13 @@ export class WorldMagicController {
             this.sink.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
         }
         if (effect.casterStatusEffects) {
-            actor.character.statuses = applyStatuses(actor.character.statuses, effect.casterStatusEffects);
-            this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'BUFF');
-            this.sink.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
+            if (skill.targetScope === 'selfAndNearbyAllies') {
+                this.applyAllyAreaBuff(actor, skill, effect.casterStatusEffects);
+            } else {
+                applyStatusesToCarrier(actor.character, effect.casterStatusEffects);
+                this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'BUFF');
+                this.sink.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
+            }
         } else if (effect.appliesBuff) {
             actor.character.applyBuff(effect.appliesBuff);
             this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'BUFF');
@@ -327,21 +325,63 @@ export class WorldMagicController {
                 this.sink.spawnDebuffEffect(enemy.gridX, enemy.gridY);
             }
 
+            if (enemyResult.mpDamage !== undefined && enemyResult.mpDamage > 0) {
+                const drainedMp = Math.min(enemy.stats.mp, enemyResult.mpDamage);
+                enemy.stats.mp = Math.max(0, enemy.stats.mp - drainedMp);
+                this.restoreCasterResources(actor, 0, drainedMp);
+                if (drainedMp > 0) this.sink.spawnStatus(enemy.gridX, enemy.gridY, `MP-${drainedMp}`);
+            }
+
             const guarded = applyGuardToDamage(enemy.statuses, enemyResult.damage);
             enemy.statuses = guarded.statuses;
             const dead = enemy.takeDamage(guarded.damage);
-            if (skill.element !== 'none' && skill.element !== 'physical') {
-                this.sink.spawnElementEffect(skill.element, enemy.gridX, enemy.gridY, guarded.damage > 0 ? feedbackGroupId : undefined);
-            } else {
-                this.sink.spawnHitEffect(enemy.gridX, enemy.gridY, guarded.damage > 0 ? feedbackGroupId : undefined);
-            }
+            this.sink.spawnSkillEffect(skill, enemy.gridX, enemy.gridY, 'impact', guarded.damage > 0 ? feedbackGroupId : undefined);
             this.sink.spawnDamage(enemy.gridX, enemy.gridY, guarded.damage, false, false);
             if (guarded.guarded) this.sink.log(`${enemy.name} 방어: 피해 감소`);
+            if (enemyResult.casterHpRestore !== undefined && enemyResult.casterHpRestore > 0) {
+                this.restoreCasterResources(actor, enemyResult.casterHpRestore, 0);
+            }
             if (dead) this.context.handleEnemyDefeated(actor, enemy, feedbackGroupId);
         }
         if (feedbackGroupId) this.sink.flushFeedbackGroup?.(feedbackGroupId);
 
         for (const log of effect.logs) this.sink.log(log);
+    }
+
+    private restoreCasterResources(actor: FieldActor, hpAmount: number, mpAmount: number): void {
+        const effective = getEffectiveStatsForCharacter(actor.character);
+        const hpRestored = Math.max(0, Math.min(hpAmount, effective.maxHp - actor.character.stats.hp));
+        const mpRestored = Math.max(0, Math.min(mpAmount, effective.maxMp - actor.character.stats.mp));
+
+        if (hpRestored > 0) {
+            actor.character.stats.hp += hpRestored;
+            this.sink.spawnHeal(actor.entity.gridX, actor.entity.gridY, hpRestored);
+            this.sink.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
+        }
+        if (mpRestored > 0) {
+            actor.character.stats.mp += mpRestored;
+            this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, `MP+${mpRestored}`);
+            this.sink.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
+        }
+    }
+
+    private applyAllyAreaBuff(actor: FieldActor, skill: Skill, statuses: SkillEffectResult['casterStatusEffects']): void {
+        if (!statuses || statuses.length === 0) return;
+
+        const targets = this.getAlliedActors(actor, skill);
+        for (const target of targets) {
+            applyStatusesToCarrier(target.character, statuses);
+            this.sink.spawnStatus(target.entity.gridX, target.entity.gridY, 'BUFF');
+            this.sink.spawnBuffEffect(target.entity.gridX, target.entity.gridY);
+            if (target !== actor) {
+                this.sink.spawnSkillEffect(skill, target.entity.gridX, target.entity.gridY, 'impact');
+            }
+        }
+        this.sink.log(`${skill.icon} ${skill.nameKr}: ${targets.length}명 강화`);
+    }
+
+    private getAlliedActors(actor: FieldActor, skill: Skill): FieldActor[] {
+        return getAlliedActorsInManhattanRange(actor, this.context.getPartyActors(), skill.allyRadius ?? 0);
     }
 
     private toSkillEnemyInput(enemy: Enemy): SkillEffectEnemyInput {
@@ -418,4 +458,17 @@ export class WorldMagicController {
     private enemyTile(enemy: Enemy): TilePoint {
         return { x: enemy.gridX, y: enemy.gridY };
     }
+}
+
+function getActorTile(actor: FieldActor): TilePoint {
+    return { x: actor.entity.gridX, y: actor.entity.gridY };
+}
+
+export function getAlliedActorsInManhattanRange(caster: FieldActor, actors: FieldActor[], radius: number): FieldActor[] {
+    const casterTile = getActorTile(caster);
+    return actors.filter((actor) =>
+        !actor.character.isDead &&
+        actor.character.stats.hp > 0 &&
+        manhattan(casterTile, getActorTile(actor)) <= radius
+    );
 }

@@ -44,7 +44,7 @@ import { fuseActivePartyBranch, getFusionCandidates, hasActiveMasterCharacter } 
 import type { MasterBranch } from '../data/ClassTree';
 import { TilePoint, manhattan, tileKey } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
-import { enqueueReadyActor } from '../field/FieldActionEconomy';
+import { FIELD_MAX_ACTION_GAUGE, enqueueReadyActor } from '../field/FieldActionEconomy';
 import { hasLineOfSight } from '../field/LineOfSight';
 import {
     AttackPatternProfile,
@@ -251,6 +251,7 @@ export class WorldEngine {
         this.magicController = new WorldMagicController(
             {
                 getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
+                getPartyActors: () => this.partyActors,
                 getFieldEnemies: () => this.fieldEnemies,
                 getEnemyById: (enemyId) => this.getEnemyById(enemyId),
                 getRemainingActionPoints: () => this.remainingActionPoints,
@@ -279,6 +280,13 @@ export class WorldEngine {
                 spawnElementEffect: (element, x, y, feedbackGroupId) => {
                     this.effectManager.spawnByElement(element, x, y);
                     this.registerCombatFeedback('normal', feedbackGroupId);
+                },
+                spawnSkillEffect: (skill, x, y, phase, feedbackGroupId) => {
+                    this.effectManager.spawnSkillEffect(skill, x, y, phase);
+                    if (feedbackGroupId) {
+                        const kind = skill.type === 'debuff' ? 'status' : 'normal';
+                        this.registerCombatFeedback(kind, feedbackGroupId);
+                    }
                 },
                 beginFeedbackGroup: () => this.beginCombatFeedbackGroup(),
                 flushFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
@@ -545,6 +553,7 @@ export class WorldEngine {
 
     private placePartyNear(anchorTile: TilePoint): void {
         const members = this.party.getCharacters().slice(0, this.party.MAX_ACTIVE_PARTY_SIZE);
+        members.forEach((character) => this.syncCharacterMovementToClass(character));
         this.partyActors = this.fieldSpawnController.createPartyActors(anchorTile, members);
     }
 
@@ -694,7 +703,9 @@ export class WorldEngine {
 
     private createPartyCompositionSnapshot(town: TownInfo): ActorSnapshot[] {
         const exit = this.worldMap.getTownExitTile(town);
-        return this.party.getCharacters().slice(0, this.party.MAX_ACTIVE_PARTY_SIZE).map((character, index) => ({
+        return this.party.getCharacters().slice(0, this.party.MAX_ACTIVE_PARTY_SIZE).map((character, index) => {
+            this.syncCharacterMovementToClass(character);
+            return {
             id: character.id,
             localActorId: character.id,
             name: character.name,
@@ -711,7 +722,8 @@ export class WorldEngine {
             majorActionUsed: false,
             facing: 'down',
             isDead: character.isDead,
-        }));
+        };
+        });
     }
 
     private updateNetworkRaid(dt: number, input: InputManager, camera: Camera): void {
@@ -1612,6 +1624,8 @@ export class WorldEngine {
     private spendAp(cost: number): boolean {
         if (cost < 0 || this.remainingActionPoints < cost) return false;
         this.remainingActionPoints -= cost;
+        const actor = this.getActivePartyTurnActor();
+        if (actor) actor.entity.actionGauge = this.remainingActionPoints;
         return true;
     }
 
@@ -1625,7 +1639,7 @@ export class WorldEngine {
             this.reopenActionMenu(actor);
             return;
         }
-        this.endActorTurn(actor, '행동력 소진');
+        this.endActorTurn(actor, '행동 게이지 부족', this.remainingActionPoints);
     }
 
     private reopenActionMenu(actor: FieldActor): void {
@@ -1636,11 +1650,11 @@ export class WorldEngine {
         this.actionMenuUI.open(this.playerActionController.getTurnActionStates(actor));
     }
 
-    private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = 0): void {
+    private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = this.remainingActionPoints): void {
         if (this.isNetworkRaid && this.networkRaidClient && actor.id === this.activeTurnActorId) {
             this.networkRaidClient.sendIntent(actor.id, 'endTurn', { reason });
         }
-        actor.entity.actionGauge = atbCarryover;
+        actor.entity.actionGauge = Math.max(0, Math.min(FIELD_MAX_ACTION_GAUGE, atbCarryover));
         this.activeTurnActorId = null;
         this.remainingActionPoints = 0;
         this.majorActionUsedThisTurn = false;
@@ -1757,16 +1771,16 @@ export class WorldEngine {
         const index = this.partyActors.indexOf(actor);
         if (index >= 0) this.switchToPartyMember(index);
         this.activeTurnActorId = actor.id;
-        this.remainingActionPoints = Math.max(1, Math.floor(actor.character.stats.actionLimit || 15));
+        this.remainingActionPoints = FIELD_MAX_ACTION_GAUGE;
         this.majorActionUsedThisTurn = false;
-        actor.entity.actionGauge = 100;
+        actor.entity.actionGauge = FIELD_MAX_ACTION_GAUGE;
         this.selectionController.selectActor(actor.id);
         if (!this.processActorTurnStartStatuses(actor)) {
             this.endActorTurn(actor, '상태이상');
             return;
         }
         this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'READY');
-        this.addCombatLog(`${actor.character.name} 턴 시작: 행동 ${this.remainingActionPoints}`);
+        this.addCombatLog(`${actor.character.name} 턴 시작: ATB ${this.remainingActionPoints}%`);
         if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
         else {
             this.closeTacticalMenu();
@@ -1837,6 +1851,11 @@ export class WorldEngine {
     private getActorTerrainMovementBudget(actor: FieldActor): number {
         if (hasStatus(actor.character.statuses, 'immobilize')) return 0;
         return Math.max(1, getEffectiveStatsForCharacter(actor.character).mov || actor.entity.moveRange);
+    }
+
+    private syncCharacterMovementToClass(character: Character): void {
+        const baseMovRange = getClassLine(character.classLineId)?.baseMovRange;
+        if (baseMovRange !== undefined) character.stats.mov = baseMovRange;
     }
 
     private getActorTerrainTraits(actor: FieldActor): TerrainActorTraits {
