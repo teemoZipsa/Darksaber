@@ -105,6 +105,8 @@ export interface WorldEngineOptions {
 
 type IntroTutorialStep = 'move' | 'attack' | 'rest' | 'magic' | 'defeat';
 
+const INTRO_TUTORIAL_ACTOR_RENDER_SCALE = 1.16;
+
 const INTRO_TUTORIAL_INSTRUCTOR_ROW_BY_FACING: Record<'up' | 'down' | 'left' | 'right', number> = {
     up: 0,
     down: 1,
@@ -667,7 +669,7 @@ export class WorldEngine {
             3,
             8,
             MONSTER_ROW_BY_FACING,
-            1.7
+            INTRO_TUTORIAL_ACTOR_RENDER_SCALE
         );
         this.fieldEnemies = [{ enemy, home: enemyTile, path: [] }];
         this.introTutorialActive = true;
@@ -746,7 +748,7 @@ export class WorldEngine {
             3,
             6,
             INTRO_TUTORIAL_INSTRUCTOR_ROW_BY_FACING,
-            1.7
+            INTRO_TUTORIAL_ACTOR_RENDER_SCALE
         );
         return instructor;
     }
