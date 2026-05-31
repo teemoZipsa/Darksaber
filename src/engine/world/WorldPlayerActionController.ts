@@ -26,6 +26,7 @@ import {
     TOOL_ACTION_GAUGE_COST,
     getActionApCost,
     hasExecutableFieldAction,
+    type FieldApAction,
 } from '../../field/FieldActionEconomy';
 import { getSelectableTiles, type AttackPatternProfile, type PatternContext } from '../../field/TargetPatterns';
 import { normalizeLegacyActionType, type ActionMenuSlotState, type ActionType } from '../../ui/ActionMenuUI';
@@ -76,6 +77,7 @@ export interface WorldPlayerActionContext {
     setReservedAction: (intent: FieldIntent | null) => void;
     selectEnemy: (enemyId: string) => void;
     selectLoot: (lootId: string) => void;
+    onActionCompleted?: (action: FieldApAction) => void;
 }
 
 export interface WorldPlayerActionEventSink {
@@ -235,6 +237,7 @@ export class WorldPlayerActionController {
 
             if (actor.queuedIntent.kind === 'move') {
                 actor.queuedIntent = null;
+                this.context.onActionCompleted?.('move');
                 const reserved = this.context.getReservedAction();
                 if (reserved?.kind === 'move' && this.context.getActiveTurnActorId() === actor.id) {
                     this.context.setReservedAction(null);
@@ -374,6 +377,7 @@ export class WorldPlayerActionController {
         this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'REST');
         this.sink.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
         this.sink.log('휴식 중: 체력과 마나가 천천히 회복됩니다. 피해를 받으면 해제됩니다.');
+        this.context.onActionCompleted?.('rest');
         this.context.resumeOrEndActiveTurn(actor);
     }
 
@@ -396,6 +400,7 @@ export class WorldPlayerActionController {
             return;
         }
         if (this.spendActionCost(ATTACK_ACTION_GAUGE_COST) && this.context.tryActorAttack(actor, enemy)) {
+            this.context.onActionCompleted?.('attack');
             this.context.resumeOrEndActiveTurn(actor);
         }
     }

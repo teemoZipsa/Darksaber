@@ -37,6 +37,10 @@ export interface WorldDungeonInfo {
     tileRadius: number;
 }
 
+interface WorldMapOptions {
+    validateTownSpawns?: boolean;
+}
+
 const BIOME_TILE: Record<BiomeType, TileType> = {
     ocean: TileType.DEEP_WATER,
     sand: TileType.SAND,
@@ -168,9 +172,9 @@ export class WorldMap {
     public loot: LootObject[] = [];
     public extractionZones: ExtractionZone[] = [];
 
-    constructor(realmOrMask: WorldRealm | BiomeMask = 'mortal') {
+    constructor(realmOrMask: WorldRealm | BiomeMask = 'mortal', options: WorldMapOptions = {}) {
         this.biomeMask = typeof realmOrMask === 'string' ? new BiomeMask(realmOrMask) : realmOrMask;
-        this.validateTownSpawns();
+        if (options.validateTownSpawns ?? true) this.validateTownSpawns();
     }
 
     public getRealm(): WorldRealm {

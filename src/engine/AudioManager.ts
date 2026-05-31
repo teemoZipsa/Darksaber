@@ -80,6 +80,7 @@ export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = 
     'bgm.boss':    { src: '/assets/sounds/bgm/boss.ogg',    channel: 'bgm' },
     'bgm.victory': { src: '/assets/sounds/bgm/victory.ogg', channel: 'bgm' },
     'bgm.gameover':{ src: '/assets/sounds/bgm/gameover.ogg',channel: 'bgm' },
+    'bgm.tutorial.training': { src: '/assets/sounds/bgm/tutorial/Sh-Fil2.mid', channel: 'bgm' },
     'bgm.story.episode01': { src: '/assets/sounds/bgm/story/01.mid', channel: 'bgm' },
     'bgm.story.episode02': { src: '/assets/sounds/bgm/story/02.mid', channel: 'bgm' },
     'bgm.story.episode03': { src: '/assets/sounds/bgm/story/03.mid', channel: 'bgm' },

@@ -7,6 +7,7 @@ import { Camera } from './Camera';
 import { InputManager } from './InputManager';
 import { AudioManager } from './AudioManager';
 import { SettingsManager } from './SettingsManager';
+import { Entity } from '../entity/Entity';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
 import { LootObject } from '../entity/LootObject';
@@ -44,12 +45,13 @@ import { FloatingTextManager } from '../ui/FloatingTextManager';
 import { MinimapUI } from '../ui/MinimapUI';
 import type { GameManager } from './GameManager';
 import { WorldMap, type WorldDungeonInfo } from '../map/WorldMap';
+import { TutorialTrainingMap } from '../map/TutorialTrainingMap';
 import { TownInfo } from '../map/BiomeMask';
 import { fuseActivePartyBranch, getFusionCandidates, hasActiveMasterCharacter } from '../character/FusionSystem';
 import type { MasterBranch } from '../data/ClassTree';
 import { TilePoint, manhattan, tileKey } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
-import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST, enqueueReadyActor } from '../field/FieldActionEconomy';
+import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST, enqueueReadyActor, type FieldApAction } from '../field/FieldActionEconomy';
 import { hasLineOfSight } from '../field/LineOfSight';
 import {
     AttackPatternProfile,
@@ -101,6 +103,23 @@ import {
 export interface WorldEngineOptions {
     startIntroTutorial?: boolean;
 }
+
+type IntroTutorialStep = 'move' | 'attack' | 'rest' | 'magic' | 'defeat';
+
+const INTRO_TUTORIAL_STEP_ACTION: Partial<Record<IntroTutorialStep, FieldApAction>> = {
+    move: 'move',
+    attack: 'attack',
+    rest: 'rest',
+    magic: 'magic',
+};
+
+const INTRO_TUTORIAL_NEXT_STEP: Record<IntroTutorialStep, IntroTutorialStep | null> = {
+    move: 'attack',
+    attack: 'rest',
+    rest: 'magic',
+    magic: 'defeat',
+    defeat: null,
+};
 
 export class WorldEngine {
     private canvas: HTMLCanvasElement;
@@ -156,6 +175,9 @@ export class WorldEngine {
     private dismissedDungeonVisitKey: string | null = null;
     private introTutorialActive = false;
     private introTutorialEnemyId: string | null = null;
+    private introTutorialStep: IntroTutorialStep = 'move';
+    private introTutorialPreviousWorldMap: WorldMap | null = null;
+    private introTutorialInstructor: Player | null = null;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -277,6 +299,7 @@ export class WorldEngine {
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
                 handleEnemyDefeated: (actor, enemy, feedbackGroupId) => this.handleEnemyDefeated(actor, enemy, feedbackGroupId),
+                onActionCompleted: (action) => this.advanceIntroTutorialStep(action),
             },
             {
                 log: (message) => this.addCombatLog(message),
@@ -366,6 +389,7 @@ export class WorldEngine {
                 setReservedAction: (intent) => { this.reservedAction = intent; },
                 selectEnemy: (enemyId) => this.selectionController.selectEnemy(enemyId),
                 selectLoot: (lootId) => this.selectionController.selectLoot(lootId),
+                onActionCompleted: (action) => this.advanceIntroTutorialStep(action),
             },
             {
                 log: (message) => this.addCombatLog(message),
@@ -402,7 +426,7 @@ export class WorldEngine {
         this.renderController = new WorldRenderController({
             party: this.party,
             playerData: this.playerData,
-            worldMap: this.worldMap,
+            getWorldMap: () => this.worldMap,
             townSession: this.townSession,
             raidSession: this.raidSession,
             fusionTempleUI: this.fusionTempleUI,
@@ -422,9 +446,10 @@ export class WorldEngine {
             getPlayer: () => this.player,
             getControlledActor: () => this.getControlledActor(),
             getPartyActors: () => this.partyActors,
+            getTutorialActors: () => this.introTutorialInstructor ? [this.introTutorialInstructor] : [],
             getFieldEnemies: () => this.fieldEnemies,
             getActiveTurnActorId: () => this.activeTurnActorId,
-                getRemainingActionPoints: () => this.getSpendableActionGauge(),
+            getRemainingActionPoints: () => this.getSpendableActionGauge(),
             getMajorActionUsedThisTurn: () => this.majorActionUsedThisTurn,
             getHoverTile: () => this.hoverTile,
             getAttackCues: () => this.attackCues,
@@ -573,7 +598,11 @@ export class WorldEngine {
     }
 
     public startIntroTutorial(): void {
+        if (this.introTutorialActive) return;
         const town = this.getCurrentHubTown();
+        const trainingMap = new TutorialTrainingMap();
+        this.introTutorialPreviousWorldMap = this.worldMap;
+        this.worldMap = trainingMap;
         this.townSession.hide();
         this.closeFieldOverlays();
         this.currentPhase = 'raid';
@@ -584,48 +613,51 @@ export class WorldEngine {
         this.remotePartyActors.clear();
         this.fieldEnemies = [];
         this.worldMap.loot = [];
-        this.placePartyNear(this.worldMap.getTownExitTile(town));
+        this.placePartyNear(trainingMap.getPlayerStartTile());
         this.player = this.getControlledActor()?.entity ?? this.player;
         this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
         this.clearFieldTurnState();
+        this.introTutorialInstructor = this.createIntroTutorialInstructor(trainingMap.getInstructorTile());
 
         const actor = this.getControlledActor();
         if (!actor) {
+            this.restoreIntroTutorialWorldMap();
             this.openTown(town);
             return;
         }
 
-        const enemyTile = this.movementController.findNearbyWalkableTile({
-            x: actor.entity.gridX + 1,
-            y: actor.entity.gridY,
-        }, 'intro_tutorial_enemy');
+        const enemyTile = trainingMap.getPracticeEnemyTile();
         const enemy = new Enemy('intro_tutorial_enemy', enemyTile.x, enemyTile.y, t('tutorial.world.enemy'), 1, '#b64048', 'bruiser');
-        enemy.aggroRange = 1;
+        enemy.aggroRange = 0;
         enemy.expReward = 0;
-        enemy.stats.maxHp = 8;
-        enemy.stats.hp = 8;
+        enemy.stats.maxHp = 42;
+        enemy.stats.hp = 42;
         enemy.stats.atk = 1;
         enemy.stats.def = 0;
+        enemy.stats.spd = 0;
+        enemy.actionGauge = 0;
         this.fieldEnemies = [{ enemy, home: enemyTile, path: [] }];
         this.introTutorialActive = true;
         this.introTutorialEnemyId = enemy.id;
+        this.introTutorialStep = 'move';
 
-        this.activeTurnActorId = actor.id;
-        this.remainingActionPoints = FIELD_MAX_ACTION_GAUGE;
-        this.majorActionUsedThisTurn = false;
-        actor.entity.actionGauge = FIELD_MAX_ACTION_GAUGE;
+        this.prepareIntroTutorialActorTurn(actor);
         this.selectionController.selectActor(actor.id);
         this.actionMenuUI.open(this.playerActionController.getTurnActionStates(actor));
         this.camera.followTile(actor.entity.gridX, actor.entity.gridY);
         this.camera.snapToTarget();
+        AudioManager.playBgm('bgm.tutorial.training', { fadeMs: 400 });
         this.addCombatLog(t('tutorial.world.startLog'));
-        this.addCombatLog(t('tutorial.world.helpLog'));
+        this.addCombatLog(t('tutorial.world.step.move.log'));
     }
 
     private finishIntroTutorial(skipped: boolean): void {
+        this.restoreIntroTutorialWorldMap();
         const town = this.getCurrentHubTown();
         this.introTutorialActive = false;
         this.introTutorialEnemyId = null;
+        this.introTutorialStep = 'move';
+        this.introTutorialInstructor = null;
         this.fieldEnemies = [];
         this.worldMap.loot = [];
         this.remotePartyActors.clear();
@@ -637,12 +669,57 @@ export class WorldEngine {
         this.addCombatLog(t(skipped ? 'tutorial.world.skipLog' : 'tutorial.world.townLog'));
     }
 
+    private restoreIntroTutorialWorldMap(): void {
+        if (!this.introTutorialPreviousWorldMap) return;
+        this.worldMap = this.introTutorialPreviousWorldMap;
+        this.introTutorialPreviousWorldMap = null;
+    }
+
+    private createIntroTutorialInstructor(tile: TilePoint): Player {
+        const instructor = new Player(tile.x, tile.y);
+        instructor.id = 'intro_tutorial_instructor';
+        instructor.label = t('tutorial.world.instructor');
+        instructor.color = '#f0c050';
+        instructor.facing = 'down';
+        instructor.setWalkSprite(
+            '/assets/images/characters/animations/infantry_t4_walk.png',
+            32,
+            32,
+            3,
+            6,
+            Entity.WALK_ROW_BY_FACING,
+            1.7
+        );
+        return instructor;
+    }
+
+    private advanceIntroTutorialStep(action: FieldApAction): void {
+        if (!this.introTutorialActive) return;
+        const expected = INTRO_TUTORIAL_STEP_ACTION[this.introTutorialStep];
+        if (action !== expected) return;
+
+        const next = INTRO_TUTORIAL_NEXT_STEP[this.introTutorialStep];
+        if (!next) return;
+        this.introTutorialStep = next;
+
+        const actor = this.getActivePartyTurnActor() ?? this.getControlledActor();
+        if (actor) this.prepareIntroTutorialActorTurn(actor);
+        this.addCombatLog(t(`tutorial.world.step.${next}.log`));
+    }
+
+    private prepareIntroTutorialActorTurn(actor: FieldActor): void {
+        this.activeTurnActorId = actor.id;
+        this.remainingActionPoints = FIELD_MAX_ACTION_GAUGE;
+        this.majorActionUsedThisTurn = false;
+        actor.entity.actionGauge = FIELD_MAX_ACTION_GAUGE;
+    }
+
     private renderIntroTutorialHud(ctx: CanvasRenderingContext2D, width: number, height: number): void {
         const scale = SettingsManager.getUIScale();
         const uiW = Math.floor(width / scale);
         const uiH = Math.floor(height / scale);
         const panelW = Math.min(560, uiW - 32);
-        const panelH = 118;
+        const panelH = 136;
         const x = Math.max(16, Math.floor((uiW - panelW) / 2));
         const y = Math.max(16, uiH - panelH - 18);
 
@@ -665,11 +742,11 @@ export class WorldEngine {
 
         ctx.fillStyle = '#e8e0d0';
         ctx.font = '13px sans-serif';
-        ctx.fillText(t('tutorial.world.line1'), x + 18, y + 58);
+        ctx.fillText(t('tutorial.world.instructorLine'), x + 18, y + 58);
         ctx.fillStyle = '#cbb992';
-        ctx.fillText(t('tutorial.world.line2'), x + 18, y + 80);
+        ctx.fillText(t(`tutorial.world.step.${this.introTutorialStep}`), x + 18, y + 82);
         ctx.fillStyle = '#ffd700';
-        ctx.fillText(t('tutorial.world.line3'), x + 18, y + 102);
+        ctx.fillText(t('tutorial.world.lineEsc'), x + 18, y + 108);
         ctx.restore();
     }
 

@@ -45,6 +45,7 @@ export interface WorldMagicContext {
     reopenActionMenu: (actor: FieldActor) => void;
     resumeOrEndActiveTurn: (actor: FieldActor) => void;
     handleEnemyDefeated: (actor: FieldActor, enemy: Enemy, feedbackGroupId?: string) => void;
+    onActionCompleted?: (action: 'magic') => void;
 }
 
 export interface WorldMagicEventSink {
@@ -268,6 +269,7 @@ export class WorldMagicController {
 
         this.applySkillEffect(actor, skill, effect);
         this.reset();
+        this.context.onActionCompleted?.('magic');
         this.context.resumeOrEndActiveTurn(actor);
     }
 

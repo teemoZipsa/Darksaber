@@ -23,6 +23,7 @@ export interface WorldRenderModel {
     activeCharacter: Character | null;
     controlledActor: FieldActor | null;
     partyActors: FieldActor[];
+    tutorialActors: Player[];
     fieldEnemies: FieldEnemy[];
     activeTurnActorId: string | null;
     remainingActionPoints: number;

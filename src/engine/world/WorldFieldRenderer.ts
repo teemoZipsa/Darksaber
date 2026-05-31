@@ -132,6 +132,32 @@ export class WorldFieldRenderer {
         }
     }
 
+    public static renderTutorialActors(ctx: CanvasRenderingContext2D, model: WorldRenderModel, camX: number, camY: number): void {
+        for (const entity of model.tutorialActors) {
+            const px = entity.pixelX * TILE_SIZE - camX;
+            const py = entity.pixelY * TILE_SIZE - camY;
+
+            const walkSpriteRendered = renderWalkSprite(ctx, entity, model.worldTime, px, py, { drawIdle: true });
+            if (!walkSpriteRendered && entity.image && entity.imageLoaded) {
+                drawScaledTileImage(ctx, entity.image, px, py, PARTY_ACTOR_IMAGE_RENDER_SCALE);
+            } else if (!walkSpriteRendered) {
+                ctx.fillStyle = entity.color;
+                ctx.fillRect(px + 5, py + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+            }
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.62)';
+            ctx.fillRect(px - 12, py - 19, TILE_SIZE + 24, 15);
+            ctx.strokeStyle = '#c8a36d';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(px - 12.5, py - 19.5, TILE_SIZE + 25, 16);
+            ctx.fillStyle = '#f0c050';
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(entity.label, px + TILE_SIZE / 2, py - 8);
+            ctx.textAlign = 'start';
+        }
+    }
+
     public static renderEnemies(ctx: CanvasRenderingContext2D, model: WorldRenderModel, camX: number, camY: number): void {
         const sortedEnemies = [...model.fieldEnemies].sort((a, b) => a.enemy.pixelY - b.enemy.pixelY);
         for (const entry of sortedEnemies) {

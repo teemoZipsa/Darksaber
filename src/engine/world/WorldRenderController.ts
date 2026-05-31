@@ -29,7 +29,7 @@ import { MIN_FIELD_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
 export interface WorldRenderContext {
     party: PartyManager;
     playerData: PlayerData;
-    worldMap: WorldMap;
+    getWorldMap: () => WorldMap;
     townSession: WorldTownSession;
     raidSession: WorldRaidSession;
     fusionTempleUI: FusionTempleUI;
@@ -49,6 +49,7 @@ export interface WorldRenderContext {
     getPlayer: () => Player;
     getControlledActor: () => FieldActor | null;
     getPartyActors: () => FieldActor[];
+    getTutorialActors: () => Player[];
     getFieldEnemies: () => FieldEnemy[];
     getActiveTurnActorId: () => string | null;
     getRemainingActionPoints: () => number;
@@ -72,6 +73,7 @@ export class WorldRenderController {
         const camX = camera.x;
         const camY = camera.y;
         const scale = SettingsManager.getUIScale();
+        const worldMap = this.context.getWorldMap();
 
         ctx.fillStyle = '#080b12';
         ctx.fillRect(0, 0, width, height);
@@ -81,8 +83,8 @@ export class WorldRenderController {
 
         const viewW = width / camera.zoom;
         const viewH = height / camera.zoom;
-        this.context.worldMap.updateLoadedChunks(model.player.pixelX * TILE_SIZE, model.player.pixelY * TILE_SIZE);
-        this.context.worldMap.render(ctx, camX, camY, viewW, viewH);
+        worldMap.updateLoadedChunks(model.player.pixelX * TILE_SIZE, model.player.pixelY * TILE_SIZE);
+        worldMap.render(ctx, camX, camY, viewW, viewH);
 
         WorldFieldRenderer.renderActionTiles(ctx, model, camX, camY);
         WorldFieldRenderer.renderMagicTargetTiles(ctx, model, camX, camY);
@@ -90,6 +92,7 @@ export class WorldRenderController {
         WorldFieldRenderer.renderTacticalMarkers(ctx, model, camX, camY);
         WorldFieldRenderer.renderSelectedLoot(ctx, model, camX, camY);
         WorldFieldRenderer.renderEnemies(ctx, model, camX, camY);
+        WorldFieldRenderer.renderTutorialActors(ctx, model, camX, camY);
         WorldFieldRenderer.renderPartyActors(ctx, model, camX, camY);
         WorldFieldRenderer.renderAttackCues(ctx, model, camX, camY);
         this.context.effectManager.render(ctx, camera);
@@ -125,14 +128,15 @@ export class WorldRenderController {
     private buildRenderModel(): WorldRenderModel {
         const activeActor = this.context.getControlledActor();
         const hoverTile = this.context.getHoverTile();
+        const worldMap = this.context.getWorldMap();
         const terrainHoverLines = hoverTile.x >= 0 && hoverTile.y >= 0
             ? describeTerrainForHover(
-                this.context.worldMap.getTileAt(hoverTile.x, hoverTile.y),
+                worldMap.getTileAt(hoverTile.x, hoverTile.y),
                 activeActor ? this.context.getActorTerrainTraits(activeActor) : {}
             )
             : [];
         const selectedLoot = this.context.selectionController.lootId
-            ? this.context.worldMap.loot.find((candidate) => candidate.id === this.context.selectionController.lootId && !candidate.opened) ?? null
+            ? worldMap.loot.find((candidate) => candidate.id === this.context.selectionController.lootId && !candidate.opened) ?? null
             : null;
 
         return {
@@ -142,6 +146,7 @@ export class WorldRenderController {
             activeCharacter: this.context.party.getActive() ?? null,
             controlledActor: activeActor,
             partyActors: this.context.getPartyActors(),
+            tutorialActors: this.context.getTutorialActors(),
             fieldEnemies: this.context.getFieldEnemies(),
             activeTurnActorId: this.context.getActiveTurnActorId(),
             remainingActionPoints: this.context.getRemainingActionPoints(),
@@ -157,7 +162,7 @@ export class WorldRenderController {
             fieldMagicState: this.context.magicController.getState(),
             hoverTile,
             hoverTileWalkable: hoverTile.x >= 0 && hoverTile.y >= 0
-                ? this.context.worldMap.isWalkable(hoverTile.x, hoverTile.y)
+                ? worldMap.isWalkable(hoverTile.x, hoverTile.y)
                 : false,
             terrainHoverLines,
             tacticalMarkers: this.context.tacticalController.getMarkers(),
@@ -165,7 +170,7 @@ export class WorldRenderController {
             attackCues: this.context.getAttackCues(),
             combatLog: this.context.getCombatLog(),
             gold: this.context.playerData.gold,
-            worldName: this.context.worldMap.getDisplayName(),
+            worldName: worldMap.getDisplayName(),
             raid: {
                 active: this.context.raidSession.active,
                 elapsedSeconds: this.context.raidSession.elapsedSeconds,
