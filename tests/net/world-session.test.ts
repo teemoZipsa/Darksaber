@@ -33,6 +33,16 @@ function joinMessage(originHubId: string, id: string, resumeToken?: string): Wor
     };
 }
 
+function withFixedRandom<T>(value: number, callback: () => T): T {
+    const previousRandom = Math.random;
+    Math.random = () => value;
+    try {
+        return callback();
+    } finally {
+        Math.random = previousRandom;
+    }
+}
+
 test('join spawns each player at their origin hub external exit tile', () => {
     const session = new WorldSession();
     const world = new WorldMap();
@@ -213,13 +223,13 @@ test('network kills auto-grant normal enemy loot and include display names in co
     serverEnemyEntry.enemy.stats.spd = 0;
     serverActor.tile = { x: serverEnemyEntry.enemy.gridX - 1, y: serverEnemyEntry.enemy.gridY };
 
-    const result = session.handleMessage(joined.playerId, {
+    const result = withFixedRandom(0, () => session.handleMessage(joined.playerId, {
         type: 'PLAYER_INTENT',
         intentId: 'attack-auto-loot',
         actorId: serverActor.id,
         kind: 'attack',
         payload: { targetId: serverEnemyEntry.enemy.id },
-    }, 1_000);
+    }, 1_000));
 
     const event = result.broadcasts.find((message) => message.type === 'COMBAT_EVENT');
     const grant = result.replies.find((message): message is AutoLootGrantMessage => message.type === 'AUTO_LOOT_GRANT');
@@ -261,13 +271,13 @@ test('network auto-loot exposes unaccepted leftovers on the field', () => {
     serverEnemyEntry.enemy.stats.spd = 0;
     serverActor.tile = { x: serverEnemyEntry.enemy.gridX - 1, y: serverEnemyEntry.enemy.gridY };
 
-    const result = session.handleMessage(joined.playerId, {
+    const result = withFixedRandom(0, () => session.handleMessage(joined.playerId, {
         type: 'PLAYER_INTENT',
         intentId: 'attack-leftover-loot',
         actorId: serverActor.id,
         kind: 'attack',
         payload: { targetId: serverEnemyEntry.enemy.id },
-    }, 1_000);
+    }, 1_000));
     const grant = result.replies.find((message): message is AutoLootGrantMessage => message.type === 'AUTO_LOOT_GRANT');
     assert.ok(grant);
 

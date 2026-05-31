@@ -82,7 +82,7 @@ export class WorldCombatController {
     public tryActorAttack(input: ActorAttackInput): CombatResult {
         const result = createCombatResult(false);
         const start = actorTile(input.actor);
-        if (input.actor.entity.actionGauge < 100 || input.targetEnemies.length === 0) return result;
+        if (input.targetEnemies.length === 0) return result;
 
         result.executed = true;
         input.actor.entity.facing = input.directionFromTo(start, enemyTile(input.selectedEnemy));

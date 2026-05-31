@@ -233,9 +233,20 @@ export class WorldEngine {
                 this.registerCombatFeedback('kill', feedbackGroupId);
             },
             spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
-            spawnLoot: (enemy) => this.spawnEnemyLoot(enemy),
-            awardExp: (actor, enemy) => this.awardDefeatExp(actor, enemy),
-            onEnemyDefeated: (enemy) => this.completeDungeonIfBossDefeated(enemy),
+            spawnLoot: (enemy) => {
+                if (!this.isIntroTutorialEnemy(enemy)) this.spawnEnemyLoot(enemy);
+            },
+            awardExp: (actor, enemy) => {
+                if (!this.isIntroTutorialEnemy(enemy)) this.awardDefeatExp(actor, enemy);
+            },
+            onEnemyDefeated: (enemy) => {
+                if (this.isIntroTutorialEnemy(enemy)) {
+                    this.addCombatLog(t('tutorial.world.completeLog'));
+                    this.finishIntroTutorial(false);
+                    return;
+                }
+                this.completeDungeonIfBossDefeated(enemy);
+            },
             flushFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
         });
         this.movementController = new WorldMovementController({
@@ -698,6 +709,15 @@ export class WorldEngine {
         const expected = INTRO_TUTORIAL_STEP_ACTION[this.introTutorialStep];
         if (action !== expected) return;
 
+        if (action === 'move') {
+            const actor = this.getActivePartyTurnActor() ?? this.getControlledActor();
+            if (actor && !this.canActorAttackIntroTutorialEnemyFrom(actor, this.actorTile(actor))) {
+                this.prepareIntroTutorialActorTurn(actor);
+                this.addCombatLog(t('tutorial.world.step.move.closeLog'));
+                return;
+            }
+        }
+
         const next = INTRO_TUTORIAL_NEXT_STEP[this.introTutorialStep];
         if (!next) return;
         this.introTutorialStep = next;
@@ -705,6 +725,16 @@ export class WorldEngine {
         const actor = this.getActivePartyTurnActor() ?? this.getControlledActor();
         if (actor) this.prepareIntroTutorialActorTurn(actor);
         this.addCombatLog(t(`tutorial.world.step.${next}.log`));
+    }
+
+    private canActorAttackIntroTutorialEnemyFrom(actor: FieldActor, casterTile: TilePoint): boolean {
+        const enemy = this.introTutorialEnemyId ? this.getEnemyById(this.introTutorialEnemyId) : null;
+        if (!enemy || enemy.stats.hp <= 0) return false;
+        return this.getActorAttackTargetFailureFromTile(actor, casterTile, enemy) === null;
+    }
+
+    private isIntroTutorialEnemy(enemy: Enemy): boolean {
+        return this.introTutorialActive && enemy.id === this.introTutorialEnemyId;
     }
 
     private prepareIntroTutorialActorTurn(actor: FieldActor): void {
@@ -2155,10 +2185,10 @@ export class WorldEngine {
             .filter((enemy) => enemy.stats.hp > 0 && effectTileKeys.has(tileKey(enemy.gridX, enemy.gridY)));
     }
 
-    private getPatternContext(actor: FieldActor, selectedTile?: TilePoint): PatternContext {
+    private getPatternContext(actor: FieldActor, selectedTile?: TilePoint, casterTile: TilePoint = this.actorTile(actor)): PatternContext {
         const bounds = this.worldMap.getBoundsTiles();
         return {
-            casterTile: this.actorTile(actor),
+            casterTile,
             selectedTile,
             isInsideMap: (tile) => tile.x >= 0 && tile.y >= 0 && tile.x < bounds.width && tile.y < bounds.height,
             isBlockingTile: (tile) => isTerrainLineOfSightBlocking(this.worldMap.getTileAt(tile.x, tile.y)),
@@ -2238,12 +2268,16 @@ export class WorldEngine {
     }
 
     private getActorAttackTargetFailure(actor: FieldActor, enemy: Enemy): AttackTargetFailure | null {
+        return this.getActorAttackTargetFailureFromTile(actor, this.actorTile(actor), enemy);
+    }
+
+    private getActorAttackTargetFailureFromTile(actor: FieldActor, casterTile: TilePoint, enemy: Enemy): AttackTargetFailure | null {
         const profile = this.getActorAttackProfile(actor);
         const target = this.enemyTile(enemy);
         return resolveActorAttackTargetFailure({
             profile,
-            context: this.getPatternContext(actor),
-            selectedContext: this.getPatternContext(actor, target),
+            context: this.getPatternContext(actor, undefined, casterTile),
+            selectedContext: this.getPatternContext(actor, target, casterTile),
             target,
         });
     }
