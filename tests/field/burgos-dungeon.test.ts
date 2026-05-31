@@ -17,6 +17,8 @@ import {
     getMonsterDefinition,
 } from '../../src/data/MonsterCatalog';
 import { getItemDef } from '../../src/data/ItemDB';
+import { getStoryQuestByDungeonId } from '../../src/data/StoryQuestData';
+import { getStoryScenarioByDungeonId } from '../../src/data/StoryScenarioData';
 import { Enemy } from '../../src/entity/Enemy';
 import { LootObject } from '../../src/entity/LootObject';
 import { Player } from '../../src/entity/Player';
@@ -203,6 +205,35 @@ test('Zamora Fortress encounter spawns Fenris center and four skeleton guards', 
     assert.deepEqual(guardPositions, ['-2,-2', '-2,2', '2,-2', '2,2']);
 });
 
+test('story scenario encounters include original named monsters and special objectives', () => {
+    const spawner = new WorldFieldSpawnController(makePassthroughMovement());
+    const pyramidFront = getStoryScenarioByDungeonId('pyramid_front');
+    const airship = getStoryScenarioByDungeonId('airship');
+    const amentGate = getStoryScenarioByDungeonId('ament_gate');
+    const amentFirst = getStoryScenarioByDungeonId('ament_1f');
+    assert.ok(pyramidFront);
+    assert.ok(airship);
+    assert.ok(amentGate);
+    assert.ok(amentFirst);
+
+    const pyramidNames = spawner.createStoryScenarioEncounter(pyramidFront, { x: 100, y: 100 })
+        .enemies.map((entry) => entry.enemy.name);
+    assert.ok(pyramidNames.includes('키스라 Lv2'));
+    assert.ok(pyramidNames.includes('펜리스 Lv2'));
+    assert.ok(pyramidNames.includes('가노마스 Lv2'));
+
+    const airshipContent = spawner.createStoryScenarioEncounter(airship, { x: 100, y: 100 });
+    assert.equal(airshipContent.enemies.some((entry) => entry.enemy.isBoss), false);
+    assert.deepEqual(airshipContent.enemies.map((entry) => entry.enemy.name).sort(), ['나이아두', '단그']);
+
+    const amentGateContent = spawner.createStoryScenarioEncounter(amentGate, { x: 100, y: 100 });
+    assert.equal(amentGateContent.enemies.filter((entry) => entry.enemy.isBoss).length, 1);
+    assert.equal(amentGateContent.enemies.filter((entry) => entry.enemy.name === '암피트 분신').length, 4);
+
+    const amentFirstContent = spawner.createStoryScenarioEncounter(amentFirst, { x: 100, y: 100 });
+    assert.equal(amentFirstContent.enemies.filter((entry) => entry.enemy.name === '우레우스 석상').length, 4);
+});
+
 test('normal enemy loot is auto-collected into the backpack', () => {
     const bag = new GridInventory(4, 4);
     const logs: string[] = [];
@@ -360,4 +391,32 @@ test('Zamora Fenris defeat clears only the dungeon encounter, not raid success',
     assert.equal(turnStateCleared, true);
     assert.equal(raidSuccessShown, false);
     assert.ok(logs.includes('자모라 요새 목표 달성. 다른 마을로 생환하면 2화가 완료됩니다.'));
+});
+
+test('Airship objective completion keeps variant monsters as optional encounters', () => {
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    raidSession.startDungeonEncounter('airship');
+    const variant = new Enemy('airship_variant_0', 100, 100, '나이아두', 9, '#5e7388', 'bruiser');
+    const storyQuest = getStoryQuestByDungeonId('airship');
+    assert.ok(storyQuest);
+
+    let selectionCleared = false;
+    let turnStateCleared = false;
+    const logs: string[] = [];
+    const engine = Object.create(WorldEngine.prototype) as any;
+    engine.raidSession = raidSession;
+    engine.fieldEnemies = [{ enemy: variant, home: { x: 100, y: 100 }, path: [] }];
+    engine.selectionController = { clear: () => { selectionCleared = true; } };
+    engine.clearFieldTurnState = () => { turnStateCleared = true; };
+    engine.addCombatLog = (message: string) => logs.push(message);
+
+    engine.completeStoryDungeonObjective('airship', storyQuest, { clearEnemies: false });
+
+    assert.equal(raidSession.activeDungeonId, null);
+    assert.equal(raidSession.isDungeonCleared('airship'), true);
+    assert.equal(engine.fieldEnemies.length, 1);
+    assert.equal(selectionCleared, true);
+    assert.equal(turnStateCleared, true);
+    assert.ok(logs.includes('비공정 목표 달성. 다른 마을로 생환하면 17화가 완료됩니다.'));
 });

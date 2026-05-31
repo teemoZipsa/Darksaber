@@ -230,6 +230,13 @@ export class WorldFieldSpawnController {
     }
 
     public createStoryScenarioEncounter(scenario: StoryScenarioDefinition, anchor: TilePoint): StarterFieldContent {
+        if (scenario.episode === 17) {
+            return this.createAirshipEncounter(scenario, anchor);
+        }
+        if (scenario.episode === 18) {
+            return this.createAmentGateEncounter(scenario, anchor);
+        }
+
         const bossSeed: CustomEnemySeed = {
             offset: { x: 0, y: 0 },
             name: scenario.bossName ?? '나이아두',
@@ -267,13 +274,42 @@ export class WorldFieldSpawnController {
             role: guardRoles[index % guardRoles.length],
             aggroRange: 6,
         }));
-        const enemies = [bossSeed, ...guardSeeds].map((seed, index) => {
+        const namedSeeds = getScenarioNamedSeeds(scenario);
+        const enemies = [bossSeed, ...namedSeeds, ...guardSeeds].map((seed, index) => {
             const id = index === 0
                 ? `${scenario.dungeonId}_objective`
-                : `${scenario.dungeonId}_guard_${index}`;
+                : `${scenario.dungeonId}_enemy_${index}`;
             return this.createEnemy(seed, anchor, id);
         });
         return { enemies, loot: [] };
+    }
+
+    private createAirshipEncounter(scenario: StoryScenarioDefinition, anchor: TilePoint): StarterFieldContent {
+        const seeds: CustomEnemySeed[] = [
+            { offset: { x: -2, y: 0 }, name: '나이아두', level: scenario.guardLevel + 1, color: '#5e7388', role: 'bruiser', aggroRange: 6 },
+            { offset: { x: 2, y: 0 }, name: '단그', level: scenario.guardLevel + 1, color: '#7d6750', role: 'tank', aggroRange: 6 },
+        ];
+        return {
+            enemies: seeds.map((seed, index) => this.createEnemy(seed, anchor, `${scenario.dungeonId}_variant_${index}`)),
+            loot: [],
+        };
+    }
+
+    private createAmentGateEncounter(scenario: StoryScenarioDefinition, anchor: TilePoint): StarterFieldContent {
+        const seeds: CustomEnemySeed[] = [
+            { offset: { x: 0, y: 0 }, name: '암피트', level: scenario.bossLevel, color: scenario.bossColor, role: 'boss', aggroRange: 9 },
+            { offset: { x: -3, y: -2 }, name: '암피트 분신', level: scenario.guardLevel, color: '#776f90', role: 'support', aggroRange: 7 },
+            { offset: { x: 3, y: -2 }, name: '암피트 분신', level: scenario.guardLevel, color: '#827898', role: 'bruiser', aggroRange: 7 },
+            { offset: { x: -3, y: 2 }, name: '암피트 분신', level: scenario.guardLevel, color: '#6f6688', role: 'coward', aggroRange: 7 },
+            { offset: { x: 3, y: 2 }, name: '암피트 분신', level: scenario.guardLevel, color: '#8b82a2', role: 'healer', aggroRange: 7 },
+        ];
+        return {
+            enemies: seeds.map((seed, index) => {
+                const id = index === 0 ? `${scenario.dungeonId}_true_amphit` : `${scenario.dungeonId}_decoy_${index}`;
+                return this.createEnemy(seed, anchor, id);
+            }),
+            loot: [],
+        };
     }
 
     private createEnemy(seed: EnemySeed, anchor: TilePoint | Player, id: string): FieldEnemy {
@@ -305,6 +341,37 @@ export class WorldFieldSpawnController {
             definition.renderScale
         );
         return enemy;
+    }
+}
+
+function getScenarioNamedSeeds(scenario: StoryScenarioDefinition): CustomEnemySeed[] {
+    switch (scenario.episode) {
+        case 12:
+            return [
+                { offset: { x: -5, y: -3 }, name: '키스라 Lv2', level: scenario.guardLevel + 2, color: '#6d78d8', role: 'bruiser', aggroRange: 7 },
+                { offset: { x: 5, y: -3 }, name: '펜리스 Lv2', level: scenario.guardLevel + 2, color: '#5f70df', role: 'coward', aggroRange: 7 },
+                { offset: { x: 0, y: 5 }, name: '가노마스 Lv2', level: scenario.guardLevel + 2, color: '#d86a3a', role: 'support', aggroRange: 7 },
+            ];
+        case 13:
+            return [
+                { offset: { x: -4, y: 4 }, name: '안피스베냐', level: scenario.guardLevel + 2, color: '#b78cc8', role: 'healer', aggroRange: 7 },
+                { offset: { x: 4, y: 4 }, name: '가노마스', level: scenario.guardLevel + 2, color: '#d86a3a', role: 'support', aggroRange: 7 },
+            ];
+        case 14:
+            return [
+                { offset: { x: -5, y: -3 }, name: '나이아드 Lv2', level: scenario.guardLevel + 2, color: '#4d8fc8', role: 'healer', aggroRange: 7 },
+                { offset: { x: 5, y: -3 }, name: '카론 Lv2', level: scenario.guardLevel + 2, color: '#5d526a', role: 'support', aggroRange: 7 },
+                { offset: { x: 0, y: 5 }, name: '단구 Lv2', level: scenario.guardLevel + 2, color: '#7d5c40', role: 'tank', aggroRange: 7 },
+            ];
+        case 19:
+            return [
+                { offset: { x: -4, y: -4 }, name: '우레우스 석상', level: scenario.guardLevel, color: '#7e4f4f', role: 'tank', aggroRange: 5 },
+                { offset: { x: 4, y: -4 }, name: '우레우스 석상', level: scenario.guardLevel, color: '#7e4f4f', role: 'tank', aggroRange: 5 },
+                { offset: { x: -4, y: 4 }, name: '우레우스 석상', level: scenario.guardLevel, color: '#7e4f4f', role: 'tank', aggroRange: 5 },
+                { offset: { x: 4, y: 4 }, name: '우레우스 석상', level: scenario.guardLevel, color: '#7e4f4f', role: 'tank', aggroRange: 5 },
+            ];
+        default:
+            return [];
     }
 }
 

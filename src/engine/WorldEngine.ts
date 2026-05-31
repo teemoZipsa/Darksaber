@@ -26,7 +26,7 @@ import {
     getMonsterDefinition,
     type MonsterId,
 } from '../data/MonsterCatalog';
-import { getStoryQuestByDungeonId, isStoryQuestAvailable } from '../data/StoryQuestData';
+import { getStoryQuestByDungeonId, isStoryQuestAvailable, type StoryQuestDefinition } from '../data/StoryQuestData';
 import { getStoryScenarioByDungeonId } from '../data/StoryScenarioData';
 import {
     getEffectiveStatsForCharacter,
@@ -1126,7 +1126,10 @@ export class WorldEngine {
         const key = this.getCurrentDungeonVisitKey(dungeon);
         if (!key || this.dismissedDungeonVisitKey === key) return;
         if (!isStoryQuestAvailable(storyQuest, this.playerData)) {
-            this.addCombatLog(t('story.dungeonLockedLog'));
+            const lockedLogKey = dungeon.id === 'sicilio_island'
+                ? 'story.sicilioRouteLockedLog'
+                : 'story.dungeonLockedLog';
+            this.addCombatLog(t(lockedLogKey));
             this.dismissedDungeonVisitKey = key;
             return;
         }
@@ -1172,6 +1175,11 @@ export class WorldEngine {
         this.dismissedDungeonVisitKey = this.getCurrentDungeonVisitKey(dungeon);
         if (storyQuest.bgmKey) AudioManager.playBgm(storyQuest.bgmKey, { fadeMs: 400 });
         this.addCombatLog(t(storyQuest.enterLogKey));
+
+        const scenario = getStoryScenarioByDungeonId(dungeon.id);
+        if (scenario?.episode === 17) {
+            this.completeStoryDungeonObjective(dungeon.id, storyQuest, { clearEnemies: false });
+        }
     }
 
     private createStoryDungeonEncounter(dungeonId: string, entrance: { x: number; y: number }) {
@@ -1525,8 +1533,16 @@ export class WorldEngine {
         const dungeonId = this.raidSession.activeDungeonId;
         const storyQuest = dungeonId ? getStoryQuestByDungeonId(dungeonId) : null;
         if (!enemy.isBoss || !dungeonId || !storyQuest) return;
+        this.completeStoryDungeonObjective(dungeonId, storyQuest);
+    }
+
+    private completeStoryDungeonObjective(
+        dungeonId: string,
+        storyQuest: StoryQuestDefinition,
+        options: { clearEnemies?: boolean } = {}
+    ): void {
         this.raidSession.completeDungeonEncounter(dungeonId);
-        this.fieldEnemies = [];
+        if (options.clearEnemies ?? true) this.fieldEnemies = [];
         this.selectionController.clear();
         this.clearFieldTurnState();
         this.addCombatLog(t(storyQuest.objectiveCompleteLogKey));

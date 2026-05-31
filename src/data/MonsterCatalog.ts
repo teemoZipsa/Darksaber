@@ -253,7 +253,7 @@ export const MONSTER_DEFINITIONS: Record<MonsterId, MonsterDefinition> = {
     },
     'burgos_wolf_boss': {
         id: 'burgos_wolf_boss',
-        name: '부르고스 늑대왕',
+        name: '키스라',
         sprite: '435R.png',
         role: 'boss',
         level: 3,
