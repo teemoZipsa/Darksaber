@@ -5,6 +5,8 @@ import { LootObject } from '../entity/LootObject';
 import { ExtractionZone } from '../entity/ExtractionZone';
 import { BiomeMask, BiomeType, MAP_HEIGHT, MAP_WIDTH, TempleInfo, TownInfo, WorldRealm } from './BiomeMask';
 import { getBurgosCastleHmapTileAt } from './BurgosCastleHmap';
+import { getStoryHmapTileAt } from './StoryHmaps';
+import { STORY_SCENARIOS } from '../data/StoryScenarioData';
 
 export interface TileBounds {
     width: number;
@@ -139,7 +141,15 @@ const DUNGEON_LANDMARKS: WorldDungeonInfo[] = [
     { id: 'beginner_mine', nameKr: '초심자의 폐광', chunkX: 38, chunkY: 35, sprite: 'beginnerMine', tileSpan: 3, tileRadius: 4 },
     { id: 'beginner_ruins', nameKr: '초보자 유적', chunkX: 62, chunkY: 28, sprite: 'beginnerRuins', tileSpan: 3, tileRadius: 4 },
     { id: 'dark_cave', nameKr: '암흑 동굴', chunkX: 62, chunkY: 48, sprite: 'caveEntrance', tileSpan: 3, tileRadius: 4 },
-    { id: 'burgos_castle', nameKr: '부르고스성', chunkX: 43, chunkY: 40, sprite: 'castle', tileSpan: 4, tileRadius: 4 },
+    ...STORY_SCENARIOS.map((scenario) => ({
+        id: scenario.dungeonId,
+        nameKr: scenario.dungeonNameKr,
+        chunkX: scenario.chunkX,
+        chunkY: scenario.chunkY,
+        sprite: scenario.sprite,
+        tileSpan: scenario.sprite === 'castle' ? 4 : 3,
+        tileRadius: 4,
+    })),
 ];
 
 const BURGOS_CASTLE_DUNGEON = DUNGEON_LANDMARKS.find((dungeon) => dungeon.id === 'burgos_castle');
@@ -386,6 +396,9 @@ export class WorldMap {
         const burgosCastleTile = this.getBurgosCastleHmapTile(tx, ty);
         if (burgosCastleTile !== null) return burgosCastleTile;
 
+        const storyHmapTile = this.getStoryHmapTile(tx, ty);
+        if (storyHmapTile !== null) return storyHmapTile;
+
         if (this.getTempleAtTile(tx, ty)) return TileType.DUNGEON_ENTRANCE;
         if (this.getDungeonAtTile(tx, ty)) return TileType.DUNGEON_ENTRANCE;
 
@@ -417,6 +430,18 @@ export class WorldMap {
     private getBurgosCastleHmapTile(tx: number, ty: number): TileType | null {
         if (!BURGOS_CASTLE_DUNGEON) return null;
         return getBurgosCastleHmapTileAt(tx, ty, this.getDungeonEntranceTile(BURGOS_CASTLE_DUNGEON));
+    }
+
+    private getStoryHmapTile(tx: number, ty: number): TileType | null {
+        if (this.isRoadTile(tx, ty) || this.isRiverTile(tx, ty)) return null;
+        for (const scenario of STORY_SCENARIOS) {
+            if (scenario.episode < 2) continue;
+            const dungeon = DUNGEON_LANDMARKS.find((entry) => entry.id === scenario.dungeonId);
+            if (!dungeon) continue;
+            const tile = getStoryHmapTileAt(scenario.episode, tx, ty, this.getDungeonEntranceTile(dungeon));
+            if (tile !== null) return tile;
+        }
+        return null;
     }
 
     private generateChunk(chunkX: number, chunkY: number): Chunk {

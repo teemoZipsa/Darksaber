@@ -122,6 +122,7 @@ test('player data guards gold and normalizes old save shapes', () => {
             gold: -10,
             clearedStages: ['stage-a', 42],
             questItems: ['quest_bomb', null],
+            storyCompanions: ['story_cleric_ep02', null],
             inventory: [
                 { uid: 'u1', itemId: 'short_sword', gridX: 1.8, gridY: Number.NaN },
                 { uid: 'bad' },
@@ -137,6 +138,7 @@ test('player data guards gold and normalizes old save shapes', () => {
         assert.equal(loaded.gold, 0);
         assert.deepEqual([...loaded.clearedStages], ['stage-a']);
         assert.equal(loaded.hasQuestItem('quest_bomb'), true);
+        assert.equal(loaded.hasStoryCompanion('story_cleric_ep02'), true);
         assert.equal(loaded.inventory.length, 1);
         assert.deepEqual(loaded.inventory[0].sockets, []);
         assert.deepEqual(loaded.equipped.weapon?.sockets, ['rune_el']);

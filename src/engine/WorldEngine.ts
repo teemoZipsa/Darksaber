@@ -5,6 +5,7 @@
 
 import { Camera } from './Camera';
 import { InputManager } from './InputManager';
+import { AudioManager } from './AudioManager';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
 import { LootObject } from '../entity/LootObject';
@@ -21,9 +22,12 @@ import {
     BURGOS_CASTLE_DUNGEON_ID,
     MONSTER_ROW_BY_FACING,
     MONSTER_SPRITE_PATH,
+    ZAMORA_FORTRESS_DUNGEON_ID,
     getMonsterDefinition,
     type MonsterId,
 } from '../data/MonsterCatalog';
+import { getStoryQuestByDungeonId, isStoryQuestAvailable } from '../data/StoryQuestData';
+import { getStoryScenarioByDungeonId } from '../data/StoryScenarioData';
 import {
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
@@ -109,7 +113,7 @@ export class WorldEngine {
     private isNetworkRaidConnecting = false;
     private networkPlayerId: string | null = null;
     private pendingNetworkMoveReopen: { intentId: string; actorId: string; tile: TilePoint } | null = null;
-    private pendingLootPicks = new Map<string, { placed: PlacedItem; source: { gridX: number; gridY: number }; at: number }>();
+    private pendingLootPicks = new Map<string, { placed: PlacedItem; source: { gridX: number; gridY: number }; at: number; timedOut?: boolean }>();
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
     private fusionTempleUI = new FusionTempleUI();
@@ -577,6 +581,7 @@ export class WorldEngine {
             this.networkPlayerId = null;
         }
         this.closeFieldOverlays();
+        AudioManager.stopBgm(600);
         this.currentPhase = 'town';
         this.raidSession.enterTown(town.id);
         this.townSession.show(town);
@@ -596,6 +601,8 @@ export class WorldEngine {
                 partyComposition: this.createPartyCompositionSnapshot(town),
             });
 
+            this.townSession.hide();
+            this.closeFieldOverlays();
             this.networkPlayerId = welcome.playerId;
             this.isNetworkRaid = true;
             this.currentPhase = 'raid';
@@ -746,10 +753,18 @@ export class WorldEngine {
 
     private applyNetworkSnapshot(snapshot: WorldSnapshot): void {
         this.raidSession.elapsedSeconds = snapshot.raidTimer.elapsedSeconds;
-        const ownSnapshots = snapshot.partyActors.filter((actor) => actor.ownerPlayerId === this.networkPlayerId);
-        const remoteSnapshots = snapshot.partyActors.filter((actor) => actor.ownerPlayerId !== this.networkPlayerId);
         const previousActors = this.partyActors;
         const localCharacters = this.party.getCharacters();
+        const localCharacterIds = new Set(localCharacters.map((character) => character.id));
+        const localPlayerActorIds = new Set(
+            snapshot.players.find((player) => player.playerId === this.networkPlayerId)?.actorIds ?? []
+        );
+        const isOwnActorSnapshot = (actor: ActorSnapshot): boolean =>
+            actor.ownerPlayerId === this.networkPlayerId
+            || localPlayerActorIds.has(actor.id)
+            || (actor.localActorId ? localCharacterIds.has(actor.localActorId) : false);
+        const ownSnapshots = snapshot.partyActors.filter(isOwnActorSnapshot);
+        const remoteSnapshots = snapshot.partyActors.filter((actor) => !isOwnActorSnapshot(actor));
         const ownByLocalId = new Map(ownSnapshots.map((actor) => [actor.localActorId ?? actor.id, actor]));
         const nextLocalActors: FieldActor[] = [];
 
@@ -833,10 +848,13 @@ export class WorldEngine {
         this.activeTurnActorId = controlled && ownReady.includes(controlled.id)
             ? controlled.id
             : ownReady[0] ?? null;
+        const activeTurnSnapshot = this.activeTurnActorId
+            ? ownSnapshots.find((actor) => actor.id === this.activeTurnActorId)
+            : undefined;
         this.remainingActionPoints = this.activeTurnActorId
             ? this.resolveSnapshotRemainingGauge(
-                snapshot.remainingApByActor[this.activeTurnActorId] ?? 0,
-                ownSnapshots.find((actor) => actor.id === this.activeTurnActorId)?.actionGauge ?? 0
+                activeTurnSnapshot?.remainingAp ?? snapshot.remainingApByActor[this.activeTurnActorId] ?? 0,
+                activeTurnSnapshot?.actionGauge ?? 0
             )
             : 0;
         this.majorActionUsedThisTurn = this.activeTurnActorId
@@ -903,7 +921,7 @@ export class WorldEngine {
             placed.durability = itemSnapshot.durability;
             placed.quantity = itemSnapshot.quantity;
             placed.acquiredInRaid = itemSnapshot.acquiredInRaid;
-            placed.sockets = itemSnapshot.sockets?.flatMap((itemId) => {
+            placed.sockets = (itemSnapshot.sockets ?? []).flatMap((itemId) => {
                 const socket = getItemDef(itemId);
                 return socket ? [socket] : [];
             });
@@ -946,6 +964,9 @@ export class WorldEngine {
     }
 
     private handleNetworkActionRejected(rejection: ActionRejectedMessage): void {
+        const rejectedMoveActorId = this.pendingNetworkMoveReopen?.intentId === rejection.intentId
+            ? this.pendingNetworkMoveReopen.actorId
+            : null;
         if (this.pendingNetworkMoveReopen?.intentId === rejection.intentId) {
             this.pendingNetworkMoveReopen = null;
         }
@@ -957,12 +978,22 @@ export class WorldEngine {
             return;
         }
         this.addCombatLog(`서버 거부: ${rejection.reason}`);
+        if (!rejectedMoveActorId) return;
+        const actor = this.partyActors.find((entry) => entry.id === rejectedMoveActorId);
+        if (!actor || actor.id !== this.activeTurnActorId) return;
+        if (this.remainingActionPoints < MIN_FIELD_ACTION_GAUGE_COST) return;
+        if (this.actionMenuUI.getIsOpen()) return;
+        if (this.playerActionController.getMode() !== null) return;
+        if (this.playerActionController.hasExecutableAction(actor)) this.reopenActionMenu(actor);
     }
 
     private purgeStaleLootPicks(): void {
         const now = Date.now();
-        for (const [intentId, pick] of this.pendingLootPicks) {
-            if (now - pick.at > 10_000) this.pendingLootPicks.delete(intentId);
+        for (const pick of this.pendingLootPicks.values()) {
+            if (now - pick.at > 10_000 && !pick.timedOut) {
+                pick.timedOut = true;
+                this.addCombatLog('전리품 획득 응답 지연: 서버 응답을 기다리는 중입니다.');
+            }
         }
     }
 
@@ -1089,10 +1120,16 @@ export class WorldEngine {
             this.dismissedDungeonVisitKey = null;
             return;
         }
-        if (dungeon.id !== BURGOS_CASTLE_DUNGEON_ID) return;
+        const storyQuest = getStoryQuestByDungeonId(dungeon.id);
+        if (!storyQuest) return;
 
         const key = this.getCurrentDungeonVisitKey(dungeon);
         if (!key || this.dismissedDungeonVisitKey === key) return;
+        if (!isStoryQuestAvailable(storyQuest, this.playerData)) {
+            this.addCombatLog(t('story.dungeonLockedLog'));
+            this.dismissedDungeonVisitKey = key;
+            return;
+        }
         if (this.raidSession.activeDungeonId) {
             this.dismissedDungeonVisitKey = key;
             return;
@@ -1105,15 +1142,18 @@ export class WorldEngine {
 
         const hostileActive = this.fieldEnemies.some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro);
         if (hostileActive) {
-            this.addCombatLog('주변 전투를 정리해야 부르고스성에 들어갈 수 있습니다.');
+            this.addCombatLog(`${dungeon.nameKr}에 들어가려면 주변 전투를 정리해야 합니다.`);
             this.dismissedDungeonVisitKey = key;
             return;
         }
 
-        this.enterBurgosCastle(dungeon);
+        this.enterStoryDungeon(dungeon);
     }
 
-    private enterBurgosCastle(dungeon: WorldDungeonInfo): void {
+    private enterStoryDungeon(dungeon: WorldDungeonInfo): void {
+        const storyQuest = getStoryQuestByDungeonId(dungeon.id);
+        if (!storyQuest) return;
+
         this.closeFieldOverlays();
         this.clearFieldTurnState();
         this.fieldEnemies = [];
@@ -1125,12 +1165,27 @@ export class WorldEngine {
         this.player = this.getControlledActor()?.entity ?? this.player;
         this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
 
-        const content = this.fieldSpawnController.createBurgosCastleEncounter(entrance);
+        const content = this.createStoryDungeonEncounter(dungeon.id, entrance);
         this.fieldEnemies = content.enemies;
         this.worldMap.loot = content.loot;
         this.clearFieldTurnState();
         this.dismissedDungeonVisitKey = this.getCurrentDungeonVisitKey(dungeon);
-        this.addCombatLog(t('story.ep01.enterDungeonLog'));
+        if (storyQuest.bgmKey) AudioManager.playBgm(storyQuest.bgmKey, { fadeMs: 400 });
+        this.addCombatLog(t(storyQuest.enterLogKey));
+    }
+
+    private createStoryDungeonEncounter(dungeonId: string, entrance: { x: number; y: number }) {
+        if (dungeonId === BURGOS_CASTLE_DUNGEON_ID) {
+            return this.fieldSpawnController.createBurgosCastleEncounter(entrance);
+        }
+        if (dungeonId === ZAMORA_FORTRESS_DUNGEON_ID) {
+            return this.fieldSpawnController.createZamoraFortressEncounter(entrance);
+        }
+        const scenario = getStoryScenarioByDungeonId(dungeonId);
+        if (scenario) {
+            return this.fieldSpawnController.createStoryScenarioEncounter(scenario, entrance);
+        }
+        return { enemies: [], loot: [] };
     }
 
     private openFusionTemple(): void {
@@ -1467,13 +1522,14 @@ export class WorldEngine {
     }
 
     private completeDungeonIfBossDefeated(enemy: Enemy): void {
-        if (!enemy.isBoss || this.raidSession.activeDungeonId !== BURGOS_CASTLE_DUNGEON_ID) return;
-        this.raidSession.completeDungeonEncounter(BURGOS_CASTLE_DUNGEON_ID);
+        const dungeonId = this.raidSession.activeDungeonId;
+        const storyQuest = dungeonId ? getStoryQuestByDungeonId(dungeonId) : null;
+        if (!enemy.isBoss || !dungeonId || !storyQuest) return;
+        this.raidSession.completeDungeonEncounter(dungeonId);
         this.fieldEnemies = [];
-        this.worldMap.loot = this.worldMap.loot.filter((loot) => loot.id === `corpse_${enemy.id}`);
         this.selectionController.clear();
         this.clearFieldTurnState();
-        this.addCombatLog(t('story.ep01.objectiveCompleteLog'));
+        this.addCombatLog(t(storyQuest.objectiveCompleteLogKey));
     }
 
     private awardDefeatExp(actor: FieldActor, enemy: Enemy): void {
@@ -1895,6 +1951,9 @@ export class WorldEngine {
     }
 
     private getSpendableActionGauge(): number {
+        if (this.activeTurnActorId && this.isNetworkRaid) {
+            return Math.max(0, Math.floor(this.remainingActionPoints));
+        }
         const actor = this.getActivePartyTurnActor();
         if (!actor) return this.remainingActionPoints;
         return Math.max(this.remainingActionPoints, Math.floor(actor.entity.actionGauge));

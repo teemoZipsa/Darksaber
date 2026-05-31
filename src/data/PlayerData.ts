@@ -27,6 +27,7 @@ export interface SaveData {
     gold: number;
     clearedStages: string[];
     questItems?: string[];
+    storyCompanions?: string[];
     marketState?: MarketState;
     marketCycle?: number;
     marketContracts?: MarketContract[];
@@ -52,6 +53,7 @@ export class PlayerData {
     public gold: number = 500;  // Starting gold
     public clearedStages: Set<string> = new Set();
     public questItems: Set<string> = new Set();
+    public storyCompanions: Set<string> = new Set();
     public marketState: MarketState = createDefaultMarketState();
     public marketCycle: number = 0;
     public marketContracts: MarketContract[] = [];
@@ -94,6 +96,14 @@ export class PlayerData {
         return this.questItems.has(itemId);
     }
 
+    public addStoryCompanion(companionId: string): void {
+        this.storyCompanions.add(companionId);
+    }
+
+    public hasStoryCompanion(companionId: string): boolean {
+        return this.storyCompanions.has(companionId);
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  Save / Load (localStorage for now, Firebase later)
     // ═══════════════════════════════════════════════════════════
@@ -103,6 +113,7 @@ export class PlayerData {
             gold: this.gold,
             clearedStages: Array.from(this.clearedStages),
             questItems: Array.from(this.questItems),
+            storyCompanions: Array.from(this.storyCompanions),
             marketState: this.marketState,
             marketCycle: this.marketCycle,
             marketContracts: this.marketContracts,
@@ -127,6 +138,7 @@ export class PlayerData {
             this.gold = normalizeLoadedGold(data.gold);
             this.clearedStages = new Set(normalizeStringArray(data.clearedStages));
             this.questItems = new Set(normalizeStringArray(data.questItems));
+            this.storyCompanions = new Set(normalizeStringArray(data.storyCompanions));
             this.marketState = normalizeMarketState(data.marketState);
             this.marketCycle = normalizeMarketCycle(data.marketCycle);
             this.marketContracts = normalizeMarketContracts(data.marketContracts, this.marketCycle);

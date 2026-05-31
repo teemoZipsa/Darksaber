@@ -7,9 +7,12 @@ import {
     GENERAL_MONSTER_IDS,
     MONSTER_ROW_BY_FACING,
     MONSTER_SPRITE_PATH,
+    ZAMORA_FENRIS_BOSS_MONSTER_ID,
+    ZAMORA_GUARD_MONSTER_ID,
     getMonsterDefinition,
     type MonsterId,
 } from '../../data/MonsterCatalog';
+import type { StoryScenarioDefinition } from '../../data/StoryScenarioData';
 import { Enemy } from '../../entity/Enemy';
 import { LootObject } from '../../entity/LootObject';
 import { Player } from '../../entity/Player';
@@ -210,6 +213,69 @@ export class WorldFieldSpawnController {
         return { enemies, loot: [] };
     }
 
+    public createZamoraFortressEncounter(anchor: TilePoint): StarterFieldContent {
+        const seeds: CatalogEnemySeed[] = [
+            { monsterId: ZAMORA_FENRIS_BOSS_MONSTER_ID, offset: { x: 0, y: 0 } },
+            { monsterId: ZAMORA_GUARD_MONSTER_ID, offset: { x: -2, y: -2 } },
+            { monsterId: ZAMORA_GUARD_MONSTER_ID, offset: { x: 2, y: -2 } },
+            { monsterId: ZAMORA_GUARD_MONSTER_ID, offset: { x: 2, y: 2 } },
+            { monsterId: ZAMORA_GUARD_MONSTER_ID, offset: { x: -2, y: 2 } },
+        ];
+        let guardIndex = 0;
+        const enemies = seeds.map((seed) => {
+            const id = seed.monsterId === ZAMORA_FENRIS_BOSS_MONSTER_ID ? 'zamora_fenris' : `zamora_guard_${guardIndex++}`;
+            return this.createEnemy(seed, anchor, id);
+        });
+        return { enemies, loot: [] };
+    }
+
+    public createStoryScenarioEncounter(scenario: StoryScenarioDefinition, anchor: TilePoint): StarterFieldContent {
+        const bossSeed: CustomEnemySeed = {
+            offset: { x: 0, y: 0 },
+            name: scenario.bossName ?? '나이아두',
+            level: scenario.bossLevel,
+            color: scenario.bossColor,
+            role: 'boss',
+            aggroRange: 9,
+        };
+        const guardRoles: EnemyRole[] = ['bruiser', 'tank', 'archer', 'support', 'healer', 'coward'];
+        const guardNames = scenario.episode === 17 ? ['단그', '나이아두 변종'] : [
+            `${scenario.dungeonNameKr} 수비병`,
+            `${scenario.dungeonNameKr} 추격병`,
+            `${scenario.dungeonNameKr} 사수`,
+            `${scenario.dungeonNameKr} 주술사`,
+            `${scenario.dungeonNameKr} 파수병`,
+            `${scenario.dungeonNameKr} 정찰병`,
+        ];
+        const ringOffsets: TilePoint[] = [
+            { x: -3, y: -2 },
+            { x: 3, y: -2 },
+            { x: -3, y: 2 },
+            { x: 3, y: 2 },
+            { x: 0, y: -4 },
+            { x: 0, y: 4 },
+            { x: -5, y: 0 },
+            { x: 5, y: 0 },
+            { x: -5, y: -4 },
+            { x: 5, y: 4 },
+        ];
+        const guardSeeds: CustomEnemySeed[] = ringOffsets.slice(0, scenario.guardCount).map((offset, index) => ({
+            offset,
+            name: guardNames[index % guardNames.length],
+            level: scenario.guardLevel + Math.floor(index / 4),
+            color: shiftColor(scenario.bossColor, index),
+            role: guardRoles[index % guardRoles.length],
+            aggroRange: 6,
+        }));
+        const enemies = [bossSeed, ...guardSeeds].map((seed, index) => {
+            const id = index === 0
+                ? `${scenario.dungeonId}_objective`
+                : `${scenario.dungeonId}_guard_${index}`;
+            return this.createEnemy(seed, anchor, id);
+        });
+        return { enemies, loot: [] };
+    }
+
     private createEnemy(seed: EnemySeed, anchor: TilePoint | Player, id: string): FieldEnemy {
         const anchorTile = 'gridX' in anchor
             ? { x: anchor.gridX, y: anchor.gridY }
@@ -240,6 +306,16 @@ export class WorldFieldSpawnController {
         );
         return enemy;
     }
+}
+
+function shiftColor(hex: string, index: number): string {
+    const value = Number.parseInt(hex.replace('#', ''), 16);
+    const r = (value >> 16) & 0xff;
+    const g = (value >> 8) & 0xff;
+    const b = value & 0xff;
+    const delta = (index % 3) * 18 - 18;
+    const clamp = (v: number) => Math.max(32, Math.min(230, v + delta));
+    return `#${[clamp(r), clamp(g), clamp(b)].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
 if (MORTAL_REALM_ENEMY_SEEDS.length !== GENERAL_MONSTER_IDS.length) {

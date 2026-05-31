@@ -11,6 +11,9 @@ import {
     MONSTER_DEFINITIONS,
     MONSTER_ROW_BY_FACING,
     MONSTER_SPRITE_PATH,
+    ZAMORA_FENRIS_BOSS_MONSTER_ID,
+    ZAMORA_FORTRESS_DUNGEON_ID,
+    ZAMORA_GUARD_MONSTER_ID,
     getMonsterDefinition,
 } from '../../src/data/MonsterCatalog';
 import { getItemDef } from '../../src/data/ItemDB';
@@ -45,7 +48,7 @@ function makePassthroughMovement(): WorldMovementController {
     } as unknown as WorldMovementController;
 }
 
-test('monster catalog includes 16 general monsters and the Burgos wolf boss sprites', () => {
+test('monster catalog includes 16 general monsters and story boss sprites', () => {
     assert.equal(GENERAL_MONSTER_IDS.length, 16);
     assert.equal(new Set(GENERAL_MONSTER_IDS).size, 16);
 
@@ -62,6 +65,13 @@ test('monster catalog includes 16 general monsters and the Burgos wolf boss spri
     assert.equal(boss.frameSize, 32);
     assert.ok(existsSync(join(process.cwd(), ...MONSTER_PUBLIC_PATH, boss.sprite)));
 
+    const fenris = getMonsterDefinition(ZAMORA_FENRIS_BOSS_MONSTER_ID);
+    assert.equal(fenris.name, '펜리스');
+    assert.equal(fenris.role, 'boss');
+    assert.equal(fenris.level, 4);
+    assert.equal(fenris.sprite, '435R.png');
+    assert.ok(existsSync(join(process.cwd(), ...MONSTER_PUBLIC_PATH, fenris.sprite)));
+
     const legacyBoss = getMonsterDefinition(BURGOS_LEGACY_BOSS_MONSTER_ID);
     assert.equal(legacyBoss.frameSize, 64);
     assert.ok(existsSync(join(process.cwd(), ...MONSTER_PUBLIC_PATH, legacyBoss.sprite)));
@@ -76,6 +86,23 @@ test('Burgos Castle is a world-map dungeon entrance landmark', () => {
     assert.equal(world.getDungeonAtTile(entrance.x, entrance.y)?.id, BURGOS_CASTLE_DUNGEON_ID);
     assert.equal(world.getTileAt(entrance.x, entrance.y), TileType.DUNGEON_ENTRANCE);
     assert.ok(world.getMapLandmarks().some((landmark) => landmark.kind === 'dungeon' && landmark.label === '부르고스성'));
+});
+
+test('Zamora Fortress is northwest of Burgos Castle on the world map', () => {
+    const world = new WorldMap();
+    const burgos = world.getDungeons().find((candidate) => candidate.id === BURGOS_CASTLE_DUNGEON_ID);
+    const zamora = world.getDungeons().find((candidate) => candidate.id === ZAMORA_FORTRESS_DUNGEON_ID);
+    assert.ok(burgos);
+    assert.ok(zamora);
+    assert.equal(zamora.chunkX, 34);
+    assert.equal(zamora.chunkY, 32);
+    assert.ok(zamora.chunkX < burgos.chunkX);
+    assert.ok(zamora.chunkY < burgos.chunkY);
+
+    const entrance = world.getDungeonEntranceTile(zamora);
+    assert.equal(world.getDungeonAtTile(entrance.x, entrance.y)?.id, ZAMORA_FORTRESS_DUNGEON_ID);
+    assert.equal(world.getTileAt(entrance.x, entrance.y), TileType.DUNGEON_ENTRANCE);
+    assert.ok(world.getMapLandmarks().some((landmark) => landmark.kind === 'dungeon' && landmark.label === '자모라 요새'));
 });
 
 test('Burgos Castle uses the original 01hmap footprint around its entrance', () => {
@@ -154,6 +181,26 @@ test('Burgos boss corpse loot includes a guaranteed rune', () => {
 
     assert.equal(engine.worldMap.loot.length, 1);
     assert.ok(engine.worldMap.loot[0].inventory.items.some((placed: { item: { slot: string } }) => placed.item.slot === 'rune'));
+});
+
+test('Zamora Fortress encounter spawns Fenris center and four skeleton guards', () => {
+    const spawner = new WorldFieldSpawnController(makePassthroughMovement());
+    const content = spawner.createZamoraFortressEncounter({ x: 100, y: 100 });
+    assert.equal(content.enemies.length, 5);
+    assert.equal(content.loot.length, 0);
+
+    const boss = content.enemies.find((entry) => entry.enemy.isBoss)?.enemy;
+    assert.ok(boss);
+    assert.equal(boss.name, getMonsterDefinition(ZAMORA_FENRIS_BOSS_MONSTER_ID).name);
+    assert.deepEqual({ x: boss.gridX, y: boss.gridY }, { x: 100, y: 100 });
+    assert.equal(boss.walkSprite?.frameWidth, 32);
+
+    const guardName = getMonsterDefinition(ZAMORA_GUARD_MONSTER_ID).name;
+    const guardPositions = content.enemies
+        .filter((entry) => entry.enemy.name === guardName)
+        .map((entry) => `${entry.enemy.gridX - 100},${entry.enemy.gridY - 100}`)
+        .sort();
+    assert.deepEqual(guardPositions, ['-2,-2', '-2,2', '2,-2', '2,2']);
 });
 
 test('normal enemy loot is auto-collected into the backpack', () => {
@@ -259,7 +306,7 @@ test('Burgos boss defeat clears only the dungeon encounter, not raid success', (
         { enemy: boss, home: { x: boss.gridX, y: boss.gridY }, path: [] },
         { enemy: guard, home: { x: guard.gridX, y: guard.gridY }, path: [] },
     ];
-    engine.worldMap = { loot: [{ id: 'corpse_burgos_boss' }] };
+    engine.worldMap = { loot: [{ id: 'preexisting_loot' }, { id: 'corpse_burgos_boss' }] };
     engine.selectionController = { clear: () => { selectionCleared = true; } };
     engine.clearFieldTurnState = () => { turnStateCleared = true; };
     engine.raidOutcomeController = { completeSuccess: () => { raidSuccessShown = true; } };
@@ -271,9 +318,46 @@ test('Burgos boss defeat clears only the dungeon encounter, not raid success', (
     assert.equal(raidSession.activeDungeonId, null);
     assert.equal(raidSession.isDungeonCleared(BURGOS_CASTLE_DUNGEON_ID), true);
     assert.deepEqual(engine.fieldEnemies, []);
-    assert.deepEqual(engine.worldMap.loot, [{ id: 'corpse_burgos_boss' }]);
+    assert.deepEqual(engine.worldMap.loot, [{ id: 'preexisting_loot' }, { id: 'corpse_burgos_boss' }]);
     assert.equal(selectionCleared, true);
     assert.equal(turnStateCleared, true);
     assert.equal(raidSuccessShown, false);
     assert.ok(logs.includes('부르고스성 목표 달성. 다른 마을로 생환하면 1화가 완료됩니다.'));
+});
+
+test('Zamora Fenris defeat clears only the dungeon encounter, not raid success', () => {
+    const bossDef = getMonsterDefinition(ZAMORA_FENRIS_BOSS_MONSTER_ID);
+    const boss = new Enemy('zamora_fenris', 100, 100, bossDef.name, bossDef.level, bossDef.color, bossDef.role);
+    const guard = new Enemy('zamora_guard_0', 98, 98, '스켈레톤 전사', 2, '#d8c8e8', 'bruiser');
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    raidSession.startDungeonEncounter(ZAMORA_FORTRESS_DUNGEON_ID);
+
+    let selectionCleared = false;
+    let turnStateCleared = false;
+    let raidSuccessShown = false;
+    const logs: string[] = [];
+    const engine = Object.create(WorldEngine.prototype) as any;
+    engine.raidSession = raidSession;
+    engine.fieldEnemies = [
+        { enemy: boss, home: { x: boss.gridX, y: boss.gridY }, path: [] },
+        { enemy: guard, home: { x: guard.gridX, y: guard.gridY }, path: [] },
+    ];
+    engine.worldMap = { loot: [{ id: 'preexisting_loot' }, { id: 'corpse_zamora_fenris' }] };
+    engine.selectionController = { clear: () => { selectionCleared = true; } };
+    engine.clearFieldTurnState = () => { turnStateCleared = true; };
+    engine.raidOutcomeController = { completeSuccess: () => { raidSuccessShown = true; } };
+    engine.addCombatLog = (message: string) => logs.push(message);
+
+    engine.completeDungeonIfBossDefeated(boss);
+
+    assert.equal(raidSession.active, true);
+    assert.equal(raidSession.activeDungeonId, null);
+    assert.equal(raidSession.isDungeonCleared(ZAMORA_FORTRESS_DUNGEON_ID), true);
+    assert.deepEqual(engine.fieldEnemies, []);
+    assert.deepEqual(engine.worldMap.loot, [{ id: 'preexisting_loot' }, { id: 'corpse_zamora_fenris' }]);
+    assert.equal(selectionCleared, true);
+    assert.equal(turnStateCleared, true);
+    assert.equal(raidSuccessShown, false);
+    assert.ok(logs.includes('자모라 요새 목표 달성. 다른 마을로 생환하면 2화가 완료됩니다.'));
 });

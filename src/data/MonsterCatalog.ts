@@ -27,6 +27,9 @@ export const BURGOS_CASTLE_DUNGEON_ID = 'burgos_castle';
 export const BURGOS_BOSS_MONSTER_ID = 'burgos_wolf_boss';
 export const BURGOS_LEGACY_BOSS_MONSTER_ID = '701R';
 export const BURGOS_GUARD_MONSTER_ID = '303R';
+export const ZAMORA_FORTRESS_DUNGEON_ID = 'zamora_fortress';
+export const ZAMORA_FENRIS_BOSS_MONSTER_ID = 'zamora_fenris_boss';
+export const ZAMORA_GUARD_MONSTER_ID = '434R';
 
 export const GENERAL_MONSTER_IDS = [
     '302R',
@@ -47,7 +50,7 @@ export const GENERAL_MONSTER_IDS = [
     '435R',
 ] as const;
 
-export const MONSTER_IDS = [...GENERAL_MONSTER_IDS, BURGOS_BOSS_MONSTER_ID, BURGOS_LEGACY_BOSS_MONSTER_ID] as const;
+export const MONSTER_IDS = [...GENERAL_MONSTER_IDS, BURGOS_BOSS_MONSTER_ID, ZAMORA_FENRIS_BOSS_MONSTER_ID, BURGOS_LEGACY_BOSS_MONSTER_ID] as const;
 export type MonsterId = typeof MONSTER_IDS[number];
 
 const commonFrame = {
@@ -257,6 +260,18 @@ export const MONSTER_DEFINITIONS: Record<MonsterId, MonsterDefinition> = {
         color: '#6676d8',
         frameSize: 32,
         renderScale: 1.75,
+        aggroRange: 9,
+        ...commonFrame,
+    },
+    'zamora_fenris_boss': {
+        id: 'zamora_fenris_boss',
+        name: '펜리스',
+        sprite: '435R.png',
+        role: 'boss',
+        level: 4,
+        color: '#5f70df',
+        frameSize: 32,
+        renderScale: 1.65,
         aggroRange: 9,
         ...commonFrame,
     },

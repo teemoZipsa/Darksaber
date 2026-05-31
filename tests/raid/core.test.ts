@@ -527,6 +527,7 @@ test('pending rest menu id persists through PlayerData save and load', () => {
         player.currentHubTownId = 'w_forest_village';
         player.pendingRestMenuId = 'hearty_breakfast';
         player.addQuestItem('quest_bomb');
+        player.addStoryCompanion('story_cleric_ep02');
         player.save();
 
         const loaded = new PlayerData();
@@ -536,6 +537,7 @@ test('pending rest menu id persists through PlayerData save and load', () => {
         assert.equal(loaded.currentHubTownId, 'w_forest_village');
         assert.equal(loaded.pendingRestMenuId, 'hearty_breakfast');
         assert.equal(loaded.hasQuestItem('quest_bomb'), true);
+        assert.equal(loaded.hasStoryCompanion('story_cleric_ep02'), true);
     } finally {
         globalThis.localStorage = previousStorage;
     }

@@ -1,7 +1,8 @@
 import type { PartyManager } from '../../character/PartyManager';
+import { Character } from '../../character/Character';
 import { getItemDef } from '../../data/ItemDB';
 import type { PlayerData } from '../../data/PlayerData';
-import { STORY_QUESTS } from '../../data/StoryQuestData';
+import { STORY_QUESTS, type StoryQuestReward } from '../../data/StoryQuestData';
 import { t } from '../../i18n/LanguageManager';
 import type { TownInfo } from '../../map/BiomeMask';
 import {
@@ -148,15 +149,46 @@ export class WorldRaidOutcomeController {
             if (this.context.playerData.isCleared(quest.id)) continue;
 
             this.context.playerData.markCleared(quest.id);
-            if (!this.context.playerData.hasQuestItem(quest.rewardItemId)) {
-                this.context.playerData.addQuestItem(quest.rewardItemId);
-            }
-
-            const rewardItem = getItemDef(quest.rewardItemId);
             rewards.push(`${t('quest.completed')}: ${t(quest.titleKey)}`);
-            rewards.push(`${t('quest.rewardItem')}: ${rewardItem?.nameKr ?? quest.rewardItemId}`);
+            rewards.push(this.grantStoryQuestReward(quest.reward));
         }
         return rewards;
+    }
+
+    private grantStoryQuestReward(reward: StoryQuestReward): string {
+        if (reward.type === 'none') {
+            return t('quest.rewardNone');
+        }
+
+        if (reward.type === 'bundle') {
+            return reward.rewards.map((entry) => this.grantStoryQuestReward(entry)).join(' / ');
+        }
+
+        if (reward.type === 'questItem') {
+            if (!this.context.playerData.hasQuestItem(reward.itemId)) {
+                this.context.playerData.addQuestItem(reward.itemId);
+            }
+            const rewardItem = getItemDef(reward.itemId);
+            return `${t('quest.rewardItem')}: ${rewardItem?.nameKr ?? reward.itemId}`;
+        }
+
+        if (reward.type === 'inventoryItem') {
+            if (!this.context.playerData.hasQuestItem(reward.itemId)) {
+                this.context.playerData.addQuestItem(reward.itemId);
+                const rewardItem = getItemDef(reward.itemId);
+                if (rewardItem) this.context.gameManager.inventory.autoPlace(rewardItem);
+            }
+            const rewardItem = getItemDef(reward.itemId);
+            return `${t('quest.rewardItem')}: ${rewardItem?.nameKr ?? reward.itemId}`;
+        }
+
+        if (!this.context.playerData.hasStoryCompanion(reward.companionId)) {
+            this.context.playerData.addStoryCompanion(reward.companionId);
+        }
+        if (!this.context.party.getRoster().some((character) => character.id === reward.companionId)) {
+            this.context.party.addToRoster(new Character(reward.companionId, t(reward.nameKey), reward.classId));
+        }
+        return `${t('quest.rewardCompanion')}: ${t(reward.nameKey)}`;
     }
 
     private showRaidResult(outcome: RaidOutcome, nextTown: TownInfo): void {

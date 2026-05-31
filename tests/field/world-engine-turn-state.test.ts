@@ -6,6 +6,7 @@ import { Player } from '../../src/entity/Player';
 import { getActionApCost } from '../../src/field/FieldActionEconomy';
 import type { FieldActor } from '../../src/field/FieldTypes';
 import { WorldEngine } from '../../src/engine/WorldEngine';
+import type { ActorSnapshot, GridSnapshot, WorldSnapshot } from '../../src/net/WorldProtocol';
 
 class ImageStub {
     public src = '';
@@ -37,7 +38,16 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
     engine.restingRecoveryTimers = new Map();
     engine.partyActors = [actor];
     engine.fieldEnemies = [];
+    engine.remotePartyActors = new Map();
+    engine.pendingLootPicks = new Map();
+    engine.raidSession = { elapsedSeconds: 0 };
+    engine.party = {
+        getCharacters: () => [actor.character],
+        getActiveIndex: () => 0,
+    };
+    engine.worldMap = { loot: [] };
     engine.combatLog = [];
+    engine.addCombatLog = (message: string) => engine.combatLog.push(message);
     engine.actionMenuUI = {
         close: () => calls.push('closeActionMenu'),
         getIsOpen: () => false,
@@ -51,8 +61,28 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
         clearTargeting: () => calls.push('clearTargeting'),
     };
     engine.magicController = { reset: () => calls.push('resetMagic') };
-    engine.selectionController = { selectActor: () => calls.push('selectActor') };
+    engine.selectionController = {
+        hasSelection: () => false,
+        selectActor: () => calls.push('selectActor'),
+    };
     return { engine, calls };
+}
+
+function makeActorSnapshot(overrides: Partial<ActorSnapshot> = {}): ActorSnapshot {
+    return {
+        id: 'server-hero',
+        name: 'hero',
+        classLineId: 'infantry',
+        level: 1,
+        tile: { x: 3, y: 4 },
+        stats: new Character('snapshot-hero', 'hero', 'infantry').stats,
+        statuses: [],
+        actionGauge: 100,
+        remainingAp: 20,
+        facing: 'down',
+        isDead: false,
+        ...overrides,
+    };
 }
 
 test('active actor turn ends instead of reopening when counter damage downs the actor', () => {
@@ -113,6 +143,19 @@ test('spending AP falls back to active actor gauge when remaining turn gauge is 
     assert.equal(actor.entity.actionGauge, 80);
 });
 
+test('network raid AP uses server remaining points instead of local actor gauge', () => {
+    const actor = makeActor('hero');
+    actor.entity.actionGauge = 100;
+    const { engine } = makeEngineHarness(actor);
+    engine.isNetworkRaid = true;
+    engine.remainingActionPoints = 20;
+
+    assert.equal(engine.getSpendableActionGauge(), 20);
+    assert.equal(engine.spendAp(getActionApCost('move')), true);
+    assert.equal(engine.remainingActionPoints, 0);
+    assert.equal(actor.entity.actionGauge, 0);
+});
+
 test('network snapshot resolves zero remaining gauge from ready actor action gauge', () => {
     const actor = makeActor('hero');
     const { engine } = makeEngineHarness(actor);
@@ -120,6 +163,51 @@ test('network snapshot resolves zero remaining gauge from ready actor action gau
     assert.equal(engine.resolveSnapshotRemainingGauge(0, 100), 100);
     assert.equal(engine.resolveSnapshotRemainingGauge(0, 10), 0);
     assert.equal(engine.resolveSnapshotRemainingGauge(25, 80), 25);
+});
+
+test('network snapshot treats local player actorIds as owned and prefers actor remaining AP', () => {
+    const actor = makeActor('hero');
+    const { engine } = makeEngineHarness(actor);
+    engine.networkPlayerId = 'client-1';
+
+    const snapshot: WorldSnapshot = {
+        seq: 1,
+        serverTime: 1000,
+        players: [
+            {
+                playerId: 'client-1',
+                originHubId: 'central_castle',
+                isGhost: false,
+                actorIds: ['server-hero'],
+            },
+        ],
+        partyActors: [
+            makeActorSnapshot({
+                id: 'server-hero',
+                localActorId: actor.character.id,
+                remainingAp: 30,
+                actionGauge: 100,
+            }),
+        ],
+        enemies: [],
+        loot: [],
+        readyActors: ['server-hero'],
+        remainingApByActor: { 'server-hero': 99 },
+        raidTimer: {
+            active: true,
+            elapsedSeconds: 12,
+            limitSeconds: 900,
+            departureTownId: 'central_castle',
+        },
+    };
+
+    engine.applyNetworkSnapshot(snapshot);
+
+    assert.equal(engine.partyActors.length, 1);
+    assert.equal(engine.partyActors[0].id, 'server-hero');
+    assert.equal(engine.remotePartyActors.size, 0);
+    assert.equal(engine.activeTurnActorId, 'server-hero');
+    assert.equal(engine.remainingActionPoints, 30);
 });
 
 test('network move reopens the action menu when the server confirms the moved tile and ATB remains', () => {
@@ -132,6 +220,42 @@ test('network move reopens the action menu when the server confirms the moved ti
 
     assert.equal(engine.pendingNetworkMoveReopen, null);
     assert.ok(calls.includes('openActionMenu'));
+});
+
+test('network move rejection reopens the action menu when the actor can still act', () => {
+    const actor = makeActor('hero');
+    const { engine, calls } = makeEngineHarness(actor);
+    engine.remainingActionPoints = 80;
+    engine.pendingNetworkMoveReopen = { intentId: 'move-1', actorId: actor.id, tile: { x: 1, y: 0 } };
+
+    engine.handleNetworkActionRejected({ type: 'ACTION_REJECTED', intentId: 'move-1', reason: 'blocked' });
+
+    assert.equal(engine.pendingNetworkMoveReopen, null);
+    assert.ok(engine.combatLog.includes('서버 거부: blocked'));
+    assert.ok(calls.includes('openActionMenu'));
+});
+
+test('grid snapshot without sockets restores placed items with an empty socket list', () => {
+    const actor = makeActor('hero');
+    const { engine } = makeEngineHarness(actor);
+    const snapshot: GridSnapshot = {
+        width: 4,
+        height: 4,
+        items: [
+            {
+                itemId: 'short_sword',
+                gridX: 0,
+                gridY: 0,
+                durability: 12,
+                quantity: 1,
+            },
+        ],
+    };
+
+    const grid = engine.gridFromSnapshot(snapshot);
+
+    assert.equal(grid.items.length, 1);
+    assert.deepEqual(grid.items[0].sockets, []);
 });
 
 test('resting status recovers over time and clears at full resources', () => {

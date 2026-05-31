@@ -817,6 +817,19 @@ const RAW_ITEMS: RawItemDef[] = [
         sellable: false,
         itemCategory: 'material'
     },
+    {
+        id: 'quest_sacred_sword', name: 'Sacred Sword', nameKr: '보검',
+        slot: 'weapon', gridW: 1, gridH: 3, color: '#f0c050', icon: '*',
+        maxDurability: 1,
+        stats: { atk: 12, magAtk: 4, hitRate: 8 },
+        description: 'A class-free sacred blade recovered after clearing Etna Volcano. Its durability does not decrease.',
+        descriptionKr: '에트나 화산 클리어 후 획득하는 직업 제한 없는 보검. 내구도가 소모되지 않습니다.',
+        rarity: 'unique',
+        weight: 1.2,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'divine_weapon'
+    },
 
     // ─── Socket Inserts (Diablo II-style runes and gems) ──────
     ...SOCKET_INSERTS,

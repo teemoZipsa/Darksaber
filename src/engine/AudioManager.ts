@@ -14,6 +14,7 @@
  */
 
 import { SettingsManager } from './SettingsManager';
+import { renderMidiToAudioBuffer } from './MidiSynth';
 
 type Channel = 'bgm' | 'sfx' | 'ui';
 
@@ -79,6 +80,26 @@ export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = 
     'bgm.boss':    { src: '/assets/sounds/bgm/boss.ogg',    channel: 'bgm' },
     'bgm.victory': { src: '/assets/sounds/bgm/victory.ogg', channel: 'bgm' },
     'bgm.gameover':{ src: '/assets/sounds/bgm/gameover.ogg',channel: 'bgm' },
+    'bgm.story.episode01': { src: '/assets/sounds/bgm/story/01.mid', channel: 'bgm' },
+    'bgm.story.episode02': { src: '/assets/sounds/bgm/story/02.mid', channel: 'bgm' },
+    'bgm.story.episode03': { src: '/assets/sounds/bgm/story/03.mid', channel: 'bgm' },
+    'bgm.story.episode04': { src: '/assets/sounds/bgm/story/04.mid', channel: 'bgm' },
+    'bgm.story.episode05': { src: '/assets/sounds/bgm/story/05.mid', channel: 'bgm' },
+    'bgm.story.episode06': { src: '/assets/sounds/bgm/story/06.mid', channel: 'bgm' },
+    'bgm.story.episode07': { src: '/assets/sounds/bgm/story/07.mid', channel: 'bgm' },
+    'bgm.story.episode08': { src: '/assets/sounds/bgm/story/08.mid', channel: 'bgm' },
+    'bgm.story.episode09': { src: '/assets/sounds/bgm/story/09.mid', channel: 'bgm' },
+    'bgm.story.episode10': { src: '/assets/sounds/bgm/story/10.mid', channel: 'bgm' },
+    'bgm.story.episode11': { src: '/assets/sounds/bgm/story/11.mid', channel: 'bgm' },
+    'bgm.story.episode12': { src: '/assets/sounds/bgm/story/12.mid', channel: 'bgm' },
+    'bgm.story.episode13': { src: '/assets/sounds/bgm/story/13.mid', channel: 'bgm' },
+    'bgm.story.episode14': { src: '/assets/sounds/bgm/story/14.mid', channel: 'bgm' },
+    'bgm.story.episode15': { src: '/assets/sounds/bgm/story/15.mid', channel: 'bgm' },
+    'bgm.story.episode16': { src: '/assets/sounds/bgm/story/16.mid', channel: 'bgm' },
+    'bgm.story.episode17': { src: '/assets/sounds/bgm/story/17.mid', channel: 'bgm' },
+    'bgm.story.episode18': { src: '/assets/sounds/bgm/story/18.mid', channel: 'bgm' },
+    'bgm.story.episode19': { src: '/assets/sounds/bgm/story/19.mid', channel: 'bgm' },
+    'bgm.story.episode20': { src: '/assets/sounds/bgm/story/20.mid', channel: 'bgm' },
 };
 
 class AudioManagerClass {
@@ -295,7 +316,9 @@ class AudioManagerClass {
             const response = await fetch(cat.src);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const arr = await response.arrayBuffer();
-            entry.buffer = await this.ctx!.decodeAudioData(arr);
+            entry.buffer = this.isMidiSource(cat.src)
+                ? await renderMidiToAudioBuffer(this.ctx!, arr)
+                : await this.ctx!.decodeAudioData(arr);
         } catch {
             entry.missing = true;
             if (!this.warnedMissing.has(key)) {
@@ -305,6 +328,11 @@ class AudioManagerClass {
         } finally {
             entry.settled = true;
         }
+    }
+
+    private isMidiSource(src: string): boolean {
+        const lower = src.toLowerCase();
+        return lower.endsWith('.mid') || lower.endsWith('.midi');
     }
 }
 

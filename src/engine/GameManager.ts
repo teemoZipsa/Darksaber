@@ -14,6 +14,7 @@ import { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
 import { ITEMS } from '../data/ItemDB';
+import { getStoryCompanionRewards } from '../data/StoryQuestData';
 import { renderGameTitle } from '../ui/UITheme';
 import { t } from '../i18n/LanguageManager';
 import { InventoryUI } from '../inventory/InventoryUI';
@@ -78,6 +79,7 @@ export class GameManager {
         this.stash = new GridInventory(15, 10);
         this.playerData = new PlayerData();
         this.playerData.load();
+        this.syncStoryCompanionsToRoster();
 
         // Give starter items
         const sword = ITEMS.find(i => i.id === 'short_sword');
@@ -235,8 +237,18 @@ export class GameManager {
         this.party.addToRoster(char);
         this.party.deployCharacter(char);
         this.party.switchTo(0);
+        this.syncStoryCompanionsToRoster();
         this.inventoryUI.setActiveCharacter(char);
         this.transitionTo(GameState.WORLD, () => this.initWorldEngine());
+    }
+
+    public syncStoryCompanionsToRoster(): void {
+        const roster = this.party.getRoster();
+        for (const companion of getStoryCompanionRewards()) {
+            if (!this.playerData.hasStoryCompanion(companion.companionId)) continue;
+            if (roster.some((character) => character.id === companion.companionId)) continue;
+            this.party.addToRoster(new Character(companion.companionId, t(companion.nameKey), companion.classId));
+        }
     }
 
     // ─── Pause menu (DOM overlay) ─────────────────────────────────
