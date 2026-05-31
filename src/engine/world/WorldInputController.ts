@@ -86,7 +86,7 @@ export class WorldInputController {
         this.context.magicController.updateHoverPreview(hoverTile);
 
         if (input.mouseJustDown && this.context.actionMenuUI.getIsOpen()) {
-            if (this.handleActionMenuClick(input, camera)) return;
+            if (this.handleActionMenuSlotClick(input, camera)) return;
         }
 
         if (this.isInputLockedByReservation()) return;
@@ -141,7 +141,13 @@ export class WorldInputController {
         }
 
         if (this.context.actionMenuUI.getIsOpen()) {
-            if (this.handleActionMenuClick(input, camera)) return;
+            if (this.handleActionMenuSlotClick(input, camera)) return;
+            if (hit.kind === 'party' && hit.party.id === this.context.getActiveTurnActorId()) {
+                this.context.selectionController.selectActor(hit.party.id);
+                return;
+            }
+            this.context.dismissActionMenuTurn();
+            return;
         }
 
         if (this.context.playerActionController.getMode()) {
@@ -175,17 +181,14 @@ export class WorldInputController {
         }
     }
 
-    private handleActionMenuClick(input: InputManager, camera: Camera): boolean {
+    private handleActionMenuSlotClick(input: InputManager, camera: Camera): boolean {
         const result = this.context.actionMenuUI.onClick(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
-        if (result) {
-            if (result.enabled) {
-                this.context.playerActionController.execute(result.type);
-            } else {
-                this.context.log(result.disabledReason ?? '지금 사용할 수 없는 행동입니다.');
-            }
-            return true;
+        if (!result) return false;
+        if (result.enabled) {
+            this.context.playerActionController.execute(result.type);
+        } else {
+            this.context.log(result.disabledReason ?? '지금 사용할 수 없는 행동입니다.');
         }
-        this.context.dismissActionMenuTurn();
         return true;
     }
 
