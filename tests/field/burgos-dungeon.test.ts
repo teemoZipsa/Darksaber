@@ -208,10 +208,14 @@ test('Zamora Fortress encounter spawns Fenris center and four skeleton guards', 
 test('story scenario encounters include original named monsters and special objectives', () => {
     const spawner = new WorldFieldSpawnController(makePassthroughMovement());
     const pyramidFront = getStoryScenarioByDungeonId('pyramid_front');
+    const pyramidInside = getStoryScenarioByDungeonId('pyramid_inside');
+    const skeria = getStoryScenarioByDungeonId('skeria');
     const airship = getStoryScenarioByDungeonId('airship');
     const amentGate = getStoryScenarioByDungeonId('ament_gate');
     const amentFirst = getStoryScenarioByDungeonId('ament_1f');
     assert.ok(pyramidFront);
+    assert.ok(pyramidInside);
+    assert.ok(skeria);
     assert.ok(airship);
     assert.ok(amentGate);
     assert.ok(amentFirst);
@@ -221,6 +225,17 @@ test('story scenario encounters include original named monsters and special obje
     assert.ok(pyramidNames.includes('키스라 Lv2'));
     assert.ok(pyramidNames.includes('펜리스 Lv2'));
     assert.ok(pyramidNames.includes('가노마스 Lv2'));
+
+    const pyramidInsideNames = spawner.createStoryScenarioEncounter(pyramidInside, { x: 100, y: 100 })
+        .enemies.map((entry) => entry.enemy.name);
+    assert.ok(pyramidInsideNames.includes('안피스베냐'));
+    assert.ok(pyramidInsideNames.includes('가노마스'));
+
+    const skeriaNames = spawner.createStoryScenarioEncounter(skeria, { x: 100, y: 100 })
+        .enemies.map((entry) => entry.enemy.name);
+    assert.ok(skeriaNames.includes('나이아드 Lv2'));
+    assert.ok(skeriaNames.includes('카론 Lv2'));
+    assert.ok(skeriaNames.includes('단구 Lv2'));
 
     const airshipContent = spawner.createStoryScenarioEncounter(airship, { x: 100, y: 100 });
     assert.equal(airshipContent.enemies.some((entry) => entry.enemy.isBoss), false);
