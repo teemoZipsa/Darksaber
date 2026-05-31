@@ -623,12 +623,30 @@ export class WorldEngine {
             this.isNetworkRaid = false;
             this.networkPlayerId = null;
             this.closeNetworkRaidClient(false);
-            this.currentPhase = 'town';
-            this.openTown(town);
             this.addCombatLog(`월드 서버 접속 실패: ${error instanceof Error ? error.message : 'unknown error'}`);
+            this.beginLocalRaidFromTown(town);
         } finally {
             this.isNetworkRaidConnecting = false;
         }
+    }
+
+    private beginLocalRaidFromTown(town: TownInfo): void {
+        this.townSession.hide();
+        this.closeFieldOverlays();
+        this.currentPhase = 'raid';
+        this.raidSession.beginRaidFromTown(town.id);
+        this.dismissedDungeonVisitKey = null;
+        this.party.resetForNewRaid();
+        this.townSession.applyPendingRestForRaidStart();
+        this.remotePartyActors.clear();
+        this.placePartyNear(this.worldMap.getTownExitTile(town));
+        this.player = this.getControlledActor()?.entity ?? this.player;
+        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
+        this.fieldEnemies = [];
+        this.worldMap.loot = [];
+        this.spawnStarterFieldContent();
+        this.clearFieldTurnState();
+        this.addCombatLog(`${town.nameKr}에서 로컬 월드로 출격.`);
     }
 
     private closeFieldOverlays(): void {

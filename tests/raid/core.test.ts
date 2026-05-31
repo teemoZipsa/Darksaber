@@ -475,11 +475,22 @@ test('WorldMap exposes original Darksaber town display names while keeping stabl
 
 test('WorldMap exposes walkable non-town exits for every town', () => {
     const world = new WorldMap();
+    const formationOffsets = [
+        { x: 0, y: 0 },
+        { x: -1, y: 0 },
+        { x: 0, y: 1 },
+        { x: 1, y: 0 },
+    ];
 
     for (const town of world.getTowns()) {
         const exit = world.getTownExitTile(town);
         assert.ok(world.isWalkable(exit.x, exit.y), `${town.id} exit should be walkable`);
         assert.notEqual(world.getTownAtTile(exit.x, exit.y)?.id, town.id, `${town.id} exit should leave town radius`);
+        for (const offset of formationOffsets) {
+            const tile = { x: exit.x + offset.x, y: exit.y + offset.y };
+            assert.ok(world.isWalkable(tile.x, tile.y), `${town.id} exit formation tile should be walkable`);
+            assert.notEqual(world.getTownAtTile(tile.x, tile.y)?.id, town.id, `${town.id} exit formation should not re-enter town`);
+        }
     }
 
     const kaosia = world.getTowns().find((town) => town.id === 'central_castle');

@@ -153,6 +153,12 @@ const DUNGEON_LANDMARKS: WorldDungeonInfo[] = [
 ];
 
 const BURGOS_CASTLE_DUNGEON = DUNGEON_LANDMARKS.find((dungeon) => dungeon.id === 'burgos_castle');
+const TOWN_EXIT_FORMATION_OFFSETS: TilePoint[] = [
+    { x: 0, y: 0 },
+    { x: -1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 1, y: 0 },
+];
 
 export class WorldMap {
     private chunks: Map<string, Chunk> = new Map();
@@ -628,6 +634,8 @@ export class WorldMap {
         const centerX = town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
         const centerY = town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
         const searchRadius = Math.max(8, town.radius * CHUNK_SIZE + CHUNK_SIZE);
+        let bestSafeRoadExit: { tile: TilePoint; score: number } | null = null;
+        let bestSafeExit: { tile: TilePoint; score: number } | null = null;
         let bestRoadExit: { tile: TilePoint; score: number } | null = null;
         let bestAdjacentExit: { tile: TilePoint; score: number } | null = null;
 
@@ -636,6 +644,15 @@ export class WorldMap {
                 const tx = centerX + dx;
                 const ty = centerY + dy;
                 if (!this.isWalkable(tx, ty) || this.getTownAtTile(tx, ty)?.id === town.id) continue;
+                const score = dx * dx + dy * dy;
+                const candidate = { tile: { x: tx, y: ty }, score };
+                if (this.isTownExitFormationSafe(town, candidate.tile)) {
+                    if (!bestSafeExit || score < bestSafeExit.score) bestSafeExit = candidate;
+                    if (this.getTileAt(tx, ty) === TileType.ROAD && (!bestSafeRoadExit || score < bestSafeRoadExit.score)) {
+                        bestSafeRoadExit = candidate;
+                    }
+                }
+
                 const isAdjacentToTown = [
                     { x: tx + 1, y: ty },
                     { x: tx - 1, y: ty },
@@ -648,8 +665,6 @@ export class WorldMap {
                 ].some((tile) => this.getTownAtTile(tile.x, tile.y)?.id === town.id);
                 if (!isAdjacentToTown) continue;
 
-                const score = dx * dx + dy * dy;
-                const candidate = { tile: { x: tx, y: ty }, score };
                 if (!bestAdjacentExit || score < bestAdjacentExit.score) bestAdjacentExit = candidate;
                 if (this.getTileAt(tx, ty) === TileType.ROAD && (!bestRoadExit || score < bestRoadExit.score)) {
                     bestRoadExit = candidate;
@@ -657,9 +672,19 @@ export class WorldMap {
             }
         }
 
+        if (bestSafeRoadExit) return bestSafeRoadExit.tile;
+        if (bestSafeExit) return bestSafeExit.tile;
         if (bestRoadExit) return bestRoadExit.tile;
         if (bestAdjacentExit) return bestAdjacentExit.tile;
         return this.getTownSpawnTile(town);
+    }
+
+    private isTownExitFormationSafe(town: TownInfo, tile: TilePoint): boolean {
+        return TOWN_EXIT_FORMATION_OFFSETS.every((offset) => {
+            const tx = tile.x + offset.x;
+            const ty = tile.y + offset.y;
+            return this.isWalkable(tx, ty) && this.getTownAtTile(tx, ty)?.id !== town.id;
+        });
     }
 
     public getBoundsTiles(): TileBounds {
