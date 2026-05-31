@@ -1,5 +1,6 @@
 import { TileType } from './Tile';
 import type { TilePoint } from './WorldMap';
+import { sampleHmapEdge, type HmapSample } from './HmapBlend';
 
 export const BURGOS_CASTLE_HMAP_SIZE = 138;
 const BURGOS_CASTLE_HMAP_HALF = Math.floor(BURGOS_CASTLE_HMAP_SIZE / 2);
@@ -178,7 +179,7 @@ function decodeRow(row: string): string {
 
 export const BURGOS_CASTLE_HMAP_ROWS = BURGOS_CASTLE_HMAP_RLE.map(decodeRow);
 
-export function getBurgosCastleHmapTileAt(tx: number, ty: number, center: TilePoint): TileType | null {
+export function getBurgosCastleHmapTileAt(tx: number, ty: number, center: TilePoint): HmapSample | null {
     const localX = tx - center.x + BURGOS_CASTLE_HMAP_HALF;
     const localY = ty - center.y + BURGOS_CASTLE_HMAP_HALF;
     if (localX < 0 || localY < 0 || localX >= BURGOS_CASTLE_HMAP_SIZE || localY >= BURGOS_CASTLE_HMAP_SIZE) {
@@ -186,9 +187,10 @@ export function getBurgosCastleHmapTileAt(tx: number, ty: number, center: TilePo
     }
 
     if (localX === BURGOS_CASTLE_HMAP_HALF && localY === BURGOS_CASTLE_HMAP_HALF) {
-        return TileType.DUNGEON_ENTRANCE;
+        return { tile: TileType.DUNGEON_ENTRANCE, weight: BURGOS_CASTLE_HMAP_HALF };
     }
 
     const symbol = BURGOS_CASTLE_HMAP_ROWS[localY][localX] as BurgosHmapSymbol;
-    return TILE_BY_SYMBOL[symbol];
+    const edgeDist = Math.min(localX, localY, BURGOS_CASTLE_HMAP_SIZE - 1 - localX, BURGOS_CASTLE_HMAP_SIZE - 1 - localY);
+    return sampleHmapEdge(TILE_BY_SYMBOL[symbol], edgeDist, tx, ty);
 }

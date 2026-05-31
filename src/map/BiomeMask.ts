@@ -119,6 +119,14 @@ const LAND_ANCHORS: InfluenceAnchor[] = [
     { cx: 72, cy: 58, radius: 5, weight: 0.74 },
     { cx: 48, cy: 90, radius: 5, weight: 0.72 },
     { cx: 75, cy: 8, radius: 4, weight: 0.66 },
+
+    // Central story spine: keep the inland scenarios (volcano, plains, temple,
+    // village) on land so their feathered hmap edges blend into terrain, not sea.
+    { cx: 44, cy: 21, radius: 12, weight: 0.92 },
+    { cx: 45, cy: 42, radius: 15, weight: 1.0 },
+    { cx: 48, cy: 50, radius: 12, weight: 0.95 },
+    { cx: 49, cy: 60, radius: 12, weight: 0.9 },
+    { cx: 40, cy: 72, radius: 11, weight: 0.82 },
 ];
 
 const OCEAN_CUTS: InfluenceAnchor[] = [
@@ -151,6 +159,28 @@ const BIOME_ANCHORS: BiomeAnchor[] = [
     { cx: 69, cy: 58, biome: 'forest', weight: 1.0 },
     { cx: 60, cy: 62, biome: 'grass',  weight: 0.95 },
     { cx: 72, cy: 58, biome: 'lava',   weight: 0.78 },
+
+    // Story-scenario theme rings: surround each scenario with terrain that
+    // matches its hmap border so the blended edge reads naturally.
+    { cx: 43, cy: 40, biome: 'grass',  weight: 0.9 },  // Ep1 Burgos Castle
+    { cx: 34, cy: 32, biome: 'stone',  weight: 0.9 },  // Ep2 Zamora Fortress
+    { cx: 43, cy: 24, biome: 'lava',   weight: 1.0 },  // Ep3 Etna Volcano
+    { cx: 43, cy: 17, biome: 'grass',  weight: 0.95 }, // Ep4 Arcadia Plain
+    { cx: 47, cy: 53, biome: 'stone',  weight: 0.9 },  // Ep5 Cacaora Highland
+    { cx: 45, cy: 45, biome: 'grass',  weight: 0.9 },  // Ep6 Village
+    { cx: 47, cy: 40, biome: 'grass',  weight: 0.9 },  // Ep7 Sagrajas Temple
+    { cx: 47, cy: 59, biome: 'sand',   weight: 1.0 },  // Ep8 Sagunto Port
+    { cx: 41, cy: 72, biome: 'sand',   weight: 1.0 },  // Ep9 Sicilio Island
+    { cx: 51, cy: 64, biome: 'grass',  weight: 0.9 },  // Ep10 Dalai Lake
+    { cx: 18, cy: 20, biome: 'sand',   weight: 1.05 }, // Ep11 Oasis
+    { cx: 21, cy: 16, biome: 'sand',   weight: 1.05 }, // Ep12 Pyramid (front)
+    { cx: 24, cy: 16, biome: 'sand',   weight: 1.0 },  // Ep13 Pyramid (inside)
+    { cx: 32, cy: 72, biome: 'sand',   weight: 0.95 }, // Ep14 Scheria
+    { cx: 27, cy: 74, biome: 'sand',   weight: 0.95 }, // Ep15 Scheria 2
+    { cx: 47, cy: 48, biome: 'grass',  weight: 0.95 }, // Ep16 Valhalla Plain
+    { cx: 61, cy: 40, biome: 'stone',  weight: 0.95 }, // Ep18 Ament Entrance
+    { cx: 64, cy: 37, biome: 'stone',  weight: 0.95 }, // Ep19 Ament 1F
+    { cx: 67, cy: 34, biome: 'stone',  weight: 0.95 }, // Ep20 Ament 2F
 ];
 
 const SPECIAL_ZONES: SpecialZone[] = [

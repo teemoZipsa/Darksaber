@@ -6,6 +6,7 @@ import { ExtractionZone } from '../entity/ExtractionZone';
 import { BiomeMask, BiomeType, MAP_HEIGHT, MAP_WIDTH, TempleInfo, TownInfo, WorldRealm } from './BiomeMask';
 import { getBurgosCastleHmapTileAt } from './BurgosCastleHmap';
 import { getStoryHmapTileAt } from './StoryHmaps';
+import { HMAP_BLEND_BAND, type HmapSample } from './HmapBlend';
 import { STORY_SCENARIOS } from '../data/StoryScenarioData';
 
 export interface TileBounds {
@@ -113,6 +114,48 @@ const ROAD_ROUTES: TileRoute[] = [
         ],
         width: 2.1,
         noiseSalt: 105,
+    },
+    // Main story spine: threads the central inland scenarios in episode order
+    // (Ep4 -> Ep3 -> Ep2 -> Ep1 -> Ep7 -> Ep6 -> Ep16 -> Ep5 -> Ep8 -> Ep10),
+    // tying into the central castle so the campaign reads as a single trail.
+    {
+        points: [
+            { chunkX: 43, chunkY: 17 },
+            { chunkX: 43, chunkY: 24 },
+            { chunkX: 37, chunkY: 44 },
+            { chunkX: 43, chunkY: 40 },
+            { chunkX: 47, chunkY: 40 },
+            { chunkX: 45, chunkY: 45 },
+            { chunkX: 47, chunkY: 48 },
+            { chunkX: 47, chunkY: 53 },
+            { chunkX: 47, chunkY: 59 },
+            { chunkX: 51, chunkY: 64 },
+        ],
+        width: 2.3,
+        noiseSalt: 106,
+    },
+    // Eastern Ament branch, kept on the east continent between its two towns.
+    {
+        points: [
+            { chunkX: 64, chunkY: 23 },
+            { chunkX: 67, chunkY: 34 },
+            { chunkX: 64, chunkY: 37 },
+            { chunkX: 61, chunkY: 40 },
+            { chunkX: 63, chunkY: 49 },
+        ],
+        width: 2.1,
+        noiseSalt: 107,
+    },
+    // North-west desert branch: desert city -> Oasis -> Pyramid cluster.
+    {
+        points: [
+            { chunkX: 16, chunkY: 11 },
+            { chunkX: 18, chunkY: 20 },
+            { chunkX: 21, chunkY: 16 },
+            { chunkX: 24, chunkY: 16 },
+        ],
+        width: 2.1,
+        noiseSalt: 108,
     },
 ];
 
@@ -403,11 +446,8 @@ export class WorldMap {
         const { chunkX, chunkY, localX, localY } = this.tileToChunk(tx, ty);
         if (!this.isChunkInBounds(chunkX, chunkY)) return TileType.DEEP_WATER;
 
-        const burgosCastleTile = this.getBurgosCastleHmapTile(tx, ty);
-        if (burgosCastleTile !== null) return burgosCastleTile;
-
-        const storyHmapTile = this.getStoryHmapTile(tx, ty);
-        if (storyHmapTile !== null) return storyHmapTile;
+        const hmapTile = this.getHmapTile(tx, ty);
+        if (hmapTile !== null) return hmapTile;
 
         if (this.getTempleAtTile(tx, ty)) return TileType.DUNGEON_ENTRANCE;
         if (this.getDungeonAtTile(tx, ty)) return TileType.DUNGEON_ENTRANCE;
@@ -437,21 +477,35 @@ export class WorldMap {
         return this.varyBiomeTile(base, tx, ty);
     }
 
-    private getBurgosCastleHmapTile(tx: number, ty: number): TileType | null {
-        if (!BURGOS_CASTLE_DUNGEON) return null;
-        return getBurgosCastleHmapTileAt(tx, ty, this.getDungeonEntranceTile(BURGOS_CASTLE_DUNGEON));
-    }
+    /**
+     * Resolve the scenario heightmap tile at a world tile, blending feathered
+     * edges and picking, where scenarios overlap, the one this tile sits deeper
+     * inside (largest weight). Returns null to fall through to procedural biome.
+     */
+    private getHmapTile(tx: number, ty: number): TileType | null {
+        let best: HmapSample | null = null;
+        const consider = (sample: HmapSample | null): void => {
+            if (sample && (!best || sample.weight > best.weight)) best = sample;
+        };
 
-    private getStoryHmapTile(tx: number, ty: number): TileType | null {
-        if (this.isRoadTile(tx, ty) || this.isRiverTile(tx, ty)) return null;
+        if (BURGOS_CASTLE_DUNGEON) {
+            consider(getBurgosCastleHmapTileAt(tx, ty, this.getDungeonEntranceTile(BURGOS_CASTLE_DUNGEON)));
+        }
         for (const scenario of STORY_SCENARIOS) {
             if (scenario.episode < 2) continue;
             const dungeon = DUNGEON_LANDMARKS.find((entry) => entry.id === scenario.dungeonId);
             if (!dungeon) continue;
-            const tile = getStoryHmapTileAt(scenario.episode, tx, ty, this.getDungeonEntranceTile(dungeon));
-            if (tile !== null) return tile;
+            consider(getStoryHmapTileAt(scenario.episode, tx, ty, this.getDungeonEntranceTile(dungeon)));
         }
-        return null;
+        if (!best) return null;
+        const sample = best as HmapSample;
+        // Roads/rivers stay on top of the feathered edge so the travel network
+        // and its bridges remain connected; only the scenario interior wins, so
+        // connecting roads tuck under a dungeon core instead of carving through it.
+        if (sample.weight < HMAP_BLEND_BAND && (this.isRoadTile(tx, ty) || this.isRiverTile(tx, ty))) {
+            return null;
+        }
+        return sample.tile;
     }
 
     private generateChunk(chunkX: number, chunkY: number): Chunk {

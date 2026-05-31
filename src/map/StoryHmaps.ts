@@ -1,5 +1,6 @@
 import { TileType } from './Tile';
 import type { TilePoint } from './WorldMap';
+import { sampleHmapEdge, type HmapSample } from './HmapBlend';
 
 // Generated from original client MAP/02hmap.BMP through MAP/20hmap.BMP.
 export const STORY_HMAP_SIZE = 138;
@@ -2701,7 +2702,7 @@ function decodeRow(row: string): string {
 
 const STORY_HMAP_ROWS = new Map<number, readonly string[]>(Object.entries(STORY_HMAP_RLE).map(([episode, rows]) => [Number(episode), rows.map(decodeRow)]));
 
-export function getStoryHmapTileAt(episode: number, tx: number, ty: number, center: TilePoint): TileType | null {
+export function getStoryHmapTileAt(episode: number, tx: number, ty: number, center: TilePoint): HmapSample | null {
     const rows = STORY_HMAP_ROWS.get(episode);
     if (!rows) return null;
     const localX = tx - center.x + STORY_HMAP_HALF;
@@ -2710,8 +2711,9 @@ export function getStoryHmapTileAt(episode: number, tx: number, ty: number, cent
         return null;
     }
     if (localX === STORY_HMAP_HALF && localY === STORY_HMAP_HALF) {
-        return TileType.DUNGEON_ENTRANCE;
+        return { tile: TileType.DUNGEON_ENTRANCE, weight: STORY_HMAP_HALF };
     }
     const symbol = rows[localY][localX] as StoryHmapSymbol;
-    return TILE_BY_SYMBOL[symbol];
+    const edgeDist = Math.min(localX, localY, STORY_HMAP_SIZE - 1 - localX, STORY_HMAP_SIZE - 1 - localY);
+    return sampleHmapEdge(TILE_BY_SYMBOL[symbol], edgeDist, tx, ty);
 }

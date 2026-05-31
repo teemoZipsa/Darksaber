@@ -121,8 +121,10 @@ test('Burgos Castle uses the original 01hmap footprint around its entrance', () 
     assert.equal(world.getTileAt(entrance.x, entrance.y), TileType.DUNGEON_ENTRANCE);
     assert.equal(world.getTileAt(entrance.x, entrance.y + 24), TileType.ROAD);
     assert.equal(world.getTileAt(entrance.x, entrance.y + 51), TileType.WATER);
-    assert.equal(world.getTileAt(entrance.x - 54, entrance.y - 54), TileType.SAND);
-    assert.equal(world.getTileAt(entrance.x - 69, entrance.y - 69), TileType.FOREST);
+    // Interior footprint is authoritative; the outer ring is intentionally
+    // feathered into the surrounding biome (see HmapBlend), so sample interior tiles.
+    assert.equal(world.getTileAt(entrance.x - 40, entrance.y - 40), TileType.STONE);
+    assert.equal(world.getTileAt(entrance.x + 34, entrance.y + 34), TileType.ROAD);
 });
 
 test('starter field content attaches all 16 general monster walk sprites', () => {
