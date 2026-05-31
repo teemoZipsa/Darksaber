@@ -63,6 +63,7 @@ export class GameManager {
     private pauseMenu = new PauseMenuUI();
     private settingsUI = new SettingsUI();
     private questJournalOpen = false;
+    private startIntroTutorialOnWorldInit = false;
 
     // React DOM UI overlay bridge (attached after construction in main.ts)
     private uiStore?: UiStore;
@@ -239,6 +240,7 @@ export class GameManager {
         this.party.switchTo(0);
         this.syncStoryCompanionsToRoster();
         this.inventoryUI.setActiveCharacter(char);
+        this.startIntroTutorialOnWorldInit = true;
         this.transitionTo(GameState.WORLD, () => this.initWorldEngine());
     }
 
@@ -457,10 +459,13 @@ export class GameManager {
     // ═══════════════════════════════════════════════════════════
 
     private initWorldEngine(): void {
+        const startIntroTutorial = this.startIntroTutorialOnWorldInit;
+        this.startIntroTutorialOnWorldInit = false;
         this.worldEngine = new WorldEngine(
             this.canvas, this.ctx, this.input, this.camera,
             this.party, this.inventory, this.playerData,
-            this
+            this,
+            { startIntroTutorial }
         );
     }
 

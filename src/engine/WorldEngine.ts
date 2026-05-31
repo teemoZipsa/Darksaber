@@ -6,6 +6,7 @@
 import { Camera } from './Camera';
 import { InputManager } from './InputManager';
 import { AudioManager } from './AudioManager';
+import { SettingsManager } from './SettingsManager';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
 import { LootObject } from '../entity/LootObject';
@@ -97,6 +98,10 @@ import {
     type WorldSnapshot,
 } from '../net/WorldProtocol';
 
+export interface WorldEngineOptions {
+    startIntroTutorial?: boolean;
+}
+
 export class WorldEngine {
     private canvas: HTMLCanvasElement;
     private camera: Camera;
@@ -149,6 +154,8 @@ export class WorldEngine {
     private worldTime: number = 0;
     private dismissedTempleVisitKey: string | null = null;
     private dismissedDungeonVisitKey: string | null = null;
+    private introTutorialActive = false;
+    private introTutorialEnemyId: string | null = null;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -158,7 +165,8 @@ export class WorldEngine {
         party: PartyManager,
         _inventory: GridInventory,
         playerData: PlayerData,
-        gameManager: GameManager
+        gameManager: GameManager,
+        options: WorldEngineOptions = {}
     ) {
         this.canvas = canvas;
         this.camera = camera;
@@ -463,11 +471,15 @@ export class WorldEngine {
         this.spawnPartyAtCurrentHub();
         this.player = this.getControlledActor()?.entity ?? new Player(0, 0);
         this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-        this.openTown(this.getCurrentHubTown());
+        if (options.startIntroTutorial) {
+            this.startIntroTutorial();
+        } else {
+            this.openTown(this.getCurrentHubTown());
+            this.addCombatLog('마을에 도착했습니다. 출격 준비를 마치세요.');
+        }
 
         camera.followTile(this.player.gridX, this.player.gridY);
         camera.snapToTarget();
-        this.addCombatLog('마을에 도착했습니다. 출격 준비를 마치세요.');
     }
 
     public update(dt: number, input: InputManager, camera: Camera): void {
@@ -490,6 +502,13 @@ export class WorldEngine {
 
         if (this.townSession.isVisible()) {
             this.townSession.updateInput(input);
+            camera.followTile(this.player.gridX, this.player.gridY);
+            camera.update(dt);
+            return;
+        }
+
+        if (this.introTutorialActive && input.justPressed('Escape')) {
+            this.finishIntroTutorial(true);
             camera.followTile(this.player.gridX, this.player.gridY);
             camera.update(dt);
             return;
@@ -550,6 +569,108 @@ export class WorldEngine {
 
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
         this.renderController.render(ctx, camera, width, height);
+        if (this.introTutorialActive) this.renderIntroTutorialHud(ctx, width, height);
+    }
+
+    public startIntroTutorial(): void {
+        const town = this.getCurrentHubTown();
+        this.townSession.hide();
+        this.closeFieldOverlays();
+        this.currentPhase = 'raid';
+        this.raidSession.beginRaidFromTown(town.id);
+        this.dismissedDungeonVisitKey = null;
+        this.party.resetForNewRaid();
+        this.townSession.applyPendingRestForRaidStart();
+        this.remotePartyActors.clear();
+        this.fieldEnemies = [];
+        this.worldMap.loot = [];
+        this.placePartyNear(this.worldMap.getTownExitTile(town));
+        this.player = this.getControlledActor()?.entity ?? this.player;
+        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
+        this.clearFieldTurnState();
+
+        const actor = this.getControlledActor();
+        if (!actor) {
+            this.openTown(town);
+            return;
+        }
+
+        const enemyTile = this.movementController.findNearbyWalkableTile({
+            x: actor.entity.gridX + 1,
+            y: actor.entity.gridY,
+        }, 'intro_tutorial_enemy');
+        const enemy = new Enemy('intro_tutorial_enemy', enemyTile.x, enemyTile.y, t('tutorial.world.enemy'), 1, '#b64048', 'bruiser');
+        enemy.aggroRange = 1;
+        enemy.expReward = 0;
+        enemy.stats.maxHp = 8;
+        enemy.stats.hp = 8;
+        enemy.stats.atk = 1;
+        enemy.stats.def = 0;
+        this.fieldEnemies = [{ enemy, home: enemyTile, path: [] }];
+        this.introTutorialActive = true;
+        this.introTutorialEnemyId = enemy.id;
+
+        this.activeTurnActorId = actor.id;
+        this.remainingActionPoints = FIELD_MAX_ACTION_GAUGE;
+        this.majorActionUsedThisTurn = false;
+        actor.entity.actionGauge = FIELD_MAX_ACTION_GAUGE;
+        this.selectionController.selectActor(actor.id);
+        this.actionMenuUI.open(this.playerActionController.getTurnActionStates(actor));
+        this.camera.followTile(actor.entity.gridX, actor.entity.gridY);
+        this.camera.snapToTarget();
+        this.addCombatLog(t('tutorial.world.startLog'));
+        this.addCombatLog(t('tutorial.world.helpLog'));
+    }
+
+    private finishIntroTutorial(skipped: boolean): void {
+        const town = this.getCurrentHubTown();
+        this.introTutorialActive = false;
+        this.introTutorialEnemyId = null;
+        this.fieldEnemies = [];
+        this.worldMap.loot = [];
+        this.remotePartyActors.clear();
+        this.placePartyNear(this.worldMap.getTownSpawnTile(town));
+        this.player = this.getControlledActor()?.entity ?? this.player;
+        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
+        this.clearFieldTurnState();
+        this.openTown(town);
+        this.addCombatLog(t(skipped ? 'tutorial.world.skipLog' : 'tutorial.world.townLog'));
+    }
+
+    private renderIntroTutorialHud(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+        const scale = SettingsManager.getUIScale();
+        const uiW = Math.floor(width / scale);
+        const uiH = Math.floor(height / scale);
+        const panelW = Math.min(560, uiW - 32);
+        const panelH = 118;
+        const x = Math.max(16, Math.floor((uiW - panelW) / 2));
+        const y = Math.max(16, uiH - panelH - 18);
+
+        ctx.save();
+        ctx.scale(scale, scale);
+        ctx.globalAlpha = 0.94;
+        ctx.fillStyle = '#1a1410';
+        ctx.strokeStyle = '#c8a36d';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(x, y, panelW, panelH, 8);
+        ctx.fill();
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        ctx.fillStyle = '#f0c050';
+        ctx.font = '18px "DOSMyungjo", serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(t('tutorial.world.title'), x + 18, y + 30);
+
+        ctx.fillStyle = '#e8e0d0';
+        ctx.font = '13px sans-serif';
+        ctx.fillText(t('tutorial.world.line1'), x + 18, y + 58);
+        ctx.fillStyle = '#cbb992';
+        ctx.fillText(t('tutorial.world.line2'), x + 18, y + 80);
+        ctx.fillStyle = '#ffd700';
+        ctx.fillText(t('tutorial.world.line3'), x + 18, y + 102);
+        ctx.restore();
     }
 
     private spawnPartyAtCurrentHub(): void {
@@ -1535,6 +1656,17 @@ export class WorldEngine {
     }
 
     private handleEnemyDefeated(actor: FieldActor, enemy: Enemy, feedbackGroupId?: string): void {
+        if (this.introTutorialActive && enemy.id === this.introTutorialEnemyId) {
+            this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
+            this.registerCombatFeedback('kill', feedbackGroupId);
+            this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
+            enemy.isAggro = false;
+            this.selectionController.clearEnemyIfSelected(enemy.id);
+            this.addCombatLog(t('tutorial.world.completeLog'));
+            this.finishIntroTutorial(false);
+            return;
+        }
+
         this.awardDefeatExp(actor, enemy);
         this.raidSession.recordKill();
         this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
