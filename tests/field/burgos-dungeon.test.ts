@@ -87,6 +87,7 @@ test('Burgos Castle is a world-map dungeon entrance landmark', () => {
     const entrance = world.getDungeonEntranceTile(dungeon);
     assert.equal(world.getDungeonAtTile(entrance.x, entrance.y)?.id, BURGOS_CASTLE_DUNGEON_ID);
     assert.equal(world.getTileAt(entrance.x, entrance.y), TileType.DUNGEON_ENTRANCE);
+    assert.equal(dungeon.sprite, 'burgosCastle');
     assert.ok(world.getMapLandmarks().some((landmark) => landmark.kind === 'dungeon' && landmark.label === '부르고스성'));
 });
 
@@ -98,6 +99,7 @@ test('Zamora Fortress is northwest of Burgos Castle on the world map', () => {
     assert.ok(zamora);
     assert.equal(zamora.chunkX, 34);
     assert.equal(zamora.chunkY, 32);
+    assert.equal(zamora.sprite, 'castle');
     assert.ok(zamora.chunkX < burgos.chunkX);
     assert.ok(zamora.chunkY < burgos.chunkY);
 

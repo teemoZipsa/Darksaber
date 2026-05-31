@@ -20,6 +20,7 @@ const DARKSABER_LANDMARK_SPRITES = {
     village: '/assets/images/landmarks/darksaber/village.png',
     portTown: '/assets/images/landmarks/darksaber/port_town.png',
     castle: '/assets/images/landmarks/darksaber/castle.png',
+    burgosCastle: '/assets/images/landmarks/darksaber/burgos_castle.png',
     caveEntrance: '/assets/images/landmarks/darksaber/cave_entrance.png',
     beginnerRuins: '/assets/images/landmarks/darksaber/beginner_ruins.png',
     beginnerMine: '/assets/images/landmarks/darksaber/beginner_mine.png',

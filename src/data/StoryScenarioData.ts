@@ -35,7 +35,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         dungeonNameEn: 'Burgos Castle',
         chunkX: 43,
         chunkY: 40,
-        sprite: 'castle',
+        sprite: 'burgosCastle',
         bossName: '키스라',
         bossLevel: 3,
         bossColor: '#6676d8',
