@@ -207,7 +207,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#5d526a',
         guardLevel: 5,
         guardCount: 7,
-        reward: noReward,
+        reward: { type: 'companion', companionId: 'story_shrine_maiden_ep11', classId: 'shrine', nameKey: 'story.companion.ep11ShrineMaiden.name' },
     },
     {
         episode: 12,
@@ -271,7 +271,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#7b55a6',
         guardLevel: 7,
         guardCount: 8,
-        reward: noReward,
+        reward: { type: 'companion', companionId: 'story_alchemist_ep15', classId: 'alchemist', nameKey: 'story.companion.ep15Alchemist.name' },
     },
     {
         episode: 16,

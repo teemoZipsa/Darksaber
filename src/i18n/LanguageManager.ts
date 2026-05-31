@@ -395,8 +395,10 @@ export const i18n = {
             'story.companion.ep07Monk.name': '몽크',
             'story.companion.ep08Captain.name': '캡틴',
             'story.companion.ep09Sniper.name': '스나이퍼',
+            'story.companion.ep11ShrineMaiden.name': '무녀',
             'story.companion.ep12HawkKnight.name': '호크나이트',
             'story.companion.ep14Shaman.name': '셔먼',
+            'story.companion.ep15Alchemist.name': '연금술사',
             'rumors.footer': '주민들의 이야기',
             'shop.stock': '재고',
             
@@ -895,8 +897,10 @@ export const i18n = {
             'story.companion.ep07Monk.name': 'Monk',
             'story.companion.ep08Captain.name': 'Captain',
             'story.companion.ep09Sniper.name': 'Sniper',
+            'story.companion.ep11ShrineMaiden.name': 'Shrine Maiden',
             'story.companion.ep12HawkKnight.name': 'Hawk Knight',
             'story.companion.ep14Shaman.name': 'Shaman',
+            'story.companion.ep15Alchemist.name': 'Alchemist',
             'rumors.footer': 'tales from the townsfolk',
             'shop.stock': 'Stock',
             

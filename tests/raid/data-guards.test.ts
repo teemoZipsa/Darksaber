@@ -12,6 +12,7 @@ import { rollBossRune, rollChestGem } from '../../src/data/SocketLoot';
 import { getSkill } from '../../src/data/SkillDB';
 import { getSkillVisualProfile } from '../../src/data/SkillVisualProfiles';
 import { createBaseStats, getBaseStatsForClass } from '../../src/data/Stats';
+import { getStoryCompanionRewards } from '../../src/data/StoryQuestData';
 import type { Skill } from '../../src/data/SkillDB';
 import {
     TOWN_FACILITIES,
@@ -94,6 +95,8 @@ test('rest, monster, and starting class data reject unknown ids', () => {
     assert.equal(getMonsterDefinitionSafe('__missing__'), null);
 
     assert.deepEqual(CHAR_CLASSES.map((cfg) => cfg.id), ['infantry', 'cavalry', 'cleric', 'mage']);
+    assert.ok(getStoryCompanionRewards().some((reward) => reward.classId === 'shrine'));
+    assert.ok(getStoryCompanionRewards().some((reward) => reward.classId === 'alchemist'));
 });
 
 test('player data guards gold and normalizes old save shapes', () => {
