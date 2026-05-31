@@ -12,8 +12,9 @@ import type { CSSProperties } from 'react';
 import { t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
-import { CHAR_CLASSES, type CharConfig } from '../../../data/characterClasses';
+import { CHAR_CLASSES, type CharConfig, type StartingClassId } from '../../../data/characterClasses';
 import { useStore } from '../UiContext';
+import { IntroTutorial } from '../tutorial/IntroTutorial';
 
 const STAT_ROWS: Array<{ key: keyof Pick<CharConfig, 'hp' | 'atk' | 'def' | 'mag'>; labelKey: string; color: string }> = [
     { key: 'hp', labelKey: 'create.hp', color: '#e6a817' },
@@ -21,6 +22,16 @@ const STAT_ROWS: Array<{ key: keyof Pick<CharConfig, 'hp' | 'atk' | 'def' | 'mag
     { key: 'def', labelKey: 'create.def', color: '#3b82f6' },
     { key: 'mag', labelKey: 'create.mag', color: '#22c55e' },
 ];
+
+type CreationMode = 'create' | 'tutorial';
+type CreationGender = 'M' | 'F';
+
+interface PendingCharacter {
+    name: string;
+    classId: StartingClassId;
+    classLabelKey: string;
+    gender: CreationGender;
+}
 
 function ClassPortrait({ cfg, size }: { cfg: CharConfig; size: number }) {
     const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
@@ -68,16 +79,38 @@ function StatBar({ label, value, color }: { label: string; value: number; color:
 
 export function CharacterCreation() {
     const store = useStore();
+    const [mode, setMode] = useState<CreationMode>('create');
+    const [pendingCharacter, setPendingCharacter] = useState<PendingCharacter | null>(null);
     const [classIdx, setClassIdx] = useState(0);
-    const [gender, setGender] = useState<'M' | 'F'>('M');
+    const [gender, setGender] = useState<CreationGender>('M');
     const [name, setName] = useState('다크마스터');
 
     const confirm = () => {
         AudioManager.playUi('ui.confirm');
-        store.charCreateComplete(name, CHAR_CLASSES[classIdx].id, gender);
+        const cfg = CHAR_CLASSES[classIdx];
+        // The commander is intentionally not committed until the tutorial ends.
+        // Refreshing during the tutorial returns to character creation.
+        setPendingCharacter({ name, classId: cfg.id, classLabelKey: cfg.labelKey, gender });
+        setMode('tutorial');
+    };
+
+    const completePendingCharacter = () => {
+        if (!pendingCharacter) return;
+        store.charCreateComplete(pendingCharacter.name, pendingCharacter.classId, pendingCharacter.gender);
     };
 
     const rootStyle = { '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
+
+    if (mode === 'tutorial' && pendingCharacter) {
+        return (
+            <IntroTutorial
+                commanderName={pendingCharacter.name}
+                classLabelKey={pendingCharacter.classLabelKey}
+                onComplete={completePendingCharacter}
+                onSkip={completePendingCharacter}
+            />
+        );
+    }
 
     return (
         <div className="cc">

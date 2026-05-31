@@ -742,6 +742,260 @@
 #ui-overlay .cc__confirm:hover { filter: brightness(1.12); }
 #ui-overlay .cc__confirm:active { transform: translateY(1px); }
 
+/* ─── Intro tutorial ────────────────────────────────────────── */
+#ui-overlay .ds-tutorial {
+    position: absolute;
+    inset: 0;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    box-sizing: border-box;
+    background:
+        radial-gradient(ellipse at center, rgba(0, 0, 0, 0.36) 0%, rgba(0, 0, 0, 0.86) 100%),
+        url('/assets/images/backgrounds/start.jpg') center / cover no-repeat,
+        var(--ds-bg-0);
+    animation: ds-fade-in 160ms ease-out;
+}
+#ui-overlay .ds-tutorial__panel {
+    width: min(1120px, 96vw);
+    max-height: 94vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+#ui-overlay .ds-tutorial__skip {
+    position: absolute;
+    right: 14px;
+    top: 10px;
+}
+#ui-overlay .ds-tutorial__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 18px;
+    padding: 18px;
+    overflow: auto;
+}
+#ui-overlay .ds-tutorial__stage {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+#ui-overlay .ds-tutorial__hud {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr) 128px;
+    gap: 10px;
+    align-items: center;
+}
+#ui-overlay .ds-tutorial__hudbtn,
+#ui-overlay .ds-tutorial__key {
+    font-family: inherit;
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+    background: var(--ds-panel-inset);
+    color: var(--ds-text-muted);
+    cursor: pointer;
+}
+#ui-overlay .ds-tutorial__hudbtn {
+    min-height: 36px;
+    padding: 0 10px;
+}
+#ui-overlay .ds-tutorial__keys {
+    display: grid;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--ds-hairline);
+    border-radius: var(--ds-radius-sm);
+    background: rgba(0, 0, 0, 0.18);
+}
+#ui-overlay .ds-tutorial__key {
+    height: 28px;
+    padding: 0;
+    font-size: 11px;
+}
+#ui-overlay .ds-tutorial__grid {
+    align-self: center;
+    display: grid;
+    grid-template-columns: repeat(7, 56px);
+    grid-auto-rows: 56px;
+    gap: 5px;
+    padding: 10px;
+    background:
+        linear-gradient(180deg, rgba(15, 13, 10, 0.94), rgba(34, 26, 18, 0.94));
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius);
+    box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.45);
+}
+#ui-overlay .ds-tutorial__cell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    padding: 0;
+    border: 1px solid rgba(200, 163, 109, 0.22);
+    border-radius: var(--ds-radius-sm);
+    background: rgba(42, 32, 24, 0.78);
+    cursor: pointer;
+}
+#ui-overlay .ds-tutorial__actor {
+    width: 46px;
+    height: 46px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border-radius: 50%;
+    border: 1px solid var(--ds-border);
+    color: var(--ds-text);
+    font-size: 11px;
+    line-height: 1.05;
+    text-align: center;
+    overflow: hidden;
+}
+#ui-overlay .ds-tutorial__actor.is-ally { background: #274331; }
+#ui-overlay .ds-tutorial__actor.is-enemy { background: #532229; border-color: var(--ds-danger); }
+#ui-overlay .ds-tutorial__actor.is-mentor { background: #332f54; }
+#ui-overlay .ds-tutorial__actorhp {
+    font-size: 10px;
+    color: var(--ds-accent);
+    font-variant-numeric: tabular-nums;
+}
+#ui-overlay .ds-tutorial__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+}
+#ui-overlay .ds-tutorial__actions .ds-btn {
+    min-width: 78px;
+}
+#ui-overlay .ds-tutorial__script {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    background: var(--ds-panel-inset);
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius);
+}
+#ui-overlay .ds-tutorial__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: var(--ds-text-muted);
+    font-size: 12px;
+}
+#ui-overlay .ds-tutorial__meta span {
+    padding: 4px 7px;
+    border: 1px solid var(--ds-hairline);
+    border-radius: var(--ds-radius-sm);
+}
+#ui-overlay .ds-tutorial__progress {
+    height: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.34);
+}
+#ui-overlay .ds-tutorial__progress span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--ds-accent), var(--ds-accent-bright));
+    transition: width 160ms ease-out;
+}
+#ui-overlay .ds-tutorial__chapter {
+    color: var(--ds-accent);
+    font-family: var(--ds-font-title, "DOSMyungjo", serif);
+    font-size: 18px;
+}
+#ui-overlay .ds-tutorial__message {
+    color: var(--ds-text);
+    font-size: 14px;
+    line-height: 1.55;
+}
+#ui-overlay .ds-tutorial__message p {
+    margin: 0 0 6px;
+}
+#ui-overlay .ds-tutorial__prompt {
+    color: var(--ds-accent-bright);
+    font-size: 13px;
+    line-height: 1.45;
+}
+#ui-overlay .ds-tutorial__status {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--ds-hairline);
+    border-radius: var(--ds-radius-sm);
+    background: rgba(0, 0, 0, 0.18);
+}
+#ui-overlay .ds-tutorial__statusrow {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    color: var(--ds-text-muted);
+    font-size: 12px;
+}
+#ui-overlay .ds-tutorial__merc {
+    color: var(--ds-text-muted);
+    font-size: 12px;
+}
+#ui-overlay .ds-tutorial__next {
+    margin-top: auto;
+    width: 100%;
+    min-height: 42px;
+    font-family: var(--ds-font-title, "DOSMyungjo", serif);
+    font-size: 17px;
+    letter-spacing: 1px;
+    color: #1a1208;
+    border-radius: var(--ds-radius-sm);
+    border: 1px solid var(--ds-accent);
+    background: linear-gradient(180deg, var(--ds-accent-bright), var(--ds-accent));
+    cursor: pointer;
+}
+#ui-overlay .ds-tutorial__next:disabled {
+    color: var(--ds-text-dim);
+    border-color: rgba(138, 110, 60, 0.55);
+    background: linear-gradient(180deg, var(--ds-panel-1), var(--ds-panel-0));
+    cursor: default;
+}
+#ui-overlay .ds-tutorial__cell.is-focused,
+#ui-overlay .ds-tutorial__hudbtn.is-focused,
+#ui-overlay .ds-tutorial__keys.is-focused,
+#ui-overlay .ds-tutorial__actions .is-focused {
+    border-color: var(--ds-accent);
+    box-shadow: 0 0 0 2px rgba(240, 192, 80, 0.18), 0 0 18px rgba(240, 192, 80, 0.25);
+}
+
+@media (max-width: 900px) {
+    #ui-overlay .ds-tutorial__body {
+        grid-template-columns: 1fr;
+    }
+    #ui-overlay .ds-tutorial__grid {
+        grid-template-columns: repeat(7, 44px);
+        grid-auto-rows: 44px;
+    }
+    #ui-overlay .ds-tutorial__actor {
+        width: 36px;
+        height: 36px;
+        font-size: 10px;
+    }
+    #ui-overlay .ds-tutorial__hud {
+        grid-template-columns: 1fr;
+    }
+    #ui-overlay .ds-tutorial__keys {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+}
+
 /* ─── Inventory (DOM grid) ──────────────────────────────────── */
 #ui-overlay .ds-inv { display: flex; flex-direction: column; max-height: 88vh; }
 #ui-overlay .ds-inv.is-embedded {
