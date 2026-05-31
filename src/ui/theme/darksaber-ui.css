@@ -54,6 +54,14 @@
     /* UI scale (overwritten per-frame from SettingsManager via inline style) */
     --ds-scale: 1;
 
+    /* Optional bitmap UI skin */
+    --ds-asset-panel-frame: url('/assets/images/ui/panel_frame.png');
+    --ds-asset-tooltip-frame: url('/assets/images/ui/tooltip_frame.png');
+    --ds-asset-slot-cell: url('/assets/images/ui/slot_cell.png');
+    --ds-asset-equip-slot-cell: url('/assets/images/ui/equip_slot_cell.png');
+    --ds-asset-drop-valid: url('/assets/images/ui/drag_valid_cell.png');
+    --ds-asset-drop-invalid: url('/assets/images/ui/drag_invalid_cell.png');
+
     font-family: inherit; /* Pretendard / Noto Sans KR, already loaded on body */
     color: var(--ds-text);
 }
@@ -752,6 +760,17 @@
 
 /* ─── Inventory (DOM grid) ──────────────────────────────────── */
 #ui-overlay .ds-inv { display: flex; flex-direction: column; max-height: 88vh; }
+#ui-overlay .ds-inv,
+#ui-overlay .ds-shop,
+#ui-overlay .ds-blacksmith,
+#ui-overlay .ds-rest,
+#ui-overlay .ds-quest,
+#ui-overlay .ds-rumors {
+    border: 18px solid transparent;
+    border-image: var(--ds-asset-panel-frame) 142 fill stretch;
+    border-radius: 0;
+    image-rendering: pixelated;
+}
 #ui-overlay .ds-inv.is-embedded {
     transform: none; animation: none;
     background: linear-gradient(160deg, var(--ds-panel-1) 0%, var(--ds-panel-0) 55%, var(--ds-bg-1) 100%);
@@ -772,11 +791,13 @@
     position: relative; flex: none;
     background-color: var(--ds-panel-inset);
     background-image:
+        var(--ds-asset-slot-cell),
         linear-gradient(to right, var(--ds-hairline) 1px, transparent 1px),
         linear-gradient(to bottom, var(--ds-hairline) 1px, transparent 1px);
-    background-size: 40px 40px;
+    background-size: 40px 40px, 40px 40px, 40px 40px;
     border: 1px solid var(--ds-border-shadow);
     border-radius: var(--ds-radius-sm);
+    image-rendering: pixelated;
 }
 #ui-overlay .inv-item {
     box-sizing: border-box;
@@ -841,11 +862,14 @@
 #ui-overlay .inv-eqslot {
     position: relative;
     z-index: 1;
-    background: rgba(13, 14, 18, 0.58);
+    background:
+        var(--ds-asset-equip-slot-cell) center / 100% 100% no-repeat,
+        rgba(13, 14, 18, 0.58);
     border: 1px dashed var(--ds-border-shadow);
     border-radius: var(--ds-radius-sm);
     display: flex; align-items: center; justify-content: center;
     backdrop-filter: blur(0.5px);
+    image-rendering: pixelated;
 }
 #ui-overlay .inv-eqslot__label { font-size: 10px; color: var(--ds-text-dim); text-align: center; }
 #ui-overlay .inv-eqslot--head { grid-area: head; }
@@ -872,13 +896,19 @@
 }
 #ui-overlay .inv-drop-cell.is-valid {
     border: 1px solid var(--ds-hp);
-    background: rgba(74, 222, 128, 0.16);
+    background:
+        var(--ds-asset-drop-valid) center / 100% 100% no-repeat,
+        rgba(74, 222, 128, 0.16);
     box-shadow: inset 0 0 10px rgba(74, 222, 128, 0.22);
+    image-rendering: pixelated;
 }
 #ui-overlay .inv-drop-cell.is-invalid {
     border: 1px solid var(--ds-danger);
-    background: rgba(228, 63, 90, 0.16);
+    background:
+        var(--ds-asset-drop-invalid) center / 100% 100% no-repeat,
+        rgba(228, 63, 90, 0.16);
     box-shadow: inset 0 0 10px rgba(228, 63, 90, 0.22);
+    image-rendering: pixelated;
 }
 #ui-overlay .inv-eqslot.is-drop-target {
     border-style: solid;
@@ -897,13 +927,12 @@
     min-width: 168px;
     max-width: 280px;
     background: linear-gradient(160deg, var(--ds-panel-1), var(--ds-bg-1));
-    border: 2px solid var(--ds-border-shadow);
-    border-radius: var(--ds-radius-sm);
+    border: 10px solid transparent;
+    border-image: var(--ds-asset-tooltip-frame) 112 fill stretch;
+    border-radius: 0;
     box-shadow: inset 0 0 0 1px var(--ds-border), inset 0 0 18px rgba(0, 0, 0, 0.5), 0 10px 28px rgba(0, 0, 0, 0.6);
     padding: 9px 11px 10px;
-    /* 2nd-pass enhancement: once a tooltip_frame.png exists under the ui assets dir,
-       add a border-image rule here (slice 8, fill, repeat) pointing at it — the CSS
-       border above stays as the fallback. Omitted now so the asset check stays clean. */
+    image-rendering: pixelated;
     animation: ds-fade-in 90ms ease-out;
 }
 #ui-overlay .ds-tooltip__name {

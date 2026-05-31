@@ -54,9 +54,9 @@ export class ActionMenuUI {
     private isOpen = false;
     private slots: ActionSlot[];
     private slotStates = new Map<ActionType, ActionMenuSlotState>();
-    private readonly menuRadius = 58;
-    private readonly iconRadius = 18;
-    private readonly hitRadius = 22;
+    private readonly menuRadius = 66;
+    private readonly iconRadius = 25;
+    private readonly hitRadius = 31;
 
     private centerX = 0;
     private centerY = 0;
@@ -175,46 +175,27 @@ export class ActionMenuUI {
             const isHovered = this.hoveredSlot === slot.type;
             const r = this.iconRadius;
 
-            ctx.beginPath();
-            ctx.arc(ix, iy, r, 0, Math.PI * 2);
-
-            if (enabled) {
-                if (isHovered) {
-                    ctx.fillStyle = 'rgba(36, 31, 24, 0.92)';
-                    ctx.shadowColor = Parchment.borderGold;
-                    ctx.shadowBlur = 9;
-                } else {
-                    ctx.fillStyle = 'rgba(18, 20, 24, 0.82)';
-                }
-                ctx.fill();
-                ctx.strokeStyle = isHovered ? Parchment.borderGold : 'rgba(245, 232, 204, 0.82)';
-                ctx.lineWidth = isHovered ? 2 : 1.5;
-            } else {
-                ctx.fillStyle = isHovered ? 'rgba(40, 30, 28, 0.68)' : 'rgba(18, 20, 24, 0.5)';
-                ctx.fill();
-                ctx.strokeStyle = isHovered ? 'rgba(228, 63, 90, 0.6)' : 'rgba(245, 232, 204, 0.32)';
-                ctx.lineWidth = isHovered ? 1.5 : 1;
+            if (isHovered) {
+                this.drawSlotFocus(ctx, ix, iy, r, enabled);
             }
-            ctx.shadowBlur = 0;
-            ctx.stroke();
 
             // Draw icon
-            slot.iconDraw(ctx, ix, iy, r * 0.5, enabled);
+            slot.iconDraw(ctx, ix, iy, r * 0.62, enabled);
 
 
 
-            ctx.font = `bold 11px ${UI.fontPrimary}`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.82)';
-            ctx.strokeText(slot.label, ix, iy + r + 10);
-            ctx.fillStyle = enabled
-                ? (isHovered ? '#ffe3a0' : '#f7ead2')
-                : (isHovered ? '#f0a0a8' : 'rgba(247, 234, 210, 0.46)');
-            ctx.fillText(slot.label, ix, iy + r + 10);
-            ctx.textAlign = 'start';
-            ctx.textBaseline = 'alphabetic';
+            if (isHovered) {
+                ctx.font = `bold 13px ${UI.fontPrimary}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.82)';
+                ctx.strokeText(slot.label, ix, iy + r + 12);
+                ctx.fillStyle = enabled ? '#ffe3a0' : '#f0a0a8';
+                ctx.fillText(slot.label, ix, iy + r + 12);
+                ctx.textAlign = 'start';
+                ctx.textBaseline = 'alphabetic';
+            }
         }
 
         this.renderHoveredDisabledReason(ctx);
@@ -267,8 +248,37 @@ export class ActionMenuUI {
     }
 
     private isSlotHit(mx: number, my: number, ix: number, iy: number): boolean {
-        if (Math.hypot(mx - ix, my - iy) <= this.hitRadius) return true;
+        if (Math.abs(mx - ix) <= this.hitRadius && Math.abs(my - iy) <= this.hitRadius) return true;
         return Math.abs(mx - ix) <= 30 && my >= iy + this.iconRadius + 2 && my <= iy + this.iconRadius + 24;
+    }
+
+    private drawSlotFocus(ctx: CanvasRenderingContext2D, ix: number, iy: number, r: number, enabled: boolean): void {
+        const size = r * 1.65;
+        const x = ix - size / 2;
+        const y = iy - size / 2;
+        const corner = 10;
+        const color = enabled ? Parchment.borderGold : 'rgba(228, 63, 90, 0.72)';
+
+        ctx.save();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = enabled ? 8 : 5;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y + corner);
+        ctx.lineTo(x, y);
+        ctx.lineTo(x + corner, y);
+        ctx.moveTo(x + size - corner, y);
+        ctx.lineTo(x + size, y);
+        ctx.lineTo(x + size, y + corner);
+        ctx.moveTo(x + size, y + size - corner);
+        ctx.lineTo(x + size, y + size);
+        ctx.lineTo(x + size - corner, y + size);
+        ctx.moveTo(x + corner, y + size);
+        ctx.lineTo(x, y + size);
+        ctx.lineTo(x, y + size - corner);
+        ctx.stroke();
+        ctx.restore();
     }
 
     private renderHoveredDisabledReason(ctx: CanvasRenderingContext2D): void {

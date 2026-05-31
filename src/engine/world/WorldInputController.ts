@@ -42,6 +42,7 @@ export interface WorldInputContext {
     switchToPartyMember: (index: number) => boolean;
     toggleActionMenuForControlled: () => void;
     closeActionMenu: () => void;
+    dismissActionMenuTurn: () => void;
     closeTacticalMenu: () => void;
     clearIntent: () => void;
     log: (message: string) => void;
@@ -105,7 +106,7 @@ export class WorldInputController {
             if (this.context.tacticalController.isOpen()) this.context.closeTacticalMenu();
             else if (this.context.magicController.isActive()) this.context.magicController.reset();
             else if (this.context.toolController.isActive()) this.context.toolController.reset();
-            else if (this.context.actionMenuUI.getIsOpen()) this.context.closeActionMenu();
+            else if (this.context.actionMenuUI.getIsOpen()) this.context.dismissActionMenuTurn();
             else if (this.context.getReservedAction()) this.context.clearIntent();
             else this.context.onUnhandledEscape();
         } else if (this.context.tacticalController.isOpen()) {
@@ -184,8 +185,8 @@ export class WorldInputController {
             }
             return true;
         }
-        this.context.closeActionMenu();
-        return false;
+        this.context.dismissActionMenuTurn();
+        return true;
     }
 
     private handleFieldRightClick(tile: TilePoint, input: InputManager): void {
@@ -205,6 +206,8 @@ export class WorldInputController {
 
         if (disposition === 'reopenTacticalMenu') {
             this.context.closeTacticalMenu();
+        } else if (mode.kind === 'actionMenu') {
+            this.context.dismissActionMenuTurn();
         } else {
             this.context.closeActionMenu();
         }

@@ -132,6 +132,32 @@ test('major action flag is set explicitly and cleared on turn end', () => {
     assert.equal(engine.majorActionUsedThisTurn, false);
 });
 
+test('dismissing an untouched full action menu resets ATB so charging can resume', () => {
+    const actor = makeActor('hero');
+    actor.entity.actionGauge = 100;
+    const { engine } = makeEngineHarness(actor);
+    engine.remainingActionPoints = 100;
+
+    engine.dismissActionMenuTurn();
+
+    assert.equal(engine.activeTurnActorId, null);
+    assert.equal(actor.entity.actionGauge, 0);
+    assert.ok(engine.combatLog.includes('hero 턴 종료: 대기'));
+});
+
+test('dismissing a partial action menu keeps remaining ATB as carryover', () => {
+    const actor = makeActor('hero');
+    actor.entity.actionGauge = 60;
+    const { engine } = makeEngineHarness(actor);
+    engine.remainingActionPoints = 60;
+
+    engine.dismissActionMenuTurn();
+
+    assert.equal(engine.activeTurnActorId, null);
+    assert.equal(actor.entity.actionGauge, 60);
+    assert.ok(engine.combatLog.includes('hero 턴 종료: 대기'));
+});
+
 test('spending AP falls back to active actor gauge when remaining turn gauge is stale', () => {
     const actor = makeActor('hero');
     actor.entity.actionGauge = 100;

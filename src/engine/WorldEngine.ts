@@ -7,7 +7,6 @@ import { Camera } from './Camera';
 import { InputManager } from './InputManager';
 import { AudioManager } from './AudioManager';
 import { SettingsManager } from './SettingsManager';
-import { Entity } from '../entity/Entity';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
 import { LootObject } from '../entity/LootObject';
@@ -106,6 +105,13 @@ export interface WorldEngineOptions {
 
 type IntroTutorialStep = 'move' | 'attack' | 'rest' | 'magic' | 'defeat';
 
+const INTRO_TUTORIAL_INSTRUCTOR_ROW_BY_FACING: Record<'up' | 'down' | 'left' | 'right', number> = {
+    up: 0,
+    down: 1,
+    left: 3,
+    right: 2,
+};
+
 const INTRO_TUTORIAL_STEP_ACTION: Partial<Record<IntroTutorialStep, FieldApAction>> = {
     move: 'move',
     attack: 'attack',
@@ -178,6 +184,7 @@ export class WorldEngine {
     private introTutorialStep: IntroTutorialStep = 'move';
     private introTutorialPreviousWorldMap: WorldMap | null = null;
     private introTutorialInstructor: Player | null = null;
+    private introTutorialCompletePending = false;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -241,8 +248,7 @@ export class WorldEngine {
             },
             onEnemyDefeated: (enemy) => {
                 if (this.isIntroTutorialEnemy(enemy)) {
-                    this.addCombatLog(t('tutorial.world.completeLog'));
-                    this.finishIntroTutorial(false);
+                    this.completeIntroTutorial();
                     return;
                 }
                 this.completeDungeonIfBossDefeated(enemy);
@@ -491,6 +497,7 @@ export class WorldEngine {
             switchToPartyMember: (index) => this.switchToPartyMember(index),
             toggleActionMenuForControlled: () => this.toggleActionMenuForControlled(),
             closeActionMenu: () => this.closeActionMenu(),
+            dismissActionMenuTurn: () => this.dismissActionMenuTurn(),
             closeTacticalMenu: () => this.closeTacticalMenu(),
             clearIntent: () => this.clearIntent(),
             log: (message) => this.addCombatLog(message),
@@ -540,6 +547,11 @@ export class WorldEngine {
             this.townSession.updateInput(input);
             camera.followTile(this.player.gridX, this.player.gridY);
             camera.update(dt);
+            return;
+        }
+
+        if (this.introTutorialActive && this.introTutorialCompletePending) {
+            this.updateIntroTutorialCompletion(input, dt, camera);
             return;
         }
 
@@ -651,6 +663,7 @@ export class WorldEngine {
         this.introTutorialActive = true;
         this.introTutorialEnemyId = enemy.id;
         this.introTutorialStep = 'move';
+        this.introTutorialCompletePending = false;
 
         this.prepareIntroTutorialActorTurn(actor);
         this.selectionController.selectActor(actor.id);
@@ -669,6 +682,7 @@ export class WorldEngine {
         this.introTutorialEnemyId = null;
         this.introTutorialStep = 'move';
         this.introTutorialInstructor = null;
+        this.introTutorialCompletePending = false;
         this.fieldEnemies = [];
         this.worldMap.loot = [];
         this.remotePartyActors.clear();
@@ -678,6 +692,29 @@ export class WorldEngine {
         this.clearFieldTurnState();
         this.openTown(town);
         this.addCombatLog(t(skipped ? 'tutorial.world.skipLog' : 'tutorial.world.townLog'));
+    }
+
+    private completeIntroTutorial(): void {
+        if (!this.introTutorialActive || this.introTutorialCompletePending) return;
+        this.addCombatLog(t('tutorial.world.completeLog'));
+        this.introTutorialCompletePending = true;
+        this.clearFieldTurnState();
+    }
+
+    private updateIntroTutorialCompletion(input: InputManager, dt: number, camera: Camera): void {
+        this.effectManager.update(dt);
+        this.floatingText.update(dt);
+        this.updateAttackCues(dt);
+
+        if (input.mouseJustDown || input.justPressed('Enter') || input.justPressed('Space')) {
+            this.finishIntroTutorial(false);
+            camera.followTile(this.player.gridX, this.player.gridY);
+            camera.update(dt);
+            return;
+        }
+
+        camera.followTile(this.player.gridX, this.player.gridY);
+        camera.update(dt);
     }
 
     private restoreIntroTutorialWorldMap(): void {
@@ -698,7 +735,7 @@ export class WorldEngine {
             32,
             3,
             6,
-            Entity.WALK_ROW_BY_FACING,
+            INTRO_TUTORIAL_INSTRUCTOR_ROW_BY_FACING,
             1.7
         );
         return instructor;
@@ -745,6 +782,11 @@ export class WorldEngine {
     }
 
     private renderIntroTutorialHud(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+        if (this.introTutorialCompletePending) {
+            this.renderIntroTutorialCompleteModal(ctx, width, height);
+            return;
+        }
+
         const scale = SettingsManager.getUIScale();
         const uiW = Math.floor(width / scale);
         const uiH = Math.floor(height / scale);
@@ -777,6 +819,66 @@ export class WorldEngine {
         ctx.fillText(t(`tutorial.world.step.${this.introTutorialStep}`), x + 18, y + 82);
         ctx.fillStyle = '#ffd700';
         ctx.fillText(t('tutorial.world.lineEsc'), x + 18, y + 108);
+        ctx.restore();
+    }
+
+    private renderIntroTutorialCompleteModal(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+        const scale = SettingsManager.getUIScale();
+        const uiW = Math.floor(width / scale);
+        const uiH = Math.floor(height / scale);
+        const panelW = Math.min(520, uiW - 40);
+        const panelH = 230;
+        const x = Math.floor((uiW - panelW) / 2);
+        const y = Math.floor((uiH - panelH) / 2);
+        const buttonW = Math.min(260, panelW - 72);
+        const buttonH = 42;
+        const buttonX = x + Math.floor((panelW - buttonW) / 2);
+        const buttonY = y + panelH - 66;
+
+        ctx.save();
+        ctx.scale(scale, scale);
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.56)';
+        ctx.fillRect(0, 0, uiW, uiH);
+
+        ctx.globalAlpha = 0.98;
+        ctx.fillStyle = '#1a1410';
+        ctx.strokeStyle = '#d6b16d';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = 'rgba(240, 192, 80, 0.32)';
+        ctx.shadowBlur = 20;
+        ctx.beginPath();
+        ctx.roundRect(x, y, panelW, panelH, 10);
+        ctx.fill();
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#f0c050';
+        ctx.font = '28px "DOSMyungjo", serif';
+        ctx.fillText(t('tutorial.world.completeTitle'), x + panelW / 2, y + 46);
+
+        ctx.fillStyle = '#e8e0d0';
+        ctx.font = '15px sans-serif';
+        ctx.fillText(t('tutorial.world.completeLine'), x + panelW / 2, y + 92);
+
+        ctx.fillStyle = '#cbb992';
+        ctx.font = '13px sans-serif';
+        ctx.fillText(t('tutorial.world.completeReward'), x + panelW / 2, y + 122);
+
+        ctx.fillStyle = '#5a1519';
+        ctx.strokeStyle = '#f0c050';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(buttonX, buttonY, buttonW, buttonH, 7);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffe8a8';
+        ctx.font = '16px "DOSMyungjo", serif';
+        ctx.fillText(t('tutorial.world.completeNext'), x + panelW / 2, buttonY + buttonH / 2 + 1);
         ctx.restore();
     }
 
@@ -1769,8 +1871,7 @@ export class WorldEngine {
             this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
             enemy.isAggro = false;
             this.selectionController.clearEnemyIfSelected(enemy.id);
-            this.addCombatLog(t('tutorial.world.completeLog'));
-            this.finishIntroTutorial(false);
+            this.completeIntroTutorial();
             return;
         }
 
@@ -1953,7 +2054,7 @@ export class WorldEngine {
         }
 
         if (this.actionMenuUI.getIsOpen()) {
-            this.closeActionMenu();
+            this.dismissActionMenuTurn();
             return;
         }
 
@@ -1963,6 +2064,18 @@ export class WorldEngine {
 
     private closeActionMenu(): void {
         this.actionMenuUI.close();
+    }
+
+    private dismissActionMenuTurn(): void {
+        const actor = this.getActivePartyTurnActor();
+        if (!actor) {
+            this.closeActionMenu();
+            return;
+        }
+        const carryover = this.remainingActionPoints >= FIELD_MAX_ACTION_GAUGE
+            ? 0
+            : this.remainingActionPoints;
+        this.endActorTurn(actor, '대기', carryover);
     }
 
     private spendAp(cost: number): boolean {
