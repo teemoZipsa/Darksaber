@@ -59,6 +59,13 @@ function isBareSpriteName(assetString) {
   return /^[^/\\]+\.(png|jpg|jpeg|gif|webp)$/i.test(assetString);
 }
 
+function resolveKnownTemplateAsset(assetString) {
+  if (assetString.startsWith('${MONSTER_SPRITE_PATH}/')) {
+    return assetString.replace('${MONSTER_SPRITE_PATH}', '/assets/images/monsters');
+  }
+  return null;
+}
+
 function collectAssetRefs(content) {
   const refs = new Set();
   for (const regex of [quotedAssetRegex, cssUrlRegex]) {
@@ -86,6 +93,7 @@ function collectMonsterSprites(content) {
 let hasError = false;
 let checked = 0;
 let optionalMissing = 0;
+let skippedDynamic = 0;
 
 console.log('Checking asset references...');
 
@@ -99,27 +107,35 @@ for (const file of sourceRoots.flatMap(walkFiles)) {
   for (const assetString of refs) {
     if (isBareSpriteName(assetString)) continue;
 
+    const resolvedAssetString = assetString.includes('${')
+      ? resolveKnownTemplateAsset(assetString)
+      : assetString;
+    if (!resolvedAssetString) {
+      skippedDynamic += 1;
+      continue;
+    }
+
     checked += 1;
-    if (existsAsset(assetString)) {
-      console.log(`OK ${assetString}`);
+    if (existsAsset(resolvedAssetString)) {
+      console.log(`OK ${resolvedAssetString}`);
       continue;
     }
 
     const location = path.relative(rootDir, file);
-    if (isOptionalAsset(assetString)) {
+    if (isOptionalAsset(resolvedAssetString)) {
       optionalMissing += 1;
-      console.warn(`WARN optional missing ${assetString} (${location})`);
+      console.warn(`WARN optional missing ${resolvedAssetString} (${location})`);
       continue;
     }
 
     hasError = true;
-    console.error(`ERROR missing ${assetString} (${location})`);
+    console.error(`ERROR missing ${resolvedAssetString} (${location})`);
   }
 }
 
 if (hasError) {
-  console.error(`Asset check failed. Checked ${checked} references; optional missing ${optionalMissing}.`);
+  console.error(`Asset check failed. Checked ${checked} references; optional missing ${optionalMissing}; skipped dynamic ${skippedDynamic}.`);
   process.exit(1);
 }
 
-console.log(`All required assets verified. Checked ${checked} references; optional missing ${optionalMissing}.`);
+console.log(`All required assets verified. Checked ${checked} references; optional missing ${optionalMissing}; skipped dynamic ${skippedDynamic}.`);

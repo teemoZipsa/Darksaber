@@ -659,6 +659,16 @@ export class WorldEngine {
         enemy.stats.def = 0;
         enemy.stats.spd = 0;
         enemy.actionGauge = 0;
+        enemy.facing = 'left';
+        enemy.setWalkSprite(
+            `${MONSTER_SPRITE_PATH}/206R.png`,
+            32,
+            32,
+            3,
+            8,
+            MONSTER_ROW_BY_FACING,
+            1.7
+        );
         this.fieldEnemies = [{ enemy, home: enemyTile, path: [] }];
         this.introTutorialActive = true;
         this.introTutorialEnemyId = enemy.id;
