@@ -13,8 +13,18 @@ import { t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
 import { SHOP_KIND_TABS, type ShopEntry, type SellEntry } from '../../../ui/ShopUI';
+import type { ItemDef } from '../../../data/ItemDB';
+import type { PlacedItem } from '../../../inventory/GridInventory';
 import { useStore, useUiVersion } from '../UiContext';
-import { ItemSwatch, itemName, statSummary } from './itemView';
+import {
+    ItemCompareTooltip,
+    ItemSwatch,
+    ItemTooltip,
+    isEquippable,
+    itemName,
+    statSummary,
+    useItemTooltip,
+} from './itemView';
 
 export function ShopPanel() {
     useUiVersion();
@@ -23,6 +33,16 @@ export function ShopPanel() {
     const buyEntries = store.getShopBuyEntries();
     const sellEntries = store.getShopSellEntries();
     const gold = store.getShopGold();
+    const char = store.getActiveCharacter();
+    const tip = useItemTooltip();
+
+    // Equippable goods compare against what the active character currently wears.
+    const tipFor = (item: ItemDef, placed?: PlacedItem) => {
+        if (isEquippable(item) && char) {
+            return <ItemCompareTooltip candidate={item} equipped={char.equipment.get(item.slot)} candidatePlaced={placed} />;
+        }
+        return <ItemTooltip item={item} placed={placed} />;
+    };
 
     const [pendingSell, setPendingSell] = useState<SellEntry | null>(null);
     const [feedback, setFeedback] = useState('');
@@ -80,10 +100,12 @@ export function ShopPanel() {
                             return (
                                 <button
                                     key={`${entry.item.id}-${i}`}
-                                    className={`ds-shop__row${soldOut ? ' is-out' : ''}`}
+                                    className={`ds-shop__row${soldOut ? ' is-out' : ''}${!afford && !soldOut ? ' is-poor' : ''}`}
                                     disabled={soldOut}
                                     onClick={() => buy(entry)}
-                                    title={statSummary(entry.item)}
+                                    onPointerEnter={tip.show(tipFor(entry.item))}
+                                    onPointerMove={tip.move}
+                                    onPointerLeave={tip.hide}
                                     aria-label={`${itemName(entry.item)} · ${entry.price}G`}
                                 >
                                     <ItemSwatch item={entry.item} dim={soldOut} />
@@ -113,7 +135,10 @@ export function ShopPanel() {
                                 <button
                                     key={`${entry.placed.item.id}-${entry.source.id}-${i}`}
                                     className="ds-shop__row"
-                                    onClick={() => setPendingSell(entry)}
+                                    onClick={() => { setPendingSell(entry); tip.hide(); }}
+                                    onPointerEnter={tip.show(tipFor(entry.placed.item, entry.placed))}
+                                    onPointerMove={tip.move}
+                                    onPointerLeave={tip.hide}
                                     aria-label={`${itemName(entry.placed.item)} · ${entry.price}G`}
                                 >
                                     <ItemSwatch item={entry.placed.item} />
@@ -138,6 +163,7 @@ export function ShopPanel() {
             </div>
 
             <div className="ds-shop__feedback">{feedback}</div>
+            {tip.node}
 
             {pendingSell && (
                 <div className="ds-modal" onClick={() => setPendingSell(null)}>
@@ -146,6 +172,9 @@ export function ShopPanel() {
                         <div className="ds-modal__line">
                             {itemName(pendingSell.placed.item)} → <strong>{pendingSell.price}G</strong>
                         </div>
+                        {statSummary(pendingSell.placed.item) && (
+                            <div className="ds-modal__line ds-modal__line--sub">{statSummary(pendingSell.placed.item)}</div>
+                        )}
                         {pendingSell.bonusPrice > 0 && (
                             <div className="ds-modal__line">
                                 {pendingSell.basePrice}G + {t('shop.contractBonus')} {pendingSell.bonusPrice}G

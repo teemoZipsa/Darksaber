@@ -39,6 +39,14 @@
     --ds-exp: #a78bfa;
     --ds-atb: #f97316;
 
+    /* Item rarity (tooltip/name tints) */
+    --ds-rarity-common: #cfc6b4;
+    --ds-rarity-uncommon: #6fcf73;
+    --ds-rarity-rare: #5aa9f0;
+    --ds-rarity-epic: #b984f0;
+    --ds-rarity-legend: #f0b54a;
+    --ds-rarity-unique: #ff7a4a;
+
     /* Shape */
     --ds-radius: 8px;
     --ds-radius-sm: 4px;
@@ -850,6 +858,109 @@
 
 #ui-overlay .ds-inv__action, #ui-overlay .ds-inv__sortbtn { font-size: 11px; padding: 4px 10px; }
 #ui-overlay .ds-inv__feedback { text-align: center; color: var(--ds-accent); font-size: 12px; min-height: 16px; padding-bottom: 8px; }
+
+/* ─── Drag-drop feedback ────────────────────────────────────── */
+#ui-overlay .inv-grid.is-drop-active {
+    box-shadow: inset 0 0 0 1px var(--ds-accent-soft), 0 0 0 1px var(--ds-border-shadow);
+}
+#ui-overlay .inv-drop-cell {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+    border-radius: 3px;
+    box-sizing: border-box;
+}
+#ui-overlay .inv-drop-cell.is-valid {
+    border: 1px solid var(--ds-hp);
+    background: rgba(74, 222, 128, 0.16);
+    box-shadow: inset 0 0 10px rgba(74, 222, 128, 0.22);
+}
+#ui-overlay .inv-drop-cell.is-invalid {
+    border: 1px solid var(--ds-danger);
+    background: rgba(228, 63, 90, 0.16);
+    box-shadow: inset 0 0 10px rgba(228, 63, 90, 0.22);
+}
+#ui-overlay .inv-eqslot.is-drop-target {
+    border-style: solid;
+    border-color: var(--ds-accent);
+    background: var(--ds-accent-soft);
+    box-shadow: inset 0 0 12px rgba(240, 192, 80, 0.28);
+}
+
+/* ─── Item tooltip (game-UI card) ───────────────────────────── */
+#ui-overlay .ds-tooltip-host {
+    position: fixed;
+    z-index: 80;
+    pointer-events: none;
+}
+#ui-overlay .ds-tooltip {
+    min-width: 168px;
+    max-width: 280px;
+    background: linear-gradient(160deg, var(--ds-panel-1), var(--ds-bg-1));
+    border: 2px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+    box-shadow: inset 0 0 0 1px var(--ds-border), inset 0 0 18px rgba(0, 0, 0, 0.5), 0 10px 28px rgba(0, 0, 0, 0.6);
+    padding: 9px 11px 10px;
+    /* 2nd-pass enhancement: once a tooltip_frame.png exists under the ui assets dir,
+       add a border-image rule here (slice 8, fill, repeat) pointing at it — the CSS
+       border above stays as the fallback. Omitted now so the asset check stays clean. */
+    animation: ds-fade-in 90ms ease-out;
+}
+#ui-overlay .ds-tooltip__name {
+    font-size: 13px; font-weight: 700; line-height: 1.2;
+    color: var(--ds-rarity-common);
+}
+#ui-overlay .ds-tooltip__name.is-rarity-common { color: var(--ds-rarity-common); }
+#ui-overlay .ds-tooltip__name.is-rarity-uncommon { color: var(--ds-rarity-uncommon); }
+#ui-overlay .ds-tooltip__name.is-rarity-rare { color: var(--ds-rarity-rare); }
+#ui-overlay .ds-tooltip__name.is-rarity-epic { color: var(--ds-rarity-epic); }
+#ui-overlay .ds-tooltip__name.is-rarity-legend { color: var(--ds-rarity-legend); }
+#ui-overlay .ds-tooltip__name.is-rarity-unique { color: var(--ds-rarity-unique); }
+#ui-overlay .ds-tooltip__type {
+    font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;
+    color: var(--ds-text-dim); margin: 2px 0 6px;
+}
+#ui-overlay .ds-tooltip__stats {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 5px 0; margin-bottom: 4px;
+    border-top: 1px solid var(--ds-hairline);
+    border-bottom: 1px solid var(--ds-hairline);
+}
+#ui-overlay .ds-tooltip__stat {
+    display: flex; justify-content: space-between; gap: 14px;
+    font-size: 11px; color: var(--ds-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+#ui-overlay .ds-tooltip__stat > span:last-child { color: var(--ds-text); }
+#ui-overlay .ds-tooltip__statvals { display: inline-flex; align-items: baseline; gap: 6px; }
+#ui-overlay .ds-tooltip__delta { font-size: 10px; font-weight: 700; }
+#ui-overlay .ds-tooltip__delta.is-up { color: var(--ds-hp); }
+#ui-overlay .ds-tooltip__delta.is-down { color: var(--ds-danger); }
+#ui-overlay .ds-tooltip__meta {
+    display: flex; flex-wrap: wrap; gap: 2px 10px;
+    font-size: 10px; color: var(--ds-text-dim); margin-top: 4px;
+}
+#ui-overlay .ds-tooltip__flavor {
+    font-size: 11px; line-height: 1.4; color: var(--ds-text-dim);
+    margin-top: 6px; font-style: italic;
+}
+#ui-overlay .ds-tooltip--compare {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    max-width: 460px;
+}
+#ui-overlay .ds-tooltip__col.is-equipped { opacity: 0.78; }
+#ui-overlay .ds-tooltip__col + .ds-tooltip__col,
+#ui-overlay .ds-tooltip--compare .ds-tooltip__col:last-child {
+    border-left: 1px solid var(--ds-hairline); padding-left: 12px;
+}
+#ui-overlay .ds-tooltip__collabel {
+    font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--ds-accent); margin-bottom: 4px;
+}
+
+/* Shop: dim un-affordable buy rows (price already turns red) */
+#ui-overlay .ds-shop__row.is-poor:not(:hover) { opacity: 0.72; }
+#ui-overlay .ds-modal__line--sub { font-size: 11px; color: var(--ds-text-dim); margin-top: -10px; margin-bottom: 14px; }
 
 /* ─── Pause class tier chart ────────────────────────────────── */
 #ui-overlay .ds-pause {

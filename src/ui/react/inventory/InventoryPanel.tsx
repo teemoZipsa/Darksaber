@@ -25,13 +25,21 @@ import type { PlacedItem } from '../../../inventory/GridInventory';
 import type { GridInventory } from '../../../inventory/GridInventory';
 import {
     EQUIP_SLOT_LIST,
+    slotAcceptsItem,
     type InventoryUI,
     type InvDragSource,
     type InvGridKind,
 } from '../../../inventory/InventoryUI';
 import type { ItemSlot } from '../../../data/ItemDB';
 import { useStore, useUiVersion } from '../UiContext';
-import { ItemGlyph, itemName, statSummary } from '../town/itemView';
+import {
+    ItemCompareTooltip,
+    ItemGlyph,
+    ItemTooltip,
+    isEquippable,
+    itemName,
+    useItemTooltip,
+} from '../town/itemView';
 
 const CELL = 40;
 const DRAG_THRESHOLD = 5;
@@ -51,6 +59,32 @@ type DragState = {
     isDragging: boolean;
 } | null;
 type DragPreview = { placed: PlacedItem; x: number; y: number } | null;
+type DropHint = { kind: InvGridKind; gx: number; gy: number; valid: boolean } | null;
+
+/** Read-only drop validity for a grid cell, ignoring the dragged item's own cells. */
+function canDropAt(grid: GridInventory, placed: PlacedItem, gx: number, gy: number): boolean {
+    const item = placed.item;
+    if (gx < 0 || gy < 0 || gx + item.gridW > grid.width || gy + item.gridH > grid.height) return false;
+    for (let dy = 0; dy < item.gridH; dy++) {
+        for (let dx = 0; dx < item.gridW; dx++) {
+            const occ = grid.getAt(gx + dx, gy + dy);
+            if (occ && occ !== placed) {
+                // A rune/gem dropped onto a socket-capable host is still a valid move.
+                if (!isSocketDrop(item, occ)) return false;
+            }
+        }
+    }
+    return true;
+}
+
+/** Mirrors InventoryUI's socketing rule for hint purposes (read-only). */
+function isSocketDrop(item: PlacedItem['item'], host: PlacedItem): boolean {
+    if (!host.item.maxSockets) return false;
+    const cat = item.itemCategory ?? item.slot;
+    if (cat !== 'rune' && cat !== 'gem') return false;
+    if (!host.item.socketTypes?.includes(cat)) return false;
+    return (host.sockets?.length ?? 0) < host.item.maxSockets;
+}
 
 function placedItemKey(placed: PlacedItem): number {
     let key = placedItemKeys.get(placed);
@@ -66,11 +100,17 @@ function InvItem({
     spanned,
     dragging,
     onPointerDown,
+    onHoverEnter,
+    onHoverMove,
+    onHoverLeave,
 }: {
     placed: PlacedItem;
     spanned: boolean; // true = positioned on a grid; false = fills an equip slot
     dragging: boolean;
     onPointerDown: (e: ReactPointerEvent) => void;
+    onHoverEnter?: (e: ReactPointerEvent) => void;
+    onHoverMove?: (e: ReactPointerEvent) => void;
+    onHoverLeave?: () => void;
 }) {
     const it = placed.item;
     const posStyle: CSSProperties = spanned
@@ -83,7 +123,9 @@ function InvItem({
             className={`inv-item${dragging ? ' is-dragging' : ''}`}
             style={{ ...posStyle, background: `${it.color}33`, borderColor: it.color }}
             onPointerDown={onPointerDown}
-            title={`${itemName(it)}\n${statSummary(it)}`}
+            onPointerEnter={onHoverEnter}
+            onPointerMove={onHoverMove}
+            onPointerLeave={onHoverLeave}
             aria-label={itemName(it)}
         >
             <ItemGlyph item={it} className="inv-item__icon" />
@@ -103,13 +145,26 @@ function InvItem({
 export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; embedded?: boolean }) {
     useUiVersion();
     const store = useStore();
+    const tip = useItemTooltip();
     const drag = useRef<DragState>(null);
     const [dragPreview, setDragPreview] = useState<DragPreview>(null);
+    const [dropHint, setDropHint] = useState<DropHint>(null);
+    const [equipHint, setEquipHint] = useState<ItemSlot | null>(null);
     const [mutationSeq, setMutationSeq] = useState(0);
 
     const bag = inv.getBag();
     const ext = inv.getExternalGrid();
     const char = inv.getActiveCharacter();
+
+    // Tooltip content for a hovered item — equippables in a grid compare against
+    // the currently-worn item in that slot; everything else shows a plain card.
+    const tipFor = (placed: PlacedItem, fromEquip: boolean) => {
+        const it = placed.item;
+        if (!fromEquip && isEquippable(it) && char) {
+            return <ItemCompareTooltip candidate={it} equipped={char.equipment.get(it.slot)} candidatePlaced={placed} />;
+        }
+        return <ItemTooltip item={it} placed={placed} />;
+    };
 
     // Surface InventoryUI feedback (sort/takeAll/raid-loot) transiently.
     const fb = inv.getFeedback();
@@ -123,6 +178,7 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
 
     const beginPointerDrag = (placed: PlacedItem, source: InvDragSource) => (e: ReactPointerEvent) => {
         if (e.button !== 0) return;
+        tip.hide();
         const rect = e.currentTarget.getBoundingClientRect();
         const offsetX = source.kind === 'grid'
             ? e.clientX - rect.left
@@ -151,6 +207,35 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
         const clearDrag = () => {
             drag.current = null;
             setDragPreview(null);
+            setDropHint(null);
+            setEquipHint(null);
+        };
+
+        // Read-only drop-target highlight while dragging (footprint + equip slot).
+        const updateHints = (d: NonNullable<DragState>, clientX: number, clientY: number) => {
+            const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+            const gridEl = target?.closest<HTMLElement>('[data-inv-grid]');
+            if (gridEl) {
+                const kind = gridEl.dataset.invGrid as InvGridKind | undefined;
+                const grid = kind === 'bag' ? inv.getBag() : kind === 'ext' ? inv.getExternalGrid() : null;
+                if (kind && grid) {
+                    const rect = gridEl.getBoundingClientRect();
+                    const gx = Math.floor((clientX - d.offsetX - rect.left) / CELL);
+                    const gy = Math.floor((clientY - d.offsetY - rect.top) / CELL);
+                    setDropHint({ kind, gx, gy, valid: canDropAt(grid, d.placed, gx, gy) });
+                    setEquipHint(null);
+                    return;
+                }
+            }
+            const equipEl = target?.closest<HTMLElement>('[data-inv-equip]');
+            if (equipEl) {
+                const slot = equipEl.dataset.invEquip as ItemSlot | undefined;
+                setEquipHint(slot && slotAcceptsItem(slot, d.placed.item.slot) ? slot : null);
+                setDropHint(null);
+                return;
+            }
+            setDropHint(null);
+            setEquipHint(null);
         };
 
         const finishDrop = (d: NonNullable<DragState>, clientX: number, clientY: number): boolean => {
@@ -199,6 +284,7 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
             if (!d.isDragging && dist >= DRAG_THRESHOLD) d.isDragging = true;
             if (d.isDragging) {
                 setDragPreview({ placed: d.placed, x: d.x, y: d.y });
+                updateHints(d, e.clientX, e.clientY);
                 e.preventDefault();
             }
         };
@@ -264,7 +350,7 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
     const renderGrid = (grid: GridInventory, kind: InvGridKind) => (
         <div
             key={`${kind}-${mutationSeq}`}
-            className="inv-grid"
+            className={`inv-grid${dragPreview ? ' is-drop-active' : ''}`}
             style={{ width: grid.width * CELL, height: grid.height * CELL } as CSSProperties}
             data-inv-grid={kind}
         >
@@ -275,8 +361,22 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                     spanned
                     dragging={dragPreview?.placed === placed}
                     onPointerDown={beginPointerDrag(placed, { kind: 'grid', grid: kind, gridX: placed.gridX, gridY: placed.gridY })}
+                    onHoverEnter={tip.show(tipFor(placed, false))}
+                    onHoverMove={tip.move}
+                    onHoverLeave={tip.hide}
                 />
             ))}
+            {dropHint?.kind === kind && drag.current && (
+                <div
+                    className={`inv-drop-cell ${dropHint.valid ? 'is-valid' : 'is-invalid'}`}
+                    style={{
+                        left: dropHint.gx * CELL,
+                        top: dropHint.gy * CELL,
+                        width: drag.current.placed.item.gridW * CELL,
+                        height: drag.current.placed.item.gridH * CELL,
+                    } as CSSProperties}
+                />
+            )}
         </div>
     );
 
@@ -314,7 +414,7 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                             return (
                                 <div
                                     key={slot}
-                                    className={`inv-eqslot inv-eqslot--${slot}`}
+                                    className={`inv-eqslot inv-eqslot--${slot}${equipHint === slot ? ' is-drop-target' : ''}`}
                                     data-inv-equip={slot}
                                     title={t(labelKey)}
                                 >
@@ -325,6 +425,9 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                                             spanned={false}
                                             dragging={dragPreview?.placed === equipped}
                                             onPointerDown={beginPointerDrag(equipped, { kind: 'equip', slot })}
+                                            onHoverEnter={tip.show(tipFor(equipped, true))}
+                                            onHoverMove={tip.move}
+                                            onHoverLeave={tip.hide}
                                         />
                                     ) : (
                                         <span className="inv-eqslot__label">{t(labelKey)}</span>
@@ -364,6 +467,7 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                     <ItemGlyph item={dragPreview.placed.item} className="inv-item__icon" />
                 </div>
             )}
+            {tip.node}
         </div>
     );
 }
