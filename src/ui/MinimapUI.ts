@@ -38,6 +38,7 @@ export interface MinimapFooter {
 
 const MAP_SIZE = 152;
 const VIEW_RANGE = 26;
+export const MINIMAP_LOOT_REVEAL_RANGE = 18;
 const FRAME_PAD = 10;
 const HEADER_H = 26;
 const FULL_HEADER_H = 34;
@@ -84,6 +85,14 @@ const MINI_TILE_COLORS: Record<TileType, string> = {
     [TileType.DUNGEON_ENTRANCE]: '#8d4c7a',
 };
 
+export function isLootVisibleOnMinimap(
+    player: { x: number; y: number },
+    loot: { x: number; y: number; opened: boolean },
+    range: number = MINIMAP_LOOT_REVEAL_RANGE
+): boolean {
+    return !loot.opened && Math.abs(player.x - loot.x) + Math.abs(player.y - loot.y) <= range;
+}
+
 export class MinimapUI {
     private mode: MinimapMode = 'mini';
     private panelX = 0;
@@ -103,6 +112,11 @@ export class MinimapUI {
     private lastDragY = 0;
 
     constructor(private readonly config: MinimapConfig) {}
+
+    private getVisibleLoot(): { x: number; y: number; opened: boolean }[] {
+        const player = this.config.getPlayerPos();
+        return this.config.getLoot().filter((loot) => isLootVisibleOnMinimap(player, loot));
+    }
 
     public toggle(): void {
         this.cycleMode();
@@ -261,7 +275,7 @@ export class MinimapUI {
             this.drawRectMarker(ctx, mapX, mapY, tilePx, player, zone.x, zone.y, '#57ff86', Math.max(2, zone.radius * tilePx));
         }
 
-        for (const loot of this.config.getLoot()) {
+        for (const loot of this.getVisibleLoot()) {
             if (!loot.opened) this.drawDot(ctx, mapX, mapY, tilePx, player, loot.x, loot.y, '#ffe45c', 2.6);
         }
 
@@ -567,7 +581,7 @@ export class MinimapUI {
             this.drawFullRing(ctx, pos.x, pos.y, Math.max(4, zone.radius * scale), '#57ff86');
         }
 
-        for (const loot of this.config.getLoot()) {
+        for (const loot of this.getVisibleLoot()) {
             if (!loot.opened) {
                 const pos = toScreen(loot.x, loot.y);
                 this.drawFullDot(ctx, pos.x, pos.y, '#ffe45c', 3.2);
@@ -594,7 +608,7 @@ export class MinimapUI {
     ): void {
         const player = this.config.getPlayerPos();
         const enemyCount = this.config.getEnemies().length;
-        const lootCount = this.config.getLoot().filter((loot) => !loot.opened).length;
+        const lootCount = this.getVisibleLoot().filter((loot) => !loot.opened).length;
         const zoneCount = this.config.getExtractionZones().length;
         const footerX = this.panelX + 18;
         const footerY = this.panelY + panelH - FULL_FOOTER_H + 10;

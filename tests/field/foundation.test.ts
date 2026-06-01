@@ -23,6 +23,7 @@ import {
     terrainCostToApCost,
 } from '../../src/field/TerrainRules';
 import { TileType } from '../../src/map/Tile';
+import { MINIMAP_LOOT_REVEAL_RANGE, isLootVisibleOnMinimap } from '../../src/ui/MinimapUI';
 
 class ImageStub {
     public src = '';
@@ -72,6 +73,14 @@ test('blocked empty field click resolves as blocked', () => {
         { party: [], enemies: [], loot: [], isGroundWalkable: () => false }
     );
     assert.equal(hit.kind, 'blocked');
+});
+
+test('minimap loot markers only reveal nearby unopened loot', () => {
+    const player = { x: 100, y: 100 };
+
+    assert.equal(isLootVisibleOnMinimap(player, { x: 100 + MINIMAP_LOOT_REVEAL_RANGE, y: 100, opened: false }), true);
+    assert.equal(isLootVisibleOnMinimap(player, { x: 100 + MINIMAP_LOOT_REVEAL_RANGE + 1, y: 100, opened: false }), false);
+    assert.equal(isLootVisibleOnMinimap(player, { x: 101, y: 100, opened: true }), false);
 });
 
 test('pathing treats enemies as hard blockers while allowing allied soft collision', () => {

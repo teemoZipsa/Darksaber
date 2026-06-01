@@ -30,7 +30,7 @@ import {
     type InvDragSource,
     type InvGridKind,
 } from '../../../inventory/InventoryUI';
-import type { ItemSlot } from '../../../data/ItemDB';
+import type { ItemRarity, ItemSlot } from '../../../data/ItemDB';
 import { useStore, useUiVersion } from '../UiContext';
 import {
     ItemCompareTooltip,
@@ -60,6 +60,19 @@ type DragState = {
 } | null;
 type DragPreview = { placed: PlacedItem; x: number; y: number } | null;
 type DropHint = { kind: InvGridKind; gx: number; gy: number; valid: boolean } | null;
+
+const RARITY_CLASS: Record<ItemRarity, string> = {
+    common: 'is-rarity-common',
+    uncommon: 'is-rarity-uncommon',
+    rare: 'is-rarity-rare',
+    epic: 'is-rarity-epic',
+    legend: 'is-rarity-legend',
+    unique: 'is-rarity-unique',
+};
+
+function itemRarityClass(placed: PlacedItem): string {
+    return RARITY_CLASS[placed.item.rarity] ?? RARITY_CLASS.common;
+}
 
 /** Read-only drop validity for a grid cell, ignoring the dragged item's own cells. */
 function canDropAt(grid: GridInventory, placed: PlacedItem, gx: number, gy: number): boolean {
@@ -120,8 +133,8 @@ function InvItem({
     const socketed = placed.sockets?.length ?? 0;
     return (
         <div
-            className={`inv-item${dragging ? ' is-dragging' : ''}`}
-            style={{ ...posStyle, background: `${it.color}33`, borderColor: it.color }}
+            className={`inv-item ${itemRarityClass(placed)}${dragging ? ' is-dragging' : ''}`}
+            style={{ ...posStyle, background: `${it.color}33` }}
             onPointerDown={onPointerDown}
             onPointerEnter={onHoverEnter}
             onPointerMove={onHoverMove}
@@ -453,7 +466,7 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
             <div className="ds-inv__feedback">{feedback}</div>
             {dragPreview && (
                 <div
-                    className="inv-drag-ghost"
+                    className={`inv-drag-ghost ${itemRarityClass(dragPreview.placed)}`}
                     style={{
                         left: dragPreview.x,
                         top: dragPreview.y,
@@ -461,7 +474,6 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                         width: dragPreview.placed.item.gridW * CELL,
                         height: dragPreview.placed.item.gridH * CELL,
                         background: `${dragPreview.placed.item.color}33`,
-                        borderColor: dragPreview.placed.item.color,
                     } as CSSProperties}
                 >
                     <ItemGlyph item={dragPreview.placed.item} className="inv-item__icon" />

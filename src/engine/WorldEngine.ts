@@ -84,6 +84,7 @@ import { WorldRenderController } from './world/WorldRenderController';
 import { WorldInputController } from './world/WorldInputController';
 import { HitStop } from './world/HitStop';
 import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
+import { generateWorldLootNear } from '../loot/WorldLootGenerator';
 import { NetworkRaidClient, type NetworkRaidStatus } from '../net/NetworkRaidClient';
 import {
     DEFAULT_WORLD_SERVER_URL,
@@ -187,6 +188,9 @@ export class WorldEngine {
     private introTutorialPreviousWorldMap: WorldMap | null = null;
     private introTutorialInstructor: Player | null = null;
     private introTutorialCompletePending = false;
+    private localLootGeneratedChunks = new Set<string>();
+    private localLootSeed = 'local-world-loot';
+    private nextLocalWorldLootId = 1;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -590,6 +594,7 @@ export class WorldEngine {
         this.floatingText.update(dt);
         this.updateAttackCues(dt);
         this.playerActionController.processQueuedIntents();
+        this.ensureLocalWorldLootNearPlayer();
         this.refreshLootState();
         this.tacticalController.updateMarkers(dt);
         this.startNextReadyTurn();
@@ -986,6 +991,9 @@ export class WorldEngine {
         this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
         this.fieldEnemies = [];
         this.worldMap.loot = [];
+        this.localLootGeneratedChunks.clear();
+        this.localLootSeed = `local:${town.id}:${Date.now()}`;
+        this.nextLocalWorldLootId = 1;
         this.spawnStarterFieldContent();
         this.clearFieldTurnState();
         this.addCombatLog(`${town.nameKr}에서 로컬 월드로 출격.`);
@@ -1035,6 +1043,25 @@ export class WorldEngine {
         });
         this.fieldEnemies = content.enemies;
         this.worldMap.loot = content.loot;
+        this.ensureLocalWorldLootNearPlayer();
+    }
+
+    private ensureLocalWorldLootNearPlayer(): void {
+        if (this.isNetworkRaid || !this.raidSession.active || this.introTutorialActive) return;
+        const anchor = this.getControlledActor()?.entity ?? this.player;
+        if (!anchor) return;
+
+        const loot = generateWorldLootNear({
+            worldMap: this.worldMap,
+            playerTile: { x: anchor.gridX, y: anchor.gridY },
+            seed: this.localLootSeed,
+            generatedChunks: this.localLootGeneratedChunks,
+            existingLoot: this.worldMap.loot,
+            departureTownId: this.raidSession.currentHubTownId,
+            findNearbyWalkableTile: (tile, actorId) => this.movementController.findNearbyWalkableTile(tile, actorId),
+            createId: (containerType) => `world_${containerType}_${this.nextLocalWorldLootId++}`,
+        });
+        if (loot.length > 0) this.worldMap.loot.push(...loot);
     }
 
     private createNetworkRaidClient(): NetworkRaidClient {
@@ -1263,6 +1290,7 @@ export class WorldEngine {
         const loot = new LootObject(snapshot.id, snapshot.tile.x, snapshot.tile.y, [], {
             sourceLabel: snapshot.sourceLabel,
             kind: snapshot.kind,
+            containerType: snapshot.containerType,
             gridW: snapshot.gridSnapshot.width,
             gridH: snapshot.gridSnapshot.height,
         });
@@ -1599,6 +1627,9 @@ export class WorldEngine {
         this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
         this.fieldEnemies = [];
         this.worldMap.loot = [];
+        this.localLootGeneratedChunks.clear();
+        this.localLootSeed = `master:${Date.now()}`;
+        this.nextLocalWorldLootId = 1;
         this.spawnStarterFieldContent();
         this.clearFieldTurnState();
         this.dismissedTempleVisitKey = this.getCurrentTempleVisitKey();

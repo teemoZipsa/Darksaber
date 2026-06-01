@@ -803,14 +803,42 @@
 #ui-overlay .inv-item {
     box-sizing: border-box;
     display: flex; align-items: center; justify-content: center;
-    border: 1px solid; border-radius: 3px;
+    --inv-rarity-color: var(--ds-rarity-common);
+    border: 1px solid var(--inv-rarity-color); border-radius: 3px;
     cursor: grab; overflow: hidden;
     user-select: none; touch-action: none;
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+    box-shadow:
+        inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+        inset 0 0 10px rgba(0, 0, 0, 0.22);
+}
+#ui-overlay .inv-item.is-rarity-common,
+#ui-overlay .inv-drag-ghost.is-rarity-common { --inv-rarity-color: var(--ds-rarity-common); }
+#ui-overlay .inv-item.is-rarity-uncommon,
+#ui-overlay .inv-drag-ghost.is-rarity-uncommon { --inv-rarity-color: var(--ds-rarity-uncommon); }
+#ui-overlay .inv-item.is-rarity-rare,
+#ui-overlay .inv-drag-ghost.is-rarity-rare { --inv-rarity-color: var(--ds-rarity-rare); }
+#ui-overlay .inv-item.is-rarity-epic,
+#ui-overlay .inv-drag-ghost.is-rarity-epic { --inv-rarity-color: var(--ds-rarity-epic); }
+#ui-overlay .inv-item.is-rarity-legend,
+#ui-overlay .inv-drag-ghost.is-rarity-legend { --inv-rarity-color: var(--ds-rarity-legend); }
+#ui-overlay .inv-item.is-rarity-unique,
+#ui-overlay .inv-drag-ghost.is-rarity-unique { --inv-rarity-color: var(--ds-rarity-unique); }
+#ui-overlay .inv-item.is-rarity-rare,
+#ui-overlay .inv-item.is-rarity-epic,
+#ui-overlay .inv-item.is-rarity-legend,
+#ui-overlay .inv-item.is-rarity-unique {
+    box-shadow:
+        inset 0 0 0 1px rgba(0, 0, 0, 0.45),
+        inset 0 0 12px color-mix(in srgb, var(--inv-rarity-color) 18%, transparent);
 }
 #ui-overlay .inv-item.is-dragging { opacity: 0.45; }
 #ui-overlay .inv-item:active { cursor: grabbing; }
-#ui-overlay .inv-item:hover { box-shadow: inset 0 0 0 1px var(--ds-accent), 0 0 8px rgba(240, 192, 80, 0.3); }
+#ui-overlay .inv-item:hover {
+    border-color: color-mix(in srgb, var(--inv-rarity-color) 70%, var(--ds-accent) 30%);
+    box-shadow:
+        inset 0 0 0 1px var(--ds-accent),
+        0 0 8px color-mix(in srgb, var(--inv-rarity-color) 38%, transparent);
+}
 #ui-overlay .inv-item__icon.is-sprite { width: 32px; height: 32px; }
 #ui-overlay .inv-item__icon.is-emoji { font-size: 22px; line-height: 1; }
 #ui-overlay .inv-item__qty {
@@ -834,8 +862,13 @@
     pointer-events: none;
     box-sizing: border-box;
     display: flex; align-items: center; justify-content: center;
-    border: 1px solid; border-radius: 3px;
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.55), 0 10px 24px rgba(0, 0, 0, 0.5);
+    --inv-rarity-color: var(--ds-rarity-common);
+    border: 1px solid var(--inv-rarity-color); border-radius: 3px;
+    box-shadow:
+        inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+        inset 0 0 16px color-mix(in srgb, var(--inv-rarity-color) 20%, transparent),
+        0 10px 24px rgba(0, 0, 0, 0.5),
+        0 0 14px color-mix(in srgb, var(--inv-rarity-color) 24%, transparent);
 }
 
 #ui-overlay .inv-equip {

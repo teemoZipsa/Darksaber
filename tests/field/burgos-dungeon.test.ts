@@ -18,7 +18,7 @@ import {
 } from '../../src/data/MonsterCatalog';
 import { getItemDef } from '../../src/data/ItemDB';
 import { getStoryQuestByDungeonId } from '../../src/data/StoryQuestData';
-import { getStoryScenarioByDungeonId } from '../../src/data/StoryScenarioData';
+import { STORY_SCENARIOS, getStoryScenarioByDungeonId } from '../../src/data/StoryScenarioData';
 import { Enemy } from '../../src/entity/Enemy';
 import { LootObject } from '../../src/entity/LootObject';
 import { Player } from '../../src/entity/Player';
@@ -28,6 +28,7 @@ import type { WorldMovementController } from '../../src/engine/world/WorldMoveme
 import { WorldRaidSession } from '../../src/engine/world/WorldRaidSession';
 import { WorldSelectionController } from '../../src/engine/world/WorldSelectionController';
 import { GridInventory } from '../../src/inventory/GridInventory';
+import { generateWorldLootNear } from '../../src/loot/WorldLootGenerator';
 import { BURGOS_CASTLE_HMAP_ROWS, BURGOS_CASTLE_HMAP_SIZE } from '../../src/map/BurgosCastleHmap';
 import { WorldMap } from '../../src/map/WorldMap';
 import { TileType } from '../../src/map/Tile';
@@ -142,19 +143,113 @@ test('starter field content attaches all 16 general monster walk sprites', () =>
     }
 });
 
-test('starter field chests roll low-tier gems through injected RNG', () => {
-    const mortalSpawner = new WorldFieldSpawnController(makePassthroughMovement(), () => 0);
-    const mortal = mortalSpawner.createStarterFieldContent(new Player(100, 100));
-    const mortalChest = mortal.loot.find((loot) => loot.id === 'field_chest_1');
-    assert.ok(mortalChest);
-    assert.ok(mortalChest.inventory.items.some((placed) => /^gem_(chipped|flawed)_/.test(placed.item.id)));
+test('world loot generator is deterministic and does not revisit generated chunks', () => {
+    const world = new WorldMap();
+    const town = world.getTowns().find((candidate) => candidate.id === 'central_castle');
+    assert.ok(town);
+    const anchor = world.getTownExitTile(town);
+    const firstChunks = new Set<string>();
+    const secondChunks = new Set<string>();
+    const createId = (type: string, chunkX: number, chunkY: number) => `loot_${type}_${chunkX}_${chunkY}`;
 
-    const rolls = [0, 0.99];
-    const masterSpawner = new WorldFieldSpawnController(makePassthroughMovement(), () => rolls.shift() ?? 0);
-    const master = masterSpawner.createStarterFieldContent(new Player(100, 100), { masterRealm: true });
-    const masterChest = master.loot.find((loot) => loot.id === 'field_chest_1');
-    assert.ok(masterChest);
-    assert.ok(masterChest.inventory.items.some((placed) => placed.item.id.startsWith('gem_normal_')));
+    const first = generateWorldLootNear({
+        worldMap: world,
+        playerTile: anchor,
+        seed: 'deterministic-test',
+        generatedChunks: firstChunks,
+        existingLoot: [],
+        departureTownId: town.id,
+        findNearbyWalkableTile: (tile) => tile,
+        createId,
+        minNew: 3,
+    });
+    const duplicate = generateWorldLootNear({
+        worldMap: world,
+        playerTile: anchor,
+        seed: 'deterministic-test',
+        generatedChunks: firstChunks,
+        existingLoot: first,
+        departureTownId: town.id,
+        findNearbyWalkableTile: (tile) => tile,
+        createId,
+        minNew: 3,
+    });
+    const replay = generateWorldLootNear({
+        worldMap: world,
+        playerTile: anchor,
+        seed: 'deterministic-test',
+        generatedChunks: secondChunks,
+        existingLoot: [],
+        departureTownId: town.id,
+        findNearbyWalkableTile: (tile) => tile,
+        createId,
+        minNew: 3,
+    });
+
+    assert.ok(first.length > 0);
+    assert.equal(duplicate.length, 0);
+    assert.deepEqual(
+        replay.map((loot) => ({
+            id: loot.id,
+            x: loot.x,
+            y: loot.y,
+            containerType: loot.containerType,
+            items: loot.inventory.items.map((placed) => placed.item.id),
+        })),
+        first.map((loot) => ({
+            id: loot.id,
+            x: loot.x,
+            y: loot.y,
+            containerType: loot.containerType,
+            items: loot.inventory.items.map((placed) => placed.item.id),
+        }))
+    );
+    assert.ok(first.every((loot) => world.getTileAt(loot.x, loot.y) !== TileType.TOWN));
+});
+
+test('world loot generator rejects blocked and ocean candidates', () => {
+    const world = new WorldMap();
+    const generatedChunks = new Set<string>();
+    const loot = generateWorldLootNear({
+        worldMap: world,
+        playerTile: { x: 16, y: 16 },
+        seed: 'ocean-test',
+        generatedChunks,
+        existingLoot: [],
+        findNearbyWalkableTile: (tile) => tile,
+        createId: (type, chunkX, chunkY) => `loot_${type}_${chunkX}_${chunkY}`,
+        minNew: 3,
+    });
+
+    assert.equal(loot.length, 0);
+});
+
+test('sealed reliquary loot comes only from non-quest rare tables', () => {
+    const world = new WorldMap();
+    const dungeon = world.getDungeons().find((candidate) => candidate.id === BURGOS_CASTLE_DUNGEON_ID);
+    assert.ok(dungeon);
+    const anchor = world.getDungeonEntranceTile(dungeon);
+    let reliquary: LootObject | undefined;
+
+    for (let seed = 0; seed < 1_000 && !reliquary; seed++) {
+        const loot = generateWorldLootNear({
+            worldMap: world,
+            playerTile: anchor,
+            seed: `sealed-${seed}`,
+            generatedChunks: new Set<string>(),
+            existingLoot: [],
+            findNearbyWalkableTile: (tile) => tile,
+            createId: (type, chunkX, chunkY) => `loot_${type}_${chunkX}_${chunkY}`,
+            maxNew: 3,
+            minNew: 3,
+        });
+        reliquary = loot.find((candidate) => candidate.containerType === 'sealed_reliquary');
+    }
+
+    assert.ok(reliquary);
+    const itemIds = reliquary.inventory.items.map((placed) => placed.item.id);
+    assert.ok(itemIds.length > 0);
+    assert.ok(itemIds.every((itemId) => !itemId.startsWith('quest_') && itemId !== 'absolution_edge'));
 });
 
 test('Burgos Castle encounter spawns wolf boss center and four diagonal guards', () => {
@@ -251,6 +346,37 @@ test('story scenario encounters include original named monsters and special obje
 
     const amentFirstContent = spawner.createStoryScenarioEncounter(amentFirst, { x: 100, y: 100 });
     assert.equal(amentFirstContent.enemies.filter((entry) => entry.enemy.name === '우레우스 석상').length, 4);
+});
+
+test('story episodes 3 through 20 have map entrances and completable objectives', () => {
+    const world = new WorldMap();
+    const spawner = new WorldFieldSpawnController(makePassthroughMovement());
+
+    for (const scenario of STORY_SCENARIOS.filter((entry) => entry.episode >= 3 && entry.episode <= 20)) {
+        const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+        assert.ok(quest, `missing quest for episode ${scenario.episode}`);
+
+        const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+        assert.ok(dungeon, `missing dungeon landmark for episode ${scenario.episode}`);
+        const entrance = world.getDungeonEntranceTile(dungeon);
+        assert.equal(world.getDungeonAtTile(entrance.x, entrance.y)?.id, scenario.dungeonId);
+        assert.equal(world.getTileAt(entrance.x, entrance.y), TileType.DUNGEON_ENTRANCE);
+
+        const content = spawner.createStoryScenarioEncounter(scenario, { x: 100, y: 100 });
+        assert.ok(content.enemies.length > 0, `missing encounter for episode ${scenario.episode}`);
+        const bosses = content.enemies.filter((entry) => entry.enemy.isBoss);
+        if (scenario.episode === 17) {
+            assert.equal(bosses.length, 0, 'airship should complete on boarding instead of boss defeat');
+        } else {
+            assert.equal(bosses.length, 1, `episode ${scenario.episode} should have one objective boss`);
+            assert.equal(bosses[0].enemy.name, scenario.bossName);
+            assert.ok(
+                bosses[0].enemy.id === `${scenario.dungeonId}_objective`
+                    || bosses[0].enemy.id === `${scenario.dungeonId}_true_amphit`,
+                `unexpected objective id ${bosses[0].enemy.id}`
+            );
+        }
+    }
 });
 
 test('normal enemy loot is auto-collected into the backpack', () => {

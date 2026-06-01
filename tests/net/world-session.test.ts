@@ -161,24 +161,36 @@ test('disconnect grace resumes same actor before expiry and starts fresh after e
 
 test('loot contention grants one occupant and rejects the other', () => {
     const session = new WorldSession();
-    const a = session.join(joinMessage('central_castle', 'hero-a'), 0);
-    const b = session.join(joinMessage('central_castle', 'hero-b'), 0);
+    const a = session.join({
+        ...joinMessage('central_castle', 'hero-a'),
+        partyComposition: [actor('hero-a', { stats: createBaseStats({ spd: 100, mov: 500, actionLimit: 80, hitRate: 200 }) })],
+    }, 0);
+    const b = session.join({
+        ...joinMessage('central_castle', 'hero-b'),
+        partyComposition: [actor('hero-b', { stats: createBaseStats({ spd: 100, mov: 500, actionLimit: 80, hitRate: 200 }) })],
+    }, 0);
     session.tick(0);
     session.tick(1_000);
 
     const snapshot = session.createSnapshot(a.playerId, 1_000);
     const loot = snapshot.loot[0];
     assert.ok(loot);
+    const world = new WorldMap();
+    const adjacentTile = [
+        { x: loot.tile.x - 1, y: loot.tile.y },
+        { x: loot.tile.x + 1, y: loot.tile.y },
+        { x: loot.tile.x, y: loot.tile.y - 1 },
+        { x: loot.tile.x, y: loot.tile.y + 1 },
+    ].find((tile) => world.isWalkable(tile.x, tile.y));
+    assert.ok(adjacentTile);
 
+    const internals = session as any;
     for (const playerId of [a.playerId, b.playerId]) {
-        const actorId = session.createSnapshot(playerId, 1_000).partyActors.find((entry) => entry.ownerPlayerId === playerId)!.id;
-        session.handleMessage(playerId, {
-            type: 'PLAYER_INTENT',
-            intentId: `move-${playerId}`,
-            actorId,
-            kind: 'move',
-            payload: { tile: { x: loot.tile.x - 1, y: loot.tile.y } },
-        }, 1_000);
+        const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === playerId);
+        assert.ok(serverActor);
+        serverActor.tile = { ...adjacentTile };
+        serverActor.remainingAp = 80;
+        serverActor.actionGauge = 80;
     }
 
     const actorA = session.createSnapshot(a.playerId, 1_000).partyActors.find((entry) => entry.ownerPlayerId === a.playerId)!.id;
@@ -200,6 +212,32 @@ test('loot contention grants one occupant and rejects the other', () => {
 
     assert.equal(grant.replies[0]?.type, 'LOOT_GRANT');
     assert.equal(reject.replies[0]?.type, 'ACTION_REJECTED');
+});
+
+test('network world loot snapshots are shared and include container types', () => {
+    const session = new WorldSession();
+    const a = session.join(joinMessage('central_castle', 'hero-a'), 0);
+    const b = session.join(joinMessage('central_castle', 'hero-b'), 0);
+    session.tick(1_000);
+
+    const lootA = session.createSnapshot(a.playerId, 1_000).loot.map((loot) => ({
+        id: loot.id,
+        tile: loot.tile,
+        sourceLabel: loot.sourceLabel,
+        kind: loot.kind,
+        containerType: loot.containerType,
+    }));
+    const lootB = session.createSnapshot(b.playerId, 1_000).loot.map((loot) => ({
+        id: loot.id,
+        tile: loot.tile,
+        sourceLabel: loot.sourceLabel,
+        kind: loot.kind,
+        containerType: loot.containerType,
+    }));
+
+    assert.ok(lootA.length > 0);
+    assert.ok(lootA.every((loot) => loot.kind === 'chest' && loot.containerType));
+    assert.deepEqual(lootB, lootA);
 });
 
 test('network kills auto-grant normal enemy loot and include display names in combat events', () => {

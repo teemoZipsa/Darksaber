@@ -2,6 +2,7 @@ import type { StatusEffect } from '../combat/StatusEffects';
 import type { MarketSnapshot } from '../data/MarketData';
 import type { CharacterStats } from '../data/Stats';
 import type { EnemyRole } from '../field/EnemyAI';
+import type { WorldLootContainerType } from '../loot/WorldLootTypes';
 
 const configuredWorldServerUrl = import.meta.env?.VITE_WORLD_SERVER_URL?.trim();
 
@@ -71,6 +72,7 @@ export interface LootSnapshot {
     tile: NetTilePoint;
     sourceLabel: string;
     kind: 'chest' | 'corpse';
+    containerType?: WorldLootContainerType;
     opened: boolean;
     lockedByPlayerId?: string;
     gridSnapshot: GridSnapshot;

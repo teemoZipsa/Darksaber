@@ -12,7 +12,9 @@ import { rollBossRune, rollChestGem } from '../../src/data/SocketLoot';
 import { getSkill } from '../../src/data/SkillDB';
 import { getSkillVisualProfile } from '../../src/data/SkillVisualProfiles';
 import { createBaseStats, getBaseStatsForClass } from '../../src/data/Stats';
-import { getStoryCompanionRewards } from '../../src/data/StoryQuestData';
+import { STORY_QUESTS, getStoryCompanionRewards } from '../../src/data/StoryQuestData';
+import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { i18n } from '../../src/i18n/LanguageManager';
 import type { Skill } from '../../src/data/SkillDB';
 import {
     TOWN_FACILITIES,
@@ -97,6 +99,29 @@ test('rest, monster, and starting class data reject unknown ids', () => {
     assert.deepEqual(CHAR_CLASSES.map((cfg) => cfg.id), ['infantry', 'cavalry', 'cleric', 'mage']);
     assert.ok(getStoryCompanionRewards().some((reward) => reward.classId === 'shrine'));
     assert.ok(getStoryCompanionRewards().some((reward) => reward.classId === 'alchemist'));
+});
+
+test('story episodes 1 through 20 are chained and fully localized', () => {
+    assert.deepEqual(STORY_SCENARIOS.map((scenario) => scenario.episode), Array.from({ length: 20 }, (_, i) => i + 1));
+    assert.equal(STORY_QUESTS.length, 20);
+
+    const ko = i18n.strings.ko as Record<string, string>;
+    const en = i18n.strings.en as Record<string, string>;
+    for (const [index, quest] of STORY_QUESTS.entries()) {
+        assert.equal(quest.episode, index + 1);
+        assert.equal(quest.prerequisiteQuestId, index === 0 ? undefined : STORY_QUESTS[index - 1].id);
+        for (const key of [
+            quest.titleKey,
+            quest.summaryKey,
+            quest.objectiveKey,
+            quest.recommendedLevelKey,
+            quest.enterLogKey,
+            quest.objectiveCompleteLogKey,
+        ].filter((key): key is string => Boolean(key))) {
+            assert.ok(ko[key], `missing ko story key ${key}`);
+            assert.ok(en[key], `missing en story key ${key}`);
+        }
+    }
 });
 
 test('player data guards gold and normalizes old save shapes', () => {

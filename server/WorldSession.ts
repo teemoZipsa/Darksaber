@@ -16,6 +16,7 @@ import {
 } from '../src/data/MonsterCatalog';
 import { Enemy } from '../src/entity/Enemy';
 import { LootObject } from '../src/entity/LootObject';
+import { generateWorldLootNear } from '../src/loot/WorldLootGenerator';
 import {
     ATTACK_AP_COST,
     INTERACT_AP_COST,
@@ -162,6 +163,7 @@ export class WorldSession {
     private readonly loot = new Map<string, LootObject>();
     private readonly lootLocks = new Map<string, LootLock>();
     private readonly autoLootPending = new Map<string, AutoLootPending>();
+    private readonly generatedLootChunks = new Set<string>();
     private seq = 0;
     private nextPlayerId = 1;
     private nextEnemyId = 1;
@@ -239,7 +241,7 @@ export class WorldSession {
             player.actorIds.push(actorId);
         });
 
-        this.ensureContentNear(spawnTile);
+        this.ensureContentNear(spawnTile, player.departureTownId);
         this.log(`join player=${playerId} origin=${originHubId} actors=${player.actorIds.length}`);
         return {
             playerId,
@@ -511,6 +513,7 @@ export class WorldSession {
             actor.facing = directionFromTo(actor.tile, next);
             actor.tile = { ...next };
         }
+        this.spawnLootNear(actor.tile, this.players.get(actor.ownerPlayerId)?.departureTownId);
         this.finishActorIfSpent(actor);
         return { replies: [], broadcasts: [] };
     }
@@ -918,14 +921,13 @@ export class WorldSession {
         actor.actionGauge = actor.remainingAp;
     }
 
-    private ensureContentNear(spawnTile: TilePoint): void {
+    private ensureContentNear(spawnTile: TilePoint, departureTownId?: string | null): void {
         const hasNearbyEnemy = [...this.enemies.values()].some((entry) =>
             entry.enemy.stats.hp > 0 && manhattan({ x: entry.enemy.gridX, y: entry.enemy.gridY }, spawnTile) <= 24
         );
         if (!hasNearbyEnemy) this.spawnEnemiesNear(spawnTile);
 
-        const hasNearbyLoot = [...this.loot.values()].some((loot) => manhattan({ x: loot.x, y: loot.y }, spawnTile) <= 8);
-        if (!hasNearbyLoot) this.spawnLootNear(spawnTile);
+        this.spawnLootNear(spawnTile, departureTownId);
     }
 
     private spawnEnemiesNear(anchor: TilePoint): void {
@@ -940,18 +942,19 @@ export class WorldSession {
         });
     }
 
-    private spawnLootNear(anchor: TilePoint): void {
-        const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
-        const sword = getItemDef('short_sword');
-        const seeds = [
-            { offset: { x: 3, y: 2 }, item: herb, label: '버려진 보급 상자', kind: 'chest' as const },
-            { offset: { x: -3, y: 4 }, item: sword, label: '전사자의 배낭', kind: 'corpse' as const },
-        ];
-        for (const seed of seeds) {
-            if (!seed.item) continue;
-            const id = `loot_${this.nextLootId++}`;
-            const tile = this.findNearbyWalkableTile({ x: anchor.x + seed.offset.x, y: anchor.y + seed.offset.y }, id);
-            this.loot.set(id, new LootObject(id, tile.x, tile.y, [seed.item], { sourceLabel: seed.label, kind: seed.kind }));
+    private spawnLootNear(anchor: TilePoint, departureTownId?: string | null): void {
+        const loot = generateWorldLootNear({
+            worldMap: this.worldMap,
+            playerTile: anchor,
+            seed: `server:${this.sessionEpoch}`,
+            generatedChunks: this.generatedLootChunks,
+            existingLoot: [...this.loot.values()],
+            departureTownId,
+            findNearbyWalkableTile: (tile, actorId) => this.findNearbyWalkableTile(tile, actorId),
+            createId: (containerType) => `loot_${containerType}_${this.nextLootId++}`,
+        });
+        for (const lootObject of loot) {
+            this.loot.set(lootObject.id, lootObject);
         }
     }
 
@@ -1064,6 +1067,7 @@ export class WorldSession {
             tile: { x: lootObject.x, y: lootObject.y },
             sourceLabel: lootObject.sourceLabel,
             kind: lootObject.kind,
+            containerType: lootObject.containerType,
             opened: lootObject.opened,
             lockedByPlayerId: this.lootLocks.get(lootObject.id)?.playerId,
             gridSnapshot: gridToSnapshot(lootObject.inventory),
