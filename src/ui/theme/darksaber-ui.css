@@ -787,6 +787,12 @@
     font-size: 12px; letter-spacing: 1px; color: var(--ds-accent);
     border-bottom: 1px solid var(--ds-border-shadow); padding-bottom: 5px;
 }
+#ui-overlay .ds-inv__weight {
+    color: var(--ds-muted);
+    font-size: 11px;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
 
 #ui-overlay .inv-grid {
     position: relative; flex: none;

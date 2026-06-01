@@ -5,6 +5,7 @@ import { createBaseStats } from '../../src/data/Stats';
 import { getEffectiveStatsForCharacter } from '../../src/combat/StatusEffects';
 import { GridInventory, PlacedItem } from '../../src/inventory/GridInventory';
 import { InventoryUI } from '../../src/inventory/InventoryUI';
+import { CARRY_MIN_ATB_MULTIPLIER, getCarryAtbMultiplier, getPartyCarriedWeight, getPlacedItemsWeight } from '../../src/inventory/CarryWeight';
 import { getRepairCost, repairItem, unsocketAll } from '../../src/inventory/Socketing';
 import { computeRaidFailureLoss } from '../../src/raid/RaidOutcome';
 import { resolveTownArrival, shouldAdvanceRaidTimer } from '../../src/raid/RaidRules';
@@ -73,6 +74,27 @@ test('normalizeItemDef applies stable defaults to raw items', () => {
     assert.equal(normalized.rarity, 'common');
     assert.equal(normalized.weight, 2.3);
     assert.ok(normalized.baseValue > 0);
+});
+
+test('carry weight totals backpack, sockets, and equipment for ATB penalty', () => {
+    const sword = placed('short_sword');
+    const herb = placed('herb_cheap');
+    herb.quantity = 3;
+    const rune = getItemDef(RUNE_ITEM_IDS[0]);
+    assert.ok(rune);
+    sword.sockets = [rune];
+
+    const char = inventoryCharacter();
+    char.equipment.set('weapon', sword);
+
+    const backpackWeight = getPlacedItemsWeight([herb]);
+    assert.equal(backpackWeight, Number((herb.item.weight * 3).toFixed(1)));
+
+    const total = getPartyCarriedWeight([herb], [char]);
+    assert.equal(total, Number((backpackWeight + sword.item.weight + rune.weight).toFixed(1)));
+    assert.equal(getCarryAtbMultiplier(0), 1);
+    assert.ok(getCarryAtbMultiplier(total) <= 1);
+    assert.equal(getCarryAtbMultiplier(999), CARRY_MIN_ATB_MULTIPLIER);
 });
 
 test('town facilities cover mortal and master towns', () => {

@@ -13,6 +13,7 @@ import { LootObject } from '../entity/LootObject';
 import { PartyManager } from '../character/PartyManager';
 import { Character } from '../character/Character';
 import { GridInventory, type PlacedItem } from '../inventory/GridInventory';
+import { getCarryAtbMultiplier, getPartyCarriedWeight } from '../inventory/CarryWeight';
 import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
 import { rollBossRune } from '../data/SocketLoot';
@@ -266,6 +267,9 @@ export class WorldEngine {
             getFieldEnemies: () => this.fieldEnemies,
             getTileAt: (x, y) => this.worldMap.getTileAt(x, y),
             getTerrainTraitsForActorId: (actorId) => this.getTerrainTraitsForActorId(actorId),
+            getPartyCarryAtbMultiplier: () => getCarryAtbMultiplier(
+                getPartyCarriedWeight(this.gameManager.inventory.items, this.party.getCharacters())
+            ),
         });
         this.fieldSpawnController = new WorldFieldSpawnController(this.movementController);
         this.enemyTurnController = new WorldEnemyTurnController(
@@ -946,6 +950,7 @@ export class WorldEngine {
             const welcome = await this.networkRaidClient.connectAndJoin({
                 originHubId: town.id,
                 partyComposition: this.createPartyCompositionSnapshot(town),
+                carriedWeight: getPartyCarriedWeight(this.gameManager.inventory.items, this.party.getCharacters()),
             });
 
             this.townSession.hide();

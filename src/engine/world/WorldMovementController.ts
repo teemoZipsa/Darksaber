@@ -19,6 +19,7 @@ export interface WorldMovementContext {
     getFieldEnemies: () => FieldEnemy[];
     getTileAt: (x: number, y: number) => TileType;
     getTerrainTraitsForActorId: (actorId?: string) => TerrainActorTraits;
+    getPartyCarryAtbMultiplier?: () => number;
 }
 
 export interface PartyMovementInput {
@@ -52,6 +53,7 @@ export class WorldMovementController {
     public updatePartyActors(input: PartyMovementInput): PartyMovementResult {
         const readyActorIds: string[] = [];
         let followRepathTimer = input.followRepathTimer - input.dt;
+        const carryAtbMultiplier = this.context.getPartyCarryAtbMultiplier?.() ?? 1;
 
         for (const actor of this.context.getPartyActors()) {
             if (actor.character.isDead) continue;
@@ -60,7 +62,7 @@ export class WorldMovementController {
                     actor.entity.actionGauge,
                     getEffectiveStatsForCharacter(actor.character).spd,
                     input.dt,
-                    FIELD_ATB_SCALE
+                    FIELD_ATB_SCALE * carryAtbMultiplier
                 );
                 if (actor.entity.actionGauge >= 100) {
                     actor.entity.actionGauge = 100;

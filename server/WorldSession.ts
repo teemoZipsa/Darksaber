@@ -16,6 +16,7 @@ import {
 } from '../src/data/MonsterCatalog';
 import { Enemy } from '../src/entity/Enemy';
 import { LootObject } from '../src/entity/LootObject';
+import { getCarryAtbMultiplier, getPlacedItemWeight } from '../src/inventory/CarryWeight';
 import { generateWorldLootNear } from '../src/loot/WorldLootGenerator';
 import {
     ATTACK_AP_COST,
@@ -90,6 +91,7 @@ interface ServerPlayer {
     departureTownId: string;
     elapsedSeconds: number;
     kills: number;
+    carriedWeight: number;
     active: boolean;
     ghost: boolean;
     disconnectedAt: number | null;
@@ -207,6 +209,7 @@ export class WorldSession {
             departureTownId: originHubId,
             elapsedSeconds: 0,
             kills: 0,
+            carriedWeight: sanitizeCarriedWeight(message.carriedWeight),
             active: true,
             ghost: false,
             disconnectedAt: null,
@@ -333,7 +336,12 @@ export class WorldSession {
                     actor.remainingAp = FIELD_MAX_ACTION_GAUGE;
                     actor.majorActionUsed = false;
                 } else if (actor.actionGauge < FIELD_MAX_ACTION_GAUGE) {
-                    actor.actionGauge = advanceAtb(actor.actionGauge, getEffectiveStats(actor.stats, actor.statuses).spd, dt, FIELD_ATB_SCALE);
+                    actor.actionGauge = advanceAtb(
+                        actor.actionGauge,
+                        getEffectiveStats(actor.stats, actor.statuses).spd,
+                        dt,
+                        FIELD_ATB_SCALE * getCarryAtbMultiplier(player.carriedWeight)
+                    );
                     if (actor.actionGauge >= FIELD_MAX_ACTION_GAUGE) {
                         actor.actionGauge = FIELD_MAX_ACTION_GAUGE;
                         actor.remainingAp = FIELD_MAX_ACTION_GAUGE;
@@ -583,6 +591,7 @@ export class WorldSession {
         const placed = lootObject.inventory.getAt(gridX, gridY);
         if (!placed) return reject(intentId, 'No item at requested loot cell.');
         lootObject.inventory.remove(placed);
+        this.addCarriedWeight(playerId, getPlacedItemWeight(placed));
         lock.lastTouchedAt = now;
         lootObject.opened = lootObject.inventory.items.length === 0;
         if (lootObject.opened) this.lootLocks.delete(lootId);
@@ -607,12 +616,15 @@ export class WorldSession {
         if (!pending || pending.playerId !== playerId || !lootObject) return { replies: [], broadcasts: [] };
 
         const removed = new Set<object>();
+        let acceptedWeight = 0;
         for (const cell of acceptedCells) {
             const placed = lootObject.inventory.getAt(cell.gridX, cell.gridY);
             if (!placed || removed.has(placed)) continue;
             lootObject.inventory.remove(placed);
             removed.add(placed);
+            acceptedWeight += getPlacedItemWeight(placed);
         }
+        this.addCarriedWeight(playerId, acceptedWeight);
 
         this.autoLootPending.delete(lootId);
         lootObject.opened = lootObject.inventory.items.length === 0;
@@ -1030,6 +1042,12 @@ export class WorldSession {
         this.logger(message);
     }
 
+    private addCarriedWeight(playerId: string, weight: number): void {
+        const player = this.players.get(playerId);
+        if (!player || weight <= 0) return;
+        player.carriedWeight = sanitizeCarriedWeight(player.carriedWeight + weight);
+    }
+
     private consumeTickDelta(now: number): number {
         if (this.lastTickAt === null) {
             this.lastTickAt = now;
@@ -1199,6 +1217,11 @@ function readStringPayload(payload: unknown, key: string): string | null {
     if (!payload || typeof payload !== 'object') return null;
     const value = (payload as Record<string, unknown>)[key];
     return typeof value === 'string' ? value : null;
+}
+
+function sanitizeCarriedWeight(value: unknown): number {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+    return Math.max(0, Math.round(value * 10) / 10);
 }
 
 function createFallbackActorSnapshot(): ActorSnapshot {

@@ -109,6 +109,7 @@ export interface WorldJoinMessage {
     originHubId: string;
     partyComposition: ActorSnapshot[];
     clientVersion: string;
+    carriedWeight?: number;
     resumeToken?: string;
 }
 

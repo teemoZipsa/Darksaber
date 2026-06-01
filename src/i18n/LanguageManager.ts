@@ -106,6 +106,7 @@ export const i18n = {
             // Inventory
             'inv.title': '⚔️ 장비 및 소지품',
             'inv.backpack': '공용 배낭',
+            'inv.weightSummary': '무게 {weight} / ATB {percent}%',
             'inv.equipment': '장비',
             'inv.takeAll': '전부 가져가기',
             'inv.sort': '정리',
@@ -515,7 +516,7 @@ export const i18n = {
             'raid.autoLoot': '전리품 자동 획득',
             'raid.autoLootFull': '배낭 공간 부족. 남은 전리품이 바닥에 떨어졌습니다.',
             'raid.bossSpawn': '강력한 적이 근처에 출현했습니다!',
-            'raid.extraction': '🚁 탈출 지점 (20분 내 도달)',
+            'raid.extraction': '🚁 탈출 지점 (30분 내 도달)',
 
             // Tactical markers
             'tactical.ping.position': '위치 핑',
@@ -664,6 +665,7 @@ export const i18n = {
             // Inventory
             'inv.title': '⚔️ Equipment & Inventory',
             'inv.backpack': 'Shared Backpack',
+            'inv.weightSummary': 'Weight {weight} / ATB {percent}%',
             'inv.equipment': 'Equipment',
             'inv.takeAll': 'Take All',
             'inv.sort': 'Sort',
@@ -1073,7 +1075,7 @@ export const i18n = {
             'raid.autoLoot': 'Loot auto-collected',
             'raid.autoLootFull': 'Backpack full. Remaining loot dropped on the ground.',
             'raid.bossSpawn': 'A powerful enemy has appeared nearby!',
-            'raid.extraction': '🚁 Extraction Point (reach within 20 min)',
+            'raid.extraction': '🚁 Extraction Point (reach within 30 min)',
 
             // Tactical markers
             'tactical.ping.position': 'Ping Location',

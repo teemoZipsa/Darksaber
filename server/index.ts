@@ -17,6 +17,7 @@ import { WorldSession, WORLD_TICK_MS } from './WorldSession';
 
 const PORT = Number(process.env.PORT ?? 8765);
 const HOST = process.env.HOST;
+const ENABLE_DEBUG_COUNTS = process.env.WORLD_DEBUG_COUNTS === '1';
 const server = createServer((request, response) => {
     if (request.url === '/healthz') {
         response.writeHead(200, { 'Content-Type': 'application/json' });
@@ -113,27 +114,31 @@ wss.on('connection', (ws: WebSocket) => {
 });
 
 setInterval(() => {
-    const marketUpdate = marketSession.tick(Date.now());
+    const now = Date.now();
+    const marketUpdate = marketSession.tick(now);
     if (marketUpdate) broadcastToAll(marketUpdate);
 
-    const result = session.tick(Date.now());
+    const result = session.tick(now);
     for (const event of result.events) broadcastToActive(event);
     for (const entry of result.perPlayerMessages) {
         const ws = socketByPlayer.get(entry.playerId);
         if (ws) send(ws, entry.message);
     }
-    for (const playerId of session.getActivePlayerIds()) {
+    const activePlayerIds = session.getActivePlayerIds();
+    for (const playerId of activePlayerIds) {
         const ws = socketByPlayer.get(playerId);
-        if (ws) send(ws, { type: 'WORLD_SNAPSHOT', snapshot: session.createSnapshot(playerId) });
+        if (ws) send(ws, { type: 'WORLD_SNAPSHOT', snapshot: session.createSnapshot(playerId, now) });
     }
 }, WORLD_TICK_MS);
 
-setInterval(() => {
-    const counts = session.getDebugCounts();
-    console.log(
-        `[WorldSession] counts activePlayers=${counts.activePlayers} ghosts=${counts.ghostPlayers} enemies=${counts.enemies} lootLocks=${counts.lootLocks}`
-    );
-}, 5_000);
+if (ENABLE_DEBUG_COUNTS) {
+    setInterval(() => {
+        const counts = session.getDebugCounts();
+        console.log(
+            `[WorldSession] counts activePlayers=${counts.activePlayers} ghosts=${counts.ghostPlayers} enemies=${counts.enemies} lootLocks=${counts.lootLocks}`
+        );
+    }, 5_000);
+}
 
 function bindPlayer(ws: WebSocket, playerId: string): void {
     const previous = socketByPlayer.get(playerId);
@@ -155,19 +160,25 @@ function parseMessage(data: Buffer): WorldClientMessage | null {
 }
 
 function send(ws: WebSocket, message: WorldServerMessage): void {
+    sendSerialized(ws, JSON.stringify(message));
+}
+
+function sendSerialized(ws: WebSocket, payload: string): void {
     if (ws.readyState !== WebSocket.OPEN) return;
-    ws.send(JSON.stringify(message));
+    ws.send(payload);
 }
 
 function broadcastToActive(message: WorldServerMessage): void {
+    const payload = JSON.stringify(message);
     for (const playerId of session.getActivePlayerIds()) {
         const ws = socketByPlayer.get(playerId);
-        if (ws) send(ws, message);
+        if (ws) sendSerialized(ws, payload);
     }
 }
 
 function broadcastToAll(message: WorldServerMessage): void {
+    const payload = JSON.stringify(message);
     for (const client of wss.clients) {
-        send(client, message);
+        sendSerialized(client, payload);
     }
 }

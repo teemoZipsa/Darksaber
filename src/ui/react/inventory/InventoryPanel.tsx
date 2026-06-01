@@ -18,9 +18,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
-import { t } from '../../../i18n/LanguageManager';
+import { formatT, t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
+import { getCarryAtbPercent, getPartyCarriedWeight } from '../../../inventory/CarryWeight';
 import type { PlacedItem } from '../../../inventory/GridInventory';
 import type { GridInventory } from '../../../inventory/GridInventory';
 import {
@@ -168,6 +169,8 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
     const bag = inv.getBag();
     const ext = inv.getExternalGrid();
     const char = inv.getActiveCharacter();
+    const carryWeight = getPartyCarriedWeight(bag.items, store.getActiveParty());
+    const carryAtbPercent = getCarryAtbPercent(carryWeight);
 
     // Tooltip content for a hovered item — equippables in a grid compare against
     // the currently-worn item in that slot; everything else shows a plain card.
@@ -455,6 +458,9 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                 <div className="ds-inv__col">
                     <div className="ds-inv__coltitle">
                         <span>{t('inv.backpack')}</span>
+                        <span className="ds-inv__weight">
+                            {formatT('inv.weightSummary', { weight: carryWeight.toFixed(1), percent: carryAtbPercent })}
+                        </span>
                         <button className="ds-btn ds-inv__sortbtn" onClick={() => mutateInventory(() => setFeedback(inv.sortBag()))}>
                             {t('inv.sort')}
                         </button>

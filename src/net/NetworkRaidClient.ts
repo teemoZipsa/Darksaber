@@ -24,6 +24,7 @@ export type NetworkRaidStatus = 'idle' | 'connecting' | 'connected' | 'reconnect
 export interface NetworkRaidJoinInput {
     originHubId: string;
     partyComposition: ActorSnapshot[];
+    carriedWeight?: number;
     resumeToken?: string;
 }
 
@@ -157,6 +158,7 @@ export class NetworkRaidClient {
             type: 'WORLD_JOIN',
             originHubId: input.originHubId,
             partyComposition: input.partyComposition,
+            carriedWeight: input.carriedWeight,
             clientVersion: WORLD_PROTOCOL_VERSION,
             resumeToken: input.resumeToken,
         });
