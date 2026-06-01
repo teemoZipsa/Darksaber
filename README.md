@@ -33,6 +33,14 @@ npm run start
 
 닥세월드 전용 로컬 주소는 `http://127.0.0.1:5731`입니다. 이 포트는 `vite.config.ts`에서 고정되어 있어 다른 포트로 자동 변경되지 않습니다.
 
+## 🌐 공개 배포
+
+포트폴리오용 공개 배포는 프론트엔드(Vite 정적 사이트)와 WebSocket 월드 서버를 분리해서 올립니다.
+
+- 프론트엔드: Vercel 또는 Cloudflare Pages
+- 월드 서버: Render, Fly.io, Railway, 또는 VPS
+- 배포 문서: [`docs/deployment.md`](docs/deployment.md)
+
 ## 🗺️ 챕터 3: 모험가의 이정표 (Roadmap)
 
 아직 많은 것이 비어있지만, 하나씩 룰을 채워나갈 예정입니다.

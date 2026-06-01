@@ -6,6 +6,7 @@
 
 import { WebSocketServer, WebSocket } from 'ws';
 import { fileURLToPath } from 'node:url';
+import { createServer } from 'node:http';
 import { isMarketClientMessage, WORLD_PROTOCOL_VERSION } from '../src/net/WorldProtocol';
 import type {
     WorldClientMessage,
@@ -14,8 +15,19 @@ import type {
 import { ServerMarketSession } from './ServerMarketSession';
 import { WorldSession, WORLD_TICK_MS } from './WorldSession';
 
-const PORT = 8765;
-const wss = new WebSocketServer({ port: PORT });
+const PORT = Number(process.env.PORT ?? 8765);
+const HOST = process.env.HOST;
+const server = createServer((request, response) => {
+    if (request.url === '/healthz') {
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ ok: true, protocol: WORLD_PROTOCOL_VERSION }));
+        return;
+    }
+
+    response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.end('Darksaber world server is running.\n');
+});
+const wss = new WebSocketServer({ server });
 const session = new WorldSession({
     logger: (message) => console.log(`[WorldSession] ${message}`),
 });
@@ -25,7 +37,10 @@ const marketSession = new ServerMarketSession({
 const playerBySocket = new Map<WebSocket, string>();
 const socketByPlayer = new Map<string, WebSocket>();
 
-console.log(`Darksaber world server started on ws://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+    const hostLabel = HOST ?? '0.0.0.0';
+    console.log(`Darksaber world server started on ws://${hostLabel}:${PORT}`);
+});
 
 wss.on('connection', (ws: WebSocket) => {
     ws.on('message', (data: Buffer) => {
