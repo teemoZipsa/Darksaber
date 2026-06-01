@@ -17,65 +17,27 @@ import { ShopUI } from './ShopUI';
 import { InputManager } from '../engine/InputManager';
 import { TownInfo } from '../map/BiomeMask';
 import type { Character } from '../character/Character';
-import { i18n, t } from '../i18n/LanguageManager';
+import { t } from '../i18n/LanguageManager';
 import { getRestFacility, type RestFacility } from '../data/RestFacilityData';
 import { getTownFacilities, type TownFacilityId } from '../data/TownFacilityData';
 
 export type TownTab = TownFacilityId;
 
-/** Random rumors per town, cycling for variety. */
-export const RUMORS: Array<{ ko: string; en: string }> = [
-    {
-        ko: '동쪽 대륙에 강력한 보스가 출현했다는 소문이 있다…',
-        en: 'Rumor says a powerful boss has appeared on the eastern continent...',
-    },
-    {
-        ko: '사막의 전초기지에서 희귀한 유물이 발견되었다고 한다.',
-        en: 'A rare relic was reportedly found near the desert outpost.',
-    },
-    {
-        ko: '남부 은신처 근처 숲에서 독 늪지대가 넓어지고 있다.',
-        en: 'The poison marsh near the southern refuge is spreading through the forest.',
-    },
-    {
-        ko: '봉인된 방을 열 수 있는 마스터키가 어딘가에 숨겨져 있다…',
-        en: 'A master key that opens sealed chambers is hidden somewhere...',
-    },
-    {
-        ko: '중앙 성채의 대장장이가 전설의 무기를 만들 수 있다는 소문이…',
-        en: 'They say the central castle blacksmith can forge legendary weapons...',
-    },
-    {
-        ko: '최근 해안가 근처에 해적들이 출몰하기 시작했다.',
-        en: 'Pirates have started appearing along the coast.',
-    },
-    {
-        ko: '동부 거점의 상인이 저주받은 유물을 비싸게 사들인다고 한다.',
-        en: 'A merchant at the eastern stronghold is paying well for cursed relics.',
-    },
-    {
-        ko: '남동 항구에서 신비한 배가 목격되었다는 이야기가 들린다.',
-        en: 'A mysterious ship was sighted near the southeastern port.',
-    },
-    {
-        ko: '숲속 마을의 장로가 그 숲에 옛 유적 입구가 있다고 말했다.',
-        en: 'The elder of the forest village spoke of ancient ruins hidden in the woods.',
-    },
-    {
-        ko: '저주받은 유물을 가진 채로 마을에 들어오면 재앙이 온다는 전설이 있다.',
-        en: 'Legend says disaster follows anyone who brings cursed relics into town.',
-    },
-    {
-        ko: '사막 한가운데에 오아시스가 있고, 그곳에 숨겨진 보물이 있다고…',
-        en: 'There is said to be an oasis in the desert, with treasure buried nearby...',
-    },
-    {
-        ko: '동쪽 대륙의 특수 지역에서는 용암이 솟아오른다고 한다.',
-        en: 'Lava is said to rise from special regions on the eastern continent.',
-    },
+/** Random rumor keys per town, cycling for variety. */
+export const RUMOR_KEYS: string[] = [
+    'rumors.common.eastBoss',
+    'rumors.common.desertRelic',
+    'rumors.common.poisonMarsh',
+    'rumors.common.masterKey',
+    'rumors.common.legendaryWeapon',
+    'rumors.common.pirates',
+    'rumors.common.cursedRelicBuyer',
+    'rumors.common.mysteryShip',
+    'rumors.common.forestRuins',
+    'rumors.common.cursedRelicDisaster',
+    'rumors.common.desertOasis',
+    'rumors.common.easternLava',
 ];
-export const RUMORS_KR: string[] = RUMORS.map((rumor) => rumor.ko);
-export const RUMORS_EN: string[] = RUMORS.map((rumor) => rumor.en);
 
 export class TownUI {
     // Current town being visited
@@ -163,8 +125,8 @@ export class TownUI {
         this.visible = true;
         this.activeTab = 'storage';
 
-        // Pick 3 random rumors for this visit
-        const rumorPool = i18n.lang === 'ko' ? RUMORS_KR : RUMORS_EN;
+        // Pick 3 random rumors for this visit.
+        const rumorPool = RUMOR_KEYS.map((key) => t(key));
         const shuffled = [...rumorPool].sort(() => Math.random() - 0.5);
         const marketRumor = getTownFacilities(town.id).includes('rumors')
             ? this.getMarketRumor?.(town.id) ?? null

@@ -1,7 +1,7 @@
 /**
  * SettingsPanel — DD-styled DOM replacement for the canvas SettingsUI.
  *
- * Sections: 사운드 / 화면 / 접근성 / 언어. Uses real form controls (toggle switches,
+ * Sections: sound / display / accessibility / language. Uses real form controls (toggle switches,
  * native range sliders, cycle buttons) instead of canvas-drawn widgets. All state
  * goes through SettingsManager (persisted); re-renders via useUiVersion so values
  * stay live. Labels are localized via t(); language toggle re-renders live.
@@ -124,7 +124,7 @@ export function SettingsPanel() {
                 </Section>
 
                 <Section title={t('settings.languageSection')}>
-                    <Row label={t('settings.lang')}><Cycle label={t('settings.lang')} value={i18n.lang === 'ko' ? '한국어' : 'English'} onCycle={() => i18n.toggleLanguage()} /></Row>
+                    <Row label={t('settings.lang')}><Cycle label={t('settings.lang')} value={t('settings.langValue')} onCycle={() => i18n.toggleLanguage()} /></Row>
                 </Section>
             </div>
 

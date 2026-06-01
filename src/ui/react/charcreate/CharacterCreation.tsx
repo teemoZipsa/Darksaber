@@ -70,7 +70,7 @@ export function CharacterCreation() {
     const store = useStore();
     const [classIdx, setClassIdx] = useState(0);
     const [gender, setGender] = useState<'M' | 'F'>('M');
-    const [name, setName] = useState('다크마스터');
+    const [name, setName] = useState(() => t('create.defaultName'));
 
     const confirm = () => {
         AudioManager.playUi('ui.confirm');

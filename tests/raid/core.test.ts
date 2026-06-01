@@ -17,8 +17,9 @@ import { marketStateKey } from '../../src/data/MarketData';
 import { PlayerData } from '../../src/data/PlayerData';
 import { REST_FACILITIES, getRestFacility, getRestMenu } from '../../src/data/RestFacilityData';
 import { TOWN_FACILITIES, getTownFacilities, hasTownFacility } from '../../src/data/TownFacilityData';
-import { TownUI } from '../../src/ui/TownUI';
+import { RUMOR_KEYS, TownUI } from '../../src/ui/TownUI';
 import { ShopUI } from '../../src/ui/ShopUI';
+import { i18n } from '../../src/i18n/LanguageManager';
 
 function placed(id: string): PlacedItem {
     const item = getItemDef(id);
@@ -411,6 +412,20 @@ test('market rumors are limited to rumor facilities and reflect cooled demand', 
 
     ui.show({ id: 'e_stronghold', name: 'Entria', nameKr: '엔트리아', chunkX: 0, chunkY: 0, radius: 1 });
     assert.equal(ui.getRumors().includes('시장 소문'), false);
+});
+
+test('town rumor keys resolve in both supported languages', () => {
+    const previousLang = i18n.lang;
+    try {
+        for (const lang of ['ko', 'en'] as const) {
+            i18n.setLanguage(lang);
+            for (const key of RUMOR_KEYS) {
+                assert.notEqual(i18n.t(key), key);
+            }
+        }
+    } finally {
+        i18n.setLanguage(previousLang);
+    }
 });
 
 test('sellable flag blocks bound or quest items from shop sale lists', () => {
