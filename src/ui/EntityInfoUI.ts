@@ -1,7 +1,6 @@
 /**
  * EntityInfoUI — Retro-warm info window with modern bar polish.
- * Parchment-tinted glass panel with dark grid portrait area,
- * preserving the classic Sin Eater feel while using modern animations.
+ * Parchment panel with a dark grid portrait area.
  */
 
 import type { StatusKind } from '../combat/StatusEffects';

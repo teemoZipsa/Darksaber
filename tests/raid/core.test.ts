@@ -18,6 +18,7 @@ import { PlayerData } from '../../src/data/PlayerData';
 import { REST_FACILITIES, getRestFacility, getRestMenu } from '../../src/data/RestFacilityData';
 import { TOWN_FACILITIES, getTownFacilities, hasTownFacility } from '../../src/data/TownFacilityData';
 import { TownUI } from '../../src/ui/TownUI';
+import { ShopUI } from '../../src/ui/ShopUI';
 
 function placed(id: string): PlacedItem {
     const item = getItemDef(id);
@@ -104,6 +105,27 @@ test('shop inventory is split by town facility while legacy town calls still wor
         kaosiaWeapons.map(({ item }) => item.id),
         belfuersWeapons.map(({ item }) => item.id),
     );
+});
+
+test('shop limited stock persists across DOM panel refreshes', () => {
+    const shop = new ShopUI();
+    shop.onBuy = () => true;
+    shop.setTownId('se_port');
+    shop.setFacilityId('specialty_trader');
+    shop.setActiveKind('consumable');
+
+    const findLimitedHerb = () => shop.listBuyEntries().find(({ item }) => item.id === 'herb_legendary');
+    const entry = findLimitedHerb();
+
+    assert.ok(entry);
+    assert.equal(entry.remaining, 1);
+    assert.equal(shop.buy(entry), true);
+    assert.equal(entry.remaining, 0);
+
+    shop.hide();
+    shop.show();
+
+    assert.equal(findLimitedHerb()?.remaining, 0);
 });
 
 test('consumables are restricted by town facility', () => {

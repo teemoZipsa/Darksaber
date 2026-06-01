@@ -7,7 +7,7 @@
  */
 
 import type { CSSProperties } from 'react';
-import { t } from '../../../i18n/LanguageManager';
+import { i18n, t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
 import type { TownTab } from '../../../ui/TownUI';
@@ -42,12 +42,14 @@ export function TownScreen() {
 
     const townInv = store.getTownInventory();
     const scaleVar = { '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
+    const townPrimaryName = i18n.lang === 'ko' ? town.nameKr : town.name;
+    const townSecondaryName = i18n.lang === 'ko' ? town.name : town.nameKr;
 
     return (
         <div className="ds-town">
             <div className="ds-town__header" style={scaleVar}>
-                <span className="ds-town__name">🏰 {town.nameKr}</span>
-                <span className="ds-town__sub">{town.name}</span>
+                <span className="ds-town__name">🏰 {townPrimaryName}</span>
+                <span className="ds-town__sub">{townSecondaryName}</span>
             </div>
 
             <div className="ds-town__tabs" style={scaleVar} role="tablist">

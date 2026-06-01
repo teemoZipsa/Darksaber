@@ -33,6 +33,9 @@
 - 레이드 중 전리품 그리드에서 배낭으로 가져오기 → `onRaidLootSecured` 호출되는지
 드롭 위치는 커서 아래 셀이 아이템의 **좌상단**. 동작이 어색하면 `InventoryPanel.tsx`의 `dropOnGrid`만 조정(모델은 건드리지 말 것).
 
+검토 메모:
+- 장착 슬롯에 기존 장비가 있고 배낭이 가득 찬 상태에서 외부 그리드/전리품 장비를 해당 슬롯에 드롭하면, `InventoryUI.moveToEquip`가 기존 장비의 `autoPlaceExisting` 실패를 확인하지 않아 기존 장비가 유실될 수 있음. `src/inventory/InventoryUI.ts`는 예약 파일이므로 여기에는 기록만 남김.
+
 ### 2. 상점 카테고리 데이터 마무리 (병행 작업 WIP)
 워킹트리에 weapon/armor/accessory/consumable 4분류 + 마을별 재고(`getShopItems(townId)`) + `OriginalShopItems.ts`가 **진행 중**으로 들어와 있음. Codex가 이어서:
 - `src/data/ShopData.ts` / `ItemDB.ts` / `OriginalShopItems.ts` 정합성 확인
@@ -41,12 +44,14 @@
 - `tests/raid/core.test.ts` 변경분 포함 → `npm test` 통과 확인
 
 ### 3. i18n 잔여 (선택)
-- 소문(`RUMORS_KR`, `TownUI.ts`)·퀘스트 이름(`QuestPanel.tsx`)이 **한국어 고정**. en 토글 시 그대로 한글. 영어 필요하면 키화.
+- 소문(`TownUI.ts`)은 ko/en 양쪽 텍스트로 분리됨. 마을 헤더/소문 footer/퀘스트 보상 아이템명도 언어 설정을 따르도록 정리됨.
 - 인벤토리/상점 새 텍스트 영어 토글 점검.
 
 ### 4. 죽은 캔버스 코드 정리 (선택, 안전)
-- `darksaber-ui.css`의 `.ds-town.is-storage*` 규칙 — 이제 미사용(제거 가능).
-- `ShopUI.ts`의 캔버스 `render/onMouseMove/onMouseDown/onMouseUp/renderXxx` 메서드들은 호출처가 사라짐(외부 public이라 tsc 에러는 안 남). 정리하려면 ShopUI도 TownUI/InventoryUI처럼 "모델+액션"만 남기고 캔버스 렌더 제거. **단, 호출처(`TownUI`는 이미 no-op) 먼저 확인**.
+- 완료: `darksaber-ui.css`의 `.ds-town.is-storage*` 미사용 규칙 제거.
+- 완료: `ShopUI.ts`의 캔버스 `render/onMouseMove/onMouseDown/onMouseUp/renderXxx` 제거. 현재는 React `ShopPanel`용 모델+액션 레이어만 유지.
+- 완료: `PauseMenuUI.ts`, `SettingsUI.ts`, `PartyUI.ts`, `CharacterPanelUI.ts`의 미사용 캔버스 렌더/입력 코드를 제거하고 DOM 오버레이용 visibility state holder로 축소.
+- 완료: `UITheme.ts`의 미사용 glass/dark-panel 렌더 헬퍼와 관련 주석 제거. 현재 캔버스 HUD에서 쓰는 parchment helper만 유지.
 - `TownUI.ts`의 `updateInput/render`는 no-op로 남겨둠(WorldEngine 파이프라인이 호출). 그대로 둘 것.
 
 ### 5. 인벤토리/패널 비주얼 다듬기 (선택)

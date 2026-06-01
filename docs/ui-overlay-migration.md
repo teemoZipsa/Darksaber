@@ -29,16 +29,18 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
 | 일시정지 (ESC) | `src/ui/react/PauseMenu.tsx` | 설정 핸드오프 포함 |
 | 설정 | `src/ui/react/settings/SettingsPanel.tsx` | 토글 스위치·네이티브 슬라이더 |
 | 파티 (P) | `src/ui/react/party/PartyPanel.tsx` | 스쿼드+로스터, HTML5 드래그앤드롭 |
-| 마을 (Town) | `src/ui/react/town/*` | **화면 전체 DOM 이전**: 헤더·탭바·출격 + 상점/휴식/퀘스트/소문. 창고 탭만 캔버스 인벤토리 임베드(투명 통과). `TownUI`는 상태 홀더로 축소, `WorldEngine.getTownSession()`→`GameManager.getTownSession()`로 노출. |
+| 캐릭생성 | `src/ui/react/charcreate/CharacterCreation.tsx` | 독립 state 기반 DOM 패널 |
+| 마을 (Town) | `src/ui/react/town/*` | **화면 전체 DOM 이전**: 헤더·탭바·출격 + 창고/상점/휴식/퀘스트/소문. `TownUI`는 상태 홀더로 축소, `WorldEngine.getTownSession()`→`GameManager.getTownSession()`로 노출. |
+| 인벤토리 | `src/ui/react/inventory/InventoryPanel.tsx` | 월드(I)·마을 창고 공용 DOM 패널. 드래그 해석은 `InventoryUI` 모델 액션에 유지. |
 
 ## 남음 (다음 순서)
-1. **캐릭생성 (CharacterCreationUI)** — 이미 HTML name input을 부분 사용 중.
-2. **인벤토리 (InventoryUI)** — 타르코프식 2D 그리드 드래그앤드롭, **최난도, 마지막**. `inventoryUI.setActiveCharacter` 결합 주의. **이게 끝나면 마을 창고 탭도 DOM으로 전환** (현재는 `TownScreen`이 storage 탭에서 투명 통과 → 캔버스 `InventoryUI` 렌더).
+1. **인벤토리 실제 마우스 검증** — 합성 이벤트가 불안정해 자동화만으로는 부족. 체크리스트는 `docs/ui-tasks.md` 참고.
+2. **예약 파일 버그 처리** — `InventoryUI.moveToEquip` 장비 교체 유실 가능성은 `docs/ui-tasks.md`에 기록됨. `src/inventory/InventoryUI.ts`는 현재 메인 마이그레이션 예약 파일이라 이 문서에서는 직접 수정하지 않음.
 
 ## 마을(Town) 이전 메모
-- `TownUI`는 더 이상 캔버스 크롬을 그리지 않음 — `activeTab==='storage'`일 때만 `inventoryUI.render`. 입력도 storage일 때만 인벤토리로 라우팅. 나머지는 React `TownScreen`이 그림.
+- `TownUI`는 더 이상 캔버스 크롬이나 storage 인벤토리를 그리지 않음. 상태·탭·소문·상점/인벤토리 모델 참조만 유지하고 React `TownScreen`/`InventoryPanel`이 그림.
 - React 동선: `UiStore.getTownSession()` → `WorldTownSession`(.ui = `TownUI`, + `purchaseRestMenu`/`treatActivePartyInjuries`). 상점 데이터/액션은 `ShopUI`의 public 메서드(`listBuyEntries`/`buy`/`sell` 등), 탭/출격은 `TownUI.setTab`/`requestDeploy`.
-- `TownScreen`은 `.ds-scrim` 안 씀 — 자체 풀스크린 컨테이너. storage 탭에서 `pointer-events:none`(크롬만 auto)로 캔버스 인벤토리 클릭 통과.
+- `TownScreen`은 `.ds-scrim` 안 씀 — 자체 풀스크린 컨테이너. storage 탭은 DOM `InventoryPanel`을 embedded 모드로 렌더.
 
 > 캔버스 유지(이전 안 함): 적 체력바·플로팅 데미지·전술 마커·방사형 액션메뉴 등 월드/카메라 좌표 HUD.
 

@@ -390,15 +390,6 @@
     animation: ds-fade-in 140ms ease-out;
     overflow: hidden;
 }
-/* Storage tab: let the canvas InventoryUI show & receive clicks; only chrome is interactive. */
-#ui-overlay .ds-town.is-storage {
-    pointer-events: none;
-    background: none;
-}
-#ui-overlay .ds-town.is-storage .ds-town__header,
-#ui-overlay .ds-town.is-storage .ds-town__tabs,
-#ui-overlay .ds-town.is-storage .ds-town__footer { pointer-events: auto; }
-
 #ui-overlay .ds-town__header {
     display: flex;
     flex-direction: column;
@@ -448,9 +439,9 @@
     align-items: center;
     justify-content: center;
     min-height: 0;
+    box-sizing: border-box;
+    padding: 0 12px;
 }
-#ui-overlay .ds-town.is-storage .ds-town__content { pointer-events: none; }
-
 #ui-overlay .ds-town__footer { transform: scale(var(--ds-scale)); }
 #ui-overlay .ds-town__deploy {
     pointer-events: auto;
@@ -776,7 +767,14 @@
 }
 #ui-overlay .ds-inv.is-embedded {
     transform: none; animation: none;
+    box-sizing: border-box;
+    max-width: calc(100vw - 24px);
+    max-height: 100%;
     background: linear-gradient(160deg, var(--ds-panel-1) 0%, var(--ds-panel-0) 55%, var(--ds-bg-1) 100%);
+}
+#ui-overlay .ds-inv.is-embedded .ds-inv__body {
+    flex: 1;
+    min-height: 0;
 }
 #ui-overlay .ds-inv__body {
     display: flex; align-items: flex-start; gap: 18px;

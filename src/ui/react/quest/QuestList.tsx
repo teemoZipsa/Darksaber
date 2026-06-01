@@ -1,6 +1,6 @@
 import { getItemDef } from '../../../data/ItemDB';
 import type { StoryQuestReward, StoryQuestStatus } from '../../../data/StoryQuestData';
-import { t } from '../../../i18n/LanguageManager';
+import { i18n, t } from '../../../i18n/LanguageManager';
 import { useStore } from '../UiContext';
 
 const STATUS_ICON: Record<StoryQuestStatus, string> = {
@@ -9,16 +9,20 @@ const STATUS_ICON: Record<StoryQuestStatus, string> = {
     completed: '✓',
 };
 
+function itemLabel(item: NonNullable<ReturnType<typeof getItemDef>>): string {
+    return i18n.lang === 'ko' ? item.nameKr : item.name;
+}
+
 function getRewardLabel(reward: StoryQuestReward): string {
     if (reward.type === 'none') return t('quest.rewardNone');
     if (reward.type === 'bundle') return reward.rewards.map(getRewardLabel).join(' / ');
     if (reward.type === 'questItem') {
         const item = getItemDef(reward.itemId);
-        return item?.nameKr ?? reward.itemId;
+        return item ? itemLabel(item) : reward.itemId;
     }
     if (reward.type === 'inventoryItem') {
         const item = getItemDef(reward.itemId);
-        return item?.nameKr ?? reward.itemId;
+        return item ? itemLabel(item) : reward.itemId;
     }
     return `${t('quest.rewardCompanion')}: ${t(reward.nameKey)}`;
 }

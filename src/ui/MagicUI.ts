@@ -1,7 +1,6 @@
 /**
  * MagicUI — Spell selection panel that appears when "Magic" is clicked
  * in the action menu. Shows learned skills based on character class & tier.
- * Glass-panel style consistent with the game's UI theme.
  * Supports drag-to-move by grabbing the header.
  */
 

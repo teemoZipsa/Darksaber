@@ -1,10 +1,10 @@
 /**
  * RumorsPanel — DD-styled DOM replacement for the canvas rumors tab.
- * Shows the 3 rumors rolled for this town visit (Korean flavor text).
+ * Shows the 3 rumors rolled for this town visit.
  */
 
 import type { CSSProperties } from 'react';
-import { t } from '../../../i18n/LanguageManager';
+import { i18n, t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { useStore, useUiVersion } from '../UiContext';
 
@@ -14,6 +14,7 @@ export function RumorsPanel() {
     const rumors = store.getTownRumors();
     const town = store.getTownInfo();
     const panelStyle = { width: 'min(560px, 92vw)', '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
+    const townName = town ? (i18n.lang === 'ko' ? town.nameKr : town.name) : t('town.tab.rumors');
 
     return (
         <div className="ds-panel ds-rumors" style={panelStyle} onClick={(e) => e.stopPropagation()}>
@@ -29,7 +30,7 @@ export function RumorsPanel() {
                         <span className="ds-rumors__text">{rumor}</span>
                     </div>
                 ))}
-                <div className="ds-rumors__footer">— {town?.nameKr ?? '마을'} {t('rumors.footer')} —</div>
+                <div className="ds-rumors__footer">— {townName} {t('rumors.footer')} —</div>
             </div>
         </div>
     );
