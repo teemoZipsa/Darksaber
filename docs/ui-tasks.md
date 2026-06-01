@@ -23,31 +23,31 @@
 
 ## 🔴 Codex가 이어서 할 일 (우선순위 순)
 
-### 1. 인벤토리 드래그앤드롭 **실제 마우스 검증** (최우선)
-헤드리스 프리뷰는 합성 DnD 이벤트가 불안정해 Opus가 검증 못 한 부분. `npm run dev`로 띄워 **실제 마우스로** 확인:
-- 배낭 ↔ 마을창고(ext) 그리드 간 드래그 이동 (빈 칸 배치)
-- 그리드 → 장비 슬롯 드래그(장착), 장비 → 그리드 드래그(해제)
-- 장비 슬롯끼리 교체(swap) — 기존 장비가 배낭으로 돌아가는지
-- 소켓 아이템(◇ 표시) 위에 룬/젬 드롭 시 소켓 삽입
-- **클릭(드래그X)** = 퀵트랜스퍼 (배낭→창고, 창고→배낭, 장비→배낭) — 이미 동작 확인됨
-- 레이드 중 전리품 그리드에서 배낭으로 가져오기 → `onRaidLootSecured` 호출되는지
-드롭 위치는 커서 아래 셀이 아이템의 **좌상단**. 동작이 어색하면 `InventoryPanel.tsx`의 `dropOnGrid`만 조정(모델은 건드리지 말 것).
+### 1. 인벤토리 드래그앤드롭 **실제 마우스 검증** (완료)
+`npm run dev`로 띄워 Browser 실제 포인터 입력으로 확인:
+- 완료: 배낭 ↔ 마을창고(ext) 그리드 간 드래그 이동 (빈 칸 배치).
+- 완료: 그리드 → 장비 슬롯 드래그(장착), 장비 → 그리드 드래그(해제).
+- 완료: 장비 슬롯끼리 교체(swap) — 기존 장비가 배낭으로 돌아오는 것 확인.
+- 완료: 소켓 아이템(◇ 표시) 위에 젬 드롭 시 소켓 삽입 확인 (`◇` → `◆`).
+- 완료: **클릭(드래그X)** = 퀵트랜스퍼 (배낭→창고, 창고→배낭, 장비→배낭).
+- 완료: 레이드 전리품 모델 경로(`moveToCell`/`quickMove`/`takeAll`)가 `onRaidLootSecured`를 호출하는지 `tests/raid/core.test.ts`로 보강.
+- 참고: 실제 레이드 화면에서 전리품 생성 후 마우스 드롭까지의 end-to-end 재현은 별도 전투/상자 조건이 필요해 이번 브라우저 검증에서는 모델 콜백 테스트로 대체.
+드롭 위치는 커서 아래 셀이 아이템의 **좌상단**.
 
 검토 메모:
 - 장착 슬롯에 기존 장비가 있고 배낭이 가득 찬 상태에서 외부 그리드/전리품 장비를 해당 슬롯에 드롭하면, `InventoryUI.moveToEquip`가 기존 장비의 `autoPlaceExisting` 실패를 확인하지 않아 기존 장비가 유실될 수 있음. `src/inventory/InventoryUI.ts`는 예약 파일이므로 여기에는 기록만 남김.
 
-### 2. 상점 카테고리 데이터 마무리 (병행 작업 WIP)
-워킹트리에 weapon/armor/accessory/consumable 4분류 + 마을별 재고(`getShopItems(townId)`) + `OriginalShopItems.ts`가 **진행 중**으로 들어와 있음. Codex가 이어서:
-- `src/data/ShopData.ts` / `ItemDB.ts` / `OriginalShopItems.ts` 정합성 확인
-- i18n 키 `shop.weapon/armor/accessory/consumable` 존재 확인(ko/en) — 이미 추가됨, 누락 시 보강
-- 마을 들어가서 상점 탭 → 4개 카테고리 버튼·아이템 목록·구매/판매 정상인지 확인
-- `tests/raid/core.test.ts` 변경분 포함 → `npm test` 통과 확인
+### 2. 상점 카테고리 데이터 마무리 (완료)
+- 완료: `src/data/ShopData.ts` / `ItemDB.ts` / `OriginalShopItems.ts` 정합성 확인.
+- 완료: i18n 키 `shop.weapon/armor/accessory/consumable` ko/en 존재 확인.
+- 완료: 마을 상점 탭에서 4개 카테고리 버튼·아이템 목록·구매/판매 렌더 확인.
+- 완료: `tests/raid/core.test.ts` 변경분 포함 → `npm test` 통과 확인.
 
 ### 3. i18n 잔여 (선택)
 - 완료: 소문(`TownUI.ts`)은 `RUMOR_KEYS` + `t()` 기반으로 이동. 마을 헤더/소문 footer/퀘스트 보상 아이템명도 언어 설정을 따르도록 정리됨.
 - 완료: 설정 언어 값과 캐릭터 생성 기본 이름도 i18n 키로 이동.
 - 완료: `tests/raid/i18n-guards.test.ts`에서 `t('...')`/`formatT('...')` 리터럴 키가 ko/en 양쪽에 존재하는지 검사.
-- 인벤토리/상점 새 텍스트 영어 토글은 브라우저에서 추가 점검 권장.
+- 완료: 인벤토리/상점 새 텍스트는 정적 i18n guard와 브라우저 ko 렌더 확인으로 누락 방지.
 
 ### 4. 죽은 캔버스 코드 정리 (선택, 안전)
 - 완료: `darksaber-ui.css`의 `.ds-town.is-storage*` 미사용 규칙 제거.
@@ -83,4 +83,4 @@
 - `b7e47aa` 설정/일시정지/파티 i18n+a11y 다듬기
 - `2e7dd40` 마을 화면 DOM 이전
 - `034018d` 캐릭생성 DOM 이전
-- `b27d03c` 인벤토리 DOM 이전 (+ 상점 카테고리 WIP 동반)
+- `b27d03c` 인벤토리 DOM 이전 (+ 상점 카테고리 후속 정리 완료)

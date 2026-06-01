@@ -34,8 +34,8 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
 | 인벤토리 | `src/ui/react/inventory/InventoryPanel.tsx` | 월드(I)·마을 창고 공용 DOM 패널. 드래그 해석은 `InventoryUI` 모델 액션에 유지. |
 
 ## 남음 (다음 순서)
-1. **인벤토리 실제 마우스 검증** — 합성 이벤트가 불안정해 자동화만으로는 부족. 체크리스트는 `docs/ui-tasks.md` 참고.
-2. **예약 파일 버그 처리** — `InventoryUI.moveToEquip` 장비 교체 유실 가능성은 `docs/ui-tasks.md`에 기록됨. `src/inventory/InventoryUI.ts`는 현재 메인 마이그레이션 예약 파일이라 이 문서에서는 직접 수정하지 않음.
+1. **예약 파일 버그 처리** — `InventoryUI.moveToEquip` 장비 교체 유실 가능성은 `docs/ui-tasks.md`에 기록됨. `src/inventory/InventoryUI.ts`는 현재 메인 마이그레이션 예약 파일이라 이 문서에서는 직접 수정하지 않음.
+2. **레이드 전리품 end-to-end 수동 검증** — DOM 인벤토리의 일반 DnD/소켓/퀵트랜스퍼는 실제 포인터로 확인됨. 전리품 콜백은 모델 테스트로 보강했지만, 실제 레이드 화면에서 전리품 생성 후 드롭까지는 별도 전투/상자 조건이 필요.
 
 ## 마을(Town) 이전 메모
 - `TownUI`는 더 이상 캔버스 크롬이나 storage 인벤토리를 그리지 않음. 상태·탭·소문·상점/인벤토리 모델 참조만 유지하고 React `TownScreen`/`InventoryPanel`이 그림.
@@ -64,7 +64,7 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
 - **i18n 키 누락 주의**: `t('key')`는 없는 키면 키 문자열을 그대로 반환(`|| '기본값'` 폴백 안 통함). 새 패널 텍스트는 `LanguageManager.ts`의 ko/en 양쪽에 키 추가 확인. (pause.* 키가 누락돼 있어 추가한 전례 있음.)
 - **SettingsManager는 static + `this` 사용**: 메서드를 bare 참조로 넘기지 말고 `() => S.setX(v)`로 감쌀 것(안 그러면 `this` undefined).
 - **WorldEngine이 월드 진입 시 `partyUI`를 자동으로 닫음**(WorldEngine.ts ~590) — 검증 시 WORLD 안정화 후 열 것.
-- **드래그앤드롭은 합성이벤트 검증이 불안정** → 실제 마우스로 확인 권장.
+- **드래그앤드롭은 합성이벤트 검증이 불안정** → 검증은 실제 포인터 입력 기준. 마을 창고/배낭/장비/소켓 주요 동선은 Browser 포인터 입력으로 확인됨.
 - `.claude/launch.json` 포트는 프리뷰 도구용 로컬 값(작업 기기별로 다를 수 있음).
 
 ## 관련 커밋

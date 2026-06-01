@@ -208,6 +208,36 @@ test('socket insertion respects equipment socket limits', () => {
     assert.equal(host.sockets?.length, 1);
 });
 
+test('raid loot transfers mark acquired items and report original loot cells', () => {
+    const bag = new GridInventory(8, 8);
+    const ext = new GridInventory(8, 8);
+    const inv = new InventoryUI(bag);
+    inv.setExternalGrid(ext, 'raid loot', { isRaidLoot: true });
+
+    const movedByDrop = ext.place(getItemDef('herb_cheap')!, 2, 1);
+    const movedByClick = ext.place(getItemDef('mp_potion')!, 3, 1);
+    const movedByTakeAll = ext.place(getItemDef('antidote')!, 4, 1);
+    assert.ok(movedByDrop);
+    assert.ok(movedByClick);
+    assert.ok(movedByTakeAll);
+
+    const secured: Array<{ itemId: string; source?: { gridX: number; gridY: number } }> = [];
+    inv.onRaidLootSecured = (placed, source) => secured.push({ itemId: placed.item.id, source });
+
+    assert.equal(inv.moveToCell(movedByDrop, { kind: 'grid', grid: 'ext', gridX: 2, gridY: 1 }, 'bag', 0, 0), true);
+    assert.equal(movedByDrop.acquiredInRaid, true);
+    assert.equal(inv.quickMove(movedByClick, { kind: 'grid', grid: 'ext', gridX: 3, gridY: 1 }), true);
+    assert.equal(movedByClick.acquiredInRaid, true);
+    assert.match(inv.takeAll(), /전리품 획득/);
+    assert.equal(movedByTakeAll.acquiredInRaid, true);
+
+    assert.deepEqual(secured, [
+        { itemId: 'herb_cheap', source: { gridX: 2, gridY: 1 } },
+        { itemId: 'mp_potion', source: { gridX: 3, gridY: 1 } },
+        { itemId: 'antidote', source: { gridX: 4, gridY: 1 } },
+    ]);
+});
+
 test('blacksmith repair and unsocket helpers charge gold and preserve equipment', () => {
     const sword = placed('short_sword');
     sword.durability = 50;
