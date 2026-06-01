@@ -35,7 +35,7 @@
 드롭 위치는 커서 아래 셀이 아이템의 **좌상단**.
 
 검토 메모:
-- 장착 슬롯에 기존 장비가 있고 배낭이 가득 찬 상태에서 외부 그리드/전리품 장비를 해당 슬롯에 드롭하면, `InventoryUI.moveToEquip`가 기존 장비의 `autoPlaceExisting` 실패를 확인하지 않아 기존 장비가 유실될 수 있음. `src/inventory/InventoryUI.ts`는 예약 파일이므로 여기에는 기록만 남김.
+- 완료: 장착 슬롯에 기존 장비가 있고 배낭이 가득 찬 상태에서 외부 그리드/전리품 장비를 해당 슬롯에 드롭하면 기존 장비가 유실될 수 있던 `InventoryUI.moveToEquip` 버그 수정. 실패 시 새 장비를 원위치로 복구하고 기존 장비를 유지하도록 테스트 보강.
 
 ### 2. 상점 카테고리 데이터 마무리 (완료)
 - 완료: `src/data/ShopData.ts` / `ItemDB.ts` / `OriginalShopItems.ts` 정합성 확인.
@@ -63,7 +63,7 @@
 ---
 
 ## ⛔ 건드리지 말 것 (Opus/메인 예약 — 충돌·회귀 위험)
-- `src/inventory/InventoryUI.ts`, `src/inventory/GridInventory.ts` — 드래그 **해석 로직**(moveToCell/moveToEquip/quickMove). 버그 발견 시 이 문서에 기록만.
+- `src/inventory/InventoryUI.ts`, `src/inventory/GridInventory.ts` — 드래그 **해석 로직**(moveToCell/moveToEquip/quickMove). 평소에는 충돌 방지를 위해 조심하고, 명시 요청/조율이 있을 때만 테스트와 함께 수정.
 - `src/engine/GameManager.ts`, `src/engine/WorldEngine.ts`, `src/engine/world/*` — 상태/루프/세션 배선.
 - `src/ui/react/OverlayRoot.tsx`, `src/ui/react/UiStore.ts`, `src/ui/react/UiContext.tsx` — 오버레이 배선.
 - `src/ui/theme/darksaber-ui.css`의 **기존 토큰/공용 클래스**(`--ds-*`, `.ds-panel`, `.ds-btn`, `.ds-scrim`, `.ds-bar` 등). 새 컴포넌트 전용 클래스 추가는 OK, 공용 토큰 값 변경은 금지.

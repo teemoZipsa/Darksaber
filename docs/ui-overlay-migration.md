@@ -34,8 +34,7 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
 | 인벤토리 | `src/ui/react/inventory/InventoryPanel.tsx` | 월드(I)·마을 창고 공용 DOM 패널. 드래그 해석은 `InventoryUI` 모델 액션에 유지. |
 
 ## 남음 (다음 순서)
-1. **예약 파일 버그 처리** — `InventoryUI.moveToEquip` 장비 교체 유실 가능성은 `docs/ui-tasks.md`에 기록됨. `src/inventory/InventoryUI.ts`는 현재 메인 마이그레이션 예약 파일이라 이 문서에서는 직접 수정하지 않음.
-2. **레이드 전리품 end-to-end 수동 검증** — DOM 인벤토리의 일반 DnD/소켓/퀵트랜스퍼는 실제 포인터로 확인됨. 전리품 콜백은 모델 테스트로 보강했지만, 실제 레이드 화면에서 전리품 생성 후 드롭까지는 별도 전투/상자 조건이 필요.
+1. **레이드 전리품 end-to-end 수동 검증** — DOM 인벤토리의 일반 DnD/소켓/퀵트랜스퍼는 실제 포인터로 확인됨. 전리품 콜백은 모델 테스트로 보강했지만, 실제 레이드 화면에서 전리품 생성 후 드롭까지는 별도 전투/상자 조건이 필요.
 
 ## 마을(Town) 이전 메모
 - `TownUI`는 더 이상 캔버스 크롬이나 storage 인벤토리를 그리지 않음. 상태·탭·소문·상점/인벤토리 모델 참조만 유지하고 React `TownScreen`/`InventoryPanel`이 그림.

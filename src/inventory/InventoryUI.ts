@@ -157,6 +157,7 @@ export class InventoryUI {
     public moveToEquip(placed: PlacedItem, source: InvDragSource, slot: ItemSlot): boolean {
         if (!this.activeChar) return false;
         const targetEq = this.activeChar.equipment.get(slot);
+        if (source.kind === 'equip' && source.slot === slot && targetEq === placed) return true;
 
         if (targetEq && canSocket(placed.item, targetEq)) {
             this.detach(placed, source);
@@ -167,7 +168,10 @@ export class InventoryUI {
         if (!slotAcceptsItem(slot, placed.item.slot)) return false;
 
         this.detach(placed, source);
-        if (targetEq) this.inventory.autoPlaceExisting(targetEq); // swapped-out gear → backpack
+        if (targetEq && targetEq !== placed && !this.inventory.autoPlaceExisting(targetEq)) {
+            this.restore(placed, source);
+            return false;
+        }
         if (source.kind === 'grid' && source.grid === 'ext' && this.externalGridIsRaidLoot) {
             placed.acquiredInRaid = true;
             this.onRaidLootSecured?.(placed, { gridX: source.gridX, gridY: source.gridY });

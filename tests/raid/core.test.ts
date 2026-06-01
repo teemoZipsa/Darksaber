@@ -20,6 +20,7 @@ import { TOWN_FACILITIES, getTownFacilities, hasTownFacility } from '../../src/d
 import { RUMOR_KEYS, TownUI } from '../../src/ui/TownUI';
 import { ShopUI } from '../../src/ui/ShopUI';
 import { i18n } from '../../src/i18n/LanguageManager';
+import type { Character } from '../../src/character/Character';
 
 function placed(id: string): PlacedItem {
     const item = getItemDef(id);
@@ -38,6 +39,10 @@ function chunkCenter(chunkX: number, chunkY: number): { x: number; y: number } {
         x: chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
         y: chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
     };
+}
+
+function inventoryCharacter(): Character {
+    return { equipment: new Map() } as Character;
 }
 
 test('item metadata is normalized once for every item definition', () => {
@@ -236,6 +241,51 @@ test('raid loot transfers mark acquired items and report original loot cells', (
         { itemId: 'mp_potion', source: { gridX: 3, gridY: 1 } },
         { itemId: 'antidote', source: { gridX: 4, gridY: 1 } },
     ]);
+});
+
+test('equipment swap fails atomically when the backpack cannot hold the old item', () => {
+    const bag = new GridInventory(1, 1);
+    const ext = new GridInventory(5, 5);
+    const inv = new InventoryUI(bag);
+    const char = inventoryCharacter();
+    inv.setActiveCharacter(char);
+    inv.setExternalGrid(ext, 'external');
+
+    const filler = bag.place(getItemDef('herb_cheap')!, 0, 0);
+    const equipped = placed('short_sword');
+    const incoming = ext.place(getItemDef('short_sword')!, 1, 1);
+    assert.ok(filler);
+    assert.ok(incoming);
+    char.equipment.set('weapon', equipped);
+
+    const result = inv.moveToEquip(incoming, { kind: 'grid', grid: 'ext', gridX: 1, gridY: 1 }, 'weapon');
+
+    assert.equal(result, false);
+    assert.equal(char.equipment.get('weapon'), equipped);
+    assert.deepEqual(bag.items, [filler]);
+    assert.equal(ext.getAt(1, 1), incoming);
+    assert.equal(ext.items.includes(incoming), true);
+});
+
+test('equipment swap moves the old item to the backpack when space exists', () => {
+    const bag = new GridInventory(2, 3);
+    const ext = new GridInventory(5, 5);
+    const inv = new InventoryUI(bag);
+    const char = inventoryCharacter();
+    inv.setActiveCharacter(char);
+    inv.setExternalGrid(ext, 'external');
+
+    const equipped = placed('short_sword');
+    const incoming = ext.place(getItemDef('short_sword')!, 1, 1);
+    assert.ok(incoming);
+    char.equipment.set('weapon', equipped);
+
+    const result = inv.moveToEquip(incoming, { kind: 'grid', grid: 'ext', gridX: 1, gridY: 1 }, 'weapon');
+
+    assert.equal(result, true);
+    assert.equal(char.equipment.get('weapon'), incoming);
+    assert.equal(ext.items.includes(incoming), false);
+    assert.equal(bag.items.includes(equipped), true);
 });
 
 test('blacksmith repair and unsocket helpers charge gold and preserve equipment', () => {
