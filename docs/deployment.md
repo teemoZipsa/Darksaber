@@ -14,6 +14,10 @@ VITE_WORLD_SERVER_URL=wss://your-world-server.example.com npm run build
 Use `wss://` for production HTTPS pages. Browsers usually block insecure
 `ws://` connections from an HTTPS site.
 
+If `VITE_WORLD_SERVER_URL` is omitted in a production build, the static client
+still runs as a portfolio demo, but network raids and the shared market server
+remain disabled until a WebSocket server URL is configured.
+
 ## Render WebSocket server
 
 1. Push the repository to GitHub.

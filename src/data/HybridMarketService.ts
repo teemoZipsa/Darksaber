@@ -198,6 +198,7 @@ export class ServerMarketService implements MarketService {
     }
 
     private connect(): void {
+        if (!this.url) return;
         if (typeof window === 'undefined') return;
         if (typeof WebSocket === 'undefined') return;
         try {

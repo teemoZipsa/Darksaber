@@ -114,6 +114,11 @@ export class NetworkRaidClient {
     }
 
     private openSocket(): void {
+        if (!this.url) {
+            this.rejectPendingWelcome(new Error('World server URL is not configured.'));
+            this.setStatus('disconnected');
+            return;
+        }
         const socket = new WebSocket(this.url);
         this.socket = socket;
         socket.onopen = () => {

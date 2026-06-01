@@ -124,6 +124,20 @@ function welcomeMessage(resumeToken = 'resume_1', sessionEpoch = 1): string {
     });
 }
 
+test('client rejects network join when the server URL is not configured', async () => {
+    const restoreSocket = installMockWebSocket();
+
+    try {
+        const client = new NetworkRaidClient({ url: '' });
+        await assert.rejects(client.connectAndJoin(joinInput()), /World server URL is not configured/);
+
+        assert.equal(MockWebSocket.instances.length, 0);
+        assert.equal(client.getStatus(), 'disconnected');
+    } finally {
+        restoreSocket();
+    }
+});
+
 test('client ignores snapshots with regressing seq', () => {
     const applied: number[] = [];
     const client = new NetworkRaidClient({
