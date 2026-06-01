@@ -6,7 +6,7 @@
 
 import { TILE_SIZE } from '../map/Chunk';
 import { ACTION_ICON_CELLS } from './DarksaberIconRegistry';
-import { DarksaberSpriteAtlas } from './DarksaberSpriteAtlas';
+import { DarksaberSpriteAtlas, MICON_CELL_SIZE } from './DarksaberSpriteAtlas';
 import { UI, Parchment } from './UITheme';
 
 const ACTION_ICON_ANIMATION_ROWS = 5;
@@ -19,6 +19,8 @@ export interface ActionMenuSlotState {
     enabled: boolean;
     costLabel?: string;
     disabledReason?: string;
+    highlighted?: boolean;
+    emphasisLabel?: string;
 }
 
 export interface ActionMenuClickResult {
@@ -47,6 +49,8 @@ interface ActionSlot {
     type: ActionType;
     label: string;
     angle: number;
+    offsetX?: number;
+    offsetY?: number;
     iconDraw: (ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean) => void;
 }
 
@@ -66,11 +70,11 @@ export class ActionMenuUI {
         const TAU = Math.PI * 2;
         this.slots = [
             { type: 'attack', label: '공격', angle: TAU / 8,     iconDraw: this.drawAttackIcon },
-            { type: 'magic',  label: '마법', angle: TAU / 4,     iconDraw: this.drawMagicIcon },
+            { type: 'magic',  label: '마법', angle: TAU / 4,     offsetX: -18, iconDraw: this.drawMagicIcon },
             { type: 'tool',   label: '도구', angle: TAU * 3 / 8, iconDraw: this.drawToolIcon },
             { type: 'open',   label: '조사', angle: TAU / 2,     iconDraw: this.drawOpenIcon },
             { type: 'rest',   label: '휴식', angle: TAU * 5 / 8, iconDraw: this.drawRestIcon },
-            { type: 'defend', label: '방어', angle: TAU * 3 / 4, iconDraw: this.drawDefendIcon },
+            { type: 'defend', label: '방어', angle: TAU * 3 / 4, offsetX: 18,  iconDraw: this.drawDefendIcon },
             { type: 'move',   label: '이동', angle: TAU * 7 / 8, iconDraw: this.drawMoveIcon },
         ];
         this.setDefaultSlotStates();
@@ -121,8 +125,7 @@ export class ActionMenuUI {
             if (slot.type === 'open' && !state.enabled) {
                 continue;
             }
-            const ix = this.centerX + Math.sin(slot.angle) * this.menuRadius;
-            const iy = this.centerY - Math.cos(slot.angle) * this.menuRadius;
+            const { x: ix, y: iy } = this.getSlotPosition(slot);
             if (this.isSlotHit(mx, my, ix, iy)) {
                 this.hoveredSlot = slot.type;
                 break;
@@ -137,8 +140,7 @@ export class ActionMenuUI {
             if (slot.type === 'open' && !state.enabled) {
                 continue;
             }
-            const ix = this.centerX + Math.sin(slot.angle) * this.menuRadius;
-            const iy = this.centerY - Math.cos(slot.angle) * this.menuRadius;
+            const { x: ix, y: iy } = this.getSlotPosition(slot);
             if (this.isSlotHit(mx, my, ix, iy)) {
                 return {
                     type: slot.type,
@@ -170,10 +172,14 @@ export class ActionMenuUI {
                 continue;
             }
             const enabled = isReady && state.enabled;
-            const ix = this.centerX + Math.sin(slot.angle) * this.menuRadius;
-            const iy = this.centerY - Math.cos(slot.angle) * this.menuRadius;
+            const { x: ix, y: iy } = this.getSlotPosition(slot);
             const isHovered = this.hoveredSlot === slot.type;
+            const isHighlighted = enabled && Boolean(state.highlighted);
             const r = this.iconRadius;
+
+            if (isHighlighted) {
+                this.drawSlotTutorialFocus(ctx, ix, iy, r);
+            }
 
             if (isHovered) {
                 this.drawSlotFocus(ctx, ix, iy, r, enabled);
@@ -184,15 +190,16 @@ export class ActionMenuUI {
 
 
 
-            if (isHovered) {
+            if (isHovered || isHighlighted) {
+                const label = isHighlighted ? state.emphasisLabel ?? slot.label : slot.label;
                 ctx.font = `bold 13px ${UI.fontPrimary}`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.lineWidth = 4;
                 ctx.strokeStyle = 'rgba(0, 0, 0, 0.82)';
-                ctx.strokeText(slot.label, ix, iy + r + 12);
+                ctx.strokeText(label, ix, iy + r + 12);
                 ctx.fillStyle = enabled ? '#ffe3a0' : '#f0a0a8';
-                ctx.fillText(slot.label, ix, iy + r + 12);
+                ctx.fillText(label, ix, iy + r + 12);
                 ctx.textAlign = 'start';
                 ctx.textBaseline = 'alphabetic';
             }
@@ -247,6 +254,13 @@ export class ActionMenuUI {
         return this.slotStates.get(type) ?? { type, enabled: true };
     }
 
+    private getSlotPosition(slot: ActionSlot): { x: number; y: number } {
+        return {
+            x: this.centerX + Math.sin(slot.angle) * this.menuRadius + (slot.offsetX ?? 0),
+            y: this.centerY - Math.cos(slot.angle) * this.menuRadius + (slot.offsetY ?? 0),
+        };
+    }
+
     private isSlotHit(mx: number, my: number, ix: number, iy: number): boolean {
         if (Math.abs(mx - ix) <= this.hitRadius && Math.abs(my - iy) <= this.hitRadius) return true;
         return Math.abs(mx - ix) <= 30 && my >= iy + this.iconRadius + 2 && my <= iy + this.iconRadius + 24;
@@ -278,6 +292,27 @@ export class ActionMenuUI {
         ctx.lineTo(x, y + size);
         ctx.lineTo(x, y + size - corner);
         ctx.stroke();
+        ctx.restore();
+    }
+
+    private drawSlotTutorialFocus(ctx: CanvasRenderingContext2D, ix: number, iy: number, r: number): void {
+        const pulse = (Math.sin(ActionMenuUI.getAnimationTime() / 150) + 1) / 2;
+        const outer = r * (1.95 + pulse * 0.18);
+
+        ctx.save();
+        ctx.shadowColor = '#f0c050';
+        ctx.shadowBlur = 18 + pulse * 10;
+        ctx.strokeStyle = '#f0c050';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(ix, iy, outer, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = `rgba(240, 192, 80, ${0.13 + pulse * 0.08})`;
+        ctx.beginPath();
+        ctx.arc(ix, iy, outer - 3, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
     }
 
@@ -321,12 +356,20 @@ export class ActionMenuUI {
             ? iconCell.row + frame * ACTION_ICON_ANIMATION_ROWS
             : iconCell.row;
         const iconSize = Math.max(18, s * 2.35);
-        return DarksaberSpriteAtlas.drawIconCell(
+        const sourceInsetX = type === 'magic' || type === 'defend' ? 1 : 0;
+        const sourceInsetY = 0;
+        return DarksaberSpriteAtlas.drawSprite(
             ctx,
-            iconCell.col,
-            row,
+            {
+                sheet: 'micon',
+                x: iconCell.col * MICON_CELL_SIZE + sourceInsetX,
+                y: row * MICON_CELL_SIZE + sourceInsetY,
+                w: MICON_CELL_SIZE - sourceInsetX * 2,
+                h: MICON_CELL_SIZE - sourceInsetY * 2,
+            },
             cx - iconSize / 2,
             cy - iconSize / 2,
+            iconSize,
             iconSize,
             { alpha: ready ? 1 : 0.35 }
         );

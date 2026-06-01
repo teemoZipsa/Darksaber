@@ -37,7 +37,7 @@ import {
     removeStatusesFromCarrier,
     resolveTurnStartStatuses,
 } from '../combat/StatusEffects';
-import { ActionMenuUI } from '../ui/ActionMenuUI';
+import { ActionMenuUI, type ActionMenuSlotState, type ActionType } from '../ui/ActionMenuUI';
 import { EntityInfoUI } from '../ui/EntityInfoUI';
 import { EffectManager } from '../ui/EffectManager';
 import { FusionTempleUI } from '../ui/FusionTempleUI';
@@ -129,6 +129,22 @@ const INTRO_TUTORIAL_NEXT_STEP: Record<IntroTutorialStep, IntroTutorialStep | nu
     rest: 'magic',
     magic: 'defeat',
     defeat: null,
+};
+
+const INTRO_TUTORIAL_STEP_NUMBER: Record<IntroTutorialStep, number> = {
+    move: 1,
+    attack: 2,
+    rest: 3,
+    magic: 4,
+    defeat: 5,
+};
+
+const INTRO_TUTORIAL_EXPECTED_ACTION: Record<IntroTutorialStep, ActionType> = {
+    move: 'move',
+    attack: 'attack',
+    rest: 'rest',
+    magic: 'magic',
+    defeat: 'attack',
 };
 
 export class WorldEngine {
@@ -416,6 +432,7 @@ export class WorldEngine {
                 setReservedAction: (intent) => { this.reservedAction = intent; },
                 selectEnemy: (enemyId) => this.selectionController.selectEnemy(enemyId),
                 selectLoot: (lootId) => this.selectionController.selectLoot(lootId),
+                filterActionTiles: (action, actor, tiles) => this.filterIntroTutorialActionTiles(action, actor, tiles),
                 onActionCompleted: (action) => this.advanceIntroTutorialStep(action),
             },
             {
@@ -577,6 +594,13 @@ export class WorldEngine {
             return;
         }
 
+        if (this.introTutorialActive && input.mouseRightJustDown) {
+            this.addIntroTutorialBlockedLog();
+            camera.followTile(this.player.gridX, this.player.gridY);
+            camera.update(dt);
+            return;
+        }
+
         this.inputController.process(input, camera);
 
         const partyMovement = this.movementController.updatePartyActors({
@@ -688,7 +712,7 @@ export class WorldEngine {
 
         this.prepareIntroTutorialActorTurn(actor);
         this.selectionController.selectActor(actor.id);
-        this.actionMenuUI.open(this.playerActionController.getTurnActionStates(actor));
+        this.actionMenuUI.open(this.getActionMenuStates(actor));
         this.camera.followTile(actor.entity.gridX, actor.entity.gridY);
         this.camera.snapToTarget();
         AudioManager.playBgm('bgm.tutorial.training', { fadeMs: 400 });
@@ -795,6 +819,50 @@ export class WorldEngine {
         return this.introTutorialActive && enemy.id === this.introTutorialEnemyId;
     }
 
+    private getActionMenuStates(actor: FieldActor): ActionMenuSlotState[] {
+        const states = this.playerActionController.getTurnActionStates(actor);
+        if (!this.introTutorialActive || this.introTutorialCompletePending) return states;
+
+        const expected = INTRO_TUTORIAL_EXPECTED_ACTION[this.introTutorialStep];
+        return states.map((state) => {
+            if (state.type === expected) {
+                return {
+                    ...state,
+                    highlighted: state.enabled,
+                    emphasisLabel: t(`tutorial.world.action.${expected}`),
+                };
+            }
+
+            return {
+                ...state,
+                enabled: false,
+                highlighted: false,
+                disabledReason: t('tutorial.world.blockedAction'),
+            };
+        });
+    }
+
+    private filterIntroTutorialActionTiles(action: 'move' | 'attack' | 'interact', actor: FieldActor, tiles: Set<string>): Set<string> {
+        if (!this.introTutorialActive || this.introTutorialCompletePending) return tiles;
+        if (this.introTutorialStep !== 'move' || action !== 'move') return tiles;
+
+        const focusedTiles = new Set<string>();
+        for (const key of tiles) {
+            const [xText, yText] = key.split(',');
+            const tile = { x: Number(xText), y: Number(yText) };
+            if (Number.isFinite(tile.x) && Number.isFinite(tile.y) && this.canActorAttackIntroTutorialEnemyFrom(actor, tile)) {
+                focusedTiles.add(key);
+            }
+        }
+        return focusedTiles.size > 0 ? focusedTiles : tiles;
+    }
+
+    private addIntroTutorialBlockedLog(): void {
+        const message = t('tutorial.world.blockedInput');
+        if (this.combatLog[this.combatLog.length - 1] === message) return;
+        this.addCombatLog(message);
+    }
+
     private prepareIntroTutorialActorTurn(actor: FieldActor): void {
         this.activeTurnActorId = actor.id;
         this.remainingActionPoints = FIELD_MAX_ACTION_GAUGE;
@@ -811,95 +879,212 @@ export class WorldEngine {
         const scale = SettingsManager.getUIScale();
         const uiW = Math.floor(width / scale);
         const uiH = Math.floor(height / scale);
-        const panelW = Math.min(560, uiW - 32);
-        const panelH = 136;
-        const x = Math.max(16, Math.floor((uiW - panelW) / 2));
-        const y = Math.max(16, uiH - panelH - 18);
+        const combatLogReserveW = 496;
+        const panelGap = 24;
+        const canFitBesideCombatLog = uiW >= combatLogReserveW + panelGap + 560 + 16;
+        const panelW = canFitBesideCombatLog
+            ? Math.min(720, uiW - combatLogReserveW - panelGap - 16)
+            : Math.min(720, uiW - 32);
+        const panelH = 196;
+        const x = canFitBesideCombatLog
+            ? combatLogReserveW + panelGap
+            : Math.max(16, Math.floor((uiW - panelW) / 2));
+        const y = canFitBesideCombatLog
+            ? Math.max(16, uiH - panelH - 18)
+            : Math.max(92, Math.floor(uiH * 0.16));
+        const expected = INTRO_TUTORIAL_EXPECTED_ACTION[this.introTutorialStep];
 
         ctx.save();
         ctx.scale(scale, scale);
-        ctx.globalAlpha = 0.94;
-        ctx.fillStyle = '#1a1410';
-        ctx.strokeStyle = '#c8a36d';
+        ctx.fillStyle = 'rgba(12, 9, 8, 0.96)';
+        ctx.strokeStyle = '#d6b16d';
         ctx.lineWidth = 2;
+        ctx.shadowColor = 'rgba(240, 192, 80, 0.28)';
+        ctx.shadowBlur = 18;
         ctx.beginPath();
         ctx.roundRect(x, y, panelW, panelH, 8);
         ctx.fill();
         ctx.stroke();
-        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = 'rgba(240, 192, 80, 0.12)';
+        ctx.fillRect(x + 14, y + 42, panelW - 28, 52);
+        ctx.strokeStyle = 'rgba(240, 192, 80, 0.38)';
+        ctx.strokeRect(x + 14, y + 42, panelW - 28, 52);
 
         ctx.fillStyle = '#f0c050';
         ctx.font = '18px "DOSMyungjo", serif';
         ctx.textAlign = 'left';
-        ctx.fillText(t('tutorial.world.title'), x + 18, y + 30);
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(`${t('tutorial.world.title')} ${INTRO_TUTORIAL_STEP_NUMBER[this.introTutorialStep]}/5`, x + 18, y + 28);
+
+        ctx.fillStyle = '#120d0a';
+        ctx.fillRect(x + 18, y + 50, 92, 26);
+        ctx.strokeStyle = '#f0c050';
+        ctx.strokeRect(x + 18, y + 50, 92, 26);
+        ctx.fillStyle = '#ffe8a8';
+        ctx.font = 'bold 14px "DOSMyungjo", serif';
+        ctx.fillText(t('tutorial.world.instructor'), x + 28, y + 68);
 
         ctx.fillStyle = '#e8e0d0';
-        ctx.font = '13px sans-serif';
-        ctx.fillText(t('tutorial.world.instructorLine'), x + 18, y + 58);
-        ctx.fillStyle = '#cbb992';
-        ctx.fillText(t(`tutorial.world.step.${this.introTutorialStep}`), x + 18, y + 82);
-        ctx.fillStyle = '#ffd700';
-        ctx.fillText(t('tutorial.world.lineEsc'), x + 18, y + 108);
+        ctx.font = 'bold 17px sans-serif';
+        this.drawWrappedText(ctx, t(`tutorial.world.dialogue.${this.introTutorialStep}`), x + 126, y + 59, panelW - 158, 21, 2);
+
+        ctx.fillStyle = '#ffd86b';
+        ctx.font = 'bold 26px "DOSMyungjo", serif';
+        this.drawWrappedText(ctx, t(`tutorial.world.press.${this.introTutorialStep}`), x + 18, y + 122, panelW - 36, 30, 2);
+
+        ctx.fillStyle = '#f6e0aa';
+        ctx.font = 'bold 14px sans-serif';
+        this.drawWrappedText(ctx, t(`tutorial.world.target.${this.introTutorialStep}`), x + 18, y + 156, panelW - 36, 18, 2);
+
+        ctx.fillStyle = '#a99773';
+        ctx.font = '12px sans-serif';
+        ctx.fillText(`${t('tutorial.world.onlyAction')}  ${t('tutorial.world.lineEsc')}`, x + 18, y + panelH - 16);
+
+        ctx.fillStyle = 'rgba(240, 192, 80, 0.2)';
+        ctx.fillRect(x + panelW - 128, y + 18, 110, 24);
+        ctx.strokeStyle = '#f0c050';
+        ctx.strokeRect(x + panelW - 128, y + 18, 110, 24);
+        ctx.fillStyle = '#ffe8a8';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(t(`tutorial.world.action.${expected}`), x + panelW - 73, y + 35);
+        ctx.textAlign = 'left';
         ctx.restore();
+    }
+
+    private drawWrappedText(
+        ctx: CanvasRenderingContext2D,
+        text: string,
+        x: number,
+        y: number,
+        maxWidth: number,
+        lineHeight: number,
+        maxLines: number
+    ): void {
+        const words = text.split(/\s+/);
+        let line = '';
+        let lineCount = 0;
+
+        for (const word of words) {
+            const nextLine = line ? `${line} ${word}` : word;
+            if (ctx.measureText(nextLine).width > maxWidth && line) {
+                ctx.fillText(line, x, y + lineCount * lineHeight);
+                line = word;
+                lineCount++;
+                if (lineCount >= maxLines) return;
+            } else {
+                line = nextLine;
+            }
+        }
+
+        if (line && lineCount < maxLines) {
+            ctx.fillText(line, x, y + lineCount * lineHeight);
+        }
     }
 
     private renderIntroTutorialCompleteModal(ctx: CanvasRenderingContext2D, width: number, height: number): void {
         const scale = SettingsManager.getUIScale();
         const uiW = Math.floor(width / scale);
         const uiH = Math.floor(height / scale);
-        const panelW = Math.min(520, uiW - 40);
-        const panelH = 230;
+        const panelW = Math.min(620, uiW - 40);
+        const panelH = 286;
         const x = Math.floor((uiW - panelW) / 2);
         const y = Math.floor((uiH - panelH) / 2);
-        const buttonW = Math.min(260, panelW - 72);
-        const buttonH = 42;
+        const buttonW = Math.min(340, panelW - 72);
+        const buttonH = 48;
         const buttonX = x + Math.floor((panelW - buttonW) / 2);
-        const buttonY = y + panelH - 66;
+        const buttonY = y + panelH - 76;
+        const crestX = x + panelW / 2;
+        const crestY = y + 54;
 
         ctx.save();
         ctx.scale(scale, scale);
 
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.56)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.68)';
         ctx.fillRect(0, 0, uiW, uiH);
 
         ctx.globalAlpha = 0.98;
-        ctx.fillStyle = '#1a1410';
+        ctx.fillStyle = '#15100d';
         ctx.strokeStyle = '#d6b16d';
         ctx.lineWidth = 2;
         ctx.shadowColor = 'rgba(240, 192, 80, 0.32)';
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 24;
         ctx.beginPath();
-        ctx.roundRect(x, y, panelW, panelH, 10);
+        ctx.roundRect(x, y, panelW, panelH, 12);
         ctx.fill();
         ctx.stroke();
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
 
+        ctx.fillStyle = 'rgba(240, 192, 80, 0.08)';
+        ctx.fillRect(x + 18, y + 18, panelW - 36, 74);
+        ctx.strokeStyle = 'rgba(240, 192, 80, 0.28)';
+        ctx.strokeRect(x + 18, y + 18, panelW - 36, 74);
+
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#f0c050';
-        ctx.font = '28px "DOSMyungjo", serif';
-        ctx.fillText(t('tutorial.world.completeTitle'), x + panelW / 2, y + 46);
 
-        ctx.fillStyle = '#e8e0d0';
-        ctx.font = '15px sans-serif';
-        ctx.fillText(t('tutorial.world.completeLine'), x + panelW / 2, y + 92);
-
-        ctx.fillStyle = '#cbb992';
-        ctx.font = '13px sans-serif';
-        ctx.fillText(t('tutorial.world.completeReward'), x + panelW / 2, y + 122);
-
-        ctx.fillStyle = '#5a1519';
+        ctx.fillStyle = '#20150f';
         ctx.strokeStyle = '#f0c050';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.roundRect(buttonX, buttonY, buttonW, buttonH, 7);
+        ctx.arc(crestX, crestY, 25, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#f0c050';
+        ctx.font = 'bold 26px "DOSMyungjo", serif';
+        ctx.fillText('✓', crestX, crestY + 1);
+
+        ctx.fillStyle = '#f0c050';
+        ctx.font = '30px "DOSMyungjo", serif';
+        ctx.fillText(t('tutorial.world.completeTitle'), x + panelW / 2, y + 114);
+
+        ctx.fillStyle = '#e8e0d0';
+        ctx.font = 'bold 16px sans-serif';
+        this.drawWrappedText(ctx, t('tutorial.world.completeLine'), x + panelW / 2, y + 150, panelW - 96, 22, 2);
+
+        const nextBoxX = x + 46;
+        const nextBoxY = y + 176;
+        const nextBoxW = panelW - 92;
+        const nextBoxH = 44;
+        ctx.fillStyle = 'rgba(240, 192, 80, 0.1)';
+        ctx.strokeStyle = 'rgba(240, 192, 80, 0.44)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(nextBoxX, nextBoxY, nextBoxW, nextBoxH, 8);
         ctx.fill();
         ctx.stroke();
 
+        ctx.fillStyle = '#a99773';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(t('tutorial.world.completeNextLabel'), nextBoxX + 18, nextBoxY + 17);
+
         ctx.fillStyle = '#ffe8a8';
-        ctx.font = '16px "DOSMyungjo", serif';
+        ctx.font = 'bold 16px "DOSMyungjo", serif';
+        ctx.fillText(t('tutorial.world.completeReward'), nextBoxX + 18, nextBoxY + 34);
+
+        ctx.fillStyle = '#f0c050';
+        ctx.strokeStyle = '#ffe8a8';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = 'rgba(240, 192, 80, 0.45)';
+        ctx.shadowBlur = 14;
+        ctx.beginPath();
+        ctx.roundRect(buttonX, buttonY, buttonW, buttonH, 8);
+        ctx.fill();
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = '#1b1008';
+        ctx.font = 'bold 18px "DOSMyungjo", serif';
+        ctx.textAlign = 'center';
         ctx.fillText(t('tutorial.world.completeNext'), x + panelW / 2, buttonY + buttonH / 2 + 1);
+
+        ctx.fillStyle = '#a99773';
+        ctx.font = '12px sans-serif';
+        ctx.fillText(t('tutorial.world.completeInputHint'), x + panelW / 2, buttonY + buttonH + 22);
         ctx.restore();
     }
 
@@ -2072,6 +2257,10 @@ export class WorldEngine {
     private switchToPartyMember(index: number): boolean {
         const actor = this.partyActors[index];
         if (!actor || actor.character.isDead) return false;
+        if (this.introTutorialActive && actor.id !== this.activeTurnActorId) {
+            this.addIntroTutorialBlockedLog();
+            return false;
+        }
         if (!this.party.getCharacters().includes(actor.character)) {
             this.selectionController.selectActor(actor.id);
             this.addCombatLog(`${actor.character.name}: 원격 플레이어는 표시 전용입니다.`);
@@ -2107,7 +2296,7 @@ export class WorldEngine {
         }
 
         this.closeTacticalMenu();
-        this.actionMenuUI.open(this.playerActionController.getTurnActionStates(actor));
+        this.actionMenuUI.open(this.getActionMenuStates(actor));
     }
 
     private closeActionMenu(): void {
@@ -2115,6 +2304,12 @@ export class WorldEngine {
     }
 
     private dismissActionMenuTurn(): void {
+        if (this.introTutorialActive) {
+            const actor = this.getActivePartyTurnActor();
+            if (actor) this.reopenActionMenu(actor);
+            this.addIntroTutorialBlockedLog();
+            return;
+        }
         const actor = this.getActivePartyTurnActor();
         if (!actor) {
             this.closeActionMenu();
@@ -2156,7 +2351,7 @@ export class WorldEngine {
         }
         this.selectionController.selectActor(actor.id);
         this.closeTacticalMenu();
-        this.actionMenuUI.open(this.playerActionController.getTurnActionStates(actor));
+        this.actionMenuUI.open(this.getActionMenuStates(actor));
     }
 
     private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = this.remainingActionPoints): void {
@@ -2293,7 +2488,7 @@ export class WorldEngine {
         if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
         else {
             this.closeTacticalMenu();
-            this.actionMenuUI.open(this.playerActionController.getTurnActionStates(actor));
+            this.actionMenuUI.open(this.getActionMenuStates(actor));
         }
     }
 

@@ -77,6 +77,7 @@ export interface WorldPlayerActionContext {
     setReservedAction: (intent: FieldIntent | null) => void;
     selectEnemy: (enemyId: string) => void;
     selectLoot: (lootId: string) => void;
+    filterActionTiles?: (action: 'move' | 'attack' | 'interact', actor: FieldActor, tiles: Set<string>) => Set<string>;
     onActionCompleted?: (action: FieldApAction) => void;
 }
 
@@ -151,12 +152,12 @@ export class WorldPlayerActionController {
                     break;
                 }
                 this.actionMode = 'move';
-                this.actionTiles = this.computeWalkableTiles(actor);
+                this.actionTiles = this.getFilteredActionTiles('move', actor, this.computeWalkableTiles(actor));
                 this.sink.log('이동할 타일을 클릭하세요.');
                 break;
             case 'attack':
                 this.actionMode = 'attack';
-                this.actionTiles = this.computeAttackableTiles(actor);
+                this.actionTiles = this.getFilteredActionTiles('attack', actor, this.computeAttackableTiles(actor));
                 this.sink.log(`공격할 적을 클릭하세요. ATB -${ATTACK_ACTION_GAUGE_COST}%`);
                 break;
             case 'magic':
@@ -174,7 +175,7 @@ export class WorldPlayerActionController {
                     break;
                 }
                 this.actionMode = 'interact';
-                this.actionTiles = this.computeInteractTiles(actor);
+                this.actionTiles = this.getFilteredActionTiles('interact', actor, this.computeInteractTiles(actor));
                 this.sink.log('조사할 상자나 전리품을 클릭하세요.');
                 break;
             case 'rest':
@@ -507,6 +508,10 @@ export class WorldPlayerActionController {
         return this.context.getLoot().some((loot) =>
             !loot.opened && manhattan(actorTile, { x: loot.x, y: loot.y }) <= 1
         );
+    }
+
+    private getFilteredActionTiles(action: 'move' | 'attack' | 'interact', actor: FieldActor, tiles: Set<string>): Set<string> {
+        return this.context.filterActionTiles?.(action, actor, tiles) ?? tiles;
     }
 
     private hasActionGauge(cost: number = MIN_FIELD_ACTION_GAUGE_COST): boolean {
