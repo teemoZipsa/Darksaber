@@ -209,7 +209,7 @@ const TOWN_EXIT_FORMATION_OFFSETS: TilePoint[] = [
 
 export class WorldMap {
     private chunks: Map<string, Chunk> = new Map();
-    private loadRadius: number = 2;
+    private preloadChunkMargin: number = 1;
     private biomeMask: BiomeMask;
 
     public loot: LootObject[] = [];
@@ -524,17 +524,22 @@ export class WorldMap {
         return new Chunk(chunkX, chunkY, tiles);
     }
 
-    public updateLoadedChunks(worldCenterX: number, worldCenterY: number): void {
-        const ccx = Math.floor(worldCenterX / (CHUNK_SIZE * TILE_SIZE));
-        const ccy = Math.floor(worldCenterY / (CHUNK_SIZE * TILE_SIZE));
+    public updateLoadedChunks(worldCenterX: number, worldCenterY: number, viewW?: number, viewH?: number): void {
+        const chunkPixelSize = CHUNK_SIZE * TILE_SIZE;
+        const halfViewW = viewW !== undefined ? viewW / 2 : this.preloadChunkMargin * chunkPixelSize;
+        const halfViewH = viewH !== undefined ? viewH / 2 : this.preloadChunkMargin * chunkPixelSize;
+        const minChunkX = Math.floor((worldCenterX - halfViewW) / chunkPixelSize) - this.preloadChunkMargin;
+        const maxChunkX = Math.floor((worldCenterX + halfViewW) / chunkPixelSize) + this.preloadChunkMargin;
+        const minChunkY = Math.floor((worldCenterY - halfViewH) / chunkPixelSize) - this.preloadChunkMargin;
+        const maxChunkY = Math.floor((worldCenterY + halfViewH) / chunkPixelSize) + this.preloadChunkMargin;
         const needed = new Set<string>();
 
-        for (let dy = -this.loadRadius; dy <= this.loadRadius; dy++) {
-            for (let dx = -this.loadRadius; dx <= this.loadRadius; dx++) {
-                const key = this.chunkKey(ccx + dx, ccy + dy);
+        for (let cy = minChunkY; cy <= maxChunkY; cy++) {
+            for (let cx = minChunkX; cx <= maxChunkX; cx++) {
+                const key = this.chunkKey(cx, cy);
                 needed.add(key);
                 if (!this.chunks.has(key)) {
-                    this.chunks.set(key, this.generateChunk(ccx + dx, ccy + dy));
+                    this.chunks.set(key, this.generateChunk(cx, cy));
                 }
             }
         }

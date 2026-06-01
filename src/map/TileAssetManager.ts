@@ -227,6 +227,7 @@ class TileAssetManagerClass {
     private images: Map<string, HTMLImageElement> = new Map();
     private loadPromises: Promise<void>[] = [];
     private cellCornerCache: Map<string, number> = new Map();
+    private cornerCellsCache: Map<string, readonly number[]> = new Map();
 
     public init(): Promise<void[]> {
         for (const texturePath of Object.values(DARKSABER_TERRAIN_TEXTURES)) {
@@ -463,19 +464,31 @@ class TileAssetManagerClass {
         neighbors: OriginalAutotileNeighbors
     ): readonly number[] | undefined {
         const wanted = this.getWantedInnerCornerMask(neighbors);
+        const cacheKey = `${img.src}:${wanted}:${cells.join(',')}`;
+        const cached = this.cornerCellsCache.get(cacheKey);
+        if (cached) return cached;
+
+        let picked: readonly number[] | undefined;
         if (wanted === 0) {
             const solidCells = cells.filter((cell) => this.getCellCornerCutMask(img, cell) === 0);
-            return solidCells.length > 0 ? solidCells : undefined;
+            picked = solidCells.length > 0 ? solidCells : undefined;
+            if (picked) this.cornerCellsCache.set(cacheKey, picked);
+            return picked;
         }
 
         const exact = cells.filter((cell) => this.getCellCornerCutMask(img, cell) === wanted);
-        if (exact.length > 0) return exact;
+        if (exact.length > 0) {
+            this.cornerCellsCache.set(cacheKey, exact);
+            return exact;
+        }
 
         const partial = cells.filter((cell) => {
             const cellMask = this.getCellCornerCutMask(img, cell);
             return cellMask !== 0 && (cellMask & wanted) !== 0;
         });
-        return partial.length > 0 ? partial : undefined;
+        picked = partial.length > 0 ? partial : undefined;
+        if (picked) this.cornerCellsCache.set(cacheKey, picked);
+        return picked;
     }
 
     private getWantedInnerCornerMask(neighbors: OriginalAutotileNeighbors): number {

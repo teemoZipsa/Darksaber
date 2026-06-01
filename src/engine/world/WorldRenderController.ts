@@ -83,7 +83,8 @@ export class WorldRenderController {
 
         const viewW = width / camera.zoom;
         const viewH = height / camera.zoom;
-        worldMap.updateLoadedChunks(model.player.pixelX * TILE_SIZE, model.player.pixelY * TILE_SIZE);
+        const worldCenter = camera.getWorldCenter();
+        worldMap.updateLoadedChunks(worldCenter.x, worldCenter.y, viewW, viewH);
         worldMap.render(ctx, camX, camY, viewW, viewH);
 
         WorldFieldRenderer.renderActionTiles(ctx, model, camX, camY);
