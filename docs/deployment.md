@@ -35,6 +35,17 @@ VITE_WORLD_SERVER_URL=wss://<render-service-host>
 The server reads `process.env.PORT`, which Render sets automatically. Locally it
 falls back to port `8765`.
 
+Auto-deploy is intentionally disabled for the Render server to preserve free-tier
+build/runtime quota. Deploy the server manually only when backend/server code
+changes need to go live:
+
+```bash
+render deploys create srv-d8eh4cc2m8qs738tesd0
+```
+
+On this Windows machine, the installed CLI path is
+`%LOCALAPPDATA%\Programs\RenderCLI\render.exe`.
+
 ## Vercel client
 
 1. Import the repository in Vercel.

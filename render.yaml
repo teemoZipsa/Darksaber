@@ -5,4 +5,4 @@ services:
     buildCommand: npm ci
     startCommand: npm run server
     healthCheckPath: /healthz
-    autoDeploy: true
+    autoDeploy: false
