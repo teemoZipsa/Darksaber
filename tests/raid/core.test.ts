@@ -13,7 +13,7 @@ import { WorldMap } from '../../src/map/WorldMap';
 import { CHUNK_SIZE } from '../../src/map/Chunk';
 import { TileType } from '../../src/map/Tile';
 import { getSellPrice, getShopItems, isSellableItem } from '../../src/data/ShopData';
-import { BUY_PRESSURE_CAP, LocalMarketService, MARKET_DRIFT_CAP, SELL_PRESSURE_CAP } from '../../src/data/MarketService';
+import { BUY_PRESSURE_CAP, MarketSimulationService, MARKET_DRIFT_CAP, SELL_PRESSURE_CAP } from '../../src/data/MarketService';
 import { marketStateKey } from '../../src/data/MarketData';
 import { PlayerData } from '../../src/data/PlayerData';
 import { REST_FACILITIES, getRestFacility, getRestMenu } from '../../src/data/RestFacilityData';
@@ -369,9 +369,9 @@ test('trade goods sell for different prices by destination town', () => {
     assert.equal(getSellPrice(herb, 's_coast_town'), 25);
 });
 
-test('local market prices adjust trade goods while leaving ordinary items alone', () => {
+test('market simulation prices adjust trade goods while leaving ordinary items alone', () => {
     const player = new PlayerData();
-    const market = new LocalMarketService(player, () => 0.99);
+    const market = new MarketSimulationService(player, () => 0.99);
     const resin = getItemDef('trade_forest_resin');
     const herb = getItemDef('herb_common');
     assert.ok(resin);
@@ -402,7 +402,7 @@ test('local market prices adjust trade goods while leaving ordinary items alone'
 test('market drift rolls on town visits within the configured cap', () => {
     const player = new PlayerData();
     const rolls = [0, 0.5, 0.9];
-    const market = new LocalMarketService(player, () => rolls.shift() ?? 0.99);
+    const market = new MarketSimulationService(player, () => rolls.shift() ?? 0.99);
 
     market.rollTownVisit('w_forest_village');
 
@@ -426,7 +426,7 @@ test('market state persists and old saves load with a default market state', () 
 
     try {
         const player = new PlayerData();
-        const market = new LocalMarketService(player, () => 0.99);
+        const market = new MarketSimulationService(player, () => 0.99);
         market.recordBuy('w_forest_village', 'trade_forest_resin', 2);
         market.recordSell('s_coast_town', 'trade_forest_resin', 3);
         player.save();
@@ -447,7 +447,7 @@ test('market state persists and old saves load with a default market state', () 
 
 test('market cycle recovery decays pressure and keeps contracts safe', () => {
     const player = new PlayerData();
-    const market = new LocalMarketService(player, () => 0.99);
+    const market = new MarketSimulationService(player, () => 0.99);
     const key = marketStateKey('s_coast_town', 'trade_forest_resin');
     player.marketState[key] = { buyPressure: 2, sellPressure: 3, drift: 0.08 };
     player.marketContracts = [{
@@ -472,7 +472,7 @@ test('market cycle recovery decays pressure and keeps contracts safe', () => {
 
 test('trade contracts add sell bonuses and only consume matching quantities', () => {
     const player = new PlayerData();
-    const market = new LocalMarketService(player, () => 0.99);
+    const market = new MarketSimulationService(player, () => 0.99);
     const resin = getItemDef('trade_forest_resin');
     assert.ok(resin);
     player.marketCycle = 1;
@@ -501,7 +501,7 @@ test('trade contracts add sell bonuses and only consume matching quantities', ()
 
 test('market rumors are limited to rumor facilities and reflect cooled demand', () => {
     const player = new PlayerData();
-    const market = new LocalMarketService(player, () => 0.99);
+    const market = new MarketSimulationService(player, () => 0.99);
     market.recordSell('central_castle', 'trade_forest_resin', 3);
     const rumor = market.getMarketRumor('central_castle');
     assert.ok(rumor?.includes('숲 수지'));

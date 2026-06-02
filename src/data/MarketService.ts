@@ -54,7 +54,7 @@ const TOWN_LABELS: Record<TownId, { ko: string; en: string }> = {
     ember_citadel: { ko: '홍염 성채', en: 'Ember Citadel' },
 };
 
-export class LocalMarketService implements MarketService {
+export class MarketSimulationService implements MarketService {
     constructor(
         private readonly playerData: PlayerData,
         private readonly random: () => number = Math.random

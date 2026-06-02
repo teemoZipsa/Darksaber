@@ -5,26 +5,20 @@ import { join } from 'node:path';
 import {
     BURGOS_BOSS_MONSTER_ID,
     BURGOS_CASTLE_DUNGEON_ID,
-    BURGOS_GUARD_MONSTER_ID,
     BURGOS_LEGACY_BOSS_MONSTER_ID,
     GENERAL_MONSTER_IDS,
-    MONSTER_DEFINITIONS,
     MONSTER_ROW_BY_FACING,
     MONSTER_SPRITE_PATH,
     ZAMORA_FENRIS_BOSS_MONSTER_ID,
     ZAMORA_FORTRESS_DUNGEON_ID,
-    ZAMORA_GUARD_MONSTER_ID,
     getMonsterDefinition,
 } from '../../src/data/MonsterCatalog';
 import { getItemDef } from '../../src/data/ItemDB';
 import { getStoryQuestByDungeonId } from '../../src/data/StoryQuestData';
-import { STORY_SCENARIOS, getStoryScenarioByDungeonId } from '../../src/data/StoryScenarioData';
+import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import { Enemy } from '../../src/entity/Enemy';
 import { LootObject } from '../../src/entity/LootObject';
-import { Player } from '../../src/entity/Player';
 import { WorldEngine } from '../../src/engine/WorldEngine';
-import { WorldFieldSpawnController } from '../../src/engine/world/WorldFieldSpawnController';
-import type { WorldMovementController } from '../../src/engine/world/WorldMovementController';
 import { WorldRaidSession } from '../../src/engine/world/WorldRaidSession';
 import { WorldSelectionController } from '../../src/engine/world/WorldSelectionController';
 import { GridInventory } from '../../src/inventory/GridInventory';
@@ -44,12 +38,6 @@ class ImageStub {
 (globalThis as unknown as { Image: typeof ImageStub }).Image = ImageStub;
 
 const MONSTER_PUBLIC_PATH = ['public', ...MONSTER_SPRITE_PATH.split('/').filter(Boolean)];
-
-function makePassthroughMovement(): WorldMovementController {
-    return {
-        findNearbyWalkableTile: (tile: { x: number; y: number }) => tile,
-    } as unknown as WorldMovementController;
-}
 
 test('monster catalog includes 16 general monsters and story boss sprites', () => {
     assert.equal(GENERAL_MONSTER_IDS.length, 16);
@@ -126,21 +114,6 @@ test('Burgos Castle uses the original 01hmap footprint around its entrance', () 
     // feathered into the surrounding biome (see HmapBlend), so sample interior tiles.
     assert.equal(world.getTileAt(entrance.x - 40, entrance.y - 40), TileType.STONE);
     assert.equal(world.getTileAt(entrance.x + 34, entrance.y + 34), TileType.ROAD);
-});
-
-test('starter field content attaches all 16 general monster walk sprites', () => {
-    const spawner = new WorldFieldSpawnController(makePassthroughMovement());
-    const anchor = new Player(100, 100);
-    const content = spawner.createStarterFieldContent(anchor);
-
-    assert.equal(content.enemies.length, GENERAL_MONSTER_IDS.length);
-    const spriteNames = new Set(content.enemies.map((entry) => {
-        const parts = entry.enemy.walkSprite?.image.src.split('/') ?? [];
-        return parts[parts.length - 1];
-    }));
-    for (const id of GENERAL_MONSTER_IDS) {
-        assert.ok(spriteNames.has(MONSTER_DEFINITIONS[id].sprite), `${id} was not spawned with its catalog sprite`);
-    }
 });
 
 test('world map neutral bird sprite asset is available', () => {
@@ -257,26 +230,6 @@ test('sealed reliquary loot comes only from non-quest rare tables', () => {
     assert.ok(itemIds.every((itemId) => !itemId.startsWith('quest_') && itemId !== 'absolution_edge'));
 });
 
-test('Burgos Castle encounter spawns wolf boss center and four diagonal guards', () => {
-    const spawner = new WorldFieldSpawnController(makePassthroughMovement());
-    const content = spawner.createBurgosCastleEncounter({ x: 100, y: 100 });
-    assert.equal(content.enemies.length, 5);
-    assert.equal(content.loot.length, 0);
-
-    const boss = content.enemies.find((entry) => entry.enemy.isBoss)?.enemy;
-    assert.ok(boss);
-    assert.equal(boss.name, getMonsterDefinition(BURGOS_BOSS_MONSTER_ID).name);
-    assert.deepEqual({ x: boss.gridX, y: boss.gridY }, { x: 100, y: 100 });
-    assert.equal(boss.walkSprite?.frameWidth, 32);
-
-    const guardName = getMonsterDefinition(BURGOS_GUARD_MONSTER_ID).name;
-    const guardPositions = content.enemies
-        .filter((entry) => entry.enemy.name === guardName)
-        .map((entry) => `${entry.enemy.gridX - 100},${entry.enemy.gridY - 100}`)
-        .sort();
-    assert.deepEqual(guardPositions, ['-2,-2', '-2,2', '2,-2', '2,2']);
-});
-
 test('Burgos boss corpse loot includes a guaranteed rune', () => {
     const bossDef = getMonsterDefinition(BURGOS_BOSS_MONSTER_ID);
     const boss = new Enemy('burgos_boss', 100, 100, bossDef.name, bossDef.level, bossDef.color, bossDef.role);
@@ -289,73 +242,8 @@ test('Burgos boss corpse loot includes a guaranteed rune', () => {
     assert.ok(engine.worldMap.loot[0].inventory.items.some((placed: { item: { slot: string } }) => placed.item.slot === 'rune'));
 });
 
-test('Zamora Fortress encounter spawns Fenris center and four skeleton guards', () => {
-    const spawner = new WorldFieldSpawnController(makePassthroughMovement());
-    const content = spawner.createZamoraFortressEncounter({ x: 100, y: 100 });
-    assert.equal(content.enemies.length, 5);
-    assert.equal(content.loot.length, 0);
-
-    const boss = content.enemies.find((entry) => entry.enemy.isBoss)?.enemy;
-    assert.ok(boss);
-    assert.equal(boss.name, getMonsterDefinition(ZAMORA_FENRIS_BOSS_MONSTER_ID).name);
-    assert.deepEqual({ x: boss.gridX, y: boss.gridY }, { x: 100, y: 100 });
-    assert.equal(boss.walkSprite?.frameWidth, 32);
-
-    const guardName = getMonsterDefinition(ZAMORA_GUARD_MONSTER_ID).name;
-    const guardPositions = content.enemies
-        .filter((entry) => entry.enemy.name === guardName)
-        .map((entry) => `${entry.enemy.gridX - 100},${entry.enemy.gridY - 100}`)
-        .sort();
-    assert.deepEqual(guardPositions, ['-2,-2', '-2,2', '2,-2', '2,2']);
-});
-
-test('story scenario encounters include original named monsters and special objectives', () => {
-    const spawner = new WorldFieldSpawnController(makePassthroughMovement());
-    const pyramidFront = getStoryScenarioByDungeonId('pyramid_front');
-    const pyramidInside = getStoryScenarioByDungeonId('pyramid_inside');
-    const skeria = getStoryScenarioByDungeonId('skeria');
-    const airship = getStoryScenarioByDungeonId('airship');
-    const amentGate = getStoryScenarioByDungeonId('ament_gate');
-    const amentFirst = getStoryScenarioByDungeonId('ament_1f');
-    assert.ok(pyramidFront);
-    assert.ok(pyramidInside);
-    assert.ok(skeria);
-    assert.ok(airship);
-    assert.ok(amentGate);
-    assert.ok(amentFirst);
-
-    const pyramidNames = spawner.createStoryScenarioEncounter(pyramidFront, { x: 100, y: 100 })
-        .enemies.map((entry) => entry.enemy.name);
-    assert.ok(pyramidNames.includes('키스라 Lv2'));
-    assert.ok(pyramidNames.includes('펜리스 Lv2'));
-    assert.ok(pyramidNames.includes('가노마스 Lv2'));
-
-    const pyramidInsideNames = spawner.createStoryScenarioEncounter(pyramidInside, { x: 100, y: 100 })
-        .enemies.map((entry) => entry.enemy.name);
-    assert.ok(pyramidInsideNames.includes('안피스베냐'));
-    assert.ok(pyramidInsideNames.includes('가노마스'));
-
-    const skeriaNames = spawner.createStoryScenarioEncounter(skeria, { x: 100, y: 100 })
-        .enemies.map((entry) => entry.enemy.name);
-    assert.ok(skeriaNames.includes('나이아드 Lv2'));
-    assert.ok(skeriaNames.includes('카론 Lv2'));
-    assert.ok(skeriaNames.includes('단구 Lv2'));
-
-    const airshipContent = spawner.createStoryScenarioEncounter(airship, { x: 100, y: 100 });
-    assert.equal(airshipContent.enemies.some((entry) => entry.enemy.isBoss), false);
-    assert.deepEqual(airshipContent.enemies.map((entry) => entry.enemy.name).sort(), ['나이아두', '단그']);
-
-    const amentGateContent = spawner.createStoryScenarioEncounter(amentGate, { x: 100, y: 100 });
-    assert.equal(amentGateContent.enemies.filter((entry) => entry.enemy.isBoss).length, 1);
-    assert.equal(amentGateContent.enemies.filter((entry) => entry.enemy.name === '암피트 분신').length, 4);
-
-    const amentFirstContent = spawner.createStoryScenarioEncounter(amentFirst, { x: 100, y: 100 });
-    assert.equal(amentFirstContent.enemies.filter((entry) => entry.enemy.name === '우레우스 석상').length, 4);
-});
-
-test('story episodes 3 through 20 have map entrances and completable objectives', () => {
+test('story episodes 3 through 20 have map entrances and server-session objective data', () => {
     const world = new WorldMap();
-    const spawner = new WorldFieldSpawnController(makePassthroughMovement());
 
     for (const scenario of STORY_SCENARIOS.filter((entry) => entry.episode >= 3 && entry.episode <= 20)) {
         const quest = getStoryQuestByDungeonId(scenario.dungeonId);
@@ -366,21 +254,11 @@ test('story episodes 3 through 20 have map entrances and completable objectives'
         const entrance = world.getDungeonEntranceTile(dungeon);
         assert.equal(world.getDungeonAtTile(entrance.x, entrance.y)?.id, scenario.dungeonId);
         assert.equal(world.getTileAt(entrance.x, entrance.y), TileType.DUNGEON_ENTRANCE);
-
-        const content = spawner.createStoryScenarioEncounter(scenario, { x: 100, y: 100 });
-        assert.ok(content.enemies.length > 0, `missing encounter for episode ${scenario.episode}`);
-        const bosses = content.enemies.filter((entry) => entry.enemy.isBoss);
-        if (scenario.episode === 17) {
-            assert.equal(bosses.length, 0, 'airship should complete on boarding instead of boss defeat');
-        } else {
-            assert.equal(bosses.length, 1, `episode ${scenario.episode} should have one objective boss`);
-            assert.equal(bosses[0].enemy.name, scenario.bossName);
-            assert.ok(
-                bosses[0].enemy.id === `${scenario.dungeonId}_objective`
-                    || bosses[0].enemy.id === `${scenario.dungeonId}_true_amphit`,
-                `unexpected objective id ${bosses[0].enemy.id}`
-            );
-        }
+        assert.ok(scenario.guardCount >= 0, `episode ${scenario.episode} guard count is invalid`);
+        assert.ok(scenario.guardLevel >= 1, `episode ${scenario.episode} guard level is invalid`);
+        assert.ok(scenario.bossLevel >= scenario.guardLevel, `episode ${scenario.episode} boss level should cover guards`);
+        if (scenario.episode === 17) assert.equal(scenario.bossName, null, 'airship completes on boarding');
+        else assert.ok(scenario.bossName, `episode ${scenario.episode} needs an objective boss name`);
     }
 });
 

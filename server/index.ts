@@ -179,7 +179,12 @@ function sendSnapshotsToActive(now: number): void {
 }
 
 function shouldSendImmediateSnapshots(message: WorldClientMessage, replies: readonly WorldServerMessage[]): boolean {
-    if (message.type !== 'PLAYER_INTENT' && message.type !== 'LOOT_PICKUP' && message.type !== 'AUTO_LOOT_RESOLVE') {
+    if (
+        message.type !== 'PLAYER_INTENT'
+        && message.type !== 'LOOT_PICKUP'
+        && message.type !== 'AUTO_LOOT_RESOLVE'
+        && message.type !== 'SCENARIO_ENTER'
+    ) {
         return false;
     }
     return !replies.some((reply) => reply.type === 'ACTION_REJECTED');

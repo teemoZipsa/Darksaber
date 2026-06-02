@@ -225,6 +225,11 @@ test('network snapshot treats local player actorIds as owned and prefers actor r
             limitSeconds: 900,
             departureTownId: 'central_castle',
         },
+        scenario: {
+            enteredDungeonIds: [],
+            activeDungeonId: null,
+            completedDungeonIds: [],
+        },
     };
 
     engine.applyNetworkSnapshot(snapshot);

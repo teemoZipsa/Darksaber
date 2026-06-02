@@ -21,15 +21,12 @@ import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
 import { getClassAttackProfile } from '../data/AttackPatternProfiles';
 import { t } from '../i18n/LanguageManager';
 import {
-    BURGOS_CASTLE_DUNGEON_ID,
     MONSTER_ROW_BY_FACING,
     MONSTER_SPRITE_PATH,
-    ZAMORA_FORTRESS_DUNGEON_ID,
     getMonsterDefinition,
     type MonsterId,
 } from '../data/MonsterCatalog';
 import { getStoryQuestByDungeonId, isStoryQuestAvailable, type StoryQuestDefinition } from '../data/StoryQuestData';
-import { getStoryScenarioByDungeonId } from '../data/StoryScenarioData';
 import {
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
@@ -85,7 +82,6 @@ import { WorldRenderController } from './world/WorldRenderController';
 import { WorldInputController } from './world/WorldInputController';
 import { HitStop } from './world/HitStop';
 import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
-import { generateWorldLootNear } from '../loot/WorldLootGenerator';
 import { NetworkRaidClient, type NetworkRaidStatus } from '../net/NetworkRaidClient';
 import {
     DEFAULT_WORLD_SERVER_URL,
@@ -163,6 +159,8 @@ export class WorldEngine {
     private isNetworkRaidConnecting = false;
     private networkPlayerId: string | null = null;
     private pendingNetworkMoveReopen: { intentId: string; actorId: string; tile: TilePoint } | null = null;
+    private pendingNetworkScenarioEnter: { intentId: string; dungeonId: string; visitKey: string | null } | null = null;
+    private readonly networkScenarioEnteredDungeonIds: Set<string> = new Set();
     private pendingLootPicks = new Map<string, { placed: PlacedItem; source: { gridX: number; gridY: number }; at: number; timedOut?: boolean }>();
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
@@ -205,9 +203,6 @@ export class WorldEngine {
     private introTutorialPreviousWorldMap: WorldMap | null = null;
     private introTutorialInstructor: Player | null = null;
     private introTutorialCompletePending = false;
-    private localLootGeneratedChunks = new Set<string>();
-    private localLootSeed = 'local-world-loot';
-    private nextLocalWorldLootId = 1;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -419,9 +414,9 @@ export class WorldEngine {
                 openLoot: (loot) => this.openLoot(loot),
                 openMagic: (actor) => this.openFieldMagic(actor),
                 openTool: (actor) => this.openFieldTool(actor),
-                hasCastableFieldSkill: (actor) => !this.isNetworkRaid && this.magicController.hasCastableFieldSkill(actor.character),
-                hasUsableCombatTool: (actor) => !this.isNetworkRaid && this.toolController.hasUsableCombatTool(actor),
-                getCombatToolAvailability: (actor) => this.isNetworkRaid
+                hasCastableFieldSkill: (actor) => this.introTutorialActive && !this.isNetworkRaid && this.magicController.hasCastableFieldSkill(actor.character),
+                hasUsableCombatTool: (actor) => this.introTutorialActive && !this.isNetworkRaid && this.toolController.hasUsableCombatTool(actor),
+                getCombatToolAvailability: (actor) => this.isNetworkRaid || !this.introTutorialActive
                     ? { hasRecoveryConsumable: false, hasEffectiveRecovery: false }
                     : this.toolController.getCombatToolAvailability(actor),
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
@@ -623,7 +618,6 @@ export class WorldEngine {
         this.floatingText.update(dt);
         this.updateAttackCues(dt);
         this.playerActionController.processQueuedIntents();
-        this.ensureLocalWorldLootNearPlayer();
         this.refreshLootState();
         this.tacticalController.updateMarkers(dt);
         this.startNextReadyTurn();
@@ -1141,6 +1135,7 @@ export class WorldEngine {
                 originHubId: town.id,
                 partyComposition: this.createPartyCompositionSnapshot(town),
                 carriedWeight: getPartyCarriedWeight(this.gameManager.inventory.items, this.party.getCharacters()),
+                completedQuestIds: Array.from(this.playerData.clearedStages),
             });
 
             this.townSession.hide();
@@ -1153,6 +1148,8 @@ export class WorldEngine {
             this.party.resetForNewRaid();
             this.townSession.applyPendingRestForRaidStart();
             this.remotePartyActors.clear();
+            this.pendingNetworkScenarioEnter = null;
+            this.networkScenarioEnteredDungeonIds.clear();
             this.partyActors = [];
             this.placePartyNear(welcome.spawnTile);
             this.player = this.getControlledActor()?.entity ?? this.player;
@@ -1166,32 +1163,12 @@ export class WorldEngine {
             this.networkPlayerId = null;
             this.closeNetworkRaidClient(false);
             this.addCombatLog(`월드 서버 접속 실패: ${error instanceof Error ? error.message : 'unknown error'}`);
-            this.beginLocalRaidFromTown(town);
+            this.addCombatLog('서버 연결 없이는 출격할 수 없습니다.');
+            this.currentPhase = 'town';
+            this.townSession.show(town);
         } finally {
             this.isNetworkRaidConnecting = false;
         }
-    }
-
-    private beginLocalRaidFromTown(town: TownInfo): void {
-        this.townSession.hide();
-        this.closeFieldOverlays();
-        this.currentPhase = 'raid';
-        this.raidSession.beginRaidFromTown(town.id);
-        this.dismissedDungeonVisitKey = null;
-        this.party.resetForNewRaid();
-        this.townSession.applyPendingRestForRaidStart();
-        this.remotePartyActors.clear();
-        this.placePartyNear(this.worldMap.getTownExitTile(town));
-        this.player = this.getControlledActor()?.entity ?? this.player;
-        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-        this.fieldEnemies = [];
-        this.worldMap.loot = [];
-        this.localLootGeneratedChunks.clear();
-        this.localLootSeed = `local:${town.id}:${Date.now()}`;
-        this.nextLocalWorldLootId = 1;
-        this.spawnStarterFieldContent();
-        this.clearFieldTurnState();
-        this.addCombatLog(`${town.nameKr}에서 로컬 월드로 출격.`);
     }
 
     private closeFieldOverlays(): void {
@@ -1228,35 +1205,6 @@ export class WorldEngine {
             entry.enemy.actionGauge = 0;
             entry.enemy.isAggro = false;
         }
-    }
-
-    private spawnStarterFieldContent(): void {
-        const anchor = this.getControlledActor()?.entity;
-        if (!anchor) return;
-        const content = this.fieldSpawnController.createStarterFieldContent(anchor, {
-            masterRealm: this.worldMap.getRealm() === 'master',
-        });
-        this.fieldEnemies = content.enemies;
-        this.worldMap.loot = content.loot;
-        this.ensureLocalWorldLootNearPlayer();
-    }
-
-    private ensureLocalWorldLootNearPlayer(): void {
-        if (this.isNetworkRaid || !this.raidSession.active || this.introTutorialActive) return;
-        const anchor = this.getControlledActor()?.entity ?? this.player;
-        if (!anchor) return;
-
-        const loot = generateWorldLootNear({
-            worldMap: this.worldMap,
-            playerTile: { x: anchor.gridX, y: anchor.gridY },
-            seed: this.localLootSeed,
-            generatedChunks: this.localLootGeneratedChunks,
-            existingLoot: this.worldMap.loot,
-            departureTownId: this.raidSession.currentHubTownId,
-            findNearbyWalkableTile: (tile, actorId) => this.movementController.findNearbyWalkableTile(tile, actorId),
-            createId: (containerType) => `world_${containerType}_${this.nextLocalWorldLootId++}`,
-        });
-        if (loot.length > 0) this.worldMap.loot.push(...loot);
     }
 
     private createNetworkRaidClient(): NetworkRaidClient {
@@ -1326,6 +1274,7 @@ export class WorldEngine {
         this.floatingText.update(dt);
         this.updateAttackCues(dt);
         this.refreshLootState();
+        this.checkDungeonArrival();
 
         const controlled = this.getControlledActor();
         if (controlled) this.player = controlled.entity;
@@ -1447,6 +1396,7 @@ export class WorldEngine {
             if (!this.selectionController.hasSelection()) this.selectionController.selectActor(controlled.id);
         }
         this.reopenPendingNetworkMoveMenu(ownSnapshots);
+        this.applyNetworkScenarioSnapshot(snapshot.scenario);
     }
 
     private applyActorSnapshot(actor: FieldActor, snapshot: ActorSnapshot): void {
@@ -1553,6 +1503,13 @@ export class WorldEngine {
         if (this.pendingNetworkMoveReopen?.intentId === rejection.intentId) {
             this.pendingNetworkMoveReopen = null;
         }
+        if (this.pendingNetworkScenarioEnter?.intentId === rejection.intentId) {
+            const visitKey = this.pendingNetworkScenarioEnter.visitKey;
+            this.pendingNetworkScenarioEnter = null;
+            this.dismissedDungeonVisitKey = visitKey;
+            this.addCombatLog(`시나리오 진입 실패: ${rejection.reason}`);
+            return;
+        }
         const pending = this.pendingLootPicks.get(rejection.intentId);
         if (pending) {
             this.pendingLootPicks.delete(rejection.intentId);
@@ -1613,6 +1570,47 @@ export class WorldEngine {
         this.addCombatLog(this.formatNetworkCombatEvent(event));
     }
 
+    private applyNetworkScenarioSnapshot(scenario: WorldSnapshot['scenario'] | undefined): void {
+        if (!scenario) return;
+
+        const enteredDungeonIds = scenario.enteredDungeonIds ?? [];
+        const completedDungeonIds = scenario.completedDungeonIds ?? [];
+        const completedSet = new Set(completedDungeonIds);
+
+        for (const dungeonId of enteredDungeonIds) {
+            if (this.networkScenarioEnteredDungeonIds.has(dungeonId)) continue;
+            this.networkScenarioEnteredDungeonIds.add(dungeonId);
+            const storyQuest = getStoryQuestByDungeonId(dungeonId);
+            if (storyQuest) this.addCombatLog(t(storyQuest.enterLogKey));
+        }
+
+        if (scenario.activeDungeonId && this.raidSession.activeDungeonId !== scenario.activeDungeonId) {
+            this.raidSession.startDungeonEncounter(scenario.activeDungeonId);
+            this.selectionController.clear();
+            this.clearFieldTurnState();
+        } else if (!scenario.activeDungeonId && this.raidSession.activeDungeonId && !completedSet.has(this.raidSession.activeDungeonId)) {
+            this.raidSession.activeDungeonId = null;
+        }
+
+        for (const dungeonId of completedDungeonIds) {
+            if (this.raidSession.isDungeonCleared(dungeonId)) continue;
+            const storyQuest = getStoryQuestByDungeonId(dungeonId);
+            if (storyQuest) this.completeStoryDungeonObjective(dungeonId, storyQuest, { clearEnemies: false });
+            else this.raidSession.completeDungeonEncounter(dungeonId);
+        }
+
+        if (
+            this.pendingNetworkScenarioEnter
+            && (
+                enteredDungeonIds.includes(this.pendingNetworkScenarioEnter.dungeonId)
+                || completedSet.has(this.pendingNetworkScenarioEnter.dungeonId)
+                || scenario.activeDungeonId === this.pendingNetworkScenarioEnter.dungeonId
+            )
+        ) {
+            this.pendingNetworkScenarioEnter = null;
+        }
+    }
+
     private formatNetworkCombatEvent(event: CombatEventMessage): string {
         const sourceName = event.sourceName ?? this.getNetworkEntityName(event.sourceId);
         const targetName = event.targetName ?? this.getNetworkEntityName(event.targetId);
@@ -1638,6 +1636,7 @@ export class WorldEngine {
         this.networkPlayerId = null;
         this.raidSession.elapsedSeconds = result.elapsedSeconds;
         this.raidSession.kills = result.kills;
+        this.applyNetworkScenarioResult(result.completedDungeonIds);
         if (result.result === 'SURVIVED') {
             const town = this.getTownById(result.extractionTownId) ?? this.getCurrentHubTown();
             this.raidOutcomeController.completeSuccess(town);
@@ -1658,8 +1657,18 @@ export class WorldEngine {
         this.raidOutcomeController.completeFailure('MIA');
     }
 
+    private applyNetworkScenarioResult(completedDungeonIds: readonly string[] | undefined): void {
+        for (const dungeonId of completedDungeonIds ?? []) {
+            if (this.raidSession.isDungeonCleared(dungeonId)) continue;
+            const storyQuest = getStoryQuestByDungeonId(dungeonId);
+            if (storyQuest) this.completeStoryDungeonObjective(dungeonId, storyQuest, { clearEnemies: false });
+            else this.raidSession.completeDungeonEncounter(dungeonId);
+        }
+    }
+
     private closeNetworkRaidClient(sendLeave: boolean, reason: 'town' | 'wipe' | 'manual' = 'manual'): void {
         this.pendingLootPicks.clear();
+        this.pendingNetworkScenarioEnter = null;
         this.remotePartyActors.clear();
         if (!this.networkRaidClient) return;
         if (sendLeave) this.networkRaidClient.leave(reason);
@@ -1733,50 +1742,31 @@ export class WorldEngine {
             return;
         }
 
+        if (this.isNetworkRaid) {
+            this.enterNetworkStoryDungeon(dungeon);
+            return;
+        }
+
         this.enterStoryDungeon(dungeon);
+    }
+
+    private enterNetworkStoryDungeon(dungeon: WorldDungeonInfo): void {
+        const actor = this.getControlledActor();
+        if (!actor || !this.networkRaidClient) return;
+
+        const visitKey = this.getCurrentDungeonVisitKey(dungeon);
+        this.dismissedDungeonVisitKey = visitKey;
+        const intentId = this.networkRaidClient.sendScenarioEnter(actor.id, dungeon.id);
+        this.pendingNetworkScenarioEnter = { intentId, dungeonId: dungeon.id, visitKey };
+        this.addCombatLog(`${dungeon.nameKr} 서버 시나리오 진입 요청.`);
     }
 
     private enterStoryDungeon(dungeon: WorldDungeonInfo): void {
         const storyQuest = getStoryQuestByDungeonId(dungeon.id);
         if (!storyQuest) return;
 
-        this.closeFieldOverlays();
-        this.clearFieldTurnState();
-        this.fieldEnemies = [];
-        this.worldMap.loot = [];
-        this.raidSession.startDungeonEncounter(dungeon.id);
-
-        const entrance = this.worldMap.getDungeonEntranceTile(dungeon);
-        this.placePartyNear({ x: entrance.x - 6, y: entrance.y });
-        this.player = this.getControlledActor()?.entity ?? this.player;
-        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-
-        const content = this.createStoryDungeonEncounter(dungeon.id, entrance);
-        this.fieldEnemies = content.enemies;
-        this.worldMap.loot = content.loot;
-        this.clearFieldTurnState();
         this.dismissedDungeonVisitKey = this.getCurrentDungeonVisitKey(dungeon);
-        if (storyQuest.bgmKey) AudioManager.playBgm(storyQuest.bgmKey, { fadeMs: 400 });
-        this.addCombatLog(t(storyQuest.enterLogKey));
-
-        const scenario = getStoryScenarioByDungeonId(dungeon.id);
-        if (scenario?.episode === 17) {
-            this.completeStoryDungeonObjective(dungeon.id, storyQuest, { clearEnemies: false });
-        }
-    }
-
-    private createStoryDungeonEncounter(dungeonId: string, entrance: { x: number; y: number }) {
-        if (dungeonId === BURGOS_CASTLE_DUNGEON_ID) {
-            return this.fieldSpawnController.createBurgosCastleEncounter(entrance);
-        }
-        if (dungeonId === ZAMORA_FORTRESS_DUNGEON_ID) {
-            return this.fieldSpawnController.createZamoraFortressEncounter(entrance);
-        }
-        const scenario = getStoryScenarioByDungeonId(dungeonId);
-        if (scenario) {
-            return this.fieldSpawnController.createStoryScenarioEncounter(scenario, entrance);
-        }
-        return { enemies: [], loot: [] };
+        this.addCombatLog(`${dungeon.nameKr} 시나리오는 서버 세션 이관 후 진입할 수 있습니다.`);
     }
 
     private openFusionTemple(): void {
@@ -1812,23 +1802,7 @@ export class WorldEngine {
             return;
         }
 
-        this.fusionTempleUI.hide();
-        this.townSession.hide();
-        this.raidSession.failBackToTown(this.raidSession.currentHubTownId);
-        this.currentPhase = 'master';
-        this.worldMap.setRealm('master');
-        this.placePartyNear(this.worldMap.getPrimaryTempleTile());
-        this.player = this.getControlledActor()?.entity ?? this.player;
-        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-        this.fieldEnemies = [];
-        this.worldMap.loot = [];
-        this.localLootGeneratedChunks.clear();
-        this.localLootSeed = `master:${Date.now()}`;
-        this.nextLocalWorldLootId = 1;
-        this.spawnStarterFieldContent();
-        this.clearFieldTurnState();
-        this.dismissedTempleVisitKey = this.getCurrentTempleVisitKey();
-        this.addCombatLog('마스터 월드에 진입했습니다. T8~T10 성장이 시작됩니다.');
+        this.addCombatLog('마스터 월드는 서버 세션 이관 후 진입할 수 있습니다.');
     }
 
     private returnToMortalWorld(): void {
@@ -2068,6 +2042,10 @@ export class WorldEngine {
             this.networkRaidClient.sendIntent(actor.id, 'attack', { targetId: enemy.id });
             return true;
         }
+        if (!this.introTutorialActive) {
+            this.addCombatLog('서버 세션 밖에서는 전투 행동을 실행할 수 없습니다.');
+            return false;
+        }
         if (!this.canActorAttackTarget(actor, enemy)) return false;
         const profile = this.getActorAttackProfile(actor);
         const targetEnemies = this.getAttackPatternTargetEnemies(actor, enemy);
@@ -2194,6 +2172,10 @@ export class WorldEngine {
             this.networkRaidClient?.sendIntent(this.requireControlledActor().id, 'interact', { lootId: loot.id });
             return;
         }
+        if (!this.introTutorialActive) {
+            this.addCombatLog('서버 세션 밖에서는 전리품을 열 수 없습니다.');
+            return;
+        }
         this.selectionController.selectLoot(loot.id);
         this.addCombatLog(`${loot.sourceLabel} 검색 중.`);
         this.clearControlledPath();
@@ -2209,12 +2191,22 @@ export class WorldEngine {
             this.reopenActionMenu(actor);
             return;
         }
+        if (!this.introTutorialActive) {
+            this.addCombatLog('서버 세션 밖에서는 마법을 사용할 수 없습니다.');
+            this.reopenActionMenu(actor);
+            return;
+        }
         this.magicController.open(actor);
     }
 
     private openFieldTool(actor: FieldActor): void {
         if (this.isNetworkRaid) {
             this.addCombatLog('네트워크 raid V1에서는 마법/아이템 사용이 비활성화되어 있습니다.');
+            this.reopenActionMenu(actor);
+            return;
+        }
+        if (!this.introTutorialActive) {
+            this.addCombatLog('서버 세션 밖에서는 도구를 사용할 수 없습니다.');
             this.reopenActionMenu(actor);
             return;
         }

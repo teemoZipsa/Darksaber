@@ -26,6 +26,7 @@ export interface NetworkRaidJoinInput {
     partyComposition: ActorSnapshot[];
     carriedWeight?: number;
     resumeToken?: string;
+    completedQuestIds?: string[];
 }
 
 export interface NetworkRaidClientOptions {
@@ -161,6 +162,7 @@ export class NetworkRaidClient {
             carriedWeight: input.carriedWeight,
             clientVersion: WORLD_PROTOCOL_VERSION,
             resumeToken: input.resumeToken,
+            completedQuestIds: input.completedQuestIds,
         });
     }
 
@@ -192,6 +194,16 @@ export class NetworkRaidClient {
             lootId,
             acceptedCells,
         });
+    }
+
+    public sendScenarioEnter(actorId: string, dungeonId: string, intentId: string = createIntentId()): string {
+        this.send({
+            type: 'SCENARIO_ENTER',
+            intentId,
+            actorId,
+            dungeonId,
+        });
+        return intentId;
     }
 
     public leave(reason: WorldLeaveMessage['reason']): void {
@@ -435,7 +447,8 @@ function isRaidResultMessage(message: unknown): message is RaidResultMessage {
         && typeof message.elapsedSeconds === 'number'
         && typeof message.kills === 'number'
         && typeof message.departureTownId === 'string'
-        && typeof message.extractionTownId === 'string';
+        && typeof message.extractionTownId === 'string'
+        && Array.isArray(message.completedDungeonIds);
 }
 
 function isWorldErrorMessage(message: unknown): message is WorldErrorMessage {

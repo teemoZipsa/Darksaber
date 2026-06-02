@@ -20,6 +20,11 @@ function snapshot(seq: number): WorldSnapshot {
             limitSeconds: 1800,
             departureTownId: 'central_castle',
         },
+        scenario: {
+            enteredDungeonIds: [],
+            activeDungeonId: null,
+            completedDungeonIds: [],
+        },
     };
 }
 
@@ -325,6 +330,7 @@ test('raid result clears resume state and disconnects without grace expiry', asy
             kills: 1,
             departureTownId: 'central_castle',
             extractionTownId: 'central_castle',
+            completedDungeonIds: [],
         }));
         socket.emitClose();
 
@@ -349,7 +355,9 @@ test('client reports sends attempted before socket open', () => {
     });
 
     const intentId = client.sendIntent('actor_1', 'endTurn', { reason: 'test' }, 'intent_test');
+    const scenarioIntentId = client.sendScenarioEnter('actor_1', 'burgos_castle', 'scenario_test');
 
     assert.equal(intentId, 'intent_test');
-    assert.deepEqual(errors, ['SOCKET_NOT_OPEN']);
+    assert.equal(scenarioIntentId, 'scenario_test');
+    assert.deepEqual(errors, ['SOCKET_NOT_OPEN', 'SOCKET_NOT_OPEN']);
 });

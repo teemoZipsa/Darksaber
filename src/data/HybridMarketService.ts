@@ -26,7 +26,7 @@ import {
     isTradeGoodItemId,
     TRADE_GOOD_SELL_MULTIPLIERS,
 } from './ShopData';
-import { LocalMarketService, type MarketService } from './MarketService';
+import type { MarketService } from './MarketService';
 import type { TownId } from './TownFacilityData';
 
 const CLIENT_ID_KEY = 'darksaber_market_client_id';
@@ -46,52 +46,46 @@ const TOWN_LABELS: Record<TownId, { ko: string; en: string }> = {
 };
 
 export class HybridMarketService implements MarketService {
-    private readonly local: LocalMarketService;
     private readonly server: ServerMarketService;
 
-    constructor(playerData: PlayerData) {
-        this.local = new LocalMarketService(playerData);
+    constructor(_playerData: PlayerData) {
         this.server = new ServerMarketService();
     }
 
     public getBuyPrice(item: ItemDef, basePrice: number, townId: string | null | undefined): number {
-        return this.active().getBuyPrice(item, basePrice, townId);
+        return this.server.getBuyPrice(item, basePrice, townId);
     }
 
     public getSellPrice(item: ItemDef, basePrice: number, townId: string | null | undefined): number {
-        return this.active().getSellPrice(item, basePrice, townId);
+        return this.server.getSellPrice(item, basePrice, townId);
     }
 
     public getSellQuote(item: ItemDef, baseUnitPrice: number, townId: string | null | undefined, quantity?: number): MarketSellQuote {
-        return this.active().getSellQuote(item, baseUnitPrice, townId, quantity);
+        return this.server.getSellQuote(item, baseUnitPrice, townId, quantity);
     }
 
     public recordBuy(townId: string | null | undefined, itemId: string, quantity?: number): void {
-        this.active().recordBuy(townId, itemId, quantity);
+        this.server.recordBuy(townId, itemId, quantity);
     }
 
     public recordSell(townId: string | null | undefined, itemId: string, quantity?: number): void {
-        this.active().recordSell(townId, itemId, quantity);
+        this.server.recordSell(townId, itemId, quantity);
     }
 
     public rollTownVisit(townId: string): void {
-        this.active().rollTownVisit(townId);
+        this.server.rollTownVisit(townId);
     }
 
     public getMarketRumor(townId: string): string | null {
-        return this.active().getMarketRumor(townId);
+        return this.server.getMarketRumor(townId);
     }
 
     public getActiveContracts(townId?: string): MarketContract[] {
-        return this.active().getActiveContracts(townId);
+        return this.server.getActiveContracts(townId);
     }
 
     public advanceMarketCycle(): void {
-        this.active().advanceMarketCycle();
-    }
-
-    private active(): MarketService {
-        return this.server.isReady() ? this.server : this.local;
+        this.server.advanceMarketCycle();
     }
 }
 

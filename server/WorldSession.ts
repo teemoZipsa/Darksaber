@@ -10,10 +10,18 @@ import type { CharacterStats } from '../src/data/Stats';
 import { getClassLine } from '../src/data/ClassTree';
 import { getItemDef } from '../src/data/ItemDB';
 import {
-    GENERAL_MONSTER_IDS,
+    BURGOS_BOSS_MONSTER_ID,
+    BURGOS_CASTLE_DUNGEON_ID,
+    BURGOS_GUARD_MONSTER_ID,
     getMonsterDefinition,
+    ZAMORA_FENRIS_BOSS_MONSTER_ID,
+    ZAMORA_FORTRESS_DUNGEON_ID,
+    ZAMORA_GUARD_MONSTER_ID,
     type MonsterId,
 } from '../src/data/MonsterCatalog';
+import { getStoryQuestByDungeonId } from '../src/data/StoryQuestData';
+import { getStoryScenarioByDungeonId, type StoryScenarioDefinition } from '../src/data/StoryScenarioData';
+import { CHUNK_TILES, nestMemberOffsets, pickNestForChunk, type FieldNest, type FieldNestState } from '../src/field/SpawnResolver';
 import { Enemy } from '../src/entity/Enemy';
 import { LootObject } from '../src/entity/LootObject';
 import { getCarryAtbMultiplier, getPlacedItemWeight } from '../src/inventory/CarryWeight';
@@ -66,6 +74,11 @@ export const WORLD_TICK_MS = 100;
 export const DISCONNECT_GRACE_MS = 30_000;
 const RAID_LIMIT_SECONDS = 30 * 60;
 const AUTO_LOOT_RESPONSE_MS = 5_000;
+const FIELD_NEST_RESPAWN_MS = 5 * 60_000;
+const FIELD_NEST_RESPAWN_SAFE_DISTANCE = 18;
+const FIELD_NEST_ROAM_RADIUS_CHUNKS = 1;
+const FIELD_NEST_NEARBY_ENEMY_DISTANCE = 24;
+const FIELD_NEST_REFRESH_INTERVAL_MS = 1_000;
 
 interface ServerActor {
     id: string;
@@ -92,6 +105,10 @@ interface ServerPlayer {
     elapsedSeconds: number;
     kills: number;
     carriedWeight: number;
+    completedQuestIds: Set<string>;
+    enteredDungeonIds: Set<string>;
+    completedDungeonIds: Set<string>;
+    activeDungeonId: string | null;
     active: boolean;
     ghost: boolean;
     disconnectedAt: number | null;
@@ -101,8 +118,20 @@ interface ServerPlayer {
 interface ServerEnemy {
     enemy: Enemy;
     monsterId?: MonsterId;
+    nestKey?: string;
+    scenarioPlayerId?: string;
+    scenarioDungeonId?: string;
+    scenarioObjective?: boolean;
     home: TilePoint;
     wanderSeed: number;
+}
+
+interface ServerScenarioState {
+    playerId: string;
+    dungeonId: string;
+    enemyIds: string[];
+    objectiveEnemyId: string | null;
+    completed: boolean;
 }
 
 interface LootLock {
@@ -137,31 +166,14 @@ export interface WorldSessionOptions {
     logger?: (message: string) => void;
 }
 
-const ENEMY_SPAWN_OFFSETS: TilePoint[] = [
-    { x: 7, y: 3 },
-    { x: 10, y: -2 },
-    { x: -6, y: 6 },
-    { x: 12, y: 4 },
-    { x: -9, y: -4 },
-    { x: -11, y: 5 },
-    { x: 15, y: -5 },
-    { x: 17, y: 6 },
-    { x: 6, y: -9 },
-    { x: -13, y: -7 },
-    { x: 19, y: 0 },
-    { x: -16, y: 2 },
-    { x: 3, y: 12 },
-    { x: -5, y: 13 },
-    { x: 14, y: 11 },
-    { x: -18, y: -3 },
-];
-
 export class WorldSession {
     public readonly sessionEpoch = Date.now();
     private readonly worldMap = new WorldMap();
     private readonly players = new Map<string, ServerPlayer>();
     private readonly actors = new Map<string, ServerActor>();
     private readonly enemies = new Map<string, ServerEnemy>();
+    private readonly nestStates = new Map<string, FieldNestState>();
+    private readonly scenarioStates = new Map<string, ServerScenarioState>();
     private readonly loot = new Map<string, LootObject>();
     private readonly lootLocks = new Map<string, LootLock>();
     private readonly autoLootPending = new Map<string, AutoLootPending>();
@@ -171,6 +183,7 @@ export class WorldSession {
     private nextEnemyId = 1;
     private nextLootId = 1;
     private lastTickAt: number | null = null;
+    private lastNestRefreshAt = 0;
     private readonly ghostGraceMs: number;
     private readonly logger: (message: string) => void;
 
@@ -210,6 +223,10 @@ export class WorldSession {
             elapsedSeconds: 0,
             kills: 0,
             carriedWeight: sanitizeCarriedWeight(message.carriedWeight),
+            completedQuestIds: new Set(sanitizeStringArray(message.completedQuestIds)),
+            enteredDungeonIds: new Set(),
+            completedDungeonIds: new Set(),
+            activeDungeonId: null,
             active: true,
             ghost: false,
             disconnectedAt: null,
@@ -244,7 +261,7 @@ export class WorldSession {
             player.actorIds.push(actorId);
         });
 
-        this.ensureContentNear(spawnTile, player.departureTownId);
+        this.ensureContentNear(spawnTile, player.departureTownId, now);
         this.log(`join player=${playerId} origin=${originHubId} actors=${player.actorIds.length}`);
         return {
             playerId,
@@ -298,6 +315,8 @@ export class WorldSession {
                 return this.handleLootPickup(playerId, message.intentId, message.lootId, message.gridX, message.gridY, now);
             case 'AUTO_LOOT_RESOLVE':
                 return this.handleAutoLootResolve(playerId, message.lootId, message.acceptedCells);
+            case 'SCENARIO_ENTER':
+                return this.handleScenarioEnter(playerId, message, now);
             case 'WORLD_LEAVE':
                 this.log(`leave player=${playerId} reason=${message.reason}`);
                 return {
@@ -349,6 +368,11 @@ export class WorldSession {
                     }
                 }
             }
+        }
+
+        if (now - this.lastNestRefreshAt >= FIELD_NEST_REFRESH_INTERVAL_MS) {
+            this.lastNestRefreshAt = now;
+            this.refreshFieldNests(now);
         }
 
         for (const entry of this.enemies.values()) {
@@ -430,6 +454,11 @@ export class WorldSession {
                 elapsedSeconds: fallbackPlayer?.elapsedSeconds ?? 0,
                 limitSeconds: RAID_LIMIT_SECONDS,
                 departureTownId: fallbackPlayer?.departureTownId ?? 'central_castle',
+            },
+            scenario: {
+                enteredDungeonIds: fallbackPlayer ? [...fallbackPlayer.enteredDungeonIds] : [],
+                activeDungeonId: fallbackPlayer?.activeDungeonId ?? null,
+                completedDungeonIds: fallbackPlayer ? [...fallbackPlayer.completedDungeonIds] : [],
             },
         };
     }
@@ -635,6 +664,51 @@ export class WorldSession {
         return { replies: [], broadcasts: [] };
     }
 
+    private handleScenarioEnter(
+        playerId: string,
+        message: Extract<WorldClientMessage, { type: 'SCENARIO_ENTER' }>,
+        now: number
+    ): WorldSessionMessageResult {
+        const player = this.players.get(playerId);
+        const actor = this.actors.get(message.actorId);
+        const validationError = this.validateScenarioActor(player, actor);
+        if (validationError) return reject(message.intentId, validationError);
+
+        const dungeonId = message.dungeonId.trim();
+        const scenario = getStoryScenarioByDungeonId(dungeonId);
+        const quest = getStoryQuestByDungeonId(dungeonId);
+        if (!scenario || !quest) return reject(message.intentId, 'Scenario dungeon does not exist.');
+        if (player!.activeDungeonId) return reject(message.intentId, 'A scenario is already active.');
+        if (player!.completedDungeonIds.has(dungeonId)) return reject(message.intentId, 'Scenario objective is already complete in this raid.');
+        if (quest.prerequisiteQuestId && !player!.completedQuestIds.has(quest.prerequisiteQuestId)) {
+            return reject(message.intentId, 'Scenario prerequisite quest is not complete.');
+        }
+
+        const dungeon = this.worldMap.getDungeonAtTile(actor!.tile.x, actor!.tile.y);
+        if (!dungeon || dungeon.id !== dungeonId) return reject(message.intentId, 'Actor is not at the requested scenario entrance.');
+        if (this.hasNearbyAggroEnemy(actor!.tile, 18)) return reject(message.intentId, 'Nearby combat must be resolved before entering a scenario.');
+
+        this.removeScenarioRuntimeForPlayer(playerId);
+        player!.enteredDungeonIds.add(dungeonId);
+        player!.activeDungeonId = dungeonId;
+
+        const state = this.spawnScenarioEncounter(player!, scenario, actor!.tile, now);
+        this.scenarioStates.set(playerId, state);
+        if (!state.objectiveEnemyId) this.completeScenarioObjective(player!, dungeonId, { clearEnemies: false });
+
+        this.log(`scenario enter player=${playerId} dungeon=${dungeonId} enemies=${state.enemyIds.length}`);
+        return { replies: [], broadcasts: [] };
+    }
+
+    private validateScenarioActor(player: ServerPlayer | undefined, actor: ServerActor | undefined): string | null {
+        if (!player || !player.active) return 'Player is not in an active raid.';
+        if (player.ghost) return 'Ghost players cannot enter scenarios.';
+        if (!actor) return 'Actor does not exist.';
+        if (actor.ownerPlayerId !== player.id) return 'Actor is not owned by this player.';
+        if (actor.isDead || actor.stats.hp <= 0) return 'Actor is down.';
+        return null;
+    }
+
     private resolveActorAttack(actor: ServerActor, target: ServerEnemy, now: number): { event: CombatEventMessage; autoLootGrant?: AutoLootGrantMessage } {
         const enemy = target.enemy;
         const result = CombatFormulas.calcPhysicalDamage(
@@ -658,6 +732,8 @@ export class WorldSession {
             if (enemy.stats.hp <= 0) {
                 event.kind = 'kill';
                 this.enemies.delete(enemy.id);
+                if (target.nestKey) this.markNestEnemyKilled(target.nestKey, enemy.id, now);
+                if (target.scenarioPlayerId && target.scenarioDungeonId) this.markScenarioEnemyKilled(target, enemy.id);
                 const player = this.players.get(actor.ownerPlayerId);
                 if (player) player.kills += 1;
                 autoLootGrant = enemy.isBoss
@@ -804,6 +880,7 @@ export class WorldSession {
             kills: player?.kills ?? 0,
             departureTownId: player?.departureTownId ?? 'central_castle',
             extractionTownId,
+            completedDungeonIds: player ? [...player.completedDungeonIds] : [],
         };
         this.log(`raid result player=${playerId} result=${result} kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
         this.removePlayer(playerId);
@@ -813,6 +890,7 @@ export class WorldSession {
     private removePlayer(playerId: string): void {
         const player = this.players.get(playerId);
         if (!player) return;
+        this.removeScenarioRuntimeForPlayer(playerId);
         for (const actorId of player.actorIds) this.actors.delete(actorId);
         this.players.delete(playerId);
         this.releaseLootLocksForPlayer(playerId);
@@ -933,24 +1011,267 @@ export class WorldSession {
         actor.actionGauge = actor.remainingAp;
     }
 
-    private ensureContentNear(spawnTile: TilePoint, departureTownId?: string | null): void {
-        const hasNearbyEnemy = [...this.enemies.values()].some((entry) =>
-            entry.enemy.stats.hp > 0 && manhattan({ x: entry.enemy.gridX, y: entry.enemy.gridY }, spawnTile) <= 24
-        );
-        if (!hasNearbyEnemy) this.spawnEnemiesNear(spawnTile);
+    private spawnScenarioEncounter(
+        player: ServerPlayer,
+        scenario: StoryScenarioDefinition,
+        anchor: TilePoint,
+        now: number
+    ): ServerScenarioState {
+        const state: ServerScenarioState = {
+            playerId: player.id,
+            dungeonId: scenario.dungeonId,
+            enemyIds: [],
+            objectiveEnemyId: null,
+            completed: false,
+        };
+        const layout = getStoryScenarioMonsterLayout(scenario);
+        const guardOffsets = storyScenarioGuardOffsets(scenario.guardCount, Boolean(scenario.bossName));
+
+        for (let index = 0; index < scenario.guardCount; index++) {
+            const monsterId = layout.guardMonsterIds[index % layout.guardMonsterIds.length];
+            const definition = getMonsterDefinition(monsterId);
+            const offset = guardOffsets[index] ?? { x: index % 2 === 0 ? 2 : -2, y: Math.floor(index / 2) + 1 };
+            this.spawnScenarioEnemy({
+                state,
+                monsterId,
+                name: definition.name,
+                level: Math.max(scenario.guardLevel, definition.level),
+                color: definition.color,
+                role: definition.role,
+                tile: { x: anchor.x + offset.x, y: anchor.y + offset.y },
+                isObjective: false,
+                now,
+            });
+        }
+
+        if (scenario.bossName) {
+            const monsterId = layout.bossMonsterId;
+            const definition = monsterId ? getMonsterDefinition(monsterId) : null;
+            const objectiveEnemyId = this.spawnScenarioEnemy({
+                state,
+                monsterId,
+                name: scenario.bossName,
+                level: scenario.bossLevel,
+                color: scenario.bossColor,
+                role: 'boss',
+                tile: { x: anchor.x + 4, y: anchor.y },
+                isObjective: true,
+                now,
+                aggroRange: Math.max(definition?.aggroRange ?? 0, 9),
+            });
+            state.objectiveEnemyId = objectiveEnemyId;
+        }
+
+        return state;
+    }
+
+    private spawnScenarioEnemy(input: {
+        state: ServerScenarioState;
+        monsterId?: MonsterId;
+        name: string;
+        level: number;
+        color: string;
+        role: Enemy['role'];
+        tile: TilePoint;
+        isObjective: boolean;
+        now: number;
+        aggroRange?: number;
+    }): string {
+        const id = `scenario_${this.nextEnemyId++}`;
+        const tile = this.findNearbyWalkableTile(input.tile, id);
+        const definition = input.monsterId ? getMonsterDefinition(input.monsterId) : null;
+        const enemy = new Enemy(id, tile.x, tile.y, input.name, input.level, input.color, input.role);
+        enemy.aggroRange = input.aggroRange ?? definition?.aggroRange ?? enemy.aggroRange;
+        enemy.isAggro = true;
+        this.enemies.set(id, {
+            enemy,
+            monsterId: input.monsterId,
+            scenarioPlayerId: input.state.playerId,
+            scenarioDungeonId: input.state.dungeonId,
+            scenarioObjective: input.isObjective,
+            home: tile,
+            wanderSeed: hashInt(input.now + this.nextEnemyId * 7919),
+        });
+        input.state.enemyIds.push(id);
+        return id;
+    }
+
+    private markScenarioEnemyKilled(target: ServerEnemy, enemyId: string): void {
+        const playerId = target.scenarioPlayerId;
+        const dungeonId = target.scenarioDungeonId;
+        if (!playerId || !dungeonId) return;
+
+        const state = this.scenarioStates.get(playerId);
+        if (state && state.dungeonId === dungeonId) {
+            state.enemyIds = state.enemyIds.filter((id) => id !== enemyId);
+        }
+
+        if (!target.scenarioObjective) return;
+        const player = this.players.get(playerId);
+        if (!player) return;
+        this.completeScenarioObjective(player, dungeonId, { clearEnemies: true });
+    }
+
+    private completeScenarioObjective(
+        player: ServerPlayer,
+        dungeonId: string,
+        options: { clearEnemies?: boolean }
+    ): void {
+        if (player.activeDungeonId === dungeonId) player.activeDungeonId = null;
+        player.completedDungeonIds.add(dungeonId);
+
+        const state = this.scenarioStates.get(player.id);
+        if (state && state.dungeonId === dungeonId) {
+            state.completed = true;
+            if (options.clearEnemies ?? true) this.removeScenarioRuntimeForPlayer(player.id);
+        }
+        this.log(`scenario complete player=${player.id} dungeon=${dungeonId}`);
+    }
+
+    private removeScenarioRuntimeForPlayer(playerId: string): void {
+        const state = this.scenarioStates.get(playerId);
+        if (!state) return;
+        for (const enemyId of state.enemyIds) this.enemies.delete(enemyId);
+        this.scenarioStates.delete(playerId);
+    }
+
+    private ensureContentNear(spawnTile: TilePoint, departureTownId: string | null | undefined, now: number): void {
+        if (!this.hasNearbyLiveEnemy(spawnTile, FIELD_NEST_NEARBY_ENEMY_DISTANCE)) {
+            this.spawnEnemiesNear(spawnTile, now, true);
+        }
 
         this.spawnLootNear(spawnTile, departureTownId);
     }
 
-    private spawnEnemiesNear(anchor: TilePoint): void {
-        GENERAL_MONSTER_IDS.forEach((monsterId, index) => {
-            const definition = getMonsterDefinition(monsterId);
-            const offset = ENEMY_SPAWN_OFFSETS[index % ENEMY_SPAWN_OFFSETS.length];
-            const tile = this.findNearbyWalkableTile({ x: anchor.x + offset.x, y: anchor.y + offset.y }, `enemy_${this.nextEnemyId}`);
+    private refreshFieldNests(now: number): void {
+        const visited = new Set<string>();
+        for (const player of this.players.values()) {
+            if (!player.active || player.ghost) continue;
+            const anchor = this.firstLivingActorTile(player);
+            if (!anchor) continue;
+            const forceCenter = !this.hasNearbyLiveEnemy(anchor, FIELD_NEST_NEARBY_ENEMY_DISTANCE);
+            this.spawnEnemiesNear(anchor, now, forceCenter, visited);
+        }
+    }
+
+    private spawnEnemiesNear(anchor: TilePoint, now: number, forceCenter: boolean, visited: Set<string> = new Set()): void {
+        const realm = this.worldMap.getRealm();
+        const seed = `server:${this.sessionEpoch}`;
+        const centerChunkX = Math.floor(anchor.x / CHUNK_TILES);
+        const centerChunkY = Math.floor(anchor.y / CHUNK_TILES);
+
+        let spawned = 0;
+        for (let dy = -FIELD_NEST_ROAM_RADIUS_CHUNKS; dy <= FIELD_NEST_ROAM_RADIUS_CHUNKS; dy++) {
+            for (let dx = -FIELD_NEST_ROAM_RADIUS_CHUNKS; dx <= FIELD_NEST_ROAM_RADIUS_CHUNKS; dx++) {
+                const chunkX = centerChunkX + dx;
+                const chunkY = centerChunkY + dy;
+                const stateKey = nestStateKey(realm, chunkX, chunkY);
+                if (visited.has(stateKey)) continue;
+                visited.add(stateKey);
+                const biome = this.worldMap.getBiomeAtChunk(chunkX, chunkY);
+                const force = forceCenter && dx === 0 && dy === 0;
+                spawned += this.spawnNest(chunkX, chunkY, biome, realm, seed, force, now);
+            }
+        }
+
+        // Player boxed in by water/town chunks — force one grass pack at the spawn chunk.
+        if (forceCenter && spawned === 0) this.spawnNest(centerChunkX, centerChunkY, 'grass', realm, seed, true, now);
+    }
+
+    private spawnNest(
+        chunkX: number,
+        chunkY: number,
+        biome: ReturnType<WorldMap['getBiomeAtChunk']>,
+        realm: ReturnType<WorldMap['getRealm']>,
+        seed: string,
+        force: boolean,
+        now: number,
+    ): number {
+        const nest = pickNestForChunk({ realm, chunkX, chunkY, biome, seed }, force);
+        if (!nest) return 0;
+        const stateKey = nestStateKey(realm, chunkX, chunkY);
+        const state = this.getOrCreateNestState(stateKey, nest);
+        this.retainLiveNestEnemies(state);
+        if (state.monsterIds.length > 0) return 0;
+        if (state.cleared) {
+            if (now < state.respawnAt) return 0;
+            if (this.hasActiveActorWithin(state.centerTile, FIELD_NEST_RESPAWN_SAFE_DISTANCE)) return 0;
+        }
+
+        const offsets = nestMemberOffsets(nest.monsters.length);
+        const spawnedEnemyIds: string[] = [];
+        nest.monsters.forEach((monster, index) => {
+            const offset = offsets[index] ?? { x: 0, y: 0 };
             const id = `enemy_${this.nextEnemyId++}`;
-            const enemy = new Enemy(id, tile.x, tile.y, definition.name, definition.level, definition.color, definition.role);
+            const tile = this.findNearbyWalkableTile(
+                { x: nest.centerTile.x + offset.x, y: nest.centerTile.y + offset.y },
+                id,
+            );
+            const definition = getMonsterDefinition(monster.monsterId);
+            const enemy = new Enemy(id, tile.x, tile.y, definition.name, monster.level, definition.color, definition.role);
             enemy.aggroRange = definition.aggroRange;
-            this.enemies.set(id, { enemy, monsterId, home: tile, wanderSeed: this.nextEnemyId * 7919 });
+            this.enemies.set(id, { enemy, monsterId: monster.monsterId, nestKey: stateKey, home: tile, wanderSeed: this.nextEnemyId * 7919 });
+            spawnedEnemyIds.push(id);
+        });
+        state.monsterIds = spawnedEnemyIds;
+        state.cleared = false;
+        state.respawnAt = 0;
+        return spawnedEnemyIds.length;
+    }
+
+    private getOrCreateNestState(stateKey: string, nest: FieldNest): FieldNestState {
+        let state = this.nestStates.get(stateKey);
+        if (!state) {
+            state = {
+                chunkKey: stateKey,
+                nestId: nest.nestId,
+                centerTile: { ...nest.centerTile },
+                monsterIds: [],
+                respawnAt: 0,
+                cleared: false,
+            };
+            this.nestStates.set(stateKey, state);
+        }
+        return state;
+    }
+
+    private retainLiveNestEnemies(state: FieldNestState): void {
+        state.monsterIds = state.monsterIds.filter((enemyId) => {
+            const entry = this.enemies.get(enemyId);
+            return Boolean(entry && entry.enemy.stats.hp > 0);
+        });
+    }
+
+    private markNestEnemyKilled(nestKey: string, enemyId: string, now: number): void {
+        const state = this.nestStates.get(nestKey);
+        if (!state) return;
+        state.monsterIds = state.monsterIds.filter((id) => id !== enemyId);
+        if (state.monsterIds.length > 0) return;
+        state.cleared = true;
+        state.respawnAt = now + FIELD_NEST_RESPAWN_MS;
+    }
+
+    private hasNearbyLiveEnemy(tile: TilePoint, distance: number): boolean {
+        return [...this.enemies.values()].some((entry) =>
+            entry.enemy.stats.hp > 0 && manhattan({ x: entry.enemy.gridX, y: entry.enemy.gridY }, tile) <= distance
+        );
+    }
+
+    private hasNearbyAggroEnemy(tile: TilePoint, distance: number): boolean {
+        return [...this.enemies.values()].some((entry) =>
+            entry.enemy.stats.hp > 0
+            && entry.enemy.isAggro
+            && manhattan({ x: entry.enemy.gridX, y: entry.enemy.gridY }, tile) <= distance
+        );
+    }
+
+    private hasActiveActorWithin(tile: TilePoint, distance: number): boolean {
+        return [...this.players.values()].some((player) => {
+            if (!player.active || player.ghost) return false;
+            return player.actorIds.some((actorId) => {
+                const actor = this.actors.get(actorId);
+                return Boolean(actor && !actor.isDead && actor.stats.hp > 0 && manhattan(actor.tile, tile) <= distance);
+            });
         });
     }
 
@@ -1024,6 +1345,13 @@ export class WorldSession {
 
     private firstActorTile(player: ServerPlayer): TilePoint | null {
         const actor = player.actorIds.map((id) => this.actors.get(id)).find(Boolean);
+        return actor ? { ...actor.tile } : null;
+    }
+
+    private firstLivingActorTile(player: ServerPlayer): TilePoint | null {
+        const actor = player.actorIds
+            .map((id) => this.actors.get(id))
+            .find((entry) => entry && !entry.isDead && entry.stats.hp > 0);
         return actor ? { ...actor.tile } : null;
     }
 
@@ -1172,6 +1500,60 @@ function formationOffset(index: number): TilePoint {
     return offsets[index % offsets.length] ?? { x: 0, y: 0 };
 }
 
+function nestStateKey(realm: ReturnType<WorldMap['getRealm']>, chunkX: number, chunkY: number): string {
+    return `${realm}:${chunkX}:${chunkY}`;
+}
+
+interface StoryScenarioMonsterLayout {
+    bossMonsterId?: MonsterId;
+    guardMonsterIds: MonsterId[];
+}
+
+const STORY_SCENARIO_MONSTER_LAYOUTS = {
+    [BURGOS_CASTLE_DUNGEON_ID]: { bossMonsterId: BURGOS_BOSS_MONSTER_ID, guardMonsterIds: [BURGOS_GUARD_MONSTER_ID] },
+    [ZAMORA_FORTRESS_DUNGEON_ID]: { bossMonsterId: ZAMORA_FENRIS_BOSS_MONSTER_ID, guardMonsterIds: [ZAMORA_GUARD_MONSTER_ID] },
+    etna_volcano: { bossMonsterId: '466R', guardMonsterIds: ['215R', '224R', '225R'] },
+    arcadia_plain: { bossMonsterId: '458R', guardMonsterIds: ['313R', '314R', '458R'] },
+    cacaora_highland: { bossMonsterId: '315R', guardMonsterIds: ['317R', '453R', '463R'] },
+    remote_village: { bossMonsterId: '311R', guardMonsterIds: ['303R', '313R', '458R'] },
+    sagrajas_temple: { bossMonsterId: '467R', guardMonsterIds: ['307R', '353R', '467R'] },
+    sagunto_port: { bossMonsterId: '634R', guardMonsterIds: ['635R', '637R', '639R'] },
+    sicilio_island: { bossMonsterId: '634R', guardMonsterIds: ['634R', '635R', '463R'] },
+    dalai_lake: { bossMonsterId: '216R', guardMonsterIds: ['214R', '216R', '462R'] },
+    oasis: { bossMonsterId: '467R', guardMonsterIds: ['458R', '462R', '467R'] },
+    pyramid_front: { bossMonsterId: '454R', guardMonsterIds: ['354R', '458R', '462R'] },
+    pyramid_inside: { bossMonsterId: '466R', guardMonsterIds: ['354R', '466R', '467R'] },
+    skeria: { bossMonsterId: '634R', guardMonsterIds: ['634R', '635R', '637R'] },
+    skeria_2: { bossMonsterId: '467R', guardMonsterIds: ['467R', '638R', '639R'] },
+    valhalla_plain: { bossMonsterId: '638R', guardMonsterIds: ['636R', '637R', '638R'] },
+    airship: { guardMonsterIds: ['216R', '634R'] },
+    ament_gate: { bossMonsterId: '638R', guardMonsterIds: ['634R', '636R', '639R'] },
+    ament_1f: { bossMonsterId: '636R', guardMonsterIds: ['636R', '637R', '638R'] },
+    ament_2f: { bossMonsterId: '638R', guardMonsterIds: ['636R', '638R', '639R'] },
+} satisfies Record<string, StoryScenarioMonsterLayout>;
+
+function getStoryScenarioMonsterLayout(scenario: StoryScenarioDefinition): StoryScenarioMonsterLayout {
+    return STORY_SCENARIO_MONSTER_LAYOUTS[scenario.dungeonId] ?? {
+        bossMonsterId: undefined,
+        guardMonsterIds: ['303R', '313R', '434R'],
+    };
+}
+
+function storyScenarioGuardOffsets(count: number, hasBoss: boolean): TilePoint[] {
+    const offsets: TilePoint[] = hasBoss
+        ? [
+            { x: 2, y: -1 }, { x: 2, y: 1 }, { x: 3, y: -2 }, { x: 3, y: 2 },
+            { x: 1, y: -2 }, { x: 1, y: 2 }, { x: 4, y: -2 }, { x: 4, y: 2 },
+            { x: 5, y: -1 }, { x: 5, y: 1 },
+        ]
+        : [
+            { x: 2, y: 0 }, { x: 3, y: -1 }, { x: 3, y: 1 }, { x: 4, y: 0 },
+            { x: 2, y: -2 }, { x: 2, y: 2 }, { x: 5, y: -1 }, { x: 5, y: 1 },
+            { x: 4, y: -2 }, { x: 4, y: 2 },
+        ];
+    return offsets.slice(0, Math.max(0, count));
+}
+
 function directionFromTo(from: TilePoint, to: TilePoint): NetFacing {
     const dx = to.x - from.x;
     const dy = to.y - from.y;
@@ -1222,6 +1604,12 @@ function readStringPayload(payload: unknown, key: string): string | null {
 function sanitizeCarriedWeight(value: unknown): number {
     if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
     return Math.max(0, Math.round(value * 10) / 10);
+}
+
+function sanitizeStringArray(value: unknown): string[] {
+    return Array.isArray(value)
+        ? value.filter((entry): entry is string => typeof entry === 'string')
+        : [];
 }
 
 function createFallbackActorSnapshot(): ActorSnapshot {

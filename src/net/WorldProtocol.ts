@@ -7,7 +7,7 @@ import type { WorldLootContainerType } from '../loot/WorldLootTypes';
 const configuredWorldServerUrl = import.meta.env?.VITE_WORLD_SERVER_URL?.trim();
 
 export const DEFAULT_WORLD_SERVER_URL = configuredWorldServerUrl || (import.meta.env?.DEV ? 'ws://localhost:8765' : '');
-export const WORLD_PROTOCOL_VERSION = 'world-pve-v1';
+export const WORLD_PROTOCOL_VERSION = 'world-pve-v2';
 
 export interface NetTilePoint {
     x: number;
@@ -92,6 +92,12 @@ export interface RaidTimerSnapshot {
     departureTownId: string;
 }
 
+export interface ScenarioSnapshot {
+    enteredDungeonIds: string[];
+    activeDungeonId: string | null;
+    completedDungeonIds: string[];
+}
+
 export interface WorldSnapshot {
     seq: number;
     serverTime: number;
@@ -102,6 +108,7 @@ export interface WorldSnapshot {
     readyActors: string[];
     remainingApByActor: Record<string, number>;
     raidTimer: RaidTimerSnapshot;
+    scenario: ScenarioSnapshot;
 }
 
 export interface WorldJoinMessage {
@@ -111,6 +118,7 @@ export interface WorldJoinMessage {
     clientVersion: string;
     carriedWeight?: number;
     resumeToken?: string;
+    completedQuestIds?: string[];
 }
 
 export interface ReconnectMessage {
@@ -150,6 +158,13 @@ export interface AutoLootResolveMessage {
     type: 'AUTO_LOOT_RESOLVE';
     lootId: string;
     acceptedCells: AutoLootCell[];
+}
+
+export interface ScenarioEnterMessage {
+    type: 'SCENARIO_ENTER';
+    intentId: string;
+    actorId: string;
+    dungeonId: string;
 }
 
 export interface MarketHelloMessage {
@@ -199,6 +214,7 @@ export type WorldClientMessage =
     | PlayerIntentMessage
     | LootPickupMessage
     | AutoLootResolveMessage
+    | ScenarioEnterMessage
     | MarketClientMessage;
 
 export interface WorldWelcomeMessage {
@@ -252,6 +268,7 @@ export interface RaidResultMessage {
     kills: number;
     departureTownId: string;
     extractionTownId: string;
+    completedDungeonIds: string[];
 }
 
 export interface WorldErrorMessage {

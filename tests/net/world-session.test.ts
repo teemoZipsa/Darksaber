@@ -4,6 +4,7 @@ import { createBaseStats } from '../../src/data/Stats';
 import type { ActorSnapshot, AutoLootGrantMessage, WorldJoinMessage } from '../../src/net/WorldProtocol';
 import { WorldMap } from '../../src/map/WorldMap';
 import { WorldSession } from '../../server/WorldSession';
+import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 
 function actor(id: string, overrides: Partial<ActorSnapshot> = {}): ActorSnapshot {
     return {
@@ -288,6 +289,121 @@ test('network kills auto-grant normal enemy loot and include display names in co
     assert.equal(session.createSnapshot(joined.playerId, 1_050).loot.some((loot) => loot.id === grant.lootId), false);
 });
 
+test('server-owned scenario entry spawns objective enemies and records completion for raid result', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const joined = session.join({
+        ...joinMessage('central_castle', 'hero-a'),
+        partyComposition: [actor('hero-a', {
+            name: 'Hero Alpha',
+            stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === 'burgos_castle');
+    assert.ok(serverActor);
+    assert.ok(dungeon);
+    serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+    const enter = session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-burgos',
+        actorId: serverActor.id,
+        dungeonId: 'burgos_castle',
+    }, 1_000);
+
+    assert.equal(enter.replies.length, 0);
+    const enteredSnapshot = session.createSnapshot(joined.playerId, 1_000);
+    assert.equal(enteredSnapshot.scenario.activeDungeonId, 'burgos_castle');
+    assert.ok(enteredSnapshot.scenario.enteredDungeonIds.includes('burgos_castle'));
+    assert.ok(enteredSnapshot.enemies.some((enemy) => enemy.isBoss && enemy.name === '키스라'));
+
+    const bossEntry = [...internals.enemies.values()].find((entry: any) => entry.scenarioObjective);
+    assert.ok(bossEntry);
+    serverActor.actionGauge = 100;
+    serverActor.remainingAp = 80;
+    serverActor.tile = { x: bossEntry.enemy.gridX - 1, y: bossEntry.enemy.gridY };
+    bossEntry.enemy.stats.hp = 1;
+    bossEntry.enemy.stats.def = 0;
+    bossEntry.enemy.stats.spd = 0;
+
+    const attack = withFixedRandom(0, () => session.handleMessage(joined.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'kill-burgos',
+        actorId: serverActor.id,
+        kind: 'attack',
+        payload: { targetId: bossEntry.enemy.id },
+    }, 1_100));
+    const event = attack.broadcasts.find((message) => message.type === 'COMBAT_EVENT');
+    assert.equal(event?.type, 'COMBAT_EVENT');
+    assert.equal(event?.kind, 'kill');
+
+    const completedSnapshot = session.createSnapshot(joined.playerId, 1_100);
+    assert.equal(completedSnapshot.scenario.activeDungeonId, null);
+    assert.ok(completedSnapshot.scenario.completedDungeonIds.includes('burgos_castle'));
+    assert.equal(completedSnapshot.enemies.some((enemy) => enemy.id !== bossEntry.enemy.id && enemy.id.startsWith('scenario_')), false);
+
+    const leave = session.handleMessage(joined.playerId, { type: 'WORLD_LEAVE', reason: 'town' }, 1_200);
+    const result = leave.replies.find((message) => message.type === 'RAID_RESULT');
+    assert.equal(result?.type, 'RAID_RESULT');
+    assert.deepEqual(result?.completedDungeonIds, ['burgos_castle']);
+});
+
+test('scenario entry validates quest prerequisites on the server', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const joined = session.join(joinMessage('central_castle', 'hero-a'), 0);
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === 'zamora_fortress');
+    assert.ok(serverActor);
+    assert.ok(dungeon);
+    serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+    const result = session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-zamora',
+        actorId: serverActor.id,
+        dungeonId: 'zamora_fortress',
+    }, 1_000);
+
+    assert.equal(result.replies[0]?.type, 'ACTION_REJECTED');
+    assert.match(result.replies[0]?.type === 'ACTION_REJECTED' ? result.replies[0].reason : '', /prerequisite/);
+});
+
+test('bossless server scenarios complete immediately while keeping optional enemies online', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const completedQuestIds = STORY_SCENARIOS
+        .filter((scenario) => scenario.episode < 17)
+        .map((scenario) => scenario.questId);
+    const joined = session.join({
+        ...joinMessage('central_castle', 'hero-a'),
+        completedQuestIds,
+    }, 0);
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === 'airship');
+    assert.ok(serverActor);
+    assert.ok(dungeon);
+    serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+    const result = session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-airship',
+        actorId: serverActor.id,
+        dungeonId: 'airship',
+    }, 1_000);
+
+    assert.equal(result.replies.length, 0);
+    const snapshot = session.createSnapshot(joined.playerId, 1_000);
+    assert.equal(snapshot.scenario.activeDungeonId, null);
+    assert.ok(snapshot.scenario.enteredDungeonIds.includes('airship'));
+    assert.ok(snapshot.scenario.completedDungeonIds.includes('airship'));
+    assert.ok(snapshot.enemies.filter((enemy) => enemy.id.startsWith('scenario_')).length >= 2);
+});
+
 test('network auto-loot exposes unaccepted leftovers on the field', () => {
     const session = new WorldSession();
     const joined = session.join({
@@ -328,4 +444,69 @@ test('network auto-loot exposes unaccepted leftovers on the field', () => {
     const exposed = session.createSnapshot(joined.playerId, 1_050).loot.find((loot) => loot.id === grant.lootId);
     assert.ok(exposed);
     assert.equal(exposed.gridSnapshot.items.length, grant.gridSnapshot.items.length);
+});
+
+test('server generates nest content around roaming players', () => {
+    const session = new WorldSession();
+    const joined = session.join(joinMessage('central_castle', 'hero-a'), 0);
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    assert.ok(serverActor);
+
+    const beforeIds = new Set(session.createSnapshot(joined.playerId, 0).enemies.map((enemy) => enemy.id));
+    serverActor.tile = { x: 67 * 32 + 16, y: 34 * 32 + 16 };
+    session.tick(1_000);
+
+    const spawned = session.createSnapshot(joined.playerId, 1_000).enemies
+        .filter((enemy) => !beforeIds.has(enemy.id));
+    assert.ok(spawned.length > 0, 'roaming into a distant chunk should create online nest enemies');
+    assert.ok(spawned.some((enemy) =>
+        Math.abs(Math.floor(enemy.tile.x / 32) - 67) <= 1
+        && Math.abs(Math.floor(enemy.tile.y / 32) - 34) <= 1
+    ));
+});
+
+test('cleared field nests respawn after five minutes away from active actors', () => {
+    const session = new WorldSession();
+    const joined = session.join({
+        ...joinMessage('central_castle', 'hero-a'),
+        partyComposition: [actor('hero-a', {
+            stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const state = [...internals.nestStates.values()].find((entry: any) => entry.monsterIds.length > 0);
+    assert.ok(serverActor);
+    assert.ok(state);
+
+    for (const enemyId of [...state.monsterIds]) {
+        const entry = internals.enemies.get(enemyId);
+        assert.ok(entry);
+        serverActor.tile = { x: entry.enemy.gridX - 1, y: entry.enemy.gridY };
+        serverActor.actionGauge = 100;
+        serverActor.remainingAp = 80;
+        entry.enemy.stats.hp = 1;
+        entry.enemy.stats.def = 0;
+        withFixedRandom(0, () => session.handleMessage(joined.playerId, {
+            type: 'PLAYER_INTENT',
+            intentId: `clear-${enemyId}`,
+            actorId: serverActor.id,
+            kind: 'attack',
+            payload: { targetId: enemyId },
+        }, 10_000));
+    }
+
+    assert.equal(state.cleared, true);
+    assert.equal(state.monsterIds.length, 0);
+    const respawnAt = state.respawnAt;
+    assert.ok(respawnAt >= 310_000);
+
+    serverActor.tile = { ...state.centerTile };
+    session.tick(respawnAt + 1);
+    assert.equal(state.monsterIds.length, 0, 'nest should not respawn inside the 18-tile safety radius');
+
+    serverActor.tile = { x: state.centerTile.x + 19, y: state.centerTile.y };
+    session.tick(respawnAt + 1_001);
+    assert.ok(state.monsterIds.length > 0, 'nest should respawn once the timer passed and actors are outside 18 tiles');
 });

@@ -352,6 +352,11 @@ export class WorldMap {
         return this.biomeMask.getRealm();
     }
 
+    /** Biome of a chunk (chunk coordinates). Used by the field spawn resolver. */
+    public getBiomeAtChunk(chunkX: number, chunkY: number): BiomeType {
+        return this.biomeMask.getBiome(chunkX, chunkY);
+    }
+
     public getDisplayName(): string {
         return this.getRealm() === 'master' ? '마스터 월드' : '현세 월드';
     }
