@@ -74,5 +74,14 @@ test('town deploy ignores click-through immediately after opening', () => {
 
     assert.equal(deployed, true);
     assert.equal(deploys, 1);
-    assert.equal(ui.isVisible(), false);
+    assert.equal(ui.isVisible(), true);
+    assert.equal(ui.isDeployPending(), true);
+
+    const duplicate = ui.requestDeploy(1000 + TOWN_DEPLOY_CLICK_GUARD_MS + 1);
+
+    assert.equal(duplicate, false);
+    assert.equal(deploys, 1);
+
+    ui.hide();
+    assert.equal(ui.isDeployPending(), false);
 });

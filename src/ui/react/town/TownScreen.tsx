@@ -27,6 +27,7 @@ export function TownScreen() {
     const town = store.getTownInfo();
     const tab = store.getTownTab();
     const restFacility = store.getRestFacility();
+    const deployPending = store.isTownDeployPending();
     if (!town) return null;
 
     const facilities = getTownFacilities(town.id);
@@ -45,6 +46,7 @@ export function TownScreen() {
     const townPrimaryName = i18n.lang === 'ko' ? town.nameKr : town.name;
     const townSecondaryName = i18n.lang === 'ko' ? town.name : town.nameKr;
     const deploy = () => {
+        if (deployPending) return;
         if (store.townDeploy()) AudioManager.playUi('ui.confirm');
     };
 
@@ -83,9 +85,10 @@ export function TownScreen() {
                 <button
                     type="button"
                     className="ds-town__deploy"
+                    disabled={deployPending}
                     onClick={deploy}
                 >
-                    ⚔️ {t('town.deploy')}
+                    ⚔️ {t(deployPending ? 'town.deploying' : 'town.deploy')}
                 </button>
             </div>
         </div>

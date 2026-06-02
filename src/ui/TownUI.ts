@@ -59,6 +59,7 @@ export class TownUI {
     private activeTab: TownTab = 'storage';
     private onDeployAction: (() => void) | null = null;
     private deployClickGuardUntilMs = 0;
+    private deployPending = false;
 
     // Rumors state (random selection per visit)
     private currentRumors: string[] = [];
@@ -101,11 +102,13 @@ export class TownUI {
     public getCurrentTown(): TownInfo | null { return this.currentTown; }
     public getRumors(): string[] { return this.currentRumors; }
     public getRestFacilityPublic(): RestFacility | null { return this.getCurrentRestFacility(); }
+    public isDeployPending(): boolean { return this.deployPending; }
     /** Leave town (mirrors the old canvas deploy button). */
     public requestDeploy(nowMs = getNowMs()): boolean {
         if (nowMs < this.deployClickGuardUntilMs) return false;
+        if (this.deployPending) return false;
         if (this.onDeployAction) {
-            this.hide();
+            this.deployPending = true;
             this.onDeployAction();
             return true;
         }
@@ -134,6 +137,7 @@ export class TownUI {
         this.shopUI.setTownId(town.id);
         this.visible = true;
         this.activeTab = 'storage';
+        this.deployPending = false;
         this.deployClickGuardUntilMs = nowMs + TOWN_DEPLOY_CLICK_GUARD_MS;
 
         // Pick 3 random rumors for this visit.
@@ -151,6 +155,7 @@ export class TownUI {
 
     public hide(): void {
         this.visible = false;
+        this.deployPending = false;
         if (this.inventoryUI.isVisible()) this.inventoryUI.toggle();
         this.shopUI.hide();
         this.currentTown = null;
