@@ -1,7 +1,7 @@
 import { getEffectiveStatsForCharacter, getEffectiveStatsForEnemy, hasStatus } from '../../combat/StatusEffects';
 import type { Enemy } from '../../entity/Enemy';
 import type { Player } from '../../entity/Player';
-import type { TileType } from '../../map/Tile';
+import { TILE_PROPERTIES, type TileType } from '../../map/Tile';
 import { ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, ENEMY_LEASH_RANGE, FIELD_ATB_SCALE, FORMATION_OFFSETS, MOVEMENT_REPATH_INTERVAL } from '../../field/FieldConfig';
 import { advanceAtb, resolveAggroState } from '../../field/FieldCombat';
 import {
@@ -18,6 +18,7 @@ export interface WorldMovementContext {
     getPartyActors: () => FieldActor[];
     getFieldEnemies: () => FieldEnemy[];
     getTileAt: (x: number, y: number) => TileType;
+    isGroundWalkable?: (x: number, y: number) => boolean;
     getTerrainTraitsForActorId: (actorId?: string) => TerrainActorTraits;
     getPartyCarryAtbMultiplier?: () => number;
 }
@@ -216,6 +217,7 @@ export class WorldMovementController {
     public isFieldPassable(query: FieldPassableQuery): boolean {
         const tile = this.context.getTileAt(query.x, query.y);
         if (!isTerrainPassable(tile, this.context.getTerrainTraitsForActorId(query.actorId))) return false;
+        if (this.context.isGroundWalkable && TILE_PROPERTIES[tile]?.walkable && !this.context.isGroundWalkable(query.x, query.y)) return false;
 
         const enemyAtTile = this.context.getFieldEnemies().some((entry) =>
             entry.enemy.id !== query.actorId &&

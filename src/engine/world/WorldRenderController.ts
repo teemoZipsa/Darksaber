@@ -95,6 +95,7 @@ export class WorldRenderController {
         WorldFieldRenderer.renderEnemies(ctx, model, camX, camY);
         WorldFieldRenderer.renderTutorialActors(ctx, model, camX, camY);
         WorldFieldRenderer.renderPartyActors(ctx, model, camX, camY);
+        worldMap.renderDecorationOverlays(ctx, camX, camY, viewW, viewH);
         WorldFieldRenderer.renderAttackCues(ctx, model, camX, camY);
         this.context.effectManager.render(ctx, camera);
         this.context.floatingText.render(ctx, camX, camY);

@@ -1,6 +1,6 @@
 import { Chunk, CHUNK_SIZE, TILE_SIZE } from './Chunk';
 import { TileType, TILE_PROPERTIES } from './Tile';
-import { TileAssetManager, type LandmarkSpriteId } from './TileAssetManager';
+import { TileAssetManager, type LandmarkSpriteId, type TreeSpriteId } from './TileAssetManager';
 import { LootObject } from '../entity/LootObject';
 import { ExtractionZone } from '../entity/ExtractionZone';
 import { BiomeMask, BiomeType, MAP_HEIGHT, MAP_WIDTH, TempleInfo, TownInfo, WorldRealm } from './BiomeMask';
@@ -26,6 +26,29 @@ export interface WorldMapLandmark {
     y: number;
     label: string;
     kind: WorldMapLandmarkKind;
+}
+
+export interface WorldMapDecorationClip {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+export interface WorldMapDecorationBounds {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+}
+
+export interface WorldMapDecoration {
+    kind: 'tree';
+    sprite: TreeSpriteId;
+    anchorTile: TilePoint;
+    trunkTiles: TilePoint[];
+    canopyClip: WorldMapDecorationClip;
+    bounds: WorldMapDecorationBounds;
 }
 
 export interface WorldDungeonInfo {
@@ -207,8 +230,57 @@ const TOWN_EXIT_FORMATION_OFFSETS: TilePoint[] = [
     { x: 1, y: 0 },
 ];
 
+interface TreeDecorationConfig {
+    widthTiles: number;
+    heightTiles: number;
+    trunkOffsets: readonly TilePoint[];
+    canopyClip: WorldMapDecorationClip;
+}
+
+const NORMAL_TREE_CHUNK_CHANCE = 0.035;
+const SCARY_TREE_CHUNK_CHANCE = 0.18;
+const TREE_DECORATION_LOOKUP_MARGIN_TILES = 8;
+const NORMAL_TREE_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST]);
+const SCARY_TREE_TILES = new Set<TileType>([TileType.POISON_SWAMP]);
+const NORMAL_TREE_CANOPY_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE]);
+const SCARY_TREE_CANOPY_TILES = new Set<TileType>([TileType.POISON_SWAMP, TileType.STONE]);
+
+const TREE_DECORATION_CONFIGS: Record<TreeSpriteId, TreeDecorationConfig> = {
+    largeTree: {
+        widthTiles: 4.2,
+        heightTiles: 4.45,
+        trunkOffsets: [
+            { x: 0, y: 0 },
+            { x: 0, y: -1 },
+        ],
+        canopyClip: { x: 0, y: 0, width: 1, height: 0.76 },
+    },
+    smallTree: {
+        widthTiles: 3.55,
+        heightTiles: 3.95,
+        trunkOffsets: [
+            { x: 0, y: 0 },
+            { x: 0, y: -1 },
+        ],
+        canopyClip: { x: 0, y: 0, width: 1, height: 0.68 },
+    },
+    scaryTree: {
+        widthTiles: 4.35,
+        heightTiles: 5.05,
+        trunkOffsets: [
+            { x: 0, y: 0 },
+            { x: 0, y: -1 },
+            { x: 0, y: -2 },
+            { x: -1, y: -1 },
+            { x: 1, y: -1 },
+        ],
+        canopyClip: { x: 0, y: 0, width: 1, height: 0.58 },
+    },
+};
+
 export class WorldMap {
     private chunks: Map<string, Chunk> = new Map();
+    private decorationChunks: Map<string, WorldMapDecoration[]> = new Map();
     private preloadChunkMargin: number = 1;
     private biomeMask: BiomeMask;
 
@@ -232,6 +304,7 @@ export class WorldMap {
         if (this.getRealm() === realm) return;
         this.biomeMask = new BiomeMask(realm);
         this.chunks.clear();
+        this.decorationChunks.clear();
         this.loot = [];
         this.extractionZones = [];
         this.validateTownSpawns();
@@ -524,6 +597,109 @@ export class WorldMap {
         return new Chunk(chunkX, chunkY, tiles);
     }
 
+    private getDecorationChunk(chunkX: number, chunkY: number): readonly WorldMapDecoration[] {
+        const key = this.chunkKey(chunkX, chunkY);
+        const cached = this.decorationChunks.get(key);
+        if (cached) return cached;
+
+        const generated = this.generateDecorationsForChunk(chunkX, chunkY);
+        this.decorationChunks.set(key, generated);
+        return generated;
+    }
+
+    private generateDecorationsForChunk(chunkX: number, chunkY: number): WorldMapDecoration[] {
+        if (!this.isChunkInBounds(chunkX, chunkY) || this.isOceanChunk(chunkX, chunkY)) return [];
+
+        const decorations: WorldMapDecoration[] = [];
+        if (this.hash(chunkX, chunkY, 501) < NORMAL_TREE_CHUNK_CHANCE) {
+            const sprite: TreeSpriteId = this.hash(chunkX, chunkY, 502) < 0.48 ? 'largeTree' : 'smallTree';
+            const anchor = this.pickDecorationAnchorTile(chunkX, chunkY, 503);
+            const decoration = this.createTreeDecoration(sprite, anchor);
+            if (this.canPlaceTreeDecoration(decoration, NORMAL_TREE_TILES, NORMAL_TREE_CANOPY_TILES)) decorations.push(decoration);
+        }
+
+        if (this.hash(chunkX, chunkY, 601) < SCARY_TREE_CHUNK_CHANCE) {
+            const anchor = this.pickDecorationAnchorTileForTerrain(chunkX, chunkY, 602, SCARY_TREE_TILES);
+            if (anchor) {
+                const decoration = this.createTreeDecoration('scaryTree', anchor);
+                if (this.canPlaceTreeDecoration(decoration, SCARY_TREE_TILES, SCARY_TREE_CANOPY_TILES)) decorations.push(decoration);
+            }
+        }
+
+        return decorations;
+    }
+
+    private pickDecorationAnchorTile(chunkX: number, chunkY: number, salt: number): TilePoint {
+        const localSpan = CHUNK_SIZE - 8;
+        return {
+            x: chunkX * CHUNK_SIZE + 4 + Math.floor(this.hash(chunkX, chunkY, salt) * localSpan),
+            y: chunkY * CHUNK_SIZE + 4 + Math.floor(this.hash(chunkX, chunkY, salt + 1) * localSpan),
+        };
+    }
+
+    private pickDecorationAnchorTileForTerrain(
+        chunkX: number,
+        chunkY: number,
+        salt: number,
+        allowedTiles: ReadonlySet<TileType>
+    ): TilePoint | null {
+        const localSpan = CHUNK_SIZE - 8;
+        for (let attempt = 0; attempt < 24; attempt++) {
+            const x = chunkX * CHUNK_SIZE + 4 + Math.floor(this.hash(chunkX * 31 + attempt, chunkY * 17, salt) * localSpan);
+            const y = chunkY * CHUNK_SIZE + 4 + Math.floor(this.hash(chunkX * 17, chunkY * 31 + attempt, salt + 1) * localSpan);
+            if (allowedTiles.has(this.getTileAt(x, y))) return { x, y };
+        }
+        return null;
+    }
+
+    private createTreeDecoration(sprite: TreeSpriteId, anchorTile: TilePoint): WorldMapDecoration {
+        const config = TREE_DECORATION_CONFIGS[sprite];
+        const left = anchorTile.x + 0.5 - config.widthTiles / 2;
+        const top = anchorTile.y + 1 - config.heightTiles;
+        return {
+            kind: 'tree',
+            sprite,
+            anchorTile: { ...anchorTile },
+            trunkTiles: config.trunkOffsets.map((offset) => ({
+                x: anchorTile.x + offset.x,
+                y: anchorTile.y + offset.y,
+            })),
+            canopyClip: { ...config.canopyClip },
+            bounds: {
+                minX: Math.floor(left),
+                minY: Math.floor(top),
+                maxX: Math.ceil(left + config.widthTiles),
+                maxY: Math.ceil(top + config.heightTiles),
+            },
+        };
+    }
+
+    private canPlaceTreeDecoration(
+        decoration: WorldMapDecoration,
+        trunkTilesAllowed: ReadonlySet<TileType>,
+        canopyTilesAllowed: ReadonlySet<TileType>
+    ): boolean {
+        const bounds = this.getBoundsTiles();
+        if (
+            decoration.bounds.minX <= 1 ||
+            decoration.bounds.minY <= 1 ||
+            decoration.bounds.maxX >= bounds.width - 1 ||
+            decoration.bounds.maxY >= bounds.height - 1
+        ) {
+            return false;
+        }
+
+        for (let y = decoration.bounds.minY; y <= decoration.bounds.maxY; y++) {
+            for (let x = decoration.bounds.minX; x <= decoration.bounds.maxX; x++) {
+                const tile = this.getTileAt(x, y);
+                if (!canopyTilesAllowed.has(tile)) return false;
+                if (this.getTownAtTile(x, y) || this.getTempleAtTile(x, y) || this.getDungeonAtTile(x, y)) return false;
+            }
+        }
+
+        return decoration.trunkTiles.every((tile) => trunkTilesAllowed.has(this.getTileAt(tile.x, tile.y)));
+    }
+
     public updateLoadedChunks(worldCenterX: number, worldCenterY: number, viewW?: number, viewH?: number): void {
         const chunkPixelSize = CHUNK_SIZE * TILE_SIZE;
         const halfViewW = viewW !== undefined ? viewW / 2 : this.preloadChunkMargin * chunkPixelSize;
@@ -562,6 +738,7 @@ export class WorldMap {
             chunk.render(ctx, sx, sy, (nx, ny) => this.getTileAt(nx, ny));
         }
 
+        this.renderDecorations(ctx, cameraX, cameraY, vw, vh, false);
         this.renderTownLandmarks(ctx, cameraX, cameraY, vw, vh);
         this.renderTempleLandmarks(ctx, cameraX, cameraY, vw, vh);
 
@@ -577,6 +754,10 @@ export class WorldMap {
         }
     }
 
+    public renderDecorationOverlays(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number, vw: number, vh: number): void {
+        this.renderDecorations(ctx, cameraX, cameraY, vw, vh, true);
+    }
+
     public getTileAt(tx: number, ty: number): TileType {
         const { chunkX, chunkY, localX, localY } = this.tileToChunk(tx, ty);
         const chunk = this.chunks.get(this.chunkKey(chunkX, chunkY));
@@ -586,6 +767,44 @@ export class WorldMap {
     }
 
     public isWalkable(tx: number, ty: number): boolean {
+        return this.isTerrainWalkable(tx, ty) && !this.isDecorationBlocked(tx, ty);
+    }
+
+    public getDecorationsInTileRect(minX: number, minY: number, maxX: number, maxY: number): readonly WorldMapDecoration[] {
+        const expandedMin = this.tileToChunk(minX - TREE_DECORATION_LOOKUP_MARGIN_TILES, minY - TREE_DECORATION_LOOKUP_MARGIN_TILES);
+        const expandedMax = this.tileToChunk(maxX + TREE_DECORATION_LOOKUP_MARGIN_TILES, maxY + TREE_DECORATION_LOOKUP_MARGIN_TILES);
+        const decorations: WorldMapDecoration[] = [];
+
+        for (let chunkY = expandedMin.chunkY; chunkY <= expandedMax.chunkY; chunkY++) {
+            for (let chunkX = expandedMin.chunkX; chunkX <= expandedMax.chunkX; chunkX++) {
+                for (const decoration of this.getDecorationChunk(chunkX, chunkY)) {
+                    if (this.decorationIntersectsTileRect(decoration, minX, minY, maxX, maxY)) {
+                        decorations.push(decoration);
+                    }
+                }
+            }
+        }
+
+        return decorations;
+    }
+
+    public isDecorationBlocked(tx: number, ty: number): boolean {
+        const expandedMin = this.tileToChunk(tx - TREE_DECORATION_LOOKUP_MARGIN_TILES, ty - TREE_DECORATION_LOOKUP_MARGIN_TILES);
+        const expandedMax = this.tileToChunk(tx + TREE_DECORATION_LOOKUP_MARGIN_TILES, ty + TREE_DECORATION_LOOKUP_MARGIN_TILES);
+
+        for (let chunkY = expandedMin.chunkY; chunkY <= expandedMax.chunkY; chunkY++) {
+            for (let chunkX = expandedMin.chunkX; chunkX <= expandedMax.chunkX; chunkX++) {
+                for (const decoration of this.getDecorationChunk(chunkX, chunkY)) {
+                    if (!this.decorationIntersectsTileRect(decoration, tx, ty, tx, ty)) continue;
+                    if (decoration.trunkTiles.some((tile) => tile.x === tx && tile.y === ty)) return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private isTerrainWalkable(tx: number, ty: number): boolean {
         return !!TILE_PROPERTIES[this.getTileAt(tx, ty)]?.walkable;
     }
 
@@ -759,6 +978,79 @@ export class WorldMap {
 
     public updateEntities(dt: number): void {
         for (const zone of this.extractionZones) zone.update(dt);
+    }
+
+    private renderDecorations(
+        ctx: CanvasRenderingContext2D,
+        cameraX: number,
+        cameraY: number,
+        vw: number,
+        vh: number,
+        overlayOnly: boolean
+    ): void {
+        const minX = Math.floor(cameraX / TILE_SIZE);
+        const minY = Math.floor(cameraY / TILE_SIZE);
+        const maxX = Math.ceil((cameraX + vw) / TILE_SIZE);
+        const maxY = Math.ceil((cameraY + vh) / TILE_SIZE);
+        const decorations = [...this.getDecorationsInTileRect(minX, minY, maxX, maxY)]
+            .sort((a, b) => a.anchorTile.y - b.anchorTile.y || a.anchorTile.x - b.anchorTile.x);
+
+        for (const decoration of decorations) {
+            this.renderTreeDecoration(ctx, decoration, cameraX, cameraY, vw, vh, overlayOnly);
+        }
+    }
+
+    private renderTreeDecoration(
+        ctx: CanvasRenderingContext2D,
+        decoration: WorldMapDecoration,
+        cameraX: number,
+        cameraY: number,
+        vw: number,
+        vh: number,
+        overlayOnly: boolean
+    ): void {
+        const config = TREE_DECORATION_CONFIGS[decoration.sprite];
+        const width = config.widthTiles * TILE_SIZE;
+        const height = config.heightTiles * TILE_SIZE;
+        const sx = (decoration.anchorTile.x + 0.5) * TILE_SIZE - cameraX - width / 2;
+        const sy = (decoration.anchorTile.y + 1) * TILE_SIZE - cameraY - height;
+
+        if (sx + width < 0 || sx > vw || sy + height < 0 || sy > vh) return;
+
+        const drew = TileAssetManager.drawTreeSprite(
+            ctx,
+            decoration.sprite,
+            sx,
+            sy,
+            width,
+            height,
+            overlayOnly ? decoration.canopyClip : undefined
+        );
+        if (drew || overlayOnly) return;
+
+        ctx.save();
+        ctx.fillStyle = decoration.sprite === 'scaryTree' ? 'rgba(90, 95, 48, 0.8)' : 'rgba(30, 112, 42, 0.78)';
+        ctx.beginPath();
+        ctx.ellipse(sx + width / 2, sy + height * 0.38, width * 0.46, height * 0.32, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#6b3f1f';
+        for (const tile of decoration.trunkTiles) {
+            ctx.fillRect(tile.x * TILE_SIZE - cameraX + 12, tile.y * TILE_SIZE - cameraY + 6, TILE_SIZE - 24, TILE_SIZE - 8);
+        }
+        ctx.restore();
+    }
+
+    private decorationIntersectsTileRect(
+        decoration: WorldMapDecoration,
+        minX: number,
+        minY: number,
+        maxX: number,
+        maxY: number
+    ): boolean {
+        return decoration.bounds.maxX >= minX &&
+            decoration.bounds.minX <= maxX &&
+            decoration.bounds.maxY >= minY &&
+            decoration.bounds.minY <= maxY;
     }
 
     private renderTownLandmarks(

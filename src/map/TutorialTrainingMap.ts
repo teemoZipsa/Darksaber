@@ -1,6 +1,6 @@
 import { TILE_SIZE } from './Chunk';
 import { TileType, TILE_PROPERTIES } from './Tile';
-import { WorldMap, type TileBounds, type TilePoint, type WorldMapLandmark } from './WorldMap';
+import { WorldMap, type TileBounds, type TilePoint, type WorldMapDecoration, type WorldMapLandmark } from './WorldMap';
 import { t } from '../i18n/LanguageManager';
 
 const ARENA_WIDTH = 18;
@@ -40,6 +40,24 @@ export class TutorialTrainingMap extends WorldMap {
 
     public getMapLandmarks(): WorldMapLandmark[] {
         return [];
+    }
+
+    public getDecorationsInTileRect(_minX: number, _minY: number, _maxX: number, _maxY: number): readonly WorldMapDecoration[] {
+        return [];
+    }
+
+    public isDecorationBlocked(_tx: number, _ty: number): boolean {
+        return false;
+    }
+
+    public renderDecorationOverlays(
+        _ctx: CanvasRenderingContext2D,
+        _cameraX: number,
+        _cameraY: number,
+        _vw: number,
+        _vh: number
+    ): void {
+        // Fixed indoor tutorial room; world decorations are intentionally disabled.
     }
 
     public getTileAt(tx: number, ty: number): TileType {

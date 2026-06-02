@@ -63,6 +63,20 @@ test('follower movement allows ally soft collision', () => {
     assert.equal(controller.isFieldPassable({ x: 1, y: 0, actorId: follower.id, intent: 'follow' }), true);
 });
 
+test('movement honors world ground blockers on walkable terrain', () => {
+    const actor = makeActor('hero', 0, 0);
+    const controller = new WorldMovementController({
+        getPartyActors: () => [actor],
+        getFieldEnemies: () => [],
+        getTileAt: () => TileType.GRASS,
+        isGroundWalkable: (x, y) => !(x === 1 && y === 0),
+        getTerrainTraitsForActorId: () => ({}),
+    });
+
+    assert.equal(controller.isFieldPassable({ x: 1, y: 0, actorId: actor.id, intent: 'move' }), false);
+    assert.equal(controller.isFieldPassable({ x: 0, y: 1, actorId: actor.id, intent: 'move' }), true);
+});
+
 test('immobilized actors and enemies do not move', () => {
     const actor = makeActor('rooted-actor', 0, 0);
     actor.character.statuses = [createStatus('immobilize')];

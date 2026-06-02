@@ -282,6 +282,7 @@ export class WorldEngine {
             getPartyActors: () => this.partyActors,
             getFieldEnemies: () => this.fieldEnemies,
             getTileAt: (x, y) => this.worldMap.getTileAt(x, y),
+            isGroundWalkable: (x, y) => this.worldMap.isWalkable(x, y),
             getTerrainTraitsForActorId: (actorId) => this.getTerrainTraitsForActorId(actorId),
             getPartyCarryAtbMultiplier: () => getCarryAtbMultiplier(
                 getPartyCarriedWeight(this.gameManager.inventory.items, this.party.getCharacters())

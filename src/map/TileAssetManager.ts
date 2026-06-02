@@ -32,8 +32,15 @@ const DARKSABER_LANDMARK_SPRITES = {
     beginnerMine: '/assets/images/landmarks/darksaber/beginner_mine.png',
 } as const;
 
+const DARKSABER_TREE_SPRITES = {
+    largeTree: '/assets/images/decor/trees/large_tree.png',
+    smallTree: '/assets/images/decor/trees/small_tree.png',
+    scaryTree: '/assets/images/decor/trees/scary_tree.png',
+} as const;
+
 type OriginalAutotileSheetId = keyof typeof ORIGINAL_AUTOTILE_SHEETS;
 export type LandmarkSpriteId = keyof typeof DARKSABER_LANDMARK_SPRITES;
+export type TreeSpriteId = keyof typeof DARKSABER_TREE_SPRITES;
 
 interface OriginalAutotileConfig {
     sheet: OriginalAutotileSheetId;
@@ -239,6 +246,9 @@ class TileAssetManagerClass {
         for (const [key, src] of Object.entries(DARKSABER_LANDMARK_SPRITES)) {
             this.queueImageLoad(`landmark:${key}`, src);
         }
+        for (const [key, src] of Object.entries(DARKSABER_TREE_SPRITES)) {
+            this.queueImageLoad(`tree:${key}`, src);
+        }
         return Promise.all(this.loadPromises);
     }
 
@@ -338,6 +348,34 @@ class TileAssetManagerClass {
         const prevSmoothing = ctx.imageSmoothingEnabled;
         ctx.imageSmoothingEnabled = true;
         ctx.drawImage(img, dx, dy, width, height);
+        ctx.imageSmoothingEnabled = prevSmoothing;
+        return true;
+    }
+
+    public drawTreeSprite(
+        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+        spriteId: TreeSpriteId,
+        dx: number,
+        dy: number,
+        width: number,
+        height: number,
+        source?: { x: number; y: number; width: number; height: number }
+    ): boolean {
+        const img = this.getSheet(`tree:${spriteId}`);
+        if (!img) return false;
+
+        const srcX = source ? source.x * img.naturalWidth : 0;
+        const srcY = source ? source.y * img.naturalHeight : 0;
+        const srcW = source ? source.width * img.naturalWidth : img.naturalWidth;
+        const srcH = source ? source.height * img.naturalHeight : img.naturalHeight;
+        const destX = source ? dx + width * source.x : dx;
+        const destY = source ? dy + height * source.y : dy;
+        const destW = source ? width * source.width : width;
+        const destH = source ? height * source.height : height;
+
+        const prevSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(img, srcX, srcY, srcW, srcH, destX, destY, destW, destH);
         ctx.imageSmoothingEnabled = prevSmoothing;
         return true;
     }
