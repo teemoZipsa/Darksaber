@@ -34,14 +34,11 @@ NODE_ENV=production
 DATABASE_URL=<Neon pooled connection string>
 AUTH_JWT_SECRET=<long random secret>
 AUTH_ALLOWED_ORIGINS=https://<vercel-client-host>
-AUTH_REFRESH_COOKIE_SAMESITE=Lax
-```
-
-If the client and auth server are cross-site, set:
-
-```text
 AUTH_REFRESH_COOKIE_SAMESITE=None
 ```
+
+Vercel and Render are cross-site, so the refresh cookie must use
+`SameSite=None` with secure cookies enabled.
 
 Secure cookies remain enabled by default. Do not set
 `AUTH_REFRESH_COOKIE_SECURE=0` in production.

@@ -82,7 +82,8 @@ import { WorldRenderController } from './world/WorldRenderController';
 import { WorldInputController } from './world/WorldInputController';
 import { HitStop } from './world/HitStop';
 import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
-import { NetworkRaidClient, type NetworkRaidStatus } from '../net/NetworkRaidClient';
+import { NetworkRaidClient, WorldServerError, type NetworkRaidStatus } from '../net/NetworkRaidClient';
+import { DEFAULT_AUTH_SERVER_URL } from '../net/AuthClient';
 import {
     DEFAULT_WORLD_SERVER_URL,
     type ActionRejectedMessage,
@@ -1142,18 +1143,18 @@ export class WorldEngine {
         this.addCombatLog('월드 서버 접속 중...');
 
         try {
-            this.closeNetworkRaidClient(false);
-            this.networkRaidClient = this.createNetworkRaidClient();
-            const welcome = await this.networkRaidClient.connectAndJoin({
-                accessToken: authContext.accessToken,
-                characterId: authContext.characterId,
-                originHubId: town.id,
-                partyComposition: this.createPartyCompositionSnapshot(town),
-                carriedWeight: getPartyCarriedWeight(this.gameManager.inventory.items, this.party.getCharacters()),
-                carriedItems: this.createCarriedItemCounts(),
-                completedQuestIds: Array.from(this.playerData.clearedStages),
-                requestedRealm,
-            });
+            let joinAuthContext = await this.refreshNetworkAuthContext(authContext) ?? authContext;
+            let welcome;
+            try {
+                welcome = await this.connectNetworkRaid(town, requestedRealm, joinAuthContext);
+            } catch (error) {
+                if (!(error instanceof WorldServerError) || error.code !== 'AUTH_FAILED') throw error;
+                const refreshed = await this.refreshNetworkAuthContext(authContext, true);
+                if (!refreshed || refreshed.accessToken === joinAuthContext.accessToken) throw error;
+                this.addCombatLog('인증 토큰 갱신 후 출격 재시도...');
+                joinAuthContext = refreshed;
+                welcome = await this.connectNetworkRaid(town, requestedRealm, joinAuthContext);
+            }
 
             this.applyServerCompletedQuestIds(welcome.completedQuestIds);
             this.townSession.hide();
@@ -1186,6 +1187,52 @@ export class WorldEngine {
             this.townSession.show(town);
         } finally {
             this.isNetworkRaidConnecting = false;
+        }
+    }
+
+    private async connectNetworkRaid(
+        town: TownInfo,
+        requestedRealm: WorldRealmId,
+        authContext: { accessToken: string; characterId: string }
+    ) {
+        this.closeNetworkRaidClient(false);
+        this.networkRaidClient = this.createNetworkRaidClient();
+        return this.networkRaidClient.connectAndJoin({
+            accessToken: authContext.accessToken,
+            characterId: authContext.characterId,
+            originHubId: town.id,
+            partyComposition: this.createPartyCompositionSnapshot(town),
+            carriedWeight: getPartyCarriedWeight(this.gameManager.inventory.items, this.party.getCharacters()),
+            carriedItems: this.createCarriedItemCounts(),
+            completedQuestIds: Array.from(this.playerData.clearedStages),
+            requestedRealm,
+        });
+    }
+
+    private async refreshNetworkAuthContext(
+        authContext: { accessToken: string; characterId: string },
+        logFailure = false
+    ): Promise<{ accessToken: string; characterId: string } | null> {
+        try {
+            const response = await fetch(`${DEFAULT_AUTH_SERVER_URL}/auth/refresh`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            if (!response.ok) {
+                if (logFailure) this.addCombatLog(`인증 토큰 갱신 실패: HTTP ${response.status}`);
+                return null;
+            }
+            const parsed = await response.json() as unknown;
+            const accessToken = typeof parsed === 'object' && parsed !== null && 'accessToken' in parsed
+                && typeof (parsed as { accessToken?: unknown }).accessToken === 'string'
+                ? (parsed as { accessToken: string }).accessToken
+                : null;
+            if (!accessToken) return null;
+            this.gameManager.updateNetworkAccessToken(accessToken);
+            return { ...authContext, accessToken };
+        } catch (error) {
+            if (logFailure) this.addCombatLog(`인증 토큰 갱신 실패: ${error instanceof Error ? error.message : 'unknown error'}`);
+            return null;
         }
     }
 

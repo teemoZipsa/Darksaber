@@ -20,7 +20,7 @@ services:
       - key: AUTH_ACCESS_TOKEN_TTL_SECONDS
         value: "900"
       - key: AUTH_REFRESH_COOKIE_SAMESITE
-        value: Lax
+        value: None
       - key: AUTH_ALLOWED_ORIGINS
         sync: false
       - key: WORLD_SHARD_COUNT

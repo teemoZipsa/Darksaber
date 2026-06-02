@@ -52,6 +52,12 @@ export interface NetworkRaidClientOptions {
     onGraceExpired?: () => void;
 }
 
+export class WorldServerError extends Error {
+    public constructor(public readonly code: string, message: string) {
+        super(`${code}: ${message}`);
+    }
+}
+
 const RESUME_TOKEN_KEY = 'darksaber_world_resume_token';
 const LEGACY_ACCOUNT_ID_KEY = 'darksaber_world_account_id';
 const LEGACY_ACCOUNT_SECRET_KEY = 'darksaber_world_account_secret';
@@ -335,7 +341,7 @@ export class NetworkRaidClient {
                     this.reportBadMessage('Malformed ERROR message.');
                     return;
                 }
-                if (this.pendingWelcome) this.rejectPendingWelcome(new Error(message.message));
+                if (this.pendingWelcome) this.rejectPendingWelcome(new WorldServerError(message.code, message.message));
                 if (message.code === 'RESUME_FAILED') this.expireGrace();
                 this.options.onErrorMessage?.(message);
                 break;

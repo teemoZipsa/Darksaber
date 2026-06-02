@@ -208,9 +208,10 @@ async function parseResponse(response: Response): Promise<unknown> {
 }
 
 function readAuthServerUrl(): string {
-    const configured = import.meta.env.VITE_AUTH_SERVER_URL?.trim();
+    const configured = import.meta.env?.VITE_AUTH_SERVER_URL?.trim();
     if (configured) return configured.replace(/\/$/, '');
-    if (import.meta.env.DEV) return 'http://localhost:8765';
+    if (import.meta.env?.DEV) return 'http://localhost:8765';
+    if (typeof window === 'undefined') return 'http://localhost:8765';
     return window.location.origin;
 }
 
