@@ -6,7 +6,7 @@
  * React drives it through the store.
  */
 
-import type { CSSProperties, KeyboardEvent } from 'react';
+import type { CSSProperties } from 'react';
 import { i18n, t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
@@ -47,11 +47,6 @@ export function TownScreen() {
     const deploy = () => {
         if (store.townDeploy()) AudioManager.playUi('ui.confirm');
     };
-    const handleDeployKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
-        deploy();
-    };
 
     return (
         <div className="ds-town">
@@ -88,12 +83,7 @@ export function TownScreen() {
                 <button
                     type="button"
                     className="ds-town__deploy"
-                    onPointerDown={(event) => {
-                        if (event.pointerType === 'mouse' && event.button !== 0) return;
-                        event.preventDefault();
-                        deploy();
-                    }}
-                    onKeyDown={handleDeployKeyDown}
+                    onClick={deploy}
                 >
                     ⚔️ {t('town.deploy')}
                 </button>
