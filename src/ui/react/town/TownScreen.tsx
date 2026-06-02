@@ -6,7 +6,7 @@
  * React drives it through the store.
  */
 
-import type { CSSProperties } from 'react';
+import type { CSSProperties, KeyboardEvent } from 'react';
 import { i18n, t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
@@ -44,6 +44,14 @@ export function TownScreen() {
     const scaleVar = { '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
     const townPrimaryName = i18n.lang === 'ko' ? town.nameKr : town.name;
     const townSecondaryName = i18n.lang === 'ko' ? town.name : town.nameKr;
+    const deploy = () => {
+        if (store.townDeploy()) AudioManager.playUi('ui.confirm');
+    };
+    const handleDeployKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        deploy();
+    };
 
     return (
         <div className="ds-town">
@@ -78,8 +86,14 @@ export function TownScreen() {
 
             <div className="ds-town__footer" style={scaleVar}>
                 <button
+                    type="button"
                     className="ds-town__deploy"
-                    onClick={() => { store.townDeploy(); AudioManager.playUi('ui.confirm'); }}
+                    onPointerDown={(event) => {
+                        if (event.pointerType === 'mouse' && event.button !== 0) return;
+                        event.preventDefault();
+                        deploy();
+                    }}
+                    onKeyDown={handleDeployKeyDown}
                 >
                     ⚔️ {t('town.deploy')}
                 </button>

@@ -150,7 +150,7 @@ export class UiStore {
 
     // Town actions
     townSetTab = (tab: TownTab): void => { this.townUi()?.setTab(tab); this.tick(); };
-    townDeploy = (): void => { this.townUi()?.requestDeploy(); this.tick(); };
+    townDeploy = (): boolean => { const deployed = this.townUi()?.requestDeploy() ?? false; this.tick(); return deployed; };
 
     shopSetKind = (kind: ShopKind): void => { this.shop()?.setActiveKind(kind); this.tick(); };
     shopBuy = (entry: ShopEntry): boolean => { const ok = this.shop()?.buy(entry) ?? false; this.tick(); return ok; };

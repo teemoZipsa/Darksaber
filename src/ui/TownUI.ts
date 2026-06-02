@@ -102,12 +102,14 @@ export class TownUI {
     public getRumors(): string[] { return this.currentRumors; }
     public getRestFacilityPublic(): RestFacility | null { return this.getCurrentRestFacility(); }
     /** Leave town (mirrors the old canvas deploy button). */
-    public requestDeploy(nowMs = getNowMs()): void {
-        if (nowMs < this.deployClickGuardUntilMs) return;
+    public requestDeploy(nowMs = getNowMs()): boolean {
+        if (nowMs < this.deployClickGuardUntilMs) return false;
         if (this.onDeployAction) {
             this.hide();
             this.onDeployAction();
+            return true;
         }
+        return false;
     }
 
     private syncShopSources(): void {

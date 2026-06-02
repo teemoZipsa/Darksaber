@@ -64,13 +64,15 @@ test('town deploy ignores click-through immediately after opening', () => {
     ui.onDeploy(() => { deploys++; });
 
     ui.show(KAOSIA, 1000);
-    ui.requestDeploy(1000 + TOWN_DEPLOY_CLICK_GUARD_MS - 1);
+    const blocked = ui.requestDeploy(1000 + TOWN_DEPLOY_CLICK_GUARD_MS - 1);
 
+    assert.equal(blocked, false);
     assert.equal(deploys, 0);
     assert.equal(ui.isVisible(), true);
 
-    ui.requestDeploy(1000 + TOWN_DEPLOY_CLICK_GUARD_MS);
+    const deployed = ui.requestDeploy(1000 + TOWN_DEPLOY_CLICK_GUARD_MS);
 
+    assert.equal(deployed, true);
     assert.equal(deploys, 1);
     assert.equal(ui.isVisible(), false);
 });
