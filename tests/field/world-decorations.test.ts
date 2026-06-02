@@ -4,6 +4,9 @@ import { WorldMap, type WorldMapDecoration } from '../../src/map/WorldMap';
 import { TutorialTrainingMap } from '../../src/map/TutorialTrainingMap';
 import { TileType, TILE_PROPERTIES } from '../../src/map/Tile';
 
+type TreeDecoration = Extract<WorldMapDecoration, { kind: 'tree' }>;
+type BridgeDecoration = Extract<WorldMapDecoration, { kind: 'bridge' }>;
+
 function getAllDecorations(world: WorldMap): readonly WorldMapDecoration[] {
     const bounds = world.getBoundsTiles();
     return [...world.getDecorationsInTileRect(0, 0, bounds.width - 1, bounds.height - 1)]
@@ -11,8 +14,17 @@ function getAllDecorations(world: WorldMap): readonly WorldMapDecoration[] {
 }
 
 function decorationSignature(decoration: WorldMapDecoration): string {
-    const trunk = decoration.trunkTiles.map((tile) => `${tile.x},${tile.y}`).join('|');
-    return `${decoration.sprite}@${decoration.anchorTile.x},${decoration.anchorTile.y}:${trunk}`;
+    const coveredTiles = decoration.kind === 'tree' ? decoration.trunkTiles : decoration.passableTiles;
+    const covered = coveredTiles.map((tile) => `${tile.x},${tile.y}`).join('|');
+    return `${decoration.kind}:${decoration.sprite}@${decoration.anchorTile.x},${decoration.anchorTile.y}:${covered}`;
+}
+
+function isTreeDecoration(decoration: WorldMapDecoration): decoration is TreeDecoration {
+    return decoration.kind === 'tree';
+}
+
+function isBridgeDecoration(decoration: WorldMapDecoration): decoration is BridgeDecoration {
+    return decoration.kind === 'bridge';
 }
 
 test('world map tree decorations are deterministic and sparse', () => {
@@ -28,7 +40,7 @@ test('world map tree decorations are deterministic and sparse', () => {
 
 test('tree decorations stay on eligible terrain by sprite family', () => {
     const world = new WorldMap();
-    const decorations = getAllDecorations(world);
+    const decorations = getAllDecorations(world).filter(isTreeDecoration);
     const normalTrees = decorations.filter((decoration) => decoration.sprite !== 'scaryTree');
     const scaryTrees = decorations.filter((decoration) => decoration.sprite === 'scaryTree');
 
@@ -52,7 +64,7 @@ test('tree decorations stay on eligible terrain by sprite family', () => {
 
 test('tree trunks block movement while canopy-only tiles remain walkable', () => {
     const world = new WorldMap();
-    const decoration = getAllDecorations(world).find((candidate) => candidate.sprite !== 'scaryTree');
+    const decoration = getAllDecorations(world).filter(isTreeDecoration).find((candidate) => candidate.sprite !== 'scaryTree');
     assert.ok(decoration);
 
     const trunk = decoration.trunkTiles[0];
@@ -74,6 +86,24 @@ test('tree trunks block movement while canopy-only tiles remain walkable', () =>
     assert.ok(canopyTile);
     assert.equal(world.isDecorationBlocked(canopyTile.x, canopyTile.y), false);
     assert.equal(world.isWalkable(canopyTile.x, canopyTile.y), true);
+});
+
+test('bridge decorations make road river crossings passable', () => {
+    const world = new WorldMap();
+    const bridges = getAllDecorations(world).filter(isBridgeDecoration);
+
+    assert.ok(bridges.length > 0);
+
+    for (const bridge of bridges) {
+        assert.equal(world.getTileAt(bridge.anchorTile.x, bridge.anchorTile.y), TileType.ROAD);
+        assert.equal(world.isDecorationBlocked(bridge.anchorTile.x, bridge.anchorTile.y), false);
+        assert.equal(world.isWalkable(bridge.anchorTile.x, bridge.anchorTile.y), true);
+
+        for (const tile of bridge.passableTiles) {
+            assert.equal(world.isDecorationBlocked(tile.x, tile.y), false);
+            assert.equal(world.isWalkable(tile.x, tile.y), true);
+        }
+    }
 });
 
 test('tutorial training map disables world decorations', () => {

@@ -38,9 +38,15 @@ const DARKSABER_TREE_SPRITES = {
     scaryTree: '/assets/images/decor/trees/scary_tree.png',
 } as const;
 
+const DARKSABER_BRIDGE_SPRITES = {
+    woodBridgeHorizontal: '/assets/images/decor/bridges/wood_bridge_horizontal.png',
+    woodBridgeVertical: '/assets/images/decor/bridges/wood_bridge_vertical.png',
+} as const;
+
 type OriginalAutotileSheetId = keyof typeof ORIGINAL_AUTOTILE_SHEETS;
 export type LandmarkSpriteId = keyof typeof DARKSABER_LANDMARK_SPRITES;
 export type TreeSpriteId = keyof typeof DARKSABER_TREE_SPRITES;
+export type BridgeSpriteId = keyof typeof DARKSABER_BRIDGE_SPRITES;
 
 interface OriginalAutotileConfig {
     sheet: OriginalAutotileSheetId;
@@ -249,6 +255,9 @@ class TileAssetManagerClass {
         for (const [key, src] of Object.entries(DARKSABER_TREE_SPRITES)) {
             this.queueImageLoad(`tree:${key}`, src);
         }
+        for (const [key, src] of Object.entries(DARKSABER_BRIDGE_SPRITES)) {
+            this.queueImageLoad(`bridge:${key}`, src);
+        }
         return Promise.all(this.loadPromises);
     }
 
@@ -376,6 +385,24 @@ class TileAssetManagerClass {
         const prevSmoothing = ctx.imageSmoothingEnabled;
         ctx.imageSmoothingEnabled = true;
         ctx.drawImage(img, srcX, srcY, srcW, srcH, destX, destY, destW, destH);
+        ctx.imageSmoothingEnabled = prevSmoothing;
+        return true;
+    }
+
+    public drawBridgeSprite(
+        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+        spriteId: BridgeSpriteId,
+        dx: number,
+        dy: number,
+        width: number,
+        height: number
+    ): boolean {
+        const img = this.getSheet(`bridge:${spriteId}`);
+        if (!img) return false;
+
+        const prevSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(img, dx, dy, width, height);
         ctx.imageSmoothingEnabled = prevSmoothing;
         return true;
     }

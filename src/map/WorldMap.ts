@@ -1,6 +1,6 @@
 import { Chunk, CHUNK_SIZE, TILE_SIZE } from './Chunk';
 import { TileType, TILE_PROPERTIES } from './Tile';
-import { TileAssetManager, type LandmarkSpriteId, type TreeSpriteId } from './TileAssetManager';
+import { TileAssetManager, type BridgeSpriteId, type LandmarkSpriteId, type TreeSpriteId } from './TileAssetManager';
 import { LootObject } from '../entity/LootObject';
 import { ExtractionZone } from '../entity/ExtractionZone';
 import { BiomeMask, BiomeType, MAP_HEIGHT, MAP_WIDTH, TempleInfo, TownInfo, WorldRealm } from './BiomeMask';
@@ -42,7 +42,7 @@ export interface WorldMapDecorationBounds {
     maxY: number;
 }
 
-export interface WorldMapDecoration {
+export interface WorldMapTreeDecoration {
     kind: 'tree';
     sprite: TreeSpriteId;
     anchorTile: TilePoint;
@@ -50,6 +50,16 @@ export interface WorldMapDecoration {
     canopyClip: WorldMapDecorationClip;
     bounds: WorldMapDecorationBounds;
 }
+
+export interface WorldMapBridgeDecoration {
+    kind: 'bridge';
+    sprite: BridgeSpriteId;
+    anchorTile: TilePoint;
+    passableTiles: TilePoint[];
+    bounds: WorldMapDecorationBounds;
+}
+
+export type WorldMapDecoration = WorldMapTreeDecoration | WorldMapBridgeDecoration;
 
 export interface WorldDungeonInfo {
     id: string;
@@ -237,9 +247,15 @@ interface TreeDecorationConfig {
     canopyClip: WorldMapDecorationClip;
 }
 
+interface BridgeDecorationConfig {
+    widthTiles: number;
+    heightTiles: number;
+    passableOffsets: readonly TilePoint[];
+}
+
 const NORMAL_TREE_CHUNK_CHANCE = 0.035;
 const SCARY_TREE_CHUNK_CHANCE = 0.18;
-const TREE_DECORATION_LOOKUP_MARGIN_TILES = 8;
+const DECORATION_LOOKUP_MARGIN_TILES = 8;
 const NORMAL_TREE_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST]);
 const SCARY_TREE_TILES = new Set<TileType>([TileType.POISON_SWAMP]);
 const NORMAL_TREE_CANOPY_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE]);
@@ -275,6 +291,31 @@ const TREE_DECORATION_CONFIGS: Record<TreeSpriteId, TreeDecorationConfig> = {
             { x: 1, y: -1 },
         ],
         canopyClip: { x: 0, y: 0, width: 1, height: 0.58 },
+    },
+};
+
+const BRIDGE_DECORATION_CONFIGS: Record<BridgeSpriteId, BridgeDecorationConfig> = {
+    woodBridgeHorizontal: {
+        widthTiles: 5,
+        heightTiles: 2.75,
+        passableOffsets: [
+            { x: -2, y: 0 },
+            { x: -1, y: 0 },
+            { x: 0, y: 0 },
+            { x: 1, y: 0 },
+            { x: 2, y: 0 },
+        ],
+    },
+    woodBridgeVertical: {
+        widthTiles: 2.4,
+        heightTiles: 5.4,
+        passableOffsets: [
+            { x: 0, y: -2 },
+            { x: 0, y: -1 },
+            { x: 0, y: 0 },
+            { x: 0, y: 1 },
+            { x: 0, y: 2 },
+        ],
     },
 };
 
@@ -613,6 +654,9 @@ export class WorldMap {
         if (!this.isChunkInBounds(chunkX, chunkY) || this.isOceanChunk(chunkX, chunkY)) return [];
 
         const decorations: WorldMapDecoration[] = [];
+        const bridge = this.createBridgeDecorationForChunk(chunkX, chunkY);
+        if (bridge) decorations.push(bridge);
+
         if (this.hash(chunkX, chunkY, 501) < NORMAL_TREE_CHUNK_CHANCE) {
             const sprite: TreeSpriteId = this.hash(chunkX, chunkY, 502) < 0.48 ? 'largeTree' : 'smallTree';
             const anchor = this.pickDecorationAnchorTile(chunkX, chunkY, 503);
@@ -654,7 +698,120 @@ export class WorldMap {
         return null;
     }
 
-    private createTreeDecoration(sprite: TreeSpriteId, anchorTile: TilePoint): WorldMapDecoration {
+    private createBridgeDecorationForChunk(chunkX: number, chunkY: number): WorldMapBridgeDecoration | null {
+        const baseX = chunkX * CHUNK_SIZE;
+        const baseY = chunkY * CHUNK_SIZE;
+        let best: { decoration: WorldMapBridgeDecoration; score: number } | null = null;
+
+        for (let localY = 4; localY < CHUNK_SIZE - 4; localY++) {
+            for (let localX = 4; localX < CHUNK_SIZE - 4; localX++) {
+                const tx = baseX + localX;
+                const ty = baseY + localY;
+                if (!this.isRoadTile(tx, ty) || !this.isRiverTile(tx, ty)) continue;
+
+                const sprite = this.pickBridgeSprite(tx, ty);
+                if (!sprite) continue;
+
+                const decoration = this.createBridgeDecoration(sprite, { x: tx, y: ty });
+                if (!this.canPlaceBridgeDecoration(decoration)) continue;
+
+                const score = this.hash(tx, ty, 701);
+                if (!best || score < best.score) best = { decoration, score };
+            }
+        }
+
+        return best?.decoration ?? null;
+    }
+
+    private pickBridgeSprite(tx: number, ty: number): BridgeSpriteId | null {
+        const roadHorizontal = this.countRouteHits([
+            { x: tx - 3, y: ty },
+            { x: tx - 2, y: ty },
+            { x: tx + 2, y: ty },
+            { x: tx + 3, y: ty },
+        ], (tile) => this.isRoadTile(tile.x, tile.y));
+        const roadVertical = this.countRouteHits([
+            { x: tx, y: ty - 3 },
+            { x: tx, y: ty - 2 },
+            { x: tx, y: ty + 2 },
+            { x: tx, y: ty + 3 },
+        ], (tile) => this.isRoadTile(tile.x, tile.y));
+        const riverHorizontal = this.countRouteHits([
+            { x: tx - 3, y: ty },
+            { x: tx - 2, y: ty },
+            { x: tx + 2, y: ty },
+            { x: tx + 3, y: ty },
+        ], (tile) => this.isRiverTile(tile.x, tile.y));
+        const riverVertical = this.countRouteHits([
+            { x: tx, y: ty - 3 },
+            { x: tx, y: ty - 2 },
+            { x: tx, y: ty + 2 },
+            { x: tx, y: ty + 3 },
+        ], (tile) => this.isRiverTile(tile.x, tile.y));
+
+        if (roadHorizontal >= roadVertical && riverVertical >= riverHorizontal) return 'woodBridgeHorizontal';
+        if (roadVertical > roadHorizontal && riverHorizontal >= riverVertical) return 'woodBridgeVertical';
+        if (roadHorizontal > roadVertical) return 'woodBridgeHorizontal';
+        if (roadVertical > roadHorizontal) return 'woodBridgeVertical';
+        return null;
+    }
+
+    private countRouteHits(tiles: readonly TilePoint[], predicate: (tile: TilePoint) => boolean): number {
+        return tiles.reduce((count, tile) => count + (predicate(tile) ? 1 : 0), 0);
+    }
+
+    private createBridgeDecoration(sprite: BridgeSpriteId, anchorTile: TilePoint): WorldMapBridgeDecoration {
+        const config = BRIDGE_DECORATION_CONFIGS[sprite];
+        const left = anchorTile.x + 0.5 - config.widthTiles / 2;
+        const top = anchorTile.y + 0.5 - config.heightTiles / 2;
+        return {
+            kind: 'bridge',
+            sprite,
+            anchorTile: { ...anchorTile },
+            passableTiles: config.passableOffsets.map((offset) => ({
+                x: anchorTile.x + offset.x,
+                y: anchorTile.y + offset.y,
+            })),
+            bounds: {
+                minX: Math.floor(left),
+                minY: Math.floor(top),
+                maxX: Math.ceil(left + config.widthTiles),
+                maxY: Math.ceil(top + config.heightTiles),
+            },
+        };
+    }
+
+    private canPlaceBridgeDecoration(decoration: WorldMapBridgeDecoration): boolean {
+        const bounds = this.getBoundsTiles();
+        if (
+            decoration.bounds.minX <= 1 ||
+            decoration.bounds.minY <= 1 ||
+            decoration.bounds.maxX >= bounds.width - 1 ||
+            decoration.bounds.maxY >= bounds.height - 1
+        ) {
+            return false;
+        }
+
+        if (!this.isRoadTile(decoration.anchorTile.x, decoration.anchorTile.y) || !this.isRiverTile(decoration.anchorTile.x, decoration.anchorTile.y)) {
+            return false;
+        }
+        const anchorTile = this.getTileAt(decoration.anchorTile.x, decoration.anchorTile.y);
+        if (anchorTile !== TileType.ROAD && anchorTile !== TileType.WATER) return false;
+
+        for (let y = decoration.bounds.minY; y <= decoration.bounds.maxY; y++) {
+            for (let x = decoration.bounds.minX; x <= decoration.bounds.maxX; x++) {
+                if (this.getTownAtTile(x, y) || this.getTempleAtTile(x, y) || this.getDungeonAtTile(x, y)) return false;
+            }
+        }
+
+        return decoration.passableTiles.every((tile) => {
+            const visibleTile = this.getTileAt(tile.x, tile.y);
+            return (visibleTile === TileType.ROAD || visibleTile === TileType.WATER) &&
+                (this.isRoadTile(tile.x, tile.y) || this.isRiverTile(tile.x, tile.y));
+        });
+    }
+
+    private createTreeDecoration(sprite: TreeSpriteId, anchorTile: TilePoint): WorldMapTreeDecoration {
         const config = TREE_DECORATION_CONFIGS[sprite];
         const left = anchorTile.x + 0.5 - config.widthTiles / 2;
         const top = anchorTile.y + 1 - config.heightTiles;
@@ -677,7 +834,7 @@ export class WorldMap {
     }
 
     private canPlaceTreeDecoration(
-        decoration: WorldMapDecoration,
+        decoration: WorldMapTreeDecoration,
         trunkTilesAllowed: ReadonlySet<TileType>,
         canopyTilesAllowed: ReadonlySet<TileType>
     ): boolean {
@@ -769,12 +926,12 @@ export class WorldMap {
     }
 
     public isWalkable(tx: number, ty: number): boolean {
-        return this.isTerrainWalkable(tx, ty) && !this.isDecorationBlocked(tx, ty);
+        return (this.isTerrainWalkable(tx, ty) || this.isDecorationPassable(tx, ty)) && !this.isDecorationBlocked(tx, ty);
     }
 
     public getDecorationsInTileRect(minX: number, minY: number, maxX: number, maxY: number): readonly WorldMapDecoration[] {
-        const expandedMin = this.tileToChunk(minX - TREE_DECORATION_LOOKUP_MARGIN_TILES, minY - TREE_DECORATION_LOOKUP_MARGIN_TILES);
-        const expandedMax = this.tileToChunk(maxX + TREE_DECORATION_LOOKUP_MARGIN_TILES, maxY + TREE_DECORATION_LOOKUP_MARGIN_TILES);
+        const expandedMin = this.tileToChunk(minX - DECORATION_LOOKUP_MARGIN_TILES, minY - DECORATION_LOOKUP_MARGIN_TILES);
+        const expandedMax = this.tileToChunk(maxX + DECORATION_LOOKUP_MARGIN_TILES, maxY + DECORATION_LOOKUP_MARGIN_TILES);
         const decorations: WorldMapDecoration[] = [];
 
         for (let chunkY = expandedMin.chunkY; chunkY <= expandedMax.chunkY; chunkY++) {
@@ -791,14 +948,31 @@ export class WorldMap {
     }
 
     public isDecorationBlocked(tx: number, ty: number): boolean {
-        const expandedMin = this.tileToChunk(tx - TREE_DECORATION_LOOKUP_MARGIN_TILES, ty - TREE_DECORATION_LOOKUP_MARGIN_TILES);
-        const expandedMax = this.tileToChunk(tx + TREE_DECORATION_LOOKUP_MARGIN_TILES, ty + TREE_DECORATION_LOOKUP_MARGIN_TILES);
+        const expandedMin = this.tileToChunk(tx - DECORATION_LOOKUP_MARGIN_TILES, ty - DECORATION_LOOKUP_MARGIN_TILES);
+        const expandedMax = this.tileToChunk(tx + DECORATION_LOOKUP_MARGIN_TILES, ty + DECORATION_LOOKUP_MARGIN_TILES);
 
         for (let chunkY = expandedMin.chunkY; chunkY <= expandedMax.chunkY; chunkY++) {
             for (let chunkX = expandedMin.chunkX; chunkX <= expandedMax.chunkX; chunkX++) {
                 for (const decoration of this.getDecorationChunk(chunkX, chunkY)) {
                     if (!this.decorationIntersectsTileRect(decoration, tx, ty, tx, ty)) continue;
-                    if (decoration.trunkTiles.some((tile) => tile.x === tx && tile.y === ty)) return true;
+                    if (decoration.kind === 'tree' && decoration.trunkTiles.some((tile) => tile.x === tx && tile.y === ty)) return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private isDecorationPassable(tx: number, ty: number): boolean {
+        const expandedMin = this.tileToChunk(tx - DECORATION_LOOKUP_MARGIN_TILES, ty - DECORATION_LOOKUP_MARGIN_TILES);
+        const expandedMax = this.tileToChunk(tx + DECORATION_LOOKUP_MARGIN_TILES, ty + DECORATION_LOOKUP_MARGIN_TILES);
+
+        for (let chunkY = expandedMin.chunkY; chunkY <= expandedMax.chunkY; chunkY++) {
+            for (let chunkX = expandedMin.chunkX; chunkX <= expandedMax.chunkX; chunkX++) {
+                for (const decoration of this.getDecorationChunk(chunkX, chunkY)) {
+                    if (decoration.kind !== 'bridge') continue;
+                    if (!this.decorationIntersectsTileRect(decoration, tx, ty, tx, ty)) continue;
+                    if (decoration.passableTiles.some((tile) => tile.x === tx && tile.y === ty)) return true;
                 }
             }
         }
@@ -1008,13 +1182,17 @@ export class WorldMap {
             .sort((a, b) => a.anchorTile.y - b.anchorTile.y || a.anchorTile.x - b.anchorTile.x);
 
         for (const decoration of decorations) {
-            this.renderTreeDecoration(ctx, decoration, cameraX, cameraY, vw, vh, overlayOnly);
+            if (decoration.kind === 'tree') {
+                this.renderTreeDecoration(ctx, decoration, cameraX, cameraY, vw, vh, overlayOnly);
+            } else {
+                this.renderBridgeDecoration(ctx, decoration, cameraX, cameraY, vw, vh, overlayOnly);
+            }
         }
     }
 
     private renderTreeDecoration(
         ctx: CanvasRenderingContext2D,
-        decoration: WorldMapDecoration,
+        decoration: WorldMapTreeDecoration,
         cameraX: number,
         cameraY: number,
         vw: number,
@@ -1049,6 +1227,37 @@ export class WorldMap {
         for (const tile of decoration.trunkTiles) {
             ctx.fillRect(tile.x * TILE_SIZE - cameraX + 12, tile.y * TILE_SIZE - cameraY + 6, TILE_SIZE - 24, TILE_SIZE - 8);
         }
+        ctx.restore();
+    }
+
+    private renderBridgeDecoration(
+        ctx: CanvasRenderingContext2D,
+        decoration: WorldMapBridgeDecoration,
+        cameraX: number,
+        cameraY: number,
+        vw: number,
+        vh: number,
+        overlayOnly: boolean
+    ): void {
+        if (overlayOnly) return;
+
+        const config = BRIDGE_DECORATION_CONFIGS[decoration.sprite];
+        const width = config.widthTiles * TILE_SIZE;
+        const height = config.heightTiles * TILE_SIZE;
+        const sx = (decoration.anchorTile.x + 0.5) * TILE_SIZE - cameraX - width / 2;
+        const sy = (decoration.anchorTile.y + 0.5) * TILE_SIZE - cameraY - height / 2;
+
+        if (sx + width < 0 || sx > vw || sy + height < 0 || sy > vh) return;
+
+        const drew = TileAssetManager.drawBridgeSprite(ctx, decoration.sprite, sx, sy, width, height);
+        if (drew) return;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(82, 52, 31, 0.88)';
+        ctx.strokeStyle = 'rgba(28, 18, 12, 0.9)';
+        ctx.lineWidth = Math.max(1, TILE_SIZE * 0.08);
+        ctx.fillRect(sx, sy + height * 0.18, width, height * 0.64);
+        ctx.strokeRect(sx, sy + height * 0.18, width, height * 0.64);
         ctx.restore();
     }
 
