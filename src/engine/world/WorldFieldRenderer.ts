@@ -237,7 +237,13 @@ export class WorldFieldRenderer {
         ctx.strokeRect(model.hoverTile.x * TILE_SIZE - camX + 1, model.hoverTile.y * TILE_SIZE - camY + 1, TILE_SIZE - 2, TILE_SIZE - 2);
     }
 
-    public static renderHudPanels(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number, vh: number): number {
+    public static renderHudPanels(
+        ctx: CanvasRenderingContext2D,
+        model: WorldRenderModel,
+        vw: number,
+        vh: number,
+        options: { combatLogOnly?: boolean } = {}
+    ): number {
         // ── HUD layout ─────────────────────────────────────────────
         // LEFT column   : title logo + character status
         // TOP-CENTER    : raid timer banner (only when raid active)
@@ -248,6 +254,11 @@ export class WorldFieldRenderer {
         const HUD_W       = 232;
         const TEXT_X      = HUD_X + 14;          // 30 — left text column
         const RIGHT_X     = HUD_X + HUD_W - 92;  // 156 — right text column
+
+        if (options.combatLogOnly) {
+            renderCombatLog(ctx, model, vw, vh);
+            return 0;
+        }
 
         renderGameTitle(ctx, HUD_X, 12, { scale: 0.7, subtitle: '' });
 

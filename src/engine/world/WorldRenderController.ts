@@ -61,6 +61,10 @@ export interface WorldRenderContext {
     isTurnCombatActive: () => boolean;
 }
 
+interface WorldRenderOptions {
+    hideWorldHud?: boolean;
+}
+
 export class WorldRenderController {
     private readonly context: WorldRenderContext;
 
@@ -68,7 +72,7 @@ export class WorldRenderController {
         this.context = context;
     }
 
-    public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
+    public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number, options: WorldRenderOptions = {}): void {
         const model = this.buildRenderModel();
         const camX = camera.x;
         const camY = camera.y;
@@ -108,19 +112,21 @@ export class WorldRenderController {
         ctx.scale(scale, scale);
         const uiW = Math.floor(width / scale);
         const uiH = Math.floor(height / scale);
-        const infoY = WorldFieldRenderer.renderHudPanels(ctx, model, uiW, uiH);
-        if (model.selectedDisplayInfo) {
+        const infoY = WorldFieldRenderer.renderHudPanels(ctx, model, uiW, uiH, { combatLogOnly: options.hideWorldHud });
+        if (!options.hideWorldHud && model.selectedDisplayInfo) {
             this.context.entityInfoUI.setPosition(16, infoY + 18);
             this.context.entityInfoUI.render(ctx, model.selectedDisplayInfo);
         }
-        this.context.tacticalController.render(ctx);
-        this.context.magicController.render(ctx, uiW, uiH);
-        this.context.toolController.render(ctx, uiW, uiH);
-        this.context.minimapUI.render(ctx, uiW, uiH, {
-            gold: model.gold,
-            worldName: model.worldName,
-            terrainLines: model.terrainHoverLines,
-        });
+        if (!options.hideWorldHud) {
+            this.context.tacticalController.render(ctx);
+            this.context.magicController.render(ctx, uiW, uiH);
+            this.context.toolController.render(ctx, uiW, uiH);
+            this.context.minimapUI.render(ctx, uiW, uiH, {
+                gold: model.gold,
+                worldName: model.worldName,
+                terrainLines: model.terrainHoverLines,
+            });
+        }
         if (this.context.townSession.isVisible()) this.context.townSession.render(ctx, uiW, uiH);
         if (this.context.fusionTempleUI.isVisible()) this.context.fusionTempleUI.render(ctx, uiW, uiH);
         if (this.context.raidOutcomeController.isVisible()) this.context.raidOutcomeController.render(ctx, uiW, uiH);

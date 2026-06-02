@@ -652,7 +652,7 @@ export class WorldEngine {
     public getRaidSession(): WorldRaidSession { return this.raidSession; }
 
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
-        this.renderController.render(ctx, camera, width, height);
+        this.renderController.render(ctx, camera, width, height, { hideWorldHud: this.introTutorialActive });
         if (this.introTutorialActive) this.renderIntroTutorialHud(ctx, width, height);
     }
 
@@ -990,13 +990,17 @@ export class WorldEngine {
         const uiW = Math.floor(width / scale);
         const uiH = Math.floor(height / scale);
         const panelW = Math.min(620, uiW - 40);
-        const panelH = 286;
+        const panelH = Math.min(320, Math.max(286, uiH - 24));
         const x = Math.floor((uiW - panelW) / 2);
         const y = Math.floor((uiH - panelH) / 2);
         const buttonW = Math.min(340, panelW - 72);
         const buttonH = 48;
         const buttonX = x + Math.floor((panelW - buttonW) / 2);
-        const buttonY = y + panelH - 76;
+        const buttonY = y + panelH - 88;
+        const nextBoxW = panelW - 92;
+        const nextBoxH = 44;
+        const nextBoxX = x + 46;
+        const nextBoxY = buttonY - nextBoxH - 18;
         const crestX = x + panelW / 2;
         const crestY = y + 54;
 
@@ -1019,13 +1023,17 @@ export class WorldEngine {
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
 
-        ctx.fillStyle = 'rgba(240, 192, 80, 0.08)';
-        ctx.fillRect(x + 18, y + 18, panelW - 36, 74);
-        ctx.strokeStyle = 'rgba(240, 192, 80, 0.28)';
-        ctx.strokeRect(x + 18, y + 18, panelW - 36, 74);
-
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+
+        ctx.strokeStyle = 'rgba(240, 192, 80, 0.36)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + 34, crestY);
+        ctx.lineTo(crestX - 44, crestY);
+        ctx.moveTo(crestX + 44, crestY);
+        ctx.lineTo(x + panelW - 34, crestY);
+        ctx.stroke();
 
         ctx.fillStyle = '#20150f';
         ctx.strokeStyle = '#f0c050';
@@ -1046,10 +1054,6 @@ export class WorldEngine {
         ctx.font = 'bold 16px sans-serif';
         this.drawWrappedText(ctx, t('tutorial.world.completeLine'), x + panelW / 2, y + 150, panelW - 96, 22, 2);
 
-        const nextBoxX = x + 46;
-        const nextBoxY = y + 176;
-        const nextBoxW = panelW - 92;
-        const nextBoxH = 44;
         ctx.fillStyle = 'rgba(240, 192, 80, 0.1)';
         ctx.strokeStyle = 'rgba(240, 192, 80, 0.44)';
         ctx.lineWidth = 1;
@@ -1061,11 +1065,11 @@ export class WorldEngine {
         ctx.fillStyle = '#a99773';
         ctx.font = '12px sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText(t('tutorial.world.completeNextLabel'), nextBoxX + 18, nextBoxY + 17);
+        ctx.fillText(t('tutorial.world.completeNextLabel'), nextBoxX + 18, nextBoxY + 15);
 
         ctx.fillStyle = '#ffe8a8';
         ctx.font = 'bold 16px "DOSMyungjo", serif';
-        ctx.fillText(t('tutorial.world.completeReward'), nextBoxX + 18, nextBoxY + 34);
+        ctx.fillText(t('tutorial.world.completeReward'), nextBoxX + 18, nextBoxY + 31);
 
         ctx.fillStyle = '#f0c050';
         ctx.strokeStyle = '#ffe8a8';
