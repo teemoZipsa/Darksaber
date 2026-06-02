@@ -21,6 +21,7 @@ import type {
 } from '../src/net/WorldProtocol';
 import { getStoryQuestByDungeonId } from '../src/data/StoryQuestData';
 import { ServerMarketSession } from './ServerMarketSession';
+import { createServerHeartbeatAck } from './WorldHeartbeat';
 import { WorldSession, WORLD_TICK_MS, type WorldCharacterSavePatch } from './WorldSession';
 import { authenticateAccessToken, createAuthHttpHandler } from './AuthHttp';
 import { InMemoryAuthStore, PostgresAuthStore, type AccountProgress, type AuthAccount, type AuthCharacter, type AuthStore, type CharacterSave } from './AuthStore';
@@ -224,12 +225,7 @@ async function handleSocketMessage(ws: WebSocket, data: RawData): Promise<void> 
     }
 
     if (message.type === 'CLIENT_HEARTBEAT') {
-        send(ws, {
-            type: 'SERVER_HEARTBEAT_ACK',
-            clientTime: Number.isFinite(message.clientTime) ? message.clientTime : 0,
-            serverTime: Date.now(),
-            joined: playerBySocket.has(ws),
-        });
+        send(ws, createServerHeartbeatAck(message.clientTime, playerBySocket.has(ws)));
         return;
     }
 

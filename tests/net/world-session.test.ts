@@ -4,6 +4,7 @@ import { createBaseStats } from '../../src/data/Stats';
 import type { ActorSnapshot, AutoLootGrantMessage, WorldJoinMessage } from '../../src/net/WorldProtocol';
 import { WorldMap } from '../../src/map/WorldMap';
 import { WorldSession } from '../../server/WorldSession';
+import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 
 function actor(id: string, overrides: Partial<ActorSnapshot> = {}): ActorSnapshot {
@@ -43,6 +44,23 @@ function withFixedRandom<T>(value: number, callback: () => T): T {
     } finally {
         Math.random = previousRandom;
     }
+}
+
+function authCharacter(id: string): AuthCharacter {
+    return {
+        id,
+        accountId: 'account-test',
+        slotNo: 1,
+        name: id,
+        classKey: 'infantry',
+        tier: 1,
+        level: 1,
+        exp: 0,
+        baseStats: createBaseStats({ spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        deletedAt: null,
+    };
 }
 
 test('join spawns each player at their origin hub external exit tile', () => {
@@ -134,6 +152,58 @@ test('useItem intent consumes server-owned carried inventory and heals actor', (
     }, 1_010);
     assert.equal(rejected.replies[0]?.type, 'ACTION_REJECTED');
     assert.match(rejected.replies[0]?.type === 'ACTION_REJECTED' ? rejected.replies[0].reason : '', /not available/);
+});
+
+test('character save dirty state is event-driven and not created by world ticks', () => {
+    const session = new WorldSession();
+    const character = authCharacter('hero-save');
+    const save = createDefaultCharacterSave(character);
+    save.inventory = {
+        width: 10,
+        height: 6,
+        items: [{
+            itemId: 'herb_common',
+            gridX: 0,
+            gridY: 0,
+            quantity: 1,
+            durability: 1,
+        }],
+    };
+    const joined = session.join({
+        ...joinMessage('central_castle', character.id),
+        carriedItems: [{ itemId: 'herb_common', quantity: 1 }],
+        partyComposition: [actor(character.id, {
+            stats: createBaseStats({ hp: 10, maxHp: 100, mp: 0, maxMp: 20, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        saveSnapshot: save,
+    });
+
+    session.tick(0);
+    session.tick(1_000);
+    assert.deepEqual(session.consumeSaveDirtyPlayerIds(), []);
+
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    assert.ok(serverActor);
+    serverActor.actionGauge = 100;
+    serverActor.remainingAp = 80;
+
+    const result = session.handleMessage(joined.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'use-save-item',
+        actorId: serverActor.id,
+        kind: 'useItem',
+        payload: { itemId: 'herb_common' },
+    }, 1_100);
+
+    assert.equal(result.replies[0]?.type, 'INVENTORY_CONSUMED');
+    assert.deepEqual(session.consumeSaveDirtyPlayerIds(), [joined.playerId]);
+    const patch = session.createCharacterSavePatch(joined.playerId);
+    assert.ok(patch?.inventory);
+    assert.deepEqual(patch.inventory.items.filter((item) => item.itemId === 'herb_common'), []);
 });
 
 test('session logs lifecycle events and exposes debug counts', () => {
