@@ -1,8 +1,37 @@
 services:
   - type: web
     name: darksaber-world-server
-    env: node
+    runtime: node
     buildCommand: npm ci
     startCommand: npm run server
     healthCheckPath: /healthz
-    autoDeploy: false
+    autoDeployTrigger: 'off'
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: darksaber-postgres
+          property: connectionString
+      - key: AUTH_JWT_SECRET
+        generateValue: true
+      - key: AUTH_JWT_ISSUER
+        value: darksaber-world
+      - key: AUTH_JWT_AUDIENCE
+        value: darksaber-client
+      - key: AUTH_ACCESS_TOKEN_TTL_SECONDS
+        value: "900"
+      - key: AUTH_REFRESH_COOKIE_SAMESITE
+        value: Lax
+      - key: AUTH_ALLOWED_ORIGINS
+        sync: false
+      - key: WORLD_SHARD_COUNT
+        value: "1"
+
+databases:
+  - name: darksaber-postgres
+    databaseName: darksaber
+    user: darksaber
+    plan: basic-256mb
+    postgresMajorVersion: "16"
+    ipAllowList: []
