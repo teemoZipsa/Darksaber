@@ -127,8 +127,8 @@ export interface WorldJoinMessage {
     carriedWeight?: number;
     resumeToken?: string;
     completedQuestIds?: string[];
-    accountId?: string;
-    accountSecret?: string;
+    accessToken?: string;
+    characterId?: string;
     requestedRealm?: WorldRealmId;
     carriedItems?: InventoryItemCountSnapshot[];
 }
@@ -136,6 +136,7 @@ export interface WorldJoinMessage {
 export interface ReconnectMessage {
     type: 'RECONNECT';
     resumeToken: string;
+    accessToken?: string;
 }
 
 export interface WorldLeaveMessage {

@@ -9,7 +9,8 @@
  * dark-blue body theme or the canvas-drawn panels still in use.
  */
 
-#ui-overlay {
+#ui-overlay,
+#auth-overlay {
     /* Backgrounds */
     --ds-bg-0: #0f0d0a;
     --ds-bg-1: #1a1410;
@@ -64,6 +65,221 @@
 
     font-family: inherit; /* Pretendard / Noto Sans KR, already loaded on body */
     color: var(--ds-text);
+}
+
+#auth-overlay .auth-root {
+    position: absolute;
+    inset: 0;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background:
+        linear-gradient(180deg, rgba(6, 5, 4, 0.72), rgba(10, 8, 6, 0.88)),
+        url('/assets/images/backgrounds/start.jpg') center / cover no-repeat;
+}
+
+#auth-overlay .auth-shell {
+    width: min(960px, 100%);
+    display: flex;
+    justify-content: center;
+}
+
+#auth-overlay .auth-status,
+#auth-overlay .auth-panel {
+    width: min(420px, 100%);
+    background: linear-gradient(160deg, var(--ds-panel-1) 0%, var(--ds-panel-0) 58%, var(--ds-bg-1) 100%);
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius);
+    box-shadow: inset 0 0 0 1px var(--ds-hairline), 0 24px 60px rgba(0, 0, 0, 0.65);
+    padding: 24px;
+    color: var(--ds-text);
+}
+
+#auth-overlay .auth-panel--wide {
+    width: min(860px, 100%);
+}
+
+#auth-overlay .auth-panel__title {
+    font-family: var(--ds-font-title, "DOSMyungjo", serif);
+    font-size: 24px;
+    color: var(--ds-accent);
+    text-align: center;
+    margin-bottom: 18px;
+}
+
+#auth-overlay .auth-tabs,
+#auth-overlay .auth-actions {
+    display: flex;
+    gap: 8px;
+}
+
+#auth-overlay .auth-tabs {
+    margin-bottom: 16px;
+}
+
+#auth-overlay button,
+#auth-overlay input {
+    font: inherit;
+}
+
+#auth-overlay button {
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+    color: var(--ds-text);
+    background: linear-gradient(180deg, var(--ds-panel-1), var(--ds-panel-0));
+    cursor: pointer;
+}
+
+#auth-overlay button:hover,
+#auth-overlay button.is-active {
+    color: var(--ds-accent-bright);
+    border-color: var(--ds-accent);
+}
+
+#auth-overlay button:disabled {
+    color: var(--ds-text-dim);
+    cursor: default;
+}
+
+#auth-overlay .auth-tabs button,
+#auth-overlay .auth-actions button {
+    flex: 1;
+    min-height: 38px;
+    padding: 8px 12px;
+}
+
+#auth-overlay .auth-field {
+    display: grid;
+    gap: 7px;
+    margin: 12px 0;
+    color: var(--ds-text-muted);
+    font-size: 13px;
+}
+
+#auth-overlay .auth-field input {
+    min-height: 42px;
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+    background: var(--ds-panel-inset);
+    color: var(--ds-text);
+    padding: 0 12px;
+}
+
+#auth-overlay .auth-primary,
+#auth-overlay .auth-continue {
+    width: 100%;
+    min-height: 46px;
+    margin-top: 14px;
+    padding: 10px 14px;
+    color: #1a1008;
+    border-color: var(--ds-accent);
+    background: linear-gradient(180deg, var(--ds-accent-bright), var(--ds-accent));
+    font-weight: 700;
+}
+
+#auth-overlay .auth-continue {
+    display: grid;
+    gap: 4px;
+    text-align: left;
+    color: #1a1008;
+}
+
+#auth-overlay .auth-error {
+    margin-top: 12px;
+    padding: 9px 10px;
+    border: 1px solid rgba(228, 63, 90, 0.6);
+    border-radius: var(--ds-radius-sm);
+    color: #ffd4dc;
+    background: rgba(120, 18, 34, 0.35);
+    font-size: 13px;
+}
+
+#auth-overlay .auth-character-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin: 16px 0;
+}
+
+#auth-overlay .auth-character-card {
+    min-height: 118px;
+    padding: 14px;
+    display: grid;
+    align-content: center;
+    gap: 8px;
+    text-align: left;
+}
+
+#auth-overlay .auth-character-card__slot,
+#auth-overlay .auth-character-card span {
+    color: var(--ds-text-muted);
+    font-size: 12px;
+}
+
+#auth-overlay .auth-character-card strong {
+    font-family: var(--ds-font-title, "DOSMyungjo", serif);
+    color: var(--ds-text);
+    font-size: 20px;
+}
+
+#auth-overlay .auth-create-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(260px, 0.9fr);
+    gap: 18px;
+}
+
+#auth-overlay .auth-class-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+#auth-overlay .auth-class-list button {
+    min-height: 132px;
+    padding: 10px;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: 8px;
+}
+
+#auth-overlay .auth-class-list img {
+    width: 64px;
+    height: 72px;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+#auth-overlay .auth-create-fields {
+    display: flex;
+    flex-direction: column;
+}
+
+#auth-overlay .auth-selected-class {
+    margin-top: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--ds-hairline);
+    border-radius: var(--ds-radius-sm);
+    color: var(--ds-accent);
+    background: rgba(0, 0, 0, 0.18);
+}
+
+@media (max-width: 720px) {
+    #auth-overlay .auth-root {
+        align-items: stretch;
+        padding: 12px;
+        overflow: auto;
+    }
+
+    #auth-overlay .auth-shell {
+        align-items: center;
+    }
+
+    #auth-overlay .auth-create-layout {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* ─── Scrim ─────────────────────────────────────────────────── */

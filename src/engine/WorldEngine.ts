@@ -1131,6 +1131,13 @@ export class WorldEngine {
         if (this.isNetworkRaidConnecting) return;
         if (this.worldMap.getRealm() !== requestedRealm) this.worldMap.setRealm(requestedRealm);
         const town = this.getCurrentHubTown();
+        const authContext = this.gameManager.getNetworkAuthContext();
+        if (!authContext) {
+            this.addCombatLog('서버 인증 정보가 없어 출격할 수 없습니다.');
+            this.currentPhase = 'town';
+            this.townSession.show(town);
+            return;
+        }
         this.isNetworkRaidConnecting = true;
         this.addCombatLog('월드 서버 접속 중...');
 
@@ -1138,6 +1145,8 @@ export class WorldEngine {
             this.closeNetworkRaidClient(false);
             this.networkRaidClient = this.createNetworkRaidClient();
             const welcome = await this.networkRaidClient.connectAndJoin({
+                accessToken: authContext.accessToken,
+                characterId: authContext.characterId,
                 originHubId: town.id,
                 partyComposition: this.createPartyCompositionSnapshot(town),
                 carriedWeight: getPartyCarriedWeight(this.gameManager.inventory.items, this.party.getCharacters()),

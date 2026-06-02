@@ -170,6 +170,12 @@ export class PartyManager {
         this.activeIndex = 0;
     }
 
+    public clear(): void {
+        this.activeParty = [];
+        this.roster = [];
+        this.activeIndex = 0;
+    }
+
     /** Swap two roster positions during drag and drop reorder */
     public swapRoster(indexA: number, indexB: number): boolean {
         if (indexA < 0 || indexA >= this.roster.length ||

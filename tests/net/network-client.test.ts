@@ -114,6 +114,8 @@ function installMemoryStorage(storage: MemoryStorage): () => void {
 
 function joinInput(): NetworkRaidJoinInput {
     return {
+        accessToken: 'access_test',
+        characterId: 'character_test',
         originHubId: 'central_castle',
         partyComposition: [],
     };
@@ -181,7 +183,7 @@ test('client uses stored resume token when joining after refresh', async () => {
     }
 });
 
-test('client includes account credentials, requested realm, and carried items in join payload', async () => {
+test('client includes access token, character id, requested realm, and carried items in join payload', async () => {
     const restoreSocket = installMockWebSocket();
     const storage = new MemoryStorage();
     const restoreStorage = installMemoryStorage(storage);
@@ -200,10 +202,10 @@ test('client includes account credentials, requested realm, and carried items in
         const sent = JSON.parse(socket.sent[0]);
         assert.equal(sent.requestedRealm, 'master');
         assert.deepEqual(sent.carriedItems, [{ itemId: 'herb_common', quantity: 2 }]);
-        assert.equal(typeof sent.accountId, 'string');
-        assert.match(sent.accountId, /^acct_/);
-        assert.equal(typeof sent.accountSecret, 'string');
-        assert.ok(sent.accountSecret.length >= 24);
+        assert.equal(sent.accessToken, 'access_test');
+        assert.equal(sent.characterId, 'character_test');
+        assert.equal(sent.accountId, undefined);
+        assert.equal(sent.accountSecret, undefined);
 
         socket.emitMessage(welcomeMessage('resume_account'));
         await join;

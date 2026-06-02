@@ -118,6 +118,7 @@ interface ServerActor {
 interface ServerPlayer {
     id: string;
     accountId?: string;
+    characterId?: string;
     resumeToken: string;
     originHubId: string;
     departureTownId: string;
@@ -189,6 +190,7 @@ export interface WorldSessionOptions {
 
 export interface WorldJoinContext {
     accountId?: string;
+    characterId?: string;
     completedQuestIds?: string[];
     shardId?: string;
 }
@@ -252,6 +254,7 @@ export class WorldSession {
         const player: ServerPlayer = {
             id: playerId,
             accountId: context.accountId,
+            characterId: context.characterId,
             resumeToken,
             originHubId,
             departureTownId: originHubId,
@@ -1660,12 +1663,12 @@ export class WorldSession {
     private getAlliedActorsWithin(player: ServerPlayer, caster: ServerActor, radius: number): ServerActor[] {
         return player.actorIds
             .map((actorId) => this.actors.get(actorId))
-            .filter((actor): actor is ServerActor =>
-                Boolean(actor)
-                && !actor.isDead
+            .filter((actor): actor is ServerActor => {
+                if (!actor) return false;
+                return !actor.isDead
                 && actor.stats.hp > 0
-                && manhattan(caster.tile, actor.tile) <= radius
-            );
+                && manhattan(caster.tile, actor.tile) <= radius;
+            });
     }
 
     private consumeTickDelta(now: number): number {
@@ -1864,7 +1867,7 @@ const STORY_SCENARIO_MONSTER_LAYOUTS = {
 } satisfies Record<string, StoryScenarioMonsterLayout>;
 
 function getStoryScenarioMonsterLayout(scenario: StoryScenarioDefinition): StoryScenarioMonsterLayout {
-    return STORY_SCENARIO_MONSTER_LAYOUTS[scenario.dungeonId] ?? {
+    return STORY_SCENARIO_MONSTER_LAYOUTS[scenario.dungeonId as keyof typeof STORY_SCENARIO_MONSTER_LAYOUTS] ?? {
         bossMonsterId: undefined,
         guardMonsterIds: ['303R', '313R', '434R'],
     };

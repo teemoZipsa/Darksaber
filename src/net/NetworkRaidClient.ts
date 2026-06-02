@@ -25,6 +25,8 @@ import {
 export type NetworkRaidStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
 export interface NetworkRaidJoinInput {
+    accessToken: string;
+    characterId: string;
     originHubId: string;
     partyComposition: ActorSnapshot[];
     carriedWeight?: number;
@@ -51,8 +53,8 @@ export interface NetworkRaidClientOptions {
 }
 
 const RESUME_TOKEN_KEY = 'darksaber_world_resume_token';
-const ACCOUNT_ID_KEY = 'darksaber_world_account_id';
-const ACCOUNT_SECRET_KEY = 'darksaber_world_account_secret';
+const LEGACY_ACCOUNT_ID_KEY = 'darksaber_world_account_id';
+const LEGACY_ACCOUNT_SECRET_KEY = 'darksaber_world_account_secret';
 const GRACE_MS = 30_000;
 const RECONNECT_INTERVAL_MS = 2_000;
 
@@ -63,8 +65,6 @@ export class NetworkRaidClient {
     private latestSeq = -1;
     private playerId: string | null = null;
     private resumeToken: string | null = null;
-    private accountId: string;
-    private accountSecret: string;
     private manualClose = false;
     private reconnecting = false;
     private reconnectTimer: number | null = null;
@@ -80,9 +80,7 @@ export class NetworkRaidClient {
         this.url = options.url ?? DEFAULT_WORLD_SERVER_URL;
         this.options = options;
         this.resumeToken = this.readStoredResumeToken();
-        const account = this.readOrCreateAccountCredentials();
-        this.accountId = account.accountId;
-        this.accountSecret = account.accountSecret;
+        this.clearLegacyAccountCredentials();
     }
 
     public getPlayerId(): string | null {
@@ -91,10 +89,6 @@ export class NetworkRaidClient {
 
     public getResumeToken(): string | null {
         return this.resumeToken;
-    }
-
-    public getAccountId(): string {
-        return this.accountId;
     }
 
     public getIsOpen(): boolean {
@@ -106,6 +100,9 @@ export class NetworkRaidClient {
     }
 
     public async connectAndJoin(input: NetworkRaidJoinInput): Promise<WorldWelcomeMessage> {
+        if (!input.accessToken || !input.characterId) {
+            throw new Error('Network join requires an access token and selected character.');
+        }
         if (this.pendingWelcome) {
             this.rejectPendingWelcome(new Error('Previous join request was superseded.'));
         }
@@ -167,7 +164,11 @@ export class NetworkRaidClient {
 
     private sendJoinOrReconnect(): void {
         if (this.reconnecting && this.resumeToken) {
-            this.send({ type: 'RECONNECT', resumeToken: this.resumeToken });
+            this.send({
+                type: 'RECONNECT',
+                resumeToken: this.resumeToken,
+                accessToken: this.joinInput?.accessToken,
+            });
             return;
         }
         const input = this.joinInput;
@@ -176,13 +177,13 @@ export class NetworkRaidClient {
             type: 'WORLD_JOIN',
             originHubId: input.originHubId,
             partyComposition: input.partyComposition,
+            accessToken: input.accessToken,
+            characterId: input.characterId,
             carriedWeight: input.carriedWeight,
             carriedItems: input.carriedItems,
             clientVersion: WORLD_PROTOCOL_VERSION,
             resumeToken: input.resumeToken,
             completedQuestIds: input.completedQuestIds,
-            accountId: this.accountId,
-            accountSecret: this.accountSecret,
             requestedRealm: input.requestedRealm,
         });
     }
@@ -271,7 +272,6 @@ export class NetworkRaidClient {
                 this.sessionEpoch = message.sessionEpoch;
                 this.playerId = message.playerId;
                 this.resumeToken = message.resumeToken;
-                if (message.accountId) this.accountId = message.accountId;
                 this.storeResumeToken(message.resumeToken);
                 this.clearReconnect();
                 this.setStatus('connected');
@@ -437,35 +437,18 @@ export class NetworkRaidClient {
         }
     }
 
-    private readOrCreateAccountCredentials(): { accountId: string; accountSecret: string } {
+    private clearLegacyAccountCredentials(): void {
         try {
-            const existingId = localStorage.getItem(ACCOUNT_ID_KEY);
-            const existingSecret = localStorage.getItem(ACCOUNT_SECRET_KEY);
-            if (existingId && existingSecret) return { accountId: existingId, accountSecret: existingSecret };
-            const accountId = `acct_${createRandomId(24)}`;
-            const accountSecret = createRandomId(48);
-            localStorage.setItem(ACCOUNT_ID_KEY, accountId);
-            localStorage.setItem(ACCOUNT_SECRET_KEY, accountSecret);
-            return { accountId, accountSecret };
+            localStorage.removeItem(LEGACY_ACCOUNT_ID_KEY);
+            localStorage.removeItem(LEGACY_ACCOUNT_SECRET_KEY);
         } catch {
-            return { accountId: `acct_${createRandomId(24)}`, accountSecret: createRandomId(48) };
+            // Ignore storage failures; the legacy account secret must not be recreated.
         }
     }
 }
 
 function createIntentId(): string {
     return `intent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function createRandomId(length: number): string {
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
-    const cryptoApi = globalThis.crypto;
-    if (cryptoApi?.getRandomValues) {
-        const bytes = new Uint8Array(length);
-        cryptoApi.getRandomValues(bytes);
-        return [...bytes].map((byte) => alphabet[byte % alphabet.length]).join('');
-    }
-    return Array.from({ length }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

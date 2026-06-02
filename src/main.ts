@@ -8,6 +8,7 @@ import { SettingsManager } from './engine/SettingsManager';
 import { TileAssetManager } from './map/TileAssetManager';
 import { DarksaberSpriteAtlas } from './ui/DarksaberSpriteAtlas';
 import { mountUiOverlay } from './ui/react/mountOverlay';
+import { mountAuthGate } from './ui/react/auth/mountAuthGate';
 
 async function init(): Promise<void> {
     SettingsManager.init();
@@ -40,6 +41,7 @@ async function init(): Promise<void> {
     // Mount the React DOM UI overlay and hand the store to the game loop.
     const uiStore = mountUiOverlay(manager);
     manager.attachUiStore(uiStore);
+    mountAuthGate(manager);
 
     // DEV-only debug handle — lets tooling drive/inspect the game in a headless
     // preview (paired with GameManager's hidden-tab loop fallback). Stripped in prod.

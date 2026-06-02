@@ -14,6 +14,7 @@ import { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
 import { ITEMS } from '../data/ItemDB';
+import { getClassLine } from '../data/ClassTree';
 import { getStoryCompanionRewards } from '../data/StoryQuestData';
 import { renderGameTitle } from '../ui/UITheme';
 import { t } from '../i18n/LanguageManager';
@@ -28,6 +29,14 @@ import { AudioManager } from './AudioManager';
 import type { UiStore } from '../ui/react/UiStore';
 import type { WorldTownSession } from './world/WorldTownSession';
 import type { WorldRaidSession } from './world/WorldRaidSession';
+import type { AccountProgress, AuthCharacter, CharacterSave, InventorySaveItem } from '../net/AuthClient';
+
+export interface AuthenticatedCharacterSession {
+    accessToken: string;
+    character: AuthCharacter;
+    save: CharacterSave;
+    accountProgress: AccountProgress;
+}
 
 export class GameManager {
     private canvas: HTMLCanvasElement;
@@ -64,6 +73,7 @@ export class GameManager {
     private settingsUI = new SettingsUI();
     private questJournalOpen = false;
     private startIntroTutorialOnWorldInit = false;
+    private networkAuthContext: { accessToken: string; characterId: string } | null = null;
 
     // React DOM UI overlay bridge (attached after construction in main.ts)
     private uiStore?: UiStore;
@@ -244,6 +254,33 @@ export class GameManager {
         this.transitionTo(GameState.WORLD, () => this.initWorldEngine());
     }
 
+    public enterAuthenticatedCharacter(session: AuthenticatedCharacterSession): void {
+        this.networkAuthContext = {
+            accessToken: session.accessToken,
+            characterId: session.character.id,
+        };
+        this.party.clear();
+        this.inventory.clear();
+        this.stash.clear();
+        this.loadRosterFromSave(session.character, session.save);
+        this.loadInventoryFromSave(session.save);
+        this.playerData.currentHubTownId = readTownId(session.save);
+        this.playerData.clearedStages = new Set(session.accountProgress.completedQuests);
+        this.syncStoryCompanionsToRoster();
+        this.onActiveCharacterChanged();
+        this.startIntroTutorialOnWorldInit = false;
+        this.transitionTo(GameState.WORLD, () => this.initWorldEngine());
+    }
+
+    public updateNetworkAccessToken(accessToken: string): void {
+        if (!this.networkAuthContext) return;
+        this.networkAuthContext = { ...this.networkAuthContext, accessToken };
+    }
+
+    public getNetworkAuthContext(): { accessToken: string; characterId: string } | null {
+        return this.networkAuthContext;
+    }
+
     public syncStoryCompanionsToRoster(): void {
         const roster = this.party.getRoster();
         for (const companion of getStoryCompanionRewards()) {
@@ -251,6 +288,49 @@ export class GameManager {
             if (roster.some((character) => character.id === companion.companionId)) continue;
             this.party.addToRoster(new Character(companion.companionId, t(companion.nameKey), companion.classId));
         }
+    }
+
+    private loadRosterFromSave(selectedCharacter: AuthCharacter, save: CharacterSave): void {
+        const rosterEntries = readRosterEntries(save, selectedCharacter);
+        const activeIds = readStringArray(save.partySnapshot.activeCharacterIds);
+        const characters = new Map<string, Character>();
+        for (const entry of rosterEntries) {
+            const character = new Character(entry.id, entry.name, entry.classKey);
+            character.gender = entry.gender;
+            character.currentTier = entry.tier;
+            character.level = entry.level;
+            character.exp = entry.exp;
+            character.expToNext = calcExpToNext(character.classLineId, character.currentTier, character.level);
+            character.stats = { ...character.stats, ...entry.baseStats };
+            this.party.addToRoster(character);
+            characters.set(character.id, character);
+        }
+
+        const deployIds = activeIds.length > 0 ? activeIds : [selectedCharacter.id];
+        for (const id of deployIds.slice(0, this.party.MAX_ACTIVE_PARTY_SIZE)) {
+            const character = characters.get(id);
+            if (character) this.party.deployCharacter(character);
+        }
+        if (this.party.getCharacters().length === 0) {
+            const fallback = characters.get(selectedCharacter.id) ?? this.party.getRoster()[0];
+            if (fallback) this.party.deployCharacter(fallback);
+        }
+        this.party.switchTo(0);
+    }
+
+    private loadInventoryFromSave(save: CharacterSave): void {
+        this.inventory.clear();
+        for (const entry of save.inventory.items) this.placeSavedInventoryItem(entry);
+    }
+
+    private placeSavedInventoryItem(entry: InventorySaveItem): void {
+        const item = ITEMS.find((candidate) => candidate.id === entry.itemId);
+        if (!item) return;
+        const placed = this.inventory.place(item, entry.gridX, entry.gridY) ?? this.inventory.autoPlace(item);
+        if (!placed) return;
+        placed.quantity = Math.max(1, Math.floor(entry.quantity));
+        placed.durability = Math.max(0, Math.min(item.maxDurability, Math.floor(entry.durability)));
+        placed.acquiredInRaid = entry.acquiredInRaid;
     }
 
     // ─── Pause menu (DOM overlay) ─────────────────────────────────
@@ -534,4 +614,77 @@ export class GameManager {
         this.ctx.restore();
     }
 
+}
+
+interface SavedRosterEntry {
+    id: string;
+    name: string;
+    classKey: string;
+    gender: string;
+    tier: number;
+    level: number;
+    exp: number;
+    baseStats: Partial<AuthCharacter['baseStats']>;
+}
+
+function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter): SavedRosterEntry[] {
+    const rawCharacters = Array.isArray(save.rosterSnapshot.characters) ? save.rosterSnapshot.characters : [];
+    const entries = rawCharacters.flatMap((raw): SavedRosterEntry[] => {
+        if (!isRecord(raw)) return [];
+        const id = typeof raw.id === 'string' ? raw.id : null;
+        const name = typeof raw.name === 'string' ? raw.name : null;
+        const classKey = typeof raw.classKey === 'string'
+            ? raw.classKey
+            : typeof raw.classLineId === 'string'
+                ? raw.classLineId
+                : null;
+        if (!id || !name || !classKey) return [];
+        return [{
+            id,
+            name,
+            classKey,
+            gender: typeof raw.gender === 'string' ? raw.gender : 'M',
+            tier: positiveInt(raw.tier ?? raw.currentTier, 1),
+            level: positiveInt(raw.level, 1),
+            exp: positiveInt(raw.exp, 0),
+            baseStats: isRecord(raw.baseStats) ? raw.baseStats : {},
+        }];
+    });
+    if (!entries.some((entry) => entry.id === selectedCharacter.id)) {
+        entries.unshift({
+            id: selectedCharacter.id,
+            name: selectedCharacter.name,
+            classKey: selectedCharacter.classKey,
+            gender: 'M',
+            tier: selectedCharacter.tier,
+            level: selectedCharacter.level,
+            exp: selectedCharacter.exp,
+            baseStats: selectedCharacter.baseStats,
+        });
+    }
+    return entries;
+}
+
+function readTownId(save: CharacterSave): string {
+    return typeof save.hubLocation.townId === 'string' ? save.hubLocation.townId : 'central_castle';
+}
+
+function readStringArray(value: unknown): string[] {
+    return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
+}
+
+function calcExpToNext(classLineId: string, currentTier: number, level: number): number {
+    const classLine = getClassLine(classLineId);
+    const tierIndex = classLine?.tiers.findIndex((tier) => tier.tier === currentTier) ?? 0;
+    const tierMult = Math.pow(1.15, Math.max(0, tierIndex));
+    const levelMult = Math.pow(1.08, Math.max(0, level - 1));
+    return Math.floor(50 * tierMult * levelMult);
+}
+
+function positiveInt(value: unknown, fallback: number): number {
+    return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
 }

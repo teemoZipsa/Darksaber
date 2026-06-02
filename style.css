@@ -35,3 +35,11 @@ canvas {
     pointer-events: none;
     cursor: url('/assets/images/ui/cursor32.png') 0 0, auto;
 }
+
+#auth-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+    cursor: url('/assets/images/ui/cursor32.png') 0 0, auto;
+}
