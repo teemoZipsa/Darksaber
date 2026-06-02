@@ -1,14 +1,22 @@
 import {
     applyStatus,
+    applyGuardToDamage,
+    applyStatuses,
+    applyStatusesToCarrier,
+    cleanseNegativeStatuses,
     createStatus,
     getEffectiveStats,
     getEffectiveStatsForEnemy,
+    hasStatus,
     type StatusEffect,
 } from '../src/combat/StatusEffects';
+import { resolveSkillEffect, type SkillEffectEnemyInput, type SkillEffectResult } from '../src/combat/SkillEffectResolver';
 import { CombatFormulas } from '../src/combat/CombatFormulas';
 import type { CharacterStats } from '../src/data/Stats';
 import { getClassLine } from '../src/data/ClassTree';
-import { getItemDef } from '../src/data/ItemDB';
+import { getSkillAttackProfile } from '../src/data/AttackPatternProfiles';
+import { getItemDef, getCombatRecovery, isCombatRecoveryConsumable } from '../src/data/ItemDB';
+import { getLearnedSkills, getSkill, type Skill } from '../src/data/SkillDB';
 import {
     BURGOS_BOSS_MONSTER_ID,
     BURGOS_CASTLE_DUNGEON_ID,
@@ -30,8 +38,10 @@ import {
     ATTACK_AP_COST,
     INTERACT_AP_COST,
     FIELD_MAX_ACTION_GAUGE,
+    MAGIC_ACTION_GAUGE_COST,
     MIN_FIELD_ACTION_GAUGE_COST,
     MOVE_ACTION_GAUGE_COST,
+    TOOL_ACTION_GAUGE_COST,
 } from '../src/field/FieldActionEconomy';
 import { FIELD_ATB_SCALE, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, ENEMY_LEASH_RANGE } from '../src/field/FieldConfig';
 import { decideEnemyAction, type EnemyAIDecision, type EnemyAIUnit } from '../src/field/EnemyAI';
@@ -46,18 +56,25 @@ import {
 } from '../src/field/FieldPathing';
 import { hasLineOfSight } from '../src/field/LineOfSight';
 import {
+    buildSkillTerrainContext,
+    getActorAttackTargetFailure as getSkillTargetFailure,
+    getSkillCandidateEnemies,
+} from '../src/field/FieldTargeting';
+import {
     getTerrainMoveCost,
     isTerrainLineOfSightBlocking,
     isTerrainPassable,
 } from '../src/field/TerrainRules';
 import { WorldMap } from '../src/map/WorldMap';
 import type { TownInfo } from '../src/map/BiomeMask';
+import type { WorldRealm } from '../src/map/BiomeMask';
 import {
     type ActorSnapshot,
     type ActionRejectedMessage,
     type AutoLootGrantMessage,
     type CombatEventMessage,
     type GridSnapshot,
+    type InventoryConsumedMessage,
     type LootGrantMessage,
     type LootSnapshot,
     type NetFacing,
@@ -86,6 +103,7 @@ interface ServerActor {
     localActorId: string;
     name: string;
     classLineId: string;
+    currentTier: number;
     level: number;
     tile: TilePoint;
     stats: CharacterStats;
@@ -99,12 +117,14 @@ interface ServerActor {
 
 interface ServerPlayer {
     id: string;
+    accountId?: string;
     resumeToken: string;
     originHubId: string;
     departureTownId: string;
     elapsedSeconds: number;
     kills: number;
     carriedWeight: number;
+    carriedItems: Map<string, number>;
     completedQuestIds: Set<string>;
     enteredDungeonIds: Set<string>;
     completedDungeonIds: Set<string>;
@@ -162,13 +182,21 @@ export interface WorldSessionDebugCounts {
 }
 
 export interface WorldSessionOptions {
+    realm?: WorldRealm;
     ghostGraceMs?: number;
     logger?: (message: string) => void;
 }
 
+export interface WorldJoinContext {
+    accountId?: string;
+    completedQuestIds?: string[];
+    shardId?: string;
+}
+
 export class WorldSession {
     public readonly sessionEpoch = Date.now();
-    private readonly worldMap = new WorldMap();
+    private readonly worldMap: WorldMap;
+    private readonly shardId: string;
     private readonly players = new Map<string, ServerPlayer>();
     private readonly actors = new Map<string, ServerActor>();
     private readonly enemies = new Map<string, ServerEnemy>();
@@ -188,11 +216,13 @@ export class WorldSession {
     private readonly logger: (message: string) => void;
 
     constructor(options: WorldSessionOptions = {}) {
+        this.worldMap = new WorldMap(options.realm ?? 'mortal');
+        this.shardId = `${this.worldMap.getRealm()}`;
         this.ghostGraceMs = options.ghostGraceMs ?? DISCONNECT_GRACE_MS;
         this.logger = options.logger ?? (() => undefined);
     }
 
-    public join(message: WorldJoinMessage, now: number = Date.now()): { playerId: string; welcome: WorldWelcomeMessage } {
+    public join(message: WorldJoinMessage, now: number = Date.now(), context: WorldJoinContext = {}): { playerId: string; welcome: WorldWelcomeMessage } {
         const resumed = message.resumeToken ? this.findResumablePlayer(message.resumeToken, now) : null;
         if (resumed) {
             resumed.ghost = false;
@@ -207,6 +237,10 @@ export class WorldSession {
                     sessionEpoch: this.sessionEpoch,
                     resumeToken: resumed.resumeToken,
                     spawnTile,
+                    accountId: context.accountId,
+                    shardId: context.shardId ?? this.shardId,
+                    realm: this.worldMap.getRealm(),
+                    completedQuestIds: [...resumed.completedQuestIds],
                 },
             };
         }
@@ -217,13 +251,15 @@ export class WorldSession {
         const spawnTile = this.getOriginExitTile(originHubId);
         const player: ServerPlayer = {
             id: playerId,
+            accountId: context.accountId,
             resumeToken,
             originHubId,
             departureTownId: originHubId,
             elapsedSeconds: 0,
             kills: 0,
             carriedWeight: sanitizeCarriedWeight(message.carriedWeight),
-            completedQuestIds: new Set(sanitizeStringArray(message.completedQuestIds)),
+            carriedItems: sanitizeCarriedItems(message.carriedItems),
+            completedQuestIds: new Set(sanitizeStringArray(context.completedQuestIds ?? message.completedQuestIds)),
             enteredDungeonIds: new Set(),
             completedDungeonIds: new Set(),
             activeDungeonId: null,
@@ -247,9 +283,10 @@ export class WorldSession {
                 localActorId: snapshot.id,
                 name: snapshot.name,
                 classLineId: snapshot.classLineId,
+                currentTier: sanitizeTier(snapshot.currentTier),
                 level: snapshot.level,
                 tile,
-                    stats: syncStatsMovementToClass(snapshot.stats, snapshot.classLineId),
+                stats: syncStatsMovementToClass(snapshot.stats, snapshot.classLineId),
                 statuses: cloneStatuses(snapshot.statuses),
                 actionGauge: 0,
                 remainingAp: 0,
@@ -271,6 +308,10 @@ export class WorldSession {
                 sessionEpoch: this.sessionEpoch,
                 resumeToken,
                 spawnTile,
+                accountId: context.accountId,
+                shardId: context.shardId ?? this.shardId,
+                realm: this.worldMap.getRealm(),
+                completedQuestIds: [...player.completedQuestIds],
             },
         };
     }
@@ -290,6 +331,8 @@ export class WorldSession {
                 sessionEpoch: this.sessionEpoch,
                 resumeToken: player.resumeToken,
                 spawnTile,
+                realm: this.worldMap.getRealm(),
+                completedQuestIds: [...player.completedQuestIds],
             },
         };
     }
@@ -509,7 +552,9 @@ export class WorldSession {
             case 'endTurn':
                 return { replies: [], broadcasts: [] };
             case 'useItem':
-                return reject(message.intentId, 'useItem is not available in network raid V1.');
+                return this.handleUseItemIntent(player!, actor!, message.intentId, message.payload);
+            case 'castSkill':
+                return this.handleCastSkillIntent(player!, actor!, message.intentId, message.payload, now);
         }
     }
 
@@ -574,6 +619,100 @@ export class WorldSession {
         return { replies: autoLootGrant ? [autoLootGrant] : [], broadcasts: [event] };
     }
 
+    private handleUseItemIntent(player: ServerPlayer, actor: ServerActor, intentId: string, payload: unknown): WorldSessionMessageResult {
+        const itemId = readStringPayload(payload, 'itemId');
+        if (!itemId) return reject(intentId, 'Use item payload must include itemId.');
+        if ((player.carriedItems.get(itemId) ?? 0) <= 0) return reject(intentId, 'Item is not available on this server session.');
+
+        const item = getItemDef(itemId);
+        if (!item || !isCombatRecoveryConsumable(item)) return reject(intentId, 'Item cannot be used in combat.');
+        if (actor.remainingAp < TOOL_ACTION_GAUGE_COST) return reject(intentId, 'No action available to use item.');
+
+        const recovery = getCombatRecovery(item);
+        const effective = getEffectiveStats(actor.stats, actor.statuses);
+        const effectiveHp = Math.max(0, Math.min(recovery.hp, effective.maxHp - actor.stats.hp));
+        const effectiveMp = Math.max(0, Math.min(recovery.mp, effective.maxMp - actor.stats.mp));
+        if (effectiveHp <= 0 && effectiveMp <= 0) return reject(intentId, 'Item has no effect.');
+
+        this.spendActorGauge(actor, TOOL_ACTION_GAUGE_COST);
+        actor.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.stats.hp + effectiveHp));
+        actor.stats.mp = Math.max(0, Math.min(effective.maxMp, actor.stats.mp + effectiveMp));
+        this.addCarriedItemQuantity(player.id, itemId, -1);
+        this.finishActorIfSpent(actor);
+
+        const consumed: InventoryConsumedMessage = { type: 'INVENTORY_CONSUMED', itemId, quantity: 1 };
+        const event: CombatEventMessage = {
+            type: 'COMBAT_EVENT',
+            kind: effectiveHp > 0 ? 'heal' : 'status',
+            sourceId: actor.id,
+            targetId: actor.id,
+            sourceName: actor.name,
+            targetName: actor.name,
+            value: effectiveHp > 0 ? effectiveHp : effectiveMp,
+        };
+        return { replies: [consumed], broadcasts: [event] };
+    }
+
+    private handleCastSkillIntent(
+        player: ServerPlayer,
+        actor: ServerActor,
+        intentId: string,
+        payload: unknown,
+        now: number
+    ): WorldSessionMessageResult {
+        const skillId = readStringPayload(payload, 'skillId');
+        if (!skillId) return reject(intentId, 'Cast skill payload must include skillId.');
+        const skill = getSkill(skillId);
+        if (!skill) return reject(intentId, 'Skill does not exist.');
+        if (!this.getLearnedSkillIds(actor).has(skill.id)) return reject(intentId, 'Skill is not learned by this actor.');
+        if (hasStatus(actor.statuses, 'silence')) return reject(intentId, 'Actor is silenced.');
+        if (actor.remainingAp < MAGIC_ACTION_GAUGE_COST) return reject(intentId, 'No action available to cast skill.');
+        if (actor.stats.mp < skill.mpCost) return reject(intentId, 'Actor does not have enough MP.');
+
+        const requiresTarget = skill.type === 'damage' || skill.type === 'debuff' || skill.type === 'aoe';
+        const targetId = readStringPayload(payload, 'targetId') ?? readStringPayload(payload, 'enemyId');
+        const target = targetId ? this.enemies.get(targetId) : undefined;
+        if (requiresTarget) {
+            if (!targetId) return reject(intentId, 'Cast skill payload must include targetId.');
+            if (!target || target.enemy.stats.hp <= 0) return reject(intentId, 'Target is not alive.');
+        }
+
+        const targetTile = target ? { x: target.enemy.gridX, y: target.enemy.gridY } : undefined;
+        const profile = getSkillAttackProfile(skill);
+        if (target && targetTile) {
+            const failure = getSkillTargetFailure({
+                profile,
+                context: this.getSkillPatternContext(actor),
+                selectedContext: this.getSkillPatternContext(actor, targetTile),
+                target: targetTile,
+            });
+            if (failure) return reject(intentId, 'Skill target is not valid.');
+        }
+
+        const aliveEnemies = [...this.enemies.values()].filter((entry) => entry.enemy.stats.hp > 0);
+        const targetEnemies = target && targetTile
+            ? getSkillCandidateEnemies(aliveEnemies.map((entry) => entry.enemy), profile, this.getSkillPatternContext(actor, targetTile), target.enemy)
+            : [];
+        const effect = resolveSkillEffect({
+            casterStats: this.getCasterSkillStats(actor),
+            skill,
+            targetEnemy: target ? this.toSkillEnemyInput(target.enemy) : undefined,
+            allEnemies: targetEnemies.map((enemy) => this.toSkillEnemyInput(enemy)),
+            targetsResolvedByPattern: Boolean(target),
+            terrainContext: buildSkillTerrainContext({
+                casterTile: actor.tile,
+                targetEnemies,
+                targetEnemy: target?.enemy,
+                getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
+            }),
+        });
+
+        this.spendActorGauge(actor, MAGIC_ACTION_GAUGE_COST);
+        const result = this.applySkillEffect(player, actor, skill, effect, now);
+        this.finishActorIfSpent(actor);
+        return result;
+    }
+
     private handleInteractIntent(
         playerId: string,
         actor: ServerActor,
@@ -621,6 +760,7 @@ export class WorldSession {
         if (!placed) return reject(intentId, 'No item at requested loot cell.');
         lootObject.inventory.remove(placed);
         this.addCarriedWeight(playerId, getPlacedItemWeight(placed));
+        this.addCarriedItemQuantity(playerId, placed.item.id, placed.quantity);
         lock.lastTouchedAt = now;
         lootObject.opened = lootObject.inventory.items.length === 0;
         if (lootObject.opened) this.lootLocks.delete(lootId);
@@ -652,6 +792,7 @@ export class WorldSession {
             lootObject.inventory.remove(placed);
             removed.add(placed);
             acceptedWeight += getPlacedItemWeight(placed);
+            this.addCarriedItemQuantity(playerId, placed.item.id, placed.quantity);
         }
         this.addCarriedWeight(playerId, acceptedWeight);
 
@@ -709,6 +850,83 @@ export class WorldSession {
         return null;
     }
 
+    private applySkillEffect(
+        player: ServerPlayer,
+        actor: ServerActor,
+        skill: Skill,
+        effect: SkillEffectResult,
+        now: number
+    ): WorldSessionMessageResult {
+        const broadcasts: CombatEventMessage[] = [];
+        const replies: WorldServerMessage[] = [];
+        this.applyActorResourceDelta(actor, effect.casterHpDelta, effect.casterMpDelta);
+        if (effect.casterHpDelta > 0) {
+            broadcasts.push(createActorEvent('heal', actor, actor, effect.casterHpDelta));
+        } else if (effect.casterHpDelta < 0) {
+            broadcasts.push(createActorEvent('damage', actor, actor, Math.abs(effect.casterHpDelta)));
+        }
+
+        if (effect.cleansesCasterStatuses) {
+            actor.statuses = cleanseNegativeStatuses(actor.statuses);
+            broadcasts.push(createActorEvent('status', actor, actor));
+        }
+
+        if (effect.casterStatusEffects && effect.casterStatusEffects.length > 0) {
+            const targets = skill.targetScope === 'selfAndNearbyAllies'
+                ? this.getAlliedActorsWithin(player, actor, skill.allyRadius ?? 0)
+                : [actor];
+            for (const target of targets) {
+                applyStatusesToCarrier(target, effect.casterStatusEffects);
+                broadcasts.push(createActorEvent('status', actor, target, undefined, effect.casterStatusEffects[0]));
+            }
+        }
+
+        for (const enemyResult of effect.enemyResults) {
+            const target = this.enemies.get(enemyResult.enemyId);
+            if (!target) continue;
+            const enemy = target.enemy;
+
+            if (enemyResult.isMiss) {
+                broadcasts.push(createEnemyEvent('miss', actor, enemy, 0));
+                continue;
+            }
+
+            if (enemyResult.statusEffects && enemyResult.statusEffects.length > 0) {
+                enemy.statuses = applyStatuses(enemy.statuses, enemyResult.statusEffects);
+                broadcasts.push(createEnemyEvent('status', actor, enemy, undefined, enemyResult.statusEffects[0]));
+            }
+
+            if (enemyResult.mpDamage !== undefined && enemyResult.mpDamage > 0) {
+                const drainedMp = Math.min(enemy.stats.mp, enemyResult.mpDamage);
+                enemy.stats.mp = Math.max(0, enemy.stats.mp - drainedMp);
+                this.applyActorResourceDelta(actor, 0, drainedMp);
+                if (drainedMp > 0) broadcasts.push(createEnemyEvent('status', actor, enemy, drainedMp));
+            }
+
+            const guarded = applyGuardToDamage(enemy.statuses, enemyResult.damage);
+            enemy.statuses = guarded.statuses;
+            const dead = enemy.takeDamage(guarded.damage);
+            if (enemyResult.casterHpRestore !== undefined && enemyResult.casterHpRestore > 0) {
+                this.applyActorResourceDelta(actor, enemyResult.casterHpRestore, 0);
+                broadcasts.push(createActorEvent('heal', actor, actor, enemyResult.casterHpRestore));
+            }
+            if (enemyResult.casterMpRestore !== undefined && enemyResult.casterMpRestore > 0) {
+                this.applyActorResourceDelta(actor, 0, enemyResult.casterMpRestore);
+                broadcasts.push(createActorEvent('status', actor, actor, enemyResult.casterMpRestore));
+            }
+            if (dead) {
+                broadcasts.push(createEnemyEvent('kill', actor, enemy, guarded.damage));
+                const autoLootGrant = this.completeEnemyKill(actor, target, now);
+                if (autoLootGrant) replies.push(autoLootGrant);
+            } else if (guarded.damage > 0 || (!enemyResult.statusEffects && enemyResult.mpDamage === undefined)) {
+                broadcasts.push(createEnemyEvent('damage', actor, enemy, guarded.damage));
+            }
+        }
+
+        if (broadcasts.length === 0 && skill.type === 'buff') broadcasts.push(createActorEvent('status', actor, actor));
+        return { replies, broadcasts };
+    }
+
     private resolveActorAttack(actor: ServerActor, target: ServerEnemy, now: number): { event: CombatEventMessage; autoLootGrant?: AutoLootGrantMessage } {
         const enemy = target.enemy;
         const result = CombatFormulas.calcPhysicalDamage(
@@ -731,18 +949,24 @@ export class WorldSession {
             enemy.takeDamage(result.damage);
             if (enemy.stats.hp <= 0) {
                 event.kind = 'kill';
-                this.enemies.delete(enemy.id);
-                if (target.nestKey) this.markNestEnemyKilled(target.nestKey, enemy.id, now);
-                if (target.scenarioPlayerId && target.scenarioDungeonId) this.markScenarioEnemyKilled(target, enemy.id);
-                const player = this.players.get(actor.ownerPlayerId);
-                if (player) player.kills += 1;
-                autoLootGrant = enemy.isBoss
-                    ? undefined
-                    : this.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
-                if (enemy.isBoss || !autoLootGrant) this.spawnEnemyLoot(enemy);
+                autoLootGrant = this.completeEnemyKill(actor, target, now);
             }
         }
         return { event, autoLootGrant };
+    }
+
+    private completeEnemyKill(actor: ServerActor, target: ServerEnemy, now: number): AutoLootGrantMessage | undefined {
+        const enemy = target.enemy;
+        this.enemies.delete(enemy.id);
+        if (target.nestKey) this.markNestEnemyKilled(target.nestKey, enemy.id, now);
+        if (target.scenarioPlayerId && target.scenarioDungeonId) this.markScenarioEnemyKilled(target, enemy.id);
+        const player = this.players.get(actor.ownerPlayerId);
+        if (player) player.kills += 1;
+        const autoLootGrant = enemy.isBoss
+            ? undefined
+            : this.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
+        if (enemy.isBoss || !autoLootGrant) this.spawnEnemyLoot(enemy);
+        return autoLootGrant;
     }
 
     private resolveEnemyTurn(entry: ServerEnemy, now: number): CombatEventMessage[] {
@@ -993,6 +1217,17 @@ export class WorldSession {
 
     private hasFieldLineOfSight(from: TilePoint, to: TilePoint): boolean {
         return hasLineOfSight(from, to, (tile) => isTerrainLineOfSightBlocking(this.worldMap.getTileAt(tile.x, tile.y)));
+    }
+
+    private getSkillPatternContext(actor: ServerActor, selectedTile?: TilePoint) {
+        const bounds = this.worldMap.getBoundsTiles();
+        return {
+            casterTile: actor.tile,
+            selectedTile,
+            isInsideMap: (tile: TilePoint) => tile.x >= 0 && tile.y >= 0 && tile.x < bounds.width && tile.y < bounds.height,
+            isBlockingTile: (tile: TilePoint) => isTerrainLineOfSightBlocking(this.worldMap.getTileAt(tile.x, tile.y)),
+            hasLineOfSight: (from: TilePoint, to: TilePoint) => this.hasFieldLineOfSight(from, to),
+        };
     }
 
     private finishActorIfSpent(actor: ServerActor): void {
@@ -1376,6 +1611,63 @@ export class WorldSession {
         player.carriedWeight = sanitizeCarriedWeight(player.carriedWeight + weight);
     }
 
+    private addCarriedItemQuantity(playerId: string, itemId: string, quantity: number): void {
+        const player = this.players.get(playerId);
+        if (!player || !itemId || !Number.isFinite(quantity) || quantity === 0) return;
+        const next = Math.max(0, (player.carriedItems.get(itemId) ?? 0) + Math.floor(quantity));
+        if (next > 0) player.carriedItems.set(itemId, next);
+        else player.carriedItems.delete(itemId);
+    }
+
+    private getLearnedSkillIds(actor: ServerActor): Set<string> {
+        const classLine = getClassLine(actor.classLineId);
+        const unlocked: string[] = [];
+        if (classLine) {
+            for (let tier = 1; tier <= actor.currentTier; tier++) {
+                const ids = classLine.skillUnlocks[tier];
+                if (ids) unlocked.push(...ids);
+            }
+        }
+        return new Set(getLearnedSkills(actor.classLineId, actor.currentTier, unlocked).map((skill) => skill.id));
+    }
+
+    private getCasterSkillStats(actor: ServerActor): CharacterStats {
+        const effective = getEffectiveStats(actor.stats, actor.statuses);
+        return {
+            ...effective,
+            hp: actor.stats.hp,
+            mp: actor.stats.mp,
+        };
+    }
+
+    private toSkillEnemyInput(enemy: Enemy): SkillEffectEnemyInput {
+        return {
+            id: enemy.id,
+            name: enemy.name,
+            gridX: enemy.gridX,
+            gridY: enemy.gridY,
+            stats: getEffectiveStatsForEnemy(enemy),
+        };
+    }
+
+    private applyActorResourceDelta(actor: ServerActor, hpDelta: number, mpDelta: number): void {
+        const effective = getEffectiveStats(actor.stats, actor.statuses);
+        actor.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.stats.hp + hpDelta));
+        actor.stats.mp = Math.max(0, Math.min(effective.maxMp, actor.stats.mp + mpDelta));
+        actor.isDead = actor.stats.hp <= 0;
+    }
+
+    private getAlliedActorsWithin(player: ServerPlayer, caster: ServerActor, radius: number): ServerActor[] {
+        return player.actorIds
+            .map((actorId) => this.actors.get(actorId))
+            .filter((actor): actor is ServerActor =>
+                Boolean(actor)
+                && !actor.isDead
+                && actor.stats.hp > 0
+                && manhattan(caster.tile, actor.tile) <= radius
+            );
+    }
+
     private consumeTickDelta(now: number): number {
         if (this.lastTickAt === null) {
             this.lastTickAt = now;
@@ -1394,6 +1686,7 @@ export class WorldSession {
             localActorId: actor.localActorId,
             name: actor.name,
             classLineId: actor.classLineId,
+            currentTier: actor.currentTier,
             level: actor.level,
             tile: { ...actor.tile },
             stats: cloneStats(actor.stats),
@@ -1469,6 +1762,44 @@ function reject(intentId: string, reason: string): WorldSessionMessageResult {
     return {
         replies: [{ type: 'ACTION_REJECTED', intentId, reason } satisfies ActionRejectedMessage],
         broadcasts: [],
+    };
+}
+
+function createActorEvent(
+    kind: string,
+    source: ServerActor,
+    target: ServerActor,
+    value?: number,
+    statusEffect?: StatusEffect
+): CombatEventMessage {
+    return {
+        type: 'COMBAT_EVENT',
+        kind,
+        sourceId: source.id,
+        targetId: target.id,
+        sourceName: source.name,
+        targetName: target.name,
+        value,
+        statusEffect,
+    };
+}
+
+function createEnemyEvent(
+    kind: string,
+    source: ServerActor,
+    target: Enemy,
+    value?: number,
+    statusEffect?: StatusEffect
+): CombatEventMessage {
+    return {
+        type: 'COMBAT_EVENT',
+        kind,
+        sourceId: source.id,
+        targetId: target.id,
+        sourceName: source.name,
+        targetName: target.name,
+        value,
+        statusEffect,
     };
 }
 
@@ -1606,6 +1937,28 @@ function sanitizeCarriedWeight(value: unknown): number {
     return Math.max(0, Math.round(value * 10) / 10);
 }
 
+function sanitizeCarriedItems(value: unknown): Map<string, number> {
+    const items = new Map<string, number>();
+    if (!Array.isArray(value)) return items;
+    for (const entry of value) {
+        if (!entry || typeof entry !== 'object') continue;
+        const record = entry as Record<string, unknown>;
+        const itemId = typeof record.itemId === 'string' ? record.itemId.trim() : '';
+        if (!itemId || !getItemDef(itemId)) continue;
+        const quantity = typeof record.quantity === 'number' && Number.isFinite(record.quantity)
+            ? Math.floor(record.quantity)
+            : 0;
+        if (quantity <= 0) continue;
+        items.set(itemId, Math.min(999, (items.get(itemId) ?? 0) + quantity));
+    }
+    return items;
+}
+
+function sanitizeTier(value: unknown): number {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return 1;
+    return Math.max(1, Math.min(10, Math.floor(value)));
+}
+
 function sanitizeStringArray(value: unknown): string[] {
     return Array.isArray(value)
         ? value.filter((entry): entry is string => typeof entry === 'string')
@@ -1617,6 +1970,7 @@ function createFallbackActorSnapshot(): ActorSnapshot {
         id: 'fallback_actor',
         name: 'Adventurer',
         classLineId: 'infantry',
+        currentTier: 1,
         level: 1,
         tile: { x: 0, y: 0 },
         stats: {

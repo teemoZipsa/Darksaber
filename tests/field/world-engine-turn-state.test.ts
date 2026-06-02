@@ -73,6 +73,7 @@ function makeActorSnapshot(overrides: Partial<ActorSnapshot> = {}): ActorSnapsho
         id: 'server-hero',
         name: 'hero',
         classLineId: 'infantry',
+        currentTier: 1,
         level: 1,
         tile: { x: 3, y: 4 },
         stats: new Character('snapshot-hero', 'hero', 'infantry').stats,

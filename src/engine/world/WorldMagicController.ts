@@ -42,6 +42,7 @@ export interface WorldMagicContext {
     spendAp: (cost: number) => boolean;
     isMajorActionUsed: () => boolean;
     markMajorActionUsed: () => void;
+    submitNetworkSkillIntent?: (actor: FieldActor, skill: Skill, targetEnemy?: Enemy) => boolean;
     reopenActionMenu: (actor: FieldActor) => void;
     resumeOrEndActiveTurn: (actor: FieldActor) => void;
     handleEnemyDefeated: (actor: FieldActor, enemy: Enemy, feedbackGroupId?: string) => void;
@@ -247,6 +248,12 @@ export class WorldMagicController {
         }
         if ((skill.type === 'damage' || skill.type === 'debuff' || skill.type === 'aoe') && !targetEnemy) {
             this.sink.log('대상 없음!');
+            return;
+        }
+
+        if (this.context.submitNetworkSkillIntent?.(actor, skill, targetEnemy)) {
+            this.reset();
+            this.context.onActionCompleted?.('magic');
             return;
         }
 

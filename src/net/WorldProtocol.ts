@@ -7,7 +7,9 @@ import type { WorldLootContainerType } from '../loot/WorldLootTypes';
 const configuredWorldServerUrl = import.meta.env?.VITE_WORLD_SERVER_URL?.trim();
 
 export const DEFAULT_WORLD_SERVER_URL = configuredWorldServerUrl || (import.meta.env?.DEV ? 'ws://localhost:8765' : '');
-export const WORLD_PROTOCOL_VERSION = 'world-pve-v2';
+export const WORLD_PROTOCOL_VERSION = 'world-pve-v3';
+
+export type WorldRealmId = 'mortal' | 'master';
 
 export interface NetTilePoint {
     x: number;
@@ -32,12 +34,18 @@ export interface GridSnapshot {
     items: GridItemSnapshot[];
 }
 
+export interface InventoryItemCountSnapshot {
+    itemId: string;
+    quantity: number;
+}
+
 export interface ActorSnapshot {
     id: string;
     ownerPlayerId?: string;
     localActorId?: string;
     name: string;
     classLineId: string;
+    currentTier: number;
     level: number;
     tile: NetTilePoint;
     stats: CharacterStats;
@@ -119,6 +127,10 @@ export interface WorldJoinMessage {
     carriedWeight?: number;
     resumeToken?: string;
     completedQuestIds?: string[];
+    accountId?: string;
+    accountSecret?: string;
+    requestedRealm?: WorldRealmId;
+    carriedItems?: InventoryItemCountSnapshot[];
 }
 
 export interface ReconnectMessage {
@@ -131,7 +143,7 @@ export interface WorldLeaveMessage {
     reason: 'town' | 'wipe' | 'manual';
 }
 
-export type PlayerIntentKind = 'move' | 'attack' | 'interact' | 'useItem' | 'endTurn';
+export type PlayerIntentKind = 'move' | 'attack' | 'interact' | 'useItem' | 'castSkill' | 'endTurn';
 
 export interface PlayerIntentMessage {
     type: 'PLAYER_INTENT';
@@ -223,6 +235,10 @@ export interface WorldWelcomeMessage {
     sessionEpoch: number;
     resumeToken: string;
     spawnTile: NetTilePoint;
+    accountId?: string;
+    shardId?: string;
+    realm?: WorldRealmId;
+    completedQuestIds?: string[];
 }
 
 export interface WorldSnapshotMessage {
@@ -247,6 +263,12 @@ export interface AutoLootGrantMessage {
     lootId: string;
     sourceName: string;
     gridSnapshot: GridSnapshot;
+}
+
+export interface InventoryConsumedMessage {
+    type: 'INVENTORY_CONSUMED';
+    itemId: string;
+    quantity: number;
 }
 
 export interface CombatEventMessage {
@@ -300,6 +322,7 @@ export type WorldServerMessage =
     | ActionRejectedMessage
     | LootGrantMessage
     | AutoLootGrantMessage
+    | InventoryConsumedMessage
     | CombatEventMessage
     | RaidResultMessage
     | WorldErrorMessage

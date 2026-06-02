@@ -12,6 +12,7 @@ function actor(id: string, overrides: Partial<ActorSnapshot> = {}): ActorSnapsho
         localActorId: id,
         name: id,
         classLineId: 'infantry',
+        currentTier: 1,
         level: 1,
         tile: { x: 0, y: 0 },
         stats: createBaseStats({ spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
@@ -94,23 +95,45 @@ test('intent ownership rejects another player actor', () => {
     assert.equal(result.replies[0]?.type, 'ACTION_REJECTED');
 });
 
-test('unsupported useItem intent is rejected cleanly when actor is ready', () => {
+test('useItem intent consumes server-owned carried inventory and heals actor', () => {
     const session = new WorldSession();
-    const a = session.join(joinMessage('central_castle', 'hero-a'), 0);
-    session.tick(0);
-    session.tick(1_000);
-    const actorId = session.createSnapshot(a.playerId, 1_000).partyActors.find((entry) => entry.ownerPlayerId === a.playerId)!.id;
+    const a = session.join({
+        ...joinMessage('central_castle', 'hero-a'),
+        carriedItems: [{ itemId: 'herb_common', quantity: 1 }],
+        partyComposition: [actor('hero-a', {
+            stats: createBaseStats({ hp: 10, maxHp: 100, mp: 0, maxMp: 20, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === a.playerId);
+    assert.ok(serverActor);
+    serverActor.actionGauge = 100;
+    serverActor.remainingAp = 80;
 
     const result = session.handleMessage(a.playerId, {
         type: 'PLAYER_INTENT',
         intentId: 'use-item',
-        actorId,
+        actorId: serverActor.id,
         kind: 'useItem',
         payload: { itemId: 'herb_common' },
     }, 1_000);
 
-    assert.equal(result.replies[0]?.type, 'ACTION_REJECTED');
-    assert.match(result.replies[0]?.type === 'ACTION_REJECTED' ? result.replies[0].reason : '', /useItem/);
+    assert.equal(result.replies[0]?.type, 'INVENTORY_CONSUMED');
+    assert.equal(result.broadcasts[0]?.type, 'COMBAT_EVENT');
+    assert.equal(result.broadcasts[0]?.type === 'COMBAT_EVENT' ? result.broadcasts[0].kind : '', 'heal');
+    assert.ok(session.createSnapshot(a.playerId, 1_000).partyActors.find((entry) => entry.id === serverActor.id)!.stats.hp > 10);
+
+    serverActor.actionGauge = 100;
+    serverActor.remainingAp = 80;
+    const rejected = session.handleMessage(a.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'use-item-again',
+        actorId: serverActor.id,
+        kind: 'useItem',
+        payload: { itemId: 'herb_common' },
+    }, 1_010);
+    assert.equal(rejected.replies[0]?.type, 'ACTION_REJECTED');
+    assert.match(rejected.replies[0]?.type === 'ACTION_REJECTED' ? rejected.replies[0].reason : '', /not available/);
 });
 
 test('session logs lifecycle events and exposes debug counts', () => {
@@ -287,6 +310,43 @@ test('network kills auto-grant normal enemy loot and include display names in co
     }, 1_050);
 
     assert.equal(session.createSnapshot(joined.playerId, 1_050).loot.some((loot) => loot.id === grant.lootId), false);
+});
+
+test('castSkill intent is resolved by server skill rules', () => {
+    const session = new WorldSession();
+    const joined = session.join({
+        ...joinMessage('central_castle', 'hero-a'),
+        partyComposition: [actor('hero-a', {
+            name: 'Hero Alpha',
+            currentTier: 3,
+            stats: createBaseStats({ atk: 999, mp: 50, maxMp: 50, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const serverEnemyEntry = [...internals.enemies.values()][0];
+    assert.ok(serverActor);
+    assert.ok(serverEnemyEntry);
+    serverActor.actionGauge = 100;
+    serverActor.remainingAp = 80;
+    serverEnemyEntry.enemy.stats.hp = 1;
+    serverEnemyEntry.enemy.stats.def = 0;
+    serverEnemyEntry.enemy.stats.spd = 0;
+    serverActor.tile = { x: serverEnemyEntry.enemy.gridX - 1, y: serverEnemyEntry.enemy.gridY };
+
+    const result = withFixedRandom(0, () => session.handleMessage(joined.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'cast-inf-t3',
+        actorId: serverActor.id,
+        kind: 'castSkill',
+        payload: { skillId: 'inf_t3', targetId: serverEnemyEntry.enemy.id },
+    }, 1_000));
+
+    const event = result.broadcasts.find((message) => message.type === 'COMBAT_EVENT' && message.kind === 'kill');
+    assert.equal(event?.type, 'COMBAT_EVENT');
+    assert.equal(event?.sourceName, 'Hero Alpha');
+    assert.equal(event?.targetName, serverEnemyEntry.enemy.name);
+    assert.equal(session.createSnapshot(joined.playerId, 1_000).partyActors.find((entry) => entry.id === serverActor.id)?.stats.mp, 40);
 });
 
 test('server-owned scenario entry spawns objective enemies and records completion for raid result', () => {

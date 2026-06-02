@@ -6,11 +6,14 @@ import {
     type AutoLootCell,
     type AutoLootGrantMessage,
     type CombatEventMessage,
+    type InventoryConsumedMessage,
+    type InventoryItemCountSnapshot,
     type LootGrantMessage,
     type MarketRecordAckMessage,
     type MarketSnapshotMessage,
     type PlayerIntentKind,
     type RaidResultMessage,
+    type WorldRealmId,
     type WorldClientMessage,
     type WorldErrorMessage,
     type WorldLeaveMessage,
@@ -25,8 +28,10 @@ export interface NetworkRaidJoinInput {
     originHubId: string;
     partyComposition: ActorSnapshot[];
     carriedWeight?: number;
+    carriedItems?: InventoryItemCountSnapshot[];
     resumeToken?: string;
     completedQuestIds?: string[];
+    requestedRealm?: WorldRealmId;
 }
 
 export interface NetworkRaidClientOptions {
@@ -35,6 +40,7 @@ export interface NetworkRaidClientOptions {
     onCombatEvent?: (event: CombatEventMessage) => void;
     onLootGrant?: (grant: LootGrantMessage) => void;
     onAutoLootGrant?: (grant: AutoLootGrantMessage) => void;
+    onInventoryConsumed?: (message: InventoryConsumedMessage) => void;
     onRaidResult?: (result: RaidResultMessage) => void;
     onMarketSnapshot?: (message: MarketSnapshotMessage) => void;
     onMarketRecordAck?: (message: MarketRecordAckMessage) => void;
@@ -45,6 +51,8 @@ export interface NetworkRaidClientOptions {
 }
 
 const RESUME_TOKEN_KEY = 'darksaber_world_resume_token';
+const ACCOUNT_ID_KEY = 'darksaber_world_account_id';
+const ACCOUNT_SECRET_KEY = 'darksaber_world_account_secret';
 const GRACE_MS = 30_000;
 const RECONNECT_INTERVAL_MS = 2_000;
 
@@ -55,6 +63,8 @@ export class NetworkRaidClient {
     private latestSeq = -1;
     private playerId: string | null = null;
     private resumeToken: string | null = null;
+    private accountId: string;
+    private accountSecret: string;
     private manualClose = false;
     private reconnecting = false;
     private reconnectTimer: number | null = null;
@@ -70,6 +80,9 @@ export class NetworkRaidClient {
         this.url = options.url ?? DEFAULT_WORLD_SERVER_URL;
         this.options = options;
         this.resumeToken = this.readStoredResumeToken();
+        const account = this.readOrCreateAccountCredentials();
+        this.accountId = account.accountId;
+        this.accountSecret = account.accountSecret;
     }
 
     public getPlayerId(): string | null {
@@ -78,6 +91,10 @@ export class NetworkRaidClient {
 
     public getResumeToken(): string | null {
         return this.resumeToken;
+    }
+
+    public getAccountId(): string {
+        return this.accountId;
     }
 
     public getIsOpen(): boolean {
@@ -160,9 +177,13 @@ export class NetworkRaidClient {
             originHubId: input.originHubId,
             partyComposition: input.partyComposition,
             carriedWeight: input.carriedWeight,
+            carriedItems: input.carriedItems,
             clientVersion: WORLD_PROTOCOL_VERSION,
             resumeToken: input.resumeToken,
             completedQuestIds: input.completedQuestIds,
+            accountId: this.accountId,
+            accountSecret: this.accountSecret,
+            requestedRealm: input.requestedRealm,
         });
     }
 
@@ -250,6 +271,7 @@ export class NetworkRaidClient {
                 this.sessionEpoch = message.sessionEpoch;
                 this.playerId = message.playerId;
                 this.resumeToken = message.resumeToken;
+                if (message.accountId) this.accountId = message.accountId;
                 this.storeResumeToken(message.resumeToken);
                 this.clearReconnect();
                 this.setStatus('connected');
@@ -273,6 +295,9 @@ export class NetworkRaidClient {
                 break;
             case 'AUTO_LOOT_GRANT':
                 this.options.onAutoLootGrant?.(message);
+                break;
+            case 'INVENTORY_CONSUMED':
+                this.options.onInventoryConsumed?.(message);
                 break;
             case 'RAID_RESULT':
                 if (!isRaidResultMessage(message)) {
@@ -411,10 +436,36 @@ export class NetworkRaidClient {
             // Ignore storage failures.
         }
     }
+
+    private readOrCreateAccountCredentials(): { accountId: string; accountSecret: string } {
+        try {
+            const existingId = localStorage.getItem(ACCOUNT_ID_KEY);
+            const existingSecret = localStorage.getItem(ACCOUNT_SECRET_KEY);
+            if (existingId && existingSecret) return { accountId: existingId, accountSecret: existingSecret };
+            const accountId = `acct_${createRandomId(24)}`;
+            const accountSecret = createRandomId(48);
+            localStorage.setItem(ACCOUNT_ID_KEY, accountId);
+            localStorage.setItem(ACCOUNT_SECRET_KEY, accountSecret);
+            return { accountId, accountSecret };
+        } catch {
+            return { accountId: `acct_${createRandomId(24)}`, accountSecret: createRandomId(48) };
+        }
+    }
 }
 
 function createIntentId(): string {
     return `intent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function createRandomId(length: number): string {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
+    const cryptoApi = globalThis.crypto;
+    if (cryptoApi?.getRandomValues) {
+        const bytes = new Uint8Array(length);
+        cryptoApi.getRandomValues(bytes);
+        return [...bytes].map((byte) => alphabet[byte % alphabet.length]).join('');
+    }
+    return Array.from({ length }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

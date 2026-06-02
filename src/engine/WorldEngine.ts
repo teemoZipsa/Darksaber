@@ -91,9 +91,12 @@ import {
     type AutoLootGrantMessage,
     type CombatEventMessage,
     type GridSnapshot,
+    type InventoryConsumedMessage,
+    type InventoryItemCountSnapshot,
     type LootGrantMessage,
     type LootSnapshot,
     type RaidResultMessage,
+    type WorldRealmId,
     type WorldSnapshot,
 } from '../net/WorldProtocol';
 
@@ -335,6 +338,7 @@ export class WorldEngine {
                 spendAp: (cost) => this.spendAp(cost),
                 isMajorActionUsed: () => this.majorActionUsedThisTurn,
                 markMajorActionUsed: () => this.markMajorActionUsed(),
+                submitNetworkSkillIntent: (actor, skill, targetEnemy) => this.submitNetworkSkillIntent(actor, skill.id, targetEnemy?.id),
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
                 handleEnemyDefeated: (actor, enemy, feedbackGroupId) => this.handleEnemyDefeated(actor, enemy, feedbackGroupId),
@@ -376,6 +380,7 @@ export class WorldEngine {
                 spendAp: (cost) => this.spendAp(cost),
                 isMajorActionUsed: () => this.majorActionUsedThisTurn,
                 markMajorActionUsed: () => this.markMajorActionUsed(),
+                submitNetworkUseItem: (actor, itemId) => this.submitNetworkUseItemIntent(actor, itemId),
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
             },
@@ -414,11 +419,11 @@ export class WorldEngine {
                 openLoot: (loot) => this.openLoot(loot),
                 openMagic: (actor) => this.openFieldMagic(actor),
                 openTool: (actor) => this.openFieldTool(actor),
-                hasCastableFieldSkill: (actor) => this.introTutorialActive && !this.isNetworkRaid && this.magicController.hasCastableFieldSkill(actor.character),
-                hasUsableCombatTool: (actor) => this.introTutorialActive && !this.isNetworkRaid && this.toolController.hasUsableCombatTool(actor),
-                getCombatToolAvailability: (actor) => this.isNetworkRaid || !this.introTutorialActive
-                    ? { hasRecoveryConsumable: false, hasEffectiveRecovery: false }
-                    : this.toolController.getCombatToolAvailability(actor),
+                hasCastableFieldSkill: (actor) => (this.isNetworkRaid || this.introTutorialActive) && this.magicController.hasCastableFieldSkill(actor.character),
+                hasUsableCombatTool: (actor) => (this.isNetworkRaid || this.introTutorialActive) && this.toolController.hasUsableCombatTool(actor),
+                getCombatToolAvailability: (actor) => (this.isNetworkRaid || this.introTutorialActive)
+                    ? this.toolController.getCombatToolAvailability(actor)
+                    : { hasRecoveryConsumable: false, hasEffectiveRecovery: false },
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 closeActionMenu: () => this.closeActionMenu(),
                 closeTacticalMenu: () => this.closeTacticalMenu(),
@@ -1122,8 +1127,9 @@ export class WorldEngine {
         this.townSession.show(town);
     }
 
-    private async beginRaidFromCurrentHub(): Promise<void> {
+    private async beginRaidFromCurrentHub(requestedRealm: WorldRealmId = this.worldMap.getRealm()): Promise<void> {
         if (this.isNetworkRaidConnecting) return;
+        if (this.worldMap.getRealm() !== requestedRealm) this.worldMap.setRealm(requestedRealm);
         const town = this.getCurrentHubTown();
         this.isNetworkRaidConnecting = true;
         this.addCombatLog('월드 서버 접속 중...');
@@ -1135,9 +1141,12 @@ export class WorldEngine {
                 originHubId: town.id,
                 partyComposition: this.createPartyCompositionSnapshot(town),
                 carriedWeight: getPartyCarriedWeight(this.gameManager.inventory.items, this.party.getCharacters()),
+                carriedItems: this.createCarriedItemCounts(),
                 completedQuestIds: Array.from(this.playerData.clearedStages),
+                requestedRealm,
             });
 
+            this.applyServerCompletedQuestIds(welcome.completedQuestIds);
             this.townSession.hide();
             this.closeFieldOverlays();
             this.networkPlayerId = welcome.playerId;
@@ -1157,7 +1166,7 @@ export class WorldEngine {
             this.fieldEnemies = [];
             this.worldMap.loot = [];
             this.clearFieldTurnState();
-            this.addCombatLog(`${town.nameKr}에서 네트워크 월드로 출격.`);
+            this.addCombatLog(`${town.nameKr}에서 ${this.worldMap.getDisplayName()} 서버로 출격.`);
         } catch (error) {
             this.isNetworkRaid = false;
             this.networkPlayerId = null;
@@ -1214,6 +1223,7 @@ export class WorldEngine {
             onCombatEvent: (event) => this.handleNetworkCombatEvent(event),
             onLootGrant: (grant) => this.openNetworkLoot(grant),
             onAutoLootGrant: (grant) => this.handleNetworkAutoLootGrant(grant),
+            onInventoryConsumed: (message) => this.handleNetworkInventoryConsumed(message),
             onRaidResult: (result) => this.handleNetworkRaidResult(result),
             onActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
             onErrorMessage: (error) => this.addCombatLog(`서버 오류(${error.code}): ${error.message}`),
@@ -1246,24 +1256,39 @@ export class WorldEngine {
         return this.party.getCharacters().slice(0, this.party.MAX_ACTIVE_PARTY_SIZE).map((character, index) => {
             this.syncCharacterMovementToClass(character);
             return {
-            id: character.id,
-            localActorId: character.id,
-            name: character.name,
-            classLineId: character.classLineId,
-            level: character.level,
-            tile: {
-                x: exit.x + (index === 2 ? 1 : 0),
-                y: exit.y + (index === 1 ? 1 : 0),
-            },
-            stats: { ...character.stats },
-            statuses: character.statuses.map((status) => ({ ...status })),
-            actionGauge: 0,
-            remainingAp: 0,
-            majorActionUsed: false,
-            facing: 'down',
-            isDead: character.isDead,
-        };
+                id: character.id,
+                localActorId: character.id,
+                name: character.name,
+                classLineId: character.classLineId,
+                currentTier: character.currentTier,
+                level: character.level,
+                tile: {
+                    x: exit.x + (index === 2 ? 1 : 0),
+                    y: exit.y + (index === 1 ? 1 : 0),
+                },
+                stats: { ...character.stats },
+                statuses: character.statuses.map((status) => ({ ...status })),
+                actionGauge: 0,
+                remainingAp: 0,
+                majorActionUsed: false,
+                facing: 'down',
+                isDead: character.isDead,
+            };
         });
+    }
+
+    private createCarriedItemCounts(): InventoryItemCountSnapshot[] {
+        const counts = new Map<string, number>();
+        for (const placed of this.gameManager.inventory.items) {
+            const quantity = Math.max(1, Math.floor(placed.quantity));
+            counts.set(placed.item.id, (counts.get(placed.item.id) ?? 0) + quantity);
+        }
+        return [...counts.entries()].map(([itemId, quantity]) => ({ itemId, quantity }));
+    }
+
+    private applyServerCompletedQuestIds(completedQuestIds: readonly string[] | undefined): void {
+        if (!completedQuestIds) return;
+        this.playerData.clearedStages = new Set(completedQuestIds);
     }
 
     private updateNetworkRaid(dt: number, input: InputManager, camera: Camera): void {
@@ -1327,6 +1352,7 @@ export class WorldEngine {
                     actorSnapshot.name,
                     actorSnapshot.classLineId
                 );
+                character.currentTier = actorSnapshot.currentTier;
                 actor = {
                     id: actorSnapshot.id,
                     character,
@@ -1404,6 +1430,7 @@ export class WorldEngine {
         actor.character.stats = { ...snapshot.stats };
         actor.character.statuses = snapshot.statuses.map((status) => ({ ...status }));
         actor.character.isDead = snapshot.isDead;
+        actor.character.currentTier = snapshot.currentTier;
         actor.character.level = snapshot.level;
         actor.entity.gridX = snapshot.tile.x;
         actor.entity.gridY = snapshot.tile.y;
@@ -1496,6 +1523,19 @@ export class WorldEngine {
         if (blocked) this.addCombatLog(`${grant.sourceName}: ${t('raid.autoLootFull')}`);
     }
 
+    private handleNetworkInventoryConsumed(message: InventoryConsumedMessage): void {
+        let remaining = Math.max(0, Math.floor(message.quantity));
+        if (remaining <= 0) return;
+        for (const placed of [...this.gameManager.inventory.items]) {
+            if (placed.item.id !== message.itemId || placed.quantity <= 0) continue;
+            const consumed = Math.min(remaining, placed.quantity);
+            placed.quantity -= consumed;
+            remaining -= consumed;
+            if (placed.quantity <= 0) this.gameManager.inventory.remove(placed);
+            if (remaining <= 0) break;
+        }
+    }
+
     private handleNetworkActionRejected(rejection: ActionRejectedMessage): void {
         const rejectedMoveActorId = this.pendingNetworkMoveReopen?.intentId === rejection.intentId
             ? this.pendingNetworkMoveReopen.actorId
@@ -1548,6 +1588,10 @@ export class WorldEngine {
             if (event.kind === 'kill') {
                 this.effectManager.spawnKillEffect(targetEnemy.gridX, targetEnemy.gridY, targetEnemy.color, targetEnemy.expReward, targetEnemy.image);
                 this.registerCombatFeedback('kill', feedbackGroupId);
+            } else if (event.kind === 'status') {
+                this.floatingText.spawnStatus(targetEnemy.gridX, targetEnemy.gridY, 'WEAK');
+                this.effectManager.spawnDebuffEffect(targetEnemy.gridX, targetEnemy.gridY);
+                this.registerCombatFeedback('status', feedbackGroupId);
             } else {
                 this.floatingText.spawnDamage(targetEnemy.gridX, targetEnemy.gridY, event.value ?? 0, false, event.kind === 'miss');
                 if (event.kind !== 'miss' && (event.value ?? 0) > 0) {
@@ -1557,8 +1601,16 @@ export class WorldEngine {
             }
         }
         if (targetActor) {
-            this.floatingText.spawnDamage(targetActor.entity.gridX, targetActor.entity.gridY, event.value ?? 0, false, event.kind === 'miss');
-            if (event.kind !== 'miss' && (event.value ?? 0) > 0) {
+            if (event.kind === 'heal') {
+                this.floatingText.spawnHeal(targetActor.entity.gridX, targetActor.entity.gridY, event.value ?? 0);
+                this.effectManager.spawnHealEffect(targetActor.entity.gridX, targetActor.entity.gridY);
+                this.registerCombatFeedback('normal', feedbackGroupId);
+            } else if (event.kind === 'status') {
+                this.floatingText.spawnStatus(targetActor.entity.gridX, targetActor.entity.gridY, 'BUFF');
+            } else {
+                this.floatingText.spawnDamage(targetActor.entity.gridX, targetActor.entity.gridY, event.value ?? 0, false, event.kind === 'miss');
+            }
+            if (event.kind !== 'miss' && event.kind !== 'heal' && (event.value ?? 0) > 0) {
                 this.effectManager.spawnHitEffect(targetActor.entity.gridX, targetActor.entity.gridY);
                 this.registerCombatFeedback(event.kind === 'down' ? 'kill' : 'normal', feedbackGroupId);
             }
@@ -1616,6 +1668,7 @@ export class WorldEngine {
         const targetName = event.targetName ?? this.getNetworkEntityName(event.targetId);
         if (event.kind === 'miss') return `${sourceName} → ${targetName} 빗나감`;
         if (event.kind === 'kill') return `${sourceName} → ${targetName} 처치`;
+        if (event.kind === 'heal') return `${sourceName} → ${targetName} HP +${event.value ?? 0}`;
         if (event.kind === 'down') return `${sourceName} → ${targetName} 행동 불능`;
         if (event.kind === 'status') return `${sourceName} → ${targetName} 상태 변화`;
         return `${sourceName} → ${targetName} ${event.value ?? 0} 피해`;
@@ -1802,11 +1855,16 @@ export class WorldEngine {
             return;
         }
 
-        this.addCombatLog('마스터 월드는 서버 세션 이관 후 진입할 수 있습니다.');
+        this.fusionTempleUI.hide();
+        void this.beginRaidFromCurrentHub('master');
     }
 
     private returnToMortalWorld(): void {
         this.fusionTempleUI.hide();
+        if (this.isNetworkRaid || this.currentPhase === 'raid') {
+            void this.beginRaidFromCurrentHub('mortal');
+            return;
+        }
         this.raidSession.failBackToTown(this.raidSession.currentHubTownId);
         this.currentPhase = 'lobby';
         this.worldMap.setRealm('mortal');
@@ -2036,6 +2094,18 @@ export class WorldEngine {
         return true;
     }
 
+    private submitNetworkUseItemIntent(actor: FieldActor, itemId: string): boolean {
+        if (!this.isNetworkRaid || !this.networkRaidClient?.getIsOpen()) return false;
+        this.networkRaidClient.sendIntent(actor.id, 'useItem', { itemId });
+        return true;
+    }
+
+    private submitNetworkSkillIntent(actor: FieldActor, skillId: string, targetId?: string): boolean {
+        if (!this.isNetworkRaid || !this.networkRaidClient?.getIsOpen()) return false;
+        this.networkRaidClient.sendIntent(actor.id, 'castSkill', { skillId, targetId });
+        return true;
+    }
+
     private tryActorAttack(actor: FieldActor, enemy: Enemy): boolean {
         if (this.isNetworkRaid) {
             if (!this.networkRaidClient) return false;
@@ -2186,12 +2256,7 @@ export class WorldEngine {
     }
 
     private openFieldMagic(actor: FieldActor): void {
-        if (this.isNetworkRaid) {
-            this.addCombatLog('네트워크 raid V1에서는 마법/아이템 사용이 비활성화되어 있습니다.');
-            this.reopenActionMenu(actor);
-            return;
-        }
-        if (!this.introTutorialActive) {
+        if (!this.isNetworkRaid && !this.introTutorialActive) {
             this.addCombatLog('서버 세션 밖에서는 마법을 사용할 수 없습니다.');
             this.reopenActionMenu(actor);
             return;
@@ -2200,12 +2265,7 @@ export class WorldEngine {
     }
 
     private openFieldTool(actor: FieldActor): void {
-        if (this.isNetworkRaid) {
-            this.addCombatLog('네트워크 raid V1에서는 마법/아이템 사용이 비활성화되어 있습니다.');
-            this.reopenActionMenu(actor);
-            return;
-        }
-        if (!this.introTutorialActive) {
+        if (!this.isNetworkRaid && !this.introTutorialActive) {
             this.addCombatLog('서버 세션 밖에서는 도구를 사용할 수 없습니다.');
             this.reopenActionMenu(actor);
             return;

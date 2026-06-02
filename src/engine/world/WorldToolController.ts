@@ -28,6 +28,7 @@ export interface WorldToolContext {
     spendAp: (cost: number) => boolean;
     isMajorActionUsed: () => boolean;
     markMajorActionUsed: () => void;
+    submitNetworkUseItem?: (actor: FieldActor, itemId: string) => boolean;
     reopenActionMenu: (actor: FieldActor) => void;
     resumeOrEndActiveTurn: (actor: FieldActor) => void;
 }
@@ -145,6 +146,11 @@ export class WorldToolController {
         if (candidate.effectiveHp <= 0 && candidate.effectiveMp <= 0) {
             this.sink.log('효과가 없습니다.');
             this.context.reopenActionMenu(actor);
+            return;
+        }
+
+        if (this.context.submitNetworkUseItem?.(actor, itemId)) {
+            this.reset();
             return;
         }
 

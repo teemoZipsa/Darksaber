@@ -181,6 +181,38 @@ test('client uses stored resume token when joining after refresh', async () => {
     }
 });
 
+test('client includes account credentials, requested realm, and carried items in join payload', async () => {
+    const restoreSocket = installMockWebSocket();
+    const storage = new MemoryStorage();
+    const restoreStorage = installMemoryStorage(storage);
+
+    try {
+        const client = new NetworkRaidClient({ url: 'ws://test' });
+        const join = client.connectAndJoin({
+            ...joinInput(),
+            requestedRealm: 'master',
+            carriedItems: [{ itemId: 'herb_common', quantity: 2 }],
+        });
+        const socket = MockWebSocket.instances[0];
+        assert.ok(socket);
+
+        socket.emitOpen();
+        const sent = JSON.parse(socket.sent[0]);
+        assert.equal(sent.requestedRealm, 'master');
+        assert.deepEqual(sent.carriedItems, [{ itemId: 'herb_common', quantity: 2 }]);
+        assert.equal(typeof sent.accountId, 'string');
+        assert.match(sent.accountId, /^acct_/);
+        assert.equal(typeof sent.accountSecret, 'string');
+        assert.ok(sent.accountSecret.length >= 24);
+
+        socket.emitMessage(welcomeMessage('resume_account'));
+        await join;
+    } finally {
+        restoreStorage();
+        restoreSocket();
+    }
+});
+
 test('client rejects a superseded join request and ignores stale socket close', async () => {
     const restoreSocket = installMockWebSocket();
     try {
@@ -299,6 +331,22 @@ test('client dispatches market messages from the shared world socket', () => {
     }));
 
     assert.deepEqual(seen, ['snapshot', 'ack']);
+});
+
+test('client dispatches server-confirmed inventory consumption', () => {
+    const consumed: Array<{ itemId: string; quantity: number }> = [];
+    const client = new NetworkRaidClient({
+        onInventoryConsumed: (message) => consumed.push({ itemId: message.itemId, quantity: message.quantity }),
+    });
+    const harness = client as unknown as { handleMessage(raw: string): void };
+
+    harness.handleMessage(JSON.stringify({
+        type: 'INVENTORY_CONSUMED',
+        itemId: 'herb_common',
+        quantity: 1,
+    }));
+
+    assert.deepEqual(consumed, [{ itemId: 'herb_common', quantity: 1 }]);
 });
 
 test('raid result clears resume state and disconnects without grace expiry', async () => {
