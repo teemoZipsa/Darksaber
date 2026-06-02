@@ -281,6 +281,7 @@ const TREE_DECORATION_CONFIGS: Record<TreeSpriteId, TreeDecorationConfig> = {
 export class WorldMap {
     private chunks: Map<string, Chunk> = new Map();
     private decorationChunks: Map<string, WorldMapDecoration[]> = new Map();
+    private townExitTileCache: Map<string, TilePoint> = new Map();
     private preloadChunkMargin: number = 1;
     private biomeMask: BiomeMask;
 
@@ -305,6 +306,7 @@ export class WorldMap {
         this.biomeMask = new BiomeMask(realm);
         this.chunks.clear();
         this.decorationChunks.clear();
+        this.townExitTileCache.clear();
         this.loot = [];
         this.extractionZones = [];
         this.validateTownSpawns();
@@ -913,6 +915,16 @@ export class WorldMap {
     }
 
     public getTownExitTile(town: TownInfo): TilePoint {
+        const cacheKey = `${this.getRealm()}:${town.id}`;
+        const cached = this.townExitTileCache.get(cacheKey);
+        if (cached) return { ...cached };
+
+        const exit = this.computeTownExitTile(town);
+        this.townExitTileCache.set(cacheKey, { ...exit });
+        return exit;
+    }
+
+    private computeTownExitTile(town: TownInfo): TilePoint {
         const centerX = town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
         const centerY = town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
         const searchRadius = Math.max(8, town.radius * CHUNK_SIZE + CHUNK_SIZE);
