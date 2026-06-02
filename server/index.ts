@@ -21,7 +21,7 @@ import type {
 } from '../src/net/WorldProtocol';
 import { getStoryQuestByDungeonId } from '../src/data/StoryQuestData';
 import { ServerMarketSession } from './ServerMarketSession';
-import { WorldSession, WORLD_TICK_MS } from './WorldSession';
+import { WorldSession, WORLD_TICK_MS, type WorldCharacterSavePatch } from './WorldSession';
 import { authenticateAccessToken, createAuthHttpHandler } from './AuthHttp';
 import { InMemoryAuthStore, PostgresAuthStore, type AccountProgress, type AuthAccount, type AuthCharacter, type AuthStore, type CharacterSave } from './AuthStore';
 import type { JwtOptions } from './AuthCrypto';
@@ -34,6 +34,9 @@ const MAX_WS_PAYLOAD_BYTES = Math.max(1024, Math.floor(Number(process.env.WORLD_
 const WS_RATE_LIMIT_WINDOW_MS = 10_000;
 const WS_RATE_LIMIT_MESSAGES = Math.max(1, Math.floor(Number(process.env.WORLD_WS_RATE_LIMIT ?? 120)));
 const WS_IDLE_TIMEOUT_MS = Math.max(10_000, Math.floor(Number(process.env.WORLD_WS_IDLE_TIMEOUT_MS ?? 60_000)));
+export const WORLD_SAVE_AUTOSAVE_MS = clampInt(Number(process.env.WORLD_SAVE_AUTOSAVE_MS ?? 90_000), 60_000, 120_000);
+const WORLD_SAVE_RETRY_LIMIT = Math.max(1, Math.floor(Number(process.env.WORLD_SAVE_RETRY_LIMIT ?? 3)));
+const WORLD_SAVE_RETRY_BASE_MS = Math.max(100, Math.floor(Number(process.env.WORLD_SAVE_RETRY_BASE_MS ?? 750)));
 const allowedOrigins = parseAllowedOrigins(process.env.AUTH_ALLOWED_ORIGINS);
 const authStoreKind = process.env.DATABASE_URL ? 'postgres' : 'memory';
 const jwtSecret = process.env.AUTH_JWT_SECRET ?? process.env.JWT_SECRET ?? (process.env.NODE_ENV === 'production' ? '' : 'darksaber-dev-jwt-secret-change-me');
@@ -79,9 +82,21 @@ interface SocketBinding {
     characterId: string;
     sessionId: string;
 }
+interface PlayerSaveTracker {
+    sessionKey: string;
+    playerId: string;
+    accountId: string;
+    characterId: string;
+    expectedRevision: number;
+    dirty: boolean;
+    saving: boolean;
+    lastDirtyAt: number;
+    lastSavedAt: number;
+}
 const playerBySocket = new Map<WebSocket, SocketBinding>();
 const socketByPlayer = new Map<string, WebSocket>();
 const socketRateLimits = new Map<WebSocket, { windowStart: number; count: number; lastMessageAt: number; isAlive: boolean }>();
+const saveTrackers = new Map<string, PlayerSaveTracker>();
 let immediateSnapshotFlushScheduled = false;
 
 server.listen(PORT, HOST, () => {
@@ -145,10 +160,23 @@ setInterval(() => {
             if (ws) send(ws, entry.message);
             const binding = findBinding(sessionKey, entry.playerId);
             if (binding) persistRaidResult(binding, entry.message);
+            if (entry.message.type === 'RAID_RESULT') {
+                void flushCharacterSave(sessionKey, entry.playerId, 'raid_result', true);
+            }
         }
+        consumeSessionSaveDirtyPlayers(sessionKey, session);
     }
     sendSnapshotsToActive(now);
 }, WORLD_TICK_MS);
+
+setInterval(() => {
+    const now = Date.now();
+    for (const tracker of saveTrackers.values()) {
+        if (!tracker.dirty || tracker.saving) continue;
+        if (now - tracker.lastDirtyAt < WORLD_SAVE_AUTOSAVE_MS) continue;
+        void flushCharacterSave(tracker.sessionKey, tracker.playerId, 'autosave', false);
+    }
+}, Math.min(30_000, WORLD_SAVE_AUTOSAVE_MS));
 
 if (ENABLE_DEBUG_COUNTS) {
     setInterval(() => {
@@ -195,6 +223,16 @@ async function handleSocketMessage(ws: WebSocket, data: RawData): Promise<void> 
         return;
     }
 
+    if (message.type === 'CLIENT_HEARTBEAT') {
+        send(ws, {
+            type: 'SERVER_HEARTBEAT_ACK',
+            clientTime: Number.isFinite(message.clientTime) ? message.clientTime : 0,
+            serverTime: Date.now(),
+            joined: playerBySocket.has(ws),
+        });
+        return;
+    }
+
     if (message.type === 'WORLD_JOIN') {
         await handleWorldJoin(ws, message);
         return;
@@ -229,7 +267,11 @@ async function handleSocketMessage(ws: WebSocket, data: RawData): Promise<void> 
     }
     for (const broadcast of result.broadcasts) broadcastToSession(binding.sessionKey, broadcast);
     if (shouldSendImmediateSnapshots(message, result.replies)) queueImmediateSnapshots(binding.sessionKey);
-    if (message.type === 'WORLD_LEAVE') cleanupJoinedSocket(ws, binding);
+    consumeSessionSaveDirtyPlayers(binding.sessionKey, session);
+    if (message.type === 'WORLD_LEAVE') {
+        await flushCharacterSave(binding.sessionKey, binding.playerId, 'world_leave', true);
+        cleanupJoinedSocket(ws, binding);
+    }
 }
 
 async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promise<void> {
@@ -269,8 +311,10 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
         characterId: character.id,
         completedQuestIds: serverJoinMessage.completedQuestIds,
         shardId: sessionKey,
+        saveSnapshot: save,
     });
     bindPlayer(ws, sessionKey, result.playerId, auth.account, character.id, auth.session.id);
+    ensureSaveTracker(sessionKey, result.playerId, auth.account.id, character.id, save.revision);
     send(ws, result.welcome);
     send(ws, { type: 'WORLD_SNAPSHOT', snapshot: session.createSnapshot(result.playerId) });
 }
@@ -290,8 +334,12 @@ async function handleReconnect(ws: WebSocket, resumeToken: string, accessToken: 
         send(ws, { type: 'ERROR', code: 'RESUME_FAILED', message: 'Resume token is expired or unknown.' });
         return;
     }
-    const progress = await authStore.getAccountProgress(auth.account.id);
+    const [progress, save] = await Promise.all([
+        authStore.getAccountProgress(auth.account.id),
+        authStore.getCharacterSave(auth.account.id, resumed.characterId),
+    ]);
     bindPlayer(ws, resumed.sessionKey, resumed.playerId, auth.account, resumed.characterId, auth.session.id);
+    if (save) ensureSaveTracker(resumed.sessionKey, resumed.playerId, auth.account.id, resumed.characterId, save.revision);
     send(ws, {
         ...resumed.welcome,
         accountId: auth.account.id,
@@ -463,9 +511,112 @@ function persistRaidResult(binding: SocketBinding, message: WorldServerMessage):
     if (message.type !== 'RAID_RESULT') return;
     if (message.result !== 'SURVIVED') return;
     const questIds = completedDungeonIdsToQuestIds(message);
-    void authStore.recordRaidSurvival(binding.accountId, binding.characterId, questIds, message.extractionTownId).catch((error) => {
+    void withRetry(() => authStore.recordRaidSurvival(binding.accountId, binding.characterId, questIds, message.extractionTownId)).catch((error) => {
         console.error('Failed to persist raid result:', error instanceof Error ? error.message : error);
     });
+}
+
+function ensureSaveTracker(sessionKey: string, playerId: string, accountId: string, characterId: string, expectedRevision: number): PlayerSaveTracker {
+    const key = socketPlayerKey(sessionKey, playerId);
+    const existing = saveTrackers.get(key);
+    if (existing) {
+        existing.accountId = accountId;
+        existing.characterId = characterId;
+        existing.expectedRevision = Math.max(existing.expectedRevision, expectedRevision);
+        return existing;
+    }
+    const tracker: PlayerSaveTracker = {
+        sessionKey,
+        playerId,
+        accountId,
+        characterId,
+        expectedRevision,
+        dirty: false,
+        saving: false,
+        lastDirtyAt: 0,
+        lastSavedAt: 0,
+    };
+    saveTrackers.set(key, tracker);
+    return tracker;
+}
+
+function consumeSessionSaveDirtyPlayers(sessionKey: string, session: WorldSession): void {
+    for (const playerId of session.consumeSaveDirtyPlayerIds()) {
+        const tracker = saveTrackers.get(socketPlayerKey(sessionKey, playerId));
+        if (!tracker) continue;
+        tracker.dirty = true;
+        tracker.lastDirtyAt = Date.now();
+    }
+}
+
+async function flushCharacterSave(sessionKey: string, playerId: string, reason: string, force: boolean): Promise<void> {
+    const key = socketPlayerKey(sessionKey, playerId);
+    const tracker = saveTrackers.get(key);
+    if (!tracker || tracker.saving) return;
+    if (!force && !tracker.dirty) return;
+    const session = sessions.get(sessionKey);
+    const patch = session?.createCharacterSavePatch(playerId);
+    if (!patch) {
+        tracker.dirty = false;
+        return;
+    }
+
+    tracker.saving = true;
+    tracker.dirty = false;
+    const isFinalPatch = Boolean(session?.hasFinalCharacterSavePatch(playerId));
+    try {
+        const updatedRevision = await updateCharacterSaveWithRetry(tracker, patch);
+        tracker.expectedRevision = updatedRevision;
+        tracker.lastSavedAt = Date.now();
+        if (isFinalPatch) {
+            session?.consumeFinalCharacterSavePatch(playerId);
+            saveTrackers.delete(key);
+        }
+        if (ENABLE_DEBUG_COUNTS) {
+            console.log(`character save flush reason=${reason} player=${playerId} revision=${updatedRevision}`);
+        }
+    } catch (error) {
+        tracker.dirty = true;
+        tracker.lastDirtyAt = Date.now();
+        console.error(`Failed to flush character save (${reason}):`, error instanceof Error ? error.message : error);
+    } finally {
+        tracker.saving = false;
+    }
+}
+
+async function updateCharacterSaveWithRetry(tracker: PlayerSaveTracker, patch: WorldCharacterSavePatch): Promise<number> {
+    let expectedRevision = tracker.expectedRevision;
+    for (let attempt = 0; attempt < WORLD_SAVE_RETRY_LIMIT; attempt++) {
+        try {
+            const result = await authStore.updateCharacterSave(tracker.accountId, tracker.characterId, {
+                expectedRevision,
+                patch,
+            });
+            if (result.status === 'updated') return result.save.revision;
+            if (result.status === 'conflict') {
+                expectedRevision = result.currentRevision;
+                tracker.expectedRevision = result.currentRevision;
+                continue;
+            }
+            throw new Error('character save was not found');
+        } catch (error) {
+            if (attempt >= WORLD_SAVE_RETRY_LIMIT - 1) throw error;
+            await sleep(WORLD_SAVE_RETRY_BASE_MS * (attempt + 1));
+        }
+    }
+    throw new Error('character save retry limit exhausted');
+}
+
+async function withRetry<T>(operation: () => Promise<T>): Promise<T> {
+    for (let attempt = 0; attempt < WORLD_SAVE_RETRY_LIMIT; attempt++) {
+        try {
+            return await operation();
+        } catch (error) {
+            if (attempt >= WORLD_SAVE_RETRY_LIMIT - 1) throw error;
+            await sleep(WORLD_SAVE_RETRY_BASE_MS * (attempt + 1));
+        }
+    }
+    throw new Error('retry limit exhausted');
 }
 
 function completedDungeonIdsToQuestIds(message: RaidResultMessage): string[] {
@@ -486,6 +637,7 @@ function cleanupSocket(ws: WebSocket): void {
     const binding = playerBySocket.get(ws);
     socketRateLimits.delete(ws);
     if (!binding) return;
+    void flushCharacterSave(binding.sessionKey, binding.playerId, 'socket_close', true);
     cleanupJoinedSocket(ws, binding);
     sessions.get(binding.sessionKey)?.disconnect(binding.playerId);
 }
@@ -648,6 +800,15 @@ function parseAllowedOrigins(value: string | undefined): string[] {
 function parseSameSite(value: string | undefined): 'Lax' | 'Strict' | 'None' {
     if (value === 'Strict' || value === 'None') return value;
     return 'Lax';
+}
+
+function clampInt(value: number, min: number, max: number): number {
+    if (!Number.isFinite(value)) return min;
+    return Math.max(min, Math.min(max, Math.floor(value)));
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function stableHash(value: string): number {

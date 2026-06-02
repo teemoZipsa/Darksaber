@@ -57,6 +57,7 @@ const LEGACY_ACCOUNT_ID_KEY = 'darksaber_world_account_id';
 const LEGACY_ACCOUNT_SECRET_KEY = 'darksaber_world_account_secret';
 const GRACE_MS = 30_000;
 const RECONNECT_INTERVAL_MS = 2_000;
+export const CLIENT_HEARTBEAT_INTERVAL_MS = 45_000;
 
 export class NetworkRaidClient {
     private readonly url: string;
@@ -68,6 +69,7 @@ export class NetworkRaidClient {
     private manualClose = false;
     private reconnecting = false;
     private reconnectTimer: number | null = null;
+    private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     private graceDeadline = 0;
     private joinInput: NetworkRaidJoinInput | null = null;
     private status: NetworkRaidStatus = 'idle';
@@ -139,6 +141,7 @@ export class NetworkRaidClient {
         this.socket = socket;
         socket.onopen = () => {
             if (this.socket !== socket) return;
+            this.startHeartbeat();
             this.sendJoinOrReconnect();
         };
         socket.onmessage = (event) => {
@@ -151,6 +154,7 @@ export class NetworkRaidClient {
         };
         socket.onclose = () => {
             if (this.socket !== socket) return;
+            this.stopHeartbeat();
             this.socket = null;
             if (this.pendingWelcome) {
                 this.rejectPendingWelcome(new Error('World server connection closed before welcome.'));
@@ -236,6 +240,7 @@ export class NetworkRaidClient {
     public close(): void {
         this.manualClose = true;
         this.clearReconnect();
+        this.stopHeartbeat();
         if (this.pendingWelcome) {
             this.rejectPendingWelcome(new Error('Connection closed by client.'));
         }
@@ -307,6 +312,7 @@ export class NetworkRaidClient {
                 this.clearStoredResumeToken();
                 this.manualClose = true;
                 this.clearReconnect();
+                this.stopHeartbeat();
                 this.options.onRaidResult?.(message);
                 if (this.socket && this.socket.readyState <= WebSocket.OPEN) this.socket.close();
                 this.socket = null;
@@ -321,6 +327,8 @@ export class NetworkRaidClient {
                 break;
             case 'MARKET_RECORD_ACK':
                 this.options.onMarketRecordAck?.(message);
+                break;
+            case 'SERVER_HEARTBEAT_ACK':
                 break;
             case 'ERROR':
                 if (!isWorldErrorMessage(message)) {
@@ -382,6 +390,7 @@ export class NetworkRaidClient {
         const wasReconnecting = this.reconnecting || this.graceDeadline !== 0;
         this.clearReconnect();
         this.manualClose = true;
+        this.stopHeartbeat();
         if (this.socket && this.socket.readyState <= WebSocket.OPEN) this.socket.close();
         this.socket = null;
         this.playerId = null;
@@ -404,6 +413,27 @@ export class NetworkRaidClient {
         }
         this.reconnecting = false;
         this.graceDeadline = 0;
+    }
+
+    private startHeartbeat(): void {
+        this.stopHeartbeat();
+        this.heartbeatTimer = globalThis.setInterval(() => {
+            if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+                this.stopHeartbeat();
+                return;
+            }
+            this.socket.send(JSON.stringify({
+                type: 'CLIENT_HEARTBEAT',
+                clientTime: Date.now(),
+            }));
+        }, CLIENT_HEARTBEAT_INTERVAL_MS);
+        (this.heartbeatTimer as { unref?: () => void }).unref?.();
+    }
+
+    private stopHeartbeat(): void {
+        if (this.heartbeatTimer === null) return;
+        globalThis.clearInterval(this.heartbeatTimer);
+        this.heartbeatTimer = null;
     }
 
     private setStatus(status: NetworkRaidStatus): void {

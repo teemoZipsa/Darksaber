@@ -144,6 +144,11 @@ export interface WorldLeaveMessage {
     reason: 'town' | 'wipe' | 'manual';
 }
 
+export interface ClientHeartbeatMessage {
+    type: 'CLIENT_HEARTBEAT';
+    clientTime: number;
+}
+
 export type PlayerIntentKind = 'move' | 'attack' | 'interact' | 'useItem' | 'castSkill' | 'endTurn';
 
 export interface PlayerIntentMessage {
@@ -224,6 +229,7 @@ export type WorldClientMessage =
     | WorldJoinMessage
     | ReconnectMessage
     | WorldLeaveMessage
+    | ClientHeartbeatMessage
     | PlayerIntentMessage
     | LootPickupMessage
     | AutoLootResolveMessage
@@ -300,6 +306,13 @@ export interface WorldErrorMessage {
     message: string;
 }
 
+export interface ServerHeartbeatAckMessage {
+    type: 'SERVER_HEARTBEAT_ACK';
+    clientTime: number;
+    serverTime: number;
+    joined: boolean;
+}
+
 export interface MarketSnapshotMessage {
     type: 'MARKET_SNAPSHOT';
     serverTime: number;
@@ -327,6 +340,7 @@ export type WorldServerMessage =
     | CombatEventMessage
     | RaidResultMessage
     | WorldErrorMessage
+    | ServerHeartbeatAckMessage
     | MarketServerMessage;
 
 export function isWorldSnapshotMessage(message: WorldServerMessage): message is WorldSnapshotMessage {

@@ -86,6 +86,7 @@ import {
     type WorldSnapshot,
     type WorldWelcomeMessage,
 } from '../src/net/WorldProtocol';
+import type { CharacterSave, InventorySaveItem, InventorySaveSnapshot } from './AuthStore';
 
 export const WORLD_TICK_MS = 100;
 export const DISCONNECT_GRACE_MS = 30_000;
@@ -134,6 +135,7 @@ interface ServerPlayer {
     ghost: boolean;
     disconnectedAt: number | null;
     actorIds: string[];
+    saveSnapshot?: CharacterSave;
 }
 
 interface ServerEnemy {
@@ -193,7 +195,10 @@ export interface WorldJoinContext {
     characterId?: string;
     completedQuestIds?: string[];
     shardId?: string;
+    saveSnapshot?: CharacterSave;
 }
+
+export type WorldCharacterSavePatch = Partial<Omit<CharacterSave, 'characterId' | 'revision' | 'updatedAt'>>;
 
 export class WorldSession {
     public readonly sessionEpoch = Date.now();
@@ -208,6 +213,8 @@ export class WorldSession {
     private readonly lootLocks = new Map<string, LootLock>();
     private readonly autoLootPending = new Map<string, AutoLootPending>();
     private readonly generatedLootChunks = new Set<string>();
+    private readonly saveDirtyPlayerIds = new Set<string>();
+    private readonly finalSavePatches = new Map<string, WorldCharacterSavePatch>();
     private seq = 0;
     private nextPlayerId = 1;
     private nextEnemyId = 1;
@@ -229,6 +236,7 @@ export class WorldSession {
         if (resumed) {
             resumed.ghost = false;
             resumed.disconnectedAt = null;
+            resumed.saveSnapshot ??= cloneCharacterSave(context.saveSnapshot);
             const spawnTile = this.firstActorTile(resumed) ?? this.getOriginExitTile(resumed.originHubId);
             this.log(`reconnect player=${resumed.id} origin=${resumed.originHubId}`);
             return {
@@ -270,6 +278,7 @@ export class WorldSession {
             ghost: false,
             disconnectedAt: null,
             actorIds: [],
+            saveSnapshot: cloneCharacterSave(context.saveSnapshot),
         };
         this.players.set(playerId, player);
 
@@ -383,6 +392,8 @@ export class WorldSession {
             if (!player.active) continue;
             if (player.ghost && player.disconnectedAt !== null && now - player.disconnectedAt >= this.ghostGraceMs) {
                 this.log(`despawn player=${player.id} reason=ghost_expired`);
+                this.captureFinalSavePatch(player);
+                this.markSaveDirty(player.id);
                 this.removePlayer(player.id);
                 continue;
             }
@@ -519,6 +530,27 @@ export class WorldSession {
         return [...this.players.values()].find((player) => player.resumeToken === resumeToken) ?? null;
     }
 
+    public consumeSaveDirtyPlayerIds(): string[] {
+        const playerIds = [...this.saveDirtyPlayerIds];
+        this.saveDirtyPlayerIds.clear();
+        return playerIds;
+    }
+
+    public createCharacterSavePatch(playerId: string, hubTownId?: string): WorldCharacterSavePatch | null {
+        const player = this.players.get(playerId);
+        return player ? this.buildCharacterSavePatch(player, hubTownId) : this.finalSavePatches.get(playerId) ?? null;
+    }
+
+    public hasFinalCharacterSavePatch(playerId: string): boolean {
+        return this.finalSavePatches.has(playerId);
+    }
+
+    public consumeFinalCharacterSavePatch(playerId: string): WorldCharacterSavePatch | null {
+        const patch = this.finalSavePatches.get(playerId) ?? null;
+        this.finalSavePatches.delete(playerId);
+        return patch;
+    }
+
     public getDebugCounts(): WorldSessionDebugCounts {
         const activePlayers = [...this.players.values()].filter((player) => player.active && !player.ghost).length;
         const ghostPlayers = [...this.players.values()].filter((player) => player.active && player.ghost).length;
@@ -641,6 +673,8 @@ export class WorldSession {
         actor.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.stats.hp + effectiveHp));
         actor.stats.mp = Math.max(0, Math.min(effective.maxMp, actor.stats.mp + effectiveMp));
         this.addCarriedItemQuantity(player.id, itemId, -1);
+        this.removeSaveItemQuantity(player, itemId, 1);
+        this.markSaveDirty(player.id);
         this.finishActorIfSpent(actor);
 
         const consumed: InventoryConsumedMessage = { type: 'INVENTORY_CONSUMED', itemId, quantity: 1 };
@@ -764,6 +798,11 @@ export class WorldSession {
         lootObject.inventory.remove(placed);
         this.addCarriedWeight(playerId, getPlacedItemWeight(placed));
         this.addCarriedItemQuantity(playerId, placed.item.id, placed.quantity);
+        const player = this.players.get(playerId);
+        if (player) {
+            this.addSavePlacedItem(player, placed);
+            this.markSaveDirty(playerId);
+        }
         lock.lastTouchedAt = now;
         lootObject.opened = lootObject.inventory.items.length === 0;
         if (lootObject.opened) this.lootLocks.delete(lootId);
@@ -796,8 +835,11 @@ export class WorldSession {
             removed.add(placed);
             acceptedWeight += getPlacedItemWeight(placed);
             this.addCarriedItemQuantity(playerId, placed.item.id, placed.quantity);
+            const player = this.players.get(playerId);
+            if (player) this.addSavePlacedItem(player, placed);
         }
         this.addCarriedWeight(playerId, acceptedWeight);
+        if (acceptedWeight > 0 || removed.size > 0) this.markSaveDirty(playerId);
 
         this.autoLootPending.delete(lootId);
         lootObject.opened = lootObject.inventory.items.length === 0;
@@ -1110,6 +1152,10 @@ export class WorldSession {
             completedDungeonIds: player ? [...player.completedDungeonIds] : [],
         };
         this.log(`raid result player=${playerId} result=${result} kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
+        if (player) {
+            this.captureFinalSavePatch(player, extractionTownId);
+            this.markSaveDirty(playerId);
+        }
         this.removePlayer(playerId);
         return message;
     }
@@ -1357,6 +1403,9 @@ export class WorldSession {
     ): void {
         if (player.activeDungeonId === dungeonId) player.activeDungeonId = null;
         player.completedDungeonIds.add(dungeonId);
+        const quest = getStoryQuestByDungeonId(dungeonId);
+        if (quest) player.completedQuestIds.add(quest.id);
+        this.markSaveDirty(player.id);
 
         const state = this.scenarioStates.get(player.id);
         if (state && state.dungeonId === dungeonId) {
@@ -1622,6 +1671,70 @@ export class WorldSession {
         else player.carriedItems.delete(itemId);
     }
 
+    private markSaveDirty(playerId: string): void {
+        this.saveDirtyPlayerIds.add(playerId);
+    }
+
+    private captureFinalSavePatch(player: ServerPlayer, hubTownId?: string): void {
+        const patch = this.buildCharacterSavePatch(player, hubTownId);
+        if (patch) this.finalSavePatches.set(player.id, patch);
+    }
+
+    private buildCharacterSavePatch(player: ServerPlayer, hubTownId?: string): WorldCharacterSavePatch | null {
+        const save = player.saveSnapshot;
+        if (!save) return null;
+        save.questState = {
+            ...save.questState,
+            completedQuestIds: [...player.completedQuestIds],
+        };
+        if (hubTownId) {
+            save.hubLocation = {
+                ...save.hubLocation,
+                townId: hubTownId,
+            };
+        }
+        return {
+            saveVersion: save.saveVersion,
+            hubLocation: cloneRecord(save.hubLocation),
+            questState: cloneRecord(save.questState),
+            inventory: cloneInventorySnapshot(save.inventory),
+            equipment: cloneRecord(save.equipment),
+            partySnapshot: cloneRecord(save.partySnapshot),
+            rosterSnapshot: cloneRecord(save.rosterSnapshot),
+        };
+    }
+
+    private removeSaveItemQuantity(player: ServerPlayer, itemId: string, quantity: number): void {
+        const inventory = player.saveSnapshot?.inventory;
+        if (!inventory || quantity <= 0) return;
+        let remaining = Math.floor(quantity);
+        for (const item of [...inventory.items]) {
+            if (item.itemId !== itemId || remaining <= 0) continue;
+            const consumed = Math.min(Math.max(1, item.quantity), remaining);
+            item.quantity -= consumed;
+            remaining -= consumed;
+            if (item.quantity <= 0) {
+                inventory.items = inventory.items.filter((entry) => entry !== item);
+            }
+        }
+    }
+
+    private addSavePlacedItem(player: ServerPlayer, placed: { item: { id: string; maxDurability: number }; durability: number; quantity: number; sockets?: Array<{ id: string }> }): void {
+        const inventory = player.saveSnapshot?.inventory;
+        if (!inventory || placed.quantity <= 0) return;
+        const slot = findFreeInventorySlot(inventory, placed.item.id);
+        if (!slot) return;
+        const item: InventorySaveItem = {
+            itemId: placed.item.id,
+            gridX: slot.x,
+            gridY: slot.y,
+            durability: Number.isFinite(placed.durability) ? placed.durability : placed.item.maxDurability,
+            quantity: Math.max(1, Math.floor(placed.quantity)),
+            acquiredInRaid: true,
+        };
+        inventory.items.push(item);
+    }
+
     private getLearnedSkillIds(actor: ServerActor): Set<string> {
         const classLine = getClassLine(actor.classLineId);
         const unlocked: string[] = [];
@@ -1759,6 +1872,56 @@ export function gridToSnapshot(grid: { width: number; height: number; items: Arr
             sockets: placed.sockets?.map((item) => item.id),
         })),
     };
+}
+
+function cloneCharacterSave(save: CharacterSave | undefined): CharacterSave | undefined {
+    if (!save) return undefined;
+    return {
+        ...save,
+        hubLocation: cloneRecord(save.hubLocation),
+        questState: cloneRecord(save.questState),
+        inventory: cloneInventorySnapshot(save.inventory),
+        equipment: cloneRecord(save.equipment),
+        partySnapshot: cloneRecord(save.partySnapshot),
+        rosterSnapshot: cloneRecord(save.rosterSnapshot),
+    };
+}
+
+function cloneInventorySnapshot(inventory: InventorySaveSnapshot): InventorySaveSnapshot {
+    return {
+        width: inventory.width,
+        height: inventory.height,
+        items: inventory.items.map((item) => ({ ...item })),
+    };
+}
+
+function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
+    return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+}
+
+function findFreeInventorySlot(inventory: InventorySaveSnapshot, itemId: string): TilePoint | null {
+    const item = getItemDef(itemId);
+    if (!item) return null;
+    for (let y = 0; y <= inventory.height - item.gridH; y++) {
+        for (let x = 0; x <= inventory.width - item.gridW; x++) {
+            if (canPlaceSavedItem(inventory, x, y, item.gridW, item.gridH)) return { x, y };
+        }
+    }
+    return null;
+}
+
+function canPlaceSavedItem(inventory: InventorySaveSnapshot, x: number, y: number, width: number, height: number): boolean {
+    for (const placed of inventory.items) {
+        const item = getItemDef(placed.itemId);
+        const itemWidth = item?.gridW ?? 1;
+        const itemHeight = item?.gridH ?? 1;
+        const overlaps = x < placed.gridX + itemWidth
+            && x + width > placed.gridX
+            && y < placed.gridY + itemHeight
+            && y + height > placed.gridY;
+        if (overlaps) return false;
+    }
+    return true;
 }
 
 function reject(intentId: string, reason: string): WorldSessionMessageResult {

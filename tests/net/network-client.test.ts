@@ -215,6 +215,45 @@ test('client includes access token, character id, requested realm, and carried i
     }
 });
 
+test('client sends world heartbeat while the socket is open and clears the timer on close', async () => {
+    const restoreSocket = installMockWebSocket();
+    const originalSetInterval = globalThis.setInterval;
+    const originalClearInterval = globalThis.clearInterval;
+    let heartbeatTick: (() => void) | null = null;
+    let clearCount = 0;
+    (globalThis as unknown as { setInterval: unknown }).setInterval = ((callback: () => void) => {
+        heartbeatTick = callback;
+        return { unref: () => undefined };
+    }) as typeof setInterval;
+    (globalThis as unknown as { clearInterval: unknown }).clearInterval = (() => {
+        clearCount += 1;
+    }) as typeof clearInterval;
+
+    try {
+        const client = new NetworkRaidClient({ url: 'ws://test' });
+        const join = client.connectAndJoin(joinInput());
+        const socket = MockWebSocket.instances[0];
+        assert.ok(socket);
+
+        socket.emitOpen();
+        assert.ok(heartbeatTick);
+        heartbeatTick();
+
+        const heartbeat = JSON.parse(socket.sent[1]);
+        assert.equal(heartbeat.type, 'CLIENT_HEARTBEAT');
+        assert.equal(typeof heartbeat.clientTime, 'number');
+
+        socket.emitMessage(welcomeMessage('resume_heartbeat'));
+        await join;
+        client.close();
+        assert.ok(clearCount >= 1);
+    } finally {
+        globalThis.setInterval = originalSetInterval;
+        globalThis.clearInterval = originalClearInterval;
+        restoreSocket();
+    }
+});
+
 test('client rejects a superseded join request and ignores stale socket close', async () => {
     const restoreSocket = installMockWebSocket();
     try {
