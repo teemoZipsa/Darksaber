@@ -20,6 +20,7 @@ export class InputManager {
 
     constructor(canvas: HTMLCanvasElement) {
         window.addEventListener('keydown', (e) => {
+            if (isEditableTarget(e.target) || e.isComposing) return;
             if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyW','KeyA','KeyS','KeyD','Tab','KeyI','KeyJ','KeyP','KeyC','KeyM'].includes(e.code)) {
                 e.preventDefault();
             }
@@ -30,6 +31,7 @@ export class InputManager {
         });
 
         window.addEventListener('keyup', (e) => {
+            if (isEditableTarget(e.target) || e.isComposing) return;
             this.keysDown.delete(e.code);
         });
 
@@ -93,5 +95,12 @@ export class InputManager {
         this.mouseJustUp = false;
         this.mouseWheelDelta = 0;
     }
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    if (target.isContentEditable) return true;
+    const tagName = target.tagName.toLowerCase();
+    return tagName === 'input' || tagName === 'textarea' || tagName === 'select';
 }
 
