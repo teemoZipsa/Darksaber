@@ -30,7 +30,7 @@ import { WorldSelectionController } from '../../src/engine/world/WorldSelectionC
 import { GridInventory } from '../../src/inventory/GridInventory';
 import { generateWorldLootNear } from '../../src/loot/WorldLootGenerator';
 import { BURGOS_CASTLE_HMAP_ROWS, BURGOS_CASTLE_HMAP_SIZE } from '../../src/map/BurgosCastleHmap';
-import { WorldMap } from '../../src/map/WorldMap';
+import { NEUTRAL_BIRD_SPRITE_SRC, WorldMap } from '../../src/map/WorldMap';
 import { TileType } from '../../src/map/Tile';
 
 class ImageStub {
@@ -141,6 +141,11 @@ test('starter field content attaches all 16 general monster walk sprites', () =>
     for (const id of GENERAL_MONSTER_IDS) {
         assert.ok(spriteNames.has(MONSTER_DEFINITIONS[id].sprite), `${id} was not spawned with its catalog sprite`);
     }
+});
+
+test('world map neutral bird sprite asset is available', () => {
+    const publicPath = ['public', ...NEUTRAL_BIRD_SPRITE_SRC.split('/').filter(Boolean)];
+    assert.ok(existsSync(join(process.cwd(), ...publicPath)));
 });
 
 test('world loot generator is deterministic and does not revisit generated chunks', () => {

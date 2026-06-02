@@ -260,6 +260,18 @@ const NORMAL_TREE_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST]);
 const SCARY_TREE_TILES = new Set<TileType>([TileType.POISON_SWAMP]);
 const NORMAL_TREE_CANOPY_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE]);
 const SCARY_TREE_CANOPY_TILES = new Set<TileType>([TileType.POISON_SWAMP, TileType.STONE]);
+export const NEUTRAL_BIRD_SPRITE_SRC = '/assets/images/monsters/791R.png';
+const NEUTRAL_BIRD_FRAME_SIZE = 64;
+const NEUTRAL_BIRD_FRAME_COUNT = 3;
+const NEUTRAL_BIRD_FPS = 8;
+const NEUTRAL_BIRD_CHUNK_CHANCE = 0.16;
+const NEUTRAL_BIRD_RENDER_SCALE = 1.38;
+const NEUTRAL_BIRD_ROW_BY_FACING: Record<'up' | 'down' | 'left' | 'right', number> = {
+    up: 0,
+    down: 1,
+    right: 2,
+    left: 3,
+};
 
 const TREE_DECORATION_CONFIGS: Record<TreeSpriteId, TreeDecorationConfig> = {
     largeTree: {
@@ -325,6 +337,8 @@ export class WorldMap {
     private townExitTileCache: Map<string, TilePoint> = new Map();
     private preloadChunkMargin: number = 1;
     private biomeMask: BiomeMask;
+    private neutralBirdImage: HTMLImageElement | null = null;
+    private neutralBirdImageLoaded = false;
 
     public loot: LootObject[] = [];
     public extractionZones: ExtractionZone[] = [];
@@ -900,6 +914,7 @@ export class WorldMap {
         this.renderDecorations(ctx, cameraX, cameraY, vw, vh, false);
         this.renderTownLandmarks(ctx, cameraX, cameraY, vw, vh);
         this.renderTempleLandmarks(ctx, cameraX, cameraY, vw, vh);
+        this.renderNeutralBirds(ctx, cameraX, cameraY, vw, vh);
 
         for (const zone of this.extractionZones) {
             zone.render(ctx, (gx, gy) => ({
@@ -1259,6 +1274,102 @@ export class WorldMap {
         ctx.fillRect(sx, sy + height * 0.18, width, height * 0.64);
         ctx.strokeRect(sx, sy + height * 0.18, width, height * 0.64);
         ctx.restore();
+    }
+
+    private ensureNeutralBirdImage(): HTMLImageElement | null {
+        if (this.neutralBirdImage) return this.neutralBirdImage;
+        if (typeof Image === 'undefined') return null;
+
+        const image = new Image();
+        this.neutralBirdImage = image;
+        this.neutralBirdImageLoaded = false;
+        image.onload = () => {
+            if (this.neutralBirdImage !== image) return;
+            this.neutralBirdImageLoaded = true;
+        };
+        image.onerror = () => {
+            if (this.neutralBirdImage !== image) return;
+            this.neutralBirdImageLoaded = false;
+        };
+        image.src = NEUTRAL_BIRD_SPRITE_SRC;
+        return image;
+    }
+
+    private renderNeutralBirds(
+        ctx: CanvasRenderingContext2D,
+        cameraX: number,
+        cameraY: number,
+        vw: number,
+        vh: number
+    ): void {
+        const image = this.ensureNeutralBirdImage();
+        if (!image || (!this.neutralBirdImageLoaded && (!image.complete || image.naturalWidth <= 0))) return;
+
+        const chunkPixelSize = CHUNK_SIZE * TILE_SIZE;
+        const minChunkX = Math.floor(cameraX / chunkPixelSize) - 1;
+        const maxChunkX = Math.floor((cameraX + vw) / chunkPixelSize) + 1;
+        const minChunkY = Math.floor(cameraY / chunkPixelSize) - 1;
+        const maxChunkY = Math.floor((cameraY + vh) / chunkPixelSize) + 1;
+        const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        for (let chunkY = minChunkY; chunkY <= maxChunkY; chunkY++) {
+            for (let chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+                if (!this.isChunkInBounds(chunkX, chunkY)) continue;
+                if (this.hash(chunkX, chunkY, 811) >= NEUTRAL_BIRD_CHUNK_CHANCE) continue;
+
+                this.renderNeutralBirdForChunk(ctx, image, chunkX, chunkY, now, cameraX, cameraY, vw, vh);
+            }
+        }
+        ctx.restore();
+    }
+
+    private renderNeutralBirdForChunk(
+        ctx: CanvasRenderingContext2D,
+        image: HTMLImageElement,
+        chunkX: number,
+        chunkY: number,
+        now: number,
+        cameraX: number,
+        cameraY: number,
+        vw: number,
+        vh: number
+    ): void {
+        const anchorX = chunkX * CHUNK_SIZE + this.hash(chunkX, chunkY, 812) * CHUNK_SIZE;
+        const anchorY = chunkY * CHUNK_SIZE + this.hash(chunkX, chunkY, 813) * CHUNK_SIZE;
+        const phase = this.hash(chunkX, chunkY, 814) * Math.PI * 2;
+        const phase2 = this.hash(chunkX, chunkY, 815) * Math.PI * 2;
+        const speed = 0.16 + this.hash(chunkX, chunkY, 816) * 0.2;
+        const radiusX = 2.5 + this.hash(chunkX, chunkY, 817) * 5;
+        const radiusY = 1.5 + this.hash(chunkX, chunkY, 818) * 4;
+        const t = now * speed + phase;
+
+        const offsetX = Math.sin(t) * radiusX + Math.sin(t * 0.43 + phase2) * radiusX * 0.32;
+        const offsetY = Math.sin(t * 0.71 + phase2) * radiusY + Math.cos(t * 0.37 + phase) * radiusY * 0.28;
+        const vx = Math.cos(t) * radiusX * speed + Math.cos(t * 0.43 + phase2) * radiusX * 0.32 * speed * 0.43;
+        const vy = Math.cos(t * 0.71 + phase2) * radiusY * speed * 0.71 - Math.sin(t * 0.37 + phase) * radiusY * 0.28 * speed * 0.37;
+        const facing = Math.abs(vx) >= Math.abs(vy)
+            ? (vx >= 0 ? 'right' : 'left')
+            : (vy >= 0 ? 'down' : 'up');
+        const frame = Math.floor(now * NEUTRAL_BIRD_FPS + this.hash(chunkX, chunkY, 819) * NEUTRAL_BIRD_FRAME_COUNT) % NEUTRAL_BIRD_FRAME_COUNT;
+        const size = TILE_SIZE * NEUTRAL_BIRD_RENDER_SCALE * (0.88 + this.hash(chunkX, chunkY, 820) * 0.18);
+        const sx = (anchorX + offsetX) * TILE_SIZE - cameraX - size / 2;
+        const sy = (anchorY + offsetY) * TILE_SIZE - cameraY - size * 0.7;
+
+        if (sx + size < 0 || sx > vw || sy + size < 0 || sy > vh) return;
+
+        ctx.drawImage(
+            image,
+            frame * NEUTRAL_BIRD_FRAME_SIZE,
+            NEUTRAL_BIRD_ROW_BY_FACING[facing] * NEUTRAL_BIRD_FRAME_SIZE,
+            NEUTRAL_BIRD_FRAME_SIZE,
+            NEUTRAL_BIRD_FRAME_SIZE,
+            Math.round(sx),
+            Math.round(sy),
+            Math.round(size),
+            Math.round(size)
+        );
     }
 
     private decorationIntersectsTileRect(
