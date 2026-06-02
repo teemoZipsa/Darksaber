@@ -4,6 +4,7 @@
  * Run with: npm run server
  */
 
+import 'dotenv/config';
 import { WebSocketServer, WebSocket, type RawData } from 'ws';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
@@ -34,8 +35,11 @@ const WS_RATE_LIMIT_WINDOW_MS = 10_000;
 const WS_RATE_LIMIT_MESSAGES = Math.max(1, Math.floor(Number(process.env.WORLD_WS_RATE_LIMIT ?? 120)));
 const WS_IDLE_TIMEOUT_MS = Math.max(10_000, Math.floor(Number(process.env.WORLD_WS_IDLE_TIMEOUT_MS ?? 60_000)));
 const allowedOrigins = parseAllowedOrigins(process.env.AUTH_ALLOWED_ORIGINS);
+const authStoreKind = process.env.DATABASE_URL ? 'postgres' : 'memory';
+const jwtSecret = process.env.AUTH_JWT_SECRET ?? process.env.JWT_SECRET ?? (process.env.NODE_ENV === 'production' ? '' : 'darksaber-dev-jwt-secret-change-me');
+if (!jwtSecret) throw new Error('AUTH_JWT_SECRET is required when NODE_ENV=production.');
 const jwtOptions: JwtOptions = {
-    secret: process.env.AUTH_JWT_SECRET ?? process.env.JWT_SECRET ?? 'darksaber-dev-jwt-secret-change-me',
+    secret: jwtSecret,
     issuer: process.env.AUTH_JWT_ISSUER ?? 'darksaber-world',
     audience: process.env.AUTH_JWT_AUDIENCE ?? 'darksaber-client',
     ttlSeconds: Math.max(60, Math.floor(Number(process.env.AUTH_ACCESS_TOKEN_TTL_SECONDS ?? 900))),
@@ -56,7 +60,7 @@ const server = createServer(async (request, response) => {
 
     if (request.url === '/healthz') {
         response.writeHead(200, { 'Content-Type': 'application/json' });
-        response.end(JSON.stringify({ ok: true, protocol: WORLD_PROTOCOL_VERSION, shards: WORLD_SHARD_COUNT, sessions: sessions.size }));
+        response.end(JSON.stringify({ ok: true, protocol: WORLD_PROTOCOL_VERSION, authStore: authStoreKind, shards: WORLD_SHARD_COUNT, sessions: sessions.size }));
         return;
     }
 
@@ -83,6 +87,7 @@ let immediateSnapshotFlushScheduled = false;
 server.listen(PORT, HOST, () => {
     const hostLabel = HOST ?? '0.0.0.0';
     console.log(`Darksaber world server started on ws://${hostLabel}:${PORT}`);
+    console.log(`Auth store: ${authStoreKind}`);
 });
 
 wss.on('connection', (ws: WebSocket, request) => {
@@ -347,7 +352,7 @@ function rawDataLength(data: RawData): number {
     if (Buffer.isBuffer(data)) return data.length;
     if (Array.isArray(data)) return data.reduce((sum, entry) => sum + entry.length, 0);
     if (data instanceof ArrayBuffer) return data.byteLength;
-    return data.byteLength;
+    return 0;
 }
 
 function rawDataToBuffer(data: RawData): Buffer {

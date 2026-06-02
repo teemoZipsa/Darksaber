@@ -397,6 +397,10 @@ export class PostgresAuthStore implements AuthStore {
         this.pool = new Pool({ connectionString });
     }
 
+    public async close(): Promise<void> {
+        await this.pool.end();
+    }
+
     public async initialize(): Promise<void> {
         await this.pool.query(`
             CREATE TABLE IF NOT EXISTS accounts (

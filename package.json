@@ -8,6 +8,10 @@
     "start": "npm run dev",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "db:check": "npx tsx server/check-db.ts",
     "server": "npx tsx server/index.ts",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "test": "node --import tsx --test tests/raid/*.test.ts tests/field/*.test.ts tests/net/*.test.ts",
@@ -35,6 +39,7 @@
   "dependencies": {
     "@types/pg": "^8.20.0",
     "argon2": "^0.44.0",
+    "dotenv": "^17.4.2",
     "pg": "^8.21.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
