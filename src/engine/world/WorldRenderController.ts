@@ -126,6 +126,9 @@ export class WorldRenderController {
                 worldName: model.worldName,
                 terrainLines: model.terrainHoverLines,
             });
+        } else {
+            if (this.context.magicController.isVisible()) this.context.magicController.render(ctx, uiW, uiH);
+            if (this.context.toolController.isVisible()) this.context.toolController.render(ctx, uiW, uiH);
         }
         if (this.context.townSession.isVisible()) this.context.townSession.render(ctx, uiW, uiH);
         if (this.context.fusionTempleUI.isVisible()) this.context.fusionTempleUI.render(ctx, uiW, uiH);
