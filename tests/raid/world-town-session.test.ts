@@ -6,6 +6,8 @@ import { createStatus, hasStatus } from '../../src/combat/StatusEffects';
 import { PlayerData } from '../../src/data/PlayerData';
 import { GridInventory } from '../../src/inventory/GridInventory';
 import { WorldTownSession } from '../../src/engine/world/WorldTownSession';
+import { TownUI, TOWN_DEPLOY_CLICK_GUARD_MS } from '../../src/ui/TownUI';
+import type { TownInfo } from '../../src/map/BiomeMask';
 
 class ImageStub {
     public src = '';
@@ -14,6 +16,15 @@ class ImageStub {
 }
 
 (globalThis as unknown as { Image: typeof ImageStub }).Image = ImageStub;
+
+const KAOSIA: TownInfo = {
+    id: 'central_castle',
+    name: 'Kaosia',
+    nameKr: '카오시아',
+    chunkX: 37,
+    chunkY: 44,
+    radius: 3,
+};
 
 test('world town session purchases pending rest and treats active party injuries', () => {
     const party = new PartyManager();
@@ -45,4 +56,21 @@ test('world town session purchases pending rest and treats active party injuries
     assert.equal(hasStatus(character.statuses, 'injury'), false);
     assert.equal(playerData.gold < goldBeforeTreatment, true);
     assert.ok(logs.length > 0);
+});
+
+test('town deploy ignores click-through immediately after opening', () => {
+    let deploys = 0;
+    const ui = new TownUI(new GridInventory(10, 6), new GridInventory(10, 6));
+    ui.onDeploy(() => { deploys++; });
+
+    ui.show(KAOSIA, 1000);
+    ui.requestDeploy(1000 + TOWN_DEPLOY_CLICK_GUARD_MS - 1);
+
+    assert.equal(deploys, 0);
+    assert.equal(ui.isVisible(), true);
+
+    ui.requestDeploy(1000 + TOWN_DEPLOY_CLICK_GUARD_MS);
+
+    assert.equal(deploys, 1);
+    assert.equal(ui.isVisible(), false);
 });

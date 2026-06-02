@@ -23,6 +23,12 @@ import { getTownFacilities, type TownFacilityId } from '../data/TownFacilityData
 
 export type TownTab = TownFacilityId;
 
+export const TOWN_DEPLOY_CLICK_GUARD_MS = 450;
+
+function getNowMs(): number {
+    return globalThis.performance?.now() ?? Date.now();
+}
+
 /** Random rumor keys per town, cycling for variety. */
 export const RUMOR_KEYS: string[] = [
     'rumors.common.eastBoss',
@@ -52,6 +58,7 @@ export class TownUI {
     private visible: boolean = false;
     private activeTab: TownTab = 'storage';
     private onDeployAction: (() => void) | null = null;
+    private deployClickGuardUntilMs = 0;
 
     // Rumors state (random selection per visit)
     private currentRumors: string[] = [];
@@ -95,7 +102,8 @@ export class TownUI {
     public getRumors(): string[] { return this.currentRumors; }
     public getRestFacilityPublic(): RestFacility | null { return this.getCurrentRestFacility(); }
     /** Leave town (mirrors the old canvas deploy button). */
-    public requestDeploy(): void {
+    public requestDeploy(nowMs = getNowMs()): void {
+        if (nowMs < this.deployClickGuardUntilMs) return;
         if (this.onDeployAction) {
             this.hide();
             this.onDeployAction();
@@ -119,11 +127,12 @@ export class TownUI {
 
     // ── Lifecycle ──────────────────────────────────────────────────
 
-    public show(town: TownInfo): void {
+    public show(town: TownInfo, nowMs = getNowMs()): void {
         this.currentTown = town;
         this.shopUI.setTownId(town.id);
         this.visible = true;
         this.activeTab = 'storage';
+        this.deployClickGuardUntilMs = nowMs + TOWN_DEPLOY_CLICK_GUARD_MS;
 
         // Pick 3 random rumors for this visit.
         const rumorPool = RUMOR_KEYS.map((key) => t(key));
