@@ -37,6 +37,7 @@ const marketSession = new ServerMarketSession({
 });
 const playerBySocket = new Map<WebSocket, string>();
 const socketByPlayer = new Map<string, WebSocket>();
+let immediateSnapshotFlushScheduled = false;
 
 server.listen(PORT, HOST, () => {
     const hostLabel = HOST ?? '0.0.0.0';
@@ -94,6 +95,7 @@ wss.on('connection', (ws: WebSocket) => {
         const result = session.handleMessage(playerId, message);
         for (const reply of result.replies) send(ws, reply);
         for (const broadcast of result.broadcasts) broadcastToActive(broadcast);
+        if (shouldSendImmediateSnapshots(message, result.replies)) queueImmediateSnapshots();
         if (message.type === 'WORLD_LEAVE') {
             playerBySocket.delete(ws);
             socketByPlayer.delete(playerId);
@@ -124,11 +126,7 @@ setInterval(() => {
         const ws = socketByPlayer.get(entry.playerId);
         if (ws) send(ws, entry.message);
     }
-    const activePlayerIds = session.getActivePlayerIds();
-    for (const playerId of activePlayerIds) {
-        const ws = socketByPlayer.get(playerId);
-        if (ws) send(ws, { type: 'WORLD_SNAPSHOT', snapshot: session.createSnapshot(playerId, now) });
-    }
+    sendSnapshotsToActive(now);
 }, WORLD_TICK_MS);
 
 if (ENABLE_DEBUG_COUNTS) {
@@ -161,6 +159,30 @@ function parseMessage(data: Buffer): WorldClientMessage | null {
 
 function send(ws: WebSocket, message: WorldServerMessage): void {
     sendSerialized(ws, JSON.stringify(message));
+}
+
+function queueImmediateSnapshots(): void {
+    if (immediateSnapshotFlushScheduled) return;
+    immediateSnapshotFlushScheduled = true;
+    setImmediate(() => {
+        immediateSnapshotFlushScheduled = false;
+        sendSnapshotsToActive(Date.now());
+    });
+}
+
+function sendSnapshotsToActive(now: number): void {
+    const activePlayerIds = session.getActivePlayerIds();
+    for (const playerId of activePlayerIds) {
+        const ws = socketByPlayer.get(playerId);
+        if (ws) send(ws, { type: 'WORLD_SNAPSHOT', snapshot: session.createSnapshot(playerId, now) });
+    }
+}
+
+function shouldSendImmediateSnapshots(message: WorldClientMessage, replies: readonly WorldServerMessage[]): boolean {
+    if (message.type !== 'PLAYER_INTENT' && message.type !== 'LOOT_PICKUP' && message.type !== 'AUTO_LOOT_RESOLVE') {
+        return false;
+    }
+    return !replies.some((reply) => reply.type === 'ACTION_REJECTED');
 }
 
 function sendSerialized(ws: WebSocket, payload: string): void {
