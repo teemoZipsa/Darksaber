@@ -10,6 +10,8 @@
 import { TILE_SIZE } from '../map/Chunk';
 import type { Skill } from '../data/SkillDB';
 import { UI, Parchment } from './UITheme';
+import { getSkillIconCell } from './DarksaberIconRegistry';
+import { DarksaberSpriteAtlas, MICON_CELL_SIZE } from './DarksaberSpriteAtlas';
 
 export interface FieldMagicSlot {
     skill: Skill;
@@ -24,12 +26,14 @@ export type FieldMagicClickResult =
     | { kind: 'cancel' };
 
 export class FieldMagicMenu {
+    private static readonly ICON_ANIMATION_ROWS = 5;
+    private static readonly ICON_ANIMATION_MS = 280;
     private open = false;
     private slots: FieldMagicSlot[] = [];
     private hoveredIndex: number | null = null;
 
     private readonly menuRadius = 82;
-    private readonly iconRadius = 23;
+    private readonly iconRadius = 25;
     private readonly hitHalfSize = 22;
 
     private centerX = 0;
@@ -128,30 +132,12 @@ export class FieldMagicMenu {
     ): void {
         const r = this.iconRadius;
 
-        // Backing disc
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = slot.enabled ? 'rgba(20, 16, 12, 0.86)' : 'rgba(28, 14, 16, 0.86)';
-        ctx.fill();
-        ctx.lineWidth = hovered ? 2.5 : 1.5;
-        ctx.strokeStyle = slot.enabled
-            ? (hovered ? Parchment.borderGold : 'rgba(200, 146, 42, 0.6)')
-            : 'rgba(228, 63, 90, 0.6)';
+        this.drawSlotBacking(ctx, x, y, r, slot.enabled, hovered);
         if (hovered) {
-            ctx.shadowColor = ctx.strokeStyle;
-            ctx.shadowBlur = 8;
+            this.drawSlotFocus(ctx, x, y, r, slot.enabled);
         }
-        ctx.stroke();
-        ctx.shadowBlur = 0;
 
-        // Skill emoji icon
-        ctx.globalAlpha = slot.enabled ? 1 : 0.4;
-        ctx.font = `${r * 1.25}px ${UI.fontPrimary}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#fff';
-        ctx.fillText(slot.skill.icon, x, y + 1);
-        ctx.globalAlpha = 1;
+        this.drawSkillIcon(ctx, slot, x, y, r);
 
         // Number hotkey (top-left)
         ctx.font = `bold 10px ${UI.fontMono}`;
@@ -168,6 +154,102 @@ export class FieldMagicMenu {
 
         ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
+    }
+
+    private drawSlotBacking(
+        ctx: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        r: number,
+        enabled: boolean,
+        hovered: boolean
+    ): void {
+        const size = r * 1.68;
+        const left = x - size / 2;
+        const top = y - size / 2;
+
+        ctx.save();
+        ctx.fillStyle = enabled ? 'rgba(20, 16, 12, 0.9)' : 'rgba(28, 14, 16, 0.9)';
+        ctx.fillRect(left, top, size, size);
+        ctx.strokeStyle = enabled
+            ? (hovered ? Parchment.borderGold : 'rgba(200, 146, 42, 0.72)')
+            : 'rgba(228, 63, 90, 0.68)';
+        ctx.lineWidth = hovered ? 2 : 1;
+        ctx.strokeRect(left + 0.5, top + 0.5, size - 1, size - 1);
+
+        ctx.fillStyle = 'rgba(255, 228, 160, 0.08)';
+        ctx.fillRect(left + 3, top + 3, size - 6, 1);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+        ctx.fillRect(left + 3, top + size - 4, size - 6, 1);
+        ctx.restore();
+    }
+
+    private drawSkillIcon(ctx: CanvasRenderingContext2D, slot: FieldMagicSlot, x: number, y: number, r: number): void {
+        const iconCell = getSkillIconCell(slot.skill);
+        const frame = Math.floor(this.getAnimationTime() / FieldMagicMenu.ICON_ANIMATION_MS) % 2;
+        const row = iconCell && iconCell.row < FieldMagicMenu.ICON_ANIMATION_ROWS
+            ? iconCell.row + frame * FieldMagicMenu.ICON_ANIMATION_ROWS
+            : iconCell?.row;
+        const iconSize = Math.max(28, r * 1.55);
+
+        ctx.save();
+        if (!slot.enabled) ctx.globalAlpha *= 0.4;
+        if (iconCell && row !== undefined) {
+            const drawn = DarksaberSpriteAtlas.drawSprite(
+                ctx,
+                {
+                    sheet: 'micon',
+                    x: iconCell.col * MICON_CELL_SIZE,
+                    y: row * MICON_CELL_SIZE,
+                    w: MICON_CELL_SIZE,
+                    h: MICON_CELL_SIZE,
+                },
+                x - iconSize / 2,
+                y - iconSize / 2,
+                iconSize,
+                iconSize
+            );
+            if (drawn) {
+                ctx.restore();
+                return;
+            }
+        }
+
+        ctx.font = `${r * 1.15}px ${UI.fontPrimary}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(slot.skill.icon, x, y + 1);
+        ctx.restore();
+    }
+
+    private drawSlotFocus(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, enabled: boolean): void {
+        const size = r * 1.65;
+        const left = x - size / 2;
+        const top = y - size / 2;
+        const corner = 10;
+        const color = enabled ? Parchment.borderGold : 'rgba(228, 63, 90, 0.72)';
+
+        ctx.save();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = enabled ? 8 : 5;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(left, top + corner);
+        ctx.lineTo(left, top);
+        ctx.lineTo(left + corner, top);
+        ctx.moveTo(left + size - corner, top);
+        ctx.lineTo(left + size, top);
+        ctx.lineTo(left + size, top + corner);
+        ctx.moveTo(left + size, top + size - corner);
+        ctx.lineTo(left + size, top + size);
+        ctx.lineTo(left + size - corner, top + size);
+        ctx.moveTo(left + corner, top + size);
+        ctx.lineTo(left, top + size);
+        ctx.lineTo(left, top + size - corner);
+        ctx.stroke();
+        ctx.restore();
     }
 
     private renderHoveredDetail(ctx: CanvasRenderingContext2D): void {
@@ -199,5 +281,9 @@ export class FieldMagicMenu {
 
         ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
+    }
+
+    private getAnimationTime(): number {
+        return typeof performance !== 'undefined' ? performance.now() : Date.now();
     }
 }
