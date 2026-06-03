@@ -14,6 +14,7 @@
     "render:status": "node scripts/render-deploy.mjs status",
     "render:deploy": "node scripts/render-deploy.mjs deploy",
     "render:wait": "node scripts/render-deploy.mjs wait",
+    "deploy:prod": "node scripts/deploy-production.mjs",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "test": "node --import tsx --test tests/raid/*.test.ts tests/field/*.test.ts tests/net/*.test.ts",
     "test:raid": "node --import tsx --test tests/raid/*.test.ts",

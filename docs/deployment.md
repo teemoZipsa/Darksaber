@@ -126,6 +126,44 @@ Use the default Vite deployment. `vercel.json` pins:
 After deployment, copy the Vercel production origin back into Render's
 `AUTH_ALLOWED_ORIGINS`. If you use a custom domain, use the custom domain origin.
 
+## Production Deploy Command
+
+Keep automatic deploys disabled during normal development:
+
+- Render: `render.yaml` uses `autoDeployTrigger: 'off'`
+- Vercel: `vercel.json` uses `git.deploymentEnabled: false`
+
+When you are ready to publish, set local secrets outside git:
+
+```powershell
+$env:RENDER_API_KEY="rnd_..."
+$env:RENDER_SERVICE_ID="srv-d8ffsauq1p3s73ducdo0"
+$env:VERCEL_TOKEN="..."
+```
+
+Vercel also needs a linked project. Run this once on the machine, or set
+`VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`:
+
+```powershell
+npx vercel link
+```
+
+Then run one command:
+
+```powershell
+npm run deploy:prod
+```
+
+The command requires a clean git working tree, then runs `npx tsc --noEmit`,
+`npm test`, `npm run build`, Render deploy/wait, and Vercel production deploy.
+Use narrow skips only when you already did that step intentionally:
+
+```powershell
+npm run deploy:prod -- --skip-render
+npm run deploy:prod -- --skip-vercel
+npm run deploy:prod -- --skip-checks
+```
+
 ## Required Production Checks
 
 Before opening access to players:
