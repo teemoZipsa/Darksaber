@@ -5,9 +5,28 @@ import type { EnemyRole } from '../field/EnemyAI';
 import type { WorldLootContainerType } from '../loot/WorldLootTypes';
 
 const configuredWorldServerUrl = import.meta.env?.VITE_WORLD_SERVER_URL?.trim();
+const configuredAuthServerUrl = import.meta.env?.VITE_AUTH_SERVER_URL?.trim();
 
-export const DEFAULT_WORLD_SERVER_URL = configuredWorldServerUrl || (import.meta.env?.DEV ? 'ws://localhost:8765' : '');
+export const DEFAULT_WORLD_SERVER_URL = configuredWorldServerUrl
+    || deriveWorldServerUrl(configuredAuthServerUrl)
+    || (import.meta.env?.DEV ? 'ws://localhost:8765' : '');
 export const WORLD_PROTOCOL_VERSION = 'world-pve-v3';
+
+export function deriveWorldServerUrl(authServerUrl: string | undefined): string {
+    if (!authServerUrl) return '';
+    try {
+        const url = new URL(authServerUrl);
+        if (url.protocol === 'https:') url.protocol = 'wss:';
+        else if (url.protocol === 'http:') url.protocol = 'ws:';
+        else return '';
+        url.pathname = '';
+        url.search = '';
+        url.hash = '';
+        return url.toString().replace(/\/$/, '');
+    } catch {
+        return '';
+    }
+}
 
 export type WorldRealmId = 'mortal' | 'master';
 

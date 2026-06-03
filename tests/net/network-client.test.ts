@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createDefaultMarketSnapshot } from '../../src/data/MarketData';
 import { NetworkRaidClient, type NetworkRaidJoinInput } from '../../src/net/NetworkRaidClient';
-import type { WorldSnapshot } from '../../src/net/WorldProtocol';
+import { deriveWorldServerUrl, type WorldSnapshot } from '../../src/net/WorldProtocol';
 
 function snapshot(seq: number): WorldSnapshot {
     return {
@@ -143,6 +143,13 @@ test('client rejects network join when the server URL is not configured', async 
     } finally {
         restoreSocket();
     }
+});
+
+test('world server URL can be derived from the auth server URL', () => {
+    assert.equal(deriveWorldServerUrl('https://darksaber-world-server-9d7y.onrender.com'), 'wss://darksaber-world-server-9d7y.onrender.com');
+    assert.equal(deriveWorldServerUrl('http://localhost:8765/'), 'ws://localhost:8765');
+    assert.equal(deriveWorldServerUrl('postgres://example.com'), '');
+    assert.equal(deriveWorldServerUrl('not a url'), '');
 });
 
 test('client ignores snapshots with regressing seq', () => {
