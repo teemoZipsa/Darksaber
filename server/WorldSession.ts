@@ -462,6 +462,10 @@ export class WorldSession {
         for (const entry of this.enemies.values()) {
             const enemy = entry.enemy;
             if (enemy.stats.hp <= 0) continue;
+            if (!this.updateEnemyAggro(entry)) {
+                enemy.actionGauge = 0;
+                continue;
+            }
             enemy.actionGauge = advanceAtb(enemy.actionGauge, getEffectiveStatsForEnemy(enemy).spd, dt, FIELD_ATB_SCALE * 0.7);
             if (enemy.actionGauge >= 100) {
                 enemy.actionGauge = 100;
@@ -1083,6 +1087,25 @@ export class WorldSession {
             : this.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
         if (enemy.isBoss || !autoLootGrant) this.spawnEnemyLoot(enemy);
         return autoLootGrant;
+    }
+
+    private updateEnemyAggro(entry: ServerEnemy): boolean {
+        const enemy = entry.enemy;
+        const targets = this.getTargetableActors();
+        const enemyTile = { x: enemy.gridX, y: enemy.gridY };
+        const closest = targets.reduce<ServerActor | null>((best, candidate) => {
+            if (!best) return candidate;
+            return manhattan(enemyTile, candidate.tile) < manhattan(enemyTile, best.tile) ? candidate : best;
+        }, null);
+        if (!closest) {
+            enemy.isAggro = false;
+            return false;
+        }
+
+        const distanceToTarget = manhattan(enemyTile, closest.tile);
+        const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
+        enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
+        return enemy.isAggro;
     }
 
     private resolveEnemyTurn(entry: ServerEnemy, now: number): CombatEventMessage[] {

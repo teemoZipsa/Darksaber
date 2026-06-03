@@ -79,7 +79,7 @@ test('join spawns each player at their origin hub external exit tile', () => {
     assert.deepEqual(forestActor?.tile, forestExit);
 });
 
-test('server tick advances shared enemy state for every client snapshot', () => {
+test('server tick keeps passive enemy ATB idle for every client snapshot', () => {
     const session = new WorldSession();
     const a = session.join(joinMessage('central_castle', 'hero-a'), 0);
     const b = session.join(joinMessage('central_castle', 'hero-b'), 0);
@@ -89,11 +89,35 @@ test('server tick advances shared enemy state for every client snapshot', () => 
 
     const snapshotA = session.createSnapshot(a.playerId, 250);
     const snapshotB = session.createSnapshot(b.playerId, 250);
-    assert.ok(snapshotA.enemies.some((enemy) => enemy.actionGauge > 0));
+    assert.ok(snapshotA.enemies.length > 0);
+    assert.equal(snapshotA.enemies.every((enemy) => enemy.actionGauge === 0 && !enemy.isAggro), true);
     assert.deepEqual(
         snapshotA.enemies.map((enemy) => ({ id: enemy.id, hp: enemy.stats.hp, tile: enemy.tile, gauge: enemy.actionGauge })),
         snapshotB.enemies.map((enemy) => ({ id: enemy.id, hp: enemy.stats.hp, tile: enemy.tile, gauge: enemy.actionGauge }))
     );
+});
+
+test('server tick charges only enemies with an active aggro target', () => {
+    const session = new WorldSession();
+    const a = session.join(joinMessage('central_castle', 'hero-a'), 0);
+    const internals = session as unknown as {
+        actors: Map<string, { tile: { x: number; y: number } }>;
+        enemies: Map<string, { enemy: { gridX: number; gridY: number; id: string } }>;
+    };
+    const serverActor = [...internals.actors.values()][0];
+    const enemyEntry = [...internals.enemies.values()][0];
+    assert.ok(serverActor);
+    assert.ok(enemyEntry);
+    serverActor.tile = { x: enemyEntry.enemy.gridX + 3, y: enemyEntry.enemy.gridY };
+
+    session.tick(0);
+    session.tick(250);
+
+    const snapshot = session.createSnapshot(a.playerId, 250);
+    const aggroEnemy = snapshot.enemies.find((enemy) => enemy.id === enemyEntry.enemy.id);
+    assert.ok(aggroEnemy);
+    assert.equal(aggroEnemy.isAggro, true);
+    assert.ok(aggroEnemy.actionGauge > 0);
 });
 
 test('intent ownership rejects another player actor', () => {
