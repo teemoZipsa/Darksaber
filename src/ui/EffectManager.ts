@@ -55,13 +55,52 @@ interface ActiveSpriteEffect {
     size: number;
 }
 
+interface KillSpriteSource {
+    image?: HTMLImageElement;
+    imageLoaded?: boolean;
+    walkSprite?: {
+        image: HTMLImageElement;
+        frameWidth: number;
+        frameHeight: number;
+        frameCount: number;
+        rowByFacing: Record<string, number>;
+        renderScale: number;
+    };
+    walkSpriteLoaded?: boolean;
+    facing?: string;
+}
+
+interface KillSpriteFrame {
+    image: HTMLImageElement;
+    sx: number;
+    sy: number;
+    sw: number;
+    sh: number;
+    renderScale: number;
+}
+
+interface KillShard {
+    sx: number;
+    sy: number;
+    sw: number;
+    sh: number;
+    dx: number;
+    dy: number;
+    dw: number;
+    dh: number;
+    vx: number;
+    vy: number;
+    spin: number;
+}
+
 // Kill fade-out tracking
 interface KillFade {
     gridX: number;
     gridY: number;
     alpha: number;
     color: string;
-    image?: HTMLImageElement;
+    sprite?: KillSpriteFrame;
+    shards: KillShard[];
     timer: number;
     expText: string;
     expAlpha: number;
@@ -173,7 +212,7 @@ export class EffectManager {
         for (let i = this.killFades.length - 1; i >= 0; i--) {
             const kf = this.killFades[i];
             kf.timer += dt;
-            kf.alpha = Math.max(0, 1 - kf.timer / 0.6);
+            kf.alpha = Math.max(0, 1 - kf.timer / 0.72);
             kf.expAlpha = Math.max(0, 1 - kf.timer / 1.2);
             kf.expY -= 30 * dt;
             if (kf.timer > 1.2) {
@@ -248,14 +287,37 @@ export class EffectManager {
         for (const kf of this.killFades) {
             const sx = kf.gridX * TILE_SIZE - camera.x;
             const sy = kf.gridY * TILE_SIZE - camera.y;
-            ctx.globalAlpha = kf.alpha;
+            const progress = Math.min(1, kf.timer / 0.72);
+            const ease = 1 - Math.pow(1 - progress, 2);
 
-            // Ghost silhouette
-            if (kf.image && kf.image.complete) {
-                ctx.drawImage(kf.image, sx, sy, TILE_SIZE, TILE_SIZE);
-            } else {
-                ctx.fillStyle = kf.color;
-                ctx.fillRect(sx + 8, sy + 8, TILE_SIZE - 16, TILE_SIZE - 16);
+            if (kf.sprite && kf.shards.length > 0) {
+                const renderW = TILE_SIZE * kf.sprite.renderScale;
+                const renderH = TILE_SIZE * kf.sprite.renderScale;
+                const baseX = sx + (TILE_SIZE - renderW) / 2;
+                const baseY = sy + (TILE_SIZE - renderH) / 2;
+                ctx.imageSmoothingEnabled = false;
+                for (const shard of kf.shards) {
+                    const dx = baseX + shard.dx + shard.vx * ease;
+                    const dy = baseY + shard.dy + shard.vy * ease + 10 * progress * progress;
+                    const cx = dx + shard.dw / 2;
+                    const cy = dy + shard.dh / 2;
+                    ctx.save();
+                    ctx.globalAlpha = kf.alpha;
+                    ctx.translate(cx, cy);
+                    ctx.rotate(shard.spin * ease);
+                    ctx.drawImage(
+                        kf.sprite.image,
+                        shard.sx,
+                        shard.sy,
+                        shard.sw,
+                        shard.sh,
+                        -shard.dw / 2,
+                        -shard.dh / 2,
+                        shard.dw,
+                        shard.dh
+                    );
+                    ctx.restore();
+                }
             }
 
             // EXP text floating up
@@ -282,14 +344,140 @@ export class EffectManager {
     //  Kill Fade-Out + EXP Pop
     // ═══════════════════════════════════════════════════════════
 
-    public spawnKillEffect(gridX: number, gridY: number, color: string, expGained: number, image?: HTMLImageElement): void {
+    public spawnKillEffect(
+        gridX: number,
+        gridY: number,
+        color: string,
+        expGained: number,
+        source?: HTMLImageElement | KillSpriteSource
+    ): void {
+        const sprite = this.resolveKillSpriteFrame(source);
         this.killFades.push({
-            gridX, gridY, color, image,
+            gridX, gridY, color, sprite,
+            shards: sprite ? this.createKillShards(sprite) : [],
             alpha: 1, timer: 0,
             expText: expGained > 0 ? `+${expGained} EXP` : '',
             expAlpha: 1,
             expY: 0,
         });
+        this.spawnDeathBurst(gridX, gridY, color, !!sprite);
+    }
+
+    private resolveKillSpriteFrame(source?: HTMLImageElement | KillSpriteSource): KillSpriteFrame | undefined {
+        if (!source) return undefined;
+
+        if (this.isImageElement(source)) {
+            if (!source.complete || source.naturalWidth <= 0 || source.naturalHeight <= 0) return undefined;
+            return {
+                image: source,
+                sx: 0,
+                sy: 0,
+                sw: source.naturalWidth,
+                sh: source.naturalHeight,
+                renderScale: 1,
+            };
+        }
+
+        const walk = source.walkSprite;
+        if (walk && source.walkSpriteLoaded && walk.image.complete) {
+            const frame = Math.min(1, Math.max(0, walk.frameCount - 1));
+            const row = walk.rowByFacing[source.facing ?? 'down'] ?? walk.rowByFacing.down ?? 0;
+            return {
+                image: walk.image,
+                sx: frame * walk.frameWidth,
+                sy: row * walk.frameHeight,
+                sw: walk.frameWidth,
+                sh: walk.frameHeight,
+                renderScale: walk.renderScale,
+            };
+        }
+
+        const image = source.image;
+        if (image && source.imageLoaded !== false && image.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {
+            return {
+                image,
+                sx: 0,
+                sy: 0,
+                sw: image.naturalWidth,
+                sh: image.naturalHeight,
+                renderScale: 1,
+            };
+        }
+
+        return undefined;
+    }
+
+    private isImageElement(source: HTMLImageElement | KillSpriteSource): source is HTMLImageElement {
+        return typeof HTMLImageElement !== 'undefined' && source instanceof HTMLImageElement;
+    }
+
+    private createKillShards(sprite: KillSpriteFrame): KillShard[] {
+        const shards: KillShard[] = [];
+        const cols = 2;
+        const rows = 3;
+        const renderW = TILE_SIZE * sprite.renderScale;
+        const renderH = TILE_SIZE * sprite.renderScale;
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                const sw = sprite.sw / cols;
+                const sh = sprite.sh / rows;
+                const dx = (renderW / cols) * col;
+                const dy = (renderH / rows) * row;
+                const side = col === 0 ? -1 : 1;
+                const verticalBias = row - 1;
+                shards.push({
+                    sx: sprite.sx + sw * col,
+                    sy: sprite.sy + sh * row,
+                    sw,
+                    sh,
+                    dx,
+                    dy,
+                    dw: renderW / cols,
+                    dh: renderH / rows,
+                    vx: side * (8 + row * 2),
+                    vy: -10 + verticalBias * 6,
+                    spin: side * (0.18 + row * 0.06),
+                });
+            }
+        }
+        return shards;
+    }
+
+    private spawnDeathBurst(gridX: number, gridY: number, color: string, hasSprite: boolean): void {
+        const cx = gridX * TILE_SIZE + TILE_SIZE / 2;
+        const cy = gridY * TILE_SIZE + TILE_SIZE / 2;
+        const particles: Particle[] = [{
+            x: cx,
+            y: cy,
+            vx: 0,
+            vy: 0,
+            life: 0.34,
+            maxLife: 0.34,
+            size: hasSprite ? 18 : 14,
+            color: 'rgba(70, 40, 28, 0.9)',
+            alpha: 1,
+            kind: 'ring',
+        }];
+
+        const count = hasSprite ? 18 : 24;
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 28 + Math.random() * 58;
+            particles.push({
+                x: cx + Math.cos(angle) * 6,
+                y: cy + Math.sin(angle) * 5,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - 18,
+                life: 0.22 + Math.random() * 0.28,
+                maxLife: 0.5,
+                size: 2 + Math.random() * 2.5,
+                color: Math.random() > 0.35 ? color : '#2b1712',
+                alpha: 1,
+                kind: Math.random() > 0.45 ? 'spark' : 'circle',
+            });
+        }
+
+        this.effects.push({ particles, timer: 0, duration: 0.52 });
     }
 
     public spawnHitEffect(gridX: number, gridY: number, isCrit: boolean = false): void {

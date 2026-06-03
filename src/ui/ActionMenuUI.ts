@@ -13,6 +13,7 @@ const ACTION_ICON_ANIMATION_ROWS = 5;
 const ACTION_ICON_ANIMATION_MS = 280;
 
 export type ActionType = 'tool' | 'attack' | 'rest' | 'defend' | 'magic' | 'move' | 'open';
+export type ReadyCursorType = 'move' | 'attack';
 
 export interface ActionMenuSlotState {
     type: ActionType;
@@ -54,13 +55,43 @@ interface ActionSlot {
     iconDraw: (ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean) => void;
 }
 
+interface ReadyCursorFrame {
+    sx: number;
+    sy: number;
+    sw: number;
+    sh: number;
+    dx: number;
+    dy: number;
+    dw: number;
+    dh: number;
+}
+
 export class ActionMenuUI {
+    private static readonly READY_CURSOR_SRC = '/assets/ui/MCURSOR.BMP';
+    private static readonly READY_CURSOR_FPS = 7;
+    private static readonly READY_CURSOR_FRAMES: Record<ReadyCursorType, ReadyCursorFrame[]> = {
+        move: [
+            { sx: 255, sy: 16, sw: 16, sh: 16, dx: 23, dy: 30, dw: 22, dh: 22 },
+            { sx: 271, sy: 16, sw: 16, sh: 16, dx: 23, dy: 30, dw: 22, dh: 22 },
+            { sx: 287, sy: 16, sw: 16, sh: 16, dx: 23, dy: 30, dw: 22, dh: 22 },
+        ],
+        attack: [
+            { sx: 254, sy: 0, sw: 13, sh: 16, dx: 25, dy: 30, dw: 17, dh: 23 },
+            { sx: 263, sy: 0, sw: 13, sh: 16, dx: 25, dy: 30, dw: 17, dh: 23 },
+            { sx: 272, sy: 0, sw: 13, sh: 16, dx: 25, dy: 30, dw: 17, dh: 23 },
+        ],
+    };
+    private static readyCursorImage: HTMLImageElement | null = null;
+    private static readyCursorLoaded = false;
+    private static readyCursorLoading = false;
+    private static readyCursorFrameCache = new Map<string, HTMLCanvasElement>();
+
     private isOpen = false;
     private slots: ActionSlot[];
     private slotStates = new Map<ActionType, ActionMenuSlotState>();
     private readonly menuRadius = 66;
     private readonly iconRadius = 25;
-    private readonly hitRadius = 31;
+    private readonly hitHalfSize = 21;
 
     private centerX = 0;
     private centerY = 0;
@@ -216,16 +247,19 @@ export class ActionMenuUI {
     public renderReadyIndicator(
         ctx: CanvasRenderingContext2D,
         playerScreenX: number,
-        playerScreenY: number
+        playerScreenY: number,
+        worldTime: number = 0,
+        type: ReadyCursorType = 'move'
     ): void {
-        const bx = playerScreenX + TILE_SIZE + 2;
-        const by = playerScreenY + TILE_SIZE - 4;
-        const s = 1.5;
+        if (this.drawReadyCursorSprite(ctx, playerScreenX, playerScreenY, worldTime, type)) return;
 
         ctx.save();
         ctx.globalAlpha = 0.85;
+        const bx = playerScreenX + TILE_SIZE * 0.72;
+        const by = playerScreenY + TILE_SIZE * 0.88;
+        const s = 2.15;
 
-        // Tiny boot/shoe icon — burnished gold for "ready"
+        // Fallback boot while MCURSOR.BMP is still loading.
         ctx.fillStyle = '#c8922a';
         ctx.fillRect(bx - 4 * s, by - 1 * s, 6 * s, 2 * s);
         ctx.fillRect(bx - 4 * s, by - 4 * s, 2 * s, 3 * s);
@@ -239,6 +273,79 @@ export class ActionMenuUI {
         ctx.shadowBlur = 0;
 
         ctx.restore();
+    }
+
+    private drawReadyCursorSprite(
+        ctx: CanvasRenderingContext2D,
+        playerScreenX: number,
+        playerScreenY: number,
+        worldTime: number,
+        type: ReadyCursorType
+    ): boolean {
+        ActionMenuUI.ensureReadyCursorLoaded();
+        if (!ActionMenuUI.readyCursorLoaded) return false;
+
+        const frames = ActionMenuUI.READY_CURSOR_FRAMES[type];
+        const frameIndex = Math.floor(worldTime * ActionMenuUI.READY_CURSOR_FPS) % frames.length;
+        const frame = frames[frameIndex];
+        const canvas = ActionMenuUI.getReadyCursorFrameCanvas(type, frameIndex, frame);
+        if (!canvas) return false;
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.shadowColor = type === 'attack' ? 'rgba(255, 230, 160, 0.8)' : 'rgba(120, 170, 255, 0.7)';
+        ctx.shadowBlur = type === 'attack' ? 7 : 5;
+        ctx.drawImage(canvas, playerScreenX + frame.dx, playerScreenY + frame.dy, frame.dw, frame.dh);
+        ctx.restore();
+        return true;
+    }
+
+    private static ensureReadyCursorLoaded(): void {
+        if (this.readyCursorLoaded || this.readyCursorLoading || typeof Image === 'undefined') return;
+        this.readyCursorLoading = true;
+        const image = new Image();
+        image.onload = () => {
+            this.readyCursorImage = image;
+            this.readyCursorLoaded = true;
+            this.readyCursorLoading = false;
+        };
+        image.onerror = () => {
+            this.readyCursorLoading = false;
+        };
+        image.src = this.READY_CURSOR_SRC;
+    }
+
+    private static getReadyCursorFrameCanvas(
+        type: ReadyCursorType,
+        frameIndex: number,
+        frame: ReadyCursorFrame
+    ): HTMLCanvasElement | null {
+        const image = this.readyCursorImage;
+        if (!image || !this.readyCursorLoaded) return null;
+
+        const key = `${type}:${frameIndex}`;
+        const cached = this.readyCursorFrameCache.get(key);
+        if (cached) return cached;
+        if (typeof document === 'undefined') return null;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = frame.sw;
+        canvas.height = frame.sh;
+        const frameCtx = canvas.getContext('2d');
+        if (!frameCtx) return null;
+
+        frameCtx.imageSmoothingEnabled = false;
+        frameCtx.drawImage(image, frame.sx, frame.sy, frame.sw, frame.sh, 0, 0, frame.sw, frame.sh);
+        const data = frameCtx.getImageData(0, 0, frame.sw, frame.sh);
+        for (let i = 0; i < data.data.length; i += 4) {
+            const r = data.data[i] ?? 0;
+            const g = data.data[i + 1] ?? 0;
+            const b = data.data[i + 2] ?? 0;
+            if (r < 8 && g < 8 && b < 8) data.data[i + 3] = 0;
+        }
+        frameCtx.putImageData(data, 0, 0);
+        this.readyCursorFrameCache.set(key, canvas);
+        return canvas;
     }
 
     // ─── ICON DRAWING FUNCTIONS ────────────────────────────────
@@ -262,8 +369,7 @@ export class ActionMenuUI {
     }
 
     private isSlotHit(mx: number, my: number, ix: number, iy: number): boolean {
-        if (Math.abs(mx - ix) <= this.hitRadius && Math.abs(my - iy) <= this.hitRadius) return true;
-        return Math.abs(mx - ix) <= 30 && my >= iy + this.iconRadius + 2 && my <= iy + this.iconRadius + 24;
+        return Math.abs(mx - ix) <= this.hitHalfSize && Math.abs(my - iy) <= this.hitHalfSize;
     }
 
     private drawSlotFocus(ctx: CanvasRenderingContext2D, ix: number, iy: number, r: number, enabled: boolean): void {

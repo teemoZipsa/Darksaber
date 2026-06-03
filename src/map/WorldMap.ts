@@ -907,13 +907,13 @@ export class WorldMap {
         for (const c of this.chunks.values()) c.markDirty();
     }
 
-    public render(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number, vw: number, vh: number): void {
+    public render(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number, vw: number, vh: number, renderScale: number = 1): void {
         for (const chunk of this.chunks.values()) {
             const sx = chunk.chunkX * CHUNK_SIZE * TILE_SIZE - cameraX;
             const sy = chunk.chunkY * CHUNK_SIZE * TILE_SIZE - cameraY;
             const ps = CHUNK_SIZE * TILE_SIZE;
             if (sx + ps < 0 || sx > vw || sy + ps < 0 || sy > vh) continue;
-            chunk.render(ctx, sx, sy, (nx, ny) => this.getTileAt(nx, ny));
+            chunk.render(ctx, sx, sy, (nx, ny) => this.getTileAt(nx, ny), renderScale);
         }
 
         this.renderDecorations(ctx, cameraX, cameraY, vw, vh, false);

@@ -179,6 +179,7 @@ export class Character {
             7: '/assets/images/characters/darksaber/cultist_t7.png',
         },
         'shrine': {
+            1: '/assets/images/characters/darksaber/shrine_t1.png',
             2: '/assets/images/characters/darksaber/shrine_t2.png',
             3: '/assets/images/characters/darksaber/shrine_t3.png',
             4: '/assets/images/characters/darksaber/shrine_t4.png',

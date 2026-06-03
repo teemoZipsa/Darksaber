@@ -44,7 +44,7 @@ const PARTY_THREE_FRAME_WALK_SPRITES: Partial<Record<string, Record<number, stri
     archer: { 2: 'archer_t2_walk.png', 3: 'archer_t3_walk.png', 4: 'archer_t4_walk.png', 5: 'archer_t5_walk.png', 6: 'archer_t6_walk.png', 7: 'archer_t7_walk.png' },
     cleric: { 1: 'cleric_t1_walk.png', 2: 'cleric_t2_walk.png', 3: 'cleric_t3_walk.png', 4: 'cleric_t4_walk.png', 5: 'cleric_t5_walk.png', 6: 'cleric_t6_walk.png', 7: 'cleric_t7_walk.png' },
     priest: { 2: 'priest_t2_walk.png', 3: 'priest_t3_walk.png', 4: 'priest_t4_walk.png', 5: 'priest_t5_walk.png', 6: 'priest_t6_walk.png', 7: 'priest_t7_walk.png' },
-    shrine: { 5: 'shrine_t5_walk.png' },
+    shrine: { 1: 'shrine_t1_walk.png', 5: 'shrine_t5_walk.png' },
     mage: { 1: 'mage_t1_walk.png', 2: 'mage_t2_walk.png', 3: 'mage_t3_walk.png', 4: 'mage_t4_walk.png', 5: 'mage_t5_walk.png', 6: 'mage_t6_walk.png', 7: 'mage_t7_walk.png' },
     cultist: { 2: 'cultist_t2_walk.png', 3: 'cultist_t3_walk.png', 4: 'cultist_t4_walk.png', 5: 'cultist_t5_walk.png', 6: 'cultist_t6_walk.png', 7: 'cultist_t7_walk.png' },
 };

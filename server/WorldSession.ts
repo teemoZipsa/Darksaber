@@ -482,7 +482,10 @@ export class WorldSession {
                 actorIds: [...player.actorIds],
             }));
         const partyActors = [...this.actors.values()]
-            .filter((actor) => this.players.get(actor.ownerPlayerId)?.active)
+            .filter((actor) => {
+                const owner = this.players.get(actor.ownerPlayerId);
+                return owner?.active && !owner.ghost;
+            })
             .map((actor) => this.toActorSnapshot(actor));
         const enemies = [...this.enemies.values()]
             .filter((entry) => entry.enemy.stats.hp > 0)

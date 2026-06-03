@@ -260,7 +260,7 @@ export class WorldEngine {
                 this.registerCombatFeedback(feedbackKind ?? (isCrit ? 'critical' : 'normal'), feedbackGroupId);
             },
             spawnKillEffect: (enemy, feedbackGroupId) => {
-                this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
+                this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy);
                 this.registerCombatFeedback('kill', feedbackGroupId);
             },
             spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
@@ -775,6 +775,20 @@ export class WorldEngine {
         this.introTutorialPreviousWorldMap = null;
     }
 
+    private clearIntroTutorialStateForNetworkRaid(): void {
+        if (!this.introTutorialActive && !this.introTutorialPreviousWorldMap) return;
+        this.restoreIntroTutorialWorldMap();
+        this.introTutorialActive = false;
+        this.introTutorialEnemyId = null;
+        this.introTutorialStep = 'move';
+        this.introTutorialInstructor = null;
+        this.introTutorialCompletePending = false;
+        this.fieldEnemies = [];
+        this.worldMap.loot = [];
+        this.remotePartyActors.clear();
+        this.clearFieldTurnState();
+    }
+
     private createIntroTutorialInstructor(tile: TilePoint): Player {
         const instructor = new Player(tile.x, tile.y);
         instructor.id = 'intro_tutorial_instructor';
@@ -1134,9 +1148,11 @@ export class WorldEngine {
         this.townSession.show(town);
     }
 
-    private async beginRaidFromCurrentHub(requestedRealm: WorldRealmId = this.worldMap.getRealm()): Promise<void> {
+    private async beginRaidFromCurrentHub(requestedRealm?: WorldRealmId): Promise<void> {
         if (this.isNetworkRaidConnecting) return;
-        if (this.worldMap.getRealm() !== requestedRealm) this.worldMap.setRealm(requestedRealm);
+        this.clearIntroTutorialStateForNetworkRaid();
+        const targetRealm = requestedRealm ?? this.worldMap.getRealm();
+        if (this.worldMap.getRealm() !== targetRealm) this.worldMap.setRealm(targetRealm);
         const town = this.getCurrentHubTown();
         const authContext = this.gameManager.getNetworkAuthContext();
         if (!authContext) {
@@ -1153,14 +1169,14 @@ export class WorldEngine {
             let joinAuthContext = await this.refreshNetworkAuthContext(authContext) ?? authContext;
             let welcome;
             try {
-                welcome = await this.connectNetworkRaid(town, requestedRealm, joinAuthContext);
+                welcome = await this.connectNetworkRaid(town, targetRealm, joinAuthContext);
             } catch (error) {
                 if (!(error instanceof WorldServerError) || error.code !== 'AUTH_FAILED') throw error;
                 const refreshed = await this.refreshNetworkAuthContext(authContext, true);
                 if (!refreshed || refreshed.accessToken === joinAuthContext.accessToken) throw error;
                 this.addCombatLog('인증 토큰 갱신 후 출격 재시도...');
                 joinAuthContext = refreshed;
-                welcome = await this.connectNetworkRaid(town, requestedRealm, joinAuthContext);
+                welcome = await this.connectNetworkRaid(town, targetRealm, joinAuthContext);
             }
 
             this.applyServerCompletedQuestIds(welcome.completedQuestIds);
@@ -1410,8 +1426,9 @@ export class WorldEngine {
             actor.ownerPlayerId === this.networkPlayerId
             || localPlayerActorIds.has(actor.id)
             || (actor.localActorId ? localCharacterIds.has(actor.localActorId) : false);
-        const ownSnapshots = snapshot.partyActors.filter(isOwnActorSnapshot);
-        const remoteSnapshots = snapshot.partyActors.filter((actor) => !isOwnActorSnapshot(actor));
+        const liveActorSnapshots = snapshot.partyActors.filter((actor) => !actor.isGhost);
+        const ownSnapshots = liveActorSnapshots.filter(isOwnActorSnapshot);
+        const remoteSnapshots = liveActorSnapshots.filter((actor) => !isOwnActorSnapshot(actor));
         const ownByLocalId = new Map(ownSnapshots.map((actor) => [actor.localActorId ?? actor.id, actor]));
         const nextLocalActors: FieldActor[] = [];
 
@@ -1677,7 +1694,7 @@ export class WorldEngine {
 
         if (targetEnemy) {
             if (event.kind === 'kill') {
-                this.effectManager.spawnKillEffect(targetEnemy.gridX, targetEnemy.gridY, targetEnemy.color, targetEnemy.expReward, targetEnemy.image);
+                this.effectManager.spawnKillEffect(targetEnemy.gridX, targetEnemy.gridY, targetEnemy.color, targetEnemy.expReward, targetEnemy);
                 this.registerCombatFeedback('kill', feedbackGroupId);
             } else if (event.kind === 'status') {
                 this.floatingText.spawnStatus(targetEnemy.gridX, targetEnemy.gridY, 'WEAK');
@@ -2251,7 +2268,7 @@ export class WorldEngine {
 
     private handleEnemyDefeated(actor: FieldActor, enemy: Enemy, feedbackGroupId?: string): void {
         if (this.introTutorialActive && enemy.id === this.introTutorialEnemyId) {
-            this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
+            this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy);
             this.registerCombatFeedback('kill', feedbackGroupId);
             this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
             enemy.isAggro = false;
@@ -2262,7 +2279,7 @@ export class WorldEngine {
 
         this.awardDefeatExp(actor, enemy);
         this.raidSession.recordKill();
-        this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy.image);
+        this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy);
         this.registerCombatFeedback('kill', feedbackGroupId);
         this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
         enemy.isAggro = false;

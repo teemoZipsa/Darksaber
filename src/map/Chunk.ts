@@ -6,7 +6,6 @@
  */
 
 import { TileType } from './Tile';
-import { SettingsManager } from '../engine/SettingsManager';
 import { TileAssetManager } from './TileAssetManager';
 
 export const CHUNK_SIZE = 32; // tiles per chunk side
@@ -47,12 +46,30 @@ export class Chunk {
     }
 
     /** Render chunk to its offscreen buffer if dirty, then blit to main canvas */
-    public render(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, getGlobalTile: (x: number, y: number) => TileType): void {
+    public render(
+        ctx: CanvasRenderingContext2D,
+        screenX: number,
+        screenY: number,
+        getGlobalTile: (x: number, y: number) => TileType,
+        renderScale: number = 1
+    ): void {
         if (this.dirty) {
             this.renderToBuffer(getGlobalTile);
             this.dirty = false;
         }
-        ctx.drawImage(this.buffer, Math.round(screenX), Math.round(screenY));
+
+        const scale = Math.max(0.001, renderScale);
+        const width = this.buffer.width;
+        const height = this.buffer.height;
+        const x = Math.floor(screenX * scale) / scale;
+        const y = Math.floor(screenY * scale) / scale;
+        const right = Math.ceil((screenX + width) * scale) / scale;
+        const bottom = Math.ceil((screenY + height) * scale) / scale;
+
+        const previousSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(this.buffer, 0, 0, width, height, x, y, right - x, bottom - y);
+        ctx.imageSmoothingEnabled = previousSmoothing;
     }
 
     private renderToBuffer(getGlobalTile: (x: number, y: number) => TileType): void {
@@ -179,22 +196,17 @@ export class Chunk {
             }
         }
 
-        // Draw subtle grid lines on buffer
-        if (SettingsManager.getGrid()) {
-            this.bufferCtx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
-            this.bufferCtx.lineWidth = 0.5;
-            for (let y = 0; y <= CHUNK_SIZE; y++) {
-                this.bufferCtx.beginPath();
-                this.bufferCtx.moveTo(0, y * TILE_SIZE);
-                this.bufferCtx.lineTo(CHUNK_SIZE * TILE_SIZE, y * TILE_SIZE);
-                this.bufferCtx.stroke();
-            }
-            for (let x = 0; x <= CHUNK_SIZE; x++) {
-                this.bufferCtx.beginPath();
-                this.bufferCtx.moveTo(x * TILE_SIZE, 0);
-                this.bufferCtx.lineTo(x * TILE_SIZE, CHUNK_SIZE * TILE_SIZE);
-                this.bufferCtx.stroke();
-            }
-        }
+        this.sealBufferEdges();
+    }
+
+    private sealBufferEdges(): void {
+        const size = this.buffer.width;
+        const previousSmoothing = this.bufferCtx.imageSmoothingEnabled;
+        this.bufferCtx.imageSmoothingEnabled = false;
+        this.bufferCtx.drawImage(this.buffer, 1, 0, 1, size, 0, 0, 1, size);
+        this.bufferCtx.drawImage(this.buffer, size - 2, 0, 1, size, size - 1, 0, 1, size);
+        this.bufferCtx.drawImage(this.buffer, 0, 1, size, 1, 0, 0, size, 1);
+        this.bufferCtx.drawImage(this.buffer, 0, size - 2, size, 1, 0, size - 1, size, 1);
+        this.bufferCtx.imageSmoothingEnabled = previousSmoothing;
     }
 }

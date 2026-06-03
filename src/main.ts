@@ -9,7 +9,7 @@ import { TileAssetManager } from './map/TileAssetManager';
 import { DarksaberSpriteAtlas } from './ui/DarksaberSpriteAtlas';
 import { mountUiOverlay } from './ui/react/mountOverlay';
 import { mountAuthGate } from './ui/react/auth/mountAuthGate';
-import { AuthClient } from './net/AuthClient';
+import { AuthApiError, AuthClient, type AuthSessionResponse } from './net/AuthClient';
 
 async function init(): Promise<void> {
     SettingsManager.init();
@@ -74,21 +74,43 @@ function clearDevWorldResumeToken(): void {
 async function enterDevTown(manager: GameManager): Promise<void> {
     try {
         const client = new AuthClient();
-        const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-        const session = await client.register(`dev-${suffix}`, 'dev-password-123');
-        const created = await client.createCharacter('Dev Hero', 'infantry', 'M');
+        const session = await loginOrRegisterDevAccount(client);
+        const characterId = session.characters[0]?.id;
+        const selected = characterId
+            ? await client.selectCharacter(characterId)
+            : await createDevCharacter(client, session);
         const accessToken = client.getAccessToken();
         if (!accessToken) throw new Error('Dev auth did not return an access token.');
         manager.enterAuthenticatedCharacter({
             accessToken,
-            character: created.character,
-            save: created.save,
-            accountProgress: session.accountProgress,
+            character: selected.character,
+            save: selected.save,
+            accountProgress: selected.accountProgress,
         });
     } catch (error) {
         console.error('[Darksaber] Dev autostart failed', error);
         mountAuthGate(manager);
     }
+}
+
+async function loginOrRegisterDevAccount(client: AuthClient): Promise<AuthSessionResponse> {
+    const loginName = 'dev-town';
+    const password = 'dev-password-123';
+    try {
+        return await client.login(loginName, password);
+    } catch (error) {
+        if (!(error instanceof AuthApiError) || error.status !== 401) throw error;
+        return client.register(loginName, password);
+    }
+}
+
+async function createDevCharacter(client: AuthClient, session: AuthSessionResponse) {
+    const created = await client.createCharacter('Dev Hero', 'infantry', 'M');
+    return {
+        character: created.character,
+        save: created.save,
+        accountProgress: session.accountProgress,
+    };
 }
 
 // Wait for DOM

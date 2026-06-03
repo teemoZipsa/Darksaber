@@ -3,7 +3,7 @@
  * Saves and loads from localStorage to persist user choices across reloads.
  */
 export class SettingsManager {
-    private static showGrid: boolean = true;
+    private static showGrid: boolean = false;
     private static showFPS: boolean = false;
     private static showHelp: boolean = true;
     private static muteBGM: boolean = false;
@@ -24,7 +24,7 @@ export class SettingsManager {
     private static changeListeners: Array<() => void> = [];
 
     public static init(): void {
-        this.showGrid = localStorage.getItem('setting_grid') !== 'false';
+        this.showGrid = localStorage.getItem('setting_grid') === 'true';
         this.showFPS = localStorage.getItem('setting_fps') === 'true';
         this.showHelp = localStorage.getItem('setting_help') !== 'false';
         this.muteBGM = localStorage.getItem('setting_muteBgm') === 'true';

@@ -89,7 +89,7 @@ export class WorldRenderController {
         const viewH = height / camera.zoom;
         const worldCenter = camera.getWorldCenter();
         worldMap.updateLoadedChunks(worldCenter.x, worldCenter.y, viewW, viewH);
-        worldMap.render(ctx, camX, camY, viewW, viewH);
+        worldMap.render(ctx, camX, camY, viewW, viewH, camera.zoom);
 
         WorldFieldRenderer.renderActionTiles(ctx, model, camX, camY);
         WorldFieldRenderer.renderMagicTargetTiles(ctx, model, camX, camY);
@@ -209,7 +209,8 @@ export class WorldRenderController {
         if (this.context.actionMenuUI.getIsOpen()) {
             this.context.actionMenuUI.render(ctx, px, py, ready);
         } else if (ready) {
-            this.context.actionMenuUI.renderReadyIndicator(ctx, px, py);
+            const cursorType = active && this.context.playerActionController.hasExecutableAttack(actor) ? 'attack' : 'move';
+            this.context.actionMenuUI.renderReadyIndicator(ctx, px, py, this.context.getWorldTime(), cursorType);
         }
     }
 }
