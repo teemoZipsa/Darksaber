@@ -49,6 +49,7 @@ const FULL_MIN_ZOOM = 1;
 const FULL_MAX_ZOOM = 5;
 const FULL_MIN_OPACITY = 0.25;
 const FULL_MAX_OPACITY = 1;
+const FULL_MAP_BUILD_BUDGET_MS = 4;
 const FOOTER_INFO_H = 56;            // base footer height (gold/world + coords)
 const FOOTER_TERRAIN_LINE_H = 16;    // per terrain hover line
 const PANEL_W = MAP_SIZE + FRAME_PAD * 2;
@@ -60,6 +61,23 @@ type MinimapMode = 'mini' | 'full' | 'hidden';
 interface FullMapCache {
     key: string;
     canvas: OffscreenCanvas;
+    ready: boolean;
+    progress: number;
+}
+
+interface FullMapBuild {
+    key: string;
+    canvas: OffscreenCanvas;
+    ctx: OffscreenCanvasRenderingContext2D;
+    image: ImageData;
+    cacheW: number;
+    cacheH: number;
+    tileW: number;
+    tileH: number;
+    sampleStep: number;
+    nextRow: number;
+    colorLookup: Partial<Record<TileType, [number, number, number]>>;
+    fallback: [number, number, number];
 }
 
 interface Rect {
@@ -100,6 +118,7 @@ export class MinimapUI {
     private currentWidth = 0;
     private currentHeight = 0;
     private fullMapCache: FullMapCache | null = null;
+    private fullMapBuild: FullMapBuild | null = null;
     private fullMapZoom = 1;
     private fullMapPanX = 0;
     private fullMapPanY = 0;
@@ -471,6 +490,11 @@ export class MinimapUI {
             ctx.imageSmoothingEnabled = false;
             ctx.drawImage(cache.canvas, displayRect.x, displayRect.y, displayRect.w, displayRect.h);
             ctx.imageSmoothingEnabled = previousSmoothing;
+
+            if (!cache.ready) {
+                ctx.fillStyle = 'rgba(215, 182, 106, 0.82)';
+                ctx.fillRect(viewRect.x, viewRect.y + viewRect.h - 3, viewRect.w * cache.progress, 3);
+            }
         } else {
             ctx.fillStyle = Parchment.textMid;
             ctx.font = `13px ${UI.fontPrimary}`;
@@ -486,8 +510,28 @@ export class MinimapUI {
         if (bounds.width <= 0 || bounds.height <= 0) return null;
 
         const key = `${worldName ?? 'world'}:${bounds.width}x${bounds.height}`;
-        if (this.fullMapCache?.key === key) return this.fullMapCache;
+        if (this.fullMapCache?.key === key && this.fullMapCache.ready) return this.fullMapCache;
 
+        if (this.fullMapBuild?.key !== key) {
+            this.fullMapBuild = this.createFullMapBuild(key, bounds);
+        }
+        const build = this.fullMapBuild;
+        if (!build) return null;
+
+        this.advanceFullMapBuild(build);
+
+        const ready = build.nextRow >= build.cacheH;
+        this.fullMapCache = {
+            key,
+            canvas: build.canvas,
+            ready,
+            progress: build.cacheH > 0 ? this.clamp(build.nextRow / build.cacheH, 0, 1) : 1,
+        };
+        if (ready) this.fullMapBuild = null;
+        return this.fullMapCache;
+    }
+
+    private createFullMapBuild(key: string, bounds: { width: number; height: number }): FullMapBuild | null {
         const sampleStep = Math.max(2, Math.ceil(Math.max(bounds.width / 720, bounds.height / 900)));
         const cacheW = Math.ceil(bounds.width / sampleStep);
         const cacheH = Math.ceil(bounds.height / sampleStep);
@@ -495,27 +539,55 @@ export class MinimapUI {
         const cacheCtx = canvas.getContext('2d');
         if (!cacheCtx) return null;
 
-        const colorLookup = this.buildTileColorLookup();
-        const fallback: [number, number, number] = [5, 5, 5];
-        const image = cacheCtx.createImageData(cacheW, cacheH);
+        cacheCtx.fillStyle = '#1a140c';
+        cacheCtx.fillRect(0, 0, cacheW, cacheH);
 
-        for (let py = 0; py < cacheH; py++) {
-            for (let px = 0; px < cacheW; px++) {
-                const tx = Math.min(bounds.width - 1, px * sampleStep);
-                const ty = Math.min(bounds.height - 1, py * sampleStep);
+        return {
+            key,
+            canvas,
+            ctx: cacheCtx,
+            image: cacheCtx.createImageData(cacheW, cacheH),
+            cacheW,
+            cacheH,
+            tileW: bounds.width,
+            tileH: bounds.height,
+            sampleStep,
+            nextRow: 0,
+            colorLookup: this.buildTileColorLookup(),
+            fallback: [5, 5, 5],
+        };
+    }
+
+    private advanceFullMapBuild(build: FullMapBuild): void {
+        const start = this.now();
+        const startRow = build.nextRow;
+
+        while (build.nextRow < build.cacheH) {
+            const py = build.nextRow;
+            for (let px = 0; px < build.cacheW; px++) {
+                const tx = Math.min(build.tileW - 1, px * build.sampleStep);
+                const ty = Math.min(build.tileH - 1, py * build.sampleStep);
                 const tile = this.config.getTile(tx, ty);
-                const [r, g, b] = colorLookup[tile] ?? fallback;
-                const offset = (py * cacheW + px) * 4;
-                image.data[offset] = r;
-                image.data[offset + 1] = g;
-                image.data[offset + 2] = b;
-                image.data[offset + 3] = 255;
+                const [r, g, b] = build.colorLookup[tile] ?? build.fallback;
+                const offset = (py * build.cacheW + px) * 4;
+                build.image.data[offset] = r;
+                build.image.data[offset + 1] = g;
+                build.image.data[offset + 2] = b;
+                build.image.data[offset + 3] = 255;
             }
+
+            build.nextRow++;
+            if (build.nextRow > startRow && this.now() - start >= FULL_MAP_BUILD_BUDGET_MS) break;
         }
 
-        cacheCtx.putImageData(image, 0, 0);
-        this.fullMapCache = { key, canvas };
-        return this.fullMapCache;
+        const rows = build.nextRow - startRow;
+        if (rows > 0) {
+            build.ctx.putImageData(build.image, 0, 0, 0, startRow, build.cacheW, rows);
+        }
+    }
+
+    private now(): number {
+        return typeof performance !== 'undefined' ? performance.now() : Date.now();
     }
 
     private buildTileColorLookup(): Partial<Record<TileType, [number, number, number]>> {
