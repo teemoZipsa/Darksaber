@@ -30,7 +30,9 @@ import { getStoryQuestByDungeonId, isStoryQuestAvailable, type StoryQuestDefinit
 import {
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
+    getStatus,
     hasStatus,
+    removeActionStanceStatusesFromCarrier,
     removeStatusesFromCarrier,
     resolveTurnStartStatuses,
 } from '../combat/StatusEffects';
@@ -416,6 +418,7 @@ export class WorldEngine {
                 markMajorActionUsed: () => this.markMajorActionUsed(),
                 submitMoveIntent: (actor, tile, path, apCost, pathCost) =>
                     this.submitNetworkMoveIntent(actor, tile, path, apCost, pathCost),
+                submitActionIntent: (actor, action) => this.submitNetworkActionIntent(actor, action),
                 tryActorAttack: (actor, enemy) => this.tryActorAttack(actor, enemy),
                 openLoot: (loot) => this.openLoot(loot),
                 openMagic: (actor) => this.openFieldMagic(actor),
@@ -1186,6 +1189,20 @@ export class WorldEngine {
                 ? `${this.worldMap.getDisplayName()} 서버 원정에 재접속했습니다.`
                 : `${town.nameKr}에서 ${this.worldMap.getDisplayName()} 서버로 출격.`);
         } catch (error) {
+            if (this.shouldReloadDevAutoStartAuth(error)) {
+                console.warn('[Darksaber] Dev auth expired after server restart; reloading to issue a fresh dev session.');
+                this.addCombatLog('개발 인증이 만료되어 새 dev 세션으로 다시 접속합니다...');
+                this.currentPhase = 'town';
+                this.townSession.show(town);
+                this.townSession.setDeployError('개발 인증 갱신 중...');
+                try {
+                    localStorage.removeItem('darksaber_world_resume_token');
+                } catch {
+                    // Ignore storage failures during dev recovery.
+                }
+                window.setTimeout(() => window.location.reload(), 250);
+                return;
+            }
             this.isNetworkRaid = false;
             this.networkPlayerId = null;
             this.closeNetworkRaidClient(false);
@@ -1199,6 +1216,13 @@ export class WorldEngine {
         } finally {
             this.isNetworkRaidConnecting = false;
         }
+    }
+
+    private shouldReloadDevAutoStartAuth(error: unknown): boolean {
+        if (!import.meta.env.DEV) return false;
+        if (!(error instanceof WorldServerError) || error.code !== 'AUTH_FAILED') return false;
+        const devStart = new URLSearchParams(window.location.search).get('devStart');
+        return devStart === '1' || devStart === 'town';
     }
 
     private async connectNetworkRaid(
@@ -1987,13 +2011,14 @@ export class WorldEngine {
                 this.restingRecoveryTimers.delete(actor.id);
                 continue;
             }
-            if (!hasStatus(actor.character.statuses, 'resting')) {
+            const resting = getStatus(actor.character.statuses, 'resting');
+            if (!resting) {
                 this.restingRecoveryTimers.delete(actor.id);
                 continue;
             }
 
             const effective = getEffectiveStatsForCharacter(actor.character);
-            if (actor.character.stats.hp >= effective.maxHp && actor.character.stats.mp >= effective.maxMp) {
+            if (resting.sourceType !== 'action' && actor.character.stats.hp >= effective.maxHp && actor.character.stats.mp >= effective.maxMp) {
                 this.stopResting(actor, `${actor.character.name}: 휴식 완료`);
                 continue;
             }
@@ -2020,7 +2045,7 @@ export class WorldEngine {
             if (mpGain > 0) this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, `MP+${mpGain}`);
             if (hpGain > 0 || mpGain > 0) this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
 
-            if (actor.character.stats.hp >= effective.maxHp && actor.character.stats.mp >= effective.maxMp) {
+            if (resting.sourceType !== 'action' && actor.character.stats.hp >= effective.maxHp && actor.character.stats.mp >= effective.maxMp) {
                 this.stopResting(actor, `${actor.character.name}: 휴식 완료`);
             }
         }
@@ -2044,6 +2069,7 @@ export class WorldEngine {
             if (beforeHp === undefined) continue;
             if (actor.character.stats.hp < beforeHp) {
                 this.stopResting(actor, `${actor.character.name}: 피해로 휴식 중단`);
+                removeActionStanceStatusesFromCarrier(actor.character);
             }
         }
     }
@@ -2158,6 +2184,12 @@ export class WorldEngine {
         if (!this.isNetworkRaid || !this.networkRaidClient) return false;
         const intentId = this.networkRaidClient.sendIntent(actor.id, 'move', { tile, path, apCost, pathCost });
         this.pendingNetworkMoveReopen = { intentId, actorId: actor.id, tile: { ...tile } };
+        return true;
+    }
+
+    private submitNetworkActionIntent(actor: FieldActor, action: 'defend' | 'rest'): boolean {
+        if (!this.isNetworkRaid || !this.networkRaidClient?.getIsOpen()) return false;
+        this.networkRaidClient.sendIntent(actor.id, action, {});
         return true;
     }
 

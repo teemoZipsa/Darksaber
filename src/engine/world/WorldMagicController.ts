@@ -251,7 +251,10 @@ export class WorldMagicController {
             return;
         }
 
+        if (targetEnemy) actor.entity.faceToward(targetEnemy.gridX, targetEnemy.gridY);
+
         if (this.context.submitNetworkSkillIntent?.(actor, skill, targetEnemy)) {
+            actor.entity.playActionMotion('magic');
             this.reset();
             this.context.onActionCompleted?.('magic');
             return;
@@ -274,6 +277,7 @@ export class WorldMagicController {
             return;
         }
 
+        actor.entity.playActionMotion('magic');
         this.applySkillEffect(actor, skill, effect);
         this.reset();
         this.context.onActionCompleted?.('magic');

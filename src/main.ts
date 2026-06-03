@@ -9,8 +9,7 @@ import { TileAssetManager } from './map/TileAssetManager';
 import { DarksaberSpriteAtlas } from './ui/DarksaberSpriteAtlas';
 import { mountUiOverlay } from './ui/react/mountOverlay';
 import { mountAuthGate } from './ui/react/auth/mountAuthGate';
-import { createBaseStats } from './data/Stats';
-import type { AuthenticatedCharacterSession } from './engine/GameManager';
+import { AuthClient } from './net/AuthClient';
 
 async function init(): Promise<void> {
     SettingsManager.init();
@@ -46,7 +45,7 @@ async function init(): Promise<void> {
 
     if (isDevAutoStartEnabled()) {
         clearDevWorldResumeToken();
-        window.setTimeout(() => manager.enterAuthenticatedCharacter(createDevCharacterSession()), 550);
+        window.setTimeout(() => { void enterDevTown(manager); }, 550);
     } else {
         mountAuthGate(manager);
     }
@@ -72,73 +71,24 @@ function clearDevWorldResumeToken(): void {
     }
 }
 
-function createDevCharacterSession(): AuthenticatedCharacterSession {
-    const now = new Date().toISOString();
-    const characterId = 'dev-infantry';
-    const accountId = 'dev-account';
-    const baseStats = createBaseStats({ hp: 110, maxHp: 110, mp: 10, maxMp: 10, atk: 12, def: 6, magAtk: 0, mov: 3 });
-    const character = {
-        id: characterId,
-        slotNo: 0,
-        name: 'Dev Hero',
-        classKey: 'infantry',
-        tier: 1,
-        level: 1,
-        exp: 0,
-        baseStats,
-        createdAt: now,
-        updatedAt: now,
-    } as const;
-
-    return {
-        accessToken: 'dev-access-token',
-        character,
-        accountProgress: {
-            accountId,
-            completedQuests: [],
-            unlocks: {},
-            flags: {},
-            updatedAt: now,
-        },
-        save: {
-            characterId,
-            saveVersion: 1,
-            revision: 1,
-            hubLocation: {
-                realm: 'mortal',
-                townId: 'central_castle',
-            },
-            questState: {
-                completedQuestIds: [],
-            },
-            inventory: {
-                width: 10,
-                height: 6,
-                items: [
-                    { itemId: 'short_sword', gridX: 0, gridY: 0, quantity: 1, durability: 100 },
-                    { itemId: 'herb_cheap', gridX: 2, gridY: 0, quantity: 2, durability: 1 },
-                    { itemId: 'mp_potion', gridX: 3, gridY: 0, quantity: 1, durability: 1 },
-                ],
-            },
-            equipment: {},
-            partySnapshot: {
-                activeCharacterIds: [characterId],
-            },
-            rosterSnapshot: {
-                characters: [{
-                    id: characterId,
-                    name: character.name,
-                    classKey: character.classKey,
-                    gender: 'M',
-                    tier: character.tier,
-                    level: character.level,
-                    exp: character.exp,
-                    baseStats,
-                }],
-            },
-            updatedAt: now,
-        },
-    };
+async function enterDevTown(manager: GameManager): Promise<void> {
+    try {
+        const client = new AuthClient();
+        const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        const session = await client.register(`dev-${suffix}`, 'dev-password-123');
+        const created = await client.createCharacter('Dev Hero', 'infantry', 'M');
+        const accessToken = client.getAccessToken();
+        if (!accessToken) throw new Error('Dev auth did not return an access token.');
+        manager.enterAuthenticatedCharacter({
+            accessToken,
+            character: created.character,
+            save: created.save,
+            accountProgress: session.accountProgress,
+        });
+    } catch (error) {
+        console.error('[Darksaber] Dev autostart failed', error);
+        mountAuthGate(manager);
+    }
 }
 
 // Wait for DOM

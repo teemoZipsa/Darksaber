@@ -1,7 +1,7 @@
 import {
-    applyStatus,
     createStatus,
     hasStatus,
+    replaceActionStanceStatuses,
 } from '../../combat/StatusEffects';
 import type { Enemy } from '../../entity/Enemy';
 import type { LootObject } from '../../entity/LootObject';
@@ -61,6 +61,7 @@ export interface WorldPlayerActionContext {
     isMajorActionUsed: () => boolean;
     markMajorActionUsed: () => void;
     submitMoveIntent?: (actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number) => boolean;
+    submitActionIntent?: (actor: FieldActor, action: 'defend' | 'rest') => boolean;
     tryActorAttack: (actor: FieldActor, enemy: Enemy) => boolean;
     openLoot: (loot: LootObject) => void;
     openMagic: (actor: FieldActor) => void;
@@ -187,8 +188,11 @@ export class WorldPlayerActionController {
                     this.context.reopenActionMenu(actor);
                     break;
                 }
-                actor.character.statuses = applyStatus(actor.character.statuses, createStatus('guard'));
-                actor.character.statuses = applyStatus(actor.character.statuses, createStatus('counterReady'));
+                this.context.submitActionIntent?.(actor, 'defend');
+                actor.character.statuses = replaceActionStanceStatuses(actor.character.statuses, [
+                    createStatus('guard', { durationTurns: undefined, sourceType: 'action' }),
+                    createStatus('counterReady', { durationTurns: undefined, sourceType: 'action' }),
+                ]);
                 this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'GUARD');
                 this.sink.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
                 this.sink.log('방어 태세: 다음 직접 공격 피해 감소 및 약한 반격 준비');
@@ -249,7 +253,11 @@ export class WorldPlayerActionController {
 
             if (actor.queuedIntent.kind === 'attack' && actor.queuedIntent.enemyId) {
                 const enemy = this.context.getEnemyById(actor.queuedIntent.enemyId);
-                if (enemy && enemy.stats.hp > 0) this.context.tryActorAttack(actor, enemy);
+                if (enemy && enemy.stats.hp > 0) {
+                    actor.entity.faceToward(enemy.gridX, enemy.gridY);
+                    const attacked = this.context.tryActorAttack(actor, enemy);
+                    if (attacked) actor.entity.playActionMotion('attack');
+                }
                 else this.context.clearActorIntent(actor);
             }
 
@@ -374,7 +382,10 @@ export class WorldPlayerActionController {
             this.context.reopenActionMenu(actor);
             return;
         }
-        actor.character.statuses = applyStatus(actor.character.statuses, createStatus('resting'));
+        this.context.submitActionIntent?.(actor, 'rest');
+        actor.character.statuses = replaceActionStanceStatuses(actor.character.statuses, [
+            createStatus('resting', { sourceType: 'action' }),
+        ]);
         this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'REST');
         this.sink.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
         this.sink.log('휴식 중: 체력과 마나가 천천히 회복됩니다. 피해를 받으면 해제됩니다.');
@@ -400,7 +411,9 @@ export class WorldPlayerActionController {
             this.sink.log(getAttackFailureMessage(failure));
             return;
         }
+        actor.entity.faceToward(enemy.gridX, enemy.gridY);
         if (this.spendActionCost(ATTACK_ACTION_GAUGE_COST) && this.context.tryActorAttack(actor, enemy)) {
+            actor.entity.playActionMotion('attack');
             this.context.onActionCompleted?.('attack');
             this.context.resumeOrEndActiveTurn(actor);
         }

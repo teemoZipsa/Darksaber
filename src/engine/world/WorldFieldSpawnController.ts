@@ -1,4 +1,5 @@
 import type { Character } from '../../character/Character';
+import type { EntityFacing } from '../../entity/Entity';
 import { Player } from '../../entity/Player';
 import { ACTOR_COLORS, FORMATION_OFFSETS } from '../../field/FieldConfig';
 import type { TilePoint } from '../../field/FieldPathing';
@@ -12,6 +13,10 @@ const PARTY_THREE_FRAME_WALK_ROW_BY_FACING: Record<'up' | 'down' | 'left' | 'rig
     left: 3,
     right: 2,
 };
+const PARTY_ACTION_ROW_BY_FACING: Partial<Record<EntityFacing, number>> = {
+    down: 4,
+    up: 5,
+};
 
 interface PartyWalkSpriteDefinition {
     src: string;
@@ -19,6 +24,8 @@ interface PartyWalkSpriteDefinition {
     frameHeight: number;
     frameCount: number;
     rowByFacing?: Record<'up' | 'down' | 'left' | 'right', number>;
+    actionRowByFacing?: Partial<Record<EntityFacing, number>>;
+    actionFrameCount?: number;
 }
 
 const FIGHTER_WALK_SPRITE: PartyWalkSpriteDefinition = {
@@ -37,6 +44,7 @@ const PARTY_THREE_FRAME_WALK_SPRITES: Partial<Record<string, Record<number, stri
     archer: { 2: 'archer_t2_walk.png', 3: 'archer_t3_walk.png', 4: 'archer_t4_walk.png', 5: 'archer_t5_walk.png', 6: 'archer_t6_walk.png', 7: 'archer_t7_walk.png' },
     cleric: { 1: 'cleric_t1_walk.png', 2: 'cleric_t2_walk.png', 3: 'cleric_t3_walk.png', 4: 'cleric_t4_walk.png', 5: 'cleric_t5_walk.png', 6: 'cleric_t6_walk.png', 7: 'cleric_t7_walk.png' },
     priest: { 2: 'priest_t2_walk.png', 3: 'priest_t3_walk.png', 4: 'priest_t4_walk.png', 5: 'priest_t5_walk.png', 6: 'priest_t6_walk.png', 7: 'priest_t7_walk.png' },
+    shrine: { 5: 'shrine_t5_walk.png' },
     mage: { 1: 'mage_t1_walk.png', 2: 'mage_t2_walk.png', 3: 'mage_t3_walk.png', 4: 'mage_t4_walk.png', 5: 'mage_t5_walk.png', 6: 'mage_t6_walk.png', 7: 'mage_t7_walk.png' },
     cultist: { 2: 'cultist_t2_walk.png', 3: 'cultist_t3_walk.png', 4: 'cultist_t4_walk.png', 5: 'cultist_t5_walk.png', 6: 'cultist_t6_walk.png', 7: 'cultist_t7_walk.png' },
 };
@@ -53,6 +61,8 @@ function getPartyWalkSprite(classLineId: string, tier: number): PartyWalkSpriteD
         frameHeight: 32,
         frameCount: 3,
         rowByFacing: PARTY_THREE_FRAME_WALK_ROW_BY_FACING,
+        actionRowByFacing: PARTY_ACTION_ROW_BY_FACING,
+        actionFrameCount: 2,
     };
 }
 
@@ -88,7 +98,9 @@ export class WorldFieldSpawnController {
                     walkSprite.frameCount,
                     8,
                     walkSprite.rowByFacing,
-                    PARTY_WALK_RENDER_SCALE
+                    PARTY_WALK_RENDER_SCALE,
+                    walkSprite.actionRowByFacing,
+                    walkSprite.actionFrameCount
                 );
             }
             return {

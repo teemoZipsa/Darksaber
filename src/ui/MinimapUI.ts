@@ -36,10 +36,10 @@ export interface MinimapFooter {
     terrainLines: string[];
 }
 
-const MAP_SIZE = 152;
+const MAP_SIZE = 168;
 const VIEW_RANGE = 26;
 export const MINIMAP_LOOT_REVEAL_RANGE = 18;
-const FRAME_PAD = 10;
+const FRAME_PAD = 12;
 const HEADER_H = 26;
 const FULL_HEADER_H = 34;
 const FULL_FOOTER_H = 36;
@@ -50,9 +50,10 @@ const FULL_MAX_ZOOM = 5;
 const FULL_MIN_OPACITY = 0.25;
 const FULL_MAX_OPACITY = 1;
 const FULL_MAP_BUILD_BUDGET_MS = 4;
-const FOOTER_INFO_H = 56;            // base footer height (gold/world + coords)
-const FOOTER_TERRAIN_LINE_H = 16;    // per terrain hover line
-const PANEL_W = MAP_SIZE + FRAME_PAD * 2;
+const FOOTER_INFO_H = 50;            // base footer height (gold/world + coords)
+const FOOTER_TERRAIN_LINE_H = 15;    // per terrain hover line
+const PANEL_W = 216;
+const FOOTER_MAX_ROWS = 5;
 const MARGIN_TOP = 16;
 const MARGIN_RIGHT = 16;
 
@@ -233,17 +234,18 @@ export class MinimapUI {
 
     private renderMiniMap(ctx: CanvasRenderingContext2D, vw: number, footer?: MinimapFooter): void {
 
-        const terrainLineCount = footer?.terrainLines.length ?? 0;
-        const footerH = FOOTER_INFO_H + (terrainLineCount > 0 ? 6 + terrainLineCount * FOOTER_TERRAIN_LINE_H : 0);
-        const panelH = HEADER_H + 6 + MAP_SIZE + 8 + footerH + FRAME_PAD;
+        const footerMaxW = PANEL_W - 28;
+        const terrainRows = footer ? this.buildMiniTerrainRows(ctx, footer.terrainLines, footerMaxW) : [];
+        const footerH = FOOTER_INFO_H + (terrainRows.length > 0 ? 8 + terrainRows.length * FOOTER_TERRAIN_LINE_H : 0);
+        const panelH = HEADER_H + 8 + MAP_SIZE + 10 + footerH + FRAME_PAD;
 
         this.panelX = vw - PANEL_W - MARGIN_RIGHT;
         this.panelY = MARGIN_TOP;
         this.currentWidth = PANEL_W;
         this.currentHeight = panelH;
 
-        const mapX = this.panelX + FRAME_PAD;
-        const mapY = this.panelY + HEADER_H + 6;
+        const mapX = this.panelX + Math.floor((PANEL_W - MAP_SIZE) / 2);
+        const mapY = this.panelY + HEADER_H + 8;
         const tilePx = MAP_SIZE / (VIEW_RANGE * 2);
         const player = this.config.getPlayerPos();
 
@@ -251,6 +253,7 @@ export class MinimapUI {
         drawParchmentPanel(ctx, this.panelX, this.panelY, PANEL_W, panelH, {
             radius: 8,
             headerH: HEADER_H,
+            darksaberFrame: true,
         });
 
         // Header label
@@ -319,46 +322,43 @@ export class MinimapUI {
 
         // ─── Info footer ────────────────────────────────────────
         const footerX = this.panelX + 14;
+        const footerRight = this.panelX + PANEL_W - 14;
         let footerY = mapY + MAP_SIZE + 14;
 
         if (footer) {
-            // Gold + world name on one row
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
             ctx.fillStyle = '#7a5410';
             ctx.font = `bold 14px ${UI.fontPrimary}`;
-            const goldText = `${footer.gold} G`;
-            ctx.fillText(goldText, footerX, footerY);
-            const goldW = ctx.measureText(goldText).width;
+            this.fillClampedText(ctx, `${footer.gold} G`, footerX, footerY, 70);
 
             ctx.fillStyle = Parchment.textMid;
             ctx.font = `13px ${UI.fontPrimary}`;
-            ctx.fillText(`· ${footer.worldName}`, footerX + goldW + 6, footerY + 1);
-            footerY += 20;
+            ctx.textAlign = 'right';
+            this.fillClampedText(ctx, footer.worldName, footerRight, footerY + 1, footerMaxW - 78);
+            footerY += 19;
 
-            // Coords
+            ctx.textAlign = 'left';
             ctx.fillStyle = Parchment.textMid;
             ctx.font = `12px ${UI.fontPrimary}`;
             ctx.fillText(`좌표 ${player.x}, ${player.y}`, footerX, footerY);
-            footerY += 18;
+            footerY += 17;
 
-            // Terrain hover lines (only when hovering a tile)
-            if (footer.terrainLines.length > 0) {
-                // Divider
+            if (terrainRows.length > 0) {
                 ctx.strokeStyle = Parchment.borderDark;
                 ctx.globalAlpha = 0.25;
                 ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.moveTo(footerX, footerY + 2);
-                ctx.lineTo(this.panelX + PANEL_W - 14, footerY + 2);
+                ctx.lineTo(footerRight, footerY + 2);
                 ctx.stroke();
                 ctx.globalAlpha = 1;
                 footerY += 8;
 
                 ctx.fillStyle = Parchment.textDark;
                 ctx.font = `12px ${UI.fontPrimary}`;
-                for (const line of footer.terrainLines) {
-                    ctx.fillText(line, footerX, footerY);
+                for (const line of terrainRows) {
+                    this.fillClampedText(ctx, line, footerX, footerY, footerMaxW);
                     footerY += FOOTER_TERRAIN_LINE_H;
                 }
             }
@@ -367,6 +367,53 @@ export class MinimapUI {
         ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
         ctx.restore();
+    }
+
+    private buildMiniTerrainRows(ctx: CanvasRenderingContext2D, lines: string[], maxW: number): string[] {
+        if (lines.length === 0) return [];
+
+        ctx.save();
+        ctx.font = `12px ${UI.fontPrimary}`;
+        const rows = lines.flatMap((line) => this.wrapMiniText(ctx, line, maxW));
+        const visible = rows.length <= FOOTER_MAX_ROWS ? rows : rows.slice(0, FOOTER_MAX_ROWS);
+        if (rows.length > FOOTER_MAX_ROWS) {
+            visible[visible.length - 1] = this.withEllipsis(ctx, visible[visible.length - 1], maxW);
+        }
+        ctx.restore();
+        return visible;
+    }
+
+    private wrapMiniText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
+        if (ctx.measureText(text).width <= maxW) return [text];
+
+        const words = text.split(' ');
+        const rows: string[] = [];
+        let current = '';
+        for (const word of words) {
+            const next = current ? `${current} ${word}` : word;
+            if (ctx.measureText(next).width <= maxW) {
+                current = next;
+                continue;
+            }
+            if (current) rows.push(current);
+            current = word;
+        }
+        if (current) rows.push(current);
+        return rows.length > 0 ? rows : [text];
+    }
+
+    private fillClampedText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number): void {
+        ctx.fillText(this.withEllipsis(ctx, text, maxW), x, y);
+    }
+
+    private withEllipsis(ctx: CanvasRenderingContext2D, text: string, maxW: number): string {
+        if (ctx.measureText(text).width <= maxW) return text;
+        const ellipsis = '…';
+        let clipped = text;
+        while (clipped.length > 0 && ctx.measureText(`${clipped}${ellipsis}`).width > maxW) {
+            clipped = clipped.slice(0, -1);
+        }
+        return clipped.length > 0 ? `${clipped}${ellipsis}` : ellipsis;
     }
 
     private renderFullMap(ctx: CanvasRenderingContext2D, vw: number, vh: number, footer?: MinimapFooter): void {

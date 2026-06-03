@@ -168,7 +168,7 @@ export interface ClientHeartbeatMessage {
     clientTime: number;
 }
 
-export type PlayerIntentKind = 'move' | 'attack' | 'interact' | 'useItem' | 'castSkill' | 'endTurn';
+export type PlayerIntentKind = 'move' | 'attack' | 'interact' | 'useItem' | 'castSkill' | 'defend' | 'rest' | 'endTurn';
 
 export interface PlayerIntentMessage {
     type: 'PLAYER_INTENT';

@@ -8,6 +8,8 @@ import {
     getEffectiveStats,
     getEffectiveStatsForEnemy,
     hasStatus,
+    removeActionStanceStatusesFromCarrier,
+    replaceActionStanceStatuses,
     type StatusEffect,
 } from '../src/combat/StatusEffects';
 import { resolveSkillEffect, type SkillEffectEnemyInput, type SkillEffectResult } from '../src/combat/SkillEffectResolver';
@@ -36,11 +38,13 @@ import { getCarryAtbMultiplier, getPlacedItemWeight } from '../src/inventory/Car
 import { generateWorldLootNear } from '../src/loot/WorldLootGenerator';
 import {
     ATTACK_AP_COST,
+    DEFEND_ACTION_GAUGE_COST,
     INTERACT_AP_COST,
     FIELD_MAX_ACTION_GAUGE,
     MAGIC_ACTION_GAUGE_COST,
     MIN_FIELD_ACTION_GAUGE_COST,
     MOVE_ACTION_GAUGE_COST,
+    REST_ACTION_GAUGE_COST,
     TOOL_ACTION_GAUGE_COST,
 } from '../src/field/FieldActionEconomy';
 import { FIELD_ATB_SCALE, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, ENEMY_LEASH_RANGE } from '../src/field/FieldConfig';
@@ -221,6 +225,7 @@ export class WorldSession {
     private readonly generatedLootChunks = new Set<string>();
     private readonly saveDirtyPlayerIds = new Set<string>();
     private readonly finalSavePatches = new Map<string, WorldCharacterSavePatch>();
+    private readonly restingRecoveryTimers = new Map<string, number>();
     private seq = 0;
     private nextPlayerId = 1;
     private nextEnemyId = 1;
@@ -418,6 +423,7 @@ export class WorldSession {
             for (const actorId of player.actorIds) {
                 const actor = this.actors.get(actorId);
                 if (!actor || actor.isDead) continue;
+                this.updateRestingActor(actor, dt);
                 if (actor.actionGauge >= FIELD_MAX_ACTION_GAUGE && actor.remainingAp <= 0) {
                     actor.remainingAp = FIELD_MAX_ACTION_GAUGE;
                     actor.majorActionUsed = false;
@@ -594,6 +600,10 @@ export class WorldSession {
                 return this.handleAttackIntent(actor!, message.intentId, message.payload, now);
             case 'interact':
                 return this.handleInteractIntent(playerId, actor!, message.intentId, message.payload, now);
+            case 'defend':
+                return this.handleDefendIntent(actor!, message.intentId);
+            case 'rest':
+                return this.handleRestIntent(actor!, message.intentId);
             case 'endTurn':
                 return { replies: [], broadcasts: [] };
             case 'useItem':
@@ -635,6 +645,7 @@ export class WorldSession {
         if (actor.remainingAp < MOVE_ACTION_GAUGE_COST) return reject(intentId, 'No action available for movement.');
 
         this.spendActorGauge(actor, MOVE_ACTION_GAUGE_COST);
+        removeActionStanceStatusesFromCarrier(actor);
         if (pathResult.path.length > 0) {
             const next = pathResult.path[pathResult.path.length - 1];
             actor.facing = directionFromTo(actor.tile, next);
@@ -643,6 +654,35 @@ export class WorldSession {
         this.spawnLootNear(actor.tile, this.players.get(actor.ownerPlayerId)?.departureTownId);
         this.finishActorIfSpent(actor);
         return { replies: [], broadcasts: [] };
+    }
+
+    private handleDefendIntent(actor: ServerActor, intentId: string): WorldSessionMessageResult {
+        if (actor.remainingAp < DEFEND_ACTION_GAUGE_COST) return reject(intentId, 'No action available to defend.');
+
+        this.spendActorGauge(actor, DEFEND_ACTION_GAUGE_COST);
+        const guard = createStatus('guard', { durationTurns: undefined, sourceType: 'action' });
+        const counterReady = createStatus('counterReady', { durationTurns: undefined, sourceType: 'action' });
+        actor.statuses = replaceActionStanceStatuses(actor.statuses, [guard, counterReady]);
+        this.finishActorIfSpent(actor);
+
+        return {
+            replies: [],
+            broadcasts: [createActorEvent('status', actor, actor, undefined, guard)],
+        };
+    }
+
+    private handleRestIntent(actor: ServerActor, intentId: string): WorldSessionMessageResult {
+        if (actor.remainingAp < REST_ACTION_GAUGE_COST) return reject(intentId, 'No action available to rest.');
+
+        this.spendActorGauge(actor, REST_ACTION_GAUGE_COST);
+        const resting = createStatus('resting', { sourceType: 'action' });
+        actor.statuses = replaceActionStanceStatuses(actor.statuses, [resting]);
+        this.finishActorIfSpent(actor);
+
+        return {
+            replies: [],
+            broadcasts: [createActorEvent('status', actor, actor, undefined, resting)],
+        };
     }
 
     private handleAttackIntent(actor: ServerActor, intentId: string, payload: unknown, now: number): WorldSessionMessageResult {
@@ -1001,7 +1041,10 @@ export class WorldSession {
         };
         let autoLootGrant: AutoLootGrantMessage | undefined;
         if (!result.isMiss) {
-            enemy.takeDamage(result.damage);
+            const guarded = applyGuardToDamage(enemy.statuses, result.damage);
+            enemy.statuses = guarded.statuses;
+            enemy.takeDamage(guarded.damage);
+            event.value = guarded.damage;
             if (enemy.stats.hp <= 0) {
                 event.kind = 'kill';
                 autoLootGrant = this.completeEnemyKill(actor, target, now);
@@ -1128,8 +1171,13 @@ export class WorldSession {
             { isRanged: range > 1 }
         );
         enemy.facing = directionFromTo({ x: enemy.gridX, y: enemy.gridY }, actor.tile);
+        let dealtDamage = result.damage;
         if (!result.isMiss) {
-            actor.stats.hp = Math.max(0, actor.stats.hp - result.damage);
+            const guarded = applyGuardToDamage(actor.statuses, result.damage);
+            actor.statuses = guarded.statuses;
+            dealtDamage = guarded.damage;
+            actor.stats.hp = Math.max(0, actor.stats.hp - dealtDamage);
+            if (dealtDamage > 0) removeActionStanceStatusesFromCarrier(actor);
             if (actor.stats.hp <= 0) {
                 actor.isDead = true;
                 actor.remainingAp = 0;
@@ -1144,7 +1192,7 @@ export class WorldSession {
             targetId: actor.id,
             sourceName: enemy.name,
             targetName: actor.name,
-            value: result.damage,
+            value: dealtDamage,
         };
     }
 
@@ -1781,6 +1829,30 @@ export class WorldSession {
         actor.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.stats.hp + hpDelta));
         actor.stats.mp = Math.max(0, Math.min(effective.maxMp, actor.stats.mp + mpDelta));
         actor.isDead = actor.stats.hp <= 0;
+    }
+
+    private updateRestingActor(actor: ServerActor, dt: number): void {
+        if (!hasStatus(actor.statuses, 'resting')) {
+            this.restingRecoveryTimers.delete(actor.id);
+            return;
+        }
+
+        const effective = getEffectiveStats(actor.stats, actor.statuses);
+        if (actor.stats.hp >= effective.maxHp && actor.stats.mp >= effective.maxMp) return;
+
+        let timer = (this.restingRecoveryTimers.get(actor.id) ?? 0) + dt;
+        const ticks = Math.floor(timer);
+        if (ticks <= 0) {
+            this.restingRecoveryTimers.set(actor.id, timer);
+            return;
+        }
+
+        timer -= ticks;
+        this.restingRecoveryTimers.set(actor.id, timer);
+        const hpPerTick = Math.max(2, Math.floor(effective.maxHp * 0.03));
+        const mpPerTick = effective.maxMp > 0 ? Math.max(1, Math.floor(effective.maxMp * 0.03)) : 0;
+        actor.stats.hp = Math.min(effective.maxHp, actor.stats.hp + hpPerTick * ticks);
+        actor.stats.mp = Math.min(effective.maxMp, actor.stats.mp + mpPerTick * ticks);
     }
 
     private getAlliedActorsWithin(player: ServerPlayer, caster: ServerActor, radius: number): ServerActor[] {

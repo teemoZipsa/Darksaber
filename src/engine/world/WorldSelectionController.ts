@@ -1,4 +1,4 @@
-import { getEffectiveStatsForCharacter, getEffectiveStatsForEnemy, getStatusIcons } from '../../combat/StatusEffects';
+import { getEffectiveStatsForCharacter, getEffectiveStatsForEnemy, getStatusIcons, getStatusKinds } from '../../combat/StatusEffects';
 import type { Enemy } from '../../entity/Enemy';
 import type { LootObject } from '../../entity/LootObject';
 import type { Entity } from '../../entity/Entity';
@@ -83,7 +83,7 @@ export class WorldSelectionController {
                 exp: actor.character.exp,
                 maxExp: actor.character.expToNext,
                 buffs: getStatusIcons(actor.character.statuses),
-                statusKinds: actor.character.statuses?.map((status) => status.kind),
+                statusKinds: getStatusKinds(actor.character.statuses),
                 atk: stats.atk,
                 def: stats.def,
                 magAtk: stats.magAtk,
@@ -108,7 +108,7 @@ export class WorldSelectionController {
                 maxMp: enemy.stats.maxMp,
                 actionGauge: enemy.actionGauge,
                 buffs: getStatusIcons(enemy.statuses),
-                statusKinds: enemy.statuses?.map((status) => status.kind),
+                statusKinds: getStatusKinds(enemy.statuses),
                 atk: stats.atk,
                 def: stats.def,
                 magAtk: stats.magAtk,

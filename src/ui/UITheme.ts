@@ -187,6 +187,8 @@ export function drawParchmentPanel(
     if (options?.darksaberFrame) {
         DarksaberSpriteAtlas.drawNineSlice(ctx, DARKSABER_PANEL_FRAME, x - 2, y - 2, w + 4, h + 4, 14, {
             alpha: 0.92,
+            fillCenter: false,
+            drawEdges: false,
         });
     }
 

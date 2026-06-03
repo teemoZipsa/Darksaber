@@ -6,8 +6,31 @@
  * settle pause at each tile, like placing a piece on a board.
  */
 
+export type EntityFacing = 'up' | 'down' | 'left' | 'right';
+export type EntityActionMotionKind = 'attack' | 'magic';
+
+interface WalkSpriteData {
+    image: HTMLImageElement;
+    frameWidth: number;
+    frameHeight: number;
+    frameCount: number;
+    framesPerSecond: number;
+    rowByFacing: Record<EntityFacing, number>;
+    renderScale: number;
+    actionRowByFacing?: Partial<Record<EntityFacing, number>>;
+    actionFrameCount: number;
+    actionRowsAvailable: Partial<Record<EntityFacing, boolean>>;
+}
+
+interface ActionMotionState {
+    kind: EntityActionMotionKind;
+    elapsed: number;
+    duration: number;
+    framesPerSecond: number;
+}
+
 export class Entity {
-    public static readonly WALK_ROW_BY_FACING: Record<'up' | 'down' | 'left' | 'right', number> = {
+    public static readonly WALK_ROW_BY_FACING: Record<EntityFacing, number> = {
         down: 0,
         up: 1,
         left: 2,
@@ -23,22 +46,15 @@ export class Entity {
     public label: string;
     public isRealtime: boolean = false;
     public actionGauge: number = 0; // ATB System: 0 to 100
-    public facing: 'up' | 'down' | 'left' | 'right' = 'down';
+    public facing: EntityFacing = 'down';
 
     /** Optional static portrait image (128x128 single illustration) */
     public image?: HTMLImageElement;
     public imageLoaded: boolean = false;
     /** Optional walking sprite sheet. Renderers may also use one frame while idle. */
-    public walkSprite?: {
-        image: HTMLImageElement;
-        frameWidth: number;
-        frameHeight: number;
-        frameCount: number;
-        framesPerSecond: number;
-        rowByFacing: Record<'up' | 'down' | 'left' | 'right', number>;
-        renderScale: number;
-    };
+    public walkSprite?: WalkSpriteData;
     public walkSpriteLoaded: boolean = false;
+    private actionMotion: ActionMotionState | null = null;
 
     // ── Tile-step movement state ──
     /** Current step target (one tile away from current integer position) */
@@ -88,15 +104,30 @@ export class Entity {
         frameHeight: number,
         frameCount: number,
         framesPerSecond: number = 8,
-        rowByFacing: Record<'up' | 'down' | 'left' | 'right', number> = Entity.WALK_ROW_BY_FACING,
-        renderScale: number = 1
+        rowByFacing: Record<EntityFacing, number> = Entity.WALK_ROW_BY_FACING,
+        renderScale: number = 1,
+        actionRowByFacing?: Partial<Record<EntityFacing, number>>,
+        actionFrameCount: number = 2
     ): void {
         const image = new Image();
-        const sprite = { image, frameWidth, frameHeight, frameCount, framesPerSecond, rowByFacing, renderScale };
+        const sprite: WalkSpriteData = {
+            image,
+            frameWidth,
+            frameHeight,
+            frameCount,
+            framesPerSecond,
+            rowByFacing,
+            renderScale,
+            actionRowByFacing,
+            actionFrameCount,
+            actionRowsAvailable: {},
+        };
         this.walkSpriteLoaded = false;
         this.walkSprite = sprite;
+        this.actionMotion = null;
         image.onload = () => {
             if (this.walkSprite !== sprite) return;
+            sprite.actionRowsAvailable = this.detectActionRows(sprite);
             this.walkSpriteLoaded = true;
         };
         image.onerror = () => {
@@ -105,6 +136,37 @@ export class Entity {
             this.walkSprite = undefined;
         };
         image.src = src;
+    }
+
+    public playActionMotion(kind: EntityActionMotionKind, duration: number = 0.36, framesPerSecond: number = 8): boolean {
+        if (!this.hasActionMotionForFacing(this.facing)) return false;
+        this.actionMotion = { kind, elapsed: 0, duration, framesPerSecond };
+        return true;
+    }
+
+    public faceToward(gridX: number, gridY: number): void {
+        const dx = gridX - this.gridX;
+        const dy = gridY - this.gridY;
+        if (Math.abs(dx) > Math.abs(dy)) {
+            if (dx > 0) this.facing = 'right';
+            else if (dx < 0) this.facing = 'left';
+        } else {
+            if (dy > 0) this.facing = 'down';
+            else if (dy < 0) this.facing = 'up';
+        }
+    }
+
+    public getActionSpriteFrame(): { row: number; frame: number } | null {
+        const sprite = this.walkSprite;
+        const motion = this.actionMotion;
+        if (!sprite || !motion || !this.hasActionMotionForFacing(this.facing)) return null;
+
+        const row = sprite.actionRowByFacing?.[this.facing];
+        if (row === undefined) return null;
+
+        const frameCount = Math.max(1, sprite.actionFrameCount);
+        const frame = Math.min(Math.floor(motion.elapsed * motion.framesPerSecond), frameCount - 1);
+        return { row, frame };
     }
 
     public setGridPosition(gridX: number, gridY: number, instant = false): void {
@@ -122,6 +184,7 @@ export class Entity {
     }
 
     public update(dt: number): void {
+        this.updateActionMotion(dt);
         if (this.isRealtime) return; // WorldEngine handles real-time position updates manually
 
         // ── Settle pause: brief stop at each tile ──
@@ -181,4 +244,62 @@ export class Entity {
         }
         this.stepping = true;
     }
+
+    private hasActionMotionForFacing(facing: EntityFacing): boolean {
+        const sprite = this.walkSprite;
+        if (!sprite || !this.walkSpriteLoaded) return false;
+        const row = sprite.actionRowByFacing?.[facing];
+        return row !== undefined && sprite.actionRowsAvailable[facing] === true;
+    }
+
+    private updateActionMotion(dt: number): void {
+        if (!this.actionMotion) return;
+        this.actionMotion.elapsed += dt;
+        if (this.actionMotion.elapsed >= this.actionMotion.duration) this.actionMotion = null;
+    }
+
+    private detectActionRows(sprite: WalkSpriteData): Partial<Record<EntityFacing, boolean>> {
+        const rows: Partial<Record<EntityFacing, boolean>> = {};
+        if (!sprite.actionRowByFacing || typeof document === 'undefined') return rows;
+
+        try {
+            const canvas = document.createElement('canvas');
+            const width = sprite.frameWidth * Math.max(1, sprite.actionFrameCount);
+            canvas.width = width;
+            canvas.height = sprite.frameHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return rows;
+
+            for (const [facing, row] of Object.entries(sprite.actionRowByFacing) as [EntityFacing, number][]) {
+                if (row < 0 || sprite.image.naturalHeight < (row + 1) * sprite.frameHeight) continue;
+                if (sprite.image.naturalWidth < width) continue;
+
+                ctx.clearRect(0, 0, width, sprite.frameHeight);
+                ctx.drawImage(
+                    sprite.image,
+                    0,
+                    row * sprite.frameHeight,
+                    width,
+                    sprite.frameHeight,
+                    0,
+                    0,
+                    width,
+                    sprite.frameHeight
+                );
+                const pixels = ctx.getImageData(0, 0, width, sprite.frameHeight).data;
+                rows[facing] = hasVisiblePixels(pixels);
+            }
+        } catch {
+            return rows;
+        }
+
+        return rows;
+    }
+}
+
+function hasVisiblePixels(pixels: Uint8ClampedArray): boolean {
+    for (let i = 3; i < pixels.length; i += 4) {
+        if (pixels[i] > 0) return true;
+    }
+    return false;
 }

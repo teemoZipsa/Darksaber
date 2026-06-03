@@ -795,6 +795,8 @@ function parseAllowedOrigins(value: string | undefined): string[] {
         .filter((origin) => origin.length > 0);
     if (configured && configured.length > 0) return configured;
     return [
+        'http://localhost:5731',
+        'http://127.0.0.1:5731',
         'http://localhost:5173',
         'http://127.0.0.1:5173',
         'http://localhost:4173',

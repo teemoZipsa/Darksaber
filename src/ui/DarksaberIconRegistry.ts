@@ -17,8 +17,8 @@ export const ACTION_ICON_CELLS: Partial<Record<ActionType, IconCell>> = {
 
 export const STATUS_KIND_ICON_CELLS: Record<StatusKind, IconCell> = {
     guard: cell(2, 2),
-    counterReady: cell(8, 2),
-    resting: cell(5, 1),
+    counterReady: cell(2, 2),
+    resting: cell(8, 0),
     poison: cell(17, 2),
     regen: cell(8, 0),
     slow: cell(9, 3),

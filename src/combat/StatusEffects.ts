@@ -31,7 +31,7 @@ export type StatusKind =
     | 'injury';
 
 export type StatusActivation = 'immediate' | 'on_raid_start';
-export type StatusSourceType = 'skill' | 'rest' | 'injury';
+export type StatusSourceType = 'skill' | 'rest' | 'injury' | 'action';
 
 export interface StatusEffect {
     kind: StatusKind;
@@ -110,6 +110,12 @@ const REACTION_STATUSES = new Set<StatusKind>([
     'counterReady',
 ]);
 
+const ACTION_STANCE_STATUSES = new Set<StatusKind>([
+    'guard',
+    'counterReady',
+    'resting',
+]);
+
 const NEGATIVE_STATUSES = new Set<StatusKind>([
     'poison',
     'slow',
@@ -120,6 +126,18 @@ const NEGATIVE_STATUSES = new Set<StatusKind>([
     'defenseDown',
     'resistDown',
 ]);
+
+const STATUS_DISPLAY_PRIORITY: Partial<Record<StatusKind, number>> = {
+    guard: 0,
+    resting: 1,
+    counterReady: 2,
+    poison: 10,
+    injury: 11,
+    immobilize: 12,
+    silence: 13,
+    slow: 14,
+    blind: 15,
+};
 
 export function createStatus(kind: StatusKind, overrides: Partial<Omit<StatusEffect, 'kind'>> = {}): StatusEffect {
     const status: StatusEffect = {
@@ -198,6 +216,18 @@ export function removeRestStatusesFromCarrier(carrier: StatusCarrier): StatusEff
     return removeStatusesFromCarrier(carrier, (status) => status.sourceType === 'rest');
 }
 
+export function isActionStanceStatus(status: StatusEffect): boolean {
+    return status.sourceType === 'action' && ACTION_STANCE_STATUSES.has(status.kind);
+}
+
+export function removeActionStanceStatusesFromCarrier(carrier: StatusCarrier): StatusEffect[] {
+    return removeStatusesFromCarrier(carrier, isActionStanceStatus);
+}
+
+export function replaceActionStanceStatuses(statuses: StatusEffect[] | undefined, nextStatuses: StatusEffect[]): StatusEffect[] {
+    return applyStatuses((statuses ?? []).filter((status) => !isActionStanceStatus(status)), nextStatuses);
+}
+
 export function advanceTimedStatuses(statuses: StatusEffect[] | undefined, dt: number): StatusEffect[] {
     const next: StatusEffect[] = [];
     for (const status of statuses ?? []) {
@@ -256,11 +286,29 @@ export function resolveTurnStartStatuses(stats: CharacterStats, statuses: Status
     let regenHealing = 0;
     let poisonMagnitude: number | undefined;
     let regenMagnitude: number | undefined;
-    const expiredReaction = hasStatus(statuses, 'guard') || hasStatus(statuses, 'counterReady');
+    let expiredReaction = false;
     const nextStatuses: StatusEffect[] = [];
 
     for (const status of statuses ?? []) {
-        if (status.kind === 'guard' || status.kind === 'counterReady') continue;
+        if (status.kind === 'guard' || status.kind === 'counterReady') {
+            if (status.sourceType === 'action') {
+                nextStatuses.push(status);
+                continue;
+            }
+
+            if (status.durationTurns === undefined) {
+                nextStatuses.push(status);
+                continue;
+            }
+
+            const durationTurns = status.durationTurns - 1;
+            if (durationTurns > 0) {
+                nextStatuses.push({ ...status, durationTurns });
+            } else {
+                expiredReaction = true;
+            }
+            continue;
+        }
 
         if (status.kind === 'poison') {
             poisonMagnitude = Math.max(poisonMagnitude ?? 0, status.magnitude);
@@ -288,7 +336,22 @@ export function cleanseNegativeStatuses(statuses: StatusEffect[] | undefined): S
 }
 
 export function getStatusIcons(statuses: StatusEffect[] | undefined): string[] {
-    return (statuses ?? []).map((status) => status.icon);
+    return getDisplayStatuses(statuses).map((status) => status.icon);
+}
+
+export function getStatusKinds(statuses: StatusEffect[] | undefined): StatusKind[] {
+    return getDisplayStatuses(statuses).map((status) => status.kind);
+}
+
+export function getDisplayStatuses(statuses: StatusEffect[] | undefined): StatusEffect[] {
+    const current = statuses ?? [];
+    const hasGuard = current.some((status) => status.kind === 'guard');
+    return current.filter((status) => !(hasGuard && status.kind === 'counterReady')).sort((a, b) => {
+        const aPriority = STATUS_DISPLAY_PRIORITY[a.kind] ?? 50;
+        const bPriority = STATUS_DISPLAY_PRIORITY[b.kind] ?? 50;
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        return a.kind.localeCompare(b.kind);
+    });
 }
 
 export function getEffectiveStatsForCharacter(character: StatusCarrier): CharacterStats {

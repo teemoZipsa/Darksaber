@@ -339,9 +339,15 @@ function renderWalkSprite(
     if (!moving && !options.drawIdle) return false;
 
     const frameCount = Math.max(1, sprite.frameCount);
-    const frame = moving
-        ? Math.floor(worldTime * sprite.framesPerSecond) % frameCount
-        : Math.min(options.idleFrame ?? 1, frameCount - 1);
+    const actionFrame = moving ? null : entity.getActionSpriteFrame();
+    let frame = Math.min(options.idleFrame ?? 1, frameCount - 1);
+    let row = sprite.rowByFacing[entity.facing];
+    if (moving) {
+        frame = Math.floor(worldTime * sprite.framesPerSecond) % frameCount;
+    } else if (actionFrame) {
+        frame = actionFrame.frame;
+        row = actionFrame.row;
+    }
     const dw = TILE_SIZE * sprite.renderScale;
     const dh = TILE_SIZE * sprite.renderScale;
     const dx = px + (TILE_SIZE - dw) / 2;
@@ -351,7 +357,7 @@ function renderWalkSprite(
     ctx.drawImage(
         sprite.image,
         frame * sprite.frameWidth,
-        sprite.rowByFacing[entity.facing] * sprite.frameHeight,
+        row * sprite.frameHeight,
         sprite.frameWidth,
         sprite.frameHeight,
         dx,

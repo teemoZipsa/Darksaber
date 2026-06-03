@@ -235,7 +235,7 @@ class DarksaberSpriteAtlasClass {
         dw: number,
         dh: number,
         inset: number | SliceInset,
-        options: { alpha?: number; smoothing?: boolean } = {}
+        options: { alpha?: number; smoothing?: boolean; fillCenter?: boolean; drawEdges?: boolean } = {}
     ): boolean {
         const img = this.getImage(rect.sheet);
         if (!img) return false;
@@ -256,16 +256,28 @@ class DarksaberSpriteAtlasClass {
         ctx.globalAlpha *= options.alpha ?? 1;
         ctx.imageSmoothingEnabled = options.smoothing ?? false;
 
+        const drawEdges = options.drawEdges !== false;
+
         this.drawSlice(ctx, img, rect.x, rect.y, slice.left, slice.top, dx, dy, dstLeft, dstTop);
-        this.drawSlice(ctx, img, rect.x + slice.left, rect.y, srcCenterW, slice.top, dx + dstLeft, dy, dstCenterW, dstTop);
+        if (drawEdges) {
+            this.drawSlice(ctx, img, rect.x + slice.left, rect.y, srcCenterW, slice.top, dx + dstLeft, dy, dstCenterW, dstTop);
+        }
         this.drawSlice(ctx, img, rect.x + rect.w - slice.right, rect.y, slice.right, slice.top, dx + dw - dstRight, dy, dstRight, dstTop);
 
-        this.drawSlice(ctx, img, rect.x, rect.y + slice.top, slice.left, srcCenterH, dx, dy + dstTop, dstLeft, dstCenterH);
-        this.drawSlice(ctx, img, rect.x + slice.left, rect.y + slice.top, srcCenterW, srcCenterH, dx + dstLeft, dy + dstTop, dstCenterW, dstCenterH);
-        this.drawSlice(ctx, img, rect.x + rect.w - slice.right, rect.y + slice.top, slice.right, srcCenterH, dx + dw - dstRight, dy + dstTop, dstRight, dstCenterH);
+        if (drawEdges) {
+            this.drawSlice(ctx, img, rect.x, rect.y + slice.top, slice.left, srcCenterH, dx, dy + dstTop, dstLeft, dstCenterH);
+        }
+        if (options.fillCenter !== false) {
+            this.drawSlice(ctx, img, rect.x + slice.left, rect.y + slice.top, srcCenterW, srcCenterH, dx + dstLeft, dy + dstTop, dstCenterW, dstCenterH);
+        }
+        if (drawEdges) {
+            this.drawSlice(ctx, img, rect.x + rect.w - slice.right, rect.y + slice.top, slice.right, srcCenterH, dx + dw - dstRight, dy + dstTop, dstRight, dstCenterH);
+        }
 
         this.drawSlice(ctx, img, rect.x, rect.y + rect.h - slice.bottom, slice.left, slice.bottom, dx, dy + dh - dstBottom, dstLeft, dstBottom);
-        this.drawSlice(ctx, img, rect.x + slice.left, rect.y + rect.h - slice.bottom, srcCenterW, slice.bottom, dx + dstLeft, dy + dh - dstBottom, dstCenterW, dstBottom);
+        if (drawEdges) {
+            this.drawSlice(ctx, img, rect.x + slice.left, rect.y + rect.h - slice.bottom, srcCenterW, slice.bottom, dx + dstLeft, dy + dh - dstBottom, dstCenterW, dstBottom);
+        }
         this.drawSlice(ctx, img, rect.x + rect.w - slice.right, rect.y + rect.h - slice.bottom, slice.right, slice.bottom, dx + dw - dstRight, dy + dh - dstBottom, dstRight, dstBottom);
 
         ctx.restore();

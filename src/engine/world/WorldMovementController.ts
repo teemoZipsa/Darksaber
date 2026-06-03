@@ -1,4 +1,4 @@
-import { getEffectiveStatsForCharacter, getEffectiveStatsForEnemy, hasStatus } from '../../combat/StatusEffects';
+import { getEffectiveStatsForCharacter, getEffectiveStatsForEnemy, hasStatus, removeActionStanceStatusesFromCarrier } from '../../combat/StatusEffects';
 import type { Enemy } from '../../entity/Enemy';
 import type { Player } from '../../entity/Player';
 import { TILE_PROPERTIES, type TileType } from '../../map/Tile';
@@ -159,6 +159,7 @@ export class WorldMovementController {
         }
 
         actor.path.shift();
+        removeActionStanceStatusesFromCarrier(actor.character);
         actor.entity.facing = directionFromTo(this.actorTile(actor), next);
         actor.entity.gridX = next.x;
         actor.entity.gridY = next.y;

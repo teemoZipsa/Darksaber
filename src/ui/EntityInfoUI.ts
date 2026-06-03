@@ -4,6 +4,7 @@
  */
 
 import type { StatusKind } from '../combat/StatusEffects';
+import { t } from '../i18n/LanguageManager';
 import { getStatusIconCell } from './DarksaberIconRegistry';
 import { DarksaberSpriteAtlas } from './DarksaberSpriteAtlas';
 import { UI, isCloseButtonHit, Parchment, drawParchmentPanel } from './UITheme';
@@ -52,6 +53,14 @@ const TEXT_DARK    = Parchment.textDark;
 const GRID_BG      = '#1a1a2e';
 const GRID_CELL    = '#2a2a4a';
 
+interface StatusSlotHitbox {
+    x: number;
+    y: number;
+    size: number;
+    kind?: StatusKind;
+    icon: string;
+}
+
 export class EntityInfoUI {
     private x = 16;
     private y = 180;
@@ -67,6 +76,10 @@ export class EntityInfoUI {
     // Flash timer for ATB
     private flashTime = 0;
     private closeHovered = false;
+    private mouseX = 0;
+    private mouseY = 0;
+    private statusSlotHitboxes: StatusSlotHitbox[] = [];
+    private hoveredStatus: StatusSlotHitbox | null = null;
 
     // Smooth bar lerp targets
     private displayHp = -1;
@@ -74,9 +87,12 @@ export class EntityInfoUI {
     private displayAtb = -1;
 
     public onMouseMove(mx: number, my: number): void {
+        this.mouseX = mx;
+        this.mouseY = my;
         const cx = this.x + this.w - 16;
         const cy = this.y + 16;
         this.closeHovered = isCloseButtonHit(mx, my, cx, cy);
+        this.hoveredStatus = this.findHoveredStatus(mx, my);
     }
 
     public onClick(mx: number, my: number): boolean {
@@ -156,32 +172,6 @@ export class EntityInfoUI {
             }
         }
 
-        // Draw buffs (up to 7 icons)
-        if (info.buffs && info.buffs.length > 0) {
-            // Buffer slots in order: top row (4), left col (2), right col (1)
-            const buffSlots = [
-                {c: 0, r: 0}, {c: 1, r: 0}, {c: 2, r: 0}, {c: 3, r: 0},
-                {c: 0, r: 1}, {c: 0, r: 2}, {c: 3, r: 1}
-            ];
-            ctx.font = '14px "DOSMyungjo", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            for (let i = 0; i < Math.min(info.buffs.length, buffSlots.length); i++) {
-                const slot = buffSlots[i];
-                const icon = info.buffs[i];
-                const iconCell = getStatusIconCell(info.statusKinds?.[i] ?? icon);
-                const cx = gridX + slot.c * cellSize + cellSize / 2;
-                const cy = gridY + slot.r * cellSize + cellSize / 2;
-                const iconSize = 18;
-                const iconDrawn = iconCell
-                    ? DarksaberSpriteAtlas.drawIconCell(ctx, iconCell.col, iconCell.row, cx - iconSize / 2, cy - iconSize / 2, iconSize)
-                    : false;
-                if (!iconDrawn) ctx.fillText(icon, cx, cy);
-            }
-            ctx.textAlign = 'start';
-            ctx.textBaseline = 'alphabetic';
-        }
-
         // Character sprite in center of grid
         const spriteCenterX = gridX + (cols * cellSize) / 2;
         const spriteCenterY = gridY + (rows * cellSize) / 2;
@@ -204,6 +194,44 @@ export class EntityInfoUI {
             ctx.lineWidth = 1;
             ctx.strokeRect(spriteCenterX - 12, spriteCenterY - 12, 24, 24);
         }
+
+        // Draw status effects above the portrait so action stances stay readable.
+        this.statusSlotHitboxes = [];
+        if (info.buffs && info.buffs.length > 0) {
+            const buffSlots = [
+                {c: 0, r: 0}, {c: 1, r: 0}, {c: 2, r: 0}, {c: 3, r: 0},
+                {c: 0, r: 1}, {c: 0, r: 2}, {c: 3, r: 1}
+            ];
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            for (let i = 0; i < Math.min(info.buffs.length, buffSlots.length); i++) {
+                const slot = buffSlots[i];
+                const icon = info.buffs[i];
+                const kind = info.statusKinds?.[i];
+                const iconCell = getStatusIconCell(kind ?? icon);
+                const cx = gridX + slot.c * cellSize + cellSize / 2;
+                const cy = gridY + slot.r * cellSize + cellSize / 2;
+                const isActionStance = kind === 'guard' || kind === 'resting' || kind === 'counterReady';
+                const iconSize = isActionStance ? 19 : 17;
+                this.statusSlotHitboxes.push({ x: cx - 12, y: cy - 12, size: 24, kind, icon });
+
+                const iconDrawn = iconCell
+                    ? DarksaberSpriteAtlas.drawIconCell(ctx, iconCell.col, iconCell.row, cx - iconSize / 2, cy - iconSize / 2, iconSize)
+                    : false;
+                if (!iconDrawn) {
+                    ctx.font = `bold 10px ${UI.fontPrimary}`;
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.82)';
+                    ctx.fillStyle = '#f6d090';
+                    const label = icon.length > 2 ? icon.slice(0, 2) : icon;
+                    ctx.strokeText(label, cx, cy + 1);
+                    ctx.fillText(label, cx, cy + 1);
+                }
+            }
+            ctx.textAlign = 'start';
+            ctx.textBaseline = 'alphabetic';
+        }
+        this.hoveredStatus = this.findHoveredStatus(this.mouseX, this.mouseY);
 
         // ── Separator line ──
         const sepY = gridY + actualGridH + 8;
@@ -324,7 +352,73 @@ export class EntityInfoUI {
         ctx.fillText(`${Math.floor(info.magDef)}`, this.x + statPad + boxW * 2 + 2, by + 16);
         ctx.textAlign = 'start';
 
+        this.drawStatusTooltip(ctx);
+
         ctx.restore();
+    }
+
+    private findHoveredStatus(mx: number, my: number): StatusSlotHitbox | null {
+        return this.statusSlotHitboxes.find((slot) =>
+            mx >= slot.x && mx <= slot.x + slot.size && my >= slot.y && my <= slot.y + slot.size
+        ) ?? null;
+    }
+
+    private drawStatusTooltip(ctx: CanvasRenderingContext2D): void {
+        if (!this.hoveredStatus) return;
+        const kind = this.hoveredStatus.kind;
+        const title = kind ? t(`status.${kind}.name`) : this.hoveredStatus.icon;
+        const desc = kind ? t(`status.${kind}.desc`) : '';
+        ctx.save();
+        ctx.font = `11px ${UI.fontPrimary}`;
+        const lines = this.wrapTooltipText(ctx, desc, 148);
+        const tooltipW = 164;
+        const tooltipH = 30 + lines.length * 14;
+        const cursorGapX = 28;
+        const cursorGapY = 22;
+        const panelPad = 8;
+        let tx = this.mouseX + cursorGapX;
+        let ty = this.mouseY + cursorGapY;
+        if (tx + tooltipW > this.x + this.w - panelPad) tx = this.mouseX - tooltipW - cursorGapX;
+        if (ty + tooltipH > this.y + this.h - panelPad) ty = this.mouseY - tooltipH - cursorGapY;
+        tx = Math.max(this.x + panelPad, Math.min(tx, this.x + this.w - tooltipW - panelPad));
+        ty = Math.max(this.y + panelPad, Math.min(ty, this.y + this.h - tooltipH - panelPad));
+
+        ctx.fillStyle = 'rgba(24, 16, 10, 0.94)';
+        ctx.strokeStyle = '#c9973d';
+        ctx.lineWidth = 1.5;
+        ctx.fillRect(tx, ty, tooltipW, tooltipH);
+        ctx.strokeRect(tx, ty, tooltipW, tooltipH);
+        ctx.font = `bold 12px ${UI.fontPrimary}`;
+        ctx.fillStyle = '#ffd76a';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(title, tx + 8, ty + 7);
+        ctx.font = `11px ${UI.fontPrimary}`;
+        ctx.fillStyle = '#ead7b0';
+        let lineY = ty + 24;
+        for (const line of lines) {
+            ctx.fillText(line, tx + 8, lineY);
+            lineY += 14;
+        }
+        ctx.restore();
+    }
+
+    private wrapTooltipText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
+        if (!text || text.startsWith('status.')) return [];
+        const tokens = text.split(' ');
+        const lines: string[] = [];
+        let line = '';
+        for (const token of tokens) {
+            const next = line ? `${line} ${token}` : token;
+            if (line && ctx.measureText(next).width > maxW) {
+                lines.push(line);
+                line = token;
+            } else {
+                line = next;
+            }
+        }
+        if (line) lines.push(line);
+        return lines.slice(0, 3);
     }
 
     private drawSpriteSheetIdleFrame(
