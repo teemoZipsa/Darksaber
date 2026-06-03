@@ -44,33 +44,81 @@ interface CrossfadeOptions {
  * Catalogue of known sound assets, keyed by short id. Add new entries here
  * as the artist provides files. Paths are relative to /public.
  */
+const originalSfx = (id: string): string => `/assets/sounds/original/${id}.wav`;
+
 export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = {
     // UI
-    'ui.confirm':  { src: '/assets/sounds/ui/confirm.ogg',  channel: 'ui' },
-    'ui.cancel':   { src: '/assets/sounds/ui/cancel.ogg',   channel: 'ui' },
-    'ui.hover':    { src: '/assets/sounds/ui/hover.ogg',    channel: 'ui' },
-    'ui.error':    { src: '/assets/sounds/ui/error.ogg',    channel: 'ui' },
-    'ui.open':     { src: '/assets/sounds/ui/open.ogg',     channel: 'ui' },
-    'ui.close':    { src: '/assets/sounds/ui/close.ogg',    channel: 'ui' },
+    'ui.confirm':  { src: originalSfx('01'), channel: 'ui' },
+    'ui.cancel':   { src: originalSfx('04'), channel: 'ui' },
+    'ui.hover':    { src: originalSfx('10'), channel: 'ui' },
+    'ui.error':    { src: originalSfx('04'), channel: 'ui' },
+    'ui.open':     { src: originalSfx('04'), channel: 'ui' },
+    'ui.close':    { src: originalSfx('04'), channel: 'ui' },
 
     // Combat
-    'sfx.swing':       { src: '/assets/sounds/sfx/swing.ogg',       channel: 'sfx' },
-    'sfx.hit_flesh':   { src: '/assets/sounds/sfx/hit_flesh.ogg',   channel: 'sfx' },
-    'sfx.hit_metal':   { src: '/assets/sounds/sfx/hit_metal.ogg',   channel: 'sfx' },
-    'sfx.crit':        { src: '/assets/sounds/sfx/crit.ogg',        channel: 'sfx' },
-    'sfx.miss':        { src: '/assets/sounds/sfx/miss.ogg',        channel: 'sfx' },
-    'sfx.heal':        { src: '/assets/sounds/sfx/heal.ogg',        channel: 'sfx' },
-    'sfx.levelup':     { src: '/assets/sounds/sfx/levelup.ogg',     channel: 'sfx' },
-    'sfx.loot_pickup': { src: '/assets/sounds/sfx/loot_pickup.ogg', channel: 'sfx' },
-    'sfx.coin':        { src: '/assets/sounds/sfx/coin.ogg',        channel: 'sfx' },
+    'sfx.swing':       { src: originalSfx('07'), channel: 'sfx' },
+    'sfx.hit_flesh':   { src: originalSfx('07'), channel: 'sfx' },
+    'sfx.hit_metal':   { src: originalSfx('03'), channel: 'sfx' },
+    'sfx.crit':        { src: originalSfx('15'), channel: 'sfx' },
+    'sfx.miss':        { src: originalSfx('10'), channel: 'sfx' },
+    'sfx.heal':        { src: originalSfx('24'), channel: 'sfx' },
+    'sfx.levelup':     { src: originalSfx('21'), channel: 'sfx' },
+    'sfx.loot_pickup': { src: originalSfx('01'), channel: 'sfx' },
+    'sfx.coin':        { src: originalSfx('01'), channel: 'sfx' },
+
+    // Original magic / state effects inferred from gameres_unpacked/set/MagicPtn.atr
+    'sfx.magic.fire':        { src: originalSfx('00'), channel: 'sfx' },
+    'sfx.magic.ice':         { src: originalSfx('02'), channel: 'sfx' },
+    'sfx.magic.ice_burst':   { src: originalSfx('03'), channel: 'sfx' },
+    'sfx.magic.thunder':     { src: originalSfx('05'), channel: 'sfx' },
+    'sfx.magic.wind_cutter': { src: originalSfx('06'), channel: 'sfx' },
+    'sfx.magic.slash':       { src: originalSfx('07'), channel: 'sfx' },
+    'sfx.magic.tornado':     { src: originalSfx('08'), channel: 'sfx' },
+    'sfx.magic.quake':       { src: originalSfx('09'), channel: 'sfx' },
+    'sfx.magic.drain':       { src: originalSfx('12'), channel: 'sfx' },
+    'sfx.magic.atomic_wave': { src: originalSfx('15'), channel: 'sfx' },
+    'sfx.magic.status':      { src: originalSfx('17'), channel: 'sfx' },
+    'sfx.magic.mute':        { src: originalSfx('18'), channel: 'sfx' },
+    'sfx.magic.resist':      { src: originalSfx('19'), channel: 'sfx' },
+    'sfx.magic.protection':  { src: originalSfx('20'), channel: 'sfx' },
+    'sfx.magic.buff':        { src: originalSfx('21'), channel: 'sfx' },
+    'sfx.magic.quick_poison': { src: originalSfx('22'), channel: 'sfx' },
+    'sfx.magic.heal':        { src: originalSfx('24'), channel: 'sfx' },
+
+    // Low-confidence originals not referenced by MagicPtn.atr, kept as semantic aliases.
+    'sfx.event.reward': { src: originalSfx('01'), channel: 'sfx' },
+    'sfx.event.device': { src: originalSfx('04'), channel: 'sfx' },
+    'sfx.event.tick':   { src: originalSfx('10'), channel: 'sfx' },
+
+    // Raw numbered aliases for tools/tests and future remapping.
+    'sfx.original.00': { src: originalSfx('00'), channel: 'sfx' },
+    'sfx.original.01': { src: originalSfx('01'), channel: 'sfx' },
+    'sfx.original.02': { src: originalSfx('02'), channel: 'sfx' },
+    'sfx.original.03': { src: originalSfx('03'), channel: 'sfx' },
+    'sfx.original.04': { src: originalSfx('04'), channel: 'sfx' },
+    'sfx.original.05': { src: originalSfx('05'), channel: 'sfx' },
+    'sfx.original.06': { src: originalSfx('06'), channel: 'sfx' },
+    'sfx.original.07': { src: originalSfx('07'), channel: 'sfx' },
+    'sfx.original.08': { src: originalSfx('08'), channel: 'sfx' },
+    'sfx.original.09': { src: originalSfx('09'), channel: 'sfx' },
+    'sfx.original.10': { src: originalSfx('10'), channel: 'sfx' },
+    'sfx.original.12': { src: originalSfx('12'), channel: 'sfx' },
+    'sfx.original.15': { src: originalSfx('15'), channel: 'sfx' },
+    'sfx.original.17': { src: originalSfx('17'), channel: 'sfx' },
+    'sfx.original.18': { src: originalSfx('18'), channel: 'sfx' },
+    'sfx.original.19': { src: originalSfx('19'), channel: 'sfx' },
+    'sfx.original.20': { src: originalSfx('20'), channel: 'sfx' },
+    'sfx.original.21': { src: originalSfx('21'), channel: 'sfx' },
+    'sfx.original.22': { src: originalSfx('22'), channel: 'sfx' },
+    'sfx.original.24': { src: originalSfx('24'), channel: 'sfx' },
 
     // World
     'sfx.footstep_grass': { src: '/assets/sounds/world/footstep_grass.ogg', channel: 'sfx' },
     'sfx.footstep_stone': { src: '/assets/sounds/world/footstep_stone.ogg', channel: 'sfx' },
     'sfx.footstep_water': { src: '/assets/sounds/world/footstep_water.ogg', channel: 'sfx' },
-    'sfx.door':           { src: '/assets/sounds/world/door.ogg',           channel: 'sfx' },
-    'sfx.extract_start':  { src: '/assets/sounds/world/extract_start.ogg',  channel: 'sfx' },
-    'sfx.extract_done':   { src: '/assets/sounds/world/extract_done.ogg',   channel: 'sfx' },
+    'sfx.door':           { src: originalSfx('04'), channel: 'sfx' },
+    'sfx.extract_start':  { src: originalSfx('09'), channel: 'sfx' },
+    'sfx.extract_done':   { src: originalSfx('01'), channel: 'sfx' },
 
     // Music
     'bgm.title':   { src: '/assets/sounds/bgm/title.ogg',   channel: 'bgm' },
