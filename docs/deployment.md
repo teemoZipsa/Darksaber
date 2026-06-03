@@ -141,6 +141,43 @@ Before opening access to players:
 8. Restart the Render server and confirm the account/character still loads from
    PostgreSQL.
 
+## Render API Automation
+
+Render dashboard login is not required for deploy checks if you create a Render
+API key and keep it outside git.
+
+1. In Render, create an API key from Account Settings.
+2. In PowerShell, set the key for the current terminal:
+
+```powershell
+$env:RENDER_API_KEY="rnd_..."
+```
+
+3. Optional: override the service ID if you are not using the default
+   `darksaber-world-server` service:
+
+```powershell
+$env:RENDER_SERVICE_ID="srv-..."
+```
+
+4. Check the latest deploy:
+
+```powershell
+npm run render:status
+```
+
+5. Trigger a deploy and wait until it reaches `live`:
+
+```powershell
+npm run render:deploy -- --wait
+```
+
+The helper calls Render's public API with a bearer token. Do not commit
+`RENDER_API_KEY`, deploy hook URLs, or any other Render secret. If you prefer a
+deploy hook instead of an API key, store the hook URL as a local secret and call
+it with `Invoke-WebRequest`; deploy hooks can trigger a deploy but do not give
+the same status-checking capability as the API helper.
+
 ## Data Operations
 
 Account data lives in managed PostgreSQL. Production operation must include:
