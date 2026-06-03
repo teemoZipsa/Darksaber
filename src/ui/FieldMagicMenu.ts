@@ -28,13 +28,22 @@ export type FieldMagicClickResult =
 export class FieldMagicMenu {
     private static readonly ICON_ANIMATION_ROWS = 5;
     private static readonly ICON_ANIMATION_MS = 280;
+    private static readonly SLOT_OFFSETS: ReadonlyArray<{ x: number; y: number }> = [
+        { x: -1, y: -1 },
+        { x: 0, y: -1 },
+        { x: 1, y: -1 },
+        { x: -1, y: 0 },
+        { x: 1, y: 0 },
+        { x: -1, y: 1 },
+        { x: 0, y: 1 },
+        { x: 1, y: 1 },
+    ];
     private open = false;
     private slots: FieldMagicSlot[] = [];
     private hoveredIndex: number | null = null;
 
-    private readonly menuRadius = 82;
-    private readonly iconRadius = 25;
-    private readonly hitHalfSize = 22;
+    private readonly iconRadius = 24;
+    private readonly hitHalfSize = TILE_SIZE / 2;
 
     private centerX = 0;
     private centerY = 0;
@@ -104,11 +113,10 @@ export class FieldMagicMenu {
     }
 
     private slotPosition(index: number): { x: number; y: number } {
-        const count = Math.max(1, this.slots.length);
-        const angle = (Math.PI * 2 * index) / count;
+        const offset = FieldMagicMenu.SLOT_OFFSETS[index] ?? FieldMagicMenu.SLOT_OFFSETS[FieldMagicMenu.SLOT_OFFSETS.length - 1]!;
         return {
-            x: this.centerX + Math.sin(angle) * this.menuRadius,
-            y: this.centerY - Math.cos(angle) * this.menuRadius,
+            x: this.centerX + offset.x * TILE_SIZE,
+            y: this.centerY + offset.y * TILE_SIZE,
         };
     }
 
@@ -232,7 +240,7 @@ export class FieldMagicMenu {
         ctx.font = `bold 11px ${UI.fontPrimary}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        const ly = this.centerY + this.menuRadius + 22;
+        const ly = this.centerY + TILE_SIZE * 2 + 10;
         ctx.lineWidth = 4;
         ctx.strokeStyle = 'rgba(0,0,0,0.82)';
         ctx.strokeText(reason, this.centerX, ly);

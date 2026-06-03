@@ -12,7 +12,7 @@ import { UI, Parchment } from './UITheme';
 const ACTION_ICON_ANIMATION_ROWS = 5;
 const ACTION_ICON_ANIMATION_MS = 280;
 
-export type ActionType = 'tool' | 'attack' | 'rest' | 'defend' | 'magic' | 'move' | 'open';
+export type ActionType = 'tool' | 'attack' | 'rest' | 'defend' | 'magic' | 'move' | 'open' | 'fanfare';
 export type ReadyCursorType = 'move' | 'attack';
 
 export interface ActionMenuSlotState {
@@ -39,7 +39,8 @@ export function normalizeLegacyActionType(action: string): ActionType | null {
         action === 'defend' ||
         action === 'magic' ||
         action === 'move' ||
-        action === 'open'
+        action === 'open' ||
+        action === 'fanfare'
     ) {
         return action;
     }
@@ -49,9 +50,8 @@ export function normalizeLegacyActionType(action: string): ActionType | null {
 interface ActionSlot {
     type: ActionType;
     label: string;
-    angle: number;
-    offsetX?: number;
-    offsetY?: number;
+    gridX: number;
+    gridY: number;
     iconDraw: (ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean) => void;
 }
 
@@ -89,24 +89,23 @@ export class ActionMenuUI {
     private isOpen = false;
     private slots: ActionSlot[];
     private slotStates = new Map<ActionType, ActionMenuSlotState>();
-    private readonly menuRadius = 66;
-    private readonly iconRadius = 25;
-    private readonly hitHalfSize = 21;
+    private readonly iconRadius = 24;
+    private readonly hitHalfSize = TILE_SIZE / 2;
 
     private centerX = 0;
     private centerY = 0;
     private hoveredSlot: ActionType | null = null;
 
     constructor() {
-        const TAU = Math.PI * 2;
         this.slots = [
-            { type: 'attack', label: '공격', angle: TAU / 8,     iconDraw: this.drawAttackIcon },
-            { type: 'magic',  label: '마법', angle: TAU / 4,     offsetX: -18, iconDraw: this.drawMagicIcon },
-            { type: 'tool',   label: '도구', angle: TAU * 3 / 8, iconDraw: this.drawToolIcon },
-            { type: 'open',   label: '조사', angle: TAU / 2,     iconDraw: this.drawOpenIcon },
-            { type: 'rest',   label: '휴식', angle: TAU * 5 / 8, iconDraw: this.drawRestIcon },
-            { type: 'defend', label: '방어', angle: TAU * 3 / 4, offsetX: 18,  iconDraw: this.drawDefendIcon },
-            { type: 'move',   label: '이동', angle: TAU * 7 / 8, iconDraw: this.drawMoveIcon },
+            { type: 'move',    label: '이동',   gridX: -1, gridY: -1, iconDraw: this.drawMoveIcon },
+            { type: 'tool',    label: '도구',   gridX: 0,  gridY: -1, iconDraw: this.drawToolIcon },
+            { type: 'attack',  label: '공격',   gridX: 1,  gridY: -1, iconDraw: this.drawAttackIcon },
+            { type: 'magic',   label: '마법',   gridX: -1, gridY: 0,  iconDraw: this.drawMagicIcon },
+            { type: 'defend',  label: '방어',   gridX: 1,  gridY: 0,  iconDraw: this.drawDefendIcon },
+            { type: 'rest',    label: '휴식',   gridX: -1, gridY: 1,  iconDraw: this.drawRestIcon },
+            { type: 'fanfare', label: '빵빠레', gridX: 0,  gridY: 1,  iconDraw: this.drawFanfareIcon },
+            { type: 'open',    label: '조사',   gridX: 1,  gridY: 1,  iconDraw: this.drawOpenIcon },
         ];
         this.setDefaultSlotStates();
     }
@@ -136,7 +135,7 @@ export class ActionMenuUI {
         }
         for (const slot of this.slots) {
             if (!this.slotStates.has(slot.type)) {
-                this.slotStates.set(slot.type, { type: slot.type, enabled: true });
+                this.slotStates.set(slot.type, this.getMissingSlotState(slot.type));
             }
         }
     }
@@ -152,10 +151,6 @@ export class ActionMenuUI {
         if (!this.isOpen) { this.hoveredSlot = null; return; }
         this.hoveredSlot = null;
         for (const slot of this.slots) {
-            const state = this.getSlotState(slot.type);
-            if (slot.type === 'open' && !state.enabled) {
-                continue;
-            }
             const { x: ix, y: iy } = this.getSlotPosition(slot);
             if (this.isSlotHit(mx, my, ix, iy)) {
                 this.hoveredSlot = slot.type;
@@ -168,9 +163,6 @@ export class ActionMenuUI {
         if (!this.isOpen) return null;
         for (const slot of this.slots) {
             const state = this.getSlotState(slot.type);
-            if (slot.type === 'open' && !state.enabled) {
-                continue;
-            }
             const { x: ix, y: iy } = this.getSlotPosition(slot);
             if (this.isSlotHit(mx, my, ix, iy)) {
                 return {
@@ -199,9 +191,6 @@ export class ActionMenuUI {
         // Draw each slot
         for (const slot of this.slots) {
             const state = this.getSlotState(slot.type);
-            if (slot.type === 'open' && !state.enabled) {
-                continue;
-            }
             const enabled = isReady && state.enabled;
             const { x: ix, y: iy } = this.getSlotPosition(slot);
             const isHovered = this.hoveredSlot === slot.type;
@@ -353,18 +342,23 @@ export class ActionMenuUI {
     private setDefaultSlotStates(): void {
         this.slotStates.clear();
         for (const slot of this.slots) {
-            this.slotStates.set(slot.type, { type: slot.type, enabled: true });
+            this.slotStates.set(slot.type, this.getMissingSlotState(slot.type));
         }
     }
 
     private getSlotState(type: ActionType): ActionMenuSlotState {
-        return this.slotStates.get(type) ?? { type, enabled: true };
+        return this.slotStates.get(type) ?? this.getMissingSlotState(type);
+    }
+
+    private getMissingSlotState(type: ActionType): ActionMenuSlotState {
+        if (type === 'fanfare') return { type, enabled: false, disabledReason: '다음 업데이트 예정' };
+        return { type, enabled: true };
     }
 
     private getSlotPosition(slot: ActionSlot): { x: number; y: number } {
         return {
-            x: this.centerX + Math.sin(slot.angle) * this.menuRadius + (slot.offsetX ?? 0),
-            y: this.centerY - Math.cos(slot.angle) * this.menuRadius + (slot.offsetY ?? 0),
+            x: this.centerX + slot.gridX * TILE_SIZE,
+            y: this.centerY + slot.gridY * TILE_SIZE,
         };
     }
 
@@ -433,7 +427,7 @@ export class ActionMenuUI {
         const text = state.disabledReason;
         const w = Math.min(210, ctx.measureText(text).width + 18);
         const x = this.centerX - w / 2;
-        const y = this.centerY + this.menuRadius + 38;
+        const y = this.centerY + TILE_SIZE * 2 + 10;
 
         ctx.fillStyle = 'rgba(18, 12, 12, 0.88)';
         ctx.fillRect(x, y, w, 24);
@@ -565,5 +559,22 @@ export class ActionMenuUI {
         ctx.textBaseline = 'middle';
         ctx.fillStyle = ready ? '#fff' : 'rgba(255,255,255,0.4)';
         ctx.fillText('🔍', cx, cy + 2);
+    }
+
+    private drawFanfareIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean): void {
+        if (ActionMenuUI.drawActionIconCell(ctx, 'fanfare', cx, cy, s, ready)) return;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-Math.PI / 8);
+        ctx.fillStyle = ready ? '#f0c050' : 'rgba(255,255,255,0.25)';
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.7, -s * 0.25);
+        ctx.lineTo(s * 0.65, -s * 0.65);
+        ctx.lineTo(s * 0.65, s * 0.65);
+        ctx.lineTo(-s * 0.7, s * 0.25);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillRect(-s * 0.8, -s * 0.12, s * 0.4, s * 0.24);
+        ctx.restore();
     }
 }

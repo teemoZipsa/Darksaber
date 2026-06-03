@@ -4,8 +4,12 @@ import { UI, Parchment, drawParchmentPanel, renderGameTitle } from '../../ui/UIT
 import { CombatLogUI } from '../../ui/CombatLogUI';
 import { formatRaidTime, getTacticalMarkerColor } from '../../field/FieldDisplay';
 import type { Entity } from '../../entity/Entity';
+import type { Skill } from '../../data/SkillDB';
 import type { TacticalMarker } from '../../field/TacticalMarkers';
 import type { WorldRenderModel } from './WorldRenderModel';
+import { tileKey } from '../../field/FieldPathing';
+import { getSkillIconCell } from '../../ui/DarksaberIconRegistry';
+import { DarksaberSpriteAtlas } from '../../ui/DarksaberSpriteAtlas';
 
 const PARTY_ACTOR_IMAGE_RENDER_SCALE = 1.12;
 
@@ -179,6 +183,21 @@ export class WorldFieldRenderer {
             if (enemy.actionGauge >= 100 || enemy.id === model.activeTurnActorId) {
                 renderReadyRing(ctx, model.worldTime, px, py, enemy.isBoss ? '#ff4ea3' : '#ffb84d');
             }
+        }
+    }
+
+    public static renderMagicTargetIcons(ctx: CanvasRenderingContext2D, model: WorldRenderModel, camX: number, camY: number): void {
+        const magicState = model.fieldMagicState;
+        if (magicState.mode !== 'targeting' || magicState.hoverAoeTiles.size === 0) return;
+
+        for (const entry of model.fieldEnemies) {
+            const enemy = entry.enemy;
+            if (enemy.stats.hp <= 0) continue;
+            if (!magicState.hoverAoeTiles.has(tileKey(enemy.gridX, enemy.gridY))) continue;
+
+            const px = enemy.gridX * TILE_SIZE - camX;
+            const py = enemy.gridY * TILE_SIZE - camY;
+            renderMagicTargetIcon(ctx, magicState.skill, px, py, model.worldTime);
         }
     }
 
@@ -437,6 +456,39 @@ function renderTacticalMarker(ctx: CanvasRenderingContext2D, marker: TacticalMar
         ctx.lineTo(cx, cy + r + 3);
         ctx.stroke();
     }
+}
+
+function renderMagicTargetIcon(ctx: CanvasRenderingContext2D, skill: Skill, px: number, py: number, worldTime: number): void {
+    const size = 26;
+    const cx = px + TILE_SIZE / 2;
+    const cy = py + TILE_SIZE / 2;
+    const pulse = 0.5 + 0.5 * Math.sin(worldTime * 8);
+    const iconCell = getSkillIconCell(skill);
+
+    ctx.save();
+    ctx.globalAlpha = 0.92;
+    ctx.shadowColor = '#ff8cf2';
+    ctx.shadowBlur = 7 + pulse * 4;
+    ctx.fillStyle = 'rgba(24, 4, 30, 0.72)';
+    ctx.strokeStyle = 'rgba(255, 165, 245, 0.88)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(cx - size / 2 - 3, cy - size / 2 - 3, size + 6, size + 6, 5);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    if (iconCell && DarksaberSpriteAtlas.drawIconCell(ctx, iconCell.col, iconCell.row, cx - size / 2, cy - size / 2, size)) {
+        ctx.restore();
+        return;
+    }
+
+    ctx.font = `bold ${Math.round(size * 0.72)}px ${UI.fontPrimary}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffe6ff';
+    ctx.fillText(skill.icon, cx, cy + 1);
+    ctx.restore();
 }
 
 function renderReadyRing(ctx: CanvasRenderingContext2D, worldTime: number, px: number, py: number, color: string): void {

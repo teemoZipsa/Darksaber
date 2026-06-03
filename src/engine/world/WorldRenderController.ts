@@ -98,6 +98,7 @@ export class WorldRenderController {
         WorldFieldRenderer.renderTacticalMarkers(ctx, model, camX, camY);
         WorldFieldRenderer.renderSelectedLoot(ctx, model, camX, camY);
         WorldFieldRenderer.renderEnemies(ctx, model, camX, camY);
+        WorldFieldRenderer.renderMagicTargetIcons(ctx, model, camX, camY);
         WorldFieldRenderer.renderTutorialActors(ctx, model, camX, camY);
         WorldFieldRenderer.renderPartyActors(ctx, model, camX, camY);
         worldMap.renderDecorationOverlays(ctx, camX, camY, viewW, viewH);

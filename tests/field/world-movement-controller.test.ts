@@ -77,6 +77,31 @@ test('movement honors world ground blockers on walkable terrain', () => {
     assert.equal(controller.isFieldPassable({ x: 0, y: 1, actorId: actor.id, intent: 'move' }), true);
 });
 
+test('passive enemies do not charge turns until aggro starts', () => {
+    const actor = makeActor('hero', 20, 0);
+    const enemyEntry = makeEnemyEntry('passive', 0, 0);
+    enemyEntry.enemy.actionGauge = 75;
+    const controller = makeController([actor], [enemyEntry]);
+
+    const result = controller.updateEnemies({ dt: 10, activeTurnActorId: null });
+
+    assert.deepEqual(result.readyEnemyIds, []);
+    assert.equal(enemyEntry.enemy.isAggro, false);
+    assert.equal(enemyEntry.enemy.actionGauge, 0);
+});
+
+test('aggro enemies charge turns and become ready', () => {
+    const actor = makeActor('hero', 3, 0);
+    const enemyEntry = makeEnemyEntry('aggro', 0, 0);
+    const controller = makeController([actor], [enemyEntry]);
+
+    const result = controller.updateEnemies({ dt: 10, activeTurnActorId: null });
+
+    assert.deepEqual(result.readyEnemyIds, [enemyEntry.enemy.id]);
+    assert.equal(enemyEntry.enemy.isAggro, true);
+    assert.equal(enemyEntry.enemy.actionGauge, 100);
+});
+
 test('immobilized actors and enemies do not move', () => {
     const actor = makeActor('rooted-actor', 0, 0);
     actor.character.statuses = [createStatus('immobilize')];

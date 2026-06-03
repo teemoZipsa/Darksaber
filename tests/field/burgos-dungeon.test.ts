@@ -329,6 +329,8 @@ test('enemy selection display info includes walk sprite sheet data', () => {
         framesPerSecond: 8,
         rowByFacing: MONSTER_ROW_BY_FACING,
         renderScale: 1.12,
+        actionFrameCount: 2,
+        actionRowsAvailable: {},
     };
     enemy.walkSpriteLoaded = true;
 

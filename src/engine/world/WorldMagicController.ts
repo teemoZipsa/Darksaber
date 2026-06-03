@@ -223,19 +223,10 @@ export class WorldMagicController {
         const actor = this.context.getActivePartyTurnActor();
         if (!actor) return;
 
-        const enemy = this.context.getFieldEnemies()
-            .map((entry) => entry.enemy)
-            .find((candidate) =>
-                candidate.stats.hp > 0 &&
-                candidate.gridX === hoverTile.x &&
-                candidate.gridY === hoverTile.y &&
-                this.state.mode === 'targeting' &&
-                this.state.validTiles.has(tileKey(candidate.gridX, candidate.gridY))
-            );
         const hoverAoeTiles = new Set<string>();
-        if (enemy && this.state.mode === 'targeting') {
+        if (this.state.validTiles.has(tileKey(hoverTile.x, hoverTile.y))) {
             const profile = getSkillAttackProfile(this.state.skill);
-            for (const tile of getEffectTiles(profile, this.getPatternContext(actor, this.enemyTile(enemy)))) {
+            for (const tile of getEffectTiles(profile, this.getPatternContext(actor, hoverTile))) {
                 hoverAoeTiles.add(tileKey(tile.x, tile.y));
             }
         }

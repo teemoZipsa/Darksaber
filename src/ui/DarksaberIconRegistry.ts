@@ -11,6 +11,7 @@ export const ACTION_ICON_CELLS: Partial<Record<ActionType, IconCell>> = {
     defend: cell(2, 2),
     move: cell(0, 0),
     open: cell(19, 1),
+    fanfare: cell(4, 0),
     tool: cell(3, 0),
     rest: cell(8, 0),
 };

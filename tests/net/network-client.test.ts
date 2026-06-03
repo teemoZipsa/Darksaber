@@ -226,15 +226,21 @@ test('client sends world heartbeat while the socket is open and clears the timer
     const restoreSocket = installMockWebSocket();
     const originalSetInterval = globalThis.setInterval;
     const originalClearInterval = globalThis.clearInterval;
-    let heartbeatTick: (() => void) | null = null;
+    let heartbeatScheduled = false;
+    let heartbeatTick = (): void => {
+        throw new Error('heartbeat interval was not scheduled');
+    };
     let clearCount = 0;
-    (globalThis as unknown as { setInterval: unknown }).setInterval = ((callback: () => void) => {
-        heartbeatTick = callback;
+    (globalThis as unknown as { setInterval: unknown }).setInterval = ((callback: TimerHandler) => {
+        if (typeof callback === 'function') {
+            heartbeatScheduled = true;
+            heartbeatTick = () => callback();
+        }
         return { unref: () => undefined };
-    }) as typeof setInterval;
+    }) as unknown as typeof setInterval;
     (globalThis as unknown as { clearInterval: unknown }).clearInterval = (() => {
         clearCount += 1;
-    }) as typeof clearInterval;
+    }) as unknown as typeof clearInterval;
 
     try {
         const client = new NetworkRaidClient({ url: 'ws://test' });
@@ -243,7 +249,7 @@ test('client sends world heartbeat while the socket is open and clears the timer
         assert.ok(socket);
 
         socket.emitOpen();
-        assert.ok(heartbeatTick);
+        assert.equal(heartbeatScheduled, true);
         heartbeatTick();
 
         const heartbeat = JSON.parse(socket.sent[1]);

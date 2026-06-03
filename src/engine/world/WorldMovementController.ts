@@ -99,6 +99,10 @@ export class WorldMovementController {
             const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
             enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
             if (!enemy.isAggro && this.hasAggroAllyNear(entry, enemy.aiProfile.assistRange)) enemy.isAggro = true;
+            if (!enemy.isAggro) {
+                enemy.actionGauge = 0;
+                continue;
+            }
 
             if (enemy.id !== input.activeTurnActorId) {
                 enemy.actionGauge = advanceAtb(enemy.actionGauge, getEffectiveStatsForEnemy(enemy).spd, input.dt, FIELD_ATB_SCALE * 0.7);

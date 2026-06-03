@@ -284,6 +284,7 @@ export class WorldPlayerActionController {
             this.getActionState(actor, 'tool'),
             this.getActionState(actor, 'open'),
             this.getActionState(actor, 'rest'),
+            this.getActionState(actor, 'fanfare'),
             this.getActionState(actor, 'defend'),
             this.getActionState(actor, 'move'),
         ];
@@ -364,6 +365,8 @@ export class WorldPlayerActionController {
                 return this.buildState(type, remainingAp >= DEFEND_ACTION_GAUGE_COST, 'ATB 부족', this.costLabel(DEFEND_ACTION_GAUGE_COST));
             case 'rest':
                 return this.buildState(type, remainingAp >= REST_ACTION_GAUGE_COST, 'ATB 부족', this.costLabel(REST_ACTION_GAUGE_COST));
+            case 'fanfare':
+                return this.buildState(type, false, '다음 업데이트 예정', '');
         }
     }
 
