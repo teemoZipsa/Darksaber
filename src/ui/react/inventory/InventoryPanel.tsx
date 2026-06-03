@@ -254,34 +254,36 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
             setEquipHint(null);
         };
 
-        const finishDrop = (d: NonNullable<DragState>, clientX: number, clientY: number): boolean => {
+        const finishDrop = (d: NonNullable<DragState>, clientX: number, clientY: number): 'equip' | 'move' | null => {
             const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
             const gridEl = target?.closest<HTMLElement>('[data-inv-grid]');
             if (gridEl) {
                 const kind = gridEl.dataset.invGrid as InvGridKind | undefined;
-                if (!kind) return false;
+                if (!kind) return null;
                 const rect = gridEl.getBoundingClientRect();
                 const gx = Math.floor((clientX - d.offsetX - rect.left) / CELL);
                 const gy = Math.floor((clientY - d.offsetY - rect.top) / CELL);
-                return inv.moveToCell(d.placed, d.source, kind, gx, gy);
+                return inv.moveToCell(d.placed, d.source, kind, gx, gy) ? 'move' : null;
             }
             const equipEl = target?.closest<HTMLElement>('[data-inv-equip]');
             if (equipEl) {
                 const slot = equipEl.dataset.invEquip as ItemSlot | undefined;
-                if (!slot) return false;
-                return inv.moveToEquip(d.placed, d.source, slot);
+                if (!slot) return null;
+                return inv.moveToEquip(d.placed, d.source, slot) ? 'equip' : null;
             }
-            return false;
+            return null;
         };
 
         const finishActiveDrag = (clientX: number, clientY: number) => {
             const d = drag.current;
             if (!d) return;
             clearDrag();
-            const success = d.isDragging
+            const result = d.isDragging
                 ? finishDrop(d, clientX, clientY)
-                : inv.quickMove(d.placed, d.source);
-            if (success) AudioManager.playUi(d.isDragging ? 'ui.confirm' : 'ui.hover');
+                : (inv.quickMove(d.placed, d.source) ? 'move' : null);
+            if (result === 'equip') AudioManager.playSfx('sfx.equip');
+            else if (result) AudioManager.playUi(d.isDragging ? 'ui.confirm' : 'ui.hover');
+            const success = result !== null;
             if (success) setMutationSeq((seq) => seq + 1);
             store.refresh();
         };

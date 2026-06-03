@@ -45,6 +45,8 @@ interface CrossfadeOptions {
  * as the artist provides files. Paths are relative to /public.
  */
 const originalSfx = (id: string): string => `/assets/sounds/original/${id}.wav`;
+const SFX_OUTPUT_TRIM = 0.88;
+const UI_OUTPUT_TRIM = 0.9;
 
 export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = {
     // UI
@@ -65,6 +67,7 @@ export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = 
     'sfx.levelup':     { src: originalSfx('21'), channel: 'sfx' },
     'sfx.loot_pickup': { src: originalSfx('01'), channel: 'sfx' },
     'sfx.coin':        { src: originalSfx('01'), channel: 'sfx' },
+    'sfx.equip':       { src: '/assets/sounds/sfx/equip.wav', channel: 'sfx' },
 
     // Original magic / state effects inferred from gameres_unpacked/set/MagicPtn.atr
     'sfx.magic.fire':        { src: originalSfx('00'), channel: 'sfx' },
@@ -329,8 +332,8 @@ class AudioManagerClass {
         if (!this.ctx || !this.bgmGain || !this.sfxGain || !this.uiGain) return;
         const t = this.ctx.currentTime;
         const bgm = SettingsManager.getMuteBGM() ? 0 : SettingsManager.getBgmVolume();
-        const sfx = SettingsManager.getMuteSFX() ? 0 : SettingsManager.getSfxVolume();
-        const ui  = SettingsManager.getMuteSFX() ? 0 : SettingsManager.getUiVolume();
+        const sfx = SettingsManager.getMuteSFX() ? 0 : SettingsManager.getSfxVolume() * SFX_OUTPUT_TRIM;
+        const ui  = SettingsManager.getMuteSFX() ? 0 : SettingsManager.getUiVolume() * UI_OUTPUT_TRIM;
         this.bgmGain.gain.setValueAtTime(bgm, t);
         this.sfxGain.gain.setValueAtTime(sfx, t);
         this.uiGain.gain.setValueAtTime(ui, t);
