@@ -80,7 +80,7 @@ export class WorldInputController {
         this.context.setHoverTile(hoverTile);
         this.context.entityInfoUI.onMouseMove(input.mouseScreenX, input.mouseScreenY);
         this.context.actionMenuUI.onMouseMove(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
-        this.context.magicController.onMouseMove(input.mouseScreenX, input.mouseScreenY);
+        this.context.magicController.onMouseMove(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
         this.context.toolController.onMouseMove(input.mouseScreenX, input.mouseScreenY);
         this.context.tacticalController.onMouseMove(input.uiMouseX, input.uiMouseY);
         this.context.magicController.updateHoverPreview(hoverTile);
@@ -104,7 +104,7 @@ export class WorldInputController {
             this.handleFieldRightClick(hoverTile, input);
         } else if (input.justPressed('Escape')) {
             if (this.context.tacticalController.isOpen()) this.context.closeTacticalMenu();
-            else if (this.context.magicController.isActive()) this.context.magicController.reset();
+            else if (this.context.magicController.isActive()) this.cancelMagicSelection();
             else if (this.context.toolController.isActive()) this.context.toolController.reset();
             else if (this.context.actionMenuUI.getIsOpen()) this.context.dismissActionMenuTurn();
             else if (this.context.getReservedAction()) this.context.clearIntent();
@@ -113,9 +113,12 @@ export class WorldInputController {
             if (input.mouseJustDown) this.context.tacticalController.handleClick(input.uiMouseX, input.uiMouseY);
         } else if (this.context.magicController.isVisible()) {
             this.context.magicController.updateMp(this.context.getControlledActor()?.character.stats.mp ?? 0);
-            if (input.mouseWheelDelta !== 0) this.context.magicController.onScroll(input.mouseWheelDelta);
-            if (input.mouseJustDown) {
-                this.context.magicController.handleMenuMouseDown(input.mouseScreenX, input.mouseScreenY);
+            if (input.mouseRightJustDown) {
+                this.cancelMagicSelection();
+            } else if (this.handleMagicDigitKeys(input)) {
+                /* handled by number key */
+            } else if (input.mouseJustDown) {
+                this.context.magicController.handleMenuMouseDown(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
             }
             if (input.mouseJustUp) this.context.magicController.onMouseUp();
         } else if (this.context.toolController.isVisible()) {
@@ -179,6 +182,26 @@ export class WorldInputController {
                 this.context.log('갈 수 없는 위치입니다.');
                 break;
         }
+    }
+
+    /** Esc / right-click while the radial magic menu is open → back to action menu. */
+    private cancelMagicSelection(): void {
+        const actor = this.context.getActivePartyTurnActor();
+        if (this.context.magicController.isVisible() && actor) {
+            this.context.magicController.cancelToActionMenu(actor);
+        } else {
+            this.context.magicController.reset();
+        }
+    }
+
+    /** Digit keys 1..8 select a radial magic slot. Returns true if one was pressed. */
+    private handleMagicDigitKeys(input: InputManager): boolean {
+        for (let digit = 1; digit <= 8; digit++) {
+            if (input.justPressed(`Digit${digit}`)) {
+                return this.context.magicController.handleMenuDigit(digit);
+            }
+        }
+        return false;
     }
 
     private handleActionMenuSlotClick(input: InputManager, camera: Camera): boolean {

@@ -75,6 +75,10 @@ export interface ActorSnapshot {
     facing: NetFacing;
     isDead: boolean;
     isGhost?: boolean;
+    /** Equipped magic skill ids (ordered, max 8). Server casts only from these. */
+    magicLoadout?: string[];
+    /** Per-skill gold upgrade level (1..5); absent = base. */
+    skillUpgradeLevels?: Record<string, number>;
 }
 
 export interface EnemySnapshot {

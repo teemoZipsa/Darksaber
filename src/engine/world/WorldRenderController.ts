@@ -119,7 +119,6 @@ export class WorldRenderController {
         }
         if (!options.hideWorldHud) {
             this.context.tacticalController.render(ctx);
-            this.context.magicController.render(ctx, uiW, uiH);
             this.context.toolController.render(ctx, uiW, uiH);
             this.context.minimapUI.render(ctx, uiW, uiH, {
                 gold: model.gold,
@@ -127,7 +126,6 @@ export class WorldRenderController {
                 terrainLines: model.terrainHoverLines,
             });
         } else {
-            if (this.context.magicController.isVisible()) this.context.magicController.render(ctx, uiW, uiH);
             if (this.context.toolController.isVisible()) this.context.toolController.render(ctx, uiW, uiH);
         }
         if (this.context.townSession.isVisible()) this.context.townSession.render(ctx, uiW, uiH);
@@ -202,6 +200,11 @@ export class WorldRenderController {
 
         const px = actor.entity.pixelX * TILE_SIZE - camX;
         const py = actor.entity.pixelY * TILE_SIZE - camY;
+        // The radial magic selector replaces the action menu around the same unit.
+        if (this.context.magicController.isVisible()) {
+            this.context.magicController.render(ctx, px, py);
+            return;
+        }
         const active = actor.id === this.context.getActiveTurnActorId();
         const ready = active
             ? this.context.getRemainingActionPoints() >= MIN_FIELD_ACTION_GAUGE_COST

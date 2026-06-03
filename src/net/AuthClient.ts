@@ -169,6 +169,24 @@ export class AuthClient {
         });
     }
 
+    /**
+     * Patch a character's persisted save (only the provided fields are written).
+     * Uses optimistic concurrency: `expectedRevision` must match the stored
+     * revision or the server returns 409. Returns the updated save.
+     */
+    public async updateCharacterSave(
+        characterId: string,
+        patch: Partial<Pick<CharacterSave,
+            'saveVersion' | 'hubLocation' | 'questState' | 'inventory' | 'equipment' | 'partySnapshot' | 'rosterSnapshot'>>,
+        expectedRevision: number
+    ): Promise<CharacterSave> {
+        const response = await this.request<{ save: CharacterSave }>(
+            `/characters/${encodeURIComponent(characterId)}/save`,
+            { method: 'PATCH', auth: true, body: { expectedRevision, save: patch } }
+        );
+        return response.save;
+    }
+
     private async request<T = unknown>(path: string, options: { method: string; body?: unknown; auth?: boolean }): Promise<T> {
         const headers: Record<string, string> = {};
         let body: string | undefined;

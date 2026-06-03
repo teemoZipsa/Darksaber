@@ -86,6 +86,7 @@ async function enterDevTown(manager: GameManager): Promise<void> {
             character: selected.character,
             save: selected.save,
             accountProgress: selected.accountProgress,
+            authClient: client,
         });
     } catch (error) {
         console.error('[Darksaber] Dev autostart failed', error);

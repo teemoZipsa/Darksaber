@@ -68,6 +68,7 @@ export function AuthGate({ client, gameManager }: AuthGateProps) {
                 character: selected.character,
                 save: selected.save,
                 accountProgress: selected.accountProgress,
+                authClient: client,
             });
             setScreen('playing');
         } catch (nextError) {

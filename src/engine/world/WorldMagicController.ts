@@ -9,8 +9,13 @@ import {
     hasStatus,
 } from '../../combat/StatusEffects';
 import type { Skill } from '../../data/SkillDB';
-import { getLearnedSkills } from '../../data/SkillDB';
-import { getClassLine } from '../../data/ClassTree';
+import { getSkill } from '../../data/SkillDB';
+import { t } from '../../i18n/LanguageManager';
+import {
+    getEffectiveSkill,
+    getUpgradeLevel,
+    normalizeLoadout,
+} from '../../magic/MagicLoadout';
 import type { SkillVisualPhase } from '../../data/SkillVisualProfiles';
 import type { Enemy } from '../../entity/Enemy';
 import type { TileType } from '../../map/Tile';
@@ -27,7 +32,7 @@ import {
 import { getEffectTiles, getSelectableTiles, type PatternContext } from '../../field/TargetPatterns';
 import { getSkillAttackProfile } from '../../data/AttackPatternProfiles';
 import { isTerrainLineOfSightBlocking } from '../../field/TerrainRules';
-import { MagicUI } from '../../ui/MagicUI';
+import { FieldMagicMenu, type FieldMagicSlot } from '../../ui/FieldMagicMenu';
 import type { CombatFeedbackKind } from './CombatFeedback';
 import { AudioManager } from '../AudioManager';
 
@@ -68,13 +73,12 @@ export interface WorldMagicEventSink {
 export class WorldMagicController {
     private readonly context: WorldMagicContext;
     private readonly sink: WorldMagicEventSink;
-    private readonly magicUI = new MagicUI();
+    private readonly menu = new FieldMagicMenu();
     private state: FieldMagicState = { mode: 'idle' };
 
     constructor(context: WorldMagicContext, sink: WorldMagicEventSink) {
         this.context = context;
         this.sink = sink;
-        this.magicUI.onSkillSelect = (skill) => this.handleSkillSelect(skill);
     }
 
     public getState(): FieldMagicState {
@@ -82,39 +86,61 @@ export class WorldMagicController {
     }
 
     public isActive(): boolean {
-        return this.state.mode !== 'idle' || this.magicUI.isVisible();
+        return this.state.mode !== 'idle' || this.menu.isVisible();
     }
 
     public isVisible(): boolean {
-        return this.magicUI.isVisible();
+        return this.menu.isVisible();
     }
 
-    public render(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-        this.magicUI.render(ctx, width, height);
+    /** Rendered in world-zoom space around the actor (see WorldRenderController). */
+    public render(ctx: CanvasRenderingContext2D, playerScreenX: number, playerScreenY: number): void {
+        this.menu.render(ctx, playerScreenX, playerScreenY);
     }
 
     public onMouseMove(x: number, y: number): void {
-        this.magicUI.onMouseMove(x, y);
+        this.menu.onMouseMove(x, y);
     }
 
     public onMouseUp(): void {
-        this.magicUI.onMouseUp();
+        this.menu.onMouseUp();
     }
 
-    public onScroll(delta: number): void {
-        this.magicUI.onScroll(delta);
+    public onScroll(_delta: number): void {
+        /* radial menu does not scroll */
     }
 
-    public updateMp(mp: number): void {
-        this.magicUI.updateMp(mp);
+    /** Refresh per-slot MP affordability while the menu is open. */
+    public updateMp(_mp: number): void {
+        const actor = this.context.getActivePartyTurnActor();
+        if (actor && this.menu.isVisible()) this.menu.show(this.buildSlots(actor));
     }
 
     public handleMenuMouseDown(x: number, y: number): void {
-        const wasMenu = this.state.mode === 'menu';
-        this.magicUI.onMouseDown(x, y);
-        if (wasMenu && this.state.mode === 'menu' && !this.magicUI.isVisible()) {
-            this.reset();
+        if (this.state.mode !== 'menu') return;
+        const result = this.menu.onClick(x, y);
+        const actor = this.context.getActivePartyTurnActor();
+        if (result.kind === 'cancel') {
+            if (actor) this.cancelToActionMenu(actor);
+            else this.reset();
+            return;
         }
+        this.selectSlot(result.index);
+    }
+
+    /** Number-key (1..8) skill selection while the radial menu is open. */
+    public handleMenuDigit(digit: number): boolean {
+        if (this.state.mode !== 'menu') return false;
+        const index = this.menu.indexForDigit(digit);
+        if (index === null) return false;
+        this.selectSlot(index);
+        return true;
+    }
+
+    /** Esc / right-click / outside-click: abort selection and reopen the action menu. */
+    public cancelToActionMenu(actor: FieldActor): void {
+        this.reset();
+        this.context.reopenActionMenu(actor);
     }
 
     public open(actor: FieldActor): void {
@@ -129,24 +155,46 @@ export class WorldMagicController {
             return;
         }
 
-        const unlocked = this.getUnlockedSkillIds(actor.character);
-        const learned = getLearnedSkills(actor.character.classLineId, actor.character.currentTier, unlocked);
-        if (learned.length === 0) {
+        const slots = this.buildSlots(actor);
+        if (slots.length === 0) {
             this.sink.log('사용 가능한 마법이 없습니다.');
             this.context.reopenActionMenu(actor);
             return;
         }
 
         this.state = { mode: 'menu' };
-        const effective = getEffectiveStatsForCharacter(actor.character);
-        this.magicUI.show(
-            actor.character.classLineId,
-            actor.character.currentTier,
-            actor.character.stats.mp,
-            effective.maxMp,
-            unlocked
-        );
+        this.menu.show(slots);
         this.sink.log('마법을 선택하세요.');
+    }
+
+    /** Build radial slots from the character's equipped loadout (+ disable reasons). */
+    private buildSlots(actor: FieldActor): FieldMagicSlot[] {
+        const character = actor.character;
+        const loadout = normalizeLoadout(character.magicLoadout, character);
+        const silenced = hasStatus(character.statuses, 'silence');
+        const hasAp = this.context.getRemainingActionPoints() >= MAGIC_ACTION_GAUGE_COST;
+        const slots: FieldMagicSlot[] = [];
+        for (const id of loadout) {
+            const skill = getSkill(id);
+            if (!skill) continue;
+            let enabled = true;
+            let disabledReason: string | undefined;
+            if (silenced) { enabled = false; disabledReason = t('magic.menu.silenced'); }
+            else if (!hasAp) { enabled = false; disabledReason = t('magic.menu.noAp'); }
+            else if (character.stats.mp < skill.mpCost) { enabled = false; disabledReason = t('magic.menu.noMp'); }
+            slots.push({ skill, level: getUpgradeLevel(character.skillUpgradeLevels, id), enabled, disabledReason });
+        }
+        return slots;
+    }
+
+    private selectSlot(index: number): void {
+        const slot = this.menu.getSlot(index);
+        if (!slot) return;
+        if (!slot.enabled) {
+            if (slot.disabledReason) this.sink.log(`${slot.skill.icon} ${slot.skill.nameKr}: ${slot.disabledReason}`);
+            return;
+        }
+        this.handleSkillSelect(slot.skill);
     }
 
     public handleTargetClick(tile: TilePoint): void {
@@ -200,7 +248,7 @@ export class WorldMagicController {
 
     public reset(): void {
         this.state = { mode: 'idle' };
-        this.magicUI.hide();
+        this.menu.hide();
     }
 
     public hasCastableFieldSkill(character: Character): boolean {
@@ -232,6 +280,7 @@ export class WorldMagicController {
         }
 
         const validTiles = this.computeTargetTiles(actor, skill);
+        this.menu.hide();
         this.state = { mode: 'targeting', skill, validTiles, hoverAoeTiles: new Set() };
         this.sink.log(`${skill.icon} ${skill.nameKr}: 대상을 선택하세요.`);
     }
@@ -262,11 +311,14 @@ export class WorldMagicController {
             return;
         }
 
-        const targetEnemies = this.getCandidateEnemies(skill, targetEnemy);
+        // Offline / tutorial path: apply enhancement scaling locally so it matches
+        // the server's authoritative result (which scales by the same helper).
+        const effectiveSkill = getEffectiveSkill(skill, getUpgradeLevel(actor.character.skillUpgradeLevels, skill.id));
+        const targetEnemies = this.getCandidateEnemies(effectiveSkill, targetEnemy);
         const effect = resolveSkillEffect({
             casterStats: actor.character.stats,
             casterCharacter: actor.character,
-            skill,
+            skill: effectiveSkill,
             targetEnemy: targetEnemy ? this.toSkillEnemyInput(targetEnemy) : undefined,
             allEnemies: targetEnemies.map((enemy) => this.toSkillEnemyInput(enemy)),
             targetsResolvedByPattern: Boolean(targetEnemy),
@@ -280,8 +332,8 @@ export class WorldMagicController {
         }
 
         actor.entity.playActionMotion('magic');
-        AudioManager.playSfx(getSkillCastSfx(skill), { volume: 0.72, rate: 0.03 });
-        this.applySkillEffect(actor, skill, effect);
+        AudioManager.playSfx(getSkillCastSfx(effectiveSkill), { volume: 0.72, rate: 0.03 });
+        this.applySkillEffect(actor, effectiveSkill, effect);
         this.reset();
         this.context.onActionCompleted?.('magic');
         this.context.resumeOrEndActiveTurn(actor);
@@ -411,20 +463,11 @@ export class WorldMagicController {
         };
     }
 
-    private getUnlockedSkillIds(character: Character): string[] {
-        const classLine = getClassLine(character.classLineId);
-        const unlocked: string[] = [];
-        if (!classLine) return unlocked;
-
-        for (let tier = 1; tier <= character.currentTier; tier++) {
-            const ids = classLine.skillUnlocks[tier];
-            if (ids) unlocked.push(...ids);
-        }
-        return unlocked;
-    }
-
+    /** Equipped skills only — the in-combat menu can cast nothing else. */
     private getLearnedFieldSkills(character: Character): Skill[] {
-        return getLearnedSkills(character.classLineId, character.currentTier, this.getUnlockedSkillIds(character));
+        return normalizeLoadout(character.magicLoadout, character)
+            .map((id) => getSkill(id))
+            .filter((skill): skill is Skill => Boolean(skill));
     }
 
     private computeTargetTiles(actor: FieldActor, skill: Skill): Set<string> {

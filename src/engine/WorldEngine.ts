@@ -18,6 +18,7 @@ import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
 import { rollBossRune } from '../data/SocketLoot';
 import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
+import { normalizeLoadout } from '../magic/MagicLoadout';
 import { getClassAttackProfile } from '../data/AttackPatternProfiles';
 import { t } from '../i18n/LanguageManager';
 import {
@@ -1380,6 +1381,8 @@ export class WorldEngine {
                 majorActionUsed: false,
                 facing: 'down',
                 isDead: character.isDead,
+                magicLoadout: normalizeLoadout(character.magicLoadout, character),
+                skillUpgradeLevels: { ...character.skillUpgradeLevels },
             };
         });
     }

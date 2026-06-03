@@ -29,13 +29,17 @@ import { AudioManager } from './AudioManager';
 import type { UiStore } from '../ui/react/UiStore';
 import type { WorldTownSession } from './world/WorldTownSession';
 import type { WorldRaidSession } from './world/WorldRaidSession';
-import type { AccountProgress, AuthCharacter, CharacterSave, InventorySaveItem } from '../net/AuthClient';
+import type { AccountProgress, AuthCharacter, AuthClient, CharacterSave, InventorySaveItem } from '../net/AuthClient';
+import { normalizeLoadout, normalizeUpgradeLevels } from '../magic/MagicLoadout';
+import { getExpToNext as originalExpToNext } from '../data/original/originalProgression';
 
 export interface AuthenticatedCharacterSession {
     accessToken: string;
     character: AuthCharacter;
     save: CharacterSave;
     accountProgress: AccountProgress;
+    /** Optional — enables server persistence of magic loadout/upgrade changes. */
+    authClient?: AuthClient;
 }
 
 export class GameManager {
@@ -72,8 +76,11 @@ export class GameManager {
     private pauseMenu = new PauseMenuUI();
     private settingsUI = new SettingsUI();
     private questJournalOpen = false;
+    private magicLoadoutOpen = false;
     private startIntroTutorialOnWorldInit = false;
     private networkAuthContext: { accessToken: string; characterId: string } | null = null;
+    private authClient: AuthClient | null = null;
+    private networkSaveRevision = 0;
 
     // React DOM UI overlay bridge (attached after construction in main.ts)
     private uiStore?: UiStore;
@@ -190,7 +197,7 @@ export class GameManager {
     public isDomModalOpen(): boolean {
         return this.charUI.isVisible() || this.pauseMenu.isVisible()
             || this.settingsUI.isVisible() || this.partyUI.isVisible()
-            || this.questJournalOpen;
+            || this.questJournalOpen || this.magicLoadoutOpen;
     }
 
     /**
@@ -222,8 +229,65 @@ export class GameManager {
             if (this.inventoryUI.isVisible()) this.inventoryUI.toggle();
             if (this.charUI.isVisible()) this.charUI.toggle();
             if (this.partyUI.isVisible()) this.partyUI.toggle();
+            this.magicLoadoutOpen = false;
         }
         this.questJournalOpen = !this.questJournalOpen;
+    }
+
+    // ─── Magic loadout panel (DOM overlay, K key) ─────────────────
+    public isMagicLoadoutOpen(): boolean {
+        return this.magicLoadoutOpen;
+    }
+
+    public closeMagicLoadout(): void {
+        this.magicLoadoutOpen = false;
+    }
+
+    /** Persist the active character's magic loadout + upgrade levels (local + network). */
+    public saveActiveCharacterMagic(): void {
+        this.playerData.save();
+        this.persistActiveCharacterSaveToServer();
+    }
+
+    /** Push the roster save (incl. magic loadout/upgrades) to the server, if authed. */
+    private persistActiveCharacterSaveToServer(): void {
+        const client = this.authClient;
+        const ctx = this.networkAuthContext;
+        if (!client || !ctx) return;
+        const rosterSnapshot = this.buildRosterSnapshot();
+        void client
+            .updateCharacterSave(ctx.characterId, { rosterSnapshot }, this.networkSaveRevision)
+            .then((save) => { this.networkSaveRevision = save.revision; })
+            .catch(() => { /* best-effort; local save already applied, retried on next change */ });
+    }
+
+    /** Serialize the current roster into the persisted rosterSnapshot shape. */
+    private buildRosterSnapshot(): Record<string, unknown> {
+        return {
+            characters: this.party.getRoster().map((character) => ({
+                id: character.id,
+                name: character.name,
+                classKey: character.classLineId,
+                classLineId: character.classLineId,
+                gender: character.gender,
+                tier: character.currentTier,
+                level: character.level,
+                exp: character.exp,
+                baseStats: character.stats,
+                magicLoadout: normalizeLoadout(character.magicLoadout, character),
+                skillUpgradeLevels: { ...character.skillUpgradeLevels },
+            })),
+        };
+    }
+
+    private toggleMagicLoadout(): void {
+        if (!this.magicLoadoutOpen) {
+            if (this.inventoryUI.isVisible()) this.inventoryUI.toggle();
+            if (this.charUI.isVisible()) this.charUI.toggle();
+            if (this.partyUI.isVisible()) this.partyUI.toggle();
+            this.questJournalOpen = false;
+        }
+        this.magicLoadoutOpen = !this.magicLoadoutOpen;
     }
 
     // ─── World inventory (DOM overlay) ────────────────────────────
@@ -259,6 +323,8 @@ export class GameManager {
             accessToken: session.accessToken,
             characterId: session.character.id,
         };
+        this.authClient = session.authClient ?? null;
+        this.networkSaveRevision = session.save.revision;
         this.party.clear();
         this.inventory.clear();
         this.stash.clear();
@@ -302,6 +368,8 @@ export class GameManager {
             character.exp = entry.exp;
             character.expToNext = calcExpToNext(character.classLineId, character.currentTier, character.level);
             character.stats = { ...character.stats, ...entry.baseStats };
+            character.magicLoadout = normalizeLoadout(entry.magicLoadout, character);
+            character.skillUpgradeLevels = normalizeUpgradeLevels(entry.skillUpgradeLevels);
             this.party.addToRoster(character);
             characters.set(character.id, character);
         }
@@ -485,6 +553,13 @@ export class GameManager {
                     if (this.charUI.isVisible() && this.inventoryUI.isVisible()) this.inventoryUI.toggle();
                     if (this.charUI.isVisible() && this.partyUI.isVisible()) this.partyUI.toggle();
                 }
+                if (this.input.justPressed('KeyK')) {
+                    this.toggleMagicLoadout();
+                }
+                if (this.magicLoadoutOpen) {
+                    if (this.input.justPressed('Escape')) this.closeMagicLoadout();
+                    break;
+                }
 
                 // Inventory is a React DOM overlay; it owns its own pointer handling.
                 // Freeze the world while it is open.
@@ -625,6 +700,8 @@ interface SavedRosterEntry {
     level: number;
     exp: number;
     baseStats: Partial<AuthCharacter['baseStats']>;
+    magicLoadout: string[];
+    skillUpgradeLevels: Record<string, number>;
 }
 
 function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter): SavedRosterEntry[] {
@@ -648,6 +725,8 @@ function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter
             level: positiveInt(raw.level, 1),
             exp: positiveInt(raw.exp, 0),
             baseStats: isRecord(raw.baseStats) ? raw.baseStats : {},
+            magicLoadout: readStringArray(raw.magicLoadout),
+            skillUpgradeLevels: readNumberRecord(raw.skillUpgradeLevels),
         }];
     });
     if (!entries.some((entry) => entry.id === selectedCharacter.id)) {
@@ -660,6 +739,8 @@ function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter
             level: selectedCharacter.level,
             exp: selectedCharacter.exp,
             baseStats: selectedCharacter.baseStats,
+            magicLoadout: [],
+            skillUpgradeLevels: {},
         });
     }
     return entries;
@@ -673,7 +754,18 @@ function readStringArray(value: unknown): string[] {
     return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 }
 
+function readNumberRecord(value: unknown): Record<string, number> {
+    if (!isRecord(value)) return {};
+    const result: Record<string, number> = {};
+    for (const [key, raw] of Object.entries(value)) {
+        if (typeof raw === 'number' && Number.isFinite(raw)) result[key] = raw;
+    }
+    return result;
+}
+
 function calcExpToNext(classLineId: string, currentTier: number, level: number): number {
+    const original = originalExpToNext(classLineId, currentTier, level);
+    if (original !== undefined) return original;
     const classLine = getClassLine(classLineId);
     const tierIndex = classLine?.tiers.findIndex((tier) => tier.tier === currentTier) ?? 0;
     const tierMult = Math.pow(1.15, Math.max(0, tierIndex));

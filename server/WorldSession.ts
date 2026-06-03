@@ -20,6 +20,12 @@ import { getSkillAttackProfile } from '../src/data/AttackPatternProfiles';
 import { getItemDef, getCombatRecovery, isCombatRecoveryConsumable } from '../src/data/ItemDB';
 import { getLearnedSkills, getSkill, type Skill } from '../src/data/SkillDB';
 import {
+    getEffectiveSkill,
+    getUpgradeLevel,
+    normalizeLoadout,
+    normalizeUpgradeLevels,
+} from '../src/magic/MagicLoadout';
+import {
     BURGOS_BOSS_MONSTER_ID,
     BURGOS_CASTLE_DUNGEON_ID,
     BURGOS_GUARD_MONSTER_ID,
@@ -118,6 +124,8 @@ interface ServerActor {
     majorActionUsed: boolean;
     facing: NetFacing;
     isDead: boolean;
+    magicLoadout: string[];
+    skillUpgradeLevels: Record<string, number>;
 }
 
 interface ServerPlayer {
@@ -304,13 +312,14 @@ export class WorldSession {
                 y: spawnTile.y + formationOffset(index).y,
             }, `${playerId}:${snapshot.id}`);
             const actorId = `${playerId}:${snapshot.id}`;
+            const tier = sanitizeTier(snapshot.currentTier);
             const actor: ServerActor = {
                 id: actorId,
                 ownerPlayerId: playerId,
                 localActorId: snapshot.id,
                 name: snapshot.name,
                 classLineId: snapshot.classLineId,
-                currentTier: sanitizeTier(snapshot.currentTier),
+                currentTier: tier,
                 level: snapshot.level,
                 tile,
                 stats: syncStatsMovementToClass(snapshot.stats, snapshot.classLineId),
@@ -320,6 +329,8 @@ export class WorldSession {
                 majorActionUsed: false,
                 facing: 'down',
                 isDead: snapshot.isDead,
+                magicLoadout: normalizeLoadout(snapshot.magicLoadout, { classLineId: snapshot.classLineId, currentTier: tier }),
+                skillUpgradeLevels: normalizeUpgradeLevels(snapshot.skillUpgradeLevels),
             };
             this.actors.set(actorId, actor);
             player.actorIds.push(actorId);
@@ -755,6 +766,7 @@ export class WorldSession {
         const skill = getSkill(skillId);
         if (!skill) return reject(intentId, 'Skill does not exist.');
         if (!this.getLearnedSkillIds(actor).has(skill.id)) return reject(intentId, 'Skill is not learned by this actor.');
+        if (!actor.magicLoadout.includes(skill.id)) return reject(intentId, 'Skill is not equipped by this actor.');
         if (hasStatus(actor.statuses, 'silence')) return reject(intentId, 'Actor is silenced.');
         if (actor.remainingAp < MAGIC_ACTION_GAUGE_COST) return reject(intentId, 'No action available to cast skill.');
         if (actor.stats.mp < skill.mpCost) return reject(intentId, 'Actor does not have enough MP.');
@@ -783,9 +795,12 @@ export class WorldSession {
         const targetEnemies = target && targetTile
             ? getSkillCandidateEnemies(aliveEnemies.map((entry) => entry.enemy), profile, this.getSkillPatternContext(actor, targetTile), target.enemy)
             : [];
+        // Authoritative damage/heal/duration scaling: apply the same enhancement
+        // helper the client uses so results stay in lockstep (no desync).
+        const effectiveSkill = getEffectiveSkill(skill, getUpgradeLevel(actor.skillUpgradeLevels, skill.id));
         const effect = resolveSkillEffect({
             casterStats: this.getCasterSkillStats(actor),
-            skill,
+            skill: effectiveSkill,
             targetEnemy: target ? this.toSkillEnemyInput(target.enemy) : undefined,
             allEnemies: targetEnemies.map((enemy) => this.toSkillEnemyInput(enemy)),
             targetsResolvedByPattern: Boolean(target),
@@ -798,7 +813,7 @@ export class WorldSession {
         });
 
         this.spendActorGauge(actor, MAGIC_ACTION_GAUGE_COST);
-        const result = this.applySkillEffect(player, actor, skill, effect, now);
+        const result = this.applySkillEffect(player, actor, effectiveSkill, effect, now);
         this.finishActorIfSpent(actor);
         return result;
     }
@@ -1898,6 +1913,8 @@ export class WorldSession {
             facing: actor.facing,
             isDead: actor.isDead,
             isGhost: player?.ghost ?? false,
+            magicLoadout: [...actor.magicLoadout],
+            skillUpgradeLevels: { ...actor.skillUpgradeLevels },
         };
     }
 

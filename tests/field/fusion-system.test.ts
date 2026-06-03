@@ -18,7 +18,7 @@ class ImageStub {
 function makeFusionReady(id: string, classLineId: string): Character {
     const character = new Character(id, id, classLineId);
     character.currentTier = 7;
-    character.level = Character.MAX_LEVEL;
+    character.level = character.levelCap();
     character.exp = character.expToNext;
     character.hasEmblem = true;
     character.stats.maxHp = 200;
@@ -30,12 +30,12 @@ function makeFusionReady(id: string, classLineId: string): Character {
 test('max base tier level unlocks the fusion emblem', () => {
     const character = new Character('fighter', 'Fighter', 'infantry');
     character.currentTier = 7;
-    character.level = 9;
+    character.level = character.levelCap() - 1;
     character.expToNext = 1;
 
     const result = character.gainExp(1);
 
-    assert.equal(character.level, 10);
+    assert.equal(character.level, character.levelCap());
     assert.equal(character.hasEmblem, true);
     assert.equal(result.emblemUnlocked, true);
     assert.equal(character.isFusionReady(), true);

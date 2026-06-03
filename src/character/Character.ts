@@ -8,6 +8,7 @@ import { ClassLine, MasterBranch, getClassLine, getMasterClassLineId } from '../
 import { ItemSlot } from '../data/ItemDB';
 import { PlacedItem } from '../inventory/GridInventory';
 import { Skill } from '../data/SkillDB';
+import { getLevelCap as originalLevelCap, getExpToNext as originalExpToNext, getOriginalStats } from '../data/original/originalProgression';
 import {
     StatusEffect,
     applyStatuses,
@@ -56,14 +57,25 @@ export class Character {
     // Equipment specific to this character
     public equipment: Map<ItemSlot, PlacedItem> = new Map();
 
+    // Equipped magic skill ids (ordered, max 8). Drives the in-combat radial menu.
+    // Empty means "auto-equip the first learned skills" — resolved via normalizeLoadout.
+    public magicLoadout: string[] = [];
+    // Per-skill gold upgrade level (1..5). Absent/1 = base skill.
+    public skillUpgradeLevels: Record<string, number> = {};
+
     // Portrait image for UI rendering
     public portraitImage?: HTMLImageElement;
     public portraitLoaded: boolean = false;
 
     private classLine: ClassLine | undefined;
 
-    /** Max level per tier */
+    /** Default max level per tier when a tier has no original data. */
     public static readonly MAX_LEVEL = 10;
+
+    /** Max level within the current tier (original level design; falls back to 10). */
+    public levelCap(): number {
+        return originalLevelCap(this.classLineId, this.currentTier);
+    }
 
     constructor(id: string, name: string, classLineId: string) {
         this.id = id;
@@ -83,6 +95,8 @@ export class Character {
         const mov = cl ? cl.baseMovRange : 3;
         const overrides = getBaseStatsForClass(this.classLineId, mov);
         this.stats = createBaseStats(overrides);
+        // Overlay original-game base stats for this class/tier/level when available.
+        this.applyOriginalClassStats();
 
         // Load portrait for starting tier
         this.updatePortrait();
@@ -263,8 +277,11 @@ export class Character {
         return this.tierIndex < this.classLine.tiers.length - 1;
     }
 
-    /** Calculate EXP needed for next level (scales with tier and level) */
+    /** Calculate EXP needed for next level. Uses the original level design when
+     *  available (2x gain rate), else falls back to the legacy formula. */
     private calcExpToNext(): number {
+        const original = originalExpToNext(this.classLineId, this.currentTier, this.level);
+        if (original !== undefined) return original;
         const tierMult = Math.pow(1.15, this.tierIndex);
         const levelMult = Math.pow(1.08, this.level - 1);
         return Math.floor(50 * tierMult * levelMult);
@@ -305,7 +322,7 @@ export class Character {
         this.exp += amount;
 
         while (this.exp >= this.expToNext) {
-            if (this.level >= Character.MAX_LEVEL) {
+            if (this.level >= this.levelCap()) {
                 // At max level — attempt promotion
                 if (this.hasNextTier) {
                     this.exp -= this.expToNext;
@@ -344,32 +361,48 @@ export class Character {
         this.level = 1;
         this.expToNext = this.calcExpToNext();
 
-        // Promotion stat bonus (2x growth for ALL stats)
-        const g = this.classLine.growth;
-        this.stats.maxHp += Math.floor(g.hp * 2);
-        this.stats.hp = this.stats.maxHp;
-        this.stats.maxMp += Math.floor(g.mp * 2);
-        this.stats.mp = this.stats.maxMp;
-        this.stats.atk += Math.floor(g.atk * 2 * 10) / 10;
-        this.stats.def += Math.floor(g.def * 2 * 10) / 10;
-        this.stats.magAtk += Math.floor(g.magAtk * 2 * 10) / 10;
-        this.stats.magDef += Math.floor(g.magDef * 2 * 10) / 10;
-        this.stats.spd += Math.floor(g.spd * 2 * 10) / 10;
+        // Prefer original base stats for the new tier; else legacy 2x growth bump.
+        if (!this.applyOriginalClassStats()) {
+            const g = this.classLine.growth;
+            this.stats.maxHp += Math.floor(g.hp * 2);
+            this.stats.hp = this.stats.maxHp;
+            this.stats.maxMp += Math.floor(g.mp * 2);
+            this.stats.mp = this.stats.maxMp;
+            this.stats.atk += Math.floor(g.atk * 2 * 10) / 10;
+            this.stats.def += Math.floor(g.def * 2 * 10) / 10;
+            this.stats.magAtk += Math.floor(g.magAtk * 2 * 10) / 10;
+            this.stats.magDef += Math.floor(g.magDef * 2 * 10) / 10;
+            this.stats.spd += Math.floor(g.spd * 2 * 10) / 10;
+        }
 
         // Update portrait for new tier
         this.updatePortrait();
     }
 
     private tryUnlockFusionEmblem(): boolean {
-        if (this.hasEmblem || this.hasNextTier || this.currentTier < 7 || this.level < Character.MAX_LEVEL) {
+        if (this.hasEmblem || this.hasNextTier || this.currentTier < 7 || this.level < this.levelCap()) {
             return false;
         }
         this.hasEmblem = true;
         return true;
     }
 
+    /**
+     * Overlay original-game base stats for the current tier/level (HP/MP full).
+     * Returns true when applied; false for classes/tiers with no original data.
+     */
+    private applyOriginalClassStats(): boolean {
+        const original = getOriginalStats(this.classLineId, this.currentTier, this.level);
+        if (!original) return false;
+        this.stats = { ...this.stats, ...original };
+        this.stats.hp = this.stats.maxHp;
+        this.stats.mp = this.stats.maxMp;
+        return true;
+    }
+
     /** Apply stat growth on level up */
     private applyLevelUpGrowth(): void {
+        if (this.applyOriginalClassStats()) return;
         if (!this.classLine) return;
         const g: GrowthRates = this.classLine.growth;
 
@@ -416,7 +449,7 @@ export class Character {
 
     /** Whether this character can promote right now */
     public canPromote(): boolean {
-        return this.level >= Character.MAX_LEVEL && this.hasNextTier;
+        return this.level >= this.levelCap() && this.hasNextTier;
     }
 
     /** Manual promote (for UI button if needed) */
@@ -429,7 +462,7 @@ export class Character {
 
     /** Check if this character is ready for fusion (max tier, max level, has emblem) */
     public isFusionReady(): boolean {
-        return !this.hasNextTier && this.level >= Character.MAX_LEVEL && this.hasEmblem;
+        return !this.hasNextTier && this.level >= this.levelCap() && this.hasEmblem;
     }
 
     public fuseToMaster(branch: MasterBranch, absorbed: Character[]): boolean {

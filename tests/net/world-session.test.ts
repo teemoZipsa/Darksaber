@@ -420,6 +420,38 @@ test('castSkill intent is resolved by server skill rules', () => {
     assert.equal(session.createSnapshot(joined.playerId, 1_000).partyActors.find((entry) => entry.id === serverActor.id)?.stats.mp, 40);
 });
 
+test('castSkill rejects a learned-but-unequipped skill', () => {
+    const session = new WorldSession();
+    // Infantry T5 learns >8 skills, so the default loadout benches inf_t3.
+    const joined = session.join({
+        ...joinMessage('central_castle', 'hero-a'),
+        partyComposition: [actor('hero-a', {
+            name: 'Hero Alpha',
+            currentTier: 5,
+            stats: createBaseStats({ atk: 999, mp: 50, maxMp: 50, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const serverEnemyEntry = [...internals.enemies.values()][0];
+    assert.ok(serverActor);
+    assert.ok(!serverActor.magicLoadout.includes('inf_t3'), 'inf_t3 should be benched at T5 default loadout');
+    serverActor.actionGauge = 100;
+    serverActor.remainingAp = 80;
+    serverActor.tile = { x: serverEnemyEntry.enemy.gridX - 1, y: serverEnemyEntry.enemy.gridY };
+
+    const result = session.handleMessage(joined.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'cast-benched',
+        actorId: serverActor.id,
+        kind: 'castSkill',
+        payload: { skillId: 'inf_t3', targetId: serverEnemyEntry.enemy.id },
+    }, 1_000);
+
+    assert.equal(result.replies[0]?.type, 'ACTION_REJECTED');
+    assert.match(result.replies[0]?.type === 'ACTION_REJECTED' ? result.replies[0].reason : '', /not equipped/);
+});
+
 test('server-owned scenario entry spawns objective enemies and records completion for raid result', () => {
     const session = new WorldSession();
     const world = new WorldMap();

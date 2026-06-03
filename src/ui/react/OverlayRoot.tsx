@@ -16,6 +16,7 @@ import { TownScreen } from './town/TownScreen';
 import { CharacterCreation } from './charcreate/CharacterCreation';
 import { InventoryPanel } from './inventory/InventoryPanel';
 import { StoryJournalPanel } from './quest/StoryJournalPanel';
+import { MagicLoadoutPanel } from './magic/MagicLoadoutPanel';
 
 export function OverlayRoot() {
     const store = useStore();
@@ -27,6 +28,7 @@ export function OverlayRoot() {
     const charCreateOpen = useUiSelector((s) => s.isCharCreateOpen());
     const inventoryOpen = useUiSelector((s) => s.isInventoryOpen());
     const questJournalOpen = useUiSelector((s) => s.isQuestJournalOpen());
+    const magicLoadoutOpen = useUiSelector((s) => s.isMagicLoadoutOpen());
 
     return (
         <>
@@ -53,6 +55,11 @@ export function OverlayRoot() {
             {inventoryOpen && (
                 <div className="ds-scrim" onClick={() => store.closeInventory()}>
                     <InventoryPanel inv={store.getWorldInventory()} />
+                </div>
+            )}
+            {magicLoadoutOpen && (
+                <div className="ds-scrim" onClick={() => store.closeMagicLoadout()}>
+                    <MagicLoadoutPanel />
                 </div>
             )}
             {townOpen && <TownScreen />}

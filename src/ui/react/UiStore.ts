@@ -23,6 +23,14 @@ import type { ItemSlot } from '../../data/ItemDB';
 import type { GridInventory, PlacedItem } from '../../inventory/GridInventory';
 import { getRepairCost, getUnsocketCost, repairItem, unsocketAll } from '../../inventory/Socketing';
 import { getStoryQuestViews as buildStoryQuestViews, type StoryQuestView } from '../../data/StoryQuestData';
+import { getSkill, type Skill } from '../../data/SkillDB';
+import {
+    checkUpgrade,
+    getLearnedSkillIdSet,
+    getOrderedLearnedSkills,
+    getUpgradeLevel,
+    normalizeLoadout,
+} from '../../magic/MagicLoadout';
 
 export interface BlacksmithEntry {
     id: string;
@@ -97,6 +105,48 @@ export class UiStore {
 
     // ─── Quest journal actions ───────────────────────────────────
     closeQuestJournal = (): void => { this.gm.closeQuestJournal(); this.tick(); };
+
+    // ─── Magic loadout / upgrade (DOM overlay, K key) ─────────────
+    isMagicLoadoutOpen = (): boolean => this.gm.isMagicLoadoutOpen();
+    closeMagicLoadout = (): void => { this.gm.closeMagicLoadout(); this.tick(); };
+
+    /** Equipped skill ids for a character, normalized to currently-learnable ones. */
+    getMagicLoadout = (char: Character): string[] => normalizeLoadout(char.magicLoadout, char);
+    /** All learned skills in deterministic (tier, id) order — for the learned list. */
+    getLearnedMagicSkills = (char: Character): Skill[] => getOrderedLearnedSkills(char);
+    getSkillUpgradeLevel = (char: Character, skillId: string): number =>
+        getUpgradeLevel(char.skillUpgradeLevels, skillId);
+
+    /** Equip `skillId` into slot `slotIndex` of the active character (swap if already equipped). */
+    equipMagic = (slotIndex: number, skillId: string): void => {
+        const char = this.gm.party.getActive();
+        if (!char || !getLearnedSkillIdSet(char).has(skillId)) return;
+        const arr = normalizeLoadout(char.magicLoadout, char);
+        if (slotIndex < 0 || slotIndex >= arr.length || arr[slotIndex] === skillId) return;
+        const existing = arr.indexOf(skillId);
+        if (existing >= 0) arr[existing] = arr[slotIndex]; // swap the two slots' skills
+        arr[slotIndex] = skillId;                          // (otherwise the benched skill replaces)
+        char.magicLoadout = arr;
+        this.gm.saveActiveCharacterMagic();
+        this.tick();
+    };
+
+    /** Spend gold to raise the active character's upgrade level for a skill by 1. */
+    upgradeMagic = (skillId: string): { ok: boolean; reasonKey?: string } => {
+        const char = this.gm.party.getActive();
+        if (!char) return { ok: false };
+        const skill = getSkill(skillId);
+        if (!skill) return { ok: false };
+        const isLearned = getLearnedSkillIdSet(char).has(skillId);
+        const level = getUpgradeLevel(char.skillUpgradeLevels, skillId);
+        const check = checkUpgrade(skill, level, this.gm.playerData.gold, isLearned);
+        if (!check.ok) { this.tick(); return { ok: false, reasonKey: check.reasonKey }; }
+        this.gm.playerData.spendGold(check.cost);
+        char.skillUpgradeLevels = { ...char.skillUpgradeLevels, [skillId]: level + 1 };
+        this.gm.saveActiveCharacterMagic();
+        this.tick();
+        return { ok: true };
+    };
 
     // ─── Party actions ────────────────────────────────────────────
     closeParty = (): void => {
