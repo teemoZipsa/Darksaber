@@ -29,6 +29,7 @@ import { getSkillAttackProfile } from '../../data/AttackPatternProfiles';
 import { isTerrainLineOfSightBlocking } from '../../field/TerrainRules';
 import { MagicUI } from '../../ui/MagicUI';
 import type { CombatFeedbackKind } from './CombatFeedback';
+import { AudioManager } from '../AudioManager';
 
 export interface WorldMagicContext {
     getActivePartyTurnActor: () => FieldActor | null;
@@ -255,6 +256,7 @@ export class WorldMagicController {
 
         if (this.context.submitNetworkSkillIntent?.(actor, skill, targetEnemy)) {
             actor.entity.playActionMotion('magic');
+            AudioManager.playSfx(getSkillCastSfx(skill), { volume: 0.72, rate: 0.03 });
             this.reset();
             this.context.onActionCompleted?.('magic');
             return;
@@ -278,6 +280,7 @@ export class WorldMagicController {
         }
 
         actor.entity.playActionMotion('magic');
+        AudioManager.playSfx(getSkillCastSfx(skill), { volume: 0.72, rate: 0.03 });
         this.applySkillEffect(actor, skill, effect);
         this.reset();
         this.context.onActionCompleted?.('magic');
@@ -328,6 +331,7 @@ export class WorldMagicController {
 
             if (enemyResult.isMiss) {
                 this.sink.spawnDamage(enemy.gridX, enemy.gridY, 0, false, true);
+                AudioManager.playSfx('sfx.miss', { volume: 0.58, rate: 0.03 });
                 this.sink.log(`${skill.nameKr} 명중 실패: ${enemy.name} (${Math.floor(enemyResult.hitChance ?? 0)}%)`);
                 continue;
             }
@@ -470,6 +474,43 @@ export class WorldMagicController {
 
     private enemyTile(enemy: Enemy): TilePoint {
         return { x: enemy.gridX, y: enemy.gridY };
+    }
+}
+
+function getSkillCastSfx(skill: Skill): string {
+    if (skill.type === 'heal') return 'sfx.magic.heal';
+
+    if (skill.type === 'buff') {
+        if (skill.buffStat === 'def' || skill.id.includes('protection')) return 'sfx.magic.protection';
+        if (skill.buffStat === 'mdef') return 'sfx.magic.resist';
+        return 'sfx.magic.buff';
+    }
+
+    if (skill.type === 'debuff') {
+        if (skill.id.includes('mute') || skill.id.includes('silence')) return 'sfx.magic.mute';
+        if (skill.id.includes('resist')) return 'sfx.magic.resist';
+        return 'sfx.magic.status';
+    }
+
+    switch (skill.element) {
+        case 'fire':
+            return 'sfx.magic.fire';
+        case 'ice':
+            return 'sfx.magic.ice';
+        case 'lightning':
+            return 'sfx.magic.thunder';
+        case 'earth':
+            return 'sfx.magic.quake';
+        case 'wind':
+            return skill.type === 'aoe' ? 'sfx.magic.tornado' : 'sfx.magic.wind_cutter';
+        case 'holy':
+            return 'sfx.magic.heal';
+        case 'dark':
+            return 'sfx.magic.drain';
+        case 'physical':
+            return 'sfx.magic.slash';
+        case 'none':
+            return 'sfx.magic.buff';
     }
 }
 
