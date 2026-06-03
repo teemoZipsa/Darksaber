@@ -444,6 +444,37 @@ test('raid result clears resume state and disconnects without grace expiry', asy
     }
 });
 
+test('resume failure clears stored resume state', async () => {
+    const restoreSocket = installMockWebSocket();
+    const storage = new MemoryStorage();
+    storage.setItem('darksaber_world_resume_token', 'stale_resume');
+    const restoreStorage = installMemoryStorage(storage);
+
+    try {
+        assert.equal(NetworkRaidClient.hasStoredResumeToken(), true);
+        const client = new NetworkRaidClient({ url: 'ws://test' });
+        const join = client.connectAndJoin(joinInput());
+        const socket = MockWebSocket.instances[0];
+        assert.ok(socket);
+
+        socket.emitOpen();
+        assert.equal(JSON.parse(socket.sent[0]).resumeToken, 'stale_resume');
+        socket.emitMessage(JSON.stringify({
+            type: 'ERROR',
+            code: 'RESUME_FAILED',
+            message: 'Resume token is expired or unknown.',
+        }));
+
+        await assert.rejects(join, /RESUME_FAILED/);
+        assert.equal(client.getResumeToken(), null);
+        assert.equal(storage.getItem('darksaber_world_resume_token'), null);
+        assert.equal(NetworkRaidClient.hasStoredResumeToken(), false);
+    } finally {
+        restoreStorage();
+        restoreSocket();
+    }
+});
+
 test('client reports sends attempted before socket open', () => {
     const errors: string[] = [];
     const client = new NetworkRaidClient({

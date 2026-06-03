@@ -200,6 +200,12 @@ export interface WorldJoinContext {
 
 export type WorldCharacterSavePatch = Partial<Omit<CharacterSave, 'characterId' | 'revision' | 'updatedAt'>>;
 
+export class WorldResumeFailedError extends Error {
+    public constructor(message = 'Resume token is expired or unknown.') {
+        super(message);
+    }
+}
+
 export class WorldSession {
     public readonly sessionEpoch = Date.now();
     private readonly worldMap: WorldMap;
@@ -253,6 +259,10 @@ export class WorldSession {
                     completedQuestIds: [...resumed.completedQuestIds],
                 },
             };
+        }
+        if (message.resumeToken) {
+            this.log('resume denied reason=expired_or_unknown');
+            throw new WorldResumeFailedError();
         }
 
         const playerId = `player_${this.nextPlayerId++}`;

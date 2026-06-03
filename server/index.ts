@@ -22,7 +22,7 @@ import type {
 import { getStoryQuestByDungeonId } from '../src/data/StoryQuestData';
 import { ServerMarketSession } from './ServerMarketSession';
 import { createServerHeartbeatAck } from './WorldHeartbeat';
-import { WorldSession, WORLD_TICK_MS, type WorldCharacterSavePatch } from './WorldSession';
+import { WorldResumeFailedError, WorldSession, WORLD_TICK_MS, type WorldCharacterSavePatch } from './WorldSession';
 import { authenticateAccessToken, createAuthHttpHandler } from './AuthHttp';
 import { InMemoryAuthStore, PostgresAuthStore, type AccountProgress, type AuthAccount, type AuthCharacter, type AuthStore, type CharacterSave } from './AuthStore';
 import type { JwtOptions } from './AuthCrypto';
@@ -302,13 +302,22 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
     const realm = normalizeRealm(message.requestedRealm);
     const { sessionKey, session } = getOrCreateSession(realm, auth.account.id);
     const serverJoinMessage = buildAuthoritativeJoinMessage(message, character, save, progress);
-    const result = session.join(serverJoinMessage, Date.now(), {
-        accountId: auth.account.id,
-        characterId: character.id,
-        completedQuestIds: serverJoinMessage.completedQuestIds,
-        shardId: sessionKey,
-        saveSnapshot: save,
-    });
+    let result: ReturnType<WorldSession['join']>;
+    try {
+        result = session.join(serverJoinMessage, Date.now(), {
+            accountId: auth.account.id,
+            characterId: character.id,
+            completedQuestIds: serverJoinMessage.completedQuestIds,
+            shardId: sessionKey,
+            saveSnapshot: save,
+        });
+    } catch (error) {
+        if (error instanceof WorldResumeFailedError) {
+            send(ws, { type: 'ERROR', code: 'RESUME_FAILED', message: error.message });
+            return;
+        }
+        throw error;
+    }
     bindPlayer(ws, sessionKey, result.playerId, auth.account, character.id, auth.session.id);
     ensureSaveTracker(sessionKey, result.playerId, auth.account.id, character.id, save.revision);
     send(ws, result.welcome);

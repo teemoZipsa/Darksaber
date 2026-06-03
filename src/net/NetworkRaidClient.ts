@@ -107,6 +107,14 @@ export class NetworkRaidClient {
         return this.status;
     }
 
+    public static hasStoredResumeToken(): boolean {
+        try {
+            return Boolean(localStorage.getItem(RESUME_TOKEN_KEY));
+        } catch {
+            return false;
+        }
+    }
+
     public async connectAndJoin(input: NetworkRaidJoinInput): Promise<WorldWelcomeMessage> {
         if (!input.accessToken || !input.characterId) {
             throw new Error('Network join requires an access token and selected character.');
@@ -396,6 +404,7 @@ export class NetworkRaidClient {
         const wasReconnecting = this.reconnecting || this.graceDeadline !== 0;
         this.clearReconnect();
         this.manualClose = true;
+        this.clearStoredResumeToken();
         this.stopHeartbeat();
         if (this.socket && this.socket.readyState <= WebSocket.OPEN) this.socket.close();
         this.socket = null;

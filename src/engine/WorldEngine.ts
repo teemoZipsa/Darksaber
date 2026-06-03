@@ -545,6 +545,9 @@ export class WorldEngine {
         this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
         if (options.startIntroTutorial) {
             this.startIntroTutorial();
+        } else if (NetworkRaidClient.hasStoredResumeToken()) {
+            this.addCombatLog('월드 세션 재접속 중...');
+            void this.beginRaidFromCurrentHub();
         } else {
             this.openTown(this.getCurrentHubTown());
             this.addCombatLog('마을에 도착했습니다. 출격 준비를 마치세요.');
@@ -1141,6 +1144,7 @@ export class WorldEngine {
         }
         this.isNetworkRaidConnecting = true;
         this.addCombatLog('월드 서버 접속 중...');
+        const isResumeJoin = NetworkRaidClient.hasStoredResumeToken();
 
         try {
             let joinAuthContext = await this.refreshNetworkAuthContext(authContext) ?? authContext;
@@ -1164,8 +1168,10 @@ export class WorldEngine {
             this.currentPhase = 'raid';
             this.raidSession.beginRaidFromTown(town.id);
             this.dismissedDungeonVisitKey = null;
-            this.party.resetForNewRaid();
-            this.townSession.applyPendingRestForRaidStart();
+            if (!isResumeJoin) {
+                this.party.resetForNewRaid();
+                this.townSession.applyPendingRestForRaidStart();
+            }
             this.remotePartyActors.clear();
             this.pendingNetworkScenarioEnter = null;
             this.networkScenarioEnteredDungeonIds.clear();
@@ -1176,7 +1182,9 @@ export class WorldEngine {
             this.fieldEnemies = [];
             this.worldMap.loot = [];
             this.clearFieldTurnState();
-            this.addCombatLog(`${town.nameKr}에서 ${this.worldMap.getDisplayName()} 서버로 출격.`);
+            this.addCombatLog(isResumeJoin
+                ? `${this.worldMap.getDisplayName()} 서버 원정에 재접속했습니다.`
+                : `${town.nameKr}에서 ${this.worldMap.getDisplayName()} 서버로 출격.`);
         } catch (error) {
             this.isNetworkRaid = false;
             this.networkPlayerId = null;

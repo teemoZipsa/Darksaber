@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createBaseStats } from '../../src/data/Stats';
 import type { ActorSnapshot, AutoLootGrantMessage, WorldJoinMessage } from '../../src/net/WorldProtocol';
 import { WorldMap } from '../../src/map/WorldMap';
-import { WorldSession } from '../../server/WorldSession';
+import { WorldResumeFailedError, WorldSession } from '../../server/WorldSession';
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 
@@ -244,13 +244,14 @@ test('disconnect grace resumes same actor before expiry and starts fresh after e
 
     assert.equal(resumed.playerId, first.playerId);
     assert.equal(resumedActorId, firstActorId);
+    assert.deepEqual(resumed.welcome.spawnTile, session.createSnapshot(resumed.playerId, 500).partyActors[0].tile);
 
     session.disconnect(resumed.playerId, 600);
     session.tick(1_700);
-    const fresh = session.join(joinMessage('central_castle', 'hero-a', first.welcome.resumeToken), 1_800);
-
-    assert.notEqual(fresh.playerId, first.playerId);
-    assert.notEqual(session.createSnapshot(fresh.playerId, 1_800).partyActors[0].id, firstActorId);
+    assert.throws(
+        () => session.join(joinMessage('central_castle', 'hero-a', first.welcome.resumeToken), 1_800),
+        WorldResumeFailedError,
+    );
 });
 
 test('loot contention grants one occupant and rejects the other', () => {
