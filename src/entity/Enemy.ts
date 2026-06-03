@@ -50,17 +50,20 @@ export class Enemy extends Entity {
         this.role = role;
         this.aiProfile = createEnemyAIProfile(role);
 
-        // Scale stats by level (tuned for balanced early game)
+        // Calibrated to the original Dark Saver monster stat scale (ability.atr),
+        // which matches the per-tier player base stats. Keeps level-band scaling.
         this.baseStats = createBaseStats({
-            maxHp: 30 + level * 8,
-            hp: 30 + level * 8,
-            maxMp: 10 + level * 3,
-            mp: 10 + level * 3,
-            atk: 3 + level * 1.5,
-            def: 2 + level,
-            magAtk: 1 + level * 0.5,
-            magDef: 1 + level * 0.5,
-            spd: 2 + level * 0.3,
+            maxHp: 80 + level * 22,
+            hp: 80 + level * 22,
+            maxMp: 25 + level * 5,
+            mp: 25 + level * 5,
+            atk: 35 + level * 7,
+            def: 20 + level * 5,
+            magAtk: 25 + level * 4,
+            magDef: 18 + level * 4,
+            spd: 13 + level * 0.4,
+            hitRate: 88 + level,
+            magHit: 88 + level,
             mov: 2,
         });
         this.stats = { ...this.baseStats };
@@ -163,49 +166,50 @@ export class Enemy extends Entity {
         if (this.tunedRole === role) return;
         this.tunedRole = role;
 
+        // Role bonuses are multiplicative so they stay meaningful on the rescaled base.
         switch (role) {
             case 'tank':
                 this.scaleMaxHp(1.35);
-                this.stats.def += 4;
+                this.stats.def = Math.round(this.stats.def * 1.4);
                 this.stats.spd = Math.max(1, this.stats.spd - 0.4);
                 this.stats.mov = 2;
                 break;
             case 'archer':
                 this.scaleMaxHp(0.85);
-                this.stats.atk += 3;
+                this.stats.atk = Math.round(this.stats.atk * 1.15);
                 this.stats.hitRate += 10;
                 this.stats.critRate += 3;
-                this.stats.def = Math.max(0, this.stats.def - 1);
+                this.stats.def = Math.round(this.stats.def * 0.85);
                 this.stats.mov = 3;
                 break;
             case 'healer':
                 this.scaleMaxHp(0.9);
-                this.stats.atk = Math.max(1, this.stats.atk - 2);
-                this.stats.magAtk += 5;
-                this.stats.magDef += 3;
-                this.stats.maxMp += 20;
+                this.stats.atk = Math.max(1, Math.round(this.stats.atk * 0.7));
+                this.stats.magAtk = Math.round(this.stats.magAtk * 1.4);
+                this.stats.magDef = Math.round(this.stats.magDef * 1.25);
+                this.stats.maxMp = Math.round(this.stats.maxMp * 1.3);
                 this.stats.mp = this.stats.maxMp;
                 this.stats.mov = 3;
                 break;
             case 'coward':
                 this.scaleMaxHp(0.8);
-                this.stats.def = Math.max(0, this.stats.def - 2);
+                this.stats.def = Math.max(0, Math.round(this.stats.def * 0.8));
                 this.stats.spd += 2;
                 this.stats.mov = 4;
                 break;
             case 'support':
                 this.scaleMaxHp(0.95);
-                this.stats.magAtk += 3;
-                this.stats.magDef += 2;
+                this.stats.magAtk = Math.round(this.stats.magAtk * 1.25);
+                this.stats.magDef = Math.round(this.stats.magDef * 1.2);
                 this.stats.spd += 0.6;
                 this.stats.mov = 3;
                 break;
             case 'boss':
                 this.scaleMaxHp(2.2);
-                this.stats.atk += 6;
-                this.stats.def += 5;
-                this.stats.magAtk += 5;
-                this.stats.magDef += 4;
+                this.stats.atk = Math.round(this.stats.atk * 1.3);
+                this.stats.def = Math.round(this.stats.def * 1.3);
+                this.stats.magAtk = Math.round(this.stats.magAtk * 1.3);
+                this.stats.magDef = Math.round(this.stats.magDef * 1.3);
                 this.stats.mov = 3;
                 this.isBoss = true;
                 break;

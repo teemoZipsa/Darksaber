@@ -929,7 +929,7 @@ const ORIGINAL_MAGIC: Skill[] = [
     // ── 공격 마법 (Damage) ──
     {
         id: 'og_fireball', nameKr: '파이어볼', nameEn: 'Fireball',
-        classId: 'shared', tier: 1, mpCost: 4,
+        classId: 'shared', tier: 1, mpCost: 5,
         type: 'damage', element: 'fire', power: 1.3,
         range: 3, aoeRadius: 0, icon: '🔥',
         descKr: '화염 구체를 발사하여 적에게 화속성 피해',
@@ -953,7 +953,7 @@ const ORIGINAL_MAGIC: Skill[] = [
     },
     {
         id: 'og_thunder', nameKr: '썬더', nameEn: 'Thunder',
-        classId: 'shared', tier: 2, mpCost: 7,
+        classId: 'shared', tier: 2, mpCost: 5,
         type: 'damage', element: 'lightning', power: 1.6,
         range: 3, aoeRadius: 0, icon: '⚡',
         descKr: '번개를 떨어뜨려 뇌속성 피해',
@@ -961,7 +961,7 @@ const ORIGINAL_MAGIC: Skill[] = [
     },
     {
         id: 'og_windcutter', nameKr: '윈드커터', nameEn: 'Wind Cutter',
-        classId: 'shared', tier: 2, mpCost: 6,
+        classId: 'shared', tier: 2, mpCost: 5,
         type: 'damage', element: 'wind', power: 1.5,
         range: 3, aoeRadius: 0, icon: '🌀',
         descKr: '진공의 칼날로 풍속성 피해',

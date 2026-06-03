@@ -183,6 +183,18 @@ test('network raid AP uses server remaining points instead of local actor gauge'
     assert.equal(actor.entity.actionGauge, 0);
 });
 
+test('intro tutorial uses only the currently active party character', () => {
+    const lead = new Character('lead', 'Lead', 'infantry');
+    const active = new Character('active', 'Active', 'cavalry');
+    const engine = Object.create(WorldEngine.prototype) as any;
+    engine.party = {
+        getActive: () => active,
+        getCharacters: () => [lead, active],
+    };
+
+    assert.deepEqual(engine.getIntroTutorialCharacters(), [active]);
+});
+
 test('network snapshot resolves zero remaining gauge from ready actor action gauge', () => {
     const actor = makeActor('hero');
     const { engine } = makeEngineHarness(actor);

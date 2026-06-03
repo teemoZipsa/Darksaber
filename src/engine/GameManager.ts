@@ -368,6 +368,9 @@ export class GameManager {
             character.exp = entry.exp;
             character.expToNext = calcExpToNext(character.classLineId, character.currentTier, character.level);
             character.stats = { ...character.stats, ...entry.baseStats };
+            // Original-aligned classes are stat-determined by (tier, level); recompute so
+            // saves created with the old/server base stats don't keep stale off-scale values.
+            character.syncOriginalBaseStats();
             character.magicLoadout = normalizeLoadout(entry.magicLoadout, character);
             character.skillUpgradeLevels = normalizeUpgradeLevels(entry.skillUpgradeLevels);
             this.party.addToRoster(character);

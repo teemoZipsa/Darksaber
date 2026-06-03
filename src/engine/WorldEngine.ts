@@ -679,7 +679,7 @@ export class WorldEngine {
         this.remotePartyActors.clear();
         this.fieldEnemies = [];
         this.worldMap.loot = [];
-        this.placePartyNear(trainingMap.getPlayerStartTile());
+        this.placePartyNear(trainingMap.getPlayerStartTile(), this.getIntroTutorialCharacters());
         this.player = this.getControlledActor()?.entity ?? this.player;
         this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
         this.clearFieldTurnState();
@@ -1118,10 +1118,15 @@ export class WorldEngine {
         this.placePartyNear(this.worldMap.getTownSpawnTile(this.getCurrentHubTown()));
     }
 
-    private placePartyNear(anchorTile: TilePoint): void {
-        const members = this.party.getCharacters().slice(0, this.party.MAX_ACTIVE_PARTY_SIZE);
+    private placePartyNear(anchorTile: TilePoint, overrideMembers?: Character[]): void {
+        const members = (overrideMembers ?? this.party.getCharacters()).slice(0, this.party.MAX_ACTIVE_PARTY_SIZE);
         members.forEach((character) => this.syncCharacterMovementToClass(character));
         this.partyActors = this.fieldSpawnController.createPartyActors(anchorTile, members);
+    }
+
+    private getIntroTutorialCharacters(): Character[] {
+        const active = this.party.getActive() ?? this.party.getCharacters()[0];
+        return active ? [active] : [];
     }
 
     private getTownById(townId: string): TownInfo | null {

@@ -77,6 +77,16 @@ export class Character {
         return originalLevelCap(this.classLineId, this.currentTier);
     }
 
+    /**
+     * Recompute base stats from the original level design for the current
+     * tier/level. Idempotent; a no-op for classes/tiers with no original data
+     * (they keep their saved/derived stats). Call after loading tier/level from
+     * a save so original-aligned classes don't keep stale, off-scale stats.
+     */
+    public syncOriginalBaseStats(): void {
+        this.applyOriginalClassStats();
+    }
+
     constructor(id: string, name: string, classLineId: string) {
         this.id = id;
         this.name = name;
