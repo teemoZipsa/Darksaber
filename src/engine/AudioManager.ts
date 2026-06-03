@@ -50,12 +50,12 @@ const UI_OUTPUT_TRIM = 0.9;
 
 export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = {
     // UI
-    'ui.confirm':  { src: originalSfx('01'), channel: 'ui' },
-    'ui.cancel':   { src: originalSfx('04'), channel: 'ui' },
-    'ui.hover':    { src: originalSfx('10'), channel: 'ui' },
-    'ui.error':    { src: originalSfx('04'), channel: 'ui' },
-    'ui.open':     { src: originalSfx('04'), channel: 'ui' },
-    'ui.close':    { src: originalSfx('04'), channel: 'ui' },
+    'ui.confirm':  { src: '/assets/sounds/ui/confirm.wav', channel: 'ui' },
+    'ui.cancel':   { src: '/assets/sounds/ui/cancel.wav',  channel: 'ui' },
+    'ui.hover':    { src: '/assets/sounds/ui/hover.wav',   channel: 'ui' },
+    'ui.error':    { src: '/assets/sounds/ui/error.wav',   channel: 'ui' },
+    'ui.open':     { src: '/assets/sounds/ui/open.wav',    channel: 'ui' },
+    'ui.close':    { src: '/assets/sounds/ui/close.wav',   channel: 'ui' },
 
     // Combat
     'sfx.swing':       { src: originalSfx('07'), channel: 'sfx' },
