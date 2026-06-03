@@ -11,18 +11,12 @@ const PARTY_ACTOR_IMAGE_RENDER_SCALE = 1.12;
 
 export class WorldFieldRenderer {
     public static renderPathPreview(ctx: CanvasRenderingContext2D, model: WorldRenderModel, camX: number, camY: number): void {
-        const actor = model.controlledActor;
-        if (!actor || actor.path.length === 0) return;
+        const path = model.pathPreviewTiles;
+        if (path.length === 0) return;
 
         ctx.fillStyle = 'rgba(55, 220, 255, 0.22)';
-        actor.path.forEach((tile, index) => {
+        path.forEach((tile) => {
             ctx.fillRect(tile.x * TILE_SIZE - camX + 8, tile.y * TILE_SIZE - camY + 8, TILE_SIZE - 16, TILE_SIZE - 16);
-            const pulse = 0.55 + 0.45 * Math.sin(model.worldTime * 8 - index * 0.8);
-            ctx.fillStyle = `rgba(180, 245, 255, ${0.35 + pulse * 0.4})`;
-            ctx.beginPath();
-            ctx.arc(tile.x * TILE_SIZE - camX + TILE_SIZE / 2, tile.y * TILE_SIZE - camY + TILE_SIZE / 2, 3 + pulse * 2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = 'rgba(55, 220, 255, 0.22)';
         });
     }
 

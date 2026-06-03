@@ -271,12 +271,81 @@ test('network move rejection reopens the action menu when the actor can still ac
     const { engine, calls } = makeEngineHarness(actor);
     engine.remainingActionPoints = 80;
     engine.pendingNetworkMoveReopen = { intentId: 'move-1', actorId: actor.id, tile: { x: 1, y: 0 } };
+    engine.networkMovePathPreview = { actorId: actor.id, target: { x: 1, y: 0 }, path: [{ x: 1, y: 0 }] };
 
     engine.handleNetworkActionRejected({ type: 'ACTION_REJECTED', intentId: 'move-1', reason: 'blocked' });
 
     assert.equal(engine.pendingNetworkMoveReopen, null);
+    assert.equal(engine.networkMovePathPreview, null);
     assert.ok(engine.combatLog.includes('서버 거부: blocked'));
     assert.ok(calls.includes('openActionMenu'));
+});
+
+test('network move stores a render-only path preview without queuing local movement', () => {
+    const actor = makeActor('hero');
+    const { engine } = makeEngineHarness(actor);
+    const sent: unknown[] = [];
+    engine.isNetworkRaid = true;
+    engine.networkRaidClient = {
+        sendIntent: (...args: unknown[]) => {
+            sent.push(args);
+            return 'move-1';
+        },
+    };
+
+    const path = [{ x: 1, y: 0 }, { x: 2, y: 0 }];
+    const submitted = engine.submitNetworkMoveIntent(actor, { x: 2, y: 0 }, path, getActionApCost('move'), 2);
+
+    assert.equal(submitted, true);
+    assert.equal(sent.length, 1);
+    assert.deepEqual(actor.path, []);
+    assert.equal(actor.queuedIntent, null);
+    assert.deepEqual(engine.getPathPreviewTiles(actor), path);
+    assert.notEqual(engine.networkMovePathPreview.path, path);
+});
+
+test('network move path preview remains through confirmed interpolation and clears on arrival', () => {
+    const actor = makeActor('hero');
+    const { engine } = makeEngineHarness(actor);
+    engine.networkMovePathPreview = {
+        actorId: actor.id,
+        target: { x: 1, y: 0 },
+        path: [{ x: 1, y: 0 }],
+    };
+    engine.pendingNetworkMoveReopen = null;
+    actor.entity.gridX = 1;
+    actor.entity.gridY = 0;
+    actor.entity.pixelX = 0.25;
+    actor.entity.pixelY = 0;
+
+    engine.refreshNetworkMovePathPreview();
+
+    assert.deepEqual(engine.getPathPreviewTiles(actor), [{ x: 1, y: 0 }]);
+
+    actor.entity.pixelX = 1;
+    engine.refreshNetworkMovePathPreview();
+
+    assert.equal(engine.networkMovePathPreview, null);
+    assert.deepEqual(engine.getPathPreviewTiles(actor), []);
+});
+
+test('network move path preview drops tiles already reached during interpolation', () => {
+    const actor = makeActor('hero');
+    const { engine } = makeEngineHarness(actor);
+    engine.networkMovePathPreview = {
+        actorId: actor.id,
+        target: { x: 2, y: 0 },
+        path: [{ x: 1, y: 0 }, { x: 2, y: 0 }],
+    };
+    engine.pendingNetworkMoveReopen = null;
+    actor.entity.gridX = 2;
+    actor.entity.gridY = 0;
+    actor.entity.pixelX = 1;
+    actor.entity.pixelY = 0;
+
+    engine.refreshNetworkMovePathPreview();
+
+    assert.deepEqual(engine.getPathPreviewTiles(actor), [{ x: 2, y: 0 }]);
 });
 
 test('grid snapshot without sockets restores placed items with an empty socket list', () => {

@@ -35,6 +35,7 @@ export interface WorldRenderModel {
     hasSelection: boolean;
     actionMode: WorldActionMode | null;
     actionTiles: Set<string>;
+    pathPreviewTiles: TilePoint[];
     actionMenuOpen: boolean;
     fieldMagicState: FieldMagicState;
     hoverTile: TilePoint;

@@ -55,6 +55,7 @@ export interface WorldRenderContext {
     getRemainingActionPoints: () => number;
     getMajorActionUsedThisTurn: () => boolean;
     getHoverTile: () => TilePoint;
+    getPathPreviewTiles: (actor: FieldActor | null) => TilePoint[];
     getAttackCues: () => AttackCue[];
     getCombatLog: () => string[];
     getActorTerrainTraits: (actor: FieldActor) => TerrainActorTraits;
@@ -167,6 +168,7 @@ export class WorldRenderController {
             hasSelection: this.context.selectionController.hasSelection(),
             actionMode: this.context.playerActionController.getMode(),
             actionTiles: this.context.playerActionController.getTiles(),
+            pathPreviewTiles: this.context.getPathPreviewTiles(activeActor),
             actionMenuOpen: this.context.actionMenuUI.getIsOpen(),
             fieldMagicState: this.context.magicController.getState(),
             hoverTile,
