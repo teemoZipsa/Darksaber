@@ -124,6 +124,7 @@ export class UiStore {
     getTownRumors = (): string[] => this.townUi()?.getRumors() ?? [];
     getRestFacility = () => this.townUi()?.getRestFacilityPublic() ?? null;
     isTownDeployPending = (): boolean => this.townUi()?.isDeployPending() ?? false;
+    getTownDeployError = (): string | null => this.townUi()?.getDeployError() ?? null;
     getPendingRestMenuId = (): string | null => this.townUi()?.getPendingRestMenuId?.() ?? null;
     getInjuredCount = (): number => this.townUi()?.getInjuredCount?.() ?? 0;
     isQuestDone = (questId: string): boolean => this.townUi()?.getQuestDone?.(questId) ?? false;

@@ -63,6 +63,10 @@ export class WorldTownSession {
         this.ui.hide();
     }
 
+    public setDeployError(message: string | null): void {
+        this.ui.setDeployError(message);
+    }
+
     public sync(): void {
         this.ui.playerGold = this.playerData.gold;
         const active = this.party.getActive();

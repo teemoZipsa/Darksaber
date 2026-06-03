@@ -28,6 +28,7 @@ export function TownScreen() {
     const tab = store.getTownTab();
     const restFacility = store.getRestFacility();
     const deployPending = store.isTownDeployPending();
+    const deployError = store.getTownDeployError();
     if (!town) return null;
 
     const facilities = getTownFacilities(town.id);
@@ -82,6 +83,7 @@ export function TownScreen() {
             </div>
 
             <div className="ds-town__footer" style={scaleVar}>
+                {deployError && <div className="ds-town__deploy-error">{deployError}</div>}
                 <button
                     type="button"
                     className="ds-town__deploy"

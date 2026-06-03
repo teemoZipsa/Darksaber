@@ -1181,10 +1181,13 @@ export class WorldEngine {
             this.isNetworkRaid = false;
             this.networkPlayerId = null;
             this.closeNetworkRaidClient(false);
-            this.addCombatLog(`월드 서버 접속 실패: ${error instanceof Error ? error.message : 'unknown error'}`);
+            const errorMessage = error instanceof Error ? error.message : 'unknown error';
+            console.error('[Darksaber] World deploy failed', error);
+            this.addCombatLog(`월드 서버 접속 실패: ${errorMessage}`);
             this.addCombatLog('서버 연결 없이는 출격할 수 없습니다.');
             this.currentPhase = 'town';
             this.townSession.show(town);
+            this.townSession.setDeployError(`월드 서버 접속 실패: ${errorMessage}`);
         } finally {
             this.isNetworkRaidConnecting = false;
         }

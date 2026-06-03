@@ -658,7 +658,21 @@
     box-sizing: border-box;
     padding: 0 12px;
 }
-#ui-overlay .ds-town__footer { transform: scale(var(--ds-scale)); }
+#ui-overlay .ds-town__footer {
+    transform: scale(var(--ds-scale));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+#ui-overlay .ds-town__deploy-error {
+    max-width: min(720px, 90vw);
+    color: #ffb0a8;
+    font-size: 13px;
+    line-height: 1.35;
+    text-align: center;
+    text-shadow: 0 1px 2px #000;
+}
 #ui-overlay .ds-town__deploy {
     pointer-events: auto;
     font-family: var(--ds-font-title, "DOSMyungjo", serif);

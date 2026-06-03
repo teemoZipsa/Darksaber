@@ -82,6 +82,10 @@ test('town deploy ignores click-through immediately after opening', () => {
     assert.equal(duplicate, false);
     assert.equal(deploys, 1);
 
+    ui.setDeployError('월드 서버 접속 실패: AUTH_FAILED');
+    assert.equal(ui.getDeployError(), '월드 서버 접속 실패: AUTH_FAILED');
+
     ui.hide();
     assert.equal(ui.isDeployPending(), false);
+    assert.equal(ui.getDeployError(), null);
 });
