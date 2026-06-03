@@ -48,7 +48,7 @@ export function TownScreen() {
     const townSecondaryName = i18n.lang === 'ko' ? town.name : town.nameKr;
     const deploy = () => {
         if (deployPending) return;
-        if (store.townDeploy()) AudioManager.playUi('ui.confirm');
+        if (store.townDeploy()) AudioManager.playSfx('sfx.deploy');
     };
 
     return (

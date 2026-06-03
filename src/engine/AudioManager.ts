@@ -68,6 +68,8 @@ export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = 
     'sfx.loot_pickup': { src: originalSfx('01'), channel: 'sfx' },
     'sfx.coin':        { src: originalSfx('01'), channel: 'sfx' },
     'sfx.equip':       { src: '/assets/sounds/sfx/equip.wav', channel: 'sfx' },
+    'sfx.unequip':     { src: '/assets/sounds/sfx/unequip.wav', channel: 'sfx' },
+    'sfx.deploy':      { src: '/assets/sounds/sfx/deploy.wav', channel: 'sfx' },
 
     // Original magic / state effects inferred from gameres_unpacked/set/MagicPtn.atr
     'sfx.magic.fire':        { src: originalSfx('00'), channel: 'sfx' },

@@ -254,7 +254,7 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
             setEquipHint(null);
         };
 
-        const finishDrop = (d: NonNullable<DragState>, clientX: number, clientY: number): 'equip' | 'move' | null => {
+        const finishDrop = (d: NonNullable<DragState>, clientX: number, clientY: number): 'equip' | 'unequip' | 'move' | null => {
             const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
             const gridEl = target?.closest<HTMLElement>('[data-inv-grid]');
             if (gridEl) {
@@ -263,7 +263,8 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                 const rect = gridEl.getBoundingClientRect();
                 const gx = Math.floor((clientX - d.offsetX - rect.left) / CELL);
                 const gy = Math.floor((clientY - d.offsetY - rect.top) / CELL);
-                return inv.moveToCell(d.placed, d.source, kind, gx, gy) ? 'move' : null;
+                if (!inv.moveToCell(d.placed, d.source, kind, gx, gy)) return null;
+                return d.source.kind === 'equip' ? 'unequip' : 'move';
             }
             const equipEl = target?.closest<HTMLElement>('[data-inv-equip]');
             if (equipEl) {
@@ -280,8 +281,9 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
             clearDrag();
             const result = d.isDragging
                 ? finishDrop(d, clientX, clientY)
-                : (inv.quickMove(d.placed, d.source) ? 'move' : null);
+                : (inv.quickMove(d.placed, d.source) ? (d.source.kind === 'equip' ? 'unequip' : 'move') : null);
             if (result === 'equip') AudioManager.playSfx('sfx.equip');
+            else if (result === 'unequip') AudioManager.playSfx('sfx.unequip');
             else if (result) AudioManager.playUi(d.isDragging ? 'ui.confirm' : 'ui.hover');
             const success = result !== null;
             if (success) setMutationSeq((seq) => seq + 1);
