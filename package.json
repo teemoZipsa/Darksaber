@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:town": "vite --open /?devStart=town",
     "start": "npm run dev",
     "build": "tsc && vite build",
     "preview": "vite preview",
