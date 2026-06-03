@@ -2,7 +2,16 @@ import { getEffectiveStatsForCharacter, getEffectiveStatsForEnemy, hasStatus, re
 import type { Enemy } from '../../entity/Enemy';
 import type { Player } from '../../entity/Player';
 import { TILE_PROPERTIES, type TileType } from '../../map/Tile';
-import { ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, ENEMY_LEASH_RANGE, FIELD_ATB_SCALE, FORMATION_OFFSETS, MOVEMENT_REPATH_INTERVAL } from '../../field/FieldConfig';
+import {
+    ENEMY_AGGRO_RANGE,
+    ENEMY_COMBAT_SIMULATION_RANGE,
+    ENEMY_EXIT_RANGE,
+    ENEMY_LEASH_RANGE,
+    ENEMY_SIMULATION_ACTIVE_RANGE,
+    FIELD_ATB_SCALE,
+    FORMATION_OFFSETS,
+    MOVEMENT_REPATH_INTERVAL,
+} from '../../field/FieldConfig';
 import { advanceAtb, resolveAggroState } from '../../field/FieldCombat';
 import {
     type FieldPassableQuery,
@@ -89,10 +98,15 @@ export class WorldMovementController {
         for (const entry of this.context.getFieldEnemies()) {
             const enemy = entry.enemy;
             if (enemy.stats.hp <= 0) continue;
-            enemy.update(input.dt);
 
             const closest = this.findClosestActor(this.enemyTile(enemy), aliveActors);
-            if (!closest) continue;
+            if (!closest || !this.isEnemySimulationActive(entry, closest)) {
+                enemy.actionGauge = 0;
+                enemy.isAggro = false;
+                continue;
+            }
+
+            enemy.update(input.dt);
 
             const enemyTile = this.enemyTile(enemy);
             const distanceToTarget = manhattan(enemyTile, this.actorTile(closest));
@@ -271,6 +285,11 @@ export class WorldMovementController {
             }
         }
         return best;
+    }
+
+    private isEnemySimulationActive(entry: FieldEnemy, closest: FieldActor): boolean {
+        const range = entry.enemy.isAggro ? ENEMY_COMBAT_SIMULATION_RANGE : ENEMY_SIMULATION_ACTIVE_RANGE;
+        return manhattan(this.enemyTile(entry.enemy), this.actorTile(closest)) <= range;
     }
 
     public hasAggroAllyNear(entry: FieldEnemy, range: number): boolean {

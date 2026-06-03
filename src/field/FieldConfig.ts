@@ -13,6 +13,8 @@ export const FIELD_ATB_SCALE = 6;
 export const ENEMY_AGGRO_RANGE = 6;
 export const ENEMY_EXIT_RANGE = 10;
 export const ENEMY_LEASH_RANGE = 16;
+export const ENEMY_SIMULATION_ACTIVE_RANGE = 48;
+export const ENEMY_COMBAT_SIMULATION_RANGE = 64;
 export const MOVEMENT_REPATH_INTERVAL = 0.35;
 
 export const ENEMY_ROLE_GLYPHS: Record<EnemyRole, string> = {

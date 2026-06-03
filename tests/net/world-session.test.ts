@@ -6,6 +6,7 @@ import { WorldMap } from '../../src/map/WorldMap';
 import { WorldResumeFailedError, WorldSession } from '../../server/WorldSession';
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { ENEMY_SIMULATION_ACTIVE_RANGE } from '../../src/field/FieldConfig';
 
 function actor(id: string, overrides: Partial<ActorSnapshot> = {}): ActorSnapshot {
     return {
@@ -118,6 +119,31 @@ test('server tick charges only enemies with an active aggro target', () => {
     assert.ok(aggroEnemy);
     assert.equal(aggroEnemy.isAggro, true);
     assert.ok(aggroEnemy.actionGauge > 0);
+});
+
+test('server tick freezes enemies outside the active simulation range', () => {
+    const session = new WorldSession();
+    const a = session.join(joinMessage('central_castle', 'hero-a'), 0);
+    const internals = session as unknown as {
+        actors: Map<string, { tile: { x: number; y: number } }>;
+        enemies: Map<string, { enemy: { gridX: number; gridY: number; id: string; actionGauge: number; isAggro: boolean } }>;
+    };
+    const serverActor = [...internals.actors.values()][0];
+    const enemyEntry = [...internals.enemies.values()][0];
+    assert.ok(serverActor);
+    assert.ok(enemyEntry);
+    serverActor.tile = { x: enemyEntry.enemy.gridX + ENEMY_SIMULATION_ACTIVE_RANGE + 1, y: enemyEntry.enemy.gridY };
+    enemyEntry.enemy.isAggro = true;
+    enemyEntry.enemy.actionGauge = 75;
+
+    session.tick(0);
+    session.tick(250);
+
+    const snapshot = session.createSnapshot(a.playerId, 250);
+    const inactiveEnemy = snapshot.enemies.find((enemy) => enemy.id === enemyEntry.enemy.id);
+    assert.ok(inactiveEnemy);
+    assert.equal(inactiveEnemy.isAggro, false);
+    assert.equal(inactiveEnemy.actionGauge, 0);
 });
 
 test('intent ownership rejects another player actor', () => {

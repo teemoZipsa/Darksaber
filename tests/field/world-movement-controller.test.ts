@@ -7,6 +7,7 @@ import { Player } from '../../src/entity/Player';
 import type { FieldActor, FieldEnemy } from '../../src/field/FieldTypes';
 import { WorldMovementController } from '../../src/engine/world/WorldMovementController';
 import { TileType } from '../../src/map/Tile';
+import { ENEMY_SIMULATION_ACTIVE_RANGE } from '../../src/field/FieldConfig';
 
 class ImageStub {
     public src = '';
@@ -80,6 +81,20 @@ test('movement honors world ground blockers on walkable terrain', () => {
 test('passive enemies do not charge turns until aggro starts', () => {
     const actor = makeActor('hero', 20, 0);
     const enemyEntry = makeEnemyEntry('passive', 0, 0);
+    enemyEntry.enemy.actionGauge = 75;
+    const controller = makeController([actor], [enemyEntry]);
+
+    const result = controller.updateEnemies({ dt: 10, activeTurnActorId: null });
+
+    assert.deepEqual(result.readyEnemyIds, []);
+    assert.equal(enemyEntry.enemy.isAggro, false);
+    assert.equal(enemyEntry.enemy.actionGauge, 0);
+});
+
+test('enemies outside the active simulation range stay idle', () => {
+    const actor = makeActor('hero', ENEMY_SIMULATION_ACTIVE_RANGE + 1, 0);
+    const enemyEntry = makeEnemyEntry('inactive', 0, 0);
+    enemyEntry.enemy.isAggro = true;
     enemyEntry.enemy.actionGauge = 75;
     const controller = makeController([actor], [enemyEntry]);
 

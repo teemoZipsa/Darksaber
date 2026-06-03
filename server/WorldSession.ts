@@ -53,7 +53,14 @@ import {
     REST_ACTION_GAUGE_COST,
     TOOL_ACTION_GAUGE_COST,
 } from '../src/field/FieldActionEconomy';
-import { FIELD_ATB_SCALE, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, ENEMY_LEASH_RANGE } from '../src/field/FieldConfig';
+import {
+    FIELD_ATB_SCALE,
+    ENEMY_AGGRO_RANGE,
+    ENEMY_COMBAT_SIMULATION_RANGE,
+    ENEMY_EXIT_RANGE,
+    ENEMY_LEASH_RANGE,
+    ENEMY_SIMULATION_ACTIVE_RANGE,
+} from '../src/field/FieldConfig';
 import { decideEnemyAction, type EnemyAIDecision, type EnemyAIUnit } from '../src/field/EnemyAI';
 import { advanceAtb, resolveAggroState } from '../src/field/FieldCombat';
 import {
@@ -462,6 +469,11 @@ export class WorldSession {
         for (const entry of this.enemies.values()) {
             const enemy = entry.enemy;
             if (enemy.stats.hp <= 0) continue;
+            if (!this.isEnemySimulationActive(entry)) {
+                enemy.actionGauge = 0;
+                enemy.isAggro = false;
+                continue;
+            }
             if (!this.updateEnemyAggro(entry)) {
                 enemy.actionGauge = 0;
                 continue;
@@ -1087,6 +1099,12 @@ export class WorldSession {
             : this.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
         if (enemy.isBoss || !autoLootGrant) this.spawnEnemyLoot(enemy);
         return autoLootGrant;
+    }
+
+    private isEnemySimulationActive(entry: ServerEnemy): boolean {
+        const enemy = entry.enemy;
+        const range = enemy.isAggro ? ENEMY_COMBAT_SIMULATION_RANGE : ENEMY_SIMULATION_ACTIVE_RANGE;
+        return this.hasActiveActorWithin({ x: enemy.gridX, y: enemy.gridY }, range);
     }
 
     private updateEnemyAggro(entry: ServerEnemy): boolean {
