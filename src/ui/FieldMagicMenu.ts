@@ -97,7 +97,7 @@ export class FieldMagicMenu {
             const slot = this.slots[i];
             const { x, y } = this.slotPosition(i);
             const hovered = this.hoveredIndex === i;
-            this.drawSlot(ctx, slot, x, y, hovered, i);
+            this.drawSlot(ctx, slot, x, y, hovered);
         }
         this.renderHoveredDetail(ctx);
         ctx.restore();
@@ -127,61 +127,30 @@ export class FieldMagicMenu {
         slot: FieldMagicSlot,
         x: number,
         y: number,
-        hovered: boolean,
-        index: number
+        hovered: boolean
     ): void {
         const r = this.iconRadius;
 
-        this.drawSlotBacking(ctx, x, y, r, slot.enabled, hovered);
         if (hovered) {
             this.drawSlotFocus(ctx, x, y, r, slot.enabled);
         }
 
         this.drawSkillIcon(ctx, slot, x, y, r);
 
-        // Number hotkey (top-left)
-        ctx.font = `bold 10px ${UI.fontMono}`;
-        ctx.fillStyle = 'rgba(240, 224, 170, 0.9)';
-        ctx.textAlign = 'center';
-        ctx.fillText(String(index + 1), x - r * 0.75, y - r * 0.75);
-
-        // Upgrade level badge (bottom-right)
-        if (slot.level > 1) {
-            ctx.font = `bold 9px ${UI.fontMono}`;
-            ctx.fillStyle = '#ffd24a';
-            ctx.fillText(`+${slot.level - 1}`, x + r * 0.7, y + r * 0.78);
+        if (hovered) {
+            const label = slot.skill.nameKr;
+            ctx.font = `bold 13px ${UI.fontPrimary}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.82)';
+            ctx.strokeText(label, x, y + r + 12);
+            ctx.fillStyle = slot.enabled ? '#ffe3a0' : '#f0a0a8';
+            ctx.fillText(label, x, y + r + 12);
         }
 
         ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
-    }
-
-    private drawSlotBacking(
-        ctx: CanvasRenderingContext2D,
-        x: number,
-        y: number,
-        r: number,
-        enabled: boolean,
-        hovered: boolean
-    ): void {
-        const size = r * 1.68;
-        const left = x - size / 2;
-        const top = y - size / 2;
-
-        ctx.save();
-        ctx.fillStyle = enabled ? 'rgba(20, 16, 12, 0.9)' : 'rgba(28, 14, 16, 0.9)';
-        ctx.fillRect(left, top, size, size);
-        ctx.strokeStyle = enabled
-            ? (hovered ? Parchment.borderGold : 'rgba(200, 146, 42, 0.72)')
-            : 'rgba(228, 63, 90, 0.68)';
-        ctx.lineWidth = hovered ? 2 : 1;
-        ctx.strokeRect(left + 0.5, top + 0.5, size - 1, size - 1);
-
-        ctx.fillStyle = 'rgba(255, 228, 160, 0.08)';
-        ctx.fillRect(left + 3, top + 3, size - 6, 1);
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
-        ctx.fillRect(left + 3, top + size - 4, size - 6, 1);
-        ctx.restore();
     }
 
     private drawSkillIcon(ctx: CanvasRenderingContext2D, slot: FieldMagicSlot, x: number, y: number, r: number): void {
@@ -190,7 +159,7 @@ export class FieldMagicMenu {
         const row = iconCell && iconCell.row < FieldMagicMenu.ICON_ANIMATION_ROWS
             ? iconCell.row + frame * FieldMagicMenu.ICON_ANIMATION_ROWS
             : iconCell?.row;
-        const iconSize = Math.max(28, r * 1.55);
+        const iconSize = Math.max(18, r * 0.62 * 2.35);
 
         ctx.save();
         if (!slot.enabled) ctx.globalAlpha *= 0.4;
@@ -199,9 +168,9 @@ export class FieldMagicMenu {
                 ctx,
                 {
                     sheet: 'micon',
-                    x: iconCell.col * MICON_CELL_SIZE,
+                    x: iconCell.col * MICON_CELL_SIZE + 1,
                     y: row * MICON_CELL_SIZE,
-                    w: MICON_CELL_SIZE,
+                    w: MICON_CELL_SIZE - 2,
                     h: MICON_CELL_SIZE,
                 },
                 x - iconSize / 2,
@@ -257,27 +226,18 @@ export class FieldMagicMenu {
         const slot = this.slots[this.hoveredIndex];
         if (!slot) return;
 
-        const label = `${slot.skill.nameKr}  MP ${slot.skill.mpCost}`;
         const reason = !slot.enabled ? slot.disabledReason : undefined;
+        if (!reason) return;
 
-        ctx.font = `bold 12px ${UI.fontPrimary}`;
+        ctx.font = `bold 11px ${UI.fontPrimary}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const ly = this.centerY + this.menuRadius + 22;
         ctx.lineWidth = 4;
         ctx.strokeStyle = 'rgba(0,0,0,0.82)';
-        ctx.strokeText(label, this.centerX, ly);
-        ctx.fillStyle = slot.enabled ? '#ffe3a0' : '#f0a0a8';
-        ctx.fillText(label, this.centerX, ly);
-
-        if (reason) {
-            ctx.font = `bold 11px ${UI.fontPrimary}`;
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = 'rgba(0,0,0,0.82)';
-            ctx.strokeText(reason, this.centerX, ly + 16);
-            ctx.fillStyle = '#ffd6d6';
-            ctx.fillText(reason, this.centerX, ly + 16);
-        }
+        ctx.strokeText(reason, this.centerX, ly);
+        ctx.fillStyle = '#ffd6d6';
+        ctx.fillText(reason, this.centerX, ly);
 
         ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
