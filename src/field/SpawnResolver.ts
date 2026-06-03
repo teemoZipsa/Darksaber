@@ -254,9 +254,9 @@ function weightedPick(pool: WeightedMonster[], rng: () => number): MonsterId {
 
 // ── Pack + nest generation ─────────────────────────────────────────────────────
 
-const NEST_CHANCE = 0.55; // share of land chunks that hold a nest
-const PACK_MIN = 2;
-const PACK_MAX = 4;
+const NEST_CHANCE = 0.75; // share of land chunks that hold a nest
+const PACK_MIN = 3;
+const PACK_MAX = 5;
 
 /** Roll a pack of monsters (with resolved levels) for a biome/danger. */
 export function rollPackMonsters(

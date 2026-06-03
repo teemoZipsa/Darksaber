@@ -75,7 +75,7 @@ test('nest generation is deterministic for the same seed/chunk/context', () => {
     const a = pickNestForChunk(ctx, true);
     const b = pickNestForChunk(ctx, true);
     assert.deepEqual(a, b);
-    assert.ok(a && a.monsters.length >= 2 && a.monsters.length <= 4, 'pack size 2-4');
+    assert.ok(a && a.monsters.length >= 3 && a.monsters.length <= 5, 'pack size 3-5');
 });
 
 test('no nests spawn on ocean or town chunks', () => {
