@@ -84,7 +84,7 @@ const SLOT_LABEL_KEY: Record<ItemSlot, string> = {
     body: 'inv.body',
     boots: 'inv.boots',
     accessory: 'inv.accessory',
-    accessory2: 'inv.accessory',
+    accessory2: 'inv.accessory2',
     consumable: 'item.consumable',
     material: 'item.material',
     rune: 'item.rune',
@@ -138,8 +138,35 @@ function SocketMeta({ placed, item }: { placed?: PlacedItem; item: ItemDef }) {
     const filled = placed?.sockets?.length ?? 0;
     return (
         <span className="ds-tooltip__metaitem">
-            {t('tooltip.sockets')} {'◆'.repeat(filled)}{'◇'.repeat(Math.max(0, item.maxSockets - filled))}
+            {t('tooltip.sockets')} {filled}/{item.maxSockets} {'◆'.repeat(filled)}{'◇'.repeat(Math.max(0, item.maxSockets - filled))}
         </span>
+    );
+}
+
+function ItemHeader({ item }: { item: ItemDef }) {
+    return (
+        <div className="ds-tooltip__head">
+            <span className={`ds-tooltip__glyph ${RARITY_CLASS[item.rarity]}`} aria-hidden>
+                <ItemGlyph item={item} />
+            </span>
+            <span className="ds-tooltip__identity">
+                <span className={`ds-tooltip__name ${RARITY_CLASS[item.rarity]}`}>{itemName(item)}</span>
+                <span className="ds-tooltip__type">{itemTypeLabel(item)}</span>
+            </span>
+            <span className={`ds-tooltip__rarity ${RARITY_CLASS[item.rarity]}`}>{t(`rarity.${item.rarity}`)}</span>
+        </div>
+    );
+}
+
+function ItemMeta({ item, placed }: { item: ItemDef; placed?: PlacedItem }) {
+    return (
+        <div className="ds-tooltip__meta">
+            <span className="ds-tooltip__metaitem">{t('tooltip.size')} {item.gridW}x{item.gridH}</span>
+            <DurabilityMeta placed={placed} item={item} />
+            <SocketMeta placed={placed} item={item} />
+            {item.weight > 0 && <span className="ds-tooltip__metaitem">{t('tooltip.weight')} {item.weight}</span>}
+            {item.baseValue > 0 && <span className="ds-tooltip__metaitem">{t('tooltip.value')} {item.baseValue} G</span>}
+        </div>
     );
 }
 
@@ -149,8 +176,7 @@ function ItemCard({ item, placed }: { item: ItemDef; placed?: PlacedItem }) {
     const flavor = itemDescription(item);
     return (
         <>
-            <div className={`ds-tooltip__name ${RARITY_CLASS[item.rarity]}`}>{itemName(item)}</div>
-            <div className="ds-tooltip__type">{itemTypeLabel(item)} · {t(`rarity.${item.rarity}`)}</div>
+            <ItemHeader item={item} />
             {rows.length > 0 && (
                 <div className="ds-tooltip__stats">
                     {rows.map((r) => (
@@ -158,11 +184,7 @@ function ItemCard({ item, placed }: { item: ItemDef; placed?: PlacedItem }) {
                     ))}
                 </div>
             )}
-            <div className="ds-tooltip__meta">
-                <DurabilityMeta placed={placed} item={item} />
-                <SocketMeta placed={placed} item={item} />
-                {item.weight > 0 && <span className="ds-tooltip__metaitem">{t('tooltip.weight')} {item.weight}</span>}
-            </div>
+            <ItemMeta item={item} placed={placed} />
             {flavor && <div className="ds-tooltip__flavor">{flavor}</div>}
         </>
     );
@@ -217,8 +239,7 @@ export function ItemCompareTooltip({
             </div>
             <div className="ds-tooltip__col">
                 <div className="ds-tooltip__collabel">{t('tooltip.candidate')}</div>
-                <div className={`ds-tooltip__name ${RARITY_CLASS[candidate.rarity]}`}>{itemName(candidate)}</div>
-                <div className="ds-tooltip__type">{itemTypeLabel(candidate)} · {t(`rarity.${candidate.rarity}`)}</div>
+                <ItemHeader item={candidate} />
                 {rows.length > 0 && (
                     <div className="ds-tooltip__stats">
                         {rows.map((r) => (
@@ -236,6 +257,7 @@ export function ItemCompareTooltip({
                         ))}
                     </div>
                 )}
+                <ItemMeta item={candidate} placed={candidatePlaced} />
             </div>
         </div>
     );

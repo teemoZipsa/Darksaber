@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { formatT, t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
@@ -122,26 +122,32 @@ function InvItem({
     spanned: boolean; // true = positioned on a grid; false = fills an equip slot
     dragging: boolean;
     onPointerDown: (e: ReactPointerEvent) => void;
-    onHoverEnter?: (e: ReactPointerEvent) => void;
-    onHoverMove?: (e: ReactPointerEvent) => void;
+    onHoverEnter?: (e: ReactPointerEvent | ReactMouseEvent) => void;
+    onHoverMove?: (e: ReactPointerEvent | ReactMouseEvent) => void;
     onHoverLeave?: () => void;
 }) {
     const it = placed.item;
     const posStyle: CSSProperties = spanned
         ? { position: 'absolute', left: placed.gridX * CELL, top: placed.gridY * CELL, width: it.gridW * CELL, height: it.gridH * CELL }
         : { width: '100%', height: '100%' };
+    const itemStyle = { ...posStyle, '--inv-item-color': it.color } as CSSProperties;
     const duraPct = it.maxDurability > 0 ? Math.max(0, Math.min(1, placed.durability / it.maxDurability)) : 1;
     const socketed = placed.sockets?.length ?? 0;
     return (
         <div
             className={`inv-item ${itemRarityClass(placed)}${dragging ? ' is-dragging' : ''}`}
-            style={{ ...posStyle, background: `${it.color}33` }}
+            style={itemStyle}
             onPointerDown={onPointerDown}
             onPointerEnter={onHoverEnter}
             onPointerMove={onHoverMove}
             onPointerLeave={onHoverLeave}
+            onMouseEnter={onHoverEnter}
+            onMouseMove={onHoverMove}
+            onMouseLeave={onHoverLeave}
             aria-label={itemName(it)}
         >
+            <span className="inv-item__rarity" aria-hidden />
+            <span className="inv-item__shine" aria-hidden />
             <ItemGlyph item={it} className="inv-item__icon" />
             {placed.quantity > 1 && <span className="inv-item__qty">{placed.quantity}</span>}
             {!!it.maxSockets && (
@@ -483,10 +489,13 @@ export function InventoryPanel({ inv, embedded = false }: { inv: InventoryUI; em
                         transform: 'none',
                         width: dragPreview.placed.item.gridW * CELL,
                         height: dragPreview.placed.item.gridH * CELL,
-                        background: `${dragPreview.placed.item.color}33`,
+                        '--inv-item-color': dragPreview.placed.item.color,
                     } as CSSProperties}
                 >
-                    <ItemGlyph item={dragPreview.placed.item} className="inv-item__icon" />
+                    <span className="inv-item__rarity" aria-hidden />
+                    <span className="inv-item__shine" aria-hidden />
+                    <ItemGlyph item={dragPreview.placed.item} className="inv-drag-ghost__icon" />
+                    <span className="inv-drag-ghost__label">{itemName(dragPreview.placed.item)}</span>
                 </div>
             )}
             {tip.node}
