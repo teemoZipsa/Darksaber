@@ -16,6 +16,13 @@ export interface WorldRaidRenderModel {
     timerAdvancing: boolean;
 }
 
+export interface WorldStoryInteriorRenderModel {
+    active: boolean;
+    dungeonId: string | null;
+    title: string;
+    enemiesLeft: number;
+}
+
 export interface WorldRenderModel {
     worldTime: number;
     phase: WorldPhase;
@@ -48,4 +55,5 @@ export interface WorldRenderModel {
     gold: number;
     worldName: string;
     raid: WorldRaidRenderModel;
+    storyInterior: WorldStoryInteriorRenderModel;
 }

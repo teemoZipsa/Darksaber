@@ -25,6 +25,7 @@ import type { WorldRaidOutcomeController } from './WorldRaidOutcomeController';
 import type { WorldSelectionController } from './WorldSelectionController';
 import type { WorldTacticalController } from './WorldTacticalController';
 import { MIN_FIELD_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
+import { formatT, t } from '../../i18n/LanguageManager';
 
 export interface WorldRenderContext {
     party: PartyManager;
@@ -115,6 +116,7 @@ export class WorldRenderController {
         const uiW = Math.floor(width / scale);
         const uiH = Math.floor(height / scale);
         const infoY = WorldFieldRenderer.renderHudPanels(ctx, model, uiW, uiH, { combatLogOnly: options.hideWorldHud });
+        if (!options.hideWorldHud && model.storyInterior.active) this.renderStoryInteriorBanner(ctx, model, uiW);
         if (!options.hideWorldHud && model.selectedDisplayInfo) {
             this.context.entityInfoUI.setPosition(16, infoY + 18);
             this.context.entityInfoUI.render(ctx, model.selectedDisplayInfo);
@@ -149,6 +151,8 @@ export class WorldRenderController {
         const selectedLoot = this.context.selectionController.lootId
             ? worldMap.loot.find((candidate) => candidate.id === this.context.selectionController.lootId && !candidate.opened) ?? null
             : null;
+        const activeDungeonId = this.context.raidSession.activeDungeonId;
+        const storyInteriorActive = Boolean(activeDungeonId && worldMap.getDungeons().length === 0);
 
         return {
             worldTime: this.context.getWorldTime(),
@@ -194,7 +198,40 @@ export class WorldRenderController {
                     turnCombatActive: this.context.isTurnCombatActive(),
                 }),
             },
+            storyInterior: {
+                active: storyInteriorActive,
+                dungeonId: storyInteriorActive ? activeDungeonId : null,
+                title: storyInteriorActive ? worldMap.getDisplayName() : '',
+                enemiesLeft: storyInteriorActive
+                    ? this.context.getFieldEnemies().filter((entry) => entry.enemy.stats.hp > 0).length
+                    : 0,
+            },
         };
+    }
+
+    private renderStoryInteriorBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel, uiW: number): void {
+        const bannerW = Math.min(440, Math.max(300, uiW - 40));
+        const x = Math.floor((uiW - bannerW) / 2);
+        const y = 14;
+        const h = 56;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(14, 12, 12, 0.88)';
+        ctx.fillRect(x, y, bannerW, h);
+        ctx.strokeStyle = 'rgba(184, 135, 74, 0.88)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 0.5, y + 0.5, bannerW - 1, h - 1);
+        ctx.fillStyle = '#f0d78a';
+        ctx.font = 'bold 14px "DOSMyungjo", serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(model.storyInterior.title, x + bannerW / 2, y + 8);
+        ctx.font = '12px sans-serif';
+        ctx.fillStyle = '#cdbb92';
+        ctx.fillText(t('story.interior.objective'), x + bannerW / 2, y + 27);
+        ctx.fillStyle = '#9fb4c8';
+        ctx.fillText(formatT('story.interior.enemyCount', { count: model.storyInterior.enemiesLeft }), x + bannerW / 2, y + 42);
+        ctx.restore();
     }
 
     private renderActionMenu(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {

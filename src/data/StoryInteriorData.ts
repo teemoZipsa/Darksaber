@@ -2,6 +2,22 @@ import type { TilePoint } from '../field/FieldPathing';
 import { TILE_PROPERTIES, TileType } from '../map/Tile';
 
 export type StoryInteriorTheme = 'castle' | 'volcano' | 'temple' | 'pyramid' | 'ament';
+export type StoryInteriorPropKind = 'torch' | 'crate' | 'banner' | 'sealedDoor' | 'throne' | 'bossSeal' | 'rubble';
+
+export interface StoryInteriorRoom {
+    id: string;
+    nameKey: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+export interface StoryInteriorProp {
+    kind: StoryInteriorPropKind;
+    tile: TilePoint;
+    labelKey?: string;
+}
 
 export interface StoryInteriorLayout {
     dungeonId: string;
@@ -13,6 +29,8 @@ export interface StoryInteriorLayout {
     playerStart: TilePoint;
     guardTiles: TilePoint[];
     bossTile: TilePoint;
+    rooms: StoryInteriorRoom[];
+    props: StoryInteriorProp[];
 }
 
 const BASE_WIDTH = 26;
@@ -32,6 +50,24 @@ const BASE_GUARD_TILES: TilePoint[] = [
     { x: 19, y: 10 },
 ];
 const BASE_BOSS_TILE: TilePoint = { x: 22, y: 8 };
+const BASE_ROOMS: StoryInteriorRoom[] = [
+    { id: 'entry', nameKey: 'story.interior.room.entryHall', x: 2, y: 6, width: 4, height: 5 },
+    { id: 'guardNorth', nameKey: 'story.interior.room.guardPost', x: 6, y: 3, width: 7, height: 4 },
+    { id: 'guardSouth', nameKey: 'story.interior.room.armory', x: 6, y: 10, width: 7, height: 4 },
+    { id: 'mainHall', nameKey: 'story.interior.room.mainHall', x: 6, y: 6, width: 9, height: 5 },
+    { id: 'bossRoom', nameKey: 'story.interior.room.bossRoom', x: 15, y: 4, width: 9, height: 9 },
+];
+const BASE_PROPS: StoryInteriorProp[] = [
+    { kind: 'torch', tile: { x: 3, y: 6 } },
+    { kind: 'torch', tile: { x: 3, y: 10 } },
+    { kind: 'crate', tile: { x: 6, y: 4 } },
+    { kind: 'crate', tile: { x: 6, y: 12 } },
+    { kind: 'banner', tile: { x: 10, y: 4 } },
+    { kind: 'banner', tile: { x: 10, y: 12 } },
+    { kind: 'sealedDoor', tile: { x: 15, y: 8 }, labelKey: 'story.interior.prop.sealedDoor' },
+    { kind: 'bossSeal', tile: { x: 22, y: 8 }, labelKey: 'story.interior.prop.bossSeal' },
+    { kind: 'throne', tile: { x: 23, y: 8 } },
+];
 
 function layout(dungeonId: string, theme: StoryInteriorTheme): StoryInteriorLayout {
     return {
@@ -44,6 +80,8 @@ function layout(dungeonId: string, theme: StoryInteriorTheme): StoryInteriorLayo
         playerStart: { ...BASE_PLAYER_START },
         guardTiles: BASE_GUARD_TILES.map((tile) => ({ ...tile })),
         bossTile: { ...BASE_BOSS_TILE },
+        rooms: BASE_ROOMS.map((room) => ({ ...room })),
+        props: BASE_PROPS.map((prop) => ({ ...prop, tile: { ...prop.tile } })),
     };
 }
 

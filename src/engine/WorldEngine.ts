@@ -1802,6 +1802,10 @@ export class WorldEngine {
             this.networkScenarioEnteredDungeonIds.add(dungeonId);
             const storyQuest = getStoryQuestByDungeonId(dungeonId);
             if (storyQuest) this.addCombatLog(t(storyQuest.enterLogKey));
+            const scenario = getStoryScenarioByDungeonId(dungeonId);
+            if (scenario && isStoryInteriorDungeon(dungeonId)) {
+                this.addCombatLog(formatT('story.interior.enterLog', { dungeon: scenario.dungeonNameKr }));
+            }
         }
 
         if (scenario.activeDungeonId) {
@@ -2329,6 +2333,9 @@ export class WorldEngine {
             kind: 'corpse',
         });
         lootMap.loot.push(loot);
+        if (storyInteriorBossReturn) {
+            this.addCombatLog(formatT('story.interior.rewardAtEntrance', { source: enemy.name }));
+        }
     }
 
     private submitNetworkMoveIntent(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean {
@@ -2442,11 +2449,16 @@ export class WorldEngine {
     ): void {
         this.raidSession.completeDungeonEncounter(dungeonId);
         if (options.clearEnemies ?? true) this.fieldEnemies = [];
+        const completedInterior = this.activeStoryInterior?.dungeonId === dungeonId ? this.activeStoryInterior : null;
         if (this.activeStoryInterior?.dungeonId === dungeonId) {
             this.exitActiveStoryInterior({ placePartyAtReturn: !this.isNetworkRaid });
         }
         this.selectionController.clear();
         this.clearFieldTurnState();
+        const scenario = getStoryScenarioByDungeonId(dungeonId);
+        if (completedInterior && scenario) {
+            this.addCombatLog(formatT('story.interior.returnLog', { dungeon: scenario.dungeonNameKr }));
+        }
         this.addCombatLog(t(storyQuest.objectiveCompleteLogKey));
     }
 

@@ -1,5 +1,5 @@
-import { formatT } from '../i18n/LanguageManager';
-import { getStoryInteriorTileAt, type StoryInteriorLayout } from '../data/StoryInteriorData';
+import { formatT, t } from '../i18n/LanguageManager';
+import { getStoryInteriorTileAt, type StoryInteriorLayout, type StoryInteriorProp } from '../data/StoryInteriorData';
 import { TILE_SIZE } from './Chunk';
 import { TILE_PROPERTIES, TileType } from './Tile';
 import { WorldMap, type TileBounds, type TilePoint, type WorldMapDecoration, type WorldMapLandmark, type WorldDungeonInfo } from './WorldMap';
@@ -157,6 +157,7 @@ export class StoryInteriorMap extends WorldMap {
         }
 
         this.renderRoomTrim(ctx, cameraX, cameraY);
+        this.renderInteriorProps(ctx, cameraX, cameraY);
         this.renderGate(ctx, cameraX, cameraY);
 
         for (const obj of this.loot) {
@@ -200,23 +201,118 @@ export class StoryInteriorMap extends WorldMap {
 
     private renderRoomTrim(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number): void {
         const colors = THEME_COLORS[this.layout.theme];
-        const rooms = [
-            { x: 2, y: 6, w: 22, h: 5 },
-            { x: 6, y: 3, w: 7, h: 4 },
-            { x: 6, y: 10, w: 7, h: 4 },
-            { x: 15, y: 4, w: 9, h: 9 },
-        ];
 
         ctx.save();
         ctx.strokeStyle = colors.accent;
         ctx.lineWidth = 2;
-        for (const room of rooms) {
-            ctx.strokeRect(
-                room.x * TILE_SIZE - cameraX + 3,
-                room.y * TILE_SIZE - cameraY + 3,
-                room.w * TILE_SIZE - 6,
-                room.h * TILE_SIZE - 6
-            );
+        for (const room of this.layout.rooms) {
+            const x = room.x * TILE_SIZE - cameraX;
+            const y = room.y * TILE_SIZE - cameraY;
+            const w = room.width * TILE_SIZE;
+            const h = room.height * TILE_SIZE;
+            ctx.strokeRect(x + 3, y + 3, w - 6, h - 6);
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillStyle = 'rgba(240, 215, 138, 0.82)';
+            const label = t(room.nameKey);
+            ctx.strokeText(label, x + w / 2, y + 7);
+            ctx.fillText(label, x + w / 2, y + 7);
+            ctx.strokeStyle = colors.accent;
+        }
+        ctx.restore();
+    }
+
+    private renderInteriorProps(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number): void {
+        for (const prop of this.layout.props) {
+            this.renderInteriorProp(ctx, prop, prop.tile.x * TILE_SIZE - cameraX, prop.tile.y * TILE_SIZE - cameraY);
+        }
+    }
+
+    private renderInteriorProp(ctx: CanvasRenderingContext2D, prop: StoryInteriorProp, sx: number, sy: number): void {
+        const colors = THEME_COLORS[this.layout.theme];
+        ctx.save();
+        switch (prop.kind) {
+            case 'torch': {
+                const pulse = 0.65 + Math.sin(Date.now() / 180 + prop.tile.x * 0.7) * 0.18;
+                ctx.fillStyle = `rgba(236, 128, 54, ${0.16 + pulse * 0.14})`;
+                ctx.beginPath();
+                ctx.arc(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2, TILE_SIZE * 0.58, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#3c2618';
+                ctx.fillRect(sx + 13, sy + 8, TILE_SIZE - 26, TILE_SIZE - 10);
+                ctx.fillStyle = colors.accent;
+                ctx.beginPath();
+                ctx.arc(sx + TILE_SIZE / 2, sy + 10, 5, 0, Math.PI * 2);
+                ctx.fill();
+                break;
+            }
+            case 'crate':
+                ctx.fillStyle = '#533826';
+                ctx.fillRect(sx + 5, sy + 8, TILE_SIZE - 10, TILE_SIZE - 12);
+                ctx.strokeStyle = '#9b7044';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(sx + 6, sy + 9, TILE_SIZE - 12, TILE_SIZE - 14);
+                ctx.beginPath();
+                ctx.moveTo(sx + 8, sy + TILE_SIZE - 8);
+                ctx.lineTo(sx + TILE_SIZE - 8, sy + 10);
+                ctx.stroke();
+                break;
+            case 'banner':
+                ctx.fillStyle = colors.accent;
+                ctx.fillRect(sx + 8, sy + 4, TILE_SIZE - 16, TILE_SIZE - 8);
+                ctx.fillStyle = 'rgba(40, 20, 20, 0.55)';
+                ctx.fillRect(sx + 11, sy + 8, TILE_SIZE - 22, TILE_SIZE - 16);
+                break;
+            case 'sealedDoor':
+                ctx.fillStyle = 'rgba(10, 8, 12, 0.74)';
+                ctx.fillRect(sx - 3, sy - 6, TILE_SIZE + 6, TILE_SIZE + 12);
+                ctx.strokeStyle = colors.accent;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(sx + 3, sy - 1, TILE_SIZE - 6, TILE_SIZE + 2);
+                ctx.fillStyle = 'rgba(255, 218, 142, 0.2)';
+                ctx.fillRect(sx + 10, sy + 7, TILE_SIZE - 20, TILE_SIZE - 14);
+                break;
+            case 'throne':
+                ctx.fillStyle = '#2c1c20';
+                ctx.fillRect(sx + 7, sy + 6, TILE_SIZE - 14, TILE_SIZE - 6);
+                ctx.fillStyle = colors.accent;
+                ctx.fillRect(sx + 9, sy + 4, TILE_SIZE - 18, 5);
+                ctx.fillRect(sx + 8, sy + TILE_SIZE - 8, TILE_SIZE - 16, 4);
+                break;
+            case 'bossSeal':
+                ctx.strokeStyle = colors.accent;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2, TILE_SIZE * 0.34, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(sx + TILE_SIZE / 2, sy + 7);
+                ctx.lineTo(sx + TILE_SIZE - 8, sy + TILE_SIZE - 9);
+                ctx.lineTo(sx + 8, sy + TILE_SIZE - 9);
+                ctx.closePath();
+                ctx.stroke();
+                break;
+            case 'rubble':
+                ctx.fillStyle = colors.wallInset;
+                ctx.fillRect(sx + 7, sy + 17, 9, 8);
+                ctx.fillRect(sx + 18, sy + 11, 8, 13);
+                ctx.fillRect(sx + 4, sy + 8, 7, 6);
+                break;
+        }
+
+        if (prop.labelKey) {
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillStyle = '#f1d58b';
+            const label = t(prop.labelKey);
+            ctx.strokeText(label, sx + TILE_SIZE / 2, sy - 2);
+            ctx.fillText(label, sx + TILE_SIZE / 2, sy - 2);
         }
         ctx.restore();
     }

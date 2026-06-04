@@ -302,6 +302,16 @@ export const i18n = {
             'story.interior.ament_2f.name': '아멘트 2층 내부',
             'story.interior.enterLog': '{dungeon} 내부 진입. 목표를 제압한 뒤 입구로 복귀합니다.',
             'story.interior.returnLog': '{dungeon} 입구로 복귀했습니다.',
+            'story.interior.rewardAtEntrance': '{source} 전리품이 입구에 남았습니다.',
+            'story.interior.objective': '목표: 보스 처치 후 입구 복귀',
+            'story.interior.enemyCount': '잔존 적 {count}',
+            'story.interior.room.entryHall': '성문 홀',
+            'story.interior.room.guardPost': '경비 초소',
+            'story.interior.room.armory': '무기고',
+            'story.interior.room.mainHall': '중앙 복도',
+            'story.interior.room.bossRoom': '보스 방',
+            'story.interior.prop.sealedDoor': '봉인문',
+            'story.interior.prop.bossSeal': '목표',
             
             // Shop
             'shop.title': '🏪 상점',
@@ -1064,6 +1074,16 @@ export const i18n = {
             'story.interior.ament_2f.name': 'Ament 2F Interior',
             'story.interior.enterLog': 'Entered {dungeon}. Defeat the objective, then return to the entrance.',
             'story.interior.returnLog': 'Returned to the entrance of {dungeon}.',
+            'story.interior.rewardAtEntrance': '{source} loot was left at the entrance.',
+            'story.interior.objective': 'Objective: defeat the boss, then return to the entrance',
+            'story.interior.enemyCount': 'Enemies left {count}',
+            'story.interior.room.entryHall': 'Gate Hall',
+            'story.interior.room.guardPost': 'Guard Post',
+            'story.interior.room.armory': 'Armory',
+            'story.interior.room.mainHall': 'Main Hall',
+            'story.interior.room.bossRoom': 'Boss Room',
+            'story.interior.prop.sealedDoor': 'Seal',
+            'story.interior.prop.bossSeal': 'Target',
             
             // Shop
             'shop.title': '🏪 Merchant',

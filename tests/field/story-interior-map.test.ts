@@ -11,6 +11,10 @@ test('solo interior layouts expose walkable entry, player, guard, and boss tiles
         assert.equal(getStoryInteriorTileAt(layout, layout.entryTile.x, layout.entryTile.y), TileType.DUNGEON_ENTRANCE);
         assert.notEqual(getStoryInteriorTileAt(layout, layout.playerStart.x, layout.playerStart.y), TileType.WALL);
         assert.notEqual(getStoryInteriorTileAt(layout, layout.bossTile.x, layout.bossTile.y), TileType.WALL);
+        assert.ok(layout.rooms.some((room) => room.id === 'entry'));
+        assert.ok(layout.rooms.some((room) => room.id === 'bossRoom'));
+        assert.ok(layout.props.some((prop) => prop.kind === 'sealedDoor'));
+        assert.ok(layout.props.some((prop) => prop.kind === 'bossSeal'));
         for (const tile of layout.guardTiles) {
             assert.notEqual(getStoryInteriorTileAt(layout, tile.x, tile.y), TileType.WALL);
         }
