@@ -1,4 +1,5 @@
 import type { SkillElement } from '../data/SkillDB';
+import { formatT, t } from '../i18n/LanguageManager';
 import { TileType, TILE_PROPERTIES } from '../map/Tile';
 import { MOVE_AP_PER_TILE } from './FieldActionEconomy';
 
@@ -233,19 +234,20 @@ export function describeTerrainForHover(tile: TileType, traits: TerrainActorTrai
     const profile = getTerrainProfile(tile);
     const props = TILE_PROPERTIES[tile];
     const moveCost = getTerrainMoveCost(tile, traits);
-    const lines = [`${props.label} | 이동 ${Number.isFinite(moveCost) ? moveCost : '불가'}`];
+    const moveLabel = Number.isFinite(moveCost) ? moveCost : t('terrain.impassable');
+    const lines = [`${t(props.labelKey)} | ${t('terrain.move')} ${moveLabel}`];
 
     const defenseMultiplier = getTerrainDefenseMultiplier(tile, traits);
     const defenseReduction = Math.round((1 - defenseMultiplier) * 100);
-    if (defenseReduction > 0) lines.push(`방어 피해 -${defenseReduction}%`);
-    if (profile.rangedHitPenalty < 0) lines.push(`원거리 명중 ${profile.rangedHitPenalty}`);
-    if (profile.blocksLineOfSight) lines.push('시야 차단');
+    if (defenseReduction > 0) lines.push(formatT('terrain.defenseDamage', { percent: defenseReduction }));
+    if (profile.rangedHitPenalty < 0) lines.push(formatT('terrain.rangedHit', { value: profile.rangedHitPenalty }));
+    if (profile.blocksLineOfSight) lines.push(t('terrain.blocksSight'));
 
     const magicHints = Object.entries(profile.targetMagic)
         .filter(([, value]) => value !== undefined && value !== 1)
         .slice(0, 3)
-        .map(([element, value]) => `${element} ${value! > 1 ? '+' : '-'}${Math.round(Math.abs(value! - 1) * 100)}%`);
-    if (magicHints.length > 0) lines.push(`마법 ${magicHints.join(' ')}`);
+        .map(([element, value]) => `${t(`magic.element.${element}`)} ${value! > 1 ? '+' : '-'}${Math.round(Math.abs(value! - 1) * 100)}%`);
+    if (magicHints.length > 0) lines.push(`${t('terrain.magic')} ${magicHints.join(' ')}`);
     return lines;
 }
 

@@ -10,6 +10,7 @@ import type { WorldRenderModel } from './WorldRenderModel';
 import { tileKey } from '../../field/FieldPathing';
 import { getSkillIconCell } from '../../ui/DarksaberIconRegistry';
 import { DarksaberSpriteAtlas } from '../../ui/DarksaberSpriteAtlas';
+import { formatT, t } from '../../i18n/LanguageManager';
 
 const PARTY_ACTOR_IMAGE_RENDER_SCALE = 1.12;
 
@@ -300,19 +301,25 @@ export class WorldFieldRenderer {
             ctx.fillStyle = '#1f4878';
             ctx.fillText(`MP ${active.stats.mp}/${effective.maxMp}`, RIGHT_X, charY + 56);
             ctx.fillStyle = '#7a4c10';
-            ctx.fillText(`ATB ${Math.floor(model.player.actionGauge)}%`, TEXT_X, charY + 76);
+            ctx.fillText(formatT('ui.actionGaugeValue', { value: Math.floor(model.player.actionGauge) }), TEXT_X, charY + 76);
             const actionText = model.controlledActor?.id === model.activeTurnActorId && model.remainingActionPoints > 0
-                ? '행동 가능'
+                ? t('field.action.ready')
                 : model.player.actionGauge >= 100
-                    ? '대기 중'
-                    : '충전 중';
+                    ? t('field.action.waiting')
+                    : t('field.action.charging');
             ctx.fillStyle = '#5c3a08';
             ctx.fillText(actionText, RIGHT_X, charY + 76);
             if (model.controlledActor?.id === model.activeTurnActorId) {
                 ctx.fillStyle = model.remainingActionPoints > 0 ? '#3f6f38' : '#8f2f3d';
-                ctx.fillText(model.remainingActionPoints > 0 ? `남은 ${Math.floor(model.remainingActionPoints)}%` : '행동 완료', TEXT_X, charY + 94);
+                ctx.fillText(
+                    model.remainingActionPoints > 0
+                        ? formatT('field.action.remaining', { value: Math.floor(model.remainingActionPoints) })
+                        : t('field.action.done'),
+                    TEXT_X,
+                    charY + 94
+                );
                 ctx.fillStyle = Parchment.textMid;
-                ctx.fillText('부분 소모', RIGHT_X, charY + 94);
+                ctx.fillText(t('field.action.partial'), RIGHT_X, charY + 94);
             }
         }
 
@@ -612,17 +619,24 @@ function renderKeyHintStrip(ctx: CanvasRenderingContext2D, vw: number, vh: numbe
 
 function renderActionModeHint(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number, vh: number): void {
     if (model.fieldMagicState.mode === 'targeting') {
-        renderCenterHint(ctx, vw, vh, '마법 대상을 클릭 - ATB -30% (ESC 취소)', 'rgba(116, 52, 160, 0.88)', '#f2d6ff');
+        renderCenterHint(
+            ctx,
+            vw,
+            vh,
+            formatT('field.hint.magicTarget', { cost: formatT('ui.actionGaugeCost', { cost: 30 }) }),
+            'rgba(116, 52, 160, 0.88)',
+            '#f2d6ff'
+        );
         return;
     }
 
     if (!model.actionMode) return;
 
     const text = model.actionMode === 'move'
-        ? '이동할 타일을 클릭 - ATB -20% (ESC 취소)'
+        ? formatT('field.hint.moveTarget', { cost: formatT('ui.actionGaugeCost', { cost: 20 }) })
         : model.actionMode === 'attack'
-            ? '공격할 적을 클릭 - ATB -25% (ESC 취소)'
-            : '조사할 대상을 클릭 - ATB -15% (ESC 취소)';
+            ? formatT('field.hint.attackTarget', { cost: formatT('ui.actionGaugeCost', { cost: 25 }) })
+            : formatT('field.hint.interactTarget', { cost: formatT('ui.actionGaugeCost', { cost: 15 }) });
     const bg = model.actionMode === 'attack'
         ? 'rgba(116, 28, 28, 0.9)'
         : model.actionMode === 'interact'

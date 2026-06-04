@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { formatRaidTime, getCombatLogColor, getEnemyRoleLabel, getTacticalMarkerColor } from '../../src/field/FieldDisplay';
+import { describeTerrainForHover } from '../../src/field/TerrainRules';
+import { i18n, type Language } from '../../src/i18n/LanguageManager';
+import { TileType } from '../../src/map/Tile';
 import type { TacticalMarker } from '../../src/field/TacticalMarkers';
 
 test('field display formats raid time as floored mm:ss', () => {
@@ -29,4 +32,25 @@ test('field display colors tactical markers by target priority', () => {
 
     assert.equal(getTacticalMarkerColor(marker), 'rgba(255, 78, 78, 0.95)');
     assert.equal(getTacticalMarkerColor({ ...marker, kind: 'rally', targetKind: 'ground' }), 'rgba(80, 255, 160, 0.95)');
+});
+
+test('terrain hover labels follow the active language', () => {
+    const previousLang: Language = i18n.lang;
+    try {
+        i18n.lang = 'ko';
+        const grassKo = describeTerrainForHover(TileType.GRASS).join(' ');
+        assert.match(grassKo, /잔디/);
+        assert.doesNotMatch(grassKo, /Grass/);
+
+        const forestKo = describeTerrainForHover(TileType.FOREST).join(' ');
+        assert.match(forestKo, /마법 화 \+20% 풍 \+10% 지 \+10%/);
+        assert.doesNotMatch(forestKo, /fire|wind|earth/);
+
+        i18n.lang = 'en';
+        const forestEn = describeTerrainForHover(TileType.FOREST).join(' ');
+        assert.match(forestEn, /Forest/);
+        assert.match(forestEn, /Magic Fir \+20% Wnd \+10% Ear \+10%/);
+    } finally {
+        i18n.lang = previousLang;
+    }
 });

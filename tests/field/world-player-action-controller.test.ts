@@ -149,7 +149,7 @@ test('turn action states always expose tool with disabled reasons', () => {
     assert.equal(lowApController.getAvailableTurnActions(actor).includes('tool'), false);
     assert.equal(noToolController.getAvailableTurnActions(actor).includes('tool'), false);
     assert.equal(readyController.getAvailableTurnActions(actor).includes('tool'), true);
-    assert.equal(lowApController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.disabledReason, 'ATB 부족');
+    assert.equal(lowApController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.disabledReason, '행동력 부족');
     assert.equal(noToolController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.disabledReason, '회복 도구 없음');
     assert.equal(noEffectController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.disabledReason, '회복 효과 없음');
     assert.equal(readyController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.enabled, true);
@@ -171,7 +171,7 @@ test('partial ATB keeps attack, magic, tool, and movement available when costs c
     assert.equal(states.find((state) => state.type === 'magic')?.enabled, true);
     assert.equal(states.find((state) => state.type === 'tool')?.enabled, true);
     assert.equal(states.find((state) => state.type === 'move')?.enabled, true);
-    assert.equal(states.find((state) => state.type === 'attack')?.costLabel, 'ATB -25%');
+    assert.equal(states.find((state) => state.type === 'attack')?.costLabel, '행동력 -25%');
 });
 
 test('defend applies guard and the integrated counter readiness', () => {

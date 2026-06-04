@@ -29,6 +29,7 @@ import {
     type FieldApAction,
 } from '../../field/FieldActionEconomy';
 import { getSelectableTiles, type AttackPatternProfile, type PatternContext } from '../../field/TargetPatterns';
+import { formatT, t } from '../../i18n/LanguageManager';
 import { normalizeLegacyActionType, type ActionMenuSlotState, type ActionType } from '../../ui/ActionMenuUI';
 import type { resolveFieldHit } from '../../field/FieldInteraction';
 
@@ -159,7 +160,7 @@ export class WorldPlayerActionController {
             case 'attack':
                 this.actionMode = 'attack';
                 this.actionTiles = this.getFilteredActionTiles('attack', actor, this.computeAttackableTiles(actor));
-                this.sink.log(`공격할 적을 클릭하세요. ATB -${ATTACK_ACTION_GAUGE_COST}%`);
+                this.sink.log(formatT('field.log.attackPrompt', { cost: this.costLabel(ATTACK_ACTION_GAUGE_COST) }));
                 break;
             case 'magic':
                 this.context.closeTacticalMenu();
@@ -334,19 +335,19 @@ export class WorldPlayerActionController {
                     entry.enemy.stats.hp > 0 && this.context.getActorAttackTargetFailure(actor, entry.enemy) === null
                 );
                 return this.buildState(type, remainingAp >= ATTACK_ACTION_GAUGE_COST && targetAvailable,
-                    remainingAp < ATTACK_ACTION_GAUGE_COST ? 'ATB 부족' : '공격 가능한 적 없음',
+                    remainingAp < ATTACK_ACTION_GAUGE_COST ? t('ui.actionGaugeLow') : '공격 가능한 적 없음',
                     this.costLabel(ATTACK_ACTION_GAUGE_COST));
             }
             case 'magic':
                 return this.buildState(type, !hasStatus(actor.character.statuses, 'silence') && remainingAp >= MAGIC_ACTION_GAUGE_COST && this.context.hasCastableFieldSkill(actor),
                     hasStatus(actor.character.statuses, 'silence') ? '침묵 상태'
-                        : remainingAp < MAGIC_ACTION_GAUGE_COST ? 'ATB 부족'
+                        : remainingAp < MAGIC_ACTION_GAUGE_COST ? t('ui.actionGaugeLow')
                             : '사용 가능한 마법 없음',
                     this.costLabel(MAGIC_ACTION_GAUGE_COST));
             case 'tool': {
                 const tool = this.context.getCombatToolAvailability(actor);
                 return this.buildState(type, remainingAp >= TOOL_ACTION_GAUGE_COST && tool.hasEffectiveRecovery,
-                    remainingAp < TOOL_ACTION_GAUGE_COST ? 'ATB 부족'
+                    remainingAp < TOOL_ACTION_GAUGE_COST ? t('ui.actionGaugeLow')
                         : !tool.hasRecoveryConsumable ? '회복 도구 없음'
                             : '회복 효과 없음',
                     this.costLabel(TOOL_ACTION_GAUGE_COST));
@@ -354,17 +355,17 @@ export class WorldPlayerActionController {
             case 'move':
                 return this.buildState(type, this.hasExecutableMove(actor),
                     hasStatus(actor.character.statuses, 'immobilize') ? '이동불가 상태'
-                        : remainingAp < MOVE_ACTION_GAUGE_COST ? 'ATB 부족'
+                        : remainingAp < MOVE_ACTION_GAUGE_COST ? t('ui.actionGaugeLow')
                             : '이동할 타일 없음',
                     this.costLabel(MOVE_ACTION_GAUGE_COST));
             case 'open':
                 return this.buildState(type, this.hasExecutableInteract(actor),
-                    remainingAp < INTERACT_ACTION_GAUGE_COST ? 'ATB 부족' : '조사 대상 없음',
+                    remainingAp < INTERACT_ACTION_GAUGE_COST ? t('ui.actionGaugeLow') : '조사 대상 없음',
                     this.costLabel(INTERACT_ACTION_GAUGE_COST));
             case 'defend':
-                return this.buildState(type, remainingAp >= DEFEND_ACTION_GAUGE_COST, 'ATB 부족', this.costLabel(DEFEND_ACTION_GAUGE_COST));
+                return this.buildState(type, remainingAp >= DEFEND_ACTION_GAUGE_COST, t('ui.actionGaugeLow'), this.costLabel(DEFEND_ACTION_GAUGE_COST));
             case 'rest':
-                return this.buildState(type, remainingAp >= REST_ACTION_GAUGE_COST, 'ATB 부족', this.costLabel(REST_ACTION_GAUGE_COST));
+                return this.buildState(type, remainingAp >= REST_ACTION_GAUGE_COST, t('ui.actionGaugeLow'), this.costLabel(REST_ACTION_GAUGE_COST));
             case 'fanfare':
                 return this.buildState(type, false, '다음 업데이트 예정', '');
         }
@@ -539,7 +540,7 @@ export class WorldPlayerActionController {
     }
 
     private costLabel(cost: number): string {
-        return `ATB -${cost}%`;
+        return formatT('ui.actionGaugeCost', { cost });
     }
 
     private actorTile(actor: FieldActor): TilePoint {

@@ -20,7 +20,7 @@ import { rollBossRune } from '../data/SocketLoot';
 import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
 import { normalizeLoadout } from '../magic/MagicLoadout';
 import { getClassAttackProfile } from '../data/AttackPatternProfiles';
-import { t } from '../i18n/LanguageManager';
+import { formatT, t } from '../i18n/LanguageManager';
 import {
     MONSTER_ROW_BY_FACING,
     MONSTER_SPRITE_PATH,
@@ -2674,7 +2674,11 @@ export class WorldEngine {
             return;
         }
         this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'READY');
-        this.addCombatLog(`${actor.character.name} 턴 시작: ATB ${this.remainingActionPoints}%`);
+        this.addCombatLog(formatT('field.log.turnStart', {
+            name: actor.character.name,
+            gauge: t('ui.actionGauge'),
+            value: this.remainingActionPoints,
+        }));
         if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
         else {
             this.closeTacticalMenu();
