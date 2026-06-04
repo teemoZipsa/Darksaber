@@ -24,9 +24,10 @@
 ## 현재 후속 점검
 
 - [x] 필드 비어그로 몬스터가 ATB를 충전한 뒤 행동 없이 즉시 초기화하는 문제 수정. 비어그로 몬스터는 ATB 0을 유지하고, 어그로가 시작된 몬스터만 ready 턴에 들어간다.
-- [ ] 실제 레이드 화면에서 어그로 진입 후 몬스터 추격/공격 동선 브라우저 확인.
+- [x] 실제 레이드 화면에서 어그로 진입 후 몬스터 추격/공격 동선 브라우저 확인.
   - 진행: `tests/field/world-enemy-turn-controller.test.ts`에 어그로 상태 적이 사거리 밖에서는 추격하고 인접 후 1회 공격하는 회귀 테스트를 추가.
-  - 진행: Browser에서 `devStart=raid` 레이드 자동 진입과 월드 인벤토리 오버레이를 확인. 실제 몬스터 조우 화면에서 추격/공격이 보이는 수동 검증은 남김.
+  - 진행: Browser에서 `devStart=raid` 레이드 자동 진입과 월드 인벤토리 오버레이를 확인.
+  - 완료: `devStart=raid&devScenario=aggro` 실제 레이드 화면에서 어그로 적의 추격 후 강제 인접 공격 로그/상태 배지 확인.
 
 ---
 
@@ -34,7 +35,8 @@
 
 - 완료: DEV 전용 시작 링크 추가. 개발 모드 기본 화면에서 Town/Raid/Tutorial 링크로 바로 진입 가능.
 - 완료: `devStart=town`은 튜토리얼을 건너뛰고 마을로 진입, `devStart=raid`는 마을 출격 경로를 통해 레이드에 자동 진입, `devStart=tutorial`은 캐릭터 생성 없이 튜토리얼 대련장으로 진입.
-- 완료: `npm run dev:town`, `npm run dev:raid`, `npm run dev:tutorial` 스크립트 추가.
+- 완료: `npm run dev:town`, `npm run dev:raid`, `npm run dev:raid:aggro`, `npm run dev:raid:loot`, `npm run dev:tutorial` 스크립트 추가.
+- 완료: `devStart=raid&devScenario=loot` / `npm run dev:raid:loot`로 실제 레이드 전리품 DOM 패널을 열고 포인터 검증할 수 있는 DEV 시나리오 추가.
 - 완료: 데이터 기반 UI 키를 `tests/raid/i18n-guards.test.ts`에서 ko/en 양쪽 검증하도록 보강하고 누락된 `inv.accessory2` 키 추가.
 - 완료: 작은 화면에서 인벤토리 패널이 화면 밖으로 밀리지 않도록 폭 제한, 컬럼 고정, 가로 스크롤, 줄바꿈 CSS 보강.
 
@@ -50,7 +52,7 @@
 - 완료: 소켓 아이템(◇ 표시) 위에 젬 드롭 시 소켓 삽입 확인 (`◇` → `◆`).
 - 완료: **클릭(드래그X)** = 퀵트랜스퍼 (배낭→창고, 창고→배낭, 장비→배낭).
 - 완료: 레이드 전리품 모델 경로(`moveToCell`/`quickMove`/`takeAll`)가 `onRaidLootSecured`를 호출하는지 `tests/raid/core.test.ts`로 보강.
-- 참고: 실제 레이드 화면에서 전리품 생성 후 마우스 드롭까지의 end-to-end 재현은 별도 전투/상자 조건이 필요해 이번 브라우저 검증에서는 모델 콜백 테스트로 대체.
+- 완료: `devStart=raid&devScenario=loot` 실제 레이드 화면에서 전리품 DOM 패널을 열고 Browser 포인터 드래그로 전리품을 배낭에 드롭. 외부 전리품 1→0, 배낭 4→5, DEV 상태 `picked:dev_raid_loot:0,0` 확인.
 드롭 위치는 커서 아래 셀이 아이템의 **좌상단**.
 
 검토 메모:
@@ -90,7 +92,7 @@
 ## 검증 명령
 - 타입체크: `npx tsc --noEmit` (반드시 통과).
 - 개발 서버: `npm run dev` → http://127.0.0.1:5731 (프리뷰 도구는 `.claude/launch.json`의 5742).
-- 개발자 바로 시작: `npm run dev:town`, `npm run dev:raid`, `npm run dev:tutorial`.
+- 개발자 바로 시작: `npm run dev:town`, `npm run dev:raid`, `npm run dev:raid:aggro`, `npm run dev:raid:loot`, `npm run dev:tutorial`.
 - 테스트: `npm test`.
 
 ## 알려진 함정

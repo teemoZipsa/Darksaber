@@ -53,6 +53,12 @@ process.on('SIGTERM', () => {
 process.on('exit', shutdown);
 
 const mode = process.argv[2] === 'raid' ? 'raid' : 'town';
+const scenario = process.argv[3] === 'aggro' || process.argv[3] === 'loot'
+    ? process.argv[3]
+    : null;
+const openPath = scenario
+    ? `/?devStart=${mode}&devScenario=${scenario}`
+    : `/?devStart=${mode}`;
 
 run('world', ['run', 'server']);
-run('vite', ['run', 'dev', '--', '--open', `/?devStart=${mode}`]);
+run('vite', ['run', 'dev', '--', '--open', openPath]);
