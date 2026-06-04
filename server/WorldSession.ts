@@ -37,6 +37,11 @@ import {
 } from '../src/data/MonsterCatalog';
 import { getStoryQuestByDungeonId } from '../src/data/StoryQuestData';
 import { getStoryScenarioByDungeonId, type StoryScenarioDefinition, type StoryScenarioMissionKind } from '../src/data/StoryScenarioData';
+import {
+    getStoryInteriorLayout,
+    getStoryInteriorTileAt,
+    type StoryInteriorLayout,
+} from '../src/data/StoryInteriorData';
 import { CHUNK_TILES, nestMemberOffsets, pickNestForChunk, type FieldNest, type FieldNestState } from '../src/field/SpawnResolver';
 import { Enemy } from '../src/entity/Enemy';
 import { LootObject } from '../src/entity/LootObject';
@@ -172,6 +177,7 @@ interface ServerScenarioState {
     playerId: string;
     dungeonId: string;
     missionKind: StoryScenarioMissionKind;
+    returnTile: TilePoint | null;
     enemyIds: string[];
     objectiveEnemyId: string | null;
     completed: boolean;
@@ -687,8 +693,8 @@ export class WorldSession {
         const pathResult = findPathWithCost(
             actor.tile,
             tile,
-            (query) => this.isFieldPassable(query),
-            (step) => getTerrainMoveCost(this.worldMap.getTileAt(step.x, step.y)),
+            (query) => this.isFieldPassableForOwner(query, actor.ownerPlayerId),
+            (step) => getTerrainMoveCost(this.getServerTileAt(step, actor.ownerPlayerId)),
             {
                 actorId: actor.id,
                 intent: 'move',
@@ -753,7 +759,7 @@ export class WorldSession {
         const range = getClassLine(actor.classLineId)?.attackRange ?? 1;
         const targetTile = { x: target.enemy.gridX, y: target.enemy.gridY };
         if (manhattan(actor.tile, targetTile) > range) return reject(intentId, 'Target is out of range.');
-        if (range > 1 && !this.hasFieldLineOfSight(actor.tile, targetTile)) return reject(intentId, 'Line of sight is blocked.');
+        if (range > 1 && !this.hasFieldLineOfSight(actor.tile, targetTile, actor.ownerPlayerId)) return reject(intentId, 'Line of sight is blocked.');
 
         this.spendActorGauge(actor, ATTACK_AP_COST);
         actor.facing = directionFromTo(actor.tile, targetTile);
@@ -855,7 +861,7 @@ export class WorldSession {
                 casterTile: actor.tile,
                 targetEnemies,
                 targetEnemy: target?.enemy,
-                getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
+                getTileAt: (tile) => this.getServerTileAt(tile, actor.ownerPlayerId),
             }),
         });
 
@@ -990,11 +996,14 @@ export class WorldSession {
         if (!dungeon || dungeon.id !== dungeonId) return reject(message.intentId, 'Actor is not at the requested scenario entrance.');
         if (this.hasNearbyAggroEnemy(actor!.tile, 18, playerId)) return reject(message.intentId, 'Nearby combat must be resolved before entering a scenario.');
 
+        const interiorLayout = getStoryInteriorLayout(dungeonId);
+        const returnTile = interiorLayout ? { ...actor!.tile } : null;
         this.removeScenarioRuntimeForPlayer(playerId);
         player!.enteredDungeonIds.add(dungeonId);
         player!.activeDungeonId = dungeonId;
+        if (interiorLayout) this.placePlayerActorsInScenarioInterior(player!, interiorLayout);
 
-        const state = this.spawnScenarioEncounter(player!, scenario, actor!.tile, now);
+        const state = this.spawnScenarioEncounter(player!, scenario, interiorLayout?.playerStart ?? actor!.tile, now, returnTile);
         this.scenarioStates.set(playerId, state);
         if (!state.objectiveEnemyId) this.completeScenarioObjective(player!, dungeonId, { clearEnemies: false });
 
@@ -1093,7 +1102,7 @@ export class WorldSession {
         const result = CombatFormulas.calcPhysicalDamage(
             getEffectiveStats(actor.stats, actor.statuses),
             getEffectiveStatsForEnemy(enemy),
-            this.worldMap.getTileAt(enemy.gridX, enemy.gridY),
+            this.getServerTileAt({ x: enemy.gridX, y: enemy.gridY }, actor.ownerPlayerId),
             { isRanged: manhattan(actor.tile, { x: enemy.gridX, y: enemy.gridY }) > 1 }
         );
         const event: CombatEventMessage = {
@@ -1121,6 +1130,10 @@ export class WorldSession {
 
     private completeEnemyKill(actor: ServerActor, target: ServerEnemy, now: number): AutoLootGrantMessage | undefined {
         const enemy = target.enemy;
+        const scenarioState = target.scenarioPlayerId ? this.scenarioStates.get(target.scenarioPlayerId) : undefined;
+        const scenarioBossLootTile = target.scenarioObjective && scenarioState?.returnTile
+            ? { ...scenarioState.returnTile }
+            : null;
         this.enemies.delete(enemy.id);
         if (target.nestKey) this.markNestEnemyKilled(target.nestKey, enemy.id, now);
         if (target.scenarioPlayerId && target.scenarioDungeonId) this.markScenarioEnemyKilled(target, enemy.id);
@@ -1129,7 +1142,7 @@ export class WorldSession {
         const autoLootGrant = enemy.isBoss
             ? undefined
             : this.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
-        if (enemy.isBoss || !autoLootGrant) this.spawnEnemyLoot(enemy);
+        if (enemy.isBoss || !autoLootGrant) this.spawnEnemyLoot(enemy, scenarioBossLootTile ?? undefined);
         return autoLootGrant;
     }
 
@@ -1184,12 +1197,15 @@ export class WorldSession {
             self: toEnemyAIUnit(enemy),
             targets: targets.map((actor) => toActorAIUnit(actor)),
             allies: [...this.enemies.values()]
+                .filter((candidate) => entry.scenarioPlayerId
+                    ? candidate.scenarioPlayerId === entry.scenarioPlayerId
+                    : !candidate.scenarioPlayerId)
                 .map((candidate) => candidate.enemy)
                 .filter((candidate) => candidate.stats.hp > 0)
                 .map((candidate) => toEnemyAIUnit(candidate)),
             profile: enemy.aiProfile,
             turnCount: enemy.aiMemory.turnCount,
-            hasLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to),
+            hasLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to, entry.scenarioPlayerId),
         });
         return this.executeEnemyDecision(entry, decision);
     }
@@ -1258,7 +1274,7 @@ export class WorldSession {
         const result = CombatFormulas.calcPhysicalDamage(
             getEffectiveStatsForEnemy(enemy),
             getEffectiveStats(actor.stats, actor.statuses),
-            this.worldMap.getTileAt(actor.tile.x, actor.tile.y),
+            this.getServerTileAt(actor.tile, actor.ownerPlayerId),
             { isRanged: range > 1 }
         );
         enemy.facing = directionFromTo({ x: enemy.gridX, y: enemy.gridY }, actor.tile);
@@ -1352,7 +1368,7 @@ export class WorldSession {
     private canEnemyAttack(enemy: Enemy, actor: ServerActor, range: number): boolean {
         const enemyTile = { x: enemy.gridX, y: enemy.gridY };
         if (manhattan(enemyTile, actor.tile) > range) return false;
-        return range <= 1 || this.hasFieldLineOfSight(enemyTile, actor.tile);
+        return range <= 1 || this.hasFieldLineOfSight(enemyTile, actor.tile, actor.ownerPlayerId);
     }
 
     private enemyStepToward(entry: ServerEnemy, actor: ServerActor, desiredRange: number): void {
@@ -1410,7 +1426,7 @@ export class WorldSession {
     private isFieldPassableForOwner(query: FieldPassableQuery, ownerPlayerId?: string): boolean {
         const queryOwnerPlayerId = ownerPlayerId ?? this.getEntityOwnerPlayerId(query.actorId);
         const queryScenarioPlayerId = ownerPlayerId ?? this.getScenarioOwnerPlayerId(query.actorId);
-        const tile = this.worldMap.getTileAt(query.x, query.y);
+        const tile = this.getServerTileAt(query, queryScenarioPlayerId ?? queryOwnerPlayerId ?? undefined);
         if (!isTerrainPassable(tile)) return false;
         for (const actor of this.actors.values()) {
             if (actor.id === query.actorId || actor.isDead) continue;
@@ -1429,6 +1445,22 @@ export class WorldSession {
         return true;
     }
 
+    private getServerTileAt(tile: TilePoint, ownerPlayerId?: string | null): ReturnType<WorldMap['getTileAt']> {
+        const layout = this.getActiveInteriorLayoutForOwner(ownerPlayerId);
+        return layout ? getStoryInteriorTileAt(layout, tile.x, tile.y) : this.worldMap.getTileAt(tile.x, tile.y);
+    }
+
+    private getServerBoundsForOwner(ownerPlayerId?: string | null): ReturnType<WorldMap['getBoundsTiles']> {
+        const layout = this.getActiveInteriorLayoutForOwner(ownerPlayerId);
+        return layout ? { width: layout.width, height: layout.height } : this.worldMap.getBoundsTiles();
+    }
+
+    private getActiveInteriorLayoutForOwner(ownerPlayerId?: string | null): StoryInteriorLayout | null {
+        if (!ownerPlayerId) return null;
+        const player = this.players.get(ownerPlayerId);
+        return player?.activeDungeonId ? getStoryInteriorLayout(player.activeDungeonId) : null;
+    }
+
     private getEntityOwnerPlayerId(entityId?: string): string | null {
         if (!entityId) return null;
         const actor = this.actors.get(entityId);
@@ -1441,18 +1473,18 @@ export class WorldSession {
         return this.enemies.get(entityId)?.scenarioPlayerId ?? null;
     }
 
-    private hasFieldLineOfSight(from: TilePoint, to: TilePoint): boolean {
-        return hasLineOfSight(from, to, (tile) => isTerrainLineOfSightBlocking(this.worldMap.getTileAt(tile.x, tile.y)));
+    private hasFieldLineOfSight(from: TilePoint, to: TilePoint, ownerPlayerId?: string): boolean {
+        return hasLineOfSight(from, to, (tile) => isTerrainLineOfSightBlocking(this.getServerTileAt(tile, ownerPlayerId)));
     }
 
     private getSkillPatternContext(actor: ServerActor, selectedTile?: TilePoint) {
-        const bounds = this.worldMap.getBoundsTiles();
+        const bounds = this.getServerBoundsForOwner(actor.ownerPlayerId);
         return {
             casterTile: actor.tile,
             selectedTile,
             isInsideMap: (tile: TilePoint) => tile.x >= 0 && tile.y >= 0 && tile.x < bounds.width && tile.y < bounds.height,
-            isBlockingTile: (tile: TilePoint) => isTerrainLineOfSightBlocking(this.worldMap.getTileAt(tile.x, tile.y)),
-            hasLineOfSight: (from: TilePoint, to: TilePoint) => this.hasFieldLineOfSight(from, to),
+            isBlockingTile: (tile: TilePoint) => isTerrainLineOfSightBlocking(this.getServerTileAt(tile, actor.ownerPlayerId)),
+            hasLineOfSight: (from: TilePoint, to: TilePoint) => this.hasFieldLineOfSight(from, to, actor.ownerPlayerId),
         };
     }
 
@@ -1472,27 +1504,59 @@ export class WorldSession {
         actor.actionGauge = actor.remainingAp;
     }
 
+    private placePlayerActorsInScenarioInterior(player: ServerPlayer, layout: StoryInteriorLayout): void {
+        player.actorIds.forEach((actorId, index) => {
+            const actor = this.actors.get(actorId);
+            if (!actor) return;
+            const offset = formationOffset(index);
+            const tile = this.findNearbyWalkableTile({
+                x: layout.playerStart.x + offset.x,
+                y: layout.playerStart.y + offset.y,
+            }, actor.id, player.id);
+            actor.tile = tile;
+            actor.facing = 'right';
+        });
+    }
+
+    private returnPlayerActorsFromScenarioInterior(player: ServerPlayer, returnTile: TilePoint): void {
+        player.actorIds.forEach((actorId, index) => {
+            const actor = this.actors.get(actorId);
+            if (!actor) return;
+            const offset = formationOffset(index);
+            const tile = this.findNearbyWalkableTile({
+                x: returnTile.x + offset.x,
+                y: returnTile.y + offset.y,
+            }, actor.id);
+            actor.tile = tile;
+            actor.facing = 'down';
+        });
+    }
+
     private spawnScenarioEncounter(
         player: ServerPlayer,
         scenario: StoryScenarioDefinition,
         anchor: TilePoint,
-        now: number
+        now: number,
+        returnTile: TilePoint | null = null
     ): ServerScenarioState {
         const state: ServerScenarioState = {
             playerId: player.id,
             dungeonId: scenario.dungeonId,
             missionKind: scenario.missionKind,
+            returnTile: returnTile ? { ...returnTile } : null,
             enemyIds: [],
             objectiveEnemyId: null,
             completed: false,
         };
         const layout = getStoryScenarioMonsterLayout(scenario);
+        const interiorLayout = getStoryInteriorLayout(scenario.dungeonId);
         const guardOffsets = layout.guardOffsets ?? storyScenarioGuardOffsets(scenario.guardCount, Boolean(scenario.bossName));
 
         for (let index = 0; index < scenario.guardCount; index++) {
             const monsterId = layout.guardMonsterIds[index % layout.guardMonsterIds.length];
             const definition = getMonsterDefinition(monsterId);
             const offset = guardOffsets[index] ?? { x: index % 2 === 0 ? 2 : -2, y: Math.floor(index / 2) + 1 };
+            const tile = interiorLayout?.guardTiles[index] ?? { x: anchor.x + offset.x, y: anchor.y + offset.y };
             this.spawnScenarioEnemy({
                 state,
                 monsterId,
@@ -1500,7 +1564,7 @@ export class WorldSession {
                 level: Math.max(scenario.guardLevel, definition.level),
                 color: definition.color,
                 role: definition.role,
-                tile: { x: anchor.x + offset.x, y: anchor.y + offset.y },
+                tile,
                 isObjective: false,
                 now,
             });
@@ -1516,7 +1580,7 @@ export class WorldSession {
                 level: scenario.bossLevel,
                 color: scenario.bossColor,
                 role: 'boss',
-                tile: { x: anchor.x + (layout.bossOffset?.x ?? 4), y: anchor.y + (layout.bossOffset?.y ?? 0) },
+                tile: interiorLayout?.bossTile ?? { x: anchor.x + (layout.bossOffset?.x ?? 4), y: anchor.y + (layout.bossOffset?.y ?? 0) },
                 isObjective: true,
                 now,
                 aggroRange: Math.max(definition?.aggroRange ?? 0, 9),
@@ -1579,13 +1643,14 @@ export class WorldSession {
         dungeonId: string,
         options: { clearEnemies?: boolean }
     ): void {
+        const state = this.scenarioStates.get(player.id);
         if (player.activeDungeonId === dungeonId) player.activeDungeonId = null;
         player.completedDungeonIds.add(dungeonId);
         const quest = getStoryQuestByDungeonId(dungeonId);
         if (quest) player.completedQuestIds.add(quest.id);
+        if (state?.returnTile) this.returnPlayerActorsFromScenarioInterior(player, state.returnTile);
         this.markSaveDirty(player.id);
 
-        const state = this.scenarioStates.get(player.id);
         if (state && state.dungeonId === dungeonId) {
             state.completed = true;
             if (options.clearEnemies ?? true) this.removeScenarioRuntimeForPlayer(player.id);
@@ -1762,11 +1827,11 @@ export class WorldSession {
         }
     }
 
-    private spawnEnemyLoot(enemy: Enemy): void {
+    private spawnEnemyLoot(enemy: Enemy, tile: TilePoint = { x: enemy.gridX, y: enemy.gridY }): void {
         const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
         if (!herb) return;
         const id = `loot_${this.nextLootId++}`;
-        this.loot.set(id, new LootObject(id, enemy.gridX, enemy.gridY, [herb], {
+        this.loot.set(id, new LootObject(id, tile.x, tile.y, [herb], {
             sourceLabel: `${enemy.name} 전리품`,
             kind: 'corpse',
         }));

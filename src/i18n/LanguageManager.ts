@@ -292,6 +292,16 @@ export const i18n = {
             'tutorial.world.completeLog': '전투 훈련 완료.',
             'tutorial.world.skipLog': '전투 훈련을 건너뛰었습니다.',
             'tutorial.world.townLog': '훈련을 마치고 마을로 이동했습니다.',
+            'story.interior.burgos_castle.name': '부르고스성 내부',
+            'story.interior.zamora_fortress.name': '자모라 요새 내부',
+            'story.interior.etna_volcano.name': '에트나 화산 내부',
+            'story.interior.sagrajas_temple.name': '사그라하스 신전 내부',
+            'story.interior.pyramid_inside.name': '피라미드 내부',
+            'story.interior.ament_gate.name': '아멘트입구 내부',
+            'story.interior.ament_1f.name': '아멘트 1층 내부',
+            'story.interior.ament_2f.name': '아멘트 2층 내부',
+            'story.interior.enterLog': '{dungeon} 내부 진입. 목표를 제압한 뒤 입구로 복귀합니다.',
+            'story.interior.returnLog': '{dungeon} 입구로 복귀했습니다.',
             
             // Shop
             'shop.title': '🏪 상점',
@@ -1044,6 +1054,16 @@ export const i18n = {
             'tutorial.world.completeLog': 'Combat training complete.',
             'tutorial.world.skipLog': 'Combat training skipped.',
             'tutorial.world.townLog': 'Training finished. Entered town.',
+            'story.interior.burgos_castle.name': 'Burgos Castle Interior',
+            'story.interior.zamora_fortress.name': 'Zamora Fortress Interior',
+            'story.interior.etna_volcano.name': 'Etna Volcano Interior',
+            'story.interior.sagrajas_temple.name': 'Sagrajas Temple Interior',
+            'story.interior.pyramid_inside.name': 'Pyramid Interior',
+            'story.interior.ament_gate.name': 'Ament Gate Interior',
+            'story.interior.ament_1f.name': 'Ament 1F Interior',
+            'story.interior.ament_2f.name': 'Ament 2F Interior',
+            'story.interior.enterLog': 'Entered {dungeon}. Defeat the objective, then return to the entrance.',
+            'story.interior.returnLog': 'Returned to the entrance of {dungeon}.',
             
             // Shop
             'shop.title': '🏪 Merchant',

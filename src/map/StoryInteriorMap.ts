@@ -1,0 +1,239 @@
+import { formatT } from '../i18n/LanguageManager';
+import { getStoryInteriorTileAt, type StoryInteriorLayout } from '../data/StoryInteriorData';
+import { TILE_SIZE } from './Chunk';
+import { TILE_PROPERTIES, TileType } from './Tile';
+import { WorldMap, type TileBounds, type TilePoint, type WorldMapDecoration, type WorldMapLandmark, type WorldDungeonInfo } from './WorldMap';
+import type { TempleInfo, TownInfo } from './BiomeMask';
+
+const THEME_COLORS = {
+    castle: {
+        void: '#070607',
+        wall: '#171419',
+        wallInset: '#2a242b',
+        floor: '#343036',
+        floorAlt: '#2b272d',
+        path: '#554537',
+        accent: '#b78245',
+        gate: '#5b2f33',
+    },
+    volcano: {
+        void: '#080504',
+        wall: '#1d1110',
+        wallInset: '#3a2018',
+        floor: '#5c3d2b',
+        floorAlt: '#493122',
+        path: '#6b4b30',
+        accent: '#e16f3b',
+        gate: '#5b2822',
+    },
+    temple: {
+        void: '#070707',
+        wall: '#171713',
+        wallInset: '#2f2e24',
+        floor: '#3c3a2f',
+        floorAlt: '#313027',
+        path: '#5a523d',
+        accent: '#b7a05a',
+        gate: '#4b3f29',
+    },
+    pyramid: {
+        void: '#090704',
+        wall: '#1f190f',
+        wallInset: '#3c2f1b',
+        floor: '#5f4b2d',
+        floorAlt: '#4f3f27',
+        path: '#76603a',
+        accent: '#c7a45c',
+        gate: '#5d4122',
+    },
+    ament: {
+        void: '#050609',
+        wall: '#111420',
+        wallInset: '#23283a',
+        floor: '#2b2f42',
+        floorAlt: '#242838',
+        path: '#424965',
+        accent: '#9e8acb',
+        gate: '#30284b',
+    },
+} as const;
+
+export class StoryInteriorMap extends WorldMap {
+    private readonly layout: StoryInteriorLayout;
+
+    constructor(layout: StoryInteriorLayout) {
+        super('mortal', { validateTownSpawns: false });
+        this.layout = layout;
+    }
+
+    public getDisplayName(): string {
+        return formatT(this.layout.displayNameKey, {});
+    }
+
+    public getLayout(): StoryInteriorLayout {
+        return this.layout;
+    }
+
+    public getPlayerStartTile(): TilePoint {
+        return { ...this.layout.playerStart };
+    }
+
+    public updateLoadedChunks(_worldCenterX: number, _worldCenterY: number): void {
+        // Fixed story interior room; no chunk streaming needed.
+    }
+
+    public getBoundsTiles(): TileBounds {
+        return { width: this.layout.width, height: this.layout.height };
+    }
+
+    public getMapLandmarks(): WorldMapLandmark[] {
+        return [];
+    }
+
+    public getTowns(): TownInfo[] {
+        return [];
+    }
+
+    public getTemples(): TempleInfo[] {
+        return [];
+    }
+
+    public getDungeons(): WorldDungeonInfo[] {
+        return [];
+    }
+
+    public getTownAtTile(_tx: number, _ty: number): TownInfo | null {
+        return null;
+    }
+
+    public getTempleAtTile(_tx: number, _ty: number): TempleInfo | null {
+        return null;
+    }
+
+    public getDungeonAtTile(_tx: number, _ty: number): WorldDungeonInfo | null {
+        return null;
+    }
+
+    public getDecorationsInTileRect(_minX: number, _minY: number, _maxX: number, _maxY: number): readonly WorldMapDecoration[] {
+        return [];
+    }
+
+    public isDecorationBlocked(_tx: number, _ty: number): boolean {
+        return false;
+    }
+
+    public renderDecorationOverlays(
+        _ctx: CanvasRenderingContext2D,
+        _cameraX: number,
+        _cameraY: number,
+        _vw: number,
+        _vh: number
+    ): void {
+        // Fixed story interior room; world decorations are disabled.
+    }
+
+    public getTileAt(tx: number, ty: number): TileType {
+        return getStoryInteriorTileAt(this.layout, tx, ty);
+    }
+
+    public isWalkable(tx: number, ty: number): boolean {
+        return Boolean(TILE_PROPERTIES[this.getTileAt(tx, ty)]?.walkable);
+    }
+
+    public render(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number, vw: number, vh: number): void {
+        const minX = Math.max(0, Math.floor(cameraX / TILE_SIZE) - 1);
+        const minY = Math.max(0, Math.floor(cameraY / TILE_SIZE) - 1);
+        const maxX = Math.min(this.layout.width - 1, Math.ceil((cameraX + vw) / TILE_SIZE) + 1);
+        const maxY = Math.min(this.layout.height - 1, Math.ceil((cameraY + vh) / TILE_SIZE) + 1);
+        const colors = THEME_COLORS[this.layout.theme];
+
+        ctx.fillStyle = colors.void;
+        ctx.fillRect(-cameraX, -cameraY, this.layout.width * TILE_SIZE, this.layout.height * TILE_SIZE);
+
+        for (let y = minY; y <= maxY; y++) {
+            for (let x = minX; x <= maxX; x++) {
+                this.renderInteriorTile(ctx, x, y, x * TILE_SIZE - cameraX, y * TILE_SIZE - cameraY);
+            }
+        }
+
+        this.renderRoomTrim(ctx, cameraX, cameraY);
+        this.renderGate(ctx, cameraX, cameraY);
+
+        for (const obj of this.loot) {
+            obj.render(ctx, obj.x * TILE_SIZE - cameraX, obj.y * TILE_SIZE - cameraY, TILE_SIZE);
+        }
+    }
+
+    private renderInteriorTile(ctx: CanvasRenderingContext2D, x: number, y: number, sx: number, sy: number): void {
+        const colors = THEME_COLORS[this.layout.theme];
+        const tile = this.getTileAt(x, y);
+
+        switch (tile) {
+            case TileType.WALL:
+                ctx.fillStyle = colors.wall;
+                ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+                ctx.fillStyle = colors.wallInset;
+                ctx.fillRect(sx + 3, sy + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+                break;
+            case TileType.DUNGEON_ENTRANCE:
+                ctx.fillStyle = colors.gate;
+                ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+                ctx.fillStyle = colors.accent;
+                ctx.fillRect(sx + 10, sy + 6, TILE_SIZE - 20, TILE_SIZE - 12);
+                break;
+            case TileType.ROAD:
+                ctx.fillStyle = colors.path;
+                ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+                ctx.fillStyle = 'rgba(255, 220, 155, 0.08)';
+                ctx.fillRect(sx + 4, sy + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+                break;
+            default:
+                ctx.fillStyle = (x + y) % 2 === 0 ? colors.floor : colors.floorAlt;
+                ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+                break;
+        }
+
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(sx + 0.5, sy + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+    }
+
+    private renderRoomTrim(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number): void {
+        const colors = THEME_COLORS[this.layout.theme];
+        const rooms = [
+            { x: 2, y: 6, w: 22, h: 5 },
+            { x: 6, y: 3, w: 7, h: 4 },
+            { x: 6, y: 10, w: 7, h: 4 },
+            { x: 15, y: 4, w: 9, h: 9 },
+        ];
+
+        ctx.save();
+        ctx.strokeStyle = colors.accent;
+        ctx.lineWidth = 2;
+        for (const room of rooms) {
+            ctx.strokeRect(
+                room.x * TILE_SIZE - cameraX + 3,
+                room.y * TILE_SIZE - cameraY + 3,
+                room.w * TILE_SIZE - 6,
+                room.h * TILE_SIZE - 6
+            );
+        }
+        ctx.restore();
+    }
+
+    private renderGate(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number): void {
+        const colors = THEME_COLORS[this.layout.theme];
+        const x = this.layout.entryTile.x * TILE_SIZE - cameraX;
+        const y = this.layout.entryTile.y * TILE_SIZE - cameraY;
+
+        ctx.save();
+        ctx.fillStyle = colors.gate;
+        ctx.fillRect(x + 2, y - 12, TILE_SIZE - 4, TILE_SIZE + 16);
+        ctx.strokeStyle = colors.accent;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 5, y - 7, TILE_SIZE - 10, TILE_SIZE + 7);
+        ctx.fillStyle = 'rgba(255, 230, 170, 0.18)';
+        ctx.fillRect(x + 11, y + 2, TILE_SIZE - 22, TILE_SIZE - 4);
+        ctx.restore();
+    }
+}

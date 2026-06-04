@@ -28,6 +28,7 @@ import {
     type MonsterId,
 } from '../data/MonsterCatalog';
 import { getStoryQuestByDungeonId, isStoryQuestAvailable, type StoryQuestDefinition } from '../data/StoryQuestData';
+import { getStoryScenarioByDungeonId } from '../data/StoryScenarioData';
 import {
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
@@ -46,6 +47,8 @@ import { MinimapUI } from '../ui/MinimapUI';
 import type { GameManager } from './GameManager';
 import { WorldMap, type WorldDungeonInfo } from '../map/WorldMap';
 import { TutorialTrainingMap } from '../map/TutorialTrainingMap';
+import { StoryInteriorMap } from '../map/StoryInteriorMap';
+import { getStoryInteriorLayout, isStoryInteriorDungeon, type StoryInteriorLayout } from '../data/StoryInteriorData';
 import { TownInfo } from '../map/BiomeMask';
 import { fuseActivePartyBranch, getFusionCandidates, hasActiveMasterCharacter } from '../character/FusionSystem';
 import type { MasterBranch } from '../data/ClassTree';
@@ -213,6 +216,7 @@ export class WorldEngine {
     private worldTime: number = 0;
     private dismissedTempleVisitKey: string | null = null;
     private dismissedDungeonVisitKey: string | null = null;
+    private activeStoryInterior: { dungeonId: string; layout: StoryInteriorLayout; previousWorldMap: WorldMap; returnTile: TilePoint } | null = null;
     private introTutorialActive = false;
     private introTutorialEnemyId: string | null = null;
     private introTutorialStep: IntroTutorialStep = 'move';
@@ -784,6 +788,37 @@ export class WorldEngine {
         if (!this.introTutorialPreviousWorldMap) return;
         this.worldMap = this.introTutorialPreviousWorldMap;
         this.introTutorialPreviousWorldMap = null;
+    }
+
+    private enterStoryInteriorMap(dungeonId: string, returnTile: TilePoint): StoryInteriorLayout | null {
+        const layout = getStoryInteriorLayout(dungeonId);
+        if (!layout) return null;
+        if (this.activeStoryInterior?.dungeonId === dungeonId) return layout;
+
+        const previousWorldMap = this.activeStoryInterior?.previousWorldMap ?? this.worldMap;
+        this.worldMap = new StoryInteriorMap(layout);
+        this.activeStoryInterior = {
+            dungeonId,
+            layout,
+            previousWorldMap,
+            returnTile: { ...returnTile },
+        };
+        this.worldMap.loot = [];
+        this.dismissedDungeonVisitKey = null;
+        return layout;
+    }
+
+    private exitActiveStoryInterior(options: { placePartyAtReturn?: boolean } = {}): void {
+        const active = this.activeStoryInterior;
+        if (!active) return;
+
+        this.worldMap = active.previousWorldMap;
+        this.activeStoryInterior = null;
+        if (options.placePartyAtReturn) {
+            this.placePartyNear(active.returnTile);
+            this.player = this.getControlledActor()?.entity ?? this.player;
+            this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
+        }
     }
 
     private clearIntroTutorialStateForNetworkRaid(): void {
@@ -1769,12 +1804,19 @@ export class WorldEngine {
             if (storyQuest) this.addCombatLog(t(storyQuest.enterLogKey));
         }
 
-        if (scenario.activeDungeonId && this.raidSession.activeDungeonId !== scenario.activeDungeonId) {
-            this.raidSession.startDungeonEncounter(scenario.activeDungeonId);
+        if (scenario.activeDungeonId) {
+            if (this.raidSession.activeDungeonId !== scenario.activeDungeonId) {
+                this.raidSession.startDungeonEncounter(scenario.activeDungeonId);
+                this.selectionController.clear();
+                this.clearFieldTurnState();
+            }
+            const controlled = this.getControlledActor();
+            if (controlled) this.enterStoryInteriorMap(scenario.activeDungeonId, this.actorTile(controlled));
+        } else if (!scenario.activeDungeonId && this.raidSession.activeDungeonId && !completedSet.has(this.raidSession.activeDungeonId)) {
+            this.exitActiveStoryInterior();
+            this.raidSession.activeDungeonId = null;
             this.selectionController.clear();
             this.clearFieldTurnState();
-        } else if (!scenario.activeDungeonId && this.raidSession.activeDungeonId && !completedSet.has(this.raidSession.activeDungeonId)) {
-            this.raidSession.activeDungeonId = null;
         }
 
         for (const dungeonId of completedDungeonIds) {
@@ -1952,7 +1994,71 @@ export class WorldEngine {
         if (!storyQuest) return;
 
         this.dismissedDungeonVisitKey = this.getCurrentDungeonVisitKey(dungeon);
+        if (isStoryInteriorDungeon(dungeon.id)) {
+            this.startLocalStoryInteriorDungeon(dungeon, storyQuest);
+            return;
+        }
+
         this.addCombatLog(`${dungeon.nameKr} 시나리오는 서버 세션 이관 후 진입할 수 있습니다.`);
+    }
+
+    private startLocalStoryInteriorDungeon(dungeon: WorldDungeonInfo, storyQuest: StoryQuestDefinition): void {
+        const actor = this.getControlledActor();
+        if (!actor) return;
+
+        const scenario = getStoryScenarioByDungeonId(dungeon.id);
+        const layout = this.enterStoryInteriorMap(dungeon.id, this.actorTile(actor));
+        if (!scenario || !layout) return;
+
+        this.raidSession.startDungeonEncounter(dungeon.id);
+        this.closeFieldOverlays();
+        this.fieldEnemies = [];
+        this.worldMap.loot = [];
+        this.placePartyNear(layout.playerStart);
+        this.player = this.getControlledActor()?.entity ?? this.player;
+        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
+        this.clearFieldTurnState();
+
+        const guardDefinition = getMonsterDefinition('303R' as MonsterId);
+        this.fieldEnemies = [];
+        for (let index = 0; index < scenario.guardCount; index++) {
+            const tile = layout.guardTiles[index] ?? layout.guardTiles[layout.guardTiles.length - 1] ?? layout.playerStart;
+            const enemy = new Enemy(
+                `story_${dungeon.id}_guard_${index}`,
+                tile.x,
+                tile.y,
+                guardDefinition.name,
+                Math.max(scenario.guardLevel, guardDefinition.level),
+                guardDefinition.color,
+                guardDefinition.role
+            );
+            enemy.aggroRange = Math.max(guardDefinition.aggroRange, 8);
+            enemy.isAggro = true;
+            this.applyMonsterSprite(enemy, guardDefinition.id);
+            this.fieldEnemies.push({ enemy, home: { ...tile }, path: [] });
+        }
+
+        if (scenario.bossName) {
+            const boss = new Enemy(
+                `story_${dungeon.id}_boss`,
+                layout.bossTile.x,
+                layout.bossTile.y,
+                scenario.bossName,
+                scenario.bossLevel,
+                scenario.bossColor,
+                'boss'
+            );
+            boss.aggroRange = 10;
+            boss.isAggro = true;
+            boss.isBoss = true;
+            this.applyMonsterSprite(boss, 'burgos_wolf_boss');
+            this.fieldEnemies.push({ enemy: boss, home: { ...layout.bossTile }, path: [] });
+        }
+
+        this.camera.followTile(this.player.gridX, this.player.gridY);
+        this.camera.snapToTarget();
+        this.addCombatLog(formatT('story.interior.enterLog', { dungeon: dungeon.nameKr }));
+        this.addCombatLog(t(storyQuest.enterLogKey));
     }
 
     private openFusionTemple(): void {
@@ -2187,6 +2293,9 @@ export class WorldEngine {
         const bossRune = enemy.isBoss ? rollBossRune(enemy.level) : null;
         const items = [bossRune, herb].filter((item): item is NonNullable<typeof item> => Boolean(item));
         if (items.length === 0) return;
+        const storyInteriorBossReturn = enemy.isBoss ? this.activeStoryInterior : null;
+        const lootMap = storyInteriorBossReturn?.previousWorldMap ?? this.worldMap;
+        const lootTile = storyInteriorBossReturn?.returnTile ?? { x: enemy.gridX, y: enemy.gridY };
 
         if (!enemy.isBoss) {
             const failedItems: typeof items = [];
@@ -2215,11 +2324,11 @@ export class WorldEngine {
             return;
         }
 
-        const loot = new LootObject(`corpse_${enemy.id}`, enemy.gridX, enemy.gridY, items, {
+        const loot = new LootObject(`corpse_${enemy.id}`, lootTile.x, lootTile.y, items, {
             sourceLabel: `${enemy.name} 전리품`,
             kind: 'corpse',
         });
-        this.worldMap.loot.push(loot);
+        lootMap.loot.push(loot);
     }
 
     private submitNetworkMoveIntent(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean {
@@ -2333,6 +2442,9 @@ export class WorldEngine {
     ): void {
         this.raidSession.completeDungeonEncounter(dungeonId);
         if (options.clearEnemies ?? true) this.fieldEnemies = [];
+        if (this.activeStoryInterior?.dungeonId === dungeonId) {
+            this.exitActiveStoryInterior({ placePartyAtReturn: !this.isNetworkRaid });
+        }
         this.selectionController.clear();
         this.clearFieldTurnState();
         this.addCombatLog(t(storyQuest.objectiveCompleteLogKey));

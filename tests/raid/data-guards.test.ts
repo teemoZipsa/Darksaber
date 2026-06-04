@@ -14,6 +14,7 @@ import { getSkillVisualProfile } from '../../src/data/SkillVisualProfiles';
 import { createBaseStats, getBaseStatsForClass } from '../../src/data/Stats';
 import { STORY_QUESTS, getStoryCompanionRewards } from '../../src/data/StoryQuestData';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
 import { i18n } from '../../src/i18n/LanguageManager';
 import type { Skill } from '../../src/data/SkillDB';
 import {
@@ -111,6 +112,10 @@ test('story episodes 1 through 20 are chained and fully localized', () => {
     assert.deepEqual(
         STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'vehicle').map((scenario) => scenario.episode),
         [17]
+    );
+    assert.deepEqual(
+        STORY_INTERIOR_LAYOUTS.map((layout) => layout.dungeonId).sort(),
+        STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'soloInterior').map((scenario) => scenario.dungeonId).sort()
     );
 
     const ko = i18n.strings.ko as Record<string, string>;

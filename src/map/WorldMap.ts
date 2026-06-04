@@ -8,6 +8,7 @@ import { getBurgosCastleHmapTileAt } from './BurgosCastleHmap';
 import { getStoryHmapTileAt } from './StoryHmaps';
 import { HMAP_BLEND_BAND, type HmapSample } from './HmapBlend';
 import { STORY_SCENARIOS } from '../data/StoryScenarioData';
+import { isStoryInteriorDungeon } from '../data/StoryInteriorData';
 
 export interface TileBounds {
     width: number;
@@ -919,6 +920,7 @@ export class WorldMap {
         this.renderDecorations(ctx, cameraX, cameraY, vw, vh, false);
         this.renderTownLandmarks(ctx, cameraX, cameraY, vw, vh);
         this.renderTempleLandmarks(ctx, cameraX, cameraY, vw, vh);
+        this.renderStoryInteriorEntrances(ctx, cameraX, cameraY, vw, vh);
         this.renderNeutralBirds(ctx, cameraX, cameraY, vw, vh);
 
         for (const zone of this.extractionZones) {
@@ -1462,6 +1464,42 @@ export class WorldMap {
         ctx.strokeText(label, labelX, labelY);
         ctx.fillText(label, labelX, labelY);
         ctx.restore();
+    }
+
+    private renderStoryInteriorEntrances(
+        ctx: CanvasRenderingContext2D,
+        cameraX: number,
+        cameraY: number,
+        vw: number,
+        vh: number
+    ): void {
+        for (const dungeon of this.getDungeons()) {
+            if (!isStoryInteriorDungeon(dungeon.id)) continue;
+            const center = this.getDungeonEntranceTile(dungeon);
+            const sx = center.x * TILE_SIZE - cameraX;
+            const sy = center.y * TILE_SIZE - cameraY;
+            const size = TILE_SIZE * 1.35;
+            if (sx + size < 0 || sx - size > vw || sy + size < 0 || sy - size > vh) continue;
+
+            ctx.save();
+            ctx.translate(sx + TILE_SIZE / 2, sy + TILE_SIZE / 2);
+            ctx.fillStyle = 'rgba(23, 13, 17, 0.84)';
+            ctx.beginPath();
+            ctx.ellipse(0, 6, size * 0.42, size * 0.26, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(96, 45, 54, 0.94)';
+            ctx.fillRect(-size * 0.28, -size * 0.38, size * 0.56, size * 0.72);
+            ctx.strokeStyle = 'rgba(225, 176, 92, 0.9)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-size * 0.23, -size * 0.32, size * 0.46, size * 0.63);
+            ctx.fillStyle = 'rgba(255, 221, 150, 0.22)';
+            ctx.fillRect(-size * 0.12, -size * 0.2, size * 0.24, size * 0.42);
+            ctx.fillStyle = 'rgba(245, 206, 118, 0.95)';
+            ctx.beginPath();
+            ctx.arc(size * 0.15, 0, 2.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
     }
 
     private renderTempleLandmarks(

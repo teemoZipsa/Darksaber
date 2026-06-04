@@ -6,6 +6,7 @@ import { WorldMap } from '../../src/map/WorldMap';
 import { WorldResumeFailedError, WorldSession } from '../../server/WorldSession';
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { getStoryInteriorLayout } from '../../src/data/StoryInteriorData';
 import { ENEMY_SIMULATION_ACTIVE_RANGE } from '../../src/field/FieldConfig';
 
 function actor(id: string, overrides: Partial<ActorSnapshot> = {}): ActorSnapshot {
@@ -515,9 +516,12 @@ test('server-owned scenario entry spawns objective enemies and records completio
     const internals = session as any;
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === 'burgos_castle');
+    const interior = getStoryInteriorLayout('burgos_castle');
     assert.ok(serverActor);
     assert.ok(dungeon);
+    assert.ok(interior);
     serverActor.tile = world.getDungeonEntranceTile(dungeon);
+    const entrance = { ...serverActor.tile };
 
     const enter = session.handleMessage(joined.playerId, {
         type: 'SCENARIO_ENTER',
@@ -531,9 +535,11 @@ test('server-owned scenario entry spawns objective enemies and records completio
     assert.equal(enteredSnapshot.scenario.activeDungeonId, 'burgos_castle');
     assert.ok(enteredSnapshot.scenario.enteredDungeonIds.includes('burgos_castle'));
     assert.ok(enteredSnapshot.enemies.some((enemy) => enemy.isBoss && enemy.name === '키스라'));
+    assert.deepEqual(enteredSnapshot.partyActors.find((entry) => entry.id === serverActor.id)?.tile, interior.playerStart);
 
     const bossEntry = [...internals.enemies.values()].find((entry: any) => entry.scenarioObjective);
     assert.ok(bossEntry);
+    assert.deepEqual({ x: bossEntry.enemy.gridX, y: bossEntry.enemy.gridY }, interior.bossTile);
     serverActor.actionGauge = 100;
     serverActor.remainingAp = 80;
     serverActor.tile = { x: bossEntry.enemy.gridX - 1, y: bossEntry.enemy.gridY };
@@ -555,6 +561,7 @@ test('server-owned scenario entry spawns objective enemies and records completio
     const completedSnapshot = session.createSnapshot(joined.playerId, 1_100);
     assert.equal(completedSnapshot.scenario.activeDungeonId, null);
     assert.ok(completedSnapshot.scenario.completedDungeonIds.includes('burgos_castle'));
+    assert.deepEqual(completedSnapshot.partyActors.find((entry) => entry.id === serverActor.id)?.tile, entrance);
     assert.equal(completedSnapshot.enemies.some((enemy) => enemy.id !== bossEntry.enemy.id && enemy.id.startsWith('scenario_')), false);
 
     const leave = session.handleMessage(joined.playerId, { type: 'WORLD_LEAVE', reason: 'town' }, 1_200);
@@ -584,9 +591,11 @@ test('solo interior scenario enemies stay private to the entering player', () =>
     const actorA = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedA.playerId);
     const actorB = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedB.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === 'burgos_castle');
+    const interior = getStoryInteriorLayout('burgos_castle');
     assert.ok(actorA);
     assert.ok(actorB);
     assert.ok(dungeon);
+    assert.ok(interior);
     actorA.tile = world.getDungeonEntranceTile(dungeon);
 
     const enter = session.handleMessage(joinedA.playerId, {
@@ -605,6 +614,7 @@ test('solo interior scenario enemies stay private to the entering player', () =>
     const snapshotB = session.createSnapshot(joinedB.playerId, 1_000);
     assert.ok(snapshotA.enemies.some((enemy) => enemy.id === bossEntry.enemy.id));
     assert.equal(snapshotB.enemies.some((enemy) => enemy.id === bossEntry.enemy.id), false);
+    assert.deepEqual(snapshotA.partyActors.find((actorSnapshot) => actorSnapshot.id === actorA.id)?.tile, interior.playerStart);
     assert.equal(snapshotA.partyActors.some((actorSnapshot) => actorSnapshot.ownerPlayerId === joinedB.playerId), false);
     assert.equal(snapshotB.partyActors.some((actorSnapshot) => actorSnapshot.ownerPlayerId === joinedA.playerId), false);
 
