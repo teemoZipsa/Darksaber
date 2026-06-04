@@ -39,11 +39,11 @@ test('terrain hover labels follow the active language', () => {
     try {
         i18n.lang = 'ko';
         const grassKo = describeTerrainForHover(TileType.GRASS).join(' ');
-        assert.match(grassKo, /잔디/);
+        assert.match(grassKo, /초원/);
         assert.doesNotMatch(grassKo, /Grass/);
 
         const forestKo = describeTerrainForHover(TileType.FOREST).join(' ');
-        assert.match(forestKo, /마법 화 \+20% 풍 \+10% 지 \+10%/);
+        assert.match(forestKo, /마법 불꽃 \+20% 바람 \+10% 땅 \+10%/);
         assert.doesNotMatch(forestKo, /fire|wind|earth/);
 
         i18n.lang = 'en';
