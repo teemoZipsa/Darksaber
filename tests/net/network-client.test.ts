@@ -349,6 +349,41 @@ test('client rejects pending welcome when server sends ERROR without closing', a
     }
 });
 
+test('client closes pending join socket when the server rejects without closing', async () => {
+    const restoreSocket = installMockWebSocket();
+    const originalSetInterval = globalThis.setInterval;
+    const originalClearInterval = globalThis.clearInterval;
+    let clearCount = 0;
+    (globalThis as unknown as { setInterval: unknown }).setInterval = (() => ({ unref: () => undefined })) as unknown as typeof setInterval;
+    (globalThis as unknown as { clearInterval: unknown }).clearInterval = (() => {
+        clearCount += 1;
+    }) as unknown as typeof clearInterval;
+
+    try {
+        const client = new NetworkRaidClient({ url: 'ws://test' });
+        const join = client.connectAndJoin(joinInput());
+        const socket = MockWebSocket.instances[0];
+        assert.ok(socket);
+
+        socket.emitOpen();
+        socket.emitMessage(JSON.stringify({
+            type: 'ERROR',
+            code: 'VERSION_MISMATCH',
+            message: 'bad version',
+        }));
+
+        await assert.rejects(join, /bad version/);
+        assert.equal(socket.readyState, MockWebSocket.CLOSED);
+        assert.equal(client.getIsOpen(), false);
+        assert.equal(client.getStatus(), 'disconnected');
+        assert.equal(clearCount, 1);
+    } finally {
+        globalThis.setInterval = originalSetInterval;
+        globalThis.clearInterval = originalClearInterval;
+        restoreSocket();
+    }
+});
+
 test('client reports malformed server messages instead of throwing', () => {
     const errors: string[] = [];
     const client = new NetworkRaidClient({

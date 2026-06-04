@@ -164,7 +164,10 @@ export class NetworkRaidClient {
         };
         socket.onerror = () => {
             if (this.socket !== socket) return;
-            if (this.pendingWelcome) this.rejectPendingWelcome(new Error(`Failed to connect to ${this.url}`));
+            if (this.pendingWelcome) {
+                this.rejectPendingWelcome(new Error(`Failed to connect to ${this.url}`));
+                this.closeSocketAfterJoinFailure();
+            }
         };
         socket.onclose = () => {
             if (this.socket !== socket) return;
@@ -349,8 +352,12 @@ export class NetworkRaidClient {
                     this.reportBadMessage('Malformed ERROR message.');
                     return;
                 }
-                if (this.pendingWelcome) this.rejectPendingWelcome(new WorldServerError(message.code, message.message));
-                if (message.code === 'RESUME_FAILED') this.expireGrace();
+                {
+                    const hadPendingWelcome = this.pendingWelcome !== null;
+                    if (hadPendingWelcome) this.rejectPendingWelcome(new WorldServerError(message.code, message.message));
+                    if (message.code === 'RESUME_FAILED') this.expireGrace();
+                    else if (hadPendingWelcome) this.closeSocketAfterJoinFailure();
+                }
                 this.options.onErrorMessage?.(message);
                 break;
         }
@@ -411,6 +418,16 @@ export class NetworkRaidClient {
         this.playerId = null;
         this.setStatus('disconnected');
         if (wasReconnecting) this.options.onGraceExpired?.();
+    }
+
+    private closeSocketAfterJoinFailure(): void {
+        this.manualClose = true;
+        this.clearReconnect();
+        this.stopHeartbeat();
+        if (this.socket && this.socket.readyState <= WebSocket.OPEN) this.socket.close();
+        this.socket = null;
+        this.playerId = null;
+        this.setStatus('disconnected');
     }
 
     private reportBadMessage(message: string): void {
