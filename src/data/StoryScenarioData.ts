@@ -7,6 +7,8 @@ export type StoryQuestRewardData =
     | { type: 'companion'; companionId: string; classId: string; nameKey: string }
     | { type: 'bundle'; rewards: StoryQuestRewardData[] };
 
+export type StoryScenarioMissionKind = 'field' | 'soloInterior' | 'vehicle';
+
 export interface StoryScenarioDefinition {
     episode: number;
     questId: string;
@@ -21,6 +23,7 @@ export interface StoryScenarioDefinition {
     bossColor: string;
     guardLevel: number;
     guardCount: number;
+    missionKind: StoryScenarioMissionKind;
     reward: StoryQuestRewardData;
 }
 
@@ -41,6 +44,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#6676d8',
         guardLevel: 2,
         guardCount: 4,
+        missionKind: 'soloInterior',
         reward: { type: 'questItem', itemId: 'quest_bomb' },
     },
     {
@@ -57,6 +61,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#5f70df',
         guardLevel: 2,
         guardCount: 4,
+        missionKind: 'soloInterior',
         reward: { type: 'companion', companionId: 'story_cleric_ep02', classId: 'cleric', nameKey: 'story.companion.ep02Cleric.name' },
     },
     {
@@ -73,6 +78,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#d86a3a',
         guardLevel: 3,
         guardCount: 5,
+        missionKind: 'soloInterior',
         reward: {
             type: 'bundle',
             rewards: [
@@ -95,6 +101,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#b9893d',
         guardLevel: 3,
         guardCount: 5,
+        missionKind: 'field',
         reward: { type: 'companion', companionId: 'story_knight_ep04', classId: 'cavalry', nameKey: 'story.companion.ep04Knight.name' },
     },
     {
@@ -111,6 +118,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#8c50c0',
         guardLevel: 3,
         guardCount: 6,
+        missionKind: 'field',
         reward: { type: 'companion', companionId: 'story_magician_ep05', classId: 'mage', nameKey: 'story.companion.ep05Magician.name' },
     },
     {
@@ -127,6 +135,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#a86948',
         guardLevel: 4,
         guardCount: 6,
+        missionKind: 'field',
         reward: { type: 'companion', companionId: 'story_lord_ep06', classId: 'lancer', nameKey: 'story.companion.ep06Lord.name' },
     },
     {
@@ -143,6 +152,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#b78cc8',
         guardLevel: 4,
         guardCount: 6,
+        missionKind: 'soloInterior',
         reward: { type: 'companion', companionId: 'story_monk_ep07', classId: 'priest', nameKey: 'story.companion.ep07Monk.name' },
     },
     {
@@ -159,6 +169,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#66727f',
         guardLevel: 4,
         guardCount: 7,
+        missionKind: 'field',
         reward: { type: 'companion', companionId: 'story_captain_ep08', classId: 'naval', nameKey: 'story.companion.ep08Captain.name' },
     },
     {
@@ -175,6 +186,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#7d5c40',
         guardLevel: 5,
         guardCount: 7,
+        missionKind: 'field',
         reward: { type: 'companion', companionId: 'story_sniper_ep09', classId: 'archer', nameKey: 'story.companion.ep09Sniper.name' },
     },
     {
@@ -191,6 +203,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#4d8fc8',
         guardLevel: 5,
         guardCount: 7,
+        missionKind: 'field',
         reward: noReward,
     },
     {
@@ -207,6 +220,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#5d526a',
         guardLevel: 5,
         guardCount: 7,
+        missionKind: 'field',
         reward: { type: 'companion', companionId: 'story_shrine_maiden_ep11', classId: 'shrine', nameKey: 'story.companion.ep11ShrineMaiden.name' },
     },
     {
@@ -223,6 +237,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#c09052',
         guardLevel: 6,
         guardCount: 8,
+        missionKind: 'field',
         reward: { type: 'companion', companionId: 'story_hawk_knight_ep12', classId: 'flying', nameKey: 'story.companion.ep12HawkKnight.name' },
     },
     {
@@ -239,6 +254,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#8b6f54',
         guardLevel: 6,
         guardCount: 8,
+        missionKind: 'soloInterior',
         reward: noReward,
     },
     {
@@ -255,6 +271,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#6a7180',
         guardLevel: 7,
         guardCount: 8,
+        missionKind: 'field',
         reward: { type: 'companion', companionId: 'story_shaman_ep14', classId: 'cultist', nameKey: 'story.companion.ep14Shaman.name' },
     },
     {
@@ -271,6 +288,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#7b55a6',
         guardLevel: 7,
         guardCount: 8,
+        missionKind: 'field',
         reward: { type: 'companion', companionId: 'story_alchemist_ep15', classId: 'alchemist', nameKey: 'story.companion.ep15Alchemist.name' },
     },
     {
@@ -287,6 +305,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#b3523f',
         guardLevel: 8,
         guardCount: 9,
+        missionKind: 'field',
         reward: noReward,
     },
     {
@@ -303,6 +322,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#6f6f78',
         guardLevel: 8,
         guardCount: 2,
+        missionKind: 'vehicle',
         reward: noReward,
     },
     {
@@ -319,6 +339,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#948ab0',
         guardLevel: 9,
         guardCount: 9,
+        missionKind: 'soloInterior',
         reward: noReward,
     },
     {
@@ -335,6 +356,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#b06a6a',
         guardLevel: 10,
         guardCount: 9,
+        missionKind: 'soloInterior',
         reward: noReward,
     },
     {
@@ -351,10 +373,15 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossColor: '#2f3f78',
         guardLevel: 11,
         guardCount: 10,
+        missionKind: 'soloInterior',
         reward: noReward,
     },
 ];
 
 export function getStoryScenarioByDungeonId(dungeonId: string): StoryScenarioDefinition | null {
     return STORY_SCENARIOS.find((scenario) => scenario.dungeonId === dungeonId) ?? null;
+}
+
+export function isSoloInteriorStoryScenario(scenario: StoryScenarioDefinition): boolean {
+    return scenario.missionKind === 'soloInterior';
 }

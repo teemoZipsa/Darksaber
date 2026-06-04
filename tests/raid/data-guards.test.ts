@@ -104,6 +104,14 @@ test('rest, monster, and starting class data reject unknown ids', () => {
 test('story episodes 1 through 20 are chained and fully localized', () => {
     assert.deepEqual(STORY_SCENARIOS.map((scenario) => scenario.episode), Array.from({ length: 20 }, (_, i) => i + 1));
     assert.equal(STORY_QUESTS.length, 20);
+    assert.deepEqual(
+        STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'soloInterior').map((scenario) => scenario.episode),
+        [1, 2, 3, 7, 13, 18, 19, 20]
+    );
+    assert.deepEqual(
+        STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'vehicle').map((scenario) => scenario.episode),
+        [17]
+    );
 
     const ko = i18n.strings.ko as Record<string, string>;
     const en = i18n.strings.en as Record<string, string>;

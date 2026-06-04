@@ -36,7 +36,7 @@ import {
     type MonsterId,
 } from '../src/data/MonsterCatalog';
 import { getStoryQuestByDungeonId } from '../src/data/StoryQuestData';
-import { getStoryScenarioByDungeonId, type StoryScenarioDefinition } from '../src/data/StoryScenarioData';
+import { getStoryScenarioByDungeonId, type StoryScenarioDefinition, type StoryScenarioMissionKind } from '../src/data/StoryScenarioData';
 import { CHUNK_TILES, nestMemberOffsets, pickNestForChunk, type FieldNest, type FieldNestState } from '../src/field/SpawnResolver';
 import { Enemy } from '../src/entity/Enemy';
 import { LootObject } from '../src/entity/LootObject';
@@ -171,6 +171,7 @@ interface ServerEnemy {
 interface ServerScenarioState {
     playerId: string;
     dungeonId: string;
+    missionKind: StoryScenarioMissionKind;
     enemyIds: string[];
     objectiveEnemyId: string | null;
     completed: boolean;
@@ -500,6 +501,7 @@ export class WorldSession {
 
     public createSnapshot(viewerPlayerId: string | null = null, now: number = Date.now()): WorldSnapshot {
         this.seq += 1;
+        const viewer = viewerPlayerId ? this.players.get(viewerPlayerId) : undefined;
         const players: WorldPlayerSnapshot[] = [...this.players.values()]
             .filter((player) => player.active)
             .map((player) => ({
@@ -513,9 +515,11 @@ export class WorldSession {
                 const owner = this.players.get(actor.ownerPlayerId);
                 return owner?.active && !owner.ghost;
             })
+            .filter((actor) => this.isActorVisibleToViewer(actor, viewerPlayerId))
             .map((actor) => this.toActorSnapshot(actor));
         const enemies = [...this.enemies.values()]
             .filter((entry) => entry.enemy.stats.hp > 0)
+            .filter((entry) => this.isEnemyVisibleToViewer(entry, viewerPlayerId))
             .map((entry) => ({
                 id: entry.enemy.id,
                 monsterId: entry.monsterId,
@@ -534,6 +538,7 @@ export class WorldSession {
             }));
         const loot = [...this.loot.values()]
             .filter((lootObject) => !this.autoLootPending.has(lootObject.id))
+            .filter(() => !viewer?.activeDungeonId)
             .map((lootObject) => this.toLootSnapshot(lootObject));
         const readyActors = partyActors
             .filter((actor) => !actor.isDead && !actor.isGhost && actor.remainingAp >= MIN_FIELD_ACTION_GAUGE_COST)
@@ -541,7 +546,6 @@ export class WorldSession {
         const remainingApByActor: Record<string, number> = {};
         for (const actor of partyActors) remainingApByActor[actor.id] = actor.remainingAp;
 
-        const viewer = viewerPlayerId ? this.players.get(viewerPlayerId) : undefined;
         const fallbackPlayer = viewer ?? [...this.players.values()].find((player) => player.active);
         return {
             seq: this.seq,
@@ -607,6 +611,28 @@ export class WorldSession {
             enemies,
             lootLocks: this.lootLocks.size,
         };
+    }
+
+    private isEnemyVisibleToViewer(entry: ServerEnemy, viewerPlayerId: string | null): boolean {
+        const viewer = viewerPlayerId ? this.players.get(viewerPlayerId) : undefined;
+        if (viewer?.activeDungeonId) return entry.scenarioPlayerId === viewer.id;
+        if (!entry.scenarioPlayerId) return true;
+        if (!viewerPlayerId) return true;
+        return entry.scenarioPlayerId === viewerPlayerId;
+    }
+
+    private isActorVisibleToViewer(actor: ServerActor, viewerPlayerId: string | null): boolean {
+        if (!viewerPlayerId) return true;
+        if (actor.ownerPlayerId === viewerPlayerId) return true;
+        const viewer = this.players.get(viewerPlayerId);
+        const owner = this.players.get(actor.ownerPlayerId);
+        if (viewer?.activeDungeonId) return false;
+        if (owner?.activeDungeonId) return false;
+        return true;
+    }
+
+    private canActorTargetEnemy(actor: ServerActor, entry: ServerEnemy): boolean {
+        return !entry.scenarioPlayerId || entry.scenarioPlayerId === actor.ownerPlayerId;
     }
 
     private handleIntent(
@@ -681,7 +707,8 @@ export class WorldSession {
             actor.facing = directionFromTo(actor.tile, next);
             actor.tile = { ...next };
         }
-        this.spawnLootNear(actor.tile, this.players.get(actor.ownerPlayerId)?.departureTownId);
+        const player = this.players.get(actor.ownerPlayerId);
+        if (!player?.activeDungeonId) this.spawnLootNear(actor.tile, player?.departureTownId);
         this.finishActorIfSpent(actor);
         return { replies: [], broadcasts: [] };
     }
@@ -720,6 +747,7 @@ export class WorldSession {
         if (!targetId) return reject(intentId, 'Attack payload must include targetId.');
         const target = this.enemies.get(targetId);
         if (!target || target.enemy.stats.hp <= 0) return reject(intentId, 'Target is not alive.');
+        if (!this.canActorTargetEnemy(actor, target)) return reject(intentId, 'Target is not visible.');
         if (actor.remainingAp < ATTACK_AP_COST) return reject(intentId, 'No action available for attack.');
 
         const range = getClassLine(actor.classLineId)?.attackRange ?? 1;
@@ -793,6 +821,7 @@ export class WorldSession {
         if (requiresTarget) {
             if (!targetId) return reject(intentId, 'Cast skill payload must include targetId.');
             if (!target || target.enemy.stats.hp <= 0) return reject(intentId, 'Target is not alive.');
+            if (!this.canActorTargetEnemy(actor, target)) return reject(intentId, 'Target is not visible.');
         }
 
         const targetTile = target ? { x: target.enemy.gridX, y: target.enemy.gridY } : undefined;
@@ -807,7 +836,9 @@ export class WorldSession {
             if (failure) return reject(intentId, 'Skill target is not valid.');
         }
 
-        const aliveEnemies = [...this.enemies.values()].filter((entry) => entry.enemy.stats.hp > 0);
+        const aliveEnemies = [...this.enemies.values()]
+            .filter((entry) => entry.enemy.stats.hp > 0)
+            .filter((entry) => this.canActorTargetEnemy(actor, entry));
         const targetEnemies = target && targetTile
             ? getSkillCandidateEnemies(aliveEnemies.map((entry) => entry.enemy), profile, this.getSkillPatternContext(actor, targetTile), target.enemy)
             : [];
@@ -843,6 +874,7 @@ export class WorldSession {
     ): WorldSessionMessageResult {
         const lootId = readStringPayload(payload, 'lootId');
         if (!lootId) return reject(intentId, 'Interact payload must include lootId.');
+        if (this.players.get(playerId)?.activeDungeonId) return reject(intentId, 'Loot is not visible.');
         const lootObject = this.loot.get(lootId);
         if (!lootObject || lootObject.opened || this.autoLootPending.has(lootId)) return reject(intentId, 'Loot is not available.');
         if (actor.remainingAp < INTERACT_AP_COST) return reject(intentId, 'No action available to inspect loot.');
@@ -956,7 +988,7 @@ export class WorldSession {
 
         const dungeon = this.worldMap.getDungeonAtTile(actor!.tile.x, actor!.tile.y);
         if (!dungeon || dungeon.id !== dungeonId) return reject(message.intentId, 'Actor is not at the requested scenario entrance.');
-        if (this.hasNearbyAggroEnemy(actor!.tile, 18)) return reject(message.intentId, 'Nearby combat must be resolved before entering a scenario.');
+        if (this.hasNearbyAggroEnemy(actor!.tile, 18, playerId)) return reject(message.intentId, 'Nearby combat must be resolved before entering a scenario.');
 
         this.removeScenarioRuntimeForPlayer(playerId);
         player!.enteredDungeonIds.add(dungeonId);
@@ -1104,12 +1136,12 @@ export class WorldSession {
     private isEnemySimulationActive(entry: ServerEnemy): boolean {
         const enemy = entry.enemy;
         const range = enemy.isAggro ? ENEMY_COMBAT_SIMULATION_RANGE : ENEMY_SIMULATION_ACTIVE_RANGE;
-        return this.hasActiveActorWithin({ x: enemy.gridX, y: enemy.gridY }, range);
+        return this.hasActiveActorWithin({ x: enemy.gridX, y: enemy.gridY }, range, entry.scenarioPlayerId);
     }
 
     private updateEnemyAggro(entry: ServerEnemy): boolean {
         const enemy = entry.enemy;
-        const targets = this.getTargetableActors();
+        const targets = this.getTargetableActors(entry);
         const enemyTile = { x: enemy.gridX, y: enemy.gridY };
         const closest = targets.reduce<ServerActor | null>((best, candidate) => {
             if (!best) return candidate;
@@ -1128,7 +1160,7 @@ export class WorldSession {
 
     private resolveEnemyTurn(entry: ServerEnemy, now: number): CombatEventMessage[] {
         const enemy = entry.enemy;
-        const targets = this.getTargetableActors();
+        const targets = this.getTargetableActors(entry);
         const enemyTile = { x: enemy.gridX, y: enemy.gridY };
         const closest = targets.reduce<ServerActor | null>((best, candidate) => {
             if (!best) return candidate;
@@ -1294,10 +1326,15 @@ export class WorldSession {
         return town?.id ?? player.departureTownId;
     }
 
-    private getTargetableActors(): ServerActor[] {
+    private getTargetableActors(entry?: ServerEnemy): ServerActor[] {
         return [...this.actors.values()]
             .filter((actor) => !actor.isDead && actor.stats.hp > 0)
-            .filter((actor) => this.players.get(actor.ownerPlayerId)?.active)
+            .filter((actor) => {
+                const owner = this.players.get(actor.ownerPlayerId);
+                if (!owner?.active) return false;
+                if (entry?.scenarioPlayerId) return actor.ownerPlayerId === entry.scenarioPlayerId;
+                return !owner.activeDungeonId;
+            })
             .sort((a, b) => {
                 const ghostA = this.players.get(a.ownerPlayerId)?.ghost ? 1 : 0;
                 const ghostB = this.players.get(b.ownerPlayerId)?.ghost ? 1 : 0;
@@ -1367,18 +1404,41 @@ export class WorldSession {
     }
 
     private isFieldPassable(query: FieldPassableQuery): boolean {
+        return this.isFieldPassableForOwner(query);
+    }
+
+    private isFieldPassableForOwner(query: FieldPassableQuery, ownerPlayerId?: string): boolean {
+        const queryOwnerPlayerId = ownerPlayerId ?? this.getEntityOwnerPlayerId(query.actorId);
+        const queryScenarioPlayerId = ownerPlayerId ?? this.getScenarioOwnerPlayerId(query.actorId);
         const tile = this.worldMap.getTileAt(query.x, query.y);
         if (!isTerrainPassable(tile)) return false;
         for (const actor of this.actors.values()) {
             if (actor.id === query.actorId || actor.isDead) continue;
+            const actorOwner = this.players.get(actor.ownerPlayerId);
+            if (actorOwner?.activeDungeonId && actor.ownerPlayerId !== queryOwnerPlayerId) continue;
+            if (queryScenarioPlayerId && actor.ownerPlayerId !== queryScenarioPlayerId) continue;
             if (actor.tile.x === query.x && actor.tile.y === query.y) return false;
         }
         for (const entry of this.enemies.values()) {
             const enemy = entry.enemy;
             if (enemy.id === query.actorId || enemy.stats.hp <= 0) continue;
+            if (entry.scenarioPlayerId && entry.scenarioPlayerId !== queryOwnerPlayerId) continue;
+            if (queryScenarioPlayerId && entry.scenarioPlayerId !== queryScenarioPlayerId) continue;
             if (enemy.gridX === query.x && enemy.gridY === query.y) return false;
         }
         return true;
+    }
+
+    private getEntityOwnerPlayerId(entityId?: string): string | null {
+        if (!entityId) return null;
+        const actor = this.actors.get(entityId);
+        if (actor) return actor.ownerPlayerId;
+        return this.getScenarioOwnerPlayerId(entityId);
+    }
+
+    private getScenarioOwnerPlayerId(entityId?: string): string | null {
+        if (!entityId) return null;
+        return this.enemies.get(entityId)?.scenarioPlayerId ?? null;
     }
 
     private hasFieldLineOfSight(from: TilePoint, to: TilePoint): boolean {
@@ -1421,12 +1481,13 @@ export class WorldSession {
         const state: ServerScenarioState = {
             playerId: player.id,
             dungeonId: scenario.dungeonId,
+            missionKind: scenario.missionKind,
             enemyIds: [],
             objectiveEnemyId: null,
             completed: false,
         };
         const layout = getStoryScenarioMonsterLayout(scenario);
-        const guardOffsets = storyScenarioGuardOffsets(scenario.guardCount, Boolean(scenario.bossName));
+        const guardOffsets = layout.guardOffsets ?? storyScenarioGuardOffsets(scenario.guardCount, Boolean(scenario.bossName));
 
         for (let index = 0; index < scenario.guardCount; index++) {
             const monsterId = layout.guardMonsterIds[index % layout.guardMonsterIds.length];
@@ -1455,7 +1516,7 @@ export class WorldSession {
                 level: scenario.bossLevel,
                 color: scenario.bossColor,
                 role: 'boss',
-                tile: { x: anchor.x + 4, y: anchor.y },
+                tile: { x: anchor.x + (layout.bossOffset?.x ?? 4), y: anchor.y + (layout.bossOffset?.y ?? 0) },
                 isObjective: true,
                 now,
                 aggroRange: Math.max(definition?.aggroRange ?? 0, 9),
@@ -1479,7 +1540,7 @@ export class WorldSession {
         aggroRange?: number;
     }): string {
         const id = `scenario_${this.nextEnemyId++}`;
-        const tile = this.findNearbyWalkableTile(input.tile, id);
+        const tile = this.findNearbyWalkableTile(input.tile, id, input.state.playerId);
         const definition = input.monsterId ? getMonsterDefinition(input.monsterId) : null;
         const enemy = new Enemy(id, tile.x, tile.y, input.name, input.level, input.color, input.role);
         enemy.aggroRange = input.aggroRange ?? definition?.aggroRange ?? enemy.aggroRange;
@@ -1551,6 +1612,7 @@ export class WorldSession {
         const visited = new Set<string>();
         for (const player of this.players.values()) {
             if (!player.active || player.ghost) continue;
+            if (player.activeDungeonId) continue;
             const anchor = this.firstLivingActorTile(player);
             if (!anchor) continue;
             const forceCenter = !this.hasNearbyLiveEnemy(anchor, FIELD_NEST_NEARBY_ENEMY_DISTANCE);
@@ -1657,21 +1719,26 @@ export class WorldSession {
 
     private hasNearbyLiveEnemy(tile: TilePoint, distance: number): boolean {
         return [...this.enemies.values()].some((entry) =>
-            entry.enemy.stats.hp > 0 && manhattan({ x: entry.enemy.gridX, y: entry.enemy.gridY }, tile) <= distance
-        );
-    }
-
-    private hasNearbyAggroEnemy(tile: TilePoint, distance: number): boolean {
-        return [...this.enemies.values()].some((entry) =>
-            entry.enemy.stats.hp > 0
-            && entry.enemy.isAggro
+            !entry.scenarioPlayerId
+            && entry.enemy.stats.hp > 0
             && manhattan({ x: entry.enemy.gridX, y: entry.enemy.gridY }, tile) <= distance
         );
     }
 
-    private hasActiveActorWithin(tile: TilePoint, distance: number): boolean {
+    private hasNearbyAggroEnemy(tile: TilePoint, distance: number, viewerPlayerId?: string): boolean {
+        return [...this.enemies.values()].some((entry) =>
+            entry.enemy.stats.hp > 0
+            && entry.enemy.isAggro
+            && (!entry.scenarioPlayerId || entry.scenarioPlayerId === viewerPlayerId)
+            && manhattan({ x: entry.enemy.gridX, y: entry.enemy.gridY }, tile) <= distance
+        );
+    }
+
+    private hasActiveActorWithin(tile: TilePoint, distance: number, ownerPlayerId?: string): boolean {
         return [...this.players.values()].some((player) => {
             if (!player.active || player.ghost) return false;
+            if (ownerPlayerId && player.id !== ownerPlayerId) return false;
+            if (!ownerPlayerId && player.activeDungeonId) return false;
             return player.actorIds.some((actorId) => {
                 const actor = this.actors.get(actorId);
                 return Boolean(actor && !actor.isDead && actor.stats.hp > 0 && manhattan(actor.tile, tile) <= distance);
@@ -1724,14 +1791,14 @@ export class WorldSession {
         };
     }
 
-    private findNearbyWalkableTile(tile: TilePoint, actorId: string): TilePoint {
-        if (this.isFieldPassable({ ...tile, actorId, intent: 'move' })) return tile;
+    private findNearbyWalkableTile(tile: TilePoint, actorId: string, ownerPlayerId?: string): TilePoint {
+        if (this.isFieldPassableForOwner({ ...tile, actorId, intent: 'move' }, ownerPlayerId)) return tile;
         for (let radius = 1; radius <= 8; radius++) {
             for (let dy = -radius; dy <= radius; dy++) {
                 for (let dx = -radius; dx <= radius; dx++) {
                     if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
                     const candidate = { x: tile.x + dx, y: tile.y + dy };
-                    if (this.isFieldPassable({ ...candidate, actorId, intent: 'move' })) return candidate;
+                    if (this.isFieldPassableForOwner({ ...candidate, actorId, intent: 'move' }, ownerPlayerId)) return candidate;
                 }
             }
         }
@@ -2147,10 +2214,17 @@ function nestStateKey(realm: ReturnType<WorldMap['getRealm']>, chunkX: number, c
 interface StoryScenarioMonsterLayout {
     bossMonsterId?: MonsterId;
     guardMonsterIds: MonsterId[];
+    guardOffsets?: TilePoint[];
+    bossOffset?: TilePoint;
 }
 
 const STORY_SCENARIO_MONSTER_LAYOUTS = {
-    [BURGOS_CASTLE_DUNGEON_ID]: { bossMonsterId: BURGOS_BOSS_MONSTER_ID, guardMonsterIds: [BURGOS_GUARD_MONSTER_ID] },
+    [BURGOS_CASTLE_DUNGEON_ID]: {
+        bossMonsterId: BURGOS_BOSS_MONSTER_ID,
+        guardMonsterIds: [BURGOS_GUARD_MONSTER_ID],
+        guardOffsets: [{ x: 1, y: -1 }, { x: 1, y: 1 }, { x: 3, y: -1 }, { x: 3, y: 1 }],
+        bossOffset: { x: 5, y: 0 },
+    },
     [ZAMORA_FORTRESS_DUNGEON_ID]: { bossMonsterId: ZAMORA_FENRIS_BOSS_MONSTER_ID, guardMonsterIds: [ZAMORA_GUARD_MONSTER_ID] },
     etna_volcano: { bossMonsterId: '466R', guardMonsterIds: ['215R', '224R', '225R'] },
     arcadia_plain: { bossMonsterId: '458R', guardMonsterIds: ['313R', '314R', '458R'] },

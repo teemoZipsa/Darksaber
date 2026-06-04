@@ -563,6 +563,66 @@ test('server-owned scenario entry spawns objective enemies and records completio
     assert.deepEqual(result?.completedDungeonIds, ['burgos_castle']);
 });
 
+test('solo interior scenario enemies stay private to the entering player', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const joinedA = session.join({
+        ...joinMessage('central_castle', 'hero-a'),
+        partyComposition: [actor('hero-a', {
+            name: 'Hero Alpha',
+            stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    const joinedB = session.join({
+        ...joinMessage('central_castle', 'hero-b'),
+        partyComposition: [actor('hero-b', {
+            name: 'Hero Beta',
+            stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    const internals = session as any;
+    const actorA = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedA.playerId);
+    const actorB = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedB.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === 'burgos_castle');
+    assert.ok(actorA);
+    assert.ok(actorB);
+    assert.ok(dungeon);
+    actorA.tile = world.getDungeonEntranceTile(dungeon);
+
+    const enter = session.handleMessage(joinedA.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-private-burgos',
+        actorId: actorA.id,
+        dungeonId: 'burgos_castle',
+    }, 1_000);
+
+    assert.equal(enter.replies.length, 0);
+    assert.equal(internals.scenarioStates.get(joinedA.playerId)?.missionKind, 'soloInterior');
+    const bossEntry = [...internals.enemies.values()].find((entry: any) => entry.scenarioObjective);
+    assert.ok(bossEntry);
+
+    const snapshotA = session.createSnapshot(joinedA.playerId, 1_000);
+    const snapshotB = session.createSnapshot(joinedB.playerId, 1_000);
+    assert.ok(snapshotA.enemies.some((enemy) => enemy.id === bossEntry.enemy.id));
+    assert.equal(snapshotB.enemies.some((enemy) => enemy.id === bossEntry.enemy.id), false);
+    assert.equal(snapshotA.partyActors.some((actorSnapshot) => actorSnapshot.ownerPlayerId === joinedB.playerId), false);
+    assert.equal(snapshotB.partyActors.some((actorSnapshot) => actorSnapshot.ownerPlayerId === joinedA.playerId), false);
+
+    actorB.actionGauge = 100;
+    actorB.remainingAp = 80;
+    actorB.tile = { x: bossEntry.enemy.gridX - 1, y: bossEntry.enemy.gridY };
+    const attack = session.handleMessage(joinedB.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'attack-hidden-burgos',
+        actorId: actorB.id,
+        kind: 'attack',
+        payload: { targetId: bossEntry.enemy.id },
+    }, 1_100);
+
+    assert.equal(attack.replies[0]?.type, 'ACTION_REJECTED');
+    assert.match(attack.replies[0]?.type === 'ACTION_REJECTED' ? attack.replies[0].reason : '', /not visible/);
+});
+
 test('scenario entry validates quest prerequisites on the server', () => {
     const session = new WorldSession();
     const world = new WorldMap();

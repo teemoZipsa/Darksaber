@@ -257,6 +257,7 @@ test('story episodes 3 through 20 have map entrances and server-session objectiv
         assert.ok(scenario.guardCount >= 0, `episode ${scenario.episode} guard count is invalid`);
         assert.ok(scenario.guardLevel >= 1, `episode ${scenario.episode} guard level is invalid`);
         assert.ok(scenario.bossLevel >= scenario.guardLevel, `episode ${scenario.episode} boss level should cover guards`);
+        assert.ok(['field', 'soloInterior', 'vehicle'].includes(scenario.missionKind), `episode ${scenario.episode} mission kind is invalid`);
         if (scenario.episode === 17) assert.equal(scenario.bossName, null, 'airship completes on boarding');
         else assert.ok(scenario.bossName, `episode ${scenario.episode} needs an objective boss name`);
     }
