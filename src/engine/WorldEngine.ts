@@ -86,6 +86,13 @@ import { WorldInputController } from './world/WorldInputController';
 import { HitStop } from './world/HitStop';
 import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
 import { NetworkRaidClient, WorldServerError, type NetworkRaidStatus } from '../net/NetworkRaidClient';
+import {
+    formatNetworkDeployFailure,
+    formatNetworkStatusLog,
+    formatReconnectRestoredLog,
+    formatWorldServerErrorLog,
+    getWorldServerErrorMessage,
+} from '../net/NetworkRaidMessages';
 import { DEFAULT_AUTH_SERVER_URL } from '../net/AuthClient';
 import {
     DEFAULT_WORLD_SERVER_URL,
@@ -164,6 +171,7 @@ export class WorldEngine {
     private networkRaidClient: NetworkRaidClient | null = null;
     private isNetworkRaid = false;
     private isNetworkRaidConnecting = false;
+    private networkWasReconnecting = false;
     private networkPlayerId: string | null = null;
     private pendingNetworkMoveReopen: { intentId: string; actorId: string; tile: TilePoint } | null = null;
     private networkMovePathPreview: { actorId: string; target: TilePoint; path: TilePoint[] } | null = null;
@@ -1164,13 +1172,13 @@ export class WorldEngine {
         const town = this.getCurrentHubTown();
         const authContext = this.gameManager.getNetworkAuthContext();
         if (!authContext) {
-            this.addCombatLog('서버 인증 정보가 없어 출격할 수 없습니다.');
+            this.addCombatLog(t('mp.deployNoAuth'));
             this.currentPhase = 'town';
             this.townSession.show(town);
             return;
         }
         this.isNetworkRaidConnecting = true;
-        this.addCombatLog('월드 서버 접속 중...');
+        this.addCombatLog(t('mp.deployConnecting'));
         const isResumeJoin = NetworkRaidClient.hasStoredResumeToken();
 
         try {
@@ -1182,7 +1190,7 @@ export class WorldEngine {
                 if (!(error instanceof WorldServerError) || error.code !== 'AUTH_FAILED') throw error;
                 const refreshed = await this.refreshNetworkAuthContext(authContext, true);
                 if (!refreshed || refreshed.accessToken === joinAuthContext.accessToken) throw error;
-                this.addCombatLog('인증 토큰 갱신 후 출격 재시도...');
+                this.addCombatLog(t('mp.deployRetryAuth'));
                 joinAuthContext = refreshed;
                 welcome = await this.connectNetworkRaid(town, targetRealm, joinAuthContext);
             }
@@ -1215,10 +1223,10 @@ export class WorldEngine {
         } catch (error) {
             if (this.shouldReloadDevAutoStartAuth(error)) {
                 console.warn('[Darksaber] Dev auth expired after server restart; reloading to issue a fresh dev session.');
-                this.addCombatLog('개발 인증이 만료되어 새 dev 세션으로 다시 접속합니다...');
+                this.addCombatLog(t('mp.devAuthReload'));
                 this.currentPhase = 'town';
                 this.townSession.show(town);
-                this.townSession.setDeployError('개발 인증 갱신 중...');
+                this.townSession.setDeployError(t('mp.devAuthRefreshing'));
                 try {
                     localStorage.removeItem('darksaber_world_resume_token');
                 } catch {
@@ -1230,13 +1238,13 @@ export class WorldEngine {
             this.isNetworkRaid = false;
             this.networkPlayerId = null;
             this.closeNetworkRaidClient(false);
-            const errorMessage = error instanceof Error ? error.message : 'unknown error';
+            const errorMessage = getWorldServerErrorMessage(error);
             console.error('[Darksaber] World deploy failed', error);
-            this.addCombatLog(`월드 서버 접속 실패: ${errorMessage}`);
-            this.addCombatLog('서버 연결 없이는 출격할 수 없습니다.');
+            this.addCombatLog(formatNetworkDeployFailure(error));
+            this.addCombatLog(t('mp.deployUnavailable'));
             this.currentPhase = 'town';
             this.townSession.show(town);
-            this.townSession.setDeployError(`월드 서버 접속 실패: ${errorMessage}`);
+            this.townSession.setDeployError(formatT('mp.deployFailed', { message: errorMessage }));
         } finally {
             this.isNetworkRaidConnecting = false;
         }
@@ -1341,7 +1349,7 @@ export class WorldEngine {
             onInventoryConsumed: (message) => this.handleNetworkInventoryConsumed(message),
             onRaidResult: (result) => this.handleNetworkRaidResult(result),
             onActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
-            onErrorMessage: (error) => this.addCombatLog(`서버 오류(${error.code}): ${error.message}`),
+            onErrorMessage: (error) => this.addCombatLog(formatWorldServerErrorLog(error)),
             onStatusChange: (status) => this.handleNetworkStatusChange(status),
             onGraceExpired: () => this.handleNetworkGraceExpired(),
         });
@@ -1350,16 +1358,21 @@ export class WorldEngine {
     private handleNetworkStatusChange(status: NetworkRaidStatus): void {
         switch (status) {
             case 'connecting':
-                this.addCombatLog('네트워크 상태: Connecting');
+                this.addCombatLog(formatNetworkStatusLog(status));
                 break;
             case 'connected':
-                this.addCombatLog('네트워크 상태: Connected');
+                this.addCombatLog(this.networkWasReconnecting
+                    ? formatReconnectRestoredLog()
+                    : formatNetworkStatusLog(status));
+                this.networkWasReconnecting = false;
                 break;
             case 'reconnecting':
-                this.addCombatLog('네트워크 상태: Reconnecting');
+                this.networkWasReconnecting = true;
+                this.addCombatLog(formatNetworkStatusLog(status));
                 break;
             case 'disconnected':
-                this.addCombatLog('네트워크 상태: Disconnected');
+                this.addCombatLog(formatNetworkStatusLog(status));
+                this.networkWasReconnecting = false;
                 break;
             case 'idle':
                 break;
@@ -1823,7 +1836,7 @@ export class WorldEngine {
 
     private handleNetworkGraceExpired(): void {
         if (!this.isNetworkRaid || !this.raidSession.active) return;
-        this.addCombatLog('월드 서버 재접속 시간이 초과되었습니다.');
+        this.addCombatLog(t('mp.graceExpired'));
         this.closeNetworkRaidClient(false);
         this.isNetworkRaid = false;
         this.networkPlayerId = null;
