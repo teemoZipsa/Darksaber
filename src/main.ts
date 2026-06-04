@@ -11,6 +11,8 @@ import { mountUiOverlay } from './ui/react/mountOverlay';
 import { mountAuthGate } from './ui/react/auth/mountAuthGate';
 import { AuthApiError, AuthClient, type AuthSessionResponse } from './net/AuthClient';
 
+type DevStartMode = 'town' | 'raid' | 'tutorial';
+
 async function init(): Promise<void> {
     SettingsManager.init();
 
@@ -43,11 +45,16 @@ async function init(): Promise<void> {
     const uiStore = mountUiOverlay(manager);
     manager.attachUiStore(uiStore);
 
-    if (isDevAutoStartEnabled()) {
+    const devStartMode = getDevStartMode();
+    if (devStartMode) {
         clearDevWorldResumeToken();
-        window.setTimeout(() => { void enterDevTown(manager); }, 550);
+        window.setTimeout(() => {
+            if (devStartMode === 'tutorial') enterDevTutorial(manager);
+            else void enterDevTown(manager, devStartMode);
+        }, 550);
     } else {
         mountAuthGate(manager);
+        mountDevLauncher();
     }
 
     // DEV-only debug handle — lets tooling drive/inspect the game in a headless
@@ -57,10 +64,13 @@ async function init(): Promise<void> {
     console.log('🎮 Darksaber : Extraction started');
 }
 
-function isDevAutoStartEnabled(): boolean {
-    if (!import.meta.env.DEV) return false;
+function getDevStartMode(): DevStartMode | null {
+    if (!import.meta.env.DEV) return null;
     const value = new URLSearchParams(window.location.search).get('devStart');
-    return value === '1' || value === 'town';
+    if (value === '1' || value === 'town') return 'town';
+    if (value === 'raid') return 'raid';
+    if (value === 'tutorial') return 'tutorial';
+    return null;
 }
 
 function clearDevWorldResumeToken(): void {
@@ -71,7 +81,7 @@ function clearDevWorldResumeToken(): void {
     }
 }
 
-async function enterDevTown(manager: GameManager): Promise<void> {
+async function enterDevTown(manager: GameManager, mode: Extract<DevStartMode, 'town' | 'raid'>): Promise<void> {
     try {
         const client = new AuthClient();
         const session = await loginOrRegisterDevAccount(client);
@@ -88,10 +98,42 @@ async function enterDevTown(manager: GameManager): Promise<void> {
             accountProgress: selected.accountProgress,
             authClient: client,
         });
+        if (mode === 'raid') scheduleDevRaidDeploy(manager);
     } catch (error) {
         console.error('[Darksaber] Dev autostart failed', error);
         mountAuthGate(manager);
     }
+}
+
+function enterDevTutorial(manager: GameManager): void {
+    manager.completeCharacterCreation('Dev Hero', 'infantry', 'M');
+}
+
+function scheduleDevRaidDeploy(manager: GameManager): void {
+    const startedAt = performance.now();
+    const attempt = () => {
+        const townSession = manager.getTownSession();
+        if (townSession?.isVisible()) {
+            townSession.ui.requestDeploy(Number.POSITIVE_INFINITY);
+            return;
+        }
+        if (performance.now() - startedAt < 6000) window.setTimeout(attempt, 120);
+        else console.warn('[Darksaber] Dev raid autostart timed out before town became visible.');
+    };
+    window.setTimeout(attempt, 700);
+}
+
+function mountDevLauncher(): void {
+    if (!import.meta.env.DEV) return;
+    const root = document.createElement('div');
+    root.className = 'dev-launcher';
+    root.innerHTML = `
+        <div class="dev-launcher__title">DEV</div>
+        <a href="/?devStart=town">Town</a>
+        <a href="/?devStart=raid">Raid</a>
+        <a href="/?devStart=tutorial">Tutorial</a>
+    `;
+    document.body.appendChild(root);
 }
 
 async function loginOrRegisterDevAccount(client: AuthClient): Promise<AuthSessionResponse> {

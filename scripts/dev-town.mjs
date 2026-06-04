@@ -52,5 +52,7 @@ process.on('SIGTERM', () => {
 });
 process.on('exit', shutdown);
 
+const mode = process.argv[2] === 'raid' ? 'raid' : 'town';
+
 run('world', ['run', 'server']);
-run('vite', ['run', 'dev', '--', '--open', '/?devStart=town']);
+run('vite', ['run', 'dev', '--', '--open', `/?devStart=${mode}`]);

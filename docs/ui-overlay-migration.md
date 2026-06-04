@@ -34,7 +34,8 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
 | 인벤토리 | `src/ui/react/inventory/InventoryPanel.tsx` | 월드(I)·마을 창고 공용 DOM 패널. 드래그 해석은 `InventoryUI` 모델 액션에 유지. |
 
 ## 남음 (다음 순서)
-1. **레이드 전리품 end-to-end 수동 검증** — DOM 인벤토리의 일반 DnD/소켓/퀵트랜스퍼는 실제 포인터로 확인됨. 전리품 콜백은 모델 테스트로 보강했지만, 실제 레이드 화면에서 전리품 생성 후 드롭까지는 별도 전투/상자 조건이 필요.
+1. **레이드 전리품 end-to-end 수동 검증** — DOM 인벤토리의 일반 DnD/소켓/퀵트랜스퍼는 실제 포인터로 확인됨. 전리품 콜백은 모델 테스트로 보강했고 `devStart=raid`로 레이드 자동 진입도 가능하지만, 실제 레이드 화면에서 전리품 생성 후 드롭까지는 별도 전투/상자 조건이 필요.
+2. **실제 레이드 화면 어그로 수동 검증** — 어그로 상태 적의 추격/인접 공격은 모델 회귀 테스트로 보강됨. Browser에서 레이드 자동 진입은 확인했지만, 실제 몬스터 조우 화면에서 추격/공격을 보는 수동 검증은 남음.
 
 ## 마을(Town) 이전 메모
 - `TownUI`는 더 이상 캔버스 크롬이나 storage 인벤토리를 그리지 않음. 상태·탭·소문·상점/인벤토리 모델 참조만 유지하고 React `TownScreen`/`InventoryPanel`이 그림.
@@ -53,6 +54,10 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
 
 ## 실행 & 검증
 - 개발 서버: `npm run dev` (Vite, http://127.0.0.1:5731).
+- 개발자 바로 시작:
+  - `npm run dev:town` 또는 `/?devStart=town`: 튜토리얼을 건너뛰고 마을로 진입.
+  - `npm run dev:raid` 또는 `/?devStart=raid`: 마을 출격 경로를 통해 레이드 자동 진입.
+  - `npm run dev:tutorial` 또는 `/?devStart=tutorial`: 캐릭터 생성 없이 튜토리얼 대련장으로 진입.
 - 타입체크: `npx tsc --noEmit`.
 - **헤드리스 프리뷰 주의**: 탭이 숨겨지면 브라우저가 `requestAnimationFrame`을 멈춰 루프가 정지 → 스크린샷/자동 tick 불가. 대응:
   - `GameManager.scheduleFrame()`에 **DEV 전용 setTimeout 폴백**(hidden일 때) — 프로덕션 무영향.

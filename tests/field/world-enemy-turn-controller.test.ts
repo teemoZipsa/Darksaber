@@ -169,6 +169,41 @@ test('move decisions invoke movement controller', () => {
     assert.ok(distance({ x: kiter.enemy.gridX, y: kiter.enemy.gridY }, { x: closeTarget.entity.gridX, y: closeTarget.entity.gridY }) > 1);
 });
 
+test('aggro enemy turn chases when out of range and attacks once adjacent', () => {
+    const previousRandom = Math.random;
+    Math.random = () => 0;
+
+    try {
+        const actor = makeActor('hero', 3, 0);
+        actor.character.stats.def = 0;
+        const enemyEntry = makeEnemyEntry('chaser', 0, 0);
+        enemyEntry.enemy.stats.atk = 30;
+        enemyEntry.enemy.stats.critRate = 0;
+        const { controller, events } = makeHarness([actor], [enemyEntry]);
+
+        const chaseResult = controller.beginEnemyTurn(enemyEntry);
+
+        assert.equal(chaseResult.executed, false);
+        assert.deepEqual({ x: enemyEntry.enemy.gridX, y: enemyEntry.enemy.gridY }, { x: 1, y: 0 });
+        assert.equal(events.includes('attack-cue'), false);
+
+        events.length = 0;
+        enemyEntry.enemy.gridX = 2;
+        enemyEntry.enemy.gridY = 0;
+        enemyEntry.enemy.pixelX = 2;
+        enemyEntry.enemy.pixelY = 0;
+
+        const attackResult = controller.beginEnemyTurn(enemyEntry);
+
+        assert.equal(attackResult.executed, true);
+        assert.deepEqual({ x: enemyEntry.enemy.gridX, y: enemyEntry.enemy.gridY }, { x: 2, y: 0 });
+        assert.ok(events.includes('attack-cue'));
+        assert.ok(events.some((event) => event.startsWith('damage:')));
+    } finally {
+        Math.random = previousRandom;
+    }
+});
+
 test('immobilized move decision emits root feedback without moving', () => {
     const target = makeActor('hero', 3, 0);
     const rooted = makeEnemyEntry('rooted', 0, 0);

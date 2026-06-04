@@ -2,6 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { CHAR_CLASSES } from '../../src/data/characterClasses';
+import { MASTER_CLASSES } from '../../src/data/ClassTree';
+import { REST_FACILITIES } from '../../src/data/RestFacilityData';
+import { STORY_QUESTS, getStoryCompanionRewards } from '../../src/data/StoryQuestData';
+import { TOWN_FACILITY_META } from '../../src/data/TownFacilityData';
+import { EQUIP_SLOT_LIST } from '../../src/inventory/InventoryUI';
+import { SHOP_KIND_TABS } from '../../src/ui/ShopUI';
 
 function walkFiles(dir: string): string[] {
     const out: string[] = [];
@@ -43,6 +50,45 @@ function collectLiteralUiKeys(): Set<string> {
     return keys;
 }
 
+function collectDataDrivenUiKeys(): Set<string> {
+    const keys = new Set<string>();
+    const add = (key: string | undefined | null) => {
+        if (key) keys.add(key);
+    };
+
+    for (const cfg of CHAR_CLASSES) add(cfg.labelKey);
+    for (const entry of EQUIP_SLOT_LIST) add(entry.labelKey);
+    for (const tab of SHOP_KIND_TABS) add(tab.labelKey);
+    for (const meta of Object.values(TOWN_FACILITY_META)) add(meta.labelKey);
+
+    for (const facility of Object.values(REST_FACILITIES)) {
+        add(facility?.nameKey);
+        for (const menu of facility?.menu ?? []) {
+            add(menu.nameKey);
+            add(menu.descKey);
+        }
+    }
+
+    for (const quest of STORY_QUESTS) {
+        add(quest.titleKey);
+        add(quest.summaryKey);
+        add(quest.objectiveKey);
+        add(quest.recommendedLevelKey);
+        add(quest.enterLogKey);
+        add(quest.objectiveCompleteLogKey);
+    }
+    for (const reward of getStoryCompanionRewards()) add(reward.nameKey);
+
+    for (const type of ['damage', 'heal', 'buff', 'debuff', 'aoe']) add(`magic.type.${type}`);
+    for (const element of ['fire', 'ice', 'lightning', 'holy', 'dark', 'earth', 'wind', 'physical', 'none']) add(`magic.element.${element}`);
+    for (const rarity of ['common', 'uncommon', 'rare', 'epic', 'legend', 'unique']) add(`rarity.${rarity}`);
+    for (const slot of ['weapon', 'shield', 'head', 'body', 'boots', 'accessory', 'accessory2']) add(`inv.${slot}`);
+    for (const branch of MASTER_CLASSES.map((master) => master.branch)) add(`tierChart.branch.${branch}`);
+    for (const status of ['active', 'objectiveComplete', 'completed']) add(`quest.status.${status}`);
+
+    return keys;
+}
+
 function collectLanguageKeys(lang: 'ko' | 'en'): Set<string> {
     const text = readFileSync(join(process.cwd(), 'src/i18n/LanguageManager.ts'), 'utf8');
     const stringsBlock = objectBlockAfter(text, 'strings:');
@@ -52,6 +98,15 @@ function collectLanguageKeys(lang: 'ko' | 'en'): Set<string> {
 
 test('literal UI translation keys exist in both languages', () => {
     const used = collectLiteralUiKeys();
+    const ko = collectLanguageKeys('ko');
+    const en = collectLanguageKeys('en');
+
+    assert.deepEqual([...used].filter((key) => !ko.has(key)).sort(), []);
+    assert.deepEqual([...used].filter((key) => !en.has(key)).sort(), []);
+});
+
+test('data-driven UI translation keys exist in both languages', () => {
+    const used = collectDataDrivenUiKeys();
     const ko = collectLanguageKeys('ko');
     const en = collectLanguageKeys('en');
 
