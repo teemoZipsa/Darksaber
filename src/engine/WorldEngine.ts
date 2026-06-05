@@ -5,7 +5,6 @@
 
 import { Camera } from './Camera';
 import { InputManager } from './InputManager';
-import { AudioManager } from './AudioManager';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
 import { LootObject } from '../entity/LootObject';
@@ -17,7 +16,6 @@ import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
 import { rollBossRune } from '../data/SocketLoot';
 import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
-import { normalizeLoadout } from '../magic/MagicLoadout';
 import { getClassAttackProfile } from '../data/AttackPatternProfiles';
 import { formatT, t } from '../i18n/LanguageManager';
 import {
@@ -60,7 +58,6 @@ import {
     isTerrainLineOfSightBlocking,
     TerrainActorTraits,
 } from '../field/TerrainRules';
-import { resolveTownArrival } from '../raid/RaidRules';
 import type { AttackCue, FieldActor, FieldEnemy, FieldHitParty, FieldIntent } from '../field/FieldTypes';
 import {
     getActorAttackTargetFailure as resolveActorAttackTargetFailure,
@@ -83,27 +80,16 @@ import { WorldInputController } from './world/WorldInputController';
 import { WorldStoryScenarioController } from './world/WorldStoryScenarioController';
 import { WorldNetworkSyncController } from './world/WorldNetworkSyncController';
 import { WorldTutorialController } from './world/WorldTutorialController';
+import { WorldRaidLifecycleController } from './world/WorldRaidLifecycleController';
 import { HitStop } from './world/HitStop';
 import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
-import { NetworkRaidClient, WorldServerError, type NetworkRaidStatus } from '../net/NetworkRaidClient';
+import { NetworkRaidClient } from '../net/NetworkRaidClient';
 import {
-    formatNetworkDeployFailure,
-    formatNetworkStatusLog,
-    formatReconnectRestoredLog,
-    formatWorldServerErrorLog,
-    getWorldServerErrorMessage,
-} from '../net/NetworkRaidMessages';
-import { DEFAULT_AUTH_SERVER_URL } from '../net/AuthClient';
-import {
-    DEFAULT_WORLD_SERVER_URL,
     type ActionRejectedMessage,
-    type ActorSnapshot,
     type AutoLootGrantMessage,
     type CombatEventMessage,
     type InventoryConsumedMessage,
-    type InventoryItemCountSnapshot,
     type LootGrantMessage,
-    type RaidResultMessage,
     type WorldRealmId,
     type WorldSnapshot,
 } from '../net/WorldProtocol';
@@ -150,6 +136,7 @@ export class WorldEngine {
     private storyScenarioController: WorldStoryScenarioController;
     private networkSyncController: WorldNetworkSyncController;
     private tutorialController: WorldTutorialController;
+    private raidLifecycleController: WorldRaidLifecycleController;
     private activeTurnActorId: string | null = null;
     private readyQueue: string[] = [];
     private remainingActionPoints = 0;
@@ -551,6 +538,50 @@ export class WorldEngine {
             setPhase: (phase) => { this.currentPhase = phase; },
             log: (message) => this.addCombatLog(message),
         });
+        this.raidLifecycleController = new WorldRaidLifecycleController({
+            party: this.party,
+            playerData: this.playerData,
+            gameManager: this.gameManager,
+            raidSession: this.raidSession,
+            townSession: this.townSession,
+            raidOutcomeController: this.raidOutcomeController,
+            storyScenarioController: this.storyScenarioController,
+            networkSyncController: this.networkSyncController,
+            getWorldMap: () => this.worldMap,
+            getTownById: (townId) => this.getTownById(townId),
+            getCurrentHubTown: () => this.getCurrentHubTown(),
+            getNetworkRaidClient: () => this.networkRaidClient,
+            setNetworkRaidClient: (client) => { this.networkRaidClient = client; },
+            isNetworkRaid: () => this.isNetworkRaid,
+            setIsNetworkRaid: (isNetworkRaid) => { this.isNetworkRaid = isNetworkRaid; },
+            isNetworkRaidConnecting: () => this.isNetworkRaidConnecting,
+            setIsNetworkRaidConnecting: (isConnecting) => { this.isNetworkRaidConnecting = isConnecting; },
+            isNetworkWasReconnecting: () => this.networkWasReconnecting,
+            setNetworkWasReconnecting: (wasReconnecting) => { this.networkWasReconnecting = wasReconnecting; },
+            getNetworkPlayerId: () => this.networkPlayerId,
+            setNetworkPlayerId: (playerId) => { this.networkPlayerId = playerId; },
+            closeFieldOverlays: () => this.closeFieldOverlays(),
+            clearFieldTurnState: () => this.clearFieldTurnState(),
+            clearIntroTutorialStateForNetworkRaid: () => this.clearIntroTutorialStateForNetworkRaid(),
+            clearRemotePartyActors: () => this.remotePartyActors.clear(),
+            placePartyNear: (tile) => this.placePartyNear(tile),
+            getControlledActor: () => this.getControlledActor(),
+            setPlayer: (player) => { this.player = player; },
+            setPartyActors: (actors) => { this.partyActors = actors; },
+            setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
+            clearWorldLoot: () => { this.worldMap.loot = []; },
+            selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            syncCharacterMovementToClass: (character) => this.syncCharacterMovementToClass(character),
+            isTurnCombatActive: () => this.isTurnCombatActive(),
+            setPhase: (phase) => { this.currentPhase = phase; },
+            applyNetworkSnapshot: (snapshot) => this.applyNetworkSnapshot(snapshot),
+            handleNetworkCombatEvent: (event) => this.handleNetworkCombatEvent(event),
+            openNetworkLoot: (grant) => this.openNetworkLoot(grant),
+            handleNetworkAutoLootGrant: (grant) => this.handleNetworkAutoLootGrant(grant),
+            handleNetworkInventoryConsumed: (message) => this.handleNetworkInventoryConsumed(message),
+            handleNetworkActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
+            log: (message) => this.addCombatLog(message),
+        });
         this.tacticalController = new WorldTacticalController({
             resolveFieldHitAt: (tile) => this.resolveFieldHitAt(tile),
             getEnemyById: (enemyId) => this.getEnemyById(enemyId),
@@ -720,8 +751,8 @@ export class WorldEngine {
         this.refreshLootState();
         this.tacticalController.updateMarkers(dt);
         this.startNextReadyTurn();
-        this.updateRaidTimer(dt);
-        this.checkRaidEndConditions();
+        this.raidLifecycleController.updateRaidTimer(dt);
+        this.raidLifecycleController.checkRaidEndConditions();
         this.checkTempleArrival();
         this.storyScenarioController.checkDungeonArrival();
 
@@ -815,156 +846,11 @@ export class WorldEngine {
     }
 
     private openTown(town: TownInfo): void {
-        if (this.isNetworkRaid) {
-            // Reaching town while still flagged as a network raid means the player is
-            // abandoning the run client-side, so tell the server instead of going silent.
-            this.closeNetworkRaidClient(true);
-            this.isNetworkRaid = false;
-            this.networkPlayerId = null;
-        }
-        this.closeFieldOverlays();
-        AudioManager.stopBgm(600);
-        this.currentPhase = 'town';
-        this.raidSession.enterTown(town.id);
-        this.townSession.show(town);
+        this.raidLifecycleController.openTown(town);
     }
 
     private async beginRaidFromCurrentHub(requestedRealm?: WorldRealmId): Promise<void> {
-        if (this.isNetworkRaidConnecting) return;
-        this.clearIntroTutorialStateForNetworkRaid();
-        const targetRealm = requestedRealm ?? this.worldMap.getRealm();
-        if (this.worldMap.getRealm() !== targetRealm) this.worldMap.setRealm(targetRealm);
-        const town = this.getCurrentHubTown();
-        const authContext = this.gameManager.getNetworkAuthContext();
-        if (!authContext) {
-            this.addCombatLog(t('mp.deployNoAuth'));
-            this.currentPhase = 'town';
-            this.townSession.show(town);
-            return;
-        }
-        this.isNetworkRaidConnecting = true;
-        this.addCombatLog(t('mp.deployConnecting'));
-        const isResumeJoin = NetworkRaidClient.hasStoredResumeToken();
-
-        try {
-            let joinAuthContext = await this.refreshNetworkAuthContext(authContext) ?? authContext;
-            let welcome;
-            try {
-                welcome = await this.connectNetworkRaid(town, targetRealm, joinAuthContext);
-            } catch (error) {
-                if (!(error instanceof WorldServerError) || error.code !== 'AUTH_FAILED') throw error;
-                const refreshed = await this.refreshNetworkAuthContext(authContext, true);
-                if (!refreshed || refreshed.accessToken === joinAuthContext.accessToken) throw error;
-                this.addCombatLog(t('mp.deployRetryAuth'));
-                joinAuthContext = refreshed;
-                welcome = await this.connectNetworkRaid(town, targetRealm, joinAuthContext);
-            }
-
-            this.applyServerCompletedQuestIds(welcome.completedQuestIds);
-            this.townSession.hide();
-            this.closeFieldOverlays();
-            this.networkPlayerId = welcome.playerId;
-            this.isNetworkRaid = true;
-            this.currentPhase = 'raid';
-            this.raidSession.beginRaidFromTown(town.id);
-            this.storyScenarioController.resetVisitState();
-            if (!isResumeJoin) {
-                this.party.resetForNewRaid();
-                this.townSession.applyPendingRestForRaidStart();
-            }
-            this.remotePartyActors.clear();
-            this.storyScenarioController.resetNetworkState();
-            this.partyActors = [];
-            this.placePartyNear(welcome.spawnTile);
-            this.player = this.getControlledActor()?.entity ?? this.player;
-            this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-            this.fieldEnemies = [];
-            this.worldMap.loot = [];
-            this.clearFieldTurnState();
-            this.addCombatLog(isResumeJoin
-                ? `${this.worldMap.getDisplayName()} 서버 원정에 재접속했습니다.`
-                : `${town.nameKr}에서 ${this.worldMap.getDisplayName()} 서버로 출격.`);
-        } catch (error) {
-            if (this.shouldReloadDevAutoStartAuth(error)) {
-                console.warn('[Darksaber] Dev auth expired after server restart; reloading to issue a fresh dev session.');
-                this.addCombatLog(t('mp.devAuthReload'));
-                this.currentPhase = 'town';
-                this.townSession.show(town);
-                this.townSession.setDeployError(t('mp.devAuthRefreshing'));
-                try {
-                    localStorage.removeItem('darksaber_world_resume_token');
-                } catch {
-                    // Ignore storage failures during dev recovery.
-                }
-                window.setTimeout(() => window.location.reload(), 250);
-                return;
-            }
-            this.isNetworkRaid = false;
-            this.networkPlayerId = null;
-            this.closeNetworkRaidClient(false);
-            const errorMessage = getWorldServerErrorMessage(error);
-            console.error('[Darksaber] World deploy failed', error);
-            this.addCombatLog(formatNetworkDeployFailure(error));
-            this.addCombatLog(t('mp.deployUnavailable'));
-            this.currentPhase = 'town';
-            this.townSession.show(town);
-            this.townSession.setDeployError(formatT('mp.deployFailed', { message: errorMessage }));
-        } finally {
-            this.isNetworkRaidConnecting = false;
-        }
-    }
-
-    private shouldReloadDevAutoStartAuth(error: unknown): boolean {
-        if (!import.meta.env.DEV) return false;
-        if (!(error instanceof WorldServerError) || error.code !== 'AUTH_FAILED') return false;
-        const devStart = new URLSearchParams(window.location.search).get('devStart');
-        return devStart === '1' || devStart === 'town';
-    }
-
-    private async connectNetworkRaid(
-        town: TownInfo,
-        requestedRealm: WorldRealmId,
-        authContext: { accessToken: string; characterId: string }
-    ) {
-        this.closeNetworkRaidClient(false);
-        this.networkRaidClient = this.createNetworkRaidClient();
-        return this.networkRaidClient.connectAndJoin({
-            accessToken: authContext.accessToken,
-            characterId: authContext.characterId,
-            originHubId: town.id,
-            partyComposition: this.createPartyCompositionSnapshot(town),
-            carriedWeight: getPartyCarriedWeight(this.gameManager.inventory.items, this.party.getCharacters()),
-            carriedItems: this.createCarriedItemCounts(),
-            completedQuestIds: Array.from(this.playerData.clearedStages),
-            requestedRealm,
-        });
-    }
-
-    private async refreshNetworkAuthContext(
-        authContext: { accessToken: string; characterId: string },
-        logFailure = false
-    ): Promise<{ accessToken: string; characterId: string } | null> {
-        try {
-            const response = await fetch(`${DEFAULT_AUTH_SERVER_URL}/auth/refresh`, {
-                method: 'POST',
-                credentials: 'include',
-            });
-            if (!response.ok) {
-                if (logFailure) this.addCombatLog(`인증 토큰 갱신 실패: HTTP ${response.status}`);
-                return null;
-            }
-            const parsed = await response.json() as unknown;
-            const accessToken = typeof parsed === 'object' && parsed !== null && 'accessToken' in parsed
-                && typeof (parsed as { accessToken?: unknown }).accessToken === 'string'
-                ? (parsed as { accessToken: string }).accessToken
-                : null;
-            if (!accessToken) return null;
-            this.gameManager.updateNetworkAccessToken(accessToken);
-            return { ...authContext, accessToken };
-        } catch (error) {
-            if (logFailure) this.addCombatLog(`인증 토큰 갱신 실패: ${error instanceof Error ? error.message : 'unknown error'}`);
-            return null;
-        }
+        return this.raidLifecycleController.beginRaidFromCurrentHub(requestedRealm);
     }
 
     private closeFieldOverlays(): void {
@@ -1002,88 +888,6 @@ export class WorldEngine {
             entry.enemy.actionGauge = 0;
             entry.enemy.isAggro = false;
         }
-    }
-
-    private createNetworkRaidClient(): NetworkRaidClient {
-        return new NetworkRaidClient({
-            url: DEFAULT_WORLD_SERVER_URL,
-            onSnapshot: (snapshot) => this.applyNetworkSnapshot(snapshot),
-            onCombatEvent: (event) => this.handleNetworkCombatEvent(event),
-            onLootGrant: (grant) => this.openNetworkLoot(grant),
-            onAutoLootGrant: (grant) => this.handleNetworkAutoLootGrant(grant),
-            onInventoryConsumed: (message) => this.handleNetworkInventoryConsumed(message),
-            onRaidResult: (result) => this.handleNetworkRaidResult(result),
-            onActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
-            onErrorMessage: (error) => this.addCombatLog(formatWorldServerErrorLog(error)),
-            onStatusChange: (status) => this.handleNetworkStatusChange(status),
-            onGraceExpired: () => this.handleNetworkGraceExpired(),
-        });
-    }
-
-    private handleNetworkStatusChange(status: NetworkRaidStatus): void {
-        switch (status) {
-            case 'connecting':
-                this.addCombatLog(formatNetworkStatusLog(status));
-                break;
-            case 'connected':
-                this.addCombatLog(this.networkWasReconnecting
-                    ? formatReconnectRestoredLog()
-                    : formatNetworkStatusLog(status));
-                this.networkWasReconnecting = false;
-                break;
-            case 'reconnecting':
-                this.networkWasReconnecting = true;
-                this.addCombatLog(formatNetworkStatusLog(status));
-                break;
-            case 'disconnected':
-                this.addCombatLog(formatNetworkStatusLog(status));
-                this.networkWasReconnecting = false;
-                break;
-            case 'idle':
-                break;
-        }
-    }
-
-    private createPartyCompositionSnapshot(town: TownInfo): ActorSnapshot[] {
-        const exit = this.worldMap.getTownExitTile(town);
-        return this.party.getCharacters().slice(0, this.party.MAX_ACTIVE_PARTY_SIZE).map((character, index) => {
-            this.syncCharacterMovementToClass(character);
-            return {
-                id: character.id,
-                localActorId: character.id,
-                name: character.name,
-                classLineId: character.classLineId,
-                currentTier: character.currentTier,
-                level: character.level,
-                tile: {
-                    x: exit.x + (index === 2 ? 1 : 0),
-                    y: exit.y + (index === 1 ? 1 : 0),
-                },
-                stats: { ...character.stats },
-                statuses: character.statuses.map((status) => ({ ...status })),
-                actionGauge: 0,
-                remainingAp: 0,
-                majorActionUsed: false,
-                facing: 'down',
-                isDead: character.isDead,
-                magicLoadout: normalizeLoadout(character.magicLoadout, character),
-                skillUpgradeLevels: { ...character.skillUpgradeLevels },
-            };
-        });
-    }
-
-    private createCarriedItemCounts(): InventoryItemCountSnapshot[] {
-        const counts = new Map<string, number>();
-        for (const placed of this.gameManager.inventory.items) {
-            const quantity = Math.max(1, Math.floor(placed.quantity));
-            counts.set(placed.item.id, (counts.get(placed.item.id) ?? 0) + quantity);
-        }
-        return [...counts.entries()].map(([itemId, quantity]) => ({ itemId, quantity }));
-    }
-
-    private applyServerCompletedQuestIds(completedQuestIds: readonly string[] | undefined): void {
-        if (!completedQuestIds) return;
-        this.playerData.clearedStages = new Set(completedQuestIds);
     }
 
     private updateNetworkRaid(dt: number, input: InputManager, camera: Camera): void {
@@ -1143,44 +947,6 @@ export class WorldEngine {
 
     private handleNetworkCombatEvent(event: CombatEventMessage): void {
         this.networkSyncController.handleCombatEvent(event);
-    }
-
-    private handleNetworkRaidResult(result: RaidResultMessage): void {
-        if (result.playerId !== this.networkPlayerId) return;
-        this.closeNetworkRaidClient(false);
-        this.isNetworkRaid = false;
-        this.networkPlayerId = null;
-        this.raidSession.elapsedSeconds = result.elapsedSeconds;
-        this.raidSession.kills = result.kills;
-        this.storyScenarioController.applyNetworkScenarioResult(result.completedDungeonIds);
-        if (result.result === 'SURVIVED') {
-            const town = this.getTownById(result.extractionTownId) ?? this.getCurrentHubTown();
-            this.raidOutcomeController.completeSuccess(town);
-        } else if (result.result === 'DEAD' || result.result === 'MIA') {
-            this.raidOutcomeController.completeFailure(result.result);
-        } else {
-            this.raidSession.failBackToTown(this.raidSession.currentHubTownId);
-            this.openTown(this.getCurrentHubTown());
-        }
-    }
-
-    private handleNetworkGraceExpired(): void {
-        if (!this.isNetworkRaid || !this.raidSession.active) return;
-        this.addCombatLog(t('mp.graceExpired'));
-        this.closeNetworkRaidClient(false);
-        this.isNetworkRaid = false;
-        this.networkPlayerId = null;
-        this.raidOutcomeController.completeFailure('MIA');
-    }
-
-    private closeNetworkRaidClient(sendLeave: boolean, reason: 'town' | 'wipe' | 'manual' = 'manual'): void {
-        this.networkSyncController.clearPendingState();
-        this.storyScenarioController.resetNetworkState();
-        this.remotePartyActors.clear();
-        if (!this.networkRaidClient) return;
-        if (sendLeave) this.networkRaidClient.leave(reason);
-        else this.networkRaidClient.close();
-        this.networkRaidClient = null;
     }
 
     private checkTempleArrival(): void {
@@ -1361,18 +1127,6 @@ export class WorldEngine {
         }
     }
 
-    private updateRaidTimer(dt: number): void {
-        const result = this.raidSession.advanceTimer(dt, {
-            townVisible: this.townSession.isVisible(),
-            resultVisible: this.raidOutcomeController.isVisible(),
-            turnCombatActive: this.isTurnCombatActive(),
-        });
-        if (result.advanced) this.townSession.advancePartyTimedRestStatuses(dt);
-        if (result.expired) {
-            this.raidOutcomeController.completeFailure('MIA');
-        }
-    }
-
     private isTurnCombatActive(): boolean {
         if (this.fieldEnemies.some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro)) return true;
         if (this.activeTurnActorId) return true;
@@ -1383,36 +1137,6 @@ export class WorldEngine {
         if (this.magicController.isActive()) return true;
         if (this.toolController?.isActive()) return true;
         return this.partyActors.some((actor) => actor.queuedIntent || actor.path.length > 0);
-    }
-
-    private checkRaidEndConditions(): void {
-        if (!this.raidSession.active || this.raidOutcomeController.isVisible()) return;
-        if (this.party.isSquadWiped()) {
-            this.raidOutcomeController.completeFailure('DEAD');
-            return;
-        }
-        this.checkTownArrival();
-    }
-
-    private checkTownArrival(): void {
-        const actor = this.getControlledActor();
-        if (!actor || !this.worldMap.isWalkable(actor.entity.gridX, actor.entity.gridY)) return;
-
-        const town = this.worldMap.getTownAtTile(actor.entity.gridX, actor.entity.gridY);
-        const arrival = resolveTownArrival(town?.id, this.raidSession.departureTownId, this.raidSession.active);
-        if (arrival.kind === 'none') {
-            this.raidSession.clearDepartureBlock();
-            return;
-        }
-        if (arrival.kind === 'departureBlocked') {
-            if (this.raidSession.shouldReportDepartureBlock(arrival.townId)) {
-                this.addCombatLog('출발한 마을로는 생환할 수 없습니다. 다른 마을로 이동하세요.');
-            }
-            return;
-        }
-
-        const destination = town ?? this.getTownById(arrival.townId ?? '') ?? this.getCurrentHubTown();
-        this.raidOutcomeController.completeSuccess(destination);
     }
 
     private applyCombatResult(result: CombatResult): void {
