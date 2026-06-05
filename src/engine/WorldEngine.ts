@@ -78,8 +78,8 @@ import { WorldRaidLifecycleController } from './world/WorldRaidLifecycleControll
 import { WorldTempleController } from './world/WorldTempleController';
 import { WorldRestingController } from './world/WorldRestingController';
 import { WorldLootController } from './world/WorldLootController';
-import { HitStop } from './world/HitStop';
-import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
+import { WorldCombatFeedbackController } from './world/WorldCombatFeedbackController';
+import type { CombatFeedbackKind } from './world/CombatFeedback';
 import { NetworkRaidClient } from '../net/NetworkRaidClient';
 import {
     type ActionRejectedMessage,
@@ -137,6 +137,7 @@ export class WorldEngine {
     private templeController: WorldTempleController;
     private restingController: WorldRestingController;
     private lootController: WorldLootController;
+    private combatFeedbackController: WorldCombatFeedbackController;
     private activeTurnActorId: string | null = null;
     private readyQueue: string[] = [];
     private remainingActionPoints = 0;
@@ -144,7 +145,6 @@ export class WorldEngine {
     private reservedAction: FieldIntent | null = null;
     private hoverTile: TilePoint = { x: -1, y: -1 };
     private combatLog: string[] = [];
-    private feedbackGroups = new Map<string, CombatFeedbackKind>();
     private followRepathTimer: number = 0;
     private fanfareLeaderActorId: string | null = null;
     private floatingText = new FloatingTextManager();
@@ -177,6 +177,10 @@ export class WorldEngine {
             getEnemies: () => this.fieldEnemies.map((entry) => entry.enemy),
             getExtractionZones: () => this.worldMap.extractionZones,
             getLoot: () => this.worldMap.loot,
+        });
+        this.combatFeedbackController = new WorldCombatFeedbackController({
+            getWorldTime: () => this.worldTime,
+            shakeCamera: (amount, durationMs) => this.camera.shake(amount, durationMs),
         });
         const initialHubTownId = this.getTownById(this.playerData.currentHubTownId)?.id ?? 'central_castle';
         this.raidSession = new WorldRaidSession(initialHubTownId);
@@ -1665,31 +1669,15 @@ export class WorldEngine {
     }
 
     private beginCombatFeedbackGroup(): string {
-        const id = `world:${this.worldTime}:${this.feedbackGroups.size + 1}:${Math.random().toString(36).slice(2, 8)}`;
-        this.feedbackGroups.set(id, 'status');
-        return id;
+        return this.combatFeedbackController.beginGroup();
     }
 
     private registerCombatFeedback(kind: CombatFeedbackKind, feedbackGroupId?: string): void {
-        if (!feedbackGroupId) {
-            this.applyCombatFeedback(kind);
-            return;
-        }
-        const current = this.feedbackGroups.get(feedbackGroupId);
-        this.feedbackGroups.set(feedbackGroupId, strongerCombatFeedback(current, kind));
+        this.combatFeedbackController.register(kind, feedbackGroupId);
     }
 
     private flushCombatFeedbackGroup(feedbackGroupId: string): void {
-        const kind = this.feedbackGroups.get(feedbackGroupId);
-        if (!kind) return;
-        this.feedbackGroups.delete(feedbackGroupId);
-        this.applyCombatFeedback(kind);
-    }
-
-    private applyCombatFeedback(kind: CombatFeedbackKind): void {
-        const feedback = HIT_FEEDBACK[kind];
-        if (feedback.shake > 0) this.camera.shake(feedback.shake, feedback.shakeMs);
-        if (feedback.hitstopMs > 0) HitStop.freeze(feedback.hitstopMs);
+        this.combatFeedbackController.flush(feedbackGroupId);
     }
 
     private spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void {

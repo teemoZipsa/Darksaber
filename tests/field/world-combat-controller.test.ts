@@ -8,6 +8,7 @@ import { TileType } from '../../src/map/Tile';
 import type { FieldActor } from '../../src/field/FieldTypes';
 import type { AttackPatternProfile } from '../../src/field/TargetPatterns';
 import { WorldCombatController, type CombatEventSink } from '../../src/engine/world/WorldCombatController';
+import { WorldCombatFeedbackController } from '../../src/engine/world/WorldCombatFeedbackController';
 
 class ImageStub {
     public src = '';
@@ -16,6 +17,21 @@ class ImageStub {
 }
 
 (globalThis as unknown as { Image: typeof ImageStub }).Image = ImageStub;
+
+test('world combat feedback group flushes the strongest registered feedback', () => {
+    const shakes: { amount: number; durationMs: number }[] = [];
+    const controller = new WorldCombatFeedbackController({
+        getWorldTime: () => 42,
+        shakeCamera: (amount, durationMs) => shakes.push({ amount, durationMs }),
+    });
+
+    const groupId = controller.beginGroup();
+    controller.register('normal', groupId);
+    controller.register('kill', groupId);
+    controller.flush(groupId);
+
+    assert.deepEqual(shakes, [{ amount: 16, durationMs: 320 }]);
+});
 
 test('world combat controller applies actor attack damage and returns defeated enemies', () => {
     const previousRandom = Math.random;
