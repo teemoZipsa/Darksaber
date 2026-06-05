@@ -33,4 +33,5 @@ See `docs/monster-balance.md` for the detailed model and tests.
 - `WorldNetworkSyncController` owns client-side network snapshot application, network combat event presentation, network loot grants, and pending network move/loot state.
 - `WorldTutorialController` owns intro tutorial state, training map setup/teardown, tutorial action gating, and tutorial HUD rendering.
 - `WorldRaidLifecycleController` owns town entry, network raid deploy/resume, network raid result handling, raid timer expiry, and extraction-town arrival checks.
+- `WorldTempleController` owns fusion temple arrival, fusion callbacks, master-world entry, and mortal-world return flow.
 - `WorldEngine` should access active story-interior state through the controller instead of owning that state directly.

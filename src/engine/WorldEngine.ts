@@ -42,8 +42,6 @@ import { MinimapUI } from '../ui/MinimapUI';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
-import { fuseActivePartyBranch, getFusionCandidates, hasActiveMasterCharacter } from '../character/FusionSystem';
-import type { MasterBranch } from '../data/ClassTree';
 import { TilePoint, manhattan, tileKey } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
 import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST, enqueueReadyActor, type FieldApAction } from '../field/FieldActionEconomy';
@@ -81,6 +79,7 @@ import { WorldStoryScenarioController } from './world/WorldStoryScenarioControll
 import { WorldNetworkSyncController } from './world/WorldNetworkSyncController';
 import { WorldTutorialController } from './world/WorldTutorialController';
 import { WorldRaidLifecycleController } from './world/WorldRaidLifecycleController';
+import { WorldTempleController } from './world/WorldTempleController';
 import { HitStop } from './world/HitStop';
 import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
 import { NetworkRaidClient } from '../net/NetworkRaidClient';
@@ -137,6 +136,7 @@ export class WorldEngine {
     private networkSyncController: WorldNetworkSyncController;
     private tutorialController: WorldTutorialController;
     private raidLifecycleController: WorldRaidLifecycleController;
+    private templeController: WorldTempleController;
     private activeTurnActorId: string | null = null;
     private readyQueue: string[] = [];
     private remainingActionPoints = 0;
@@ -152,7 +152,6 @@ export class WorldEngine {
     private effectManager = new EffectManager();
     private attackCues: AttackCue[] = [];
     private worldTime: number = 0;
-    private dismissedTempleVisitKey: string | null = null;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -189,12 +188,26 @@ export class WorldEngine {
             onDeploy: () => this.beginRaidFromCurrentHub(),
             log: (message) => this.addCombatLog(message),
         });
-        this.fusionTempleUI.onFuse = (branch) => this.performTempleFusion(branch);
-        this.fusionTempleUI.onEnterMasterWorld = () => this.enterMasterWorld();
-        this.fusionTempleUI.onReturnToMortalWorld = () => this.returnToMortalWorld();
-        this.fusionTempleUI.onClose = () => {
-            this.dismissedTempleVisitKey = this.getCurrentTempleVisitKey();
-        };
+        this.templeController = new WorldTempleController({
+            party: this.party,
+            raidSession: this.raidSession,
+            fusionTempleUI: this.fusionTempleUI,
+            getWorldMap: () => this.worldMap,
+            getControlledActor: () => this.getControlledActor(),
+            getFieldEnemies: () => this.fieldEnemies,
+            isNetworkRaid: () => this.isNetworkRaid,
+            getPhase: () => this.currentPhase,
+            setPhase: (phase) => { this.currentPhase = phase; },
+            beginRaidFromCurrentHub: (realm) => { void this.beginRaidFromCurrentHub(realm); },
+            closeFieldOverlays: () => this.closeFieldOverlays(),
+            clearFieldTurnState: () => this.clearFieldTurnState(),
+            placePartyNear: (tile) => this.placePartyNear(tile),
+            setPlayer: (player) => { this.player = player; },
+            setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
+            clearWorldLoot: () => { this.worldMap.loot = []; },
+            selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            log: (message) => this.addCombatLog(message),
+        });
         this.storyScenarioController = new WorldStoryScenarioController({
             playerData: this.playerData,
             raidSession: this.raidSession,
@@ -753,7 +766,7 @@ export class WorldEngine {
         this.startNextReadyTurn();
         this.raidLifecycleController.updateRaidTimer(dt);
         this.raidLifecycleController.checkRaidEndConditions();
-        this.checkTempleArrival();
+        this.templeController.checkArrival();
         this.storyScenarioController.checkDungeonArrival();
 
         const controlled = this.getControlledActor();
@@ -947,93 +960,6 @@ export class WorldEngine {
 
     private handleNetworkCombatEvent(event: CombatEventMessage): void {
         this.networkSyncController.handleCombatEvent(event);
-    }
-
-    private checkTempleArrival(): void {
-        const actor = this.getControlledActor();
-        if (!actor) return;
-
-        const temple = this.worldMap.getTempleAtTile(actor.entity.gridX, actor.entity.gridY);
-        if (!temple) {
-            this.dismissedTempleVisitKey = null;
-            return;
-        }
-
-        const key = this.getCurrentTempleVisitKey();
-        if (!key || this.dismissedTempleVisitKey === key || this.fusionTempleUI.isVisible()) return;
-
-        const hostileActive = this.fieldEnemies.some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro);
-        if (hostileActive) {
-            this.addCombatLog('주변의 적을 정리해야 신전에 들어갈 수 있습니다.');
-            this.dismissedTempleVisitKey = key;
-            return;
-        }
-
-        this.openFusionTemple();
-    }
-
-    private openFusionTemple(): void {
-        this.closeFieldOverlays();
-        this.clearFieldTurnState();
-        this.fusionTempleUI.show({
-            realm: this.worldMap.getRealm(),
-            candidates: getFusionCandidates(this.party),
-            canEnterMasterWorld: hasActiveMasterCharacter(this.party),
-        });
-        this.addCombatLog(this.worldMap.getRealm() === 'master' ? '현세의 문에 도착했습니다.' : '융합의 신전에 들어섰습니다.');
-    }
-
-    private performTempleFusion(branch: MasterBranch): void {
-        const result = fuseActivePartyBranch(this.party, branch);
-        this.addCombatLog(result.message);
-        if (!result.success) {
-            this.fusionTempleUI.show({
-                realm: this.worldMap.getRealm(),
-                candidates: getFusionCandidates(this.party),
-                canEnterMasterWorld: hasActiveMasterCharacter(this.party),
-            });
-            return;
-        }
-
-        this.fusionTempleUI.hide();
-        this.enterMasterWorld();
-    }
-
-    private enterMasterWorld(): void {
-        if (!hasActiveMasterCharacter(this.party)) {
-            this.addCombatLog('마스터 클래스가 있어야 마스터 월드에 들어갈 수 있습니다.');
-            return;
-        }
-
-        this.fusionTempleUI.hide();
-        void this.beginRaidFromCurrentHub('master');
-    }
-
-    private returnToMortalWorld(): void {
-        this.fusionTempleUI.hide();
-        if (this.isNetworkRaid || this.currentPhase === 'raid') {
-            void this.beginRaidFromCurrentHub('mortal');
-            return;
-        }
-        this.raidSession.failBackToTown(this.raidSession.currentHubTownId);
-        this.currentPhase = 'lobby';
-        this.worldMap.setRealm('mortal');
-        this.placePartyNear(this.worldMap.getPrimaryTempleTile());
-        this.player = this.getControlledActor()?.entity ?? this.player;
-        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-        this.fieldEnemies = [];
-        this.worldMap.loot = [];
-        this.clearFieldTurnState();
-        this.dismissedTempleVisitKey = this.getCurrentTempleVisitKey();
-        this.addCombatLog('현세의 융합 신전으로 돌아왔습니다.');
-    }
-
-    private getCurrentTempleVisitKey(): string | null {
-        const actor = this.getControlledActor();
-        if (!actor) return null;
-        const temple = this.worldMap.getTempleAtTile(actor.entity.gridX, actor.entity.gridY);
-        if (!temple) return null;
-        return `${this.worldMap.getRealm()}:${temple.id}:${actor.entity.gridX},${actor.entity.gridY}`;
     }
 
     private resolveFieldHitAt(tile: TilePoint) {

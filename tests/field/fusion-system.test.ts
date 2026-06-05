@@ -4,8 +4,14 @@ import { Character } from '../../src/character/Character';
 import { fuseActivePartyBranch, getFusionCandidates, hasActiveMasterCharacter } from '../../src/character/FusionSystem';
 import { PartyManager } from '../../src/character/PartyManager';
 import { getClassLine, isMasterClassLineId } from '../../src/data/ClassTree';
+import { Enemy } from '../../src/entity/Enemy';
+import { Player } from '../../src/entity/Player';
+import { WorldTempleController } from '../../src/engine/world/WorldTempleController';
+import { WorldRaidSession, type WorldPhase } from '../../src/engine/world/WorldRaidSession';
+import type { FieldActor, FieldEnemy } from '../../src/field/FieldTypes';
 import { WorldMap } from '../../src/map/WorldMap';
 import { TileType } from '../../src/map/Tile';
+import { FusionTempleUI } from '../../src/ui/FusionTempleUI';
 
 class ImageStub {
     public src = '';
@@ -25,6 +31,58 @@ function makeFusionReady(id: string, classLineId: string): Character {
     character.stats.hp = 200;
     character.stats.atk = 35;
     return character;
+}
+
+function createTempleHarness(options: { hostile?: boolean } = {}) {
+    const world = new WorldMap('mortal');
+    const temple = world.getPrimaryTempleTile();
+    const party = new PartyManager();
+    const character = new Character('hero', 'Hero', 'infantry');
+    party.addToRoster(character);
+    party.deployCharacter(character);
+    const actor: FieldActor = {
+        id: character.id,
+        character,
+        entity: new Player(temple.x, temple.y),
+        path: [],
+        queuedIntent: null,
+    };
+    let fieldEnemies: FieldEnemy[] = [];
+    if (options.hostile) {
+        const enemy = new Enemy('hostile', temple.x + 1, temple.y, 'Hostile', 1);
+        enemy.isAggro = true;
+        fieldEnemies = [{ enemy, home: { x: enemy.gridX, y: enemy.gridY }, path: [] }];
+    }
+
+    const ui = new FusionTempleUI();
+    const raidSession = new WorldRaidSession('central_castle');
+    let phase: WorldPhase = 'raid';
+    const calls: string[] = [];
+    const logs: string[] = [];
+    const controller = new WorldTempleController({
+        party,
+        raidSession,
+        fusionTempleUI: ui,
+        getWorldMap: () => world,
+        getControlledActor: () => actor,
+        getFieldEnemies: () => fieldEnemies,
+        isNetworkRaid: () => false,
+        getPhase: () => phase,
+        setPhase: (nextPhase) => { phase = nextPhase; },
+        beginRaidFromCurrentHub: (realm) => calls.push(`begin:${realm}`),
+        closeFieldOverlays: () => calls.push('closeFieldOverlays'),
+        clearFieldTurnState: () => calls.push('clearFieldTurnState'),
+        placePartyNear: (tile) => {
+            actor.entity.setGridPosition(tile.x, tile.y);
+            calls.push('placePartyNear');
+        },
+        setPlayer: () => calls.push('setPlayer'),
+        setFieldEnemies: (enemies) => { fieldEnemies = enemies; },
+        clearWorldLoot: () => calls.push('clearWorldLoot'),
+        selectActor: (actorId) => calls.push(`select:${actorId ?? 'none'}`),
+        log: (message) => logs.push(message),
+    });
+    return { controller, ui, calls, logs };
 }
 
 test('max base tier level unlocks the fusion emblem', () => {
@@ -98,4 +156,25 @@ test('world map exposes mortal and master temple entrances', () => {
     assert.equal(world.getRealm(), 'master');
     assert.equal(world.getTileAt(masterTemple.x, masterTemple.y), TileType.DUNGEON_ENTRANCE);
     assert.equal(world.getDisplayName(), '마스터 월드');
+});
+
+test('world temple controller opens the fusion temple when the party reaches a clear temple', () => {
+    const { controller, ui, calls, logs } = createTempleHarness();
+
+    controller.checkArrival();
+
+    assert.equal(ui.isVisible(), true);
+    assert.deepEqual(calls, ['closeFieldOverlays', 'clearFieldTurnState']);
+    assert.equal(logs.at(-1), '융합의 신전에 들어섰습니다.');
+});
+
+test('world temple controller blocks temple entry while hostile enemies are active', () => {
+    const { controller, ui, calls, logs } = createTempleHarness({ hostile: true });
+
+    controller.checkArrival();
+    controller.checkArrival();
+
+    assert.equal(ui.isVisible(), false);
+    assert.deepEqual(calls, []);
+    assert.deepEqual(logs, ['주변의 적을 정리해야 신전에 들어갈 수 있습니다.']);
 });
