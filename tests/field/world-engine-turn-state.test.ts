@@ -7,6 +7,7 @@ import { getActionApCost } from '../../src/field/FieldActionEconomy';
 import type { FieldActor } from '../../src/field/FieldTypes';
 import { WorldEngine } from '../../src/engine/WorldEngine';
 import { WorldNetworkSyncController } from '../../src/engine/world/WorldNetworkSyncController';
+import { WorldNetworkIntentController } from '../../src/engine/world/WorldNetworkIntentController';
 import { WorldRestingController } from '../../src/engine/world/WorldRestingController';
 import { WorldTutorialController } from '../../src/engine/world/WorldTutorialController';
 import type { ActorSnapshot, GridSnapshot, WorldSnapshot } from '../../src/net/WorldProtocol';
@@ -164,6 +165,11 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
         spawnHeal: (x, y, amount) => engine.floatingText.spawnHeal(x, y, amount),
         spawnStatus: (x, y, text) => engine.floatingText.spawnStatus(x, y, text),
         log: (message) => engine.addCombatLog(message),
+    });
+    engine.networkIntentController = new WorldNetworkIntentController({
+        networkSyncController: engine.networkSyncController,
+        isNetworkRaid: () => engine.isNetworkRaid,
+        getNetworkRaidClient: () => engine.networkRaidClient ?? null,
     });
     return { engine, calls };
 }

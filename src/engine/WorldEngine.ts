@@ -79,6 +79,7 @@ import { WorldTempleController } from './world/WorldTempleController';
 import { WorldRestingController } from './world/WorldRestingController';
 import { WorldLootController } from './world/WorldLootController';
 import { WorldCombatFeedbackController } from './world/WorldCombatFeedbackController';
+import { WorldNetworkIntentController } from './world/WorldNetworkIntentController';
 import type { CombatFeedbackKind } from './world/CombatFeedback';
 import { NetworkRaidClient } from '../net/NetworkRaidClient';
 import {
@@ -138,6 +139,7 @@ export class WorldEngine {
     private restingController: WorldRestingController;
     private lootController: WorldLootController;
     private combatFeedbackController: WorldCombatFeedbackController;
+    private networkIntentController: WorldNetworkIntentController;
     private activeTurnActorId: string | null = null;
     private readyQueue: string[] = [];
     private remainingActionPoints = 0;
@@ -340,6 +342,11 @@ export class WorldEngine {
             spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
             spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
             log: (message) => this.addCombatLog(message),
+        });
+        this.networkIntentController = new WorldNetworkIntentController({
+            networkSyncController: this.networkSyncController,
+            isNetworkRaid: () => this.isNetworkRaid,
+            getNetworkRaidClient: () => this.networkRaidClient,
         });
         this.combatController = new WorldCombatController({
             log: (message) => this.addCombatLog(message),
@@ -1045,35 +1052,24 @@ export class WorldEngine {
     }
 
     private submitNetworkMoveIntent(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean {
-        if (!this.isNetworkRaid || !this.networkRaidClient) return false;
-        const intentId = this.networkRaidClient.sendIntent(actor.id, 'move', { tile, path, apCost, pathCost });
-        this.networkSyncController.trackPendingMove(intentId, actor.id, tile, path);
-        return true;
+        return this.networkIntentController.submitMove(actor, tile, path, apCost, pathCost);
     }
 
     private submitNetworkActionIntent(actor: FieldActor, action: 'defend' | 'rest'): boolean {
-        if (!this.isNetworkRaid || !this.networkRaidClient?.getIsOpen()) return false;
-        this.networkRaidClient.sendIntent(actor.id, action, {});
-        return true;
+        return this.networkIntentController.submitAction(actor, action);
     }
 
     private submitNetworkUseItemIntent(actor: FieldActor, itemId: string): boolean {
-        if (!this.isNetworkRaid || !this.networkRaidClient?.getIsOpen()) return false;
-        this.networkRaidClient.sendIntent(actor.id, 'useItem', { itemId });
-        return true;
+        return this.networkIntentController.submitUseItem(actor, itemId);
     }
 
     private submitNetworkSkillIntent(actor: FieldActor, skillId: string, targetId?: string): boolean {
-        if (!this.isNetworkRaid || !this.networkRaidClient?.getIsOpen()) return false;
-        this.networkRaidClient.sendIntent(actor.id, 'castSkill', { skillId, targetId });
-        return true;
+        return this.networkIntentController.submitSkill(actor, skillId, targetId);
     }
 
     private tryActorAttack(actor: FieldActor, enemy: Enemy): boolean {
         if (this.isNetworkRaid) {
-            if (!this.networkRaidClient) return false;
-            this.networkRaidClient.sendIntent(actor.id, 'attack', { targetId: enemy.id });
-            return true;
+            return this.networkIntentController.submitAttack(actor, enemy);
         }
         if (!this.tutorialController.isActive()) {
             this.addCombatLog('서버 세션 밖에서는 전투 행동을 실행할 수 없습니다.');
@@ -1348,9 +1344,7 @@ export class WorldEngine {
     }
 
     private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = this.remainingActionPoints): void {
-        if (this.isNetworkRaid && this.networkRaidClient && actor.id === this.activeTurnActorId) {
-            this.networkRaidClient.sendIntent(actor.id, 'endTurn', { reason });
-        }
+        if (actor.id === this.activeTurnActorId) this.networkIntentController.submitEndTurn(actor, reason);
         actor.entity.actionGauge = Math.max(0, Math.min(FIELD_MAX_ACTION_GAUGE, atbCarryover));
         this.activeTurnActorId = null;
         this.remainingActionPoints = 0;

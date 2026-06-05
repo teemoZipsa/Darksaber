@@ -37,4 +37,5 @@ See `docs/monster-balance.md` for the detailed model and tests.
 - `WorldRestingController` owns field resting recovery timers, periodic HP/MP recovery, and damage-based rest interruption.
 - `WorldLootController` owns enemy loot creation, local/network loot opening, inventory loot-secured callbacks, and opened-loot refresh.
 - `WorldCombatFeedbackController` owns grouped combat feedback priority, camera shake dispatch, and hitstop dispatch.
+- `WorldNetworkIntentController` owns client-side network intent submission and pending move preview registration.
 - `WorldEngine` should access active story-interior state through the controller instead of owning that state directly.
