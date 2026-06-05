@@ -6,6 +6,7 @@ import { Player } from '../../src/entity/Player';
 import { getActionApCost } from '../../src/field/FieldActionEconomy';
 import type { FieldActor } from '../../src/field/FieldTypes';
 import { WorldEngine } from '../../src/engine/WorldEngine';
+import { WorldNetworkSyncController } from '../../src/engine/world/WorldNetworkSyncController';
 import type { ActorSnapshot, GridSnapshot, WorldSnapshot } from '../../src/net/WorldProtocol';
 
 class ImageStub {
@@ -39,7 +40,6 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
     engine.partyActors = [actor];
     engine.fieldEnemies = [];
     engine.remotePartyActors = new Map();
-    engine.pendingLootPicks = new Map();
     engine.storyScenarioController = {
         applyNetworkScenarioSnapshot: () => undefined,
         handleNetworkActionRejected: () => false,
@@ -68,7 +68,84 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
     engine.selectionController = {
         hasSelection: () => false,
         selectActor: () => calls.push('selectActor'),
+        selectLoot: () => calls.push('selectLoot'),
     };
+    engine.getControlledActor = () => engine.partyActors.find((entry: FieldActor) => engine.party.getCharacters().includes(entry.character)) ?? null;
+    engine.getEnemyById = () => null;
+    engine.actorTile = (entry: FieldActor) => ({ x: entry.entity.gridX, y: entry.entity.gridY });
+    engine.enemyTile = (enemy: { gridX: number; gridY: number }) => ({ x: enemy.gridX, y: enemy.gridY });
+    engine.applyMonsterSprite = () => undefined;
+    engine.isEntityMoving = (entity: { pixelX: number; pixelY: number; gridX: number; gridY: number }) =>
+        Math.abs(entity.pixelX - entity.gridX) > 0.01 || Math.abs(entity.pixelY - entity.gridY) > 0.01;
+    engine.beginCombatFeedbackGroup = () => 'feedback';
+    engine.registerCombatFeedback = () => undefined;
+    engine.flushCombatFeedbackGroup = () => undefined;
+    engine.spawnAttackCue = () => undefined;
+    engine.effectManager = {
+        spawnKillEffect: () => undefined,
+        spawnDebuffEffect: () => undefined,
+        spawnHitEffect: () => undefined,
+        spawnHealEffect: () => undefined,
+    };
+    engine.floatingText = {
+        spawnDamage: () => undefined,
+        spawnHeal: () => undefined,
+        spawnStatus: () => undefined,
+    };
+    engine.gameManager = {
+        inventory: { items: [], remove: () => undefined },
+        inventoryUI: {
+            setExternalGrid: () => undefined,
+            isVisible: () => false,
+            toggle: () => undefined,
+            getBag: () => ({ autoPlaceExisting: () => true }),
+            revertRaidLoot: () => undefined,
+        },
+    };
+    engine.networkSyncController = new WorldNetworkSyncController({
+        party: engine.party,
+        gameManager: engine.gameManager,
+        storyScenarioController: engine.storyScenarioController,
+        getNetworkPlayerId: () => engine.networkPlayerId,
+        getNetworkRaidClient: () => engine.networkRaidClient ?? null,
+        getWorldMap: () => engine.worldMap,
+        getPartyActors: () => engine.partyActors,
+        setPartyActors: (actors) => { engine.partyActors = actors; },
+        getRemotePartyActors: () => engine.remotePartyActors,
+        getFieldEnemies: () => engine.fieldEnemies,
+        setFieldEnemies: (enemies) => { engine.fieldEnemies = enemies; },
+        getControlledActor: () => engine.getControlledActor(),
+        setPlayer: (player) => { engine.player = player; },
+        getActiveTurnActorId: () => engine.activeTurnActorId,
+        setActiveTurnActorId: (actorId) => { engine.activeTurnActorId = actorId; },
+        getRemainingActionPoints: () => engine.remainingActionPoints,
+        setRemainingActionPoints: (points) => { engine.remainingActionPoints = points; },
+        setMajorActionUsedThisTurn: (used) => { engine.majorActionUsedThisTurn = used; },
+        hasSelection: () => engine.selectionController.hasSelection(),
+        selectActor: (actorId) => engine.selectionController.selectActor(actorId),
+        selectLoot: (lootId) => engine.selectionController.selectLoot(lootId),
+        getActionMenuIsOpen: () => engine.actionMenuUI.getIsOpen(),
+        getPlayerActionMode: () => engine.playerActionController.getMode(),
+        hasExecutableAction: (targetActor) => engine.playerActionController.hasExecutableAction(targetActor),
+        reopenActionMenu: () => calls.push('openActionMenu'),
+        getEnemyById: (enemyId) => engine.getEnemyById(enemyId),
+        actorTile: (targetActor) => engine.actorTile(targetActor),
+        enemyTile: (enemy) => engine.enemyTile(enemy),
+        applyMonsterSprite: (enemy, monsterId) => engine.applyMonsterSprite(enemy, monsterId),
+        isEntityMoving: (entity) => engine.isEntityMoving(entity),
+        beginCombatFeedbackGroup: () => engine.beginCombatFeedbackGroup(),
+        registerCombatFeedback: (kind, feedbackGroupId) => engine.registerCombatFeedback(kind, feedbackGroupId),
+        flushCombatFeedbackGroup: (feedbackGroupId) => engine.flushCombatFeedbackGroup(feedbackGroupId),
+        spawnAttackCue: (from, to, color, label) => engine.spawnAttackCue(from, to, color, label),
+        spawnKillEffect: () => undefined,
+        spawnDebuffEffect: (x, y) => engine.effectManager.spawnDebuffEffect(x, y),
+        spawnHitEffect: (x, y) => engine.effectManager.spawnHitEffect(x, y),
+        spawnHealEffect: (x, y) => engine.effectManager.spawnHealEffect(x, y),
+        spawnDamage: (x, y, amount, isCrit, isMiss) => engine.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
+        spawnHeal: (x, y, amount) => engine.floatingText.spawnHeal(x, y, amount),
+        spawnStatus: (x, y, text) => engine.floatingText.spawnStatus(x, y, text),
+        log: (message) => engine.addCombatLog(message),
+    });
     return { engine, calls };
 }
 
@@ -203,9 +280,9 @@ test('network snapshot resolves zero remaining gauge from ready actor action gau
     const actor = makeActor('hero');
     const { engine } = makeEngineHarness(actor);
 
-    assert.equal(engine.resolveSnapshotRemainingGauge(0, 100), 100);
-    assert.equal(engine.resolveSnapshotRemainingGauge(0, 10), 0);
-    assert.equal(engine.resolveSnapshotRemainingGauge(25, 80), 25);
+    assert.equal(engine.networkSyncController.resolveSnapshotRemainingGauge(0, 100), 100);
+    assert.equal(engine.networkSyncController.resolveSnapshotRemainingGauge(0, 10), 0);
+    assert.equal(engine.networkSyncController.resolveSnapshotRemainingGauge(25, 80), 25);
 });
 
 test('network snapshot treats local player actorIds as owned and prefers actor remaining AP', () => {
@@ -262,11 +339,10 @@ test('network move reopens the action menu when the server confirms the moved ti
     const actor = makeActor('hero');
     const { engine, calls } = makeEngineHarness(actor);
     engine.remainingActionPoints = 80;
-    engine.pendingNetworkMoveReopen = { intentId: 'move-1', actorId: actor.id, tile: { x: 1, y: 0 } };
+    engine.networkSyncController.trackPendingMove('move-1', actor.id, { x: 1, y: 0 }, []);
 
-    engine.reopenPendingNetworkMoveMenu([{ id: actor.id, tile: { x: 1, y: 0 } }]);
+    engine.networkSyncController.reopenPendingMoveMenu([{ id: actor.id, tile: { x: 1, y: 0 } }]);
 
-    assert.equal(engine.pendingNetworkMoveReopen, null);
     assert.ok(calls.includes('openActionMenu'));
 });
 
@@ -274,13 +350,11 @@ test('network move rejection reopens the action menu when the actor can still ac
     const actor = makeActor('hero');
     const { engine, calls } = makeEngineHarness(actor);
     engine.remainingActionPoints = 80;
-    engine.pendingNetworkMoveReopen = { intentId: 'move-1', actorId: actor.id, tile: { x: 1, y: 0 } };
-    engine.networkMovePathPreview = { actorId: actor.id, target: { x: 1, y: 0 }, path: [{ x: 1, y: 0 }] };
+    engine.networkSyncController.trackPendingMove('move-1', actor.id, { x: 1, y: 0 }, [{ x: 1, y: 0 }]);
 
     engine.handleNetworkActionRejected({ type: 'ACTION_REJECTED', intentId: 'move-1', reason: 'blocked' });
 
-    assert.equal(engine.pendingNetworkMoveReopen, null);
-    assert.equal(engine.networkMovePathPreview, null);
+    assert.deepEqual(engine.getPathPreviewTiles(actor), []);
     assert.ok(engine.combatLog.includes('서버 거부: blocked'));
     assert.ok(calls.includes('openActionMenu'));
 });
@@ -304,50 +378,40 @@ test('network move stores a render-only path preview without queuing local movem
     assert.equal(sent.length, 1);
     assert.deepEqual(actor.path, []);
     assert.equal(actor.queuedIntent, null);
-    assert.deepEqual(engine.getPathPreviewTiles(actor), path);
-    assert.notEqual(engine.networkMovePathPreview.path, path);
+    const previewPath = engine.getPathPreviewTiles(actor);
+    assert.deepEqual(previewPath, path);
+    assert.notEqual(previewPath, path);
 });
 
 test('network move path preview remains through confirmed interpolation and clears on arrival', () => {
     const actor = makeActor('hero');
     const { engine } = makeEngineHarness(actor);
-    engine.networkMovePathPreview = {
-        actorId: actor.id,
-        target: { x: 1, y: 0 },
-        path: [{ x: 1, y: 0 }],
-    };
-    engine.pendingNetworkMoveReopen = null;
+    engine.networkSyncController.trackPendingMove('move-1', actor.id, { x: 1, y: 0 }, [{ x: 1, y: 0 }]);
     actor.entity.gridX = 1;
     actor.entity.gridY = 0;
     actor.entity.pixelX = 0.25;
     actor.entity.pixelY = 0;
 
-    engine.refreshNetworkMovePathPreview();
+    engine.networkSyncController.refreshMovePathPreview();
 
     assert.deepEqual(engine.getPathPreviewTiles(actor), [{ x: 1, y: 0 }]);
 
     actor.entity.pixelX = 1;
-    engine.refreshNetworkMovePathPreview();
+    engine.networkSyncController.refreshMovePathPreview();
 
-    assert.equal(engine.networkMovePathPreview, null);
     assert.deepEqual(engine.getPathPreviewTiles(actor), []);
 });
 
 test('network move path preview drops tiles already reached during interpolation', () => {
     const actor = makeActor('hero');
     const { engine } = makeEngineHarness(actor);
-    engine.networkMovePathPreview = {
-        actorId: actor.id,
-        target: { x: 2, y: 0 },
-        path: [{ x: 1, y: 0 }, { x: 2, y: 0 }],
-    };
-    engine.pendingNetworkMoveReopen = null;
+    engine.networkSyncController.trackPendingMove('move-1', actor.id, { x: 2, y: 0 }, [{ x: 1, y: 0 }, { x: 2, y: 0 }]);
     actor.entity.gridX = 2;
     actor.entity.gridY = 0;
     actor.entity.pixelX = 1;
     actor.entity.pixelY = 0;
 
-    engine.refreshNetworkMovePathPreview();
+    engine.networkSyncController.refreshMovePathPreview();
 
     assert.deepEqual(engine.getPathPreviewTiles(actor), [{ x: 2, y: 0 }]);
 });
@@ -369,7 +433,7 @@ test('grid snapshot without sockets restores placed items with an empty socket l
         ],
     };
 
-    const grid = engine.gridFromSnapshot(snapshot);
+    const grid = engine.networkSyncController.gridFromSnapshot(snapshot);
 
     assert.equal(grid.items.length, 1);
     assert.deepEqual(grid.items[0].sockets, []);

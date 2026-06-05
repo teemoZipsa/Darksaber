@@ -12,7 +12,7 @@ import { Enemy } from '../entity/Enemy';
 import { LootObject } from '../entity/LootObject';
 import { PartyManager } from '../character/PartyManager';
 import { Character } from '../character/Character';
-import { GridInventory, type PlacedItem } from '../inventory/GridInventory';
+import { GridInventory } from '../inventory/GridInventory';
 import { getCarryAtbMultiplier, getPartyCarriedWeight } from '../inventory/CarryWeight';
 import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
@@ -83,6 +83,7 @@ import { WorldFieldSpawnController } from './world/WorldFieldSpawnController';
 import { WorldRenderController } from './world/WorldRenderController';
 import { WorldInputController } from './world/WorldInputController';
 import { WorldStoryScenarioController } from './world/WorldStoryScenarioController';
+import { WorldNetworkSyncController } from './world/WorldNetworkSyncController';
 import { HitStop } from './world/HitStop';
 import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
 import { NetworkRaidClient, WorldServerError, type NetworkRaidStatus } from '../net/NetworkRaidClient';
@@ -98,14 +99,11 @@ import {
     DEFAULT_WORLD_SERVER_URL,
     type ActionRejectedMessage,
     type ActorSnapshot,
-    type AutoLootCell,
     type AutoLootGrantMessage,
     type CombatEventMessage,
-    type GridSnapshot,
     type InventoryConsumedMessage,
     type InventoryItemCountSnapshot,
     type LootGrantMessage,
-    type LootSnapshot,
     type RaidResultMessage,
     type WorldRealmId,
     type WorldSnapshot,
@@ -173,9 +171,6 @@ export class WorldEngine {
     private isNetworkRaidConnecting = false;
     private networkWasReconnecting = false;
     private networkPlayerId: string | null = null;
-    private pendingNetworkMoveReopen: { intentId: string; actorId: string; tile: TilePoint } | null = null;
-    private networkMovePathPreview: { actorId: string; target: TilePoint; path: TilePoint[] } | null = null;
-    private pendingLootPicks = new Map<string, { placed: PlacedItem; source: { gridX: number; gridY: number }; at: number; timedOut?: boolean }>();
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
     private fusionTempleUI = new FusionTempleUI();
@@ -196,6 +191,7 @@ export class WorldEngine {
     private renderController: WorldRenderController;
     private inputController: WorldInputController;
     private storyScenarioController: WorldStoryScenarioController;
+    private networkSyncController: WorldNetworkSyncController;
     private activeTurnActorId: string | null = null;
     private readyQueue: string[] = [];
     private remainingActionPoints = 0;
@@ -287,6 +283,53 @@ export class WorldEngine {
                 this.camera.followTile(this.player.gridX, this.player.gridY);
                 this.camera.snapToTarget();
             },
+            log: (message) => this.addCombatLog(message),
+        });
+        this.networkSyncController = new WorldNetworkSyncController({
+            party: this.party,
+            gameManager: this.gameManager,
+            storyScenarioController: this.storyScenarioController,
+            getNetworkPlayerId: () => this.networkPlayerId,
+            getNetworkRaidClient: () => this.networkRaidClient,
+            getWorldMap: () => this.worldMap,
+            getPartyActors: () => this.partyActors,
+            setPartyActors: (actors) => { this.partyActors = actors; },
+            getRemotePartyActors: () => this.remotePartyActors,
+            getFieldEnemies: () => this.fieldEnemies,
+            setFieldEnemies: (fieldEnemies) => { this.fieldEnemies = fieldEnemies; },
+            getControlledActor: () => this.getControlledActor(),
+            setPlayer: (player) => { this.player = player; },
+            getActiveTurnActorId: () => this.activeTurnActorId,
+            setActiveTurnActorId: (actorId) => { this.activeTurnActorId = actorId; },
+            getRemainingActionPoints: () => this.remainingActionPoints,
+            setRemainingActionPoints: (points) => { this.remainingActionPoints = points; },
+            setMajorActionUsedThisTurn: (used) => { this.majorActionUsedThisTurn = used; },
+            hasSelection: () => this.selectionController.hasSelection(),
+            selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            selectLoot: (lootId) => this.selectionController.selectLoot(lootId),
+            getActionMenuIsOpen: () => this.actionMenuUI.getIsOpen(),
+            getPlayerActionMode: () => this.playerActionController.getMode(),
+            hasExecutableAction: (actor) => this.playerActionController.hasExecutableAction(actor),
+            reopenActionMenu: (actor) => this.reopenActionMenu(actor),
+            getEnemyById: (enemyId) => this.getEnemyById(enemyId),
+            actorTile: (actor) => this.actorTile(actor),
+            enemyTile: (enemy) => this.enemyTile(enemy),
+            applyMonsterSprite: (enemy, monsterId) => this.applyMonsterSprite(enemy, monsterId),
+            isEntityMoving: (entity) => this.isEntityMoving(entity),
+            beginCombatFeedbackGroup: () => this.beginCombatFeedbackGroup(),
+            registerCombatFeedback: (kind, feedbackGroupId) => this.registerCombatFeedback(kind, feedbackGroupId),
+            flushCombatFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
+            spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
+            spawnKillEffect: (enemy, feedbackGroupId) => {
+                this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy);
+                this.registerCombatFeedback('kill', feedbackGroupId);
+            },
+            spawnDebuffEffect: (x, y) => this.effectManager.spawnDebuffEffect(x, y),
+            spawnHitEffect: (x, y) => this.effectManager.spawnHitEffect(x, y),
+            spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
+            spawnDamage: (x, y, amount, isCrit, isMiss) => this.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
+            spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
+            spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
             log: (message) => this.addCombatLog(message),
         });
         this.combatController = new WorldCombatController({
@@ -584,8 +627,8 @@ export class WorldEngine {
         this.gameManager.inventoryUI.onRaidLootSecured = (placed, source) => {
             if (!this.isNetworkRaid || !this.networkRaidClient || !source || !this.selectionController.lootId) return;
             const intentId = this.networkRaidClient.sendLootPickup(this.selectionController.lootId, source.gridX, source.gridY);
-            this.pendingLootPicks.set(intentId, { placed, source, at: Date.now() });
-            this.purgeStaleLootPicks();
+            this.networkSyncController.addPendingLootPick(intentId, placed, source);
+            this.networkSyncController.purgeStaleLootPicks();
         };
 
         this.spawnPartyAtCurrentHub();
@@ -1460,7 +1503,7 @@ export class WorldEngine {
         this.inputController.process(input, camera);
         for (const actor of this.partyActors) actor.entity.update(dt);
         for (const entry of this.fieldEnemies) entry.enemy.update(dt);
-        this.refreshNetworkMovePathPreview();
+        this.networkSyncController.refreshMovePathPreview();
         this.effectManager.update(dt);
         this.floatingText.update(dt);
         this.updateAttackCues(dt);
@@ -1475,137 +1518,7 @@ export class WorldEngine {
 
     private applyNetworkSnapshot(snapshot: WorldSnapshot): void {
         this.raidSession.elapsedSeconds = snapshot.raidTimer.elapsedSeconds;
-        const previousActors = this.partyActors;
-        const localCharacters = this.party.getCharacters();
-        const localCharacterIds = new Set(localCharacters.map((character) => character.id));
-        const localPlayerActorIds = new Set(
-            snapshot.players.find((player) => player.playerId === this.networkPlayerId)?.actorIds ?? []
-        );
-        const isOwnActorSnapshot = (actor: ActorSnapshot): boolean =>
-            actor.ownerPlayerId === this.networkPlayerId
-            || localPlayerActorIds.has(actor.id)
-            || (actor.localActorId ? localCharacterIds.has(actor.localActorId) : false);
-        const liveActorSnapshots = snapshot.partyActors.filter((actor) => !actor.isGhost);
-        const ownSnapshots = liveActorSnapshots.filter(isOwnActorSnapshot);
-        const remoteSnapshots = liveActorSnapshots.filter((actor) => !isOwnActorSnapshot(actor));
-        const ownByLocalId = new Map(ownSnapshots.map((actor) => [actor.localActorId ?? actor.id, actor]));
-        const nextLocalActors: FieldActor[] = [];
-
-        for (const character of localCharacters) {
-            const actorSnapshot = ownByLocalId.get(character.id);
-            const existing = previousActors.find((actor) => actor.character === character);
-            if (!actorSnapshot) {
-                continue;
-            }
-            const actor = existing ?? {
-                id: actorSnapshot.id,
-                character,
-                entity: new Player(actorSnapshot.tile.x, actorSnapshot.tile.y),
-                path: [],
-                queuedIntent: null,
-            };
-            this.applyActorSnapshot(actor, actorSnapshot);
-            nextLocalActors.push(actor);
-        }
-
-        const nextRemoteActors: FieldActor[] = [];
-        const seenRemoteIds = new Set<string>();
-        for (const actorSnapshot of remoteSnapshots) {
-            seenRemoteIds.add(actorSnapshot.id);
-            let actor = this.remotePartyActors.get(actorSnapshot.id);
-            if (!actor) {
-                const character = new Character(
-                    actorSnapshot.localActorId ?? actorSnapshot.id,
-                    actorSnapshot.name,
-                    actorSnapshot.classLineId
-                );
-                character.currentTier = actorSnapshot.currentTier;
-                actor = {
-                    id: actorSnapshot.id,
-                    character,
-                    entity: new Player(actorSnapshot.tile.x, actorSnapshot.tile.y),
-                    path: [],
-                    queuedIntent: null,
-                };
-                this.remotePartyActors.set(actorSnapshot.id, actor);
-            }
-            this.applyActorSnapshot(actor, actorSnapshot);
-            nextRemoteActors.push(actor);
-        }
-        for (const actorId of [...this.remotePartyActors.keys()]) {
-            if (!seenRemoteIds.has(actorId)) this.remotePartyActors.delete(actorId);
-        }
-
-        this.partyActors = [...nextLocalActors, ...nextRemoteActors];
-        this.fieldEnemies = snapshot.enemies.map((enemySnapshot) => {
-            const existing = this.fieldEnemies.find((entry) => entry.enemy.id === enemySnapshot.id)?.enemy;
-            const enemy = existing ?? new Enemy(
-                enemySnapshot.id,
-                enemySnapshot.tile.x,
-                enemySnapshot.tile.y,
-                enemySnapshot.name,
-                enemySnapshot.level,
-                enemySnapshot.color,
-                enemySnapshot.role
-            );
-            enemy.gridX = enemySnapshot.tile.x;
-            enemy.gridY = enemySnapshot.tile.y;
-            enemy.stats = { ...enemySnapshot.stats };
-            enemy.statuses = enemySnapshot.statuses.map((status) => ({ ...status }));
-            enemy.actionGauge = enemySnapshot.actionGauge;
-            enemy.facing = enemySnapshot.facing;
-            enemy.isAggro = enemySnapshot.isAggro;
-            enemy.isBoss = enemySnapshot.isBoss;
-            enemy.color = enemySnapshot.color;
-            enemy.name = enemySnapshot.name;
-            if (enemySnapshot.monsterId && !enemy.walkSprite) this.applyMonsterSprite(enemy, enemySnapshot.monsterId);
-            return {
-                enemy,
-                home: { ...enemySnapshot.home },
-                path: [],
-            };
-        });
-        this.worldMap.loot = snapshot.loot.map((lootSnapshot) => this.createLootFromSnapshot(lootSnapshot));
-
-        const controlled = this.getControlledActor();
-        const ownReady = snapshot.readyActors.filter((actorId) => ownSnapshots.some((actor) => actor.id === actorId));
-        this.activeTurnActorId = controlled && ownReady.includes(controlled.id)
-            ? controlled.id
-            : ownReady[0] ?? null;
-        const activeTurnSnapshot = this.activeTurnActorId
-            ? ownSnapshots.find((actor) => actor.id === this.activeTurnActorId)
-            : undefined;
-        this.remainingActionPoints = this.activeTurnActorId
-            ? this.resolveSnapshotRemainingGauge(
-                activeTurnSnapshot?.remainingAp ?? snapshot.remainingApByActor[this.activeTurnActorId] ?? 0,
-                activeTurnSnapshot?.actionGauge ?? 0
-            )
-            : 0;
-        this.majorActionUsedThisTurn = this.activeTurnActorId
-            ? Boolean(ownSnapshots.find((actor) => actor.id === this.activeTurnActorId)?.majorActionUsed)
-            : false;
-        if (controlled) {
-            this.player = controlled.entity;
-            if (!this.selectionController.hasSelection()) this.selectionController.selectActor(controlled.id);
-        }
-        this.reopenPendingNetworkMoveMenu(ownSnapshots);
-        this.storyScenarioController.applyNetworkScenarioSnapshot(snapshot.scenario);
-    }
-
-    private applyActorSnapshot(actor: FieldActor, snapshot: ActorSnapshot): void {
-        actor.id = snapshot.id;
-        actor.character.stats = { ...snapshot.stats };
-        actor.character.statuses = snapshot.statuses.map((status) => ({ ...status }));
-        actor.character.isDead = snapshot.isDead;
-        actor.character.currentTier = snapshot.currentTier;
-        actor.character.level = snapshot.level;
-        actor.entity.gridX = snapshot.tile.x;
-        actor.entity.gridY = snapshot.tile.y;
-        actor.entity.actionGauge = snapshot.actionGauge;
-        actor.entity.facing = snapshot.facing;
-        actor.entity.label = snapshot.name;
-        actor.path = [];
-        actor.queuedIntent = null;
+        this.networkSyncController.applySnapshot(snapshot);
     }
 
     private applyMonsterSprite(enemy: Enemy, monsterId: string): void {
@@ -1625,184 +1538,24 @@ export class WorldEngine {
         }
     }
 
-    private createLootFromSnapshot(snapshot: LootSnapshot): LootObject {
-        const loot = new LootObject(snapshot.id, snapshot.tile.x, snapshot.tile.y, [], {
-            sourceLabel: snapshot.sourceLabel,
-            kind: snapshot.kind,
-            containerType: snapshot.containerType,
-            gridW: snapshot.gridSnapshot.width,
-            gridH: snapshot.gridSnapshot.height,
-        });
-        loot.inventory = this.gridFromSnapshot(snapshot.gridSnapshot);
-        loot.opened = snapshot.opened;
-        return loot;
-    }
-
-    private gridFromSnapshot(snapshot: GridSnapshot): GridInventory {
-        const grid = new GridInventory(snapshot.width, snapshot.height);
-        for (const itemSnapshot of snapshot.items) {
-            const item = getItemDef(itemSnapshot.itemId);
-            if (!item) continue;
-            const placed = grid.place(item, itemSnapshot.gridX, itemSnapshot.gridY);
-            if (!placed) continue;
-            placed.durability = itemSnapshot.durability;
-            placed.quantity = itemSnapshot.quantity;
-            placed.acquiredInRaid = itemSnapshot.acquiredInRaid;
-            placed.sockets = (itemSnapshot.sockets ?? []).flatMap((itemId) => {
-                const socket = getItemDef(itemId);
-                return socket ? [socket] : [];
-            });
-        }
-        return grid;
-    }
-
     private openNetworkLoot(grant: LootGrantMessage): void {
-        const grid = this.gridFromSnapshot(grant.gridSnapshot);
-        this.gameManager.inventoryUI.setExternalGrid(grid, `전리품 ${grant.lootId}`, { isRaidLoot: true });
-        if (!this.gameManager.inventoryUI.isVisible()) this.gameManager.inventoryUI.toggle();
-        this.selectionController.selectLoot(grant.lootId);
+        this.networkSyncController.openLoot(grant);
     }
 
     private handleNetworkAutoLootGrant(grant: AutoLootGrantMessage): void {
-        const grid = this.gridFromSnapshot(grant.gridSnapshot);
-        const bag = this.gameManager.inventoryUI.getBag();
-        const acceptedCells: AutoLootCell[] = [];
-        const acquiredNames: string[] = [];
-        let blocked = false;
-
-        for (const placed of [...grid.items]) {
-            const source = { gridX: placed.gridX, gridY: placed.gridY };
-            grid.remove(placed);
-            if (bag.autoPlaceExisting(placed)) {
-                placed.acquiredInRaid = true;
-                acceptedCells.push(source);
-                acquiredNames.push(placed.item.nameKr);
-            } else {
-                grid.placeExisting(placed, source.gridX, source.gridY);
-                blocked = true;
-            }
-        }
-
-        this.networkRaidClient?.sendAutoLootResolve(grant.lootId, acceptedCells);
-        if (acquiredNames.length > 0) {
-            this.addCombatLog(`${grant.sourceName} ${t('raid.autoLoot')}: ${acquiredNames.join(', ')}`);
-        }
-        if (blocked) this.addCombatLog(`${grant.sourceName}: ${t('raid.autoLootFull')}`);
+        this.networkSyncController.handleAutoLootGrant(grant);
     }
 
     private handleNetworkInventoryConsumed(message: InventoryConsumedMessage): void {
-        let remaining = Math.max(0, Math.floor(message.quantity));
-        if (remaining <= 0) return;
-        for (const placed of [...this.gameManager.inventory.items]) {
-            if (placed.item.id !== message.itemId || placed.quantity <= 0) continue;
-            const consumed = Math.min(remaining, placed.quantity);
-            placed.quantity -= consumed;
-            remaining -= consumed;
-            if (placed.quantity <= 0) this.gameManager.inventory.remove(placed);
-            if (remaining <= 0) break;
-        }
+        this.networkSyncController.handleInventoryConsumed(message);
     }
 
     private handleNetworkActionRejected(rejection: ActionRejectedMessage): void {
-        const rejectedMoveActorId = this.pendingNetworkMoveReopen?.intentId === rejection.intentId
-            ? this.pendingNetworkMoveReopen.actorId
-            : null;
-        if (this.pendingNetworkMoveReopen?.intentId === rejection.intentId) {
-            this.pendingNetworkMoveReopen = null;
-            this.clearNetworkMovePathPreview(rejectedMoveActorId);
-        }
-        if (this.storyScenarioController.handleNetworkActionRejected(rejection.intentId, rejection.reason)) {
-            return;
-        }
-        const pending = this.pendingLootPicks.get(rejection.intentId);
-        if (pending) {
-            this.pendingLootPicks.delete(rejection.intentId);
-            this.gameManager.inventoryUI.revertRaidLoot(pending.placed, pending.source);
-            this.addCombatLog(`전리품 획득 실패: ${rejection.reason}`);
-            return;
-        }
-        this.addCombatLog(`서버 거부: ${rejection.reason}`);
-        if (!rejectedMoveActorId) return;
-        const actor = this.partyActors.find((entry) => entry.id === rejectedMoveActorId);
-        if (!actor || actor.id !== this.activeTurnActorId) return;
-        if (this.remainingActionPoints < MIN_FIELD_ACTION_GAUGE_COST) return;
-        if (this.actionMenuUI.getIsOpen()) return;
-        if (this.playerActionController.getMode() !== null) return;
-        if (this.playerActionController.hasExecutableAction(actor)) this.reopenActionMenu(actor);
-    }
-
-    private purgeStaleLootPicks(): void {
-        const now = Date.now();
-        for (const pick of this.pendingLootPicks.values()) {
-            if (now - pick.at > 10_000 && !pick.timedOut) {
-                pick.timedOut = true;
-                this.addCombatLog('전리품 획득 응답 지연: 서버 응답을 기다리는 중입니다.');
-            }
-        }
+        this.networkSyncController.handleActionRejected(rejection);
     }
 
     private handleNetworkCombatEvent(event: CombatEventMessage): void {
-        const targetEnemy = this.getEnemyById(event.targetId);
-        const targetActor = this.partyActors.find((actor) => actor.id === event.targetId);
-        const sourceActor = this.partyActors.find((actor) => actor.id === event.sourceId);
-        const sourceEnemy = this.getEnemyById(event.sourceId);
-        const feedbackGroupId = this.beginCombatFeedbackGroup();
-
-        if (targetEnemy) {
-            if (event.kind === 'kill') {
-                this.effectManager.spawnKillEffect(targetEnemy.gridX, targetEnemy.gridY, targetEnemy.color, targetEnemy.expReward, targetEnemy);
-                this.registerCombatFeedback('kill', feedbackGroupId);
-            } else if (event.kind === 'status') {
-                this.floatingText.spawnStatus(targetEnemy.gridX, targetEnemy.gridY, 'WEAK');
-                this.effectManager.spawnDebuffEffect(targetEnemy.gridX, targetEnemy.gridY);
-                this.registerCombatFeedback('status', feedbackGroupId);
-            } else {
-                this.floatingText.spawnDamage(targetEnemy.gridX, targetEnemy.gridY, event.value ?? 0, false, event.kind === 'miss');
-                if (event.kind !== 'miss' && (event.value ?? 0) > 0) {
-                    this.effectManager.spawnHitEffect(targetEnemy.gridX, targetEnemy.gridY);
-                    this.registerCombatFeedback('normal', feedbackGroupId);
-                }
-            }
-        }
-        if (targetActor) {
-            if (event.kind === 'heal') {
-                this.floatingText.spawnHeal(targetActor.entity.gridX, targetActor.entity.gridY, event.value ?? 0);
-                this.effectManager.spawnHealEffect(targetActor.entity.gridX, targetActor.entity.gridY);
-                this.registerCombatFeedback('normal', feedbackGroupId);
-            } else if (event.kind === 'status') {
-                this.floatingText.spawnStatus(targetActor.entity.gridX, targetActor.entity.gridY, 'BUFF');
-            } else {
-                this.floatingText.spawnDamage(targetActor.entity.gridX, targetActor.entity.gridY, event.value ?? 0, false, event.kind === 'miss');
-            }
-            if (event.kind !== 'miss' && event.kind !== 'heal' && (event.value ?? 0) > 0) {
-                this.effectManager.spawnHitEffect(targetActor.entity.gridX, targetActor.entity.gridY);
-                this.registerCombatFeedback(event.kind === 'down' ? 'kill' : 'normal', feedbackGroupId);
-            }
-            if (event.kind === 'down') this.floatingText.spawnStatus(targetActor.entity.gridX, targetActor.entity.gridY, 'DOWN');
-        }
-        if (sourceActor && targetEnemy) this.spawnAttackCue(this.actorTile(sourceActor), this.enemyTile(targetEnemy), '#72e8ff');
-        if (sourceEnemy && targetActor) this.spawnAttackCue(this.enemyTile(sourceEnemy), this.actorTile(targetActor), '#ff8a55');
-        this.flushCombatFeedbackGroup(feedbackGroupId);
-        this.addCombatLog(this.formatNetworkCombatEvent(event));
-    }
-
-    private formatNetworkCombatEvent(event: CombatEventMessage): string {
-        const sourceName = event.sourceName ?? this.getNetworkEntityName(event.sourceId);
-        const targetName = event.targetName ?? this.getNetworkEntityName(event.targetId);
-        if (event.kind === 'miss') return `${sourceName} → ${targetName} 빗나감`;
-        if (event.kind === 'kill') return `${sourceName} → ${targetName} 처치`;
-        if (event.kind === 'heal') return `${sourceName} → ${targetName} HP +${event.value ?? 0}`;
-        if (event.kind === 'down') return `${sourceName} → ${targetName} 행동 불능`;
-        if (event.kind === 'status') return `${sourceName} → ${targetName} 상태 변화`;
-        return `${sourceName} → ${targetName} ${event.value ?? 0} 피해`;
-    }
-
-    private getNetworkEntityName(entityId: string): string {
-        const actor = this.partyActors.find((candidate) => candidate.id === entityId);
-        if (actor) return actor.character.name || actor.entity.label || entityId;
-        const enemy = this.getEnemyById(entityId);
-        if (enemy) return enemy.name || enemy.label || entityId;
-        return entityId;
+        this.networkSyncController.handleCombatEvent(event);
     }
 
     private handleNetworkRaidResult(result: RaidResultMessage): void {
@@ -1834,7 +1587,7 @@ export class WorldEngine {
     }
 
     private closeNetworkRaidClient(sendLeave: boolean, reason: 'town' | 'wipe' | 'manual' = 'manual'): void {
-        this.pendingLootPicks.clear();
+        this.networkSyncController.clearPendingState();
         this.storyScenarioController.resetNetworkState();
         this.remotePartyActors.clear();
         if (!this.networkRaidClient) return;
@@ -2136,12 +1889,7 @@ export class WorldEngine {
     private submitNetworkMoveIntent(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean {
         if (!this.isNetworkRaid || !this.networkRaidClient) return false;
         const intentId = this.networkRaidClient.sendIntent(actor.id, 'move', { tile, path, apCost, pathCost });
-        this.pendingNetworkMoveReopen = { intentId, actorId: actor.id, tile: { ...tile } };
-        this.networkMovePathPreview = {
-            actorId: actor.id,
-            target: { ...tile },
-            path: path.map((step) => ({ ...step })),
-        };
+        this.networkSyncController.trackPendingMove(intentId, actor.id, tile, path);
         return true;
     }
 
@@ -2696,46 +2444,9 @@ export class WorldEngine {
 
     private getPathPreviewTiles(actor: FieldActor | null): TilePoint[] {
         if (!actor) return [];
-        if (this.networkMovePathPreview?.actorId === actor.id) return this.networkMovePathPreview.path;
+        const networkPreview = this.networkSyncController.getPathPreviewTiles(actor);
+        if (networkPreview) return networkPreview;
         return actor.path;
-    }
-
-    private refreshNetworkMovePathPreview(): void {
-        const preview = this.networkMovePathPreview;
-        if (!preview) return;
-
-        const actor = this.partyActors.find((candidate) => candidate.id === preview.actorId);
-        if (!actor) {
-            this.networkMovePathPreview = null;
-            return;
-        }
-
-        while (preview.path.length > 0 && this.hasEntityReachedPreviewTile(actor, preview.path[0])) {
-            preview.path.shift();
-        }
-        if (preview.path.length === 0) {
-            this.networkMovePathPreview = null;
-            return;
-        }
-
-        const pendingMatches = this.pendingNetworkMoveReopen?.actorId === preview.actorId
-            && this.pendingNetworkMoveReopen.tile.x === preview.target.x
-            && this.pendingNetworkMoveReopen.tile.y === preview.target.y;
-        const atTarget = actor.entity.gridX === preview.target.x && actor.entity.gridY === preview.target.y;
-
-        if (atTarget && !this.isEntityMoving(actor.entity)) {
-            this.networkMovePathPreview = null;
-            return;
-        }
-        if (!pendingMatches && !atTarget) this.networkMovePathPreview = null;
-    }
-
-    private clearNetworkMovePathPreview(actorId: string | null): void {
-        if (!actorId || this.networkMovePathPreview?.actorId === actorId) this.networkMovePathPreview = null;
-    }
-
-    private hasEntityReachedPreviewTile(actor: FieldActor, tile: TilePoint): boolean {
-        return Math.abs(actor.entity.pixelX - tile.x) < 0.03 && Math.abs(actor.entity.pixelY - tile.y) < 0.03;
     }
 
     private getSpendableActionGauge(): number {
@@ -2745,31 +2456,6 @@ export class WorldEngine {
         const actor = this.getActivePartyTurnActor();
         if (!actor) return this.remainingActionPoints;
         return Math.max(this.remainingActionPoints, Math.floor(actor.entity.actionGauge));
-    }
-
-    private resolveSnapshotRemainingGauge(remainingGauge: number, actionGauge: number): number {
-        if (remainingGauge > 0) return remainingGauge;
-        return actionGauge >= MIN_FIELD_ACTION_GAUGE_COST ? Math.floor(actionGauge) : 0;
-    }
-
-    private reopenPendingNetworkMoveMenu(ownSnapshots: ActorSnapshot[]): void {
-        const pending = this.pendingNetworkMoveReopen;
-        if (!pending) return;
-
-        const actorSnapshot = ownSnapshots.find((actor) => actor.id === pending.actorId);
-        if (!actorSnapshot) {
-            this.pendingNetworkMoveReopen = null;
-            return;
-        }
-        if (actorSnapshot.tile.x !== pending.tile.x || actorSnapshot.tile.y !== pending.tile.y) return;
-
-        this.pendingNetworkMoveReopen = null;
-        const actor = this.partyActors.find((entry) => entry.id === pending.actorId);
-        if (!actor || actor.id !== this.activeTurnActorId) return;
-        if (this.remainingActionPoints < MIN_FIELD_ACTION_GAUGE_COST) return;
-        if (this.actionMenuUI.getIsOpen()) return;
-        if (this.playerActionController.getMode() !== null) return;
-        if (this.playerActionController.hasExecutableAction(actor)) this.reopenActionMenu(actor);
     }
 
     private hasFieldLineOfSight(from: TilePoint, to: TilePoint): boolean {
