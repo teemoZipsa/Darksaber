@@ -34,4 +34,5 @@ See `docs/monster-balance.md` for the detailed model and tests.
 - `WorldTutorialController` owns intro tutorial state, training map setup/teardown, tutorial action gating, and tutorial HUD rendering.
 - `WorldRaidLifecycleController` owns town entry, network raid deploy/resume, network raid result handling, raid timer expiry, and extraction-town arrival checks.
 - `WorldTempleController` owns fusion temple arrival, fusion callbacks, master-world entry, and mortal-world return flow.
+- `WorldRestingController` owns field resting recovery timers, periodic HP/MP recovery, and damage-based rest interruption.
 - `WorldEngine` should access active story-interior state through the controller instead of owning that state directly.

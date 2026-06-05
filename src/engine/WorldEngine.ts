@@ -27,9 +27,7 @@ import {
 import {
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
-    getStatus,
     hasStatus,
-    removeActionStanceStatusesFromCarrier,
     removeStatusesFromCarrier,
     resolveTurnStartStatuses,
 } from '../combat/StatusEffects';
@@ -80,6 +78,7 @@ import { WorldNetworkSyncController } from './world/WorldNetworkSyncController';
 import { WorldTutorialController } from './world/WorldTutorialController';
 import { WorldRaidLifecycleController } from './world/WorldRaidLifecycleController';
 import { WorldTempleController } from './world/WorldTempleController';
+import { WorldRestingController } from './world/WorldRestingController';
 import { HitStop } from './world/HitStop';
 import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
 import { NetworkRaidClient } from '../net/NetworkRaidClient';
@@ -137,12 +136,12 @@ export class WorldEngine {
     private tutorialController: WorldTutorialController;
     private raidLifecycleController: WorldRaidLifecycleController;
     private templeController: WorldTempleController;
+    private restingController: WorldRestingController;
     private activeTurnActorId: string | null = null;
     private readyQueue: string[] = [];
     private remainingActionPoints = 0;
     private majorActionUsedThisTurn = false;
     private reservedAction: FieldIntent | null = null;
-    private restingRecoveryTimers = new Map<string, number>();
     private hoverTile: TilePoint = { x: -1, y: -1 };
     private combatLog: string[] = [];
     private feedbackGroups = new Map<string, CombatFeedbackKind>();
@@ -206,6 +205,13 @@ export class WorldEngine {
             setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
             clearWorldLoot: () => { this.worldMap.loot = []; },
             selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            log: (message) => this.addCombatLog(message),
+        });
+        this.restingController = new WorldRestingController({
+            getPartyActors: () => this.partyActors,
+            spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
+            spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
+            spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
             log: (message) => this.addCombatLog(message),
         });
         this.storyScenarioController = new WorldStoryScenarioController({
@@ -886,7 +892,7 @@ export class WorldEngine {
         this.majorActionUsedThisTurn = false;
         this.reservedAction = null;
         this.fanfareLeaderActorId = null;
-        this.restingRecoveryTimers.clear();
+        this.restingController.clearTimers();
         this.closeActionMenu();
         this.magicController.reset();
         this.toolController?.reset();
@@ -985,72 +991,19 @@ export class WorldEngine {
     }
 
     private updateRestingActors(dt: number): void {
-        for (const actor of this.partyActors) {
-            if (actor.character.isDead || actor.character.stats.hp <= 0) {
-                this.restingRecoveryTimers.delete(actor.id);
-                continue;
-            }
-            const resting = getStatus(actor.character.statuses, 'resting');
-            if (!resting) {
-                this.restingRecoveryTimers.delete(actor.id);
-                continue;
-            }
-
-            const effective = getEffectiveStatsForCharacter(actor.character);
-            if (resting.sourceType !== 'action' && actor.character.stats.hp >= effective.maxHp && actor.character.stats.mp >= effective.maxMp) {
-                this.stopResting(actor, `${actor.character.name}: 휴식 완료`);
-                continue;
-            }
-
-            let timer = (this.restingRecoveryTimers.get(actor.id) ?? 0) + dt;
-            const ticks = Math.floor(timer);
-            if (ticks <= 0) {
-                this.restingRecoveryTimers.set(actor.id, timer);
-                continue;
-            }
-            timer -= ticks;
-            this.restingRecoveryTimers.set(actor.id, timer);
-
-            const hpPerTick = Math.max(2, Math.floor(effective.maxHp * 0.03));
-            const mpPerTick = effective.maxMp > 0 ? Math.max(1, Math.floor(effective.maxMp * 0.03)) : 0;
-            const beforeHp = actor.character.stats.hp;
-            const beforeMp = actor.character.stats.mp;
-            actor.character.stats.hp = Math.min(effective.maxHp, actor.character.stats.hp + hpPerTick * ticks);
-            actor.character.stats.mp = Math.min(effective.maxMp, actor.character.stats.mp + mpPerTick * ticks);
-            const hpGain = actor.character.stats.hp - beforeHp;
-            const mpGain = actor.character.stats.mp - beforeMp;
-
-            if (hpGain > 0) this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, hpGain);
-            if (mpGain > 0) this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, `MP+${mpGain}`);
-            if (hpGain > 0 || mpGain > 0) this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
-
-            if (resting.sourceType !== 'action' && actor.character.stats.hp >= effective.maxHp && actor.character.stats.mp >= effective.maxMp) {
-                this.stopResting(actor, `${actor.character.name}: 휴식 완료`);
-            }
-        }
+        this.restingController.update(dt);
     }
 
     private stopResting(actor: FieldActor, logMessage?: string): void {
-        const removed = removeStatusesFromCarrier(actor.character, (status) => status.kind === 'resting');
-        this.restingRecoveryTimers.delete(actor.id);
-        if (removed.length === 0) return;
-        this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'REST END');
-        if (logMessage) this.addCombatLog(logMessage);
+        this.restingController.stop(actor, logMessage);
     }
 
     private snapshotPartyHp(): Map<string, number> {
-        return new Map(this.partyActors.map((actor) => [actor.id, actor.character.stats.hp]));
+        return this.restingController.snapshotPartyHp();
     }
 
     private interruptRestingForDamage(beforeHpByActorId: Map<string, number>): void {
-        for (const actor of this.partyActors) {
-            const beforeHp = beforeHpByActorId.get(actor.id);
-            if (beforeHp === undefined) continue;
-            if (actor.character.stats.hp < beforeHp) {
-                this.stopResting(actor, `${actor.character.name}: 피해로 휴식 중단`);
-                removeActionStanceStatusesFromCarrier(actor.character);
-            }
-        }
+        this.restingController.interruptForDamage(beforeHpByActorId);
     }
 
     private isTurnCombatActive(): boolean {

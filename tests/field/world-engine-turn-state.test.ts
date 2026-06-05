@@ -7,6 +7,7 @@ import { getActionApCost } from '../../src/field/FieldActionEconomy';
 import type { FieldActor } from '../../src/field/FieldTypes';
 import { WorldEngine } from '../../src/engine/WorldEngine';
 import { WorldNetworkSyncController } from '../../src/engine/world/WorldNetworkSyncController';
+import { WorldRestingController } from '../../src/engine/world/WorldRestingController';
 import { WorldTutorialController } from '../../src/engine/world/WorldTutorialController';
 import type { ActorSnapshot, GridSnapshot, WorldSnapshot } from '../../src/net/WorldProtocol';
 
@@ -37,7 +38,6 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
     engine.remainingActionPoints = 6;
     engine.majorActionUsedThisTurn = false;
     engine.reservedAction = null;
-    engine.restingRecoveryTimers = new Map();
     engine.partyActors = [actor];
     engine.fieldEnemies = [];
     engine.remotePartyActors = new Map();
@@ -104,6 +104,13 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
         spawnHeal: () => undefined,
         spawnStatus: () => undefined,
     };
+    engine.restingController = new WorldRestingController({
+        getPartyActors: () => engine.partyActors,
+        spawnHeal: (x, y, amount) => engine.floatingText.spawnHeal(x, y, amount),
+        spawnStatus: (x, y, text) => engine.floatingText.spawnStatus(x, y, text),
+        spawnHealEffect: (x, y) => engine.effectManager.spawnHealEffect(x, y),
+        log: (message) => engine.addCombatLog(message),
+    });
     engine.gameManager = {
         inventory: { items: [], remove: () => undefined },
         inventoryUI: {
