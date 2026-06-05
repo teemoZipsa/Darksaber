@@ -5,6 +5,7 @@
  */
 
 import { TILE_SIZE } from '../map/Chunk';
+import { t } from '../i18n/LanguageManager';
 import { ACTION_ICON_CELLS } from './DarksaberIconRegistry';
 import { DarksaberSpriteAtlas, MICON_CELL_SIZE } from './DarksaberSpriteAtlas';
 import { UI, Parchment } from './UITheme';
@@ -49,7 +50,7 @@ export function normalizeLegacyActionType(action: string): ActionType | null {
 
 interface ActionSlot {
     type: ActionType;
-    label: string;
+    labelKey: string;
     gridX: number;
     gridY: number;
     iconDraw: (ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean) => void;
@@ -98,14 +99,14 @@ export class ActionMenuUI {
 
     constructor() {
         this.slots = [
-            { type: 'move',    label: '이동',   gridX: -1, gridY: -1, iconDraw: this.drawMoveIcon },
-            { type: 'tool',    label: '도구',   gridX: 0,  gridY: -1, iconDraw: this.drawToolIcon },
-            { type: 'attack',  label: '공격',   gridX: 1,  gridY: -1, iconDraw: this.drawAttackIcon },
-            { type: 'magic',   label: '마법',   gridX: -1, gridY: 0,  iconDraw: this.drawMagicIcon },
-            { type: 'defend',  label: '방어',   gridX: 1,  gridY: 0,  iconDraw: this.drawDefendIcon },
-            { type: 'rest',    label: '휴식',   gridX: -1, gridY: 1,  iconDraw: this.drawRestIcon },
-            { type: 'fanfare', label: '빵빠레', gridX: 0,  gridY: 1,  iconDraw: this.drawFanfareIcon },
-            { type: 'open',    label: '조사',   gridX: 1,  gridY: 1,  iconDraw: this.drawOpenIcon },
+            { type: 'move',    labelKey: 'action.label.move',    gridX: -1, gridY: -1, iconDraw: this.drawMoveIcon },
+            { type: 'tool',    labelKey: 'action.label.tool',    gridX: 0,  gridY: -1, iconDraw: this.drawToolIcon },
+            { type: 'attack',  labelKey: 'action.label.attack',  gridX: 1,  gridY: -1, iconDraw: this.drawAttackIcon },
+            { type: 'magic',   labelKey: 'action.label.magic',   gridX: -1, gridY: 0,  iconDraw: this.drawMagicIcon },
+            { type: 'defend',  labelKey: 'action.label.defend',  gridX: 1,  gridY: 0,  iconDraw: this.drawDefendIcon },
+            { type: 'rest',    labelKey: 'action.label.rest',    gridX: -1, gridY: 1,  iconDraw: this.drawRestIcon },
+            { type: 'fanfare', labelKey: 'action.label.fanfare', gridX: 0,  gridY: 1,  iconDraw: this.drawFanfareIcon },
+            { type: 'open',    labelKey: 'action.label.open',    gridX: 1,  gridY: 1,  iconDraw: this.drawOpenIcon },
         ];
         this.setDefaultSlotStates();
     }
@@ -211,7 +212,8 @@ export class ActionMenuUI {
 
 
             if (isHovered || isHighlighted) {
-                const label = isHighlighted ? state.emphasisLabel ?? slot.label : slot.label;
+                const slotLabel = t(slot.labelKey);
+                const label = isHighlighted ? state.emphasisLabel ?? slotLabel : slotLabel;
                 ctx.font = `bold 13px ${UI.fontPrimary}`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -351,7 +353,7 @@ export class ActionMenuUI {
     }
 
     private getMissingSlotState(type: ActionType): ActionMenuSlotState {
-        if (type === 'fanfare') return { type, enabled: false, disabledReason: '다음 업데이트 예정' };
+        if (type === 'fanfare') return { type, enabled: false, disabledReason: t('field.action.fanfareNoFollowers') };
         return { type, enabled: true };
     }
 

@@ -61,6 +61,9 @@ export interface WorldPlayerActionContext {
     spendAp: (cost: number) => boolean;
     isMajorActionUsed: () => boolean;
     markMajorActionUsed: () => void;
+    getFanfareLeaderId?: () => string | null;
+    setFanfareLeaderId?: (actorId: string | null) => void;
+    getFanfareFollowerCount?: (actor: FieldActor) => number;
     submitMoveIntent?: (actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number) => boolean;
     submitActionIntent?: (actor: FieldActor, action: 'defend' | 'rest') => boolean;
     tryActorAttack: (actor: FieldActor, enemy: Enemy) => boolean;
@@ -118,7 +121,7 @@ export class WorldPlayerActionController {
     public execute(action: ActionType | string): void {
         const normalizedAction = normalizeLegacyActionType(action);
         if (!normalizedAction) {
-            this.sink.log('아직 필드에서 사용할 수 없는 행동입니다.');
+            this.sink.log(t('field.action.unavailable'));
             return;
         }
 
@@ -126,14 +129,14 @@ export class WorldPlayerActionController {
         if (!actor) return;
 
         if (this.context.getActiveTurnActorId() !== actor.id) {
-            this.sink.log('행동 게이지가 차지 않았습니다.');
+            this.sink.log(t('field.action.turnNotReady'));
             this.context.closeActionMenu();
             return;
         }
 
         const actionState = this.getActionState(actor, normalizedAction);
         if (!actionState.enabled) {
-            this.sink.log(actionState.disabledReason ?? '지금 사용할 수 없는 행동입니다.');
+            this.sink.log(actionState.disabledReason ?? t('field.action.useBlocked'));
             this.context.reopenActionMenu(actor);
             return;
         }
@@ -144,18 +147,18 @@ export class WorldPlayerActionController {
         switch (normalizedAction) {
             case 'move':
                 if (hasStatus(actor.character.statuses, 'immobilize')) {
-                    this.sink.log('이동불가 상태입니다.');
+                    this.sink.log(t('field.action.moveImmobilizedLog'));
                     this.context.reopenActionMenu(actor);
                     break;
                 }
                 if (!this.hasActionGauge(MOVE_ACTION_GAUGE_COST) || !this.hasExecutableMove(actor)) {
-                    this.sink.log('이동할 행동력이 부족합니다.');
+                    this.sink.log(t('field.action.moveNoAp'));
                     this.context.reopenActionMenu(actor);
                     break;
                 }
                 this.actionMode = 'move';
                 this.actionTiles = this.getFilteredActionTiles('move', actor, this.computeWalkableTiles(actor));
-                this.sink.log('이동할 타일을 클릭하세요.');
+                this.sink.log(t('field.action.movePrompt'));
                 break;
             case 'attack':
                 this.actionMode = 'attack';
@@ -172,20 +175,20 @@ export class WorldPlayerActionController {
                 break;
             case 'open':
                 if (!this.hasActionGauge(INTERACT_ACTION_GAUGE_COST) || !this.hasExecutableInteract(actor)) {
-                    this.sink.log('조사할 수 있는 대상이 없습니다.');
+                    this.sink.log(t('field.action.interactNoTarget'));
                     this.context.reopenActionMenu(actor);
                     break;
                 }
                 this.actionMode = 'interact';
                 this.actionTiles = this.getFilteredActionTiles('interact', actor, this.computeInteractTiles(actor));
-                this.sink.log('조사할 상자나 전리품을 클릭하세요.');
+                this.sink.log(t('field.action.interactPrompt'));
                 break;
             case 'rest':
                 this.rest(actor);
                 break;
             case 'defend':
                 if (!this.spendActionCost(DEFEND_ACTION_GAUGE_COST)) {
-                    this.sink.log('방어할 행동 게이지가 부족합니다.');
+                    this.sink.log(t('field.action.defendNoAp'));
                     this.context.reopenActionMenu(actor);
                     break;
                 }
@@ -194,13 +197,16 @@ export class WorldPlayerActionController {
                     createStatus('guard', { durationTurns: undefined, sourceType: 'action' }),
                     createStatus('counterReady', { durationTurns: undefined, sourceType: 'action' }),
                 ]);
-                this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'GUARD');
+                this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, t('field.action.defendStatus'));
                 this.sink.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
-                this.sink.log('방어 태세: 다음 직접 공격 피해 감소 및 약한 반격 준비');
+                this.sink.log(t('field.action.defendLog'));
                 this.context.resumeOrEndActiveTurn(actor);
                 break;
+            case 'fanfare':
+                this.toggleFanfare(actor);
+                break;
             default:
-                this.sink.log('아직 필드에서 사용할 수 없는 행동입니다.');
+                this.sink.log(t('field.action.unavailable'));
                 break;
         }
     }
@@ -217,7 +223,7 @@ export class WorldPlayerActionController {
 
         const selectedTileKey = tileKey(tile.x, tile.y);
         if (!this.actionTiles.has(selectedTileKey)) {
-            this.sink.log('선택할 수 없는 위치입니다.');
+            this.sink.log(t('field.action.moveInvalid'));
             this.clearTargeting();
             return;
         }
@@ -225,7 +231,7 @@ export class WorldPlayerActionController {
         if (this.actionMode === 'move') {
             const queued = this.queueMoveIntent(actor, tile);
             if (queued) {
-                this.sink.log(`이동 시작 (${tile.x}, ${tile.y})`);
+                this.sink.log(formatT('field.action.moveStarted', { x: tile.x, y: tile.y }));
             }
             this.clearTargeting();
             return;
@@ -335,39 +341,49 @@ export class WorldPlayerActionController {
                     entry.enemy.stats.hp > 0 && this.context.getActorAttackTargetFailure(actor, entry.enemy) === null
                 );
                 return this.buildState(type, remainingAp >= ATTACK_ACTION_GAUGE_COST && targetAvailable,
-                    remainingAp < ATTACK_ACTION_GAUGE_COST ? t('ui.actionGaugeLow') : '공격 가능한 적 없음',
+                    remainingAp < ATTACK_ACTION_GAUGE_COST ? t('ui.actionGaugeLow') : t('field.action.attackNone'),
                     this.costLabel(ATTACK_ACTION_GAUGE_COST));
             }
             case 'magic':
                 return this.buildState(type, !hasStatus(actor.character.statuses, 'silence') && remainingAp >= MAGIC_ACTION_GAUGE_COST && this.context.hasCastableFieldSkill(actor),
-                    hasStatus(actor.character.statuses, 'silence') ? '침묵 상태'
+                    hasStatus(actor.character.statuses, 'silence') ? t('field.action.magicSilenced')
                         : remainingAp < MAGIC_ACTION_GAUGE_COST ? t('ui.actionGaugeLow')
-                            : '사용 가능한 마법 없음',
+                            : t('field.action.magicNone'),
                     this.costLabel(MAGIC_ACTION_GAUGE_COST));
             case 'tool': {
                 const tool = this.context.getCombatToolAvailability(actor);
                 return this.buildState(type, remainingAp >= TOOL_ACTION_GAUGE_COST && tool.hasEffectiveRecovery,
                     remainingAp < TOOL_ACTION_GAUGE_COST ? t('ui.actionGaugeLow')
-                        : !tool.hasRecoveryConsumable ? '회복 도구 없음'
-                            : '회복 효과 없음',
+                        : !tool.hasRecoveryConsumable ? t('field.action.toolNone')
+                            : t('field.action.toolNoEffect'),
                     this.costLabel(TOOL_ACTION_GAUGE_COST));
             }
             case 'move':
                 return this.buildState(type, this.hasExecutableMove(actor),
-                    hasStatus(actor.character.statuses, 'immobilize') ? '이동불가 상태'
+                    hasStatus(actor.character.statuses, 'immobilize') ? t('field.action.moveImmobilized')
                         : remainingAp < MOVE_ACTION_GAUGE_COST ? t('ui.actionGaugeLow')
-                            : '이동할 타일 없음',
+                            : t('field.action.moveNone'),
                     this.costLabel(MOVE_ACTION_GAUGE_COST));
             case 'open':
                 return this.buildState(type, this.hasExecutableInteract(actor),
-                    remainingAp < INTERACT_ACTION_GAUGE_COST ? t('ui.actionGaugeLow') : '조사 대상 없음',
+                    remainingAp < INTERACT_ACTION_GAUGE_COST ? t('ui.actionGaugeLow') : t('field.action.interactNone'),
                     this.costLabel(INTERACT_ACTION_GAUGE_COST));
             case 'defend':
                 return this.buildState(type, remainingAp >= DEFEND_ACTION_GAUGE_COST, t('ui.actionGaugeLow'), this.costLabel(DEFEND_ACTION_GAUGE_COST));
             case 'rest':
                 return this.buildState(type, remainingAp >= REST_ACTION_GAUGE_COST, t('ui.actionGaugeLow'), this.costLabel(REST_ACTION_GAUGE_COST));
-            case 'fanfare':
-                return this.buildState(type, false, '다음 업데이트 예정', '');
+            case 'fanfare': {
+                const followerCount = this.context.getFanfareFollowerCount?.(actor) ?? Math.max(0, this.context.getPartyActors().filter((entry) => entry !== actor && !entry.character.isDead).length);
+                const isActiveLeader = this.context.getFanfareLeaderId?.() === actor.id;
+                return {
+                    type,
+                    enabled: followerCount > 0,
+                    costLabel: t('field.action.free'),
+                    disabledReason: followerCount > 0 ? undefined : t('field.action.fanfareNoFollowers'),
+                    highlighted: isActiveLeader,
+                    emphasisLabel: isActiveLeader ? t('field.action.fanfareActive') : undefined,
+                };
+            }
         }
     }
 
@@ -382,7 +398,7 @@ export class WorldPlayerActionController {
 
     private rest(actor: FieldActor): void {
         if (!this.spendActionCost(REST_ACTION_GAUGE_COST)) {
-            this.sink.log('휴식할 행동 게이지가 부족합니다.');
+            this.sink.log(t('field.action.restNoAp'));
             this.context.reopenActionMenu(actor);
             return;
         }
@@ -390,22 +406,41 @@ export class WorldPlayerActionController {
         actor.character.statuses = replaceActionStanceStatuses(actor.character.statuses, [
             createStatus('resting', { sourceType: 'action' }),
         ]);
-        this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'REST');
+        this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, t('field.action.restStatus'));
         this.sink.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
-        this.sink.log('휴식 중: 체력과 마나가 천천히 회복됩니다. 피해를 받으면 해제됩니다.');
+        this.sink.log(t('field.action.restLog'));
         this.context.onActionCompleted?.('rest');
         this.context.resumeOrEndActiveTurn(actor);
     }
 
+    private toggleFanfare(actor: FieldActor): void {
+        const followerCount = this.context.getFanfareFollowerCount?.(actor) ?? Math.max(0, this.context.getPartyActors().filter((entry) => entry !== actor && !entry.character.isDead).length);
+        if (followerCount <= 0) {
+            this.sink.log(t('field.action.fanfareNoFollowers'));
+            this.context.reopenActionMenu(actor);
+            return;
+        }
+
+        const isActiveLeader = this.context.getFanfareLeaderId?.() === actor.id;
+        this.context.setFanfareLeaderId?.(isActiveLeader ? null : actor.id);
+        this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, t('field.action.fanfareStatus'));
+        this.sink.spawnBuffEffect(actor.entity.gridX, actor.entity.gridY);
+        this.sink.log(isActiveLeader
+            ? t('field.action.fanfareOff')
+            : formatT('field.action.fanfareOn', { name: actor.character.name })
+        );
+        this.context.reopenActionMenu(actor);
+    }
+
     private handleAttackTarget(actor: FieldActor, hit: FieldHit): void {
         if (hit.kind !== 'enemy') {
-            this.sink.log('공격할 적이 없습니다.');
+            this.sink.log(t('field.action.attackNone'));
             return;
         }
 
         const enemy = this.context.getEnemyById(hit.enemy.id);
         if (!enemy) {
-            this.sink.log('공격할 적이 없습니다.');
+            this.sink.log(t('field.action.attackNone'));
             return;
         }
 
@@ -425,19 +460,19 @@ export class WorldPlayerActionController {
 
     private handleInteractTarget(actor: FieldActor, hit: FieldHit): void {
         if (hit.kind !== 'loot') {
-            this.sink.log('조사할 대상이 없습니다.');
+            this.sink.log(t('field.action.interactNoTarget'));
             return;
         }
 
         const loot = this.context.getLootById(hit.loot.id);
         if (!loot) {
-            this.sink.log('조사할 대상이 없습니다.');
+            this.sink.log(t('field.action.interactNoTarget'));
             return;
         }
 
         this.context.selectLoot(loot.id);
         if (!this.spendActionCost(INTERACT_ACTION_GAUGE_COST)) {
-            this.sink.log('조사할 행동력이 부족합니다.');
+            this.sink.log(t('field.action.interactNoAp'));
             return;
         }
         this.context.openLoot(loot);
@@ -455,13 +490,13 @@ export class WorldPlayerActionController {
         const path = pathResult.path;
         if (path.length === 0 && !this.context.isActorAt(actor, tile)) {
             this.context.clearActorIntent(actor);
-            this.sink.log('이동 경로를 찾지 못했습니다.');
+            this.sink.log(t('field.action.movePathMissing'));
             return false;
         }
 
         const apCost = getActionApCost('move');
         if (!this.spendActionCost(MOVE_ACTION_GAUGE_COST)) {
-            this.sink.log('이동할 행동력이 부족합니다.');
+            this.sink.log(t('field.action.moveNoAp'));
             return false;
         }
 

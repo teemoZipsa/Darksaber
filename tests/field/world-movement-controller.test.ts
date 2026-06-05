@@ -64,6 +64,33 @@ test('follower movement allows ally soft collision', () => {
     assert.equal(controller.isFieldPassable({ x: 1, y: 0, actorId: follower.id, intent: 'follow' }), true);
 });
 
+test('party followers only repath when a fanfare leader is supplied', () => {
+    const leader = makeActor('leader', 0, 0);
+    const follower = makeActor('follower', 5, 5);
+    const actors = [leader, follower];
+    const controller = makeController(actors, []);
+
+    controller.updatePartyActors({
+        dt: 1,
+        controlled: null,
+        activeTurnActorId: null,
+        followRepathTimer: 0,
+    });
+
+    assert.deepEqual(follower.path, []);
+    assert.equal(follower.queuedIntent, null);
+
+    controller.updatePartyActors({
+        dt: 1,
+        controlled: leader,
+        activeTurnActorId: null,
+        followRepathTimer: 0,
+    });
+
+    assert.ok(follower.path.length > 0);
+    assert.equal(follower.queuedIntent?.kind, 'move');
+});
+
 test('movement honors world ground blockers on walkable terrain', () => {
     const actor = makeActor('hero', 0, 0);
     const controller = new WorldMovementController({

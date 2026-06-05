@@ -36,19 +36,25 @@ function makeEnemyEntry(id: string, x: number, y: number): FieldEnemy {
 }
 
 interface ControllerOptions {
+    partyActors?: FieldActor[];
     fieldEnemies?: FieldEnemy[];
     hasCastableFieldSkill?: boolean;
     hasUsableCombatTool?: boolean;
     hasRecoveryConsumable?: boolean;
     hasEffectiveRecovery?: boolean;
     majorActionUsed?: { value: boolean };
+    fanfareLeaderId?: { value: string | null };
+    fanfareFollowerCount?: (actor: FieldActor) => number;
     getActorAttackTargetFailure?: WorldPlayerActionContext['getActorAttackTargetFailure'];
+    logs?: string[];
+    reopened?: { value: number };
+    spentCosts?: number[];
 }
 
 function makeController(actor: FieldActor, remainingAp: number, options: ControllerOptions = {}): WorldPlayerActionController {
     const context: WorldPlayerActionContext = {
         getActivePartyTurnActor: () => actor,
-        getPartyActors: () => [actor],
+        getPartyActors: () => options.partyActors ?? [actor],
         getFieldEnemies: () => options.fieldEnemies ?? [],
         getRemainingActionPoints: () => remainingAp,
         getReservedAction: () => null,
@@ -64,11 +70,19 @@ function makeController(actor: FieldActor, remainingAp: number, options: Control
         isActorAt: (_actor, tile) => _actor.entity.gridX === tile.x && _actor.entity.gridY === tile.y,
         isEntityMoving: () => false,
         isFieldPassable: () => true,
-        spendAp: () => true,
+        spendAp: (cost) => {
+            options.spentCosts?.push(cost);
+            return true;
+        },
         isMajorActionUsed: () => options.majorActionUsed?.value ?? false,
         markMajorActionUsed: () => {
             if (options.majorActionUsed) options.majorActionUsed.value = true;
         },
+        getFanfareLeaderId: () => options.fanfareLeaderId?.value ?? null,
+        setFanfareLeaderId: (actorId) => {
+            if (options.fanfareLeaderId) options.fanfareLeaderId.value = actorId;
+        },
+        getFanfareFollowerCount: options.fanfareFollowerCount,
         tryActorAttack: () => false,
         openLoot: () => undefined,
         openMagic: () => undefined,
@@ -79,7 +93,9 @@ function makeController(actor: FieldActor, remainingAp: number, options: Control
             hasRecoveryConsumable: options.hasRecoveryConsumable ?? options.hasUsableCombatTool ?? false,
             hasEffectiveRecovery: options.hasEffectiveRecovery ?? options.hasUsableCombatTool ?? false,
         }),
-        reopenActionMenu: () => undefined,
+        reopenActionMenu: () => {
+            if (options.reopened) options.reopened.value += 1;
+        },
         closeActionMenu: () => undefined,
         closeTacticalMenu: () => undefined,
         resumeOrEndActiveTurn: () => undefined,
@@ -90,7 +106,9 @@ function makeController(actor: FieldActor, remainingAp: number, options: Control
         selectLoot: () => undefined,
     };
     return new WorldPlayerActionController(context, {
-        log: () => undefined,
+        log: (message) => {
+            options.logs?.push(message);
+        },
         spawnHeal: () => undefined,
         spawnStatus: () => undefined,
         spawnHealEffect: () => undefined,
@@ -153,6 +171,57 @@ test('turn action states always expose tool with disabled reasons', () => {
     assert.equal(noToolController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.disabledReason, '회복 도구 없음');
     assert.equal(noEffectController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.disabledReason, '회복 효과 없음');
     assert.equal(readyController.getTurnActionStates(actor).find((state) => state.type === 'tool')?.enabled, true);
+});
+
+test('fanfare toggles the current actor as the rally leader without spending AP', () => {
+    const actor = makeActor('leader', 0, 0);
+    const follower = makeActor('follower', 2, 0);
+    const fanfareLeaderId = { value: null as string | null };
+    const logs: string[] = [];
+    const spentCosts: number[] = [];
+    const reopened = { value: 0 };
+    const controller = makeController(actor, 0, {
+        partyActors: [actor, follower],
+        fanfareLeaderId,
+        logs,
+        spentCosts,
+        reopened,
+    });
+
+    const initial = controller.getTurnActionStates(actor).find((state) => state.type === 'fanfare');
+    assert.equal(initial?.enabled, true);
+    assert.equal(initial?.highlighted, false);
+
+    controller.execute('fanfare');
+
+    assert.equal(fanfareLeaderId.value, actor.id);
+    assert.deepEqual(spentCosts, []);
+    assert.equal(reopened.value, 1);
+    assert.match(logs[logs.length - 1] ?? '', /leader 기준으로 파티 집결/);
+
+    const active = controller.getTurnActionStates(actor).find((state) => state.type === 'fanfare');
+    assert.equal(active?.highlighted, true);
+    assert.equal(active?.emphasisLabel, '집결 중');
+
+    controller.execute('fanfare');
+
+    assert.equal(fanfareLeaderId.value, null);
+    assert.deepEqual(spentCosts, []);
+    assert.match(logs[logs.length - 1] ?? '', /파티 집결을 해제/);
+});
+
+test('fanfare stays disabled when only remote actors would be followers', () => {
+    const actor = makeActor('local', 0, 0);
+    const remote = makeActor('remote', 3, 0);
+    const controller = makeController(actor, 100, {
+        partyActors: [actor, remote],
+        fanfareFollowerCount: () => 0,
+    });
+
+    const fanfare = controller.getTurnActionStates(actor).find((state) => state.type === 'fanfare');
+
+    assert.equal(fanfare?.enabled, false);
+    assert.equal(fanfare?.disabledReason, '집결할 파티원이 없습니다.');
 });
 
 test('partial ATB keeps attack, magic, tool, and movement available when costs can be paid', () => {

@@ -210,6 +210,7 @@ export class WorldEngine {
     private combatLog: string[] = [];
     private feedbackGroups = new Map<string, CombatFeedbackKind>();
     private followRepathTimer: number = 0;
+    private fanfareLeaderActorId: string | null = null;
     private floatingText = new FloatingTextManager();
     private effectManager = new EffectManager();
     private attackCues: AttackCue[] = [];
@@ -430,6 +431,12 @@ export class WorldEngine {
                 spendAp: (cost) => this.spendAp(cost),
                 isMajorActionUsed: () => this.majorActionUsedThisTurn,
                 markMajorActionUsed: () => this.markMajorActionUsed(),
+                getFanfareLeaderId: () => this.fanfareLeaderActorId,
+                setFanfareLeaderId: (actorId) => {
+                    this.fanfareLeaderActorId = actorId;
+                    this.followRepathTimer = 0;
+                },
+                getFanfareFollowerCount: (actor) => this.getFanfareFollowerCount(actor),
                 submitMoveIntent: (actor, tile, path, apCost, pathCost) =>
                     this.submitNetworkMoveIntent(actor, tile, path, apCost, pathCost),
                 submitActionIntent: (actor, action) => this.submitNetworkActionIntent(actor, action),
@@ -628,7 +635,7 @@ export class WorldEngine {
 
         const partyMovement = this.movementController.updatePartyActors({
             dt,
-            controlled: this.getControlledActor(),
+            controlled: this.getFanfareLeaderActor(),
             activeTurnActorId: this.activeTurnActorId,
             followRepathTimer: this.followRepathTimer,
         });
@@ -1167,6 +1174,7 @@ export class WorldEngine {
         const members = (overrideMembers ?? this.party.getCharacters()).slice(0, this.party.MAX_ACTIVE_PARTY_SIZE);
         members.forEach((character) => this.syncCharacterMovementToClass(character));
         this.partyActors = this.fieldSpawnController.createPartyActors(anchorTile, members);
+        this.fanfareLeaderActorId = null;
     }
 
     private getIntroTutorialCharacters(): Character[] {
@@ -1357,6 +1365,7 @@ export class WorldEngine {
         this.remainingActionPoints = 0;
         this.majorActionUsedThisTurn = false;
         this.reservedAction = null;
+        this.fanfareLeaderActorId = null;
         this.restingRecoveryTimers.clear();
         this.closeActionMenu();
         this.magicController.reset();
@@ -2549,17 +2558,33 @@ export class WorldEngine {
         }
     }
 
-    private getControlledActor(): FieldActor | null {
+    private getLocalPartyActors(): FieldActor[] {
         // partyActors may also hold remote players' actors during a network raid, so
-        // resolve the controlled actor by local Character identity rather than by raw
-        // index, which could otherwise point at someone else's unit.
+        // resolve local actors by Character identity rather than by raw index.
+        const characters = this.party.getCharacters();
+        return this.partyActors.filter((actor) => characters.includes(actor.character));
+    }
+
+    private getControlledActor(): FieldActor | null {
         const characters = this.party.getCharacters();
         const activeChar = characters[this.party.getActiveIndex()];
-        const localActors = this.partyActors.filter((actor) => characters.includes(actor.character));
+        const localActors = this.getLocalPartyActors();
         return localActors.find((actor) => actor.character === activeChar)
             ?? localActors.find((actor) => !actor.character.isDead)
             ?? localActors[0]
             ?? null;
+    }
+
+    private getFanfareFollowerCount(actor: FieldActor): number {
+        if (this.isNetworkRaid) return 0;
+        return this.getLocalPartyActors().filter((candidate) => candidate !== actor && !candidate.character.isDead).length;
+    }
+
+    private getFanfareLeaderActor(): FieldActor | null {
+        if (!this.fanfareLeaderActorId || this.isNetworkRaid) return null;
+        const leader = this.getLocalPartyActors().find((actor) => actor.id === this.fanfareLeaderActorId && !actor.character.isDead) ?? null;
+        if (!leader) this.fanfareLeaderActorId = null;
+        return leader;
     }
 
     private getActivePartyTurnActor(): FieldActor | null {

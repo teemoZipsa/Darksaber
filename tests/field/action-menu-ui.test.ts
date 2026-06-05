@@ -34,7 +34,7 @@ test('disabled inspect slot remains visible and clickable as a disabled action',
     assert.equal(result?.disabledReason, '조사 대상 없음');
 });
 
-test('fanfare slot is present but disabled until its effect is implemented', () => {
+test('fanfare slot remains visible and disabled when no state enables it', () => {
     const menu = new ActionMenuUI();
     menu.open();
 
@@ -42,7 +42,7 @@ test('fanfare slot is present but disabled until its effect is implemented', () 
 
     assert.equal(result?.type, 'fanfare');
     assert.equal(result?.enabled, false);
-    assert.equal(result?.disabledReason, '다음 업데이트 예정');
+    assert.equal(result?.disabledReason, '집결할 파티원이 없습니다.');
 });
 
 test('action menu slots use the eight adjacent square cells around the actor', () => {
