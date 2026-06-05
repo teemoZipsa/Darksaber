@@ -26,17 +26,12 @@ import {
     normalizeUpgradeLevels,
 } from '../src/magic/MagicLoadout';
 import {
-    BURGOS_BOSS_MONSTER_ID,
-    BURGOS_CASTLE_DUNGEON_ID,
-    BURGOS_GUARD_MONSTER_ID,
     getMonsterDefinition,
-    ZAMORA_FENRIS_BOSS_MONSTER_ID,
-    ZAMORA_FORTRESS_DUNGEON_ID,
-    ZAMORA_GUARD_MONSTER_ID,
     type MonsterId,
 } from '../src/data/MonsterCatalog';
 import { getStoryQuestByDungeonId } from '../src/data/StoryQuestData';
 import { getStoryScenarioByDungeonId, type StoryScenarioDefinition, type StoryScenarioMissionKind } from '../src/data/StoryScenarioData';
+import { getStoryScenarioMonsterLayout } from '../src/data/StoryScenarioMonsterData';
 import {
     getStoryInteriorLayout,
     getStoryInteriorTileAt,
@@ -1606,7 +1601,7 @@ export class WorldSession {
         const id = `scenario_${this.nextEnemyId++}`;
         const tile = this.findNearbyWalkableTile(input.tile, id, input.state.playerId);
         const definition = input.monsterId ? getMonsterDefinition(input.monsterId) : null;
-        const enemy = new Enemy(id, tile.x, tile.y, input.name, input.level, input.color, input.role);
+        const enemy = new Enemy(id, tile.x, tile.y, input.name, input.level, input.color, input.role, input.monsterId);
         enemy.aggroRange = input.aggroRange ?? definition?.aggroRange ?? enemy.aggroRange;
         enemy.isAggro = true;
         this.enemies.set(id, {
@@ -1739,7 +1734,7 @@ export class WorldSession {
                 id,
             );
             const definition = getMonsterDefinition(monster.monsterId);
-            const enemy = new Enemy(id, tile.x, tile.y, definition.name, monster.level, definition.color, definition.role);
+            const enemy = new Enemy(id, tile.x, tile.y, definition.name, monster.level, definition.color, definition.role, monster.monsterId);
             enemy.aggroRange = definition.aggroRange;
             this.enemies.set(id, { enemy, monsterId: monster.monsterId, nestKey: stateKey, home: tile, wanderSeed: this.nextEnemyId * 7919 });
             spawnedEnemyIds.push(id);
@@ -2274,48 +2269,6 @@ function formationOffset(index: number): TilePoint {
 
 function nestStateKey(realm: ReturnType<WorldMap['getRealm']>, chunkX: number, chunkY: number): string {
     return `${realm}:${chunkX}:${chunkY}`;
-}
-
-interface StoryScenarioMonsterLayout {
-    bossMonsterId?: MonsterId;
-    guardMonsterIds: MonsterId[];
-    guardOffsets?: TilePoint[];
-    bossOffset?: TilePoint;
-}
-
-const STORY_SCENARIO_MONSTER_LAYOUTS = {
-    [BURGOS_CASTLE_DUNGEON_ID]: {
-        bossMonsterId: BURGOS_BOSS_MONSTER_ID,
-        guardMonsterIds: [BURGOS_GUARD_MONSTER_ID],
-        guardOffsets: [{ x: 1, y: -1 }, { x: 1, y: 1 }, { x: 3, y: -1 }, { x: 3, y: 1 }],
-        bossOffset: { x: 5, y: 0 },
-    },
-    [ZAMORA_FORTRESS_DUNGEON_ID]: { bossMonsterId: ZAMORA_FENRIS_BOSS_MONSTER_ID, guardMonsterIds: [ZAMORA_GUARD_MONSTER_ID] },
-    etna_volcano: { bossMonsterId: '466R', guardMonsterIds: ['215R', '224R', '225R'] },
-    arcadia_plain: { bossMonsterId: '458R', guardMonsterIds: ['313R', '314R', '458R'] },
-    cacaora_highland: { bossMonsterId: '315R', guardMonsterIds: ['317R', '453R', '463R'] },
-    remote_village: { bossMonsterId: '311R', guardMonsterIds: ['303R', '313R', '458R'] },
-    sagrajas_temple: { bossMonsterId: '467R', guardMonsterIds: ['307R', '353R', '467R'] },
-    sagunto_port: { bossMonsterId: '634R', guardMonsterIds: ['635R', '637R', '639R'] },
-    sicilio_island: { bossMonsterId: '634R', guardMonsterIds: ['634R', '635R', '463R'] },
-    dalai_lake: { bossMonsterId: '216R', guardMonsterIds: ['214R', '216R', '462R'] },
-    oasis: { bossMonsterId: '467R', guardMonsterIds: ['458R', '462R', '467R'] },
-    pyramid_front: { bossMonsterId: '454R', guardMonsterIds: ['354R', '458R', '462R'] },
-    pyramid_inside: { bossMonsterId: '466R', guardMonsterIds: ['354R', '466R', '467R'] },
-    skeria: { bossMonsterId: '634R', guardMonsterIds: ['634R', '635R', '637R'] },
-    skeria_2: { bossMonsterId: '467R', guardMonsterIds: ['467R', '638R', '639R'] },
-    valhalla_plain: { bossMonsterId: '638R', guardMonsterIds: ['636R', '637R', '638R'] },
-    airship: { guardMonsterIds: ['216R', '634R'] },
-    ament_gate: { bossMonsterId: '638R', guardMonsterIds: ['634R', '636R', '639R'] },
-    ament_1f: { bossMonsterId: '636R', guardMonsterIds: ['636R', '637R', '638R'] },
-    ament_2f: { bossMonsterId: '638R', guardMonsterIds: ['636R', '638R', '639R'] },
-} satisfies Record<string, StoryScenarioMonsterLayout>;
-
-function getStoryScenarioMonsterLayout(scenario: StoryScenarioDefinition): StoryScenarioMonsterLayout {
-    return STORY_SCENARIO_MONSTER_LAYOUTS[scenario.dungeonId as keyof typeof STORY_SCENARIO_MONSTER_LAYOUTS] ?? {
-        bossMonsterId: undefined,
-        guardMonsterIds: ['303R', '313R', '434R'],
-    };
 }
 
 function storyScenarioGuardOffsets(count: number, hasBoss: boolean): TilePoint[] {

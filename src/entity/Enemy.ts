@@ -3,7 +3,8 @@
  */
 
 import { Entity } from './Entity';
-import { createBaseStats, type CharacterStats } from '../data/Stats';
+import { type CharacterStats } from '../data/Stats';
+import { getNormalizedMonsterBalance } from '../data/original/originalMonsterBalance';
 import { TILE_PROPERTIES, type TileType } from '../map/Tile';
 import type { StatusEffect } from '../combat/StatusEffects';
 import { createEnemyAIProfile, type EnemyAIProfile, type EnemyRole } from '../field/EnemyAI';
@@ -40,7 +41,8 @@ export class Enemy extends Entity {
         name: string,
         level: number,
         color: string = '#ff4444',
-        role: EnemyRole = 'bruiser'
+        role: EnemyRole = 'bruiser',
+        monsterId?: string
     ) {
         super(id, gridX, gridY, color, name.charAt(0).toUpperCase());
         this.name = name;
@@ -50,22 +52,7 @@ export class Enemy extends Entity {
         this.role = role;
         this.aiProfile = createEnemyAIProfile(role);
 
-        // Calibrated to the original Dark Saver monster stat scale (ability.atr),
-        // which matches the per-tier player base stats. Keeps level-band scaling.
-        this.baseStats = createBaseStats({
-            maxHp: 80 + level * 22,
-            hp: 80 + level * 22,
-            maxMp: 25 + level * 5,
-            mp: 25 + level * 5,
-            atk: 35 + level * 7,
-            def: 20 + level * 5,
-            magAtk: 25 + level * 4,
-            magDef: 18 + level * 4,
-            spd: 13 + level * 0.4,
-            hitRate: 88 + level,
-            magHit: 88 + level,
-            mov: 2,
-        });
+        this.baseStats = getNormalizedMonsterBalance(monsterId, level).stats;
         this.stats = { ...this.baseStats };
         this.applyRoleTuning(role);
     }

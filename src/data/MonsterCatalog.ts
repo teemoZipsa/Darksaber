@@ -78,9 +78,16 @@ export const NEW_MONSTER_IDS = [
     '634R', '635R', '636R', '637R', '638R', '639R',
 ] as const;
 
+/** Renderable legacy sprites kept out of automatic field spawn pools until authored. */
+export const RESERVED_RENDERABLE_MONSTER_IDS = [
+    '206R',
+    '791R',
+] as const;
+
 export const MONSTER_IDS = [
     ...GENERAL_MONSTER_IDS,
     ...NEW_MONSTER_IDS,
+    ...RESERVED_RENDERABLE_MONSTER_IDS,
     BURGOS_BOSS_MONSTER_ID,
     ZAMORA_FENRIS_BOSS_MONSTER_ID,
     BURGOS_LEGACY_BOSS_MONSTER_ID,
@@ -93,6 +100,12 @@ const commonFrame = {
 };
 
 export const MONSTER_DEFINITIONS: Record<MonsterId, MonsterDefinition> = {
+    '206R': {
+        id: '206R', name: '인펀트리B', sprite: '206R.png', role: 'tank',
+        level: 3, levelBand: [2, 5], family: 'human', spawnTags: ['grass', 'castle'],
+        color: '#c4875a', frameSize: 32, renderScale: 1.12, aggroRange: 5, ...commonFrame,
+    },
+
     '302R': {
         id: '302R', name: '스켈레톤 궁수', sprite: '302R.png', role: 'archer',
         level: 2, levelBand: [1, 4], family: 'undead', spawnTags: ['cave', 'stone', 'grass'],
@@ -330,6 +343,12 @@ export const MONSTER_DEFINITIONS: Record<MonsterId, MonsterDefinition> = {
         id: '639R', name: '제국 병사', sprite: '639R.png', role: 'tank',
         level: 16, levelBand: [14, 20], family: 'human', spawnTags: ['castle', 'ament', 'sand'],
         color: '#3a8888', frameSize: 32, renderScale: 1.16, aggroRange: 6, ...commonFrame,
+    },
+
+    '791R': {
+        id: '791R', name: '새', sprite: '791R.png', role: 'boss',
+        level: 20, levelBand: [20, 20], family: 'beast', spawnTags: ['special'],
+        color: '#d0b080', frameSize: 64, renderScale: 1.65, aggroRange: 9, ...commonFrame,
     },
 
     'burgos_wolf_boss': {

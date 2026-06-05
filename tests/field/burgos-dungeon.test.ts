@@ -5,25 +5,31 @@ import { join } from 'node:path';
 import {
     BURGOS_BOSS_MONSTER_ID,
     BURGOS_CASTLE_DUNGEON_ID,
+    BURGOS_GUARD_MONSTER_ID,
     BURGOS_LEGACY_BOSS_MONSTER_ID,
     GENERAL_MONSTER_IDS,
     MONSTER_ROW_BY_FACING,
     MONSTER_SPRITE_PATH,
+    RESERVED_RENDERABLE_MONSTER_IDS,
     ZAMORA_FENRIS_BOSS_MONSTER_ID,
     ZAMORA_FORTRESS_DUNGEON_ID,
     getMonsterDefinition,
 } from '../../src/data/MonsterCatalog';
+import { getNormalizedMonsterBalance } from '../../src/data/original/originalMonsterBalance';
 import { getItemDef } from '../../src/data/ItemDB';
 import { getStoryQuestByDungeonId } from '../../src/data/StoryQuestData';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import { Enemy } from '../../src/entity/Enemy';
 import { LootObject } from '../../src/entity/LootObject';
+import { Player } from '../../src/entity/Player';
 import { WorldEngine } from '../../src/engine/WorldEngine';
 import { WorldRaidSession } from '../../src/engine/world/WorldRaidSession';
 import { WorldSelectionController } from '../../src/engine/world/WorldSelectionController';
+import { WorldStoryScenarioController } from '../../src/engine/world/WorldStoryScenarioController';
 import { GridInventory } from '../../src/inventory/GridInventory';
 import { generateWorldLootNear } from '../../src/loot/WorldLootGenerator';
 import { BURGOS_CASTLE_HMAP_ROWS, BURGOS_CASTLE_HMAP_SIZE } from '../../src/map/BurgosCastleHmap';
+import { getStoryInteriorLayout, isStoryInteriorDungeon } from '../../src/data/StoryInteriorData';
 import { NEUTRAL_BIRD_SPRITE_SRC, WorldMap } from '../../src/map/WorldMap';
 import { TileType } from '../../src/map/Tile';
 
@@ -38,6 +44,67 @@ class ImageStub {
 (globalThis as unknown as { Image: typeof ImageStub }).Image = ImageStub;
 
 const MONSTER_PUBLIC_PATH = ['public', ...MONSTER_SPRITE_PATH.split('/').filter(Boolean)];
+
+function createStoryScenarioHarness(options: {
+    player?: Player;
+    raidSession?: WorldRaidSession;
+    fieldEnemies?: { enemy: Enemy; home: { x: number; y: number }; path: { x: number; y: number }[] }[];
+    worldMap?: WorldMap;
+    isNetworkRaid?: boolean;
+} = {}) {
+    const player = options.player ?? new Player(0, 0);
+    const raidSession = options.raidSession ?? new WorldRaidSession('central_castle');
+    let worldMap = options.worldMap ?? new WorldMap();
+    let fieldEnemies = options.fieldEnemies ?? [];
+    let selectionCleared = false;
+    let turnStateCleared = false;
+    let selectedActorId: string | null = null;
+    let placedNear: { x: number; y: number } | null = null;
+    let cameraFollowed = false;
+    const logs: string[] = [];
+
+    const controller = new WorldStoryScenarioController({
+        playerData: {} as any,
+        raidSession,
+        getWorldMap: () => worldMap,
+        setWorldMap: (nextWorldMap) => { worldMap = nextWorldMap; },
+        getPlayer: () => player,
+        setPlayer: () => undefined,
+        getFieldEnemies: () => fieldEnemies,
+        setFieldEnemies: (nextFieldEnemies) => { fieldEnemies = nextFieldEnemies; },
+        getControlledActor: () => ({ id: 'hero', entity: player } as any),
+        actorTile: () => ({ x: player.gridX, y: player.gridY }),
+        placePartyNear: (tile) => { placedNear = { ...tile }; },
+        clearFieldTurnState: () => { turnStateCleared = true; },
+        closeFieldOverlays: () => undefined,
+        selectActor: (actorId) => { selectedActorId = actorId; },
+        clearSelection: () => { selectionCleared = true; },
+        applyMonsterSprite: (enemy, monsterId) => {
+            (enemy as unknown as { spriteTestId: string }).spriteTestId = monsterId;
+        },
+        isEntityMoving: () => false,
+        isNetworkRaid: () => options.isNetworkRaid ?? false,
+        getNetworkRaidClient: () => null,
+        isRaidOutcomeVisible: () => false,
+        isTownVisible: () => false,
+        isFusionTempleVisible: () => false,
+        followCameraToPlayer: () => { cameraFollowed = true; },
+        log: (message) => logs.push(message),
+    });
+
+    return {
+        controller,
+        raidSession,
+        logs,
+        get fieldEnemies() { return fieldEnemies; },
+        get worldMap() { return worldMap; },
+        get selectedActorId() { return selectedActorId; },
+        get selectionCleared() { return selectionCleared; },
+        get turnStateCleared() { return turnStateCleared; },
+        get placedNear() { return placedNear; },
+        get cameraFollowed() { return cameraFollowed; },
+    };
+}
 
 test('monster catalog includes 16 general monsters and story boss sprites', () => {
     assert.equal(GENERAL_MONSTER_IDS.length, 16);
@@ -66,6 +133,11 @@ test('monster catalog includes 16 general monsters and story boss sprites', () =
     const legacyBoss = getMonsterDefinition(BURGOS_LEGACY_BOSS_MONSTER_ID);
     assert.equal(legacyBoss.frameSize, 64);
     assert.ok(existsSync(join(process.cwd(), ...MONSTER_PUBLIC_PATH, legacyBoss.sprite)));
+
+    for (const id of RESERVED_RENDERABLE_MONSTER_IDS) {
+        const definition = getMonsterDefinition(id);
+        assert.ok(existsSync(join(process.cwd(), ...MONSTER_PUBLIC_PATH, definition.sprite)), `${id} sprite missing`);
+    }
 });
 
 test('Burgos Castle is a world-map dungeon entrance landmark', () => {
@@ -235,6 +307,7 @@ test('Burgos boss corpse loot includes a guaranteed rune', () => {
     const boss = new Enemy('burgos_boss', 100, 100, bossDef.name, bossDef.level, bossDef.color, bossDef.role);
     const engine = Object.create(WorldEngine.prototype) as any;
     engine.worldMap = { loot: [] };
+    engine.storyScenarioController = { getActiveInterior: () => null };
 
     engine.spawnEnemyLoot(boss);
 
@@ -261,6 +334,68 @@ test('story episodes 3 through 20 have map entrances and server-session objectiv
         if (scenario.episode === 17) assert.equal(scenario.bossName, null, 'airship completes on boarding');
         else assert.ok(scenario.bossName, `episode ${scenario.episode} needs an objective boss name`);
     }
+});
+
+test('local story interior uses the shared monster ids and normalized stats', () => {
+    const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === BURGOS_CASTLE_DUNGEON_ID);
+    const quest = getStoryQuestByDungeonId(BURGOS_CASTLE_DUNGEON_ID);
+    const interior = getStoryInteriorLayout(BURGOS_CASTLE_DUNGEON_ID);
+    assert.ok(dungeon);
+    assert.ok(quest);
+    assert.ok(interior);
+    assert.equal(isStoryInteriorDungeon(BURGOS_CASTLE_DUNGEON_ID), true);
+
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ raidSession });
+
+    harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+
+    assert.equal(raidSession.activeDungeonId, BURGOS_CASTLE_DUNGEON_ID);
+    assert.equal(harness.fieldEnemies.length, 5);
+    assert.deepEqual(harness.placedNear, interior.playerStart);
+    assert.equal(harness.selectedActorId, 'hero');
+    assert.equal(harness.turnStateCleared, true);
+    assert.equal(harness.cameraFollowed, true);
+    const guard = harness.fieldEnemies.find((entry) => entry.enemy.id.endsWith('_guard_0'))?.enemy;
+    const boss = harness.fieldEnemies.find((entry) => entry.enemy.id.endsWith('_boss'))?.enemy;
+    assert.ok(guard);
+    assert.ok(boss);
+
+    const guardBalance = getNormalizedMonsterBalance(BURGOS_GUARD_MONSTER_ID, 2);
+    assert.equal(guard.stats.maxHp, guardBalance.stats.maxHp);
+    assert.equal(guard.stats.atk, guardBalance.stats.atk);
+    assert.equal((guard as unknown as { spriteTestId: string }).spriteTestId, BURGOS_GUARD_MONSTER_ID);
+
+    const expectedBoss = new Enemy('expected_boss', 0, 0, boss.name, 3, boss.color, 'boss', BURGOS_BOSS_MONSTER_ID);
+    assert.equal(boss.stats.maxHp, expectedBoss.stats.maxHp);
+    assert.equal(boss.stats.atk, expectedBoss.stats.atk);
+    assert.equal((boss as unknown as { spriteTestId: string }).spriteTestId, BURGOS_BOSS_MONSTER_ID);
+});
+
+test('story interior completion restores the previous world map at the return tile', () => {
+    const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === BURGOS_CASTLE_DUNGEON_ID);
+    const quest = getStoryQuestByDungeonId(BURGOS_CASTLE_DUNGEON_ID);
+    assert.ok(dungeon);
+    assert.ok(quest);
+
+    const player = new Player(12, 13);
+    const overworld = new WorldMap();
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ player, raidSession, worldMap: overworld });
+
+    harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+    const boss = harness.fieldEnemies.find((entry) => entry.enemy.isBoss)?.enemy;
+    assert.ok(boss);
+    assert.notEqual(harness.worldMap, overworld);
+
+    harness.controller.completeDungeonIfBossDefeated(boss);
+
+    assert.equal(harness.worldMap, overworld);
+    assert.deepEqual(harness.placedNear, { x: 12, y: 13 });
+    assert.equal(raidSession.activeDungeonId, null);
+    assert.equal(raidSession.isDungeonCleared(BURGOS_CASTLE_DUNGEON_ID), true);
 });
 
 test('normal enemy loot is auto-collected into the backpack', () => {
@@ -358,33 +493,30 @@ test('Burgos boss defeat clears only the dungeon encounter, not raid success', (
     raidSession.beginRaidFromTown('central_castle');
     raidSession.startDungeonEncounter(BURGOS_CASTLE_DUNGEON_ID);
 
-    let selectionCleared = false;
-    let turnStateCleared = false;
     let raidSuccessShown = false;
-    const logs: string[] = [];
-    const engine = Object.create(WorldEngine.prototype) as any;
-    engine.raidSession = raidSession;
-    engine.fieldEnemies = [
-        { enemy: boss, home: { x: boss.gridX, y: boss.gridY }, path: [] },
-        { enemy: guard, home: { x: guard.gridX, y: guard.gridY }, path: [] },
-    ];
-    engine.worldMap = { loot: [{ id: 'preexisting_loot' }, { id: 'corpse_burgos_boss' }] };
-    engine.selectionController = { clear: () => { selectionCleared = true; } };
-    engine.clearFieldTurnState = () => { turnStateCleared = true; };
-    engine.raidOutcomeController = { completeSuccess: () => { raidSuccessShown = true; } };
-    engine.addCombatLog = (message: string) => logs.push(message);
+    const worldMap = new WorldMap();
+    worldMap.loot = [{ id: 'preexisting_loot' } as any, { id: 'corpse_burgos_boss' } as any];
+    const harness = createStoryScenarioHarness({
+        raidSession,
+        worldMap,
+        fieldEnemies: [
+            { enemy: boss, home: { x: boss.gridX, y: boss.gridY }, path: [] },
+            { enemy: guard, home: { x: guard.gridX, y: guard.gridY }, path: [] },
+        ],
+    });
+    void raidSuccessShown;
 
-    engine.completeDungeonIfBossDefeated(boss);
+    harness.controller.completeDungeonIfBossDefeated(boss);
 
     assert.equal(raidSession.active, true);
     assert.equal(raidSession.activeDungeonId, null);
     assert.equal(raidSession.isDungeonCleared(BURGOS_CASTLE_DUNGEON_ID), true);
-    assert.deepEqual(engine.fieldEnemies, []);
-    assert.deepEqual(engine.worldMap.loot, [{ id: 'preexisting_loot' }, { id: 'corpse_burgos_boss' }]);
-    assert.equal(selectionCleared, true);
-    assert.equal(turnStateCleared, true);
+    assert.deepEqual(harness.fieldEnemies, []);
+    assert.deepEqual(harness.worldMap.loot.map((loot) => loot.id), ['preexisting_loot', 'corpse_burgos_boss']);
+    assert.equal(harness.selectionCleared, true);
+    assert.equal(harness.turnStateCleared, true);
     assert.equal(raidSuccessShown, false);
-    assert.ok(logs.includes('부르고스성 목표 달성. 다른 마을로 생환하면 1화가 완료됩니다.'));
+    assert.ok(harness.logs.includes('부르고스성 목표 달성. 다른 마을로 생환하면 1화가 완료됩니다.'));
 });
 
 test('Zamora Fenris defeat clears only the dungeon encounter, not raid success', () => {
@@ -395,33 +527,30 @@ test('Zamora Fenris defeat clears only the dungeon encounter, not raid success',
     raidSession.beginRaidFromTown('central_castle');
     raidSession.startDungeonEncounter(ZAMORA_FORTRESS_DUNGEON_ID);
 
-    let selectionCleared = false;
-    let turnStateCleared = false;
     let raidSuccessShown = false;
-    const logs: string[] = [];
-    const engine = Object.create(WorldEngine.prototype) as any;
-    engine.raidSession = raidSession;
-    engine.fieldEnemies = [
-        { enemy: boss, home: { x: boss.gridX, y: boss.gridY }, path: [] },
-        { enemy: guard, home: { x: guard.gridX, y: guard.gridY }, path: [] },
-    ];
-    engine.worldMap = { loot: [{ id: 'preexisting_loot' }, { id: 'corpse_zamora_fenris' }] };
-    engine.selectionController = { clear: () => { selectionCleared = true; } };
-    engine.clearFieldTurnState = () => { turnStateCleared = true; };
-    engine.raidOutcomeController = { completeSuccess: () => { raidSuccessShown = true; } };
-    engine.addCombatLog = (message: string) => logs.push(message);
+    const worldMap = new WorldMap();
+    worldMap.loot = [{ id: 'preexisting_loot' } as any, { id: 'corpse_zamora_fenris' } as any];
+    const harness = createStoryScenarioHarness({
+        raidSession,
+        worldMap,
+        fieldEnemies: [
+            { enemy: boss, home: { x: boss.gridX, y: boss.gridY }, path: [] },
+            { enemy: guard, home: { x: guard.gridX, y: guard.gridY }, path: [] },
+        ],
+    });
+    void raidSuccessShown;
 
-    engine.completeDungeonIfBossDefeated(boss);
+    harness.controller.completeDungeonIfBossDefeated(boss);
 
     assert.equal(raidSession.active, true);
     assert.equal(raidSession.activeDungeonId, null);
     assert.equal(raidSession.isDungeonCleared(ZAMORA_FORTRESS_DUNGEON_ID), true);
-    assert.deepEqual(engine.fieldEnemies, []);
-    assert.deepEqual(engine.worldMap.loot, [{ id: 'preexisting_loot' }, { id: 'corpse_zamora_fenris' }]);
-    assert.equal(selectionCleared, true);
-    assert.equal(turnStateCleared, true);
+    assert.deepEqual(harness.fieldEnemies, []);
+    assert.deepEqual(harness.worldMap.loot.map((loot) => loot.id), ['preexisting_loot', 'corpse_zamora_fenris']);
+    assert.equal(harness.selectionCleared, true);
+    assert.equal(harness.turnStateCleared, true);
     assert.equal(raidSuccessShown, false);
-    assert.ok(logs.includes('자모라 요새 목표 달성. 다른 마을로 생환하면 2화가 완료됩니다.'));
+    assert.ok(harness.logs.includes('자모라 요새 목표 달성. 다른 마을로 생환하면 2화가 완료됩니다.'));
 });
 
 test('Airship objective completion keeps variant monsters as optional encounters', () => {
@@ -432,22 +561,17 @@ test('Airship objective completion keeps variant monsters as optional encounters
     const storyQuest = getStoryQuestByDungeonId('airship');
     assert.ok(storyQuest);
 
-    let selectionCleared = false;
-    let turnStateCleared = false;
-    const logs: string[] = [];
-    const engine = Object.create(WorldEngine.prototype) as any;
-    engine.raidSession = raidSession;
-    engine.fieldEnemies = [{ enemy: variant, home: { x: 100, y: 100 }, path: [] }];
-    engine.selectionController = { clear: () => { selectionCleared = true; } };
-    engine.clearFieldTurnState = () => { turnStateCleared = true; };
-    engine.addCombatLog = (message: string) => logs.push(message);
+    const harness = createStoryScenarioHarness({
+        raidSession,
+        fieldEnemies: [{ enemy: variant, home: { x: 100, y: 100 }, path: [] }],
+    });
 
-    engine.completeStoryDungeonObjective('airship', storyQuest, { clearEnemies: false });
+    harness.controller.completeStoryDungeonObjective('airship', storyQuest, { clearEnemies: false });
 
     assert.equal(raidSession.activeDungeonId, null);
     assert.equal(raidSession.isDungeonCleared('airship'), true);
-    assert.equal(engine.fieldEnemies.length, 1);
-    assert.equal(selectionCleared, true);
-    assert.equal(turnStateCleared, true);
-    assert.ok(logs.includes('비공정 목표 달성. 다른 마을로 생환하면 17화가 완료됩니다.'));
+    assert.equal(harness.fieldEnemies.length, 1);
+    assert.equal(harness.selectionCleared, true);
+    assert.equal(harness.turnStateCleared, true);
+    assert.ok(harness.logs.includes('비공정 목표 달성. 다른 마을로 생환하면 17화가 완료됩니다.'));
 });

@@ -40,6 +40,10 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
     engine.fieldEnemies = [];
     engine.remotePartyActors = new Map();
     engine.pendingLootPicks = new Map();
+    engine.storyScenarioController = {
+        applyNetworkScenarioSnapshot: () => undefined,
+        handleNetworkActionRejected: () => false,
+    };
     engine.raidSession = { elapsedSeconds: 0 };
     engine.party = {
         getCharacters: () => [actor.character],

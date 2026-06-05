@@ -25,8 +25,12 @@ Work from **`docs/ui-tasks.md`**. When a task is finished and type-checks:
 That checklist + `git log` is the shared "done" record across machines/tools.
 
 ## Scope (IMPORTANT — stay in your lane)
-Do **only** the tasks listed under "Codex-safe tasks" in `docs/ui-tasks.md`.
+For UI migration work, do **only** the tasks listed under "Codex-safe tasks" in `docs/ui-tasks.md`.
 **Do NOT** edit `src/engine/GameManager.ts`, `src/ui/react/OverlayRoot.tsx`,
 `src/ui/react/UiStore.ts`, or attempt the inventory drag-grid / new panel wiring —
 those are reserved for the main migration effort and editing them will cause merge
 conflicts. When unsure, leave it and note it in the checklist.
+
+For non-UI work, keep the same caution around reserved files, but a user may
+explicitly approve a narrow edit. When that happens, keep the change scoped,
+add/adjust tests, run `npx tsc --noEmit`, and update the relevant docs.

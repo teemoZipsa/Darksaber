@@ -16,3 +16,18 @@
 - `Player Entity`: `{ id, x, y, hp, ap, class, inventory }`
 - `Chunk Header`: `{ id (x_y), tilesMatrix, staticCollisionMap }`
 - `Event Queue`: Client will maintain an event queue to process turn animations smoothly without desyncing from absolute server states.
+
+## 4. Monster Data and Balance
+- Original monster rows are exposed through `src/data/original/originalMonsters.ts`.
+- Renderable monsters and authored spawn pools live in `src/data/MonsterCatalog.ts`.
+- Original raw monster stats are normalized through `src/data/original/originalMonsterBalance.ts` before they become `Enemy` base stats.
+- `Enemy` accepts an optional `monsterId`; when present, it uses normalized original-backed stats, then applies role tuning.
+- Server scenario enemies and field nests pass `monsterId` into `Enemy`, and clients consume authoritative snapshot stats.
+- Local story interiors use the same `src/data/StoryScenarioMonsterData.ts` layout table as the server.
+
+See `docs/monster-balance.md` for the detailed model and tests.
+
+## 5. World Engine Controllers
+- `WorldEngine` is the field-loop orchestrator; domain flows should move into `src/engine/world/*` controllers when they become self-contained.
+- `WorldStoryScenarioController` owns story dungeon arrival, local story-interior entry/exit, network scenario entry state, and story objective completion.
+- `WorldEngine` should access active story-interior state through the controller instead of owning that state directly.

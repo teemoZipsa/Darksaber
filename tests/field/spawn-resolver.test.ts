@@ -8,7 +8,13 @@ import {
     pickNestForChunk,
     type SpawnContext,
 } from '../../src/field/SpawnResolver';
-import { MONSTER_DEFINITIONS, NEW_MONSTER_IDS, GENERAL_MONSTER_IDS, type MonsterId } from '../../src/data/MonsterCatalog';
+import {
+    GENERAL_MONSTER_IDS,
+    MONSTER_DEFINITIONS,
+    NEW_MONSTER_IDS,
+    RESERVED_RENDERABLE_MONSTER_IDS,
+    type MonsterId,
+} from '../../src/data/MonsterCatalog';
 
 test('catalog level bands are well-formed and contain the base level', () => {
     const fieldPool: MonsterId[] = [...GENERAL_MONSTER_IDS, ...NEW_MONSTER_IDS];
@@ -49,6 +55,16 @@ test('eligibility excludes bosses and respects the band +/- 1 window', () => {
     // 634R band [14,20]
     assert.equal(isEligible('634R', 4), false);
     assert.equal(isEligible('634R', 13), true); // min - 1
+});
+
+test('reserved renderable monsters are not automatic field spawns', () => {
+    const reserved = new Set<string>(RESERVED_RENDERABLE_MONSTER_IDS);
+    for (let danger = 1; danger <= 20; danger++) {
+        for (const biome of ['grass', 'forest', 'sand', 'stone', 'snow', 'lava', 'special'] as const) {
+            const pool = getRegionPacks(biome, danger).map((pack) => pack.monsterId);
+            assert.equal(pool.some((id) => reserved.has(id)), false, `${biome}/${danger} included a reserved monster`);
+        }
+    }
 });
 
 test('spawn level is the base nudged toward danger and clamped to the band', () => {

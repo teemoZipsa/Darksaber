@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
 import { getMasterClass, isMasterClassLineId } from '../../src/data/ClassTree';
 import { getItemDef, ITEMS } from '../../src/data/ItemDB';
-import { getMonsterDefinitionSafe, isMonsterId } from '../../src/data/MonsterCatalog';
+import {
+    GENERAL_MONSTER_IDS,
+    NEW_MONSTER_IDS,
+    RESERVED_RENDERABLE_MONSTER_IDS,
+    getMonsterDefinitionSafe,
+    isMonsterId,
+} from '../../src/data/MonsterCatalog';
 import { ORIGINAL_SHOP_ITEMS } from '../../src/data/OriginalShopItems';
 import { PlayerData } from '../../src/data/PlayerData';
 import { getRestFacility, REST_FACILITIES } from '../../src/data/RestFacilityData';
@@ -16,6 +22,11 @@ import { STORY_QUESTS, getStoryCompanionRewards } from '../../src/data/StoryQues
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import { STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
 import { i18n } from '../../src/i18n/LanguageManager';
+import {
+    ORIGINAL_MONSTER_COUNT,
+    getOriginalMonsterRow,
+    isOriginalMonsterId,
+} from '../../src/data/original/originalMonsters';
 import type { Skill } from '../../src/data/SkillDB';
 import {
     TOWN_FACILITIES,
@@ -100,6 +111,31 @@ test('rest, monster, and starting class data reject unknown ids', () => {
     assert.deepEqual(CHAR_CLASSES.map((cfg) => cfg.id), ['infantry', 'cavalry', 'cleric', 'mage']);
     assert.ok(getStoryCompanionRewards().some((reward) => reward.classId === 'shrine'));
     assert.ok(getStoryCompanionRewards().some((reward) => reward.classId === 'alchemist'));
+});
+
+test('original monster ledger stays separate from renderable spawn catalog', () => {
+    assert.equal(ORIGINAL_MONSTER_COUNT, 451);
+    assert.equal(isOriginalMonsterId('302R'), true);
+    assert.equal(isOriginalMonsterId(302), true);
+    assert.equal(isOriginalMonsterId('__missing__'), false);
+
+    const originalSkeleton = getOriginalMonsterRow('302R');
+    assert.ok(originalSkeleton);
+    assert.equal(originalSkeleton.combat.hpLo, 135);
+    assert.equal(originalSkeleton.combat.atkLo, 105);
+    assert.equal(originalSkeleton.combat.defLo, 42);
+
+    assert.deepEqual([...RESERVED_RENDERABLE_MONSTER_IDS], ['206R', '791R']);
+    const authoredSpawnIds = new Set<string>([...GENERAL_MONSTER_IDS, ...NEW_MONSTER_IDS]);
+    for (const id of RESERVED_RENDERABLE_MONSTER_IDS) {
+        assert.equal(isMonsterId(id), true);
+        assert.ok(getMonsterDefinitionSafe(id));
+        assert.equal(authoredSpawnIds.has(id), false);
+    }
+
+    assert.ok(getOriginalMonsterRow('206R'));
+    assert.ok(getOriginalMonsterRow('791R'));
+    assert.equal(getOriginalMonsterRow('634R'), null);
 });
 
 test('story episodes 1 through 20 are chained and fully localized', () => {

@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBaseStats } from '../../src/data/Stats';
+import { getNormalizedMonsterBalance } from '../../src/data/original/originalMonsterBalance';
+import { Enemy } from '../../src/entity/Enemy';
 import type { ActorSnapshot, AutoLootGrantMessage, WorldJoinMessage } from '../../src/net/WorldProtocol';
 import { WorldMap } from '../../src/map/WorldMap';
 import { WorldResumeFailedError, WorldSession } from '../../server/WorldSession';
@@ -535,6 +537,12 @@ test('server-owned scenario entry spawns objective enemies and records completio
     assert.equal(enteredSnapshot.scenario.activeDungeonId, 'burgos_castle');
     assert.ok(enteredSnapshot.scenario.enteredDungeonIds.includes('burgos_castle'));
     assert.ok(enteredSnapshot.enemies.some((enemy) => enemy.isBoss && enemy.name === '키스라'));
+    const guard = enteredSnapshot.enemies.find((enemy) => enemy.monsterId === '303R');
+    assert.ok(guard);
+    const guardBalance = getNormalizedMonsterBalance('303R', guard.level);
+    assert.equal(guardBalance.source, 'original');
+    assert.equal(guard.stats.maxHp, guardBalance.stats.maxHp);
+    assert.equal(guard.stats.atk, guardBalance.stats.atk);
     assert.deepEqual(enteredSnapshot.partyActors.find((entry) => entry.id === serverActor.id)?.tile, interior.playerStart);
 
     const bossEntry = [...internals.enemies.values()].find((entry: any) => entry.scenarioObjective);
@@ -747,6 +755,21 @@ test('server generates nest content around roaming players', () => {
         Math.abs(Math.floor(enemy.tile.x / 32) - 67) <= 1
         && Math.abs(Math.floor(enemy.tile.y / 32) - 34) <= 1
     ));
+
+    const firstSpawned = spawned.find((enemy) => enemy.monsterId);
+    assert.ok(firstSpawned);
+    const expected = new Enemy(
+        'expected',
+        0,
+        0,
+        firstSpawned.name,
+        firstSpawned.level,
+        firstSpawned.color,
+        firstSpawned.role as Enemy['role'],
+        firstSpawned.monsterId
+    );
+    assert.equal(firstSpawned.stats.maxHp, expected.stats.maxHp);
+    assert.equal(firstSpawned.stats.atk, expected.stats.atk);
 });
 
 test('cleared field nests respawn after five minutes away from active actors', () => {
