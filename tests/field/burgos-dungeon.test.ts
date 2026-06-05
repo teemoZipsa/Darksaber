@@ -24,6 +24,7 @@ import { LootObject } from '../../src/entity/LootObject';
 import { Player } from '../../src/entity/Player';
 import { WorldEngine } from '../../src/engine/WorldEngine';
 import { WorldRaidSession } from '../../src/engine/world/WorldRaidSession';
+import { WorldLootController } from '../../src/engine/world/WorldLootController';
 import { WorldSelectionController } from '../../src/engine/world/WorldSelectionController';
 import { WorldStoryScenarioController } from '../../src/engine/world/WorldStoryScenarioController';
 import { GridInventory } from '../../src/inventory/GridInventory';
@@ -104,6 +105,50 @@ function createStoryScenarioHarness(options: {
         get placedNear() { return placedNear; },
         get cameraFollowed() { return cameraFollowed; },
     };
+}
+
+function installLootController(engine: any, options: {
+    bag?: GridInventory;
+    logs?: string[];
+} = {}) {
+    const bag = options.bag ?? new GridInventory(4, 4);
+    const logs = options.logs ?? [];
+    engine.gameManager = {
+        inventoryUI: {
+            getBag: () => bag,
+            isVisible: () => false,
+            toggle: () => undefined,
+            setExternalGrid: () => undefined,
+        },
+    };
+    engine.selectionController = new WorldSelectionController({
+        getPartyActors: () => [],
+        getEnemyById: () => null,
+        getLootById: () => null,
+    });
+    engine.storyScenarioController ??= { getActiveInterior: () => null };
+    engine.networkSyncController = {
+        addPendingLootPick: () => undefined,
+        purgeStaleLootPicks: () => undefined,
+    };
+    engine.isNetworkRaid = false;
+    engine.networkRaidClient = null;
+    engine.addCombatLog = (message: string) => logs.push(message);
+    engine.getControlledActor = () => null;
+    engine.clearControlledPath = () => undefined;
+    engine.lootController = new WorldLootController({
+        gameManager: engine.gameManager,
+        selectionController: engine.selectionController,
+        storyScenarioController: engine.storyScenarioController,
+        networkSyncController: engine.networkSyncController,
+        getWorldMap: () => engine.worldMap,
+        isNetworkRaid: () => engine.isNetworkRaid,
+        isLocalLootEnabled: () => false,
+        getNetworkRaidClient: () => engine.networkRaidClient,
+        getControlledActor: () => engine.getControlledActor(),
+        clearControlledPath: () => engine.clearControlledPath(),
+        log: (message) => engine.addCombatLog(message),
+    });
 }
 
 test('monster catalog includes 16 general monsters and story boss sprites', () => {
@@ -308,6 +353,7 @@ test('Burgos boss corpse loot includes a guaranteed rune', () => {
     const engine = Object.create(WorldEngine.prototype) as any;
     engine.worldMap = { loot: [] };
     engine.storyScenarioController = { getActiveInterior: () => null };
+    installLootController(engine);
 
     engine.spawnEnemyLoot(boss);
 
@@ -404,8 +450,7 @@ test('normal enemy loot is auto-collected into the backpack', () => {
     const enemy = new Enemy('field_enemy_1', 10, 10, '부르고스 추격병', 1, '#d98a5a', 'bruiser');
     const engine = Object.create(WorldEngine.prototype) as any;
     engine.worldMap = { loot: [] };
-    engine.gameManager = { inventoryUI: { getBag: () => bag } };
-    engine.addCombatLog = (message: string) => logs.push(message);
+    installLootController(engine, { bag, logs });
 
     engine.spawnEnemyLoot(enemy);
 
@@ -424,8 +469,7 @@ test('normal enemy loot drops to the field when the backpack is full', () => {
     const enemy = new Enemy('field_enemy_2', 11, 10, '부르고스 추격병', 1, '#d98a5a', 'bruiser');
     const engine = Object.create(WorldEngine.prototype) as any;
     engine.worldMap = { loot: [] };
-    engine.gameManager = { inventoryUI: { getBag: () => bag } };
-    engine.addCombatLog = (message: string) => logs.push(message);
+    installLootController(engine, { bag, logs });
 
     engine.spawnEnemyLoot(enemy);
 

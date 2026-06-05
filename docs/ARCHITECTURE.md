@@ -35,4 +35,5 @@ See `docs/monster-balance.md` for the detailed model and tests.
 - `WorldRaidLifecycleController` owns town entry, network raid deploy/resume, network raid result handling, raid timer expiry, and extraction-town arrival checks.
 - `WorldTempleController` owns fusion temple arrival, fusion callbacks, master-world entry, and mortal-world return flow.
 - `WorldRestingController` owns field resting recovery timers, periodic HP/MP recovery, and damage-based rest interruption.
+- `WorldLootController` owns enemy loot creation, local/network loot opening, inventory loot-secured callbacks, and opened-loot refresh.
 - `WorldEngine` should access active story-interior state through the controller instead of owning that state directly.

@@ -7,14 +7,12 @@ import { Camera } from './Camera';
 import { InputManager } from './InputManager';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
-import { LootObject } from '../entity/LootObject';
+import type { LootObject } from '../entity/LootObject';
 import { PartyManager } from '../character/PartyManager';
 import { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { getCarryAtbMultiplier, getPartyCarriedWeight } from '../inventory/CarryWeight';
 import { PlayerData } from '../data/PlayerData';
-import { getItemDef } from '../data/ItemDB';
-import { rollBossRune } from '../data/SocketLoot';
 import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
 import { getClassAttackProfile } from '../data/AttackPatternProfiles';
 import { formatT, t } from '../i18n/LanguageManager';
@@ -79,6 +77,7 @@ import { WorldTutorialController } from './world/WorldTutorialController';
 import { WorldRaidLifecycleController } from './world/WorldRaidLifecycleController';
 import { WorldTempleController } from './world/WorldTempleController';
 import { WorldRestingController } from './world/WorldRestingController';
+import { WorldLootController } from './world/WorldLootController';
 import { HitStop } from './world/HitStop';
 import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
 import { NetworkRaidClient } from '../net/NetworkRaidClient';
@@ -137,6 +136,7 @@ export class WorldEngine {
     private raidLifecycleController: WorldRaidLifecycleController;
     private templeController: WorldTempleController;
     private restingController: WorldRestingController;
+    private lootController: WorldLootController;
     private activeTurnActorId: string | null = null;
     private readyQueue: string[] = [];
     private remainingActionPoints = 0;
@@ -414,6 +414,19 @@ export class WorldEngine {
             getEnemyById: (enemyId) => this.getEnemyById(enemyId),
             getLootById: (lootId) => this.worldMap.loot.find((candidate) => candidate.id === lootId) ?? null,
         });
+        this.lootController = new WorldLootController({
+            gameManager: this.gameManager,
+            selectionController: this.selectionController,
+            storyScenarioController: this.storyScenarioController,
+            networkSyncController: this.networkSyncController,
+            getWorldMap: () => this.worldMap,
+            isNetworkRaid: () => this.isNetworkRaid,
+            isLocalLootEnabled: () => this.tutorialController.isActive(),
+            getNetworkRaidClient: () => this.networkRaidClient,
+            getControlledActor: () => this.getControlledActor(),
+            clearControlledPath: () => this.clearControlledPath(),
+            log: (message) => this.addCombatLog(message),
+        });
         this.magicController = new WorldMagicController(
             {
                 getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
@@ -673,13 +686,6 @@ export class WorldEngine {
             getCombatLog: () => this.combatLog,
             onUnhandledEscape: () => this.gameManager.openPauseMenu(),
         });
-        this.gameManager.inventoryUI.onRaidLootSecured = (placed, source) => {
-            if (!this.isNetworkRaid || !this.networkRaidClient || !source || !this.selectionController.lootId) return;
-            const intentId = this.networkRaidClient.sendLootPickup(this.selectionController.lootId, source.gridX, source.gridY);
-            this.networkSyncController.addPendingLootPick(intentId, placed, source);
-            this.networkSyncController.purgeStaleLootPicks();
-        };
-
         this.spawnPartyAtCurrentHub();
         this.player = this.getControlledActor()?.entity ?? new Player(0, 0);
         this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
@@ -1031,49 +1037,7 @@ export class WorldEngine {
     }
 
     private spawnEnemyLoot(enemy: Enemy): void {
-        const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
-        const bossRune = enemy.isBoss ? rollBossRune(enemy.level) : null;
-        const items = [bossRune, herb].filter((item): item is NonNullable<typeof item> => Boolean(item));
-        if (items.length === 0) return;
-        const storyInteriorBossReturn = enemy.isBoss ? this.storyScenarioController.getActiveInterior() : null;
-        const lootMap = storyInteriorBossReturn?.previousWorldMap ?? this.worldMap;
-        const lootTile = storyInteriorBossReturn?.returnTile ?? { x: enemy.gridX, y: enemy.gridY };
-
-        if (!enemy.isBoss) {
-            const failedItems: typeof items = [];
-            const acquiredNames: string[] = [];
-            const bag = this.gameManager.inventoryUI.getBag();
-            for (const item of items) {
-                const placed = bag.autoPlace(item);
-                if (placed) {
-                    placed.acquiredInRaid = true;
-                    acquiredNames.push(item.nameKr);
-                } else {
-                    failedItems.push(item);
-                }
-            }
-            if (acquiredNames.length > 0) {
-                this.addCombatLog(`${enemy.name} ${t('raid.autoLoot')}: ${acquiredNames.join(', ')}`);
-            }
-            if (failedItems.length === 0) return;
-
-            this.addCombatLog(`${enemy.name}: ${t('raid.autoLootFull')}`);
-            const loot = new LootObject(`corpse_${enemy.id}`, enemy.gridX, enemy.gridY, failedItems, {
-                sourceLabel: `${enemy.name} 전리품`,
-                kind: 'corpse',
-            });
-            this.worldMap.loot.push(loot);
-            return;
-        }
-
-        const loot = new LootObject(`corpse_${enemy.id}`, lootTile.x, lootTile.y, items, {
-            sourceLabel: `${enemy.name} 전리품`,
-            kind: 'corpse',
-        });
-        lootMap.loot.push(loot);
-        if (storyInteriorBossReturn) {
-            this.addCombatLog(formatT('story.interior.rewardAtEntrance', { source: enemy.name }));
-        }
+        this.lootController.spawnEnemyLoot(enemy);
     }
 
     private submitNetworkMoveIntent(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean {
@@ -1212,23 +1176,7 @@ export class WorldEngine {
     }
 
     private openLoot(loot: LootObject): void {
-        if (this.isNetworkRaid) {
-            this.selectionController.selectLoot(loot.id);
-            this.addCombatLog(`${loot.sourceLabel} 서버 점유 요청.`);
-            this.networkRaidClient?.sendIntent(this.requireControlledActor().id, 'interact', { lootId: loot.id });
-            return;
-        }
-        if (!this.tutorialController.isActive()) {
-            this.addCombatLog('서버 세션 밖에서는 전리품을 열 수 없습니다.');
-            return;
-        }
-        this.selectionController.selectLoot(loot.id);
-        this.addCombatLog(`${loot.sourceLabel} 검색 중.`);
-        this.clearControlledPath();
-        this.requireControlledActor().queuedIntent = null;
-
-        this.gameManager.inventoryUI.setExternalGrid(loot.inventory, loot.sourceLabel, { isRaidLoot: true });
-        if (!this.gameManager.inventoryUI.isVisible()) this.gameManager.inventoryUI.toggle();
+        this.lootController.openLoot(loot);
     }
 
     private openFieldMagic(actor: FieldActor): void {
@@ -1250,9 +1198,7 @@ export class WorldEngine {
     }
 
     private refreshLootState(): void {
-        for (const loot of this.worldMap.loot) {
-            loot.opened = loot.inventory.items.length === 0;
-        }
+        this.lootController.refreshLootState();
     }
 
     private getLocalPartyActors(): FieldActor[] {
@@ -1287,12 +1233,6 @@ export class WorldEngine {
     private getActivePartyTurnActor(): FieldActor | null {
         if (!this.activeTurnActorId) return null;
         return this.partyActors.find((actor) => actor.id === this.activeTurnActorId && !actor.character.isDead) ?? null;
-    }
-
-    private requireControlledActor(): FieldActor {
-        const actor = this.getControlledActor();
-        if (!actor) throw new Error('No active field actor');
-        return actor;
     }
 
     private switchToNextAliveActor(): void {
