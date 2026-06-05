@@ -31,4 +31,5 @@ See `docs/monster-balance.md` for the detailed model and tests.
 - `WorldEngine` is the field-loop orchestrator; domain flows should move into `src/engine/world/*` controllers when they become self-contained.
 - `WorldStoryScenarioController` owns story dungeon arrival, local story-interior entry/exit, network scenario entry state, and story objective completion.
 - `WorldNetworkSyncController` owns client-side network snapshot application, network combat event presentation, network loot grants, and pending network move/loot state.
+- `WorldTutorialController` owns intro tutorial state, training map setup/teardown, tutorial action gating, and tutorial HUD rendering.
 - `WorldEngine` should access active story-interior state through the controller instead of owning that state directly.

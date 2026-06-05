@@ -7,6 +7,7 @@ import { getActionApCost } from '../../src/field/FieldActionEconomy';
 import type { FieldActor } from '../../src/field/FieldTypes';
 import { WorldEngine } from '../../src/engine/WorldEngine';
 import { WorldNetworkSyncController } from '../../src/engine/world/WorldNetworkSyncController';
+import { WorldTutorialController } from '../../src/engine/world/WorldTutorialController';
 import type { ActorSnapshot, GridSnapshot, WorldSnapshot } from '../../src/net/WorldProtocol';
 
 class ImageStub {
@@ -63,6 +64,17 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
         getTurnActionStates: () => [],
         getMode: () => null,
         clearTargeting: () => calls.push('clearTargeting'),
+    };
+    engine.tutorialController = {
+        isActive: () => false,
+        isCompletePending: () => false,
+        getInstructor: () => null,
+        getActionMenuStates: (targetActor: FieldActor) => engine.playerActionController.getTurnActionStates(targetActor),
+        filterActionTiles: (_action: string, _targetActor: FieldActor, tiles: Set<string>) => tiles,
+        addBlockedLog: () => undefined,
+        isTutorialEnemy: () => false,
+        complete: () => undefined,
+        advanceStep: () => undefined,
     };
     engine.magicController = { reset: () => calls.push('resetMagic') };
     engine.selectionController = {
@@ -267,13 +279,15 @@ test('network raid AP uses server remaining points instead of local actor gauge'
 test('intro tutorial uses only the currently active party character', () => {
     const lead = new Character('lead', 'Lead', 'infantry');
     const active = new Character('active', 'Active', 'cavalry');
-    const engine = Object.create(WorldEngine.prototype) as any;
-    engine.party = {
-        getActive: () => active,
-        getCharacters: () => [lead, active],
-    };
+    const tutorial = new WorldTutorialController({
+        party: {
+            MAX_ACTIVE_PARTY_SIZE: 3,
+            getActive: () => active,
+            getCharacters: () => [lead, active],
+        },
+    } as any);
 
-    assert.deepEqual(engine.getIntroTutorialCharacters(), [active]);
+    assert.deepEqual(tutorial.getIntroTutorialCharacters(), [active]);
 });
 
 test('network snapshot resolves zero remaining gauge from ready actor action gauge', () => {
