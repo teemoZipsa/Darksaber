@@ -818,6 +818,30 @@ const RAW_ITEMS: RawItemDef[] = [
         itemCategory: 'material'
     },
     {
+        id: 'quest_burgos_key', name: 'Burgos Key', nameKr: '부르고스성 열쇠',
+        slot: 'material', gridW: 1, gridH: 1, color: '#d0aa55', icon: '⚿',
+        maxDurability: 1,
+        description: 'A story key received from a Burgos Castle survivor.',
+        descriptionKr: '부르고스성 생존자에게 받은 스토리 열쇠입니다.',
+        rarity: 'unique',
+        weight: 0.1,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'material'
+    },
+    {
+        id: 'quest_cain_necklace', name: "Cain's Necklace", nameKr: '케인의 목걸이',
+        slot: 'material', gridW: 1, gridH: 1, color: '#b7c8e8', icon: '◇',
+        maxDurability: 1,
+        description: "A keepsake entrusted by Cain's son in Burgos Castle.",
+        descriptionKr: '부르고스성에서 케인의 아들이 맡긴 유품입니다.',
+        rarity: 'unique',
+        weight: 0.1,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'material'
+    },
+    {
         id: 'quest_sacred_sword', name: 'Sacred Sword', nameKr: '보검',
         slot: 'weapon', gridW: 1, gridH: 3, color: '#f0c050', icon: '*',
         maxDurability: 1,

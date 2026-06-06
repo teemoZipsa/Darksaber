@@ -2,6 +2,7 @@ import type { PartyManager } from '../../character/PartyManager';
 import { Character } from '../../character/Character';
 import { getItemDef } from '../../data/ItemDB';
 import type { PlayerData } from '../../data/PlayerData';
+import { STORY_SCENARIO_EVENT_SEQUENCES } from '../../data/StoryScenarioEventData';
 import { STORY_QUESTS, type StoryQuestReward } from '../../data/StoryQuestData';
 import { t } from '../../i18n/LanguageManager';
 import type { TownInfo } from '../../map/BiomeMask';
@@ -73,6 +74,7 @@ export class WorldRaidOutcomeController {
             goldReward = 200;
             questRewards.push('퀘스트 완료: 첫 생환');
         }
+        questRewards.push(...this.completeScenarioRuntimeQuestItems());
         questRewards.push(...this.completeStoryQuestRewards());
 
         raidSession.completeAtTown(destination.id);
@@ -151,6 +153,22 @@ export class WorldRaidOutcomeController {
             this.context.playerData.markCleared(quest.id);
             rewards.push(`${t('quest.completed')}: ${t(quest.titleKey)}`);
             rewards.push(this.grantStoryQuestReward(quest.reward));
+        }
+        return rewards;
+    }
+
+    private completeScenarioRuntimeQuestItems(): string[] {
+        const rewards: string[] = [];
+        for (const sequence of STORY_SCENARIO_EVENT_SEQUENCES) {
+            for (const event of sequence.fieldEvents) {
+                if (!event.runtimeFlag || !event.questItemId) continue;
+                if (!this.context.raidSession.hasScenarioFlag(sequence.dungeonId, event.runtimeFlag)) continue;
+                if (this.context.playerData.hasQuestItem(event.questItemId)) continue;
+
+                this.context.playerData.addQuestItem(event.questItemId);
+                const item = getItemDef(event.questItemId);
+                rewards.push(`${t('quest.rewardItem')}: ${item?.nameKr ?? event.questItemId}`);
+            }
         }
         return rewards;
     }

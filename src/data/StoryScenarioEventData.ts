@@ -25,6 +25,7 @@ export interface StoryScenarioFieldEvent {
     trigger: string;
     triggerTiles: TilePoint[];
     runtimeFlag?: string;
+    questItemId?: string;
     steps: StoryScenarioEventStep[];
 }
 
@@ -101,6 +102,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 trigger: 'CHARDEAD survivor/key holder near throne approach',
                 triggerTiles: [{ x: 25, y: 9 }],
                 runtimeFlag: 'burgos_key',
+                questItemId: 'quest_burgos_key',
                 steps: [
                     {
                         kind: 'dialogue',
@@ -140,6 +142,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 trigger: 'DUTY_STEP_TRUE 1 1 and CHARDEAD survivor',
                 triggerTiles: [{ x: 9, y: 12 }],
                 runtimeFlag: 'cain_necklace',
+                questItemId: 'quest_cain_necklace',
                 steps: [
                     {
                         kind: 'dialogue',

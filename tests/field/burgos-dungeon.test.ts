@@ -475,7 +475,7 @@ test('Burgos field events can be inspected once inside the local interior', () =
     assert.equal(harness.controller.playFieldEventAt({ x: 25, y: 9 }, { id: 'hero', entity: player } as any), false);
 });
 
-test('Burgos Cain field event records a raid-scoped relic flag without permanent rewards', () => {
+test('Burgos Cain field event records a raid-scoped relic flag before survival reward', () => {
     const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === BURGOS_CASTLE_DUNGEON_ID);
     const quest = getStoryQuestByDungeonId(BURGOS_CASTLE_DUNGEON_ID);
     assert.ok(dungeon);

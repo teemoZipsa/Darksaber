@@ -37,6 +37,9 @@ const DESTINATION_TOWN: TownInfo = {
     radius: 1,
 };
 
+const BURGOS_KEY_ITEM_ID = 'quest_burgos_key';
+const CAIN_NECKLACE_ITEM_ID = 'quest_cain_necklace';
+
 function markBurgosObjectiveComplete(raidSession: WorldRaidSession): void {
     raidSession.startDungeonEncounter(BURGOS_CASTLE_DUNGEON_ID);
     raidSession.completeDungeonEncounter(BURGOS_CASTLE_DUNGEON_ID);
@@ -116,6 +119,35 @@ test('Burgos objective does not grant episode 1 reward on raid failure', () => {
 
     assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_01_ID), false);
     assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), false);
+    assert.equal(getOutcome()?.questRewards, undefined);
+});
+
+test('Burgos field event items are preserved as quest items only after survival', () => {
+    const { controller, playerData, raidSession, getOutcome } = createController();
+    raidSession.beginRaidFromTown('central_castle');
+    raidSession.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key');
+    raidSession.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'cain_necklace');
+
+    controller.completeSuccess(DESTINATION_TOWN);
+
+    assert.equal(playerData.hasQuestItem(BURGOS_KEY_ITEM_ID), true);
+    assert.equal(playerData.hasQuestItem(CAIN_NECKLACE_ITEM_ID), true);
+    assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_01_ID), false);
+    assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), false);
+    assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('부르고스성 열쇠')));
+    assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('케인의 목걸이')));
+});
+
+test('Burgos field event items are not preserved on raid failure', () => {
+    const { controller, playerData, raidSession, getOutcome } = createController();
+    raidSession.beginRaidFromTown('central_castle');
+    raidSession.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key');
+    raidSession.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'cain_necklace');
+
+    controller.completeFailure('DEAD');
+
+    assert.equal(playerData.hasQuestItem(BURGOS_KEY_ITEM_ID), false);
+    assert.equal(playerData.hasQuestItem(CAIN_NECKLACE_ITEM_ID), false);
     assert.equal(getOutcome()?.questRewards, undefined);
 });
 

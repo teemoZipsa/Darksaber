@@ -12,7 +12,7 @@
 - Indoor story dungeons should follow original map structure, doors, blocked paths, boss positions, and event order as closely as the current combat model allows.
 - Outdoor story missions should prefer original coordinates/hmaps first, then adjust only where the current world map would break movement or combat.
 - Dialogue is keyed separately from event flow. Burgos v1 scenario lines use original CP949 text extracted from `MAP/01set.arc` (`01.DEO`, `01.evt`, `01.srf`).
-- Burgos local inspect events currently record original event item outcomes as raid-scoped runtime flags (`burgos_key`, `cain_necklace`). These flags prevent duplicate event playback and preserve in-raid progress, but they do not grant permanent inventory items yet.
+- Burgos local inspect events record original event item outcomes as raid-scoped runtime flags (`burgos_key`, `cain_necklace`) during the raid. On survival, those flags are promoted into persistent `PlayerData.questItems` (`quest_burgos_key`, `quest_cain_necklace`); on raid failure they are discarded with the session.
 - Tests should validate event order, key presence, and counts, not snapshot full original dialogue.
 
 ## Tooling

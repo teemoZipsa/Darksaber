@@ -84,6 +84,12 @@ test('shop and original item data expose guarded equipment fields', () => {
     const questBomb = getItemDef('quest_bomb');
     assert.ok(questBomb);
     assert.equal(getSellPrice(questBomb), 0);
+    const burgosKey = getItemDef('quest_burgos_key');
+    assert.ok(burgosKey);
+    assert.equal(getSellPrice(burgosKey), 0);
+    const cainNecklace = getItemDef('quest_cain_necklace');
+    assert.ok(cainNecklace);
+    assert.equal(getSellPrice(cainNecklace), 0);
 
     for (const inventory of Object.values(SHOP_INVENTORY_BY_TOWN_FACILITY)) {
         for (const entries of Object.values(inventory)) {
