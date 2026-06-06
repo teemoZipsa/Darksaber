@@ -17,6 +17,10 @@
 ## Tooling
 
 - `scripts/scan-original-scenario.mjs` scans `.lsc` files as little-endian 4-byte words and emits JSON summaries.
+- `scripts/extract-original-arc.mjs` extracts text-like members from `gameres/duty.arc` and `MAP/*set.arc` into `outputs/original_arc_unpacked` by default.
+  - Example: `node scripts/extract-original-arc.mjs`
+  - Use `--manifest-only` to inspect archive tables without unpacking files.
+  - Use `--all` only when bitmap/audio members are needed.
 - Original `.arc` files use the `0901` archive table. For Burgos dialogue verification, `Compress.dll` exports (`OpenArcFile`, `UnpackAFile`, `GetPointer`, `GetBuf2Size`) were used from 32-bit PowerShell to unpack CP949 text members.
 - The scanner reports byte/word counts, stable hashes, opcode candidates, coordinate candidates, text-reference candidates, scene-reference candidates, and `MAP` file manifest entries.
 - The scanner is intentionally descriptive only; it does not rewrite game data.
