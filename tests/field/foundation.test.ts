@@ -23,7 +23,7 @@ import {
     terrainCostToApCost,
 } from '../../src/field/TerrainRules';
 import { TileType } from '../../src/map/Tile';
-import { MINIMAP_LOOT_REVEAL_RANGE, isLootVisibleOnMinimap } from '../../src/ui/MinimapUI';
+import { MINIMAP_LOOT_REVEAL_RANGE, MinimapUI, isLootVisibleOnMinimap } from '../../src/ui/MinimapUI';
 
 class ImageStub {
     public src = '';
@@ -81,6 +81,32 @@ test('minimap loot markers only reveal nearby unopened loot', () => {
     assert.equal(isLootVisibleOnMinimap(player, { x: 100 + MINIMAP_LOOT_REVEAL_RANGE, y: 100, opened: false }), true);
     assert.equal(isLootVisibleOnMinimap(player, { x: 100 + MINIMAP_LOOT_REVEAL_RANGE + 1, y: 100, opened: false }), false);
     assert.equal(isLootVisibleOnMinimap(player, { x: 101, y: 100, opened: true }), false);
+});
+
+test('full minimap close button hides the map immediately', () => {
+    const minimap = new MinimapUI({
+        getTile: () => TileType.GRASS,
+        getPlayerPos: () => ({ x: 0, y: 0 }),
+        getBounds: () => ({ width: 100, height: 100 }),
+        getLandmarks: () => [],
+        getEnemies: () => [],
+        getExtractionZones: () => [],
+        getLoot: () => [],
+    });
+    minimap.toggle();
+    (minimap as any).fullMapCloseButtonRect = { x: 10, y: 10, w: 28, h: 28 };
+
+    const consumed = minimap.handleInput({
+        uiMouseX: 24,
+        uiMouseY: 24,
+        mouseJustDown: true,
+        mouseJustUp: false,
+        mouseIsDown: true,
+        mouseWheelDelta: 0,
+    });
+
+    assert.equal(consumed, true);
+    assert.equal(minimap.isVisible(), false);
 });
 
 test('pathing treats enemies as hard blockers while allowing allied soft collision', () => {
