@@ -336,6 +336,20 @@ export class WorldStoryScenarioController {
         this.completeStoryDungeonObjective(dungeonId, storyQuest);
     }
 
+    public playEnemyDefeatEvent(enemy: Enemy): boolean {
+        const dungeonId = this.context.raidSession.activeDungeonId;
+        if (!dungeonId || this.context.isNetworkRaid()) return false;
+        const sequence = getStoryScenarioEventSequence(dungeonId);
+        const event = sequence?.enemyDefeatEvents?.find((candidate) => candidate.enemyId === enemy.id);
+        if (!event) return false;
+
+        const key = this.fieldEventKey(dungeonId, event.id);
+        if (this.completedFieldEventKeys.has(key)) return false;
+        this.completedFieldEventKeys.add(key);
+        for (const step of event.steps) this.playStoryScenarioEventStep(step);
+        return true;
+    }
+
     public completeStoryDungeonObjective(
         dungeonId: string,
         storyQuest: StoryQuestDefinition,
@@ -377,6 +391,7 @@ export class WorldStoryScenarioController {
             this.networkScenarioEnteredDungeonIds.add(dungeonId);
             const storyQuest = getStoryQuestByDungeonId(dungeonId);
             if (storyQuest) this.context.log(t(storyQuest.enterLogKey));
+            this.playStoryScenarioSequence(dungeonId, 'entry');
             const scenario = getStoryScenarioByDungeonId(dungeonId);
             if (scenario && isStoryInteriorDungeon(dungeonId)) {
                 this.context.log(formatT('story.interior.enterLog', { dungeon: scenario.dungeonNameKr }));

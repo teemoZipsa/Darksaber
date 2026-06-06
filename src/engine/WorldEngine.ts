@@ -1126,6 +1126,7 @@ export class WorldEngine {
         this.selectionController.clearEnemyIfSelected(enemy.id);
 
         this.spawnEnemyLoot(enemy);
+        this.storyScenarioController.playEnemyDefeatEvent(enemy);
         this.storyScenarioController.completeDungeonIfBossDefeated(enemy);
     }
 

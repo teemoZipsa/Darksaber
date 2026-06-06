@@ -494,6 +494,40 @@ test('Zamora local story interior plays original entry flow before Fenris object
     assert.ok(harness.logs.includes('자모라 요새 공주 구출 완료. 다른 마을로 생환하면 2화가 완료됩니다.'));
 });
 
+test('Etna local story interior maps original guard death events 400 through 470', () => {
+    const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === ETNA_VOLCANO_DUNGEON_ID);
+    const quest = getStoryQuestByDungeonId(ETNA_VOLCANO_DUNGEON_ID);
+    const interior = getStoryInteriorLayout(ETNA_VOLCANO_DUNGEON_ID);
+    assert.ok(dungeon);
+    assert.ok(quest);
+    assert.ok(interior);
+
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ raidSession });
+
+    harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+
+    assert.equal(raidSession.activeDungeonId, ETNA_VOLCANO_DUNGEON_ID);
+    assert.equal(harness.fieldEnemies.filter((entry) => entry.enemy.id.includes('_guard_')).length, 8);
+    assert.equal(harness.fieldEnemies.length, 9);
+    assert.deepEqual(harness.fieldEnemies.filter((entry) => entry.enemy.id.includes('_guard_')).map((entry) => ({
+        id: entry.enemy.id,
+        x: entry.enemy.gridX,
+        y: entry.enemy.gridY,
+    })), interior.guardTiles.map((tile, index) => ({
+        id: `story_etna_volcano_guard_${index}`,
+        x: tile.x,
+        y: tile.y,
+    })));
+
+    const guard = harness.fieldEnemies.find((entry) => entry.enemy.id === 'story_etna_volcano_guard_7')?.enemy;
+    assert.ok(guard);
+    assert.equal(harness.controller.playEnemyDefeatEvent(guard), true);
+    assert.ok(harness.logs.some((entry) => entry.includes('에트나 수비병: 으으.. 분하다..')));
+    assert.equal(harness.controller.playEnemyDefeatEvent(guard), false);
+});
+
 test('Zamora chest events grant raid rewards once per chest', () => {
     const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === ZAMORA_FORTRESS_DUNGEON_ID);
     const quest = getStoryQuestByDungeonId(ZAMORA_FORTRESS_DUNGEON_ID);
@@ -681,6 +715,33 @@ test('Burgos local field events are disabled during network scenario play', () =
 
     assert.equal(harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any).size, 0);
     assert.equal(harness.controller.playFieldEventAt({ x: 25, y: 9 }, { id: 'hero', entity: player } as any), false);
+});
+
+test('network field scenario entry plays original episode 4 event flow once', () => {
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ raidSession, isNetworkRaid: true });
+
+    harness.controller.applyNetworkScenarioSnapshot({
+        enteredDungeonIds: ['arcadia_plain'],
+        activeDungeonId: 'arcadia_plain',
+        completedDungeonIds: [],
+    });
+
+    assert.equal(raidSession.activeDungeonId, 'arcadia_plain');
+    assert.ok(harness.logs.some((entry) => entry.includes('알카디아 평원 진입.')));
+    assert.ok(harness.logs.some((entry) => entry.includes('시선 이동: 알카디아 평원')));
+    assert.ok(harness.logs.some((entry) => entry.includes('에우리티온: 네가 우리 일을')));
+    assert.ok(harness.logs.some((entry) => entry.includes('승리조건 : 에우리티온의 처치')));
+    const logCount = harness.logs.length;
+
+    harness.controller.applyNetworkScenarioSnapshot({
+        enteredDungeonIds: ['arcadia_plain'],
+        activeDungeonId: 'arcadia_plain',
+        completedDungeonIds: [],
+    });
+
+    assert.equal(harness.logs.length, logCount);
 });
 
 test('normal enemy loot is auto-collected into the backpack', () => {

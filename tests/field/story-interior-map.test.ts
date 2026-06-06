@@ -235,6 +235,41 @@ test('Etna Volcano exposes original episode 3 entry, chest, and Ganomas event fl
     assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
 });
 
+test('episodes 4 through 6 expose original field scenario event flows', () => {
+    const arcadia = getStoryScenarioEventSequence('arcadia_plain');
+    const cacaora = getStoryScenarioEventSequence('cacaora_highland');
+    const village = getStoryScenarioEventSequence('remote_village');
+    assert.ok(arcadia);
+    assert.ok(cacaora);
+    assert.ok(village);
+
+    assert.equal(arcadia.originalSources.sceneScript, 'Wlib/scene4.lsc');
+    assert.ok(arcadia.originalSources.mapFiles.includes('MAP/04set.arc'));
+    assert.equal(arcadia.entry.filter((step) => step.kind === 'dialogue').length, 7);
+    assert.equal(arcadia.fieldEvents.length, 7);
+    assert.equal(arcadia.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'gold' && reward.amount === 100)).length, 4);
+    assert.equal(arcadia.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 300)).length, 2);
+    assert.ok(arcadia.fieldEvents.some((event) => event.id === 'arcadia_child_rescue'));
+    assert.equal(arcadia.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
+
+    assert.equal(cacaora.originalSources.sceneScript, 'Wlib/scene5.lsc');
+    assert.ok(cacaora.originalSources.mapFiles.includes('MAP/05set.arc'));
+    assert.equal(cacaora.entry.filter((step) => step.kind === 'dialogue').length, 7);
+    assert.equal(cacaora.fieldEvents.length, 4);
+    assert.equal(cacaora.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'gold' && reward.amount === 100)).length, 2);
+    assert.ok(cacaora.fieldEvents.some((event) => event.id === 'cacaora_rusted_sword'));
+    assert.ok(cacaora.fieldEvents.some((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 305)));
+
+    assert.equal(village.originalSources.sceneScript, 'Wlib/scene6.lsc');
+    assert.ok(village.originalSources.mapFiles.includes('MAP/06set.arc'));
+    assert.equal(village.entry.filter((step) => step.kind === 'dialogue').length, 4);
+    assert.equal(village.fieldEvents.length, 3);
+    assert.ok(village.fieldEvents.some((event) => event.id === 'remote_village_healer_01'));
+    assert.ok(village.fieldEvents.some((event) => event.id === 'remote_village_poison_02'));
+    assert.ok(village.fieldEvents.some((event) => event.id === 'remote_village_dark_root'));
+    assert.equal(village.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
+});
+
 test('story scenario event keys exist in both languages without snapshotting full text', () => {
     const keys = new Set<string>();
     const collect = (step: (typeof STORY_SCENARIO_EVENT_SEQUENCES)[number]['entry'][number]) => {
@@ -246,6 +281,7 @@ test('story scenario event keys exist in both languages without snapshotting ful
     for (const sequence of STORY_SCENARIO_EVENT_SEQUENCES) {
         sequence.entry.forEach(collect);
         sequence.bossDefeat.forEach(collect);
+        sequence.enemyDefeatEvents?.forEach((event) => event.steps.forEach(collect));
         sequence.markers?.forEach((marker) => keys.add(marker.markerLabelKey));
         sequence.fieldEvents.forEach((event) => {
             if (event.markerLabelKey) keys.add(event.markerLabelKey);

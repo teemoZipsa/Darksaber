@@ -17,6 +17,7 @@ export interface StoryScenarioEventSequence {
     markers?: StoryScenarioMarker[];
     entry: StoryScenarioEventStep[];
     fieldEvents: StoryScenarioFieldEvent[];
+    enemyDefeatEvents?: StoryScenarioEnemyDefeatEvent[];
     bossDefeat: StoryScenarioEventStep[];
 }
 
@@ -43,6 +44,15 @@ export interface StoryScenarioFieldEvent {
     markerLabelKey?: string;
     markerKind?: 'person' | 'chest';
     rewards?: StoryScenarioFieldEventReward[];
+    steps: StoryScenarioEventStep[];
+}
+
+export interface StoryScenarioEnemyDefeatEvent {
+    id: string;
+    originalSource: string;
+    originalEventId: string;
+    trigger: string;
+    enemyId: string;
     steps: StoryScenarioEventStep[];
 }
 
@@ -610,6 +620,72 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep03.chest.opened', focus: { x: 16, y: 16 } }],
             },
         ],
+        enemyDefeatEvents: [
+            {
+                id: 'etna_guard_defeat_400',
+                originalSource: 'MAP/03set.arc:03.evt',
+                originalEventId: 'EVENT 10',
+                trigger: 'CHARDEAD 400',
+                enemyId: 'story_etna_volcano_guard_0',
+                steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.400', focus: { x: 10, y: 24 } }],
+            },
+            {
+                id: 'etna_guard_defeat_410',
+                originalSource: 'MAP/03set.arc:03.evt',
+                originalEventId: 'EVENT 11',
+                trigger: 'CHARDEAD 410',
+                enemyId: 'story_etna_volcano_guard_1',
+                steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.410', focus: { x: 21, y: 22 } }],
+            },
+            {
+                id: 'etna_guard_defeat_420',
+                originalSource: 'MAP/03set.arc:03.evt',
+                originalEventId: 'EVENT 12',
+                trigger: 'CHARDEAD 420',
+                enemyId: 'story_etna_volcano_guard_2',
+                steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.420', focus: { x: 14, y: 20 } }],
+            },
+            {
+                id: 'etna_guard_defeat_430',
+                originalSource: 'MAP/03set.arc:03.evt',
+                originalEventId: 'EVENT 13',
+                trigger: 'CHARDEAD 430',
+                enemyId: 'story_etna_volcano_guard_3',
+                steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.430', focus: { x: 16, y: 18 } }],
+            },
+            {
+                id: 'etna_guard_defeat_440',
+                originalSource: 'MAP/03set.arc:03.evt',
+                originalEventId: 'EVENT 14',
+                trigger: 'CHARDEAD 440',
+                enemyId: 'story_etna_volcano_guard_4',
+                steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.440', focus: { x: 14, y: 12 } }],
+            },
+            {
+                id: 'etna_guard_defeat_450',
+                originalSource: 'MAP/03set.arc:03.evt',
+                originalEventId: 'EVENT 15',
+                trigger: 'CHARDEAD 450',
+                enemyId: 'story_etna_volcano_guard_5',
+                steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.450', focus: { x: 16, y: 10 } }],
+            },
+            {
+                id: 'etna_guard_defeat_460',
+                originalSource: 'MAP/03set.arc:03.evt',
+                originalEventId: 'EVENT 16',
+                trigger: 'CHARDEAD 460',
+                enemyId: 'story_etna_volcano_guard_6',
+                steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.460', focus: { x: 12, y: 6 } }],
+            },
+            {
+                id: 'etna_guard_defeat_470',
+                originalSource: 'MAP/03set.arc:03.evt',
+                originalEventId: 'EVENT 17',
+                trigger: 'CHARDEAD 470',
+                enemyId: 'story_etna_volcano_guard_7',
+                steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.470', focus: { x: 18, y: 6 } }],
+            },
+        ],
         bossDefeat: [
             {
                 kind: 'dialogue',
@@ -620,6 +696,296 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             },
             { kind: 'objective', labelKey: 'story.event.ep03.bossDefeat.sword', focus: { x: 15, y: 5 } },
             { kind: 'objective', labelKey: 'story.event.ep03.objective', focus: { x: 15, y: 34 } },
+        ],
+    },
+    {
+        dungeonId: 'arcadia_plain',
+        originalSources: {
+            sceneScript: 'Wlib/scene4.lsc',
+            globalScript: 'Glib/gscene4.lsc',
+            mapFiles: ['MAP/04.mrc', 'MAP/04t.mrc', 'MAP/04hmap.BMP', 'MAP/04set.arc'],
+        },
+        entry: [
+            { kind: 'focus', target: { x: 11, y: 39 }, labelKey: 'story.event.ep04.focus.plain' },
+            {
+                kind: 'dialogue',
+                speakerId: 'hero',
+                speakerNameKey: 'story.event.speaker.hero',
+                textKey: 'story.event.ep04.dialogue.01',
+                focus: { x: 11, y: 39 },
+            },
+            {
+                kind: 'dialogue',
+                speakerId: 'hero',
+                speakerNameKey: 'story.event.speaker.hero',
+                textKey: 'story.event.ep04.dialogue.02',
+                focus: { x: 16, y: 9 },
+            },
+            {
+                kind: 'dialogue',
+                speakerId: 'hero',
+                speakerNameKey: 'story.event.speaker.hero',
+                textKey: 'story.event.ep04.dialogue.03',
+                focus: { x: 19, y: 2 },
+            },
+            { kind: 'focus', target: { x: 19, y: 2 }, labelKey: 'story.event.ep04.focus.eurytion' },
+            {
+                kind: 'dialogue',
+                speakerId: 'eurytion',
+                speakerNameKey: 'story.event.speaker.eurytion',
+                textKey: 'story.event.ep04.dialogue.04',
+                focus: { x: 19, y: 2 },
+            },
+            {
+                kind: 'dialogue',
+                speakerId: 'hero',
+                speakerNameKey: 'story.event.speaker.hero',
+                textKey: 'story.event.ep04.dialogue.05',
+                focus: { x: 11, y: 39 },
+            },
+            {
+                kind: 'dialogue',
+                speakerId: 'eurytion',
+                speakerNameKey: 'story.event.speaker.eurytion',
+                textKey: 'story.event.ep04.dialogue.06',
+                focus: { x: 19, y: 2 },
+            },
+            {
+                kind: 'dialogue',
+                speakerId: 'hero',
+                speakerNameKey: 'story.event.speaker.hero',
+                textKey: 'story.event.ep04.dialogue.07',
+                focus: { x: 11, y: 39 },
+            },
+            { kind: 'combatStart', labelKey: 'story.event.ep04.combatStart', focus: { x: 19, y: 2 } },
+        ],
+        fieldEvents: [
+            {
+                id: 'arcadia_gold_chest_01',
+                originalSource: 'MAP/04set.arc:04.evt',
+                originalEventId: 'EVENT 01',
+                trigger: 'treasure chest GOLD 100',
+                triggerTiles: [{ x: 13, y: 34 }],
+                runtimeFlag: 'arcadia_gold_chest_01',
+                markerLabelKey: 'story.event.ep04.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'gold', amount: 100 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep04.chest.opened', focus: { x: 13, y: 34 } }],
+            },
+            {
+                id: 'arcadia_gold_chest_02',
+                originalSource: 'MAP/04set.arc:04.evt',
+                originalEventId: 'EVENT 02',
+                trigger: 'treasure chest GOLD 100',
+                triggerTiles: [{ x: 17, y: 34 }],
+                runtimeFlag: 'arcadia_gold_chest_02',
+                markerLabelKey: 'story.event.ep04.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'gold', amount: 100 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep04.chest.opened', focus: { x: 17, y: 34 } }],
+            },
+            {
+                id: 'arcadia_gold_chest_03',
+                originalSource: 'MAP/04set.arc:04.evt',
+                originalEventId: 'EVENT 03',
+                trigger: 'treasure chest GOLD 100',
+                triggerTiles: [{ x: 22, y: 25 }],
+                runtimeFlag: 'arcadia_gold_chest_03',
+                markerLabelKey: 'story.event.ep04.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'gold', amount: 100 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep04.chest.opened', focus: { x: 22, y: 25 } }],
+            },
+            {
+                id: 'arcadia_gold_chest_04',
+                originalSource: 'MAP/04set.arc:04.evt',
+                originalEventId: 'EVENT 04',
+                trigger: 'treasure chest GOLD 100',
+                triggerTiles: [{ x: 26, y: 25 }],
+                runtimeFlag: 'arcadia_gold_chest_04',
+                markerLabelKey: 'story.event.ep04.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'gold', amount: 100 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep04.chest.opened', focus: { x: 26, y: 25 } }],
+            },
+            {
+                id: 'arcadia_item_chest_05',
+                originalSource: 'MAP/04set.arc:04.evt',
+                originalEventId: 'EVENT 05',
+                trigger: 'treasure chest GETITEM 300',
+                triggerTiles: [{ x: 14, y: 18 }],
+                runtimeFlag: 'arcadia_item_chest_05',
+                markerLabelKey: 'story.event.ep04.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep04.chest.opened', focus: { x: 14, y: 18 } }],
+            },
+            {
+                id: 'arcadia_item_chest_06',
+                originalSource: 'MAP/04set.arc:04.evt',
+                originalEventId: 'EVENT 06',
+                trigger: 'treasure chest GETITEM 300',
+                triggerTiles: [{ x: 18, y: 18 }],
+                runtimeFlag: 'arcadia_item_chest_06',
+                markerLabelKey: 'story.event.ep04.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep04.chest.opened', focus: { x: 18, y: 18 } }],
+            },
+            {
+                id: 'arcadia_child_rescue',
+                originalSource: 'MAP/04set.arc:04.evt',
+                originalEventId: 'EVENT 18',
+                trigger: 'CHARDEAD 480 with DUTY_STEP 5',
+                triggerTiles: [{ x: 16, y: 9 }],
+                runtimeFlag: 'arcadia_child_rescued',
+                markerLabelKey: 'story.event.ep04.child.marker',
+                markerKind: 'person',
+                steps: [
+                    { kind: 'dialogue', speakerId: 'arcadiaChild', speakerNameKey: 'story.event.speaker.arcadiaChild', textKey: 'story.event.ep04.field.child.01', focus: { x: 16, y: 9 } },
+                    { kind: 'objective', labelKey: 'story.event.ep04.field.child.result', focus: { x: 16, y: 9 } },
+                ],
+            },
+        ],
+        bossDefeat: [
+            { kind: 'dialogue', speakerId: 'eurytion', speakerNameKey: 'story.event.speaker.eurytion', textKey: 'story.event.ep04.bossDefeat.01', focus: { x: 19, y: 2 } },
+            { kind: 'objective', labelKey: 'story.event.ep04.objective', focus: { x: 11, y: 39 } },
+        ],
+    },
+    {
+        dungeonId: 'cacaora_highland',
+        originalSources: {
+            sceneScript: 'Wlib/scene5.lsc',
+            globalScript: 'Glib/gscene5.lsc',
+            mapFiles: ['MAP/05.mrc', 'MAP/05t.mrc', 'MAP/05hmap.BMP', 'MAP/05set.arc'],
+        },
+        entry: [
+            { kind: 'focus', target: { x: 14, y: 7 }, labelKey: 'story.event.ep05.focus.minotaur' },
+            { kind: 'dialogue', speakerId: 'minotaur', speakerNameKey: 'story.event.speaker.minotaur', textKey: 'story.event.ep05.dialogue.01', focus: { x: 14, y: 7 } },
+            { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep05.dialogue.02', focus: { x: 24, y: 39 } },
+            { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep05.dialogue.03', focus: { x: 24, y: 39 } },
+            { kind: 'dialogue', speakerId: 'minotaur', speakerNameKey: 'story.event.speaker.minotaur', textKey: 'story.event.ep05.dialogue.04', focus: { x: 14, y: 7 } },
+            { kind: 'dialogue', speakerId: 'minotaur', speakerNameKey: 'story.event.speaker.minotaur', textKey: 'story.event.ep05.dialogue.05', focus: { x: 14, y: 7 } },
+            { kind: 'dialogue', speakerId: 'minotaur', speakerNameKey: 'story.event.speaker.minotaur', textKey: 'story.event.ep05.dialogue.06', focus: { x: 14, y: 7 } },
+            { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep05.dialogue.07', focus: { x: 24, y: 39 } },
+            { kind: 'combatStart', labelKey: 'story.event.ep05.combatStart', focus: { x: 14, y: 7 } },
+        ],
+        fieldEvents: [
+            {
+                id: 'cacaora_gold_chest_01',
+                originalSource: 'MAP/05set.arc:05.evt',
+                originalEventId: 'EVENT 01',
+                trigger: 'treasure chest GOLD 100',
+                triggerTiles: [{ x: 18, y: 34 }],
+                runtimeFlag: 'cacaora_gold_chest_01',
+                markerLabelKey: 'story.event.ep05.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'gold', amount: 100 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep05.chest.opened', focus: { x: 18, y: 34 } }],
+            },
+            {
+                id: 'cacaora_gold_chest_02',
+                originalSource: 'MAP/05set.arc:05.evt',
+                originalEventId: 'EVENT 02',
+                trigger: 'treasure chest GOLD 100',
+                triggerTiles: [{ x: 30, y: 34 }],
+                runtimeFlag: 'cacaora_gold_chest_02',
+                markerLabelKey: 'story.event.ep05.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'gold', amount: 100 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep05.chest.opened', focus: { x: 30, y: 34 } }],
+            },
+            {
+                id: 'cacaora_rusted_sword',
+                originalSource: 'MAP/05set.arc:05.evt',
+                originalEventId: 'EVENT 05',
+                trigger: 'treasure chest rusted iron sword',
+                triggerTiles: [{ x: 21, y: 23 }],
+                runtimeFlag: 'cacaora_rusted_sword',
+                markerLabelKey: 'story.event.ep05.chest.marker',
+                markerKind: 'chest',
+                steps: [
+                    { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep05.field.rustedSword.01', focus: { x: 21, y: 23 } },
+                    { kind: 'objective', labelKey: 'story.event.ep05.field.rustedSword.result', focus: { x: 21, y: 23 } },
+                ],
+            },
+            {
+                id: 'cacaora_magic_potion',
+                originalSource: 'MAP/05set.arc:05.evt',
+                originalEventId: 'EVENT 06',
+                trigger: 'treasure chest GETITEM 305',
+                triggerTiles: [{ x: 27, y: 23 }],
+                runtimeFlag: 'cacaora_magic_potion',
+                markerLabelKey: 'story.event.ep05.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'item', itemId: 'mp_potion', originalItemId: 305 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep05.field.magicPotion.result', focus: { x: 27, y: 23 } }],
+            },
+        ],
+        bossDefeat: [
+            { kind: 'objective', labelKey: 'story.event.ep05.objective', focus: { x: 24, y: 39 } },
+        ],
+    },
+    {
+        dungeonId: 'remote_village',
+        originalSources: {
+            sceneScript: 'Wlib/scene6.lsc',
+            globalScript: 'Glib/gscene6.lsc',
+            mapFiles: ['MAP/06.mrc', 'MAP/06t.mrc', 'MAP/06hmap.BMP', 'MAP/06set.arc'],
+        },
+        entry: [
+            { kind: 'focus', target: { x: 17, y: 34 }, labelKey: 'story.event.ep06.focus.village' },
+            { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep06.dialogue.01', focus: { x: 17, y: 34 } },
+            { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep06.dialogue.02', focus: { x: 19, y: 34 } },
+            { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep06.dialogue.03', focus: { x: 21, y: 34 } },
+            { kind: 'focus', target: { x: 20, y: 16 }, labelKey: 'story.event.ep06.focus.templeGate' },
+            { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep06.dialogue.04', focus: { x: 20, y: 16 } },
+            { kind: 'combatStart', labelKey: 'story.event.ep06.combatStart', focus: { x: 20, y: 16 } },
+        ],
+        fieldEvents: [
+            {
+                id: 'remote_village_healer_01',
+                originalSource: 'MAP/06set.arc:06.evt',
+                originalEventId: 'EVENT 01',
+                trigger: 'villager aid heal',
+                triggerTiles: [{ x: 15, y: 25 }],
+                runtimeFlag: 'remote_village_healer_01',
+                markerLabelKey: 'story.event.ep06.villager.marker',
+                markerKind: 'person',
+                steps: [
+                    { kind: 'dialogue', speakerId: 'villager', speakerNameKey: 'story.event.speaker.villager', textKey: 'story.event.ep06.field.aid.01', focus: { x: 15, y: 25 } },
+                    { kind: 'objective', labelKey: 'story.event.ep06.field.heal.result', focus: { x: 15, y: 25 } },
+                ],
+            },
+            {
+                id: 'remote_village_poison_02',
+                originalSource: 'MAP/06set.arc:06.evt',
+                originalEventId: 'EVENT 02',
+                trigger: 'villager aid poison',
+                triggerTiles: [{ x: 21, y: 24 }],
+                runtimeFlag: 'remote_village_poison_02',
+                markerLabelKey: 'story.event.ep06.villager.marker',
+                markerKind: 'person',
+                steps: [
+                    { kind: 'dialogue', speakerId: 'villager', speakerNameKey: 'story.event.speaker.villager', textKey: 'story.event.ep06.field.aid.01', focus: { x: 21, y: 24 } },
+                    { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep06.field.poison.01', focus: { x: 21, y: 24 } },
+                    { kind: 'objective', labelKey: 'story.event.ep06.field.poison.result', focus: { x: 21, y: 24 } },
+                ],
+            },
+            {
+                id: 'remote_village_dark_root',
+                originalSource: 'MAP/06set.arc:06.evt',
+                originalEventId: 'EVENT 10',
+                trigger: 'DUTY_STEP 10 dark root removal',
+                triggerTiles: [{ x: 20, y: 16 }],
+                runtimeFlag: 'remote_village_dark_root_removed',
+                markerLabelKey: 'story.event.ep06.root.marker',
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep06.field.root.result', focus: { x: 20, y: 16 } }],
+            },
+        ],
+        bossDefeat: [
+            { kind: 'dialogue', speakerId: 'pachi', speakerNameKey: 'story.event.speaker.pachi', textKey: 'story.event.ep06.bossDefeat.01', focus: { x: 20, y: 16 } },
+            { kind: 'objective', labelKey: 'story.event.ep06.objective', focus: { x: 17, y: 34 } },
         ],
     },
 ];

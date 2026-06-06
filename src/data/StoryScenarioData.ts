@@ -77,7 +77,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 5,
         bossColor: '#d86a3a',
         guardLevel: 3,
-        guardCount: 5,
+        guardCount: 8,
         missionKind: 'soloInterior',
         reward: {
             type: 'bundle',
