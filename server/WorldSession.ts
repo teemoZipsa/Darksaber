@@ -119,8 +119,12 @@ const RAID_LIMIT_SECONDS = 30 * 60;
 const AUTO_LOOT_RESPONSE_MS = 5_000;
 const FIELD_NEST_RESPAWN_MS = 5 * 60_000;
 const FIELD_NEST_RESPAWN_SAFE_DISTANCE = 18;
-const FIELD_NEST_ROAM_RADIUS_CHUNKS = 1;
+const FIELD_NEST_ROAM_RADIUS_CHUNKS = 2;
+const FIELD_NEST_DEPARTURE_RADIUS_CHUNKS = 4;
+const FIELD_NEST_DEPARTURE_MAX_ENEMIES = 18;
+const FIELD_NEST_REFRESH_MAX_ENEMIES = 28;
 const FIELD_NEST_NEARBY_ENEMY_DISTANCE = 24;
+const FIELD_NEST_SPAWN_SAFE_DISTANCE = ENEMY_AGGRO_RANGE;
 const FIELD_NEST_REFRESH_INTERVAL_MS = 1_000;
 
 interface ServerActor {
@@ -1788,7 +1792,14 @@ export class WorldSession {
 
     private ensureContentNear(spawnTile: TilePoint, departureTownId: string | null | undefined, now: number): void {
         if (!this.hasNearbyLiveEnemy(spawnTile, FIELD_NEST_NEARBY_ENEMY_DISTANCE)) {
-            this.spawnEnemiesNear(spawnTile, now, true);
+            this.spawnEnemiesNear(
+                spawnTile,
+                now,
+                false,
+                new Set(),
+                FIELD_NEST_DEPARTURE_RADIUS_CHUNKS,
+                FIELD_NEST_DEPARTURE_MAX_ENEMIES,
+            );
         }
 
         this.spawnLootNear(spawnTile, departureTownId);
@@ -1802,32 +1813,39 @@ export class WorldSession {
             const anchor = this.firstLivingActorTile(player);
             if (!anchor) continue;
             const forceCenter = !this.hasNearbyLiveEnemy(anchor, FIELD_NEST_NEARBY_ENEMY_DISTANCE);
-            this.spawnEnemiesNear(anchor, now, forceCenter, visited);
+            this.spawnEnemiesNear(anchor, now, forceCenter, visited, FIELD_NEST_ROAM_RADIUS_CHUNKS, FIELD_NEST_REFRESH_MAX_ENEMIES);
         }
     }
 
-    private spawnEnemiesNear(anchor: TilePoint, now: number, forceCenter: boolean, visited: Set<string> = new Set()): void {
+    private spawnEnemiesNear(
+        anchor: TilePoint,
+        now: number,
+        forceCenter: boolean,
+        visited: Set<string> = new Set(),
+        radiusChunks = FIELD_NEST_ROAM_RADIUS_CHUNKS,
+        maxSpawnedEnemies = Number.POSITIVE_INFINITY,
+    ): number {
         const realm = this.worldMap.getRealm();
         const seed = `server:${this.sessionEpoch}`;
         const centerChunkX = Math.floor(anchor.x / CHUNK_TILES);
         const centerChunkY = Math.floor(anchor.y / CHUNK_TILES);
 
         let spawned = 0;
-        for (let dy = -FIELD_NEST_ROAM_RADIUS_CHUNKS; dy <= FIELD_NEST_ROAM_RADIUS_CHUNKS; dy++) {
-            for (let dx = -FIELD_NEST_ROAM_RADIUS_CHUNKS; dx <= FIELD_NEST_ROAM_RADIUS_CHUNKS; dx++) {
-                const chunkX = centerChunkX + dx;
-                const chunkY = centerChunkY + dy;
-                const stateKey = nestStateKey(realm, chunkX, chunkY);
-                if (visited.has(stateKey)) continue;
-                visited.add(stateKey);
-                const biome = this.worldMap.getBiomeAtChunk(chunkX, chunkY);
-                const force = forceCenter && dx === 0 && dy === 0;
-                spawned += this.spawnNest(chunkX, chunkY, biome, realm, seed, force, now);
-            }
+        for (const offset of chunkOffsetsByDistance(radiusChunks)) {
+            if (spawned >= maxSpawnedEnemies) return spawned;
+            const chunkX = centerChunkX + offset.dx;
+            const chunkY = centerChunkY + offset.dy;
+            const stateKey = nestStateKey(realm, chunkX, chunkY);
+            if (visited.has(stateKey)) continue;
+            visited.add(stateKey);
+            const biome = this.worldMap.getBiomeAtChunk(chunkX, chunkY);
+            const force = forceCenter && offset.dx === 0 && offset.dy === 0;
+            spawned += this.spawnNest(chunkX, chunkY, biome, realm, seed, force, now);
         }
 
         // Player boxed in by water/town chunks — force one grass pack at the spawn chunk.
-        if (forceCenter && spawned === 0) this.spawnNest(centerChunkX, centerChunkY, 'grass', realm, seed, true, now);
+        if (forceCenter && spawned === 0) spawned += this.spawnNest(centerChunkX, centerChunkY, 'grass', realm, seed, true, now);
+        return spawned;
     }
 
     private spawnNest(
@@ -1841,6 +1859,7 @@ export class WorldSession {
     ): number {
         const nest = pickNestForChunk({ realm, chunkX, chunkY, biome, seed }, force);
         if (!nest) return 0;
+        if (this.hasActiveActorWithin(nest.centerTile, FIELD_NEST_SPAWN_SAFE_DISTANCE)) return 0;
         const stateKey = nestStateKey(realm, chunkX, chunkY);
         const state = this.getOrCreateNestState(stateKey, nest);
         this.retainLiveNestEnemies(state);
@@ -2403,6 +2422,22 @@ function formationOffset(index: number): TilePoint {
 
 function nestStateKey(realm: ReturnType<WorldMap['getRealm']>, chunkX: number, chunkY: number): string {
     return `${realm}:${chunkX}:${chunkY}`;
+}
+
+function chunkOffsetsByDistance(radiusChunks: number): { dx: number; dy: number }[] {
+    const offsets: { dx: number; dy: number }[] = [];
+    for (let dy = -radiusChunks; dy <= radiusChunks; dy++) {
+        for (let dx = -radiusChunks; dx <= radiusChunks; dx++) {
+            offsets.push({ dx, dy });
+        }
+    }
+    return offsets.sort((a, b) => {
+        const da = a.dx * a.dx + a.dy * a.dy;
+        const db = b.dx * b.dx + b.dy * b.dy;
+        if (da !== db) return da - db;
+        if (a.dy !== b.dy) return a.dy - b.dy;
+        return a.dx - b.dx;
+    });
 }
 
 function storyScenarioGuardOffsets(count: number, hasBoss: boolean): TilePoint[] {

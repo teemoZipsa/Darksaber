@@ -24,6 +24,7 @@ import {
 } from '../../src/field/TerrainRules';
 import { TileType } from '../../src/map/Tile';
 import { MINIMAP_LOOT_REVEAL_RANGE, MinimapUI, isLootVisibleOnMinimap } from '../../src/ui/MinimapUI';
+import { ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE } from '../../src/field/FieldConfig';
 
 class ImageStub {
     public src = '';
@@ -153,10 +154,10 @@ test('active party deployment remains capped at three characters', () => {
 });
 
 test('enemy aggro enters and exits with hysteresis', () => {
-    assert.equal(resolveAggroState(false, 6, 6, 10), true);
-    assert.equal(resolveAggroState(true, 9, 6, 10), true);
-    assert.equal(resolveAggroState(true, 11, 6, 10), false);
-    assert.equal(resolveAggroState(true, 4, 6, 10, true), false);
+    assert.equal(resolveAggroState(false, ENEMY_AGGRO_RANGE, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE), true);
+    assert.equal(resolveAggroState(true, ENEMY_EXIT_RANGE - 1, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE), true);
+    assert.equal(resolveAggroState(true, ENEMY_EXIT_RANGE + 1, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE), false);
+    assert.equal(resolveAggroState(true, 4, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, true), false);
 });
 
 test('assist AI only helps controlled targets inside leash', () => {

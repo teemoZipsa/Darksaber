@@ -12,7 +12,7 @@ import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import { getStoryScenarioEventSequence } from '../../src/data/StoryScenarioEventData';
 import { getStoryScenarioFieldEventTiles } from '../../src/data/StoryScenarioFieldEventPlacement';
 import { getStoryInteriorLayout } from '../../src/data/StoryInteriorData';
-import { ENEMY_SIMULATION_ACTIVE_RANGE } from '../../src/field/FieldConfig';
+import { ENEMY_AGGRO_RANGE, ENEMY_SIMULATION_ACTIVE_RANGE } from '../../src/field/FieldConfig';
 
 function actor(id: string, overrides: Partial<ActorSnapshot> = {}): ActorSnapshot {
     return {
@@ -982,21 +982,21 @@ test('cleared field nests respawn after five minutes away from active actors', (
     const stateChunkX = Math.floor(state.centerTile.x / CHUNK_SIZE);
     const stateChunkY = Math.floor(state.centerTile.y / CHUNK_SIZE);
     let outsideSafeTile: { x: number; y: number } | null = null;
-    for (let distance = 19; distance < CHUNK_SIZE && !outsideSafeTile; distance++) {
+    for (let distance = ENEMY_AGGRO_RANGE + 1; distance < CHUNK_SIZE * 2 && !outsideSafeTile; distance++) {
         for (let dy = -distance; dy <= distance && !outsideSafeTile; dy++) {
             const dxAbs = distance - Math.abs(dy);
             for (const dx of dxAbs === 0 ? [0] : [-dxAbs, dxAbs]) {
                 const tile = { x: state.centerTile.x + dx, y: state.centerTile.y + dy };
-                if (Math.floor(tile.x / CHUNK_SIZE) !== stateChunkX) continue;
-                if (Math.floor(tile.y / CHUNK_SIZE) !== stateChunkY) continue;
+                if (Math.abs(Math.floor(tile.x / CHUNK_SIZE) - stateChunkX) > 2) continue;
+                if (Math.abs(Math.floor(tile.y / CHUNK_SIZE) - stateChunkY) > 2) continue;
                 if (!internals.worldMap.isWalkable(tile.x, tile.y)) continue;
                 outsideSafeTile = tile;
                 break;
             }
         }
     }
-    assert.ok(outsideSafeTile, 'test fixture should find a same-chunk tile outside the 18-tile safety radius');
+    assert.ok(outsideSafeTile, 'test fixture should find a nearby tile outside the nest spawn safety radius');
     serverActor.tile = outsideSafeTile;
     session.tick(respawnAt + 1_001);
-    assert.ok(state.monsterIds.length > 0, 'nest should respawn once the timer passed and actors are outside 18 tiles');
+    assert.ok(state.monsterIds.length > 0, 'nest should respawn once the timer passed and actors are outside the spawn safety radius');
 });
