@@ -9,6 +9,7 @@ import { WorldEngine } from '../../src/engine/WorldEngine';
 import { WorldNetworkSyncController } from '../../src/engine/world/WorldNetworkSyncController';
 import { WorldNetworkIntentController } from '../../src/engine/world/WorldNetworkIntentController';
 import { WorldRestingController } from '../../src/engine/world/WorldRestingController';
+import { WorldTurnStateController } from '../../src/engine/world/WorldTurnStateController';
 import { WorldTutorialController } from '../../src/engine/world/WorldTutorialController';
 import type { ActorSnapshot, GridSnapshot, WorldSnapshot } from '../../src/net/WorldProtocol';
 
@@ -34,6 +35,7 @@ function makeActor(id: string): FieldActor {
 function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } {
     const calls: string[] = [];
     const engine = Object.create(WorldEngine.prototype) as any;
+    engine.turnStateController = new WorldTurnStateController();
     engine.activeTurnActorId = actor.id;
     engine.readyQueue = [];
     engine.remainingActionPoints = 6;
@@ -173,6 +175,29 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
     });
     return { engine, calls };
 }
+
+test('world turn state controller owns queue, AP, and active-turn clearing', () => {
+    const controller = new WorldTurnStateController();
+
+    controller.setActiveTurn('hero', 40);
+    assert.equal(controller.markMajorActionUsed(), undefined);
+    assert.equal(controller.majorActionUsedThisTurn, true);
+    assert.equal(controller.spendAp(20, 100), true);
+    assert.equal(controller.remainingActionPoints, 20);
+    assert.equal(controller.enqueueReadyActor('hero'), true);
+    assert.equal(controller.enqueueReadyActor('hero'), false);
+    assert.deepEqual(controller.readyQueue, ['hero']);
+    assert.equal(controller.hasTurnActivity(), true);
+
+    controller.clearActiveTurn();
+    assert.equal(controller.activeTurnActorId, null);
+    assert.equal(controller.remainingActionPoints, 0);
+    assert.equal(controller.majorActionUsedThisTurn, false);
+    assert.deepEqual(controller.readyQueue, ['hero']);
+
+    assert.equal(controller.shiftReadyActorId(), 'hero');
+    assert.equal(controller.hasTurnActivity(), false);
+});
 
 function makeActorSnapshot(overrides: Partial<ActorSnapshot> = {}): ActorSnapshot {
     return {

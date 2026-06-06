@@ -40,7 +40,7 @@ import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
 import { TilePoint, manhattan, tileKey } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
-import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST, enqueueReadyActor, type FieldApAction } from '../field/FieldActionEconomy';
+import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST, type FieldApAction } from '../field/FieldActionEconomy';
 import { hasLineOfSight } from '../field/LineOfSight';
 import {
     AttackPatternProfile,
@@ -80,6 +80,7 @@ import { WorldRestingController } from './world/WorldRestingController';
 import { WorldLootController } from './world/WorldLootController';
 import { WorldCombatFeedbackController } from './world/WorldCombatFeedbackController';
 import { WorldNetworkIntentController } from './world/WorldNetworkIntentController';
+import { WorldTurnStateController } from './world/WorldTurnStateController';
 import type { CombatFeedbackKind } from './world/CombatFeedback';
 import { NetworkRaidClient } from '../net/NetworkRaidClient';
 import {
@@ -140,11 +141,7 @@ export class WorldEngine {
     private lootController: WorldLootController;
     private combatFeedbackController: WorldCombatFeedbackController;
     private networkIntentController: WorldNetworkIntentController;
-    private activeTurnActorId: string | null = null;
-    private readyQueue: string[] = [];
-    private remainingActionPoints = 0;
-    private majorActionUsedThisTurn = false;
-    private reservedAction: FieldIntent | null = null;
+    private turnStateController = new WorldTurnStateController();
     private hoverTile: TilePoint = { x: -1, y: -1 };
     private combatLog: string[] = [];
     private followRepathTimer: number = 0;
@@ -153,6 +150,46 @@ export class WorldEngine {
     private effectManager = new EffectManager();
     private attackCues: AttackCue[] = [];
     private worldTime: number = 0;
+
+    private get activeTurnActorId(): string | null {
+        return this.turnStateController.activeTurnActorId;
+    }
+
+    private set activeTurnActorId(actorId: string | null) {
+        this.turnStateController.activeTurnActorId = actorId;
+    }
+
+    private get readyQueue(): string[] {
+        return this.turnStateController.readyQueue;
+    }
+
+    private set readyQueue(queue: string[]) {
+        this.turnStateController.readyQueue = queue;
+    }
+
+    private get remainingActionPoints(): number {
+        return this.turnStateController.remainingActionPoints;
+    }
+
+    private set remainingActionPoints(points: number) {
+        this.turnStateController.remainingActionPoints = points;
+    }
+
+    private get majorActionUsedThisTurn(): boolean {
+        return this.turnStateController.majorActionUsedThisTurn;
+    }
+
+    private set majorActionUsedThisTurn(used: boolean) {
+        this.turnStateController.majorActionUsedThisTurn = used;
+    }
+
+    private get reservedAction(): FieldIntent | null {
+        return this.turnStateController.reservedAction;
+    }
+
+    private set reservedAction(intent: FieldIntent | null) {
+        this.turnStateController.reservedAction = intent;
+    }
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -772,13 +809,13 @@ export class WorldEngine {
             followRepathTimer: this.followRepathTimer,
         });
         this.followRepathTimer = partyMovement.followRepathTimer;
-        for (const actorId of partyMovement.readyActorIds) enqueueReadyActor(this.readyQueue, actorId);
+        for (const actorId of partyMovement.readyActorIds) this.turnStateController.enqueueReadyActor(actorId);
 
         const enemyMovement = this.movementController.updateEnemies({
             dt,
             activeTurnActorId: this.activeTurnActorId,
         });
-        for (const enemyId of enemyMovement.readyEnemyIds) enqueueReadyActor(this.readyQueue, enemyId);
+        for (const enemyId of enemyMovement.readyEnemyIds) this.turnStateController.enqueueReadyActor(enemyId);
         this.updateRestingActors(dt);
         this.effectManager.update(dt);
         this.floatingText.update(dt);
@@ -903,11 +940,7 @@ export class WorldEngine {
     }
 
     private clearFieldTurnState(): void {
-        this.activeTurnActorId = null;
-        this.readyQueue = [];
-        this.remainingActionPoints = 0;
-        this.majorActionUsedThisTurn = false;
-        this.reservedAction = null;
+        this.turnStateController.clear();
         this.fanfareLeaderActorId = null;
         this.restingController.clearTimers();
         this.closeActionMenu();
@@ -1004,7 +1037,7 @@ export class WorldEngine {
     }
 
     private markMajorActionUsed(): void {
-        if (this.activeTurnActorId) this.majorActionUsedThisTurn = true;
+        this.turnStateController.markMajorActionUsed();
     }
 
     private updateRestingActors(dt: number): void {
@@ -1025,9 +1058,7 @@ export class WorldEngine {
 
     private isTurnCombatActive(): boolean {
         if (this.fieldEnemies.some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro)) return true;
-        if (this.activeTurnActorId) return true;
-        if (this.readyQueue.length > 0) return true;
-        if (this.reservedAction) return true;
+        if (this.turnStateController.hasTurnActivity()) return true;
         if (this.actionMenuUI.getIsOpen() || this.playerActionController.getMode()) return true;
         if (this.tacticalController.isOpen()) return true;
         if (this.magicController.isActive()) return true;
@@ -1311,9 +1342,7 @@ export class WorldEngine {
     }
 
     private spendAp(cost: number): boolean {
-        if (this.remainingActionPoints <= 0) this.remainingActionPoints = this.getSpendableActionGauge();
-        if (cost < 0 || this.remainingActionPoints < cost) return false;
-        this.remainingActionPoints -= cost;
+        if (!this.turnStateController.spendAp(cost, this.getSpendableActionGauge())) return false;
         const actor = this.getActivePartyTurnActor();
         if (actor) actor.entity.actionGauge = this.remainingActionPoints;
         return true;
@@ -1346,10 +1375,7 @@ export class WorldEngine {
     private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = this.remainingActionPoints): void {
         if (actor.id === this.activeTurnActorId) this.networkIntentController.submitEndTurn(actor, reason);
         actor.entity.actionGauge = Math.max(0, Math.min(FIELD_MAX_ACTION_GAUGE, atbCarryover));
-        this.activeTurnActorId = null;
-        this.remainingActionPoints = 0;
-        this.majorActionUsedThisTurn = false;
-        this.reservedAction = null;
+        this.turnStateController.clearActiveTurn();
         this.clearActorIntent(actor);
         this.closeActionMenu();
         this.closeTacticalMenu();
@@ -1361,10 +1387,7 @@ export class WorldEngine {
 
     private endEnemyTurn(enemy: Enemy): void {
         enemy.actionGauge = 0;
-        this.activeTurnActorId = null;
-        this.remainingActionPoints = 0;
-        this.majorActionUsedThisTurn = false;
-        this.reservedAction = null;
+        this.turnStateController.clearActiveTurn();
     }
 
     private startNextReadyTurn(): void {
@@ -1372,7 +1395,7 @@ export class WorldEngine {
         if (this.activeTurnActorId || this.reservedAction) return;
 
         while (this.readyQueue.length > 0) {
-            const actorId = this.readyQueue.shift()!;
+            const actorId = this.turnStateController.shiftReadyActorId()!;
             const actor = this.partyActors.find((candidate) => candidate.id === actorId);
             if (actor) {
                 if (actor.character.isDead) continue;
@@ -1396,10 +1419,7 @@ export class WorldEngine {
         const activeEnemy = this.fieldEnemies.find((entry) => entry.enemy.id === this.activeTurnActorId)?.enemy;
         if (activeEnemy && activeEnemy.stats.hp > 0) return;
 
-        this.activeTurnActorId = null;
-        this.remainingActionPoints = 0;
-        this.majorActionUsedThisTurn = false;
-        this.reservedAction = null;
+        this.turnStateController.clearActiveTurn();
         this.closeActionMenu();
         this.closeTacticalMenu();
         this.playerActionController.clearTargeting();
@@ -1461,9 +1481,7 @@ export class WorldEngine {
     private beginActorTurn(actor: FieldActor): void {
         const index = this.partyActors.indexOf(actor);
         if (index >= 0) this.switchToPartyMember(index);
-        this.activeTurnActorId = actor.id;
-        this.remainingActionPoints = FIELD_MAX_ACTION_GAUGE;
-        this.majorActionUsedThisTurn = false;
+        this.turnStateController.setActiveTurn(actor.id, FIELD_MAX_ACTION_GAUGE);
         actor.entity.actionGauge = FIELD_MAX_ACTION_GAUGE;
         this.selectionController.selectActor(actor.id);
         if (!this.processActorTurnStartStatuses(actor)) {
@@ -1485,7 +1503,7 @@ export class WorldEngine {
 
     private beginEnemyTurn(entry: FieldEnemy): void {
         const enemy = entry.enemy;
-        this.activeTurnActorId = enemy.id;
+        this.turnStateController.setActiveTurn(enemy.id, 0);
         this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'READY');
 
         if (!this.processEnemyTurnStartStatuses(entry)) {
