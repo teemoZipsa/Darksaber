@@ -29,7 +29,7 @@
 
 | Episode | Dungeon | Status | Scene Candidate | Global Candidate | Map Candidates | Notes |
 |---|---|---|---|---|---|---|
-| 1 | `burgos_castle` | verified-v1 | `Wlib/scene1.lsc` | `Glib/gscene1.lsc` | `MAP/01.mrc`, `MAP/01t.mrc`, `MAP/01hmap.BMP`, `MAP/01set.arc` | v1 layout split into gatehouse, barracks, great hall, inner keep, and throne room. Entry sequence uses `01.DEO`; Cain's son/key handoff are preserved as `01.evt` field event data. |
+| 1 | `burgos_castle` | verified-v1 | `Wlib/scene1.lsc` | `Glib/gscene1.lsc` | `MAP/01.mrc`, `MAP/01t.mrc`, `MAP/01hmap.BMP`, `MAP/01set.arc` | v1 layout split into gatehouse, barracks, great hall, inner keep, and throne room. Entry sequence uses `01.DEO`; Cain's son/key handoff are connected as local `01.evt` inspect events. |
 | 2 | `zamora_fortress` | candidate | `Wlib/scene2.lsc` | `Glib/gscene2.lsc` | `MAP/02.*` | Follow after Burgos validation. |
 | 3 | `etna_volcano` | candidate | `Wlib/scene3.lsc` | `Glib/gscene3.lsc` | `MAP/03.*` | Indoor volcanic layout. |
 | 4 | `arcadia_plain` | candidate | `Wlib/scene4.lsc` | `Glib/gscene4.lsc` | `MAP/04.*` | Outdoor adaptation; prefer original coordinates. |

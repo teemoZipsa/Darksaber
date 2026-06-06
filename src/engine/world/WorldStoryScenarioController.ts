@@ -9,7 +9,7 @@ import { formatT, t } from '../../i18n/LanguageManager';
 import { Enemy } from '../../entity/Enemy';
 import type { Player } from '../../entity/Player';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
-import type { TilePoint } from '../../field/FieldPathing';
+import { manhattan, type TilePoint } from '../../field/FieldPathing';
 import { StoryInteriorMap } from '../../map/StoryInteriorMap';
 import type { WorldDungeonInfo, WorldMap } from '../../map/WorldMap';
 import type { WorldRaidSession } from './WorldRaidSession';
@@ -64,6 +64,7 @@ export class WorldStoryScenarioController {
     private dismissedDungeonVisitKey: string | null = null;
     private pendingNetworkScenarioEnter: WorldStoryScenarioPendingEnter | null = null;
     private readonly networkScenarioEnteredDungeonIds: Set<string> = new Set();
+    private readonly completedFieldEventKeys: Set<string> = new Set();
 
     constructor(context: WorldStoryScenarioContext) {
         this.context = context;
@@ -98,6 +99,50 @@ export class WorldStoryScenarioController {
         this.context.getWorldMap().loot = [];
         this.dismissedDungeonVisitKey = null;
         return layout;
+    }
+
+    public getInspectableFieldEventTiles(actor: FieldActor | null): Set<string> {
+        const active = this.activeInterior;
+        const result = new Set<string>();
+        if (!active || !actor || this.context.isNetworkRaid()) return result;
+
+        const sequence = getStoryScenarioEventSequence(active.dungeonId);
+        if (!sequence) return result;
+
+        const actorTile = this.context.actorTile(actor);
+        for (const event of sequence.fieldEvents) {
+            if (this.completedFieldEventKeys.has(this.fieldEventKey(active.dungeonId, event.id))) continue;
+            for (const tile of event.triggerTiles) {
+                if (manhattan(actorTile, tile) <= 1) result.add(`${tile.x},${tile.y}`);
+            }
+        }
+        return result;
+    }
+
+    public playFieldEvent(dungeonId: string, eventId: string): boolean {
+        const sequence = getStoryScenarioEventSequence(dungeonId);
+        const event = sequence?.fieldEvents.find((candidate) => candidate.id === eventId);
+        if (!event) return false;
+        const key = this.fieldEventKey(dungeonId, event.id);
+        if (this.completedFieldEventKeys.has(key)) return false;
+        this.completedFieldEventKeys.add(key);
+        for (const step of event.steps) this.playStoryScenarioEventStep(step);
+        return true;
+    }
+
+    public playFieldEventAt(tile: TilePoint, actor: FieldActor | null = this.context.getControlledActor()): boolean {
+        const active = this.activeInterior;
+        if (!active || !actor || this.context.isNetworkRaid()) return false;
+
+        const sequence = getStoryScenarioEventSequence(active.dungeonId);
+        if (!sequence || manhattan(this.context.actorTile(actor), tile) > 1) return false;
+
+        const event = sequence.fieldEvents.find((candidate) =>
+            !this.completedFieldEventKeys.has(this.fieldEventKey(active.dungeonId, candidate.id))
+            && candidate.triggerTiles.some((triggerTile) => triggerTile.x === tile.x && triggerTile.y === tile.y)
+        );
+        if (!event) return false;
+        return this.playFieldEvent(active.dungeonId, event.id);
     }
 
     public exitActiveInterior(options: { placePartyAtReturn?: boolean } = {}): void {
@@ -204,6 +249,7 @@ export class WorldStoryScenarioController {
         if (!scenario || !layout) return;
 
         this.context.raidSession.startDungeonEncounter(dungeon.id);
+        this.clearFieldEventState(dungeon.id);
         this.context.closeFieldOverlays();
         this.context.setFieldEnemies([]);
         this.context.getWorldMap().loot = [];
@@ -377,6 +423,16 @@ export class WorldStoryScenarioController {
         const sequence = getStoryScenarioEventSequence(dungeonId);
         if (!sequence) return;
         for (const step of sequence[phase]) this.playStoryScenarioEventStep(step);
+    }
+
+    private fieldEventKey(dungeonId: string, eventId: string): string {
+        return `${dungeonId}:${eventId}`;
+    }
+
+    private clearFieldEventState(dungeonId: string): void {
+        for (const key of [...this.completedFieldEventKeys]) {
+            if (key.startsWith(`${dungeonId}:`)) this.completedFieldEventKeys.delete(key);
+        }
     }
 
     private playStoryScenarioEventStep(step: StoryScenarioEventStep): void {

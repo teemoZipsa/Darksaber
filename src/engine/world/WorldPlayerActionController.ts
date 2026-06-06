@@ -83,6 +83,8 @@ export interface WorldPlayerActionContext {
     selectEnemy: (enemyId: string) => void;
     selectLoot: (lootId: string) => void;
     filterActionTiles?: (action: 'move' | 'attack' | 'interact', actor: FieldActor, tiles: Set<string>) => Set<string>;
+    getAdditionalInteractTiles?: (actor: FieldActor) => Set<string>;
+    interactAtTile?: (actor: FieldActor, tile: TilePoint) => boolean;
     onActionCompleted?: (action: FieldApAction) => void;
 }
 
@@ -238,7 +240,7 @@ export class WorldPlayerActionController {
         }
 
         if (this.actionMode === 'interact') {
-            this.handleInteractTarget(actor, hit);
+            this.handleInteractTarget(actor, tile, hit);
             this.clearTargeting();
         }
     }
@@ -321,7 +323,8 @@ export class WorldPlayerActionController {
     }
 
     public hasExecutableInteract(actor: FieldActor): boolean {
-        return this.hasActionGauge(INTERACT_ACTION_GAUGE_COST) && this.hasAdjacentLoot(actor);
+        return this.hasActionGauge(INTERACT_ACTION_GAUGE_COST)
+            && (this.hasAdjacentLoot(actor) || this.hasAdditionalInteractTarget(actor));
     }
 
     public hasExecutableMagic(actor: FieldActor): boolean {
@@ -458,14 +461,16 @@ export class WorldPlayerActionController {
         }
     }
 
-    private handleInteractTarget(actor: FieldActor, hit: FieldHit): void {
+    private handleInteractTarget(actor: FieldActor, tile: TilePoint, hit: FieldHit): void {
         if (hit.kind !== 'loot') {
+            if (this.tryAdditionalInteract(actor, tile)) return;
             this.sink.log(t('field.action.interactNoTarget'));
             return;
         }
 
         const loot = this.context.getLootById(hit.loot.id);
         if (!loot) {
+            if (this.tryAdditionalInteract(actor, tile)) return;
             this.sink.log(t('field.action.interactNoTarget'));
             return;
         }
@@ -477,6 +482,23 @@ export class WorldPlayerActionController {
         }
         this.context.openLoot(loot);
         this.context.resumeOrEndActiveTurn(actor);
+    }
+
+    private tryAdditionalInteract(actor: FieldActor, tile: TilePoint): boolean {
+        const additionalTiles = this.context.getAdditionalInteractTiles?.(actor);
+        if (!additionalTiles?.has(tileKey(tile.x, tile.y))) return false;
+        if (!this.spendActionCost(INTERACT_ACTION_GAUGE_COST)) {
+            this.sink.log(t('field.action.interactNoAp'));
+            return true;
+        }
+        const handled = this.context.interactAtTile?.(actor, tile) ?? false;
+        if (!handled) {
+            this.sink.log(t('field.action.interactNoTarget'));
+            return true;
+        }
+        this.context.onActionCompleted?.('interact');
+        this.context.resumeOrEndActiveTurn(actor);
+        return true;
     }
 
     private queueMoveIntent(actor: FieldActor, tile: TilePoint): boolean {
@@ -552,6 +574,7 @@ export class WorldPlayerActionController {
             if (tile.x === start.x && tile.y === start.y) continue;
             result.add(tileKey(tile.x, tile.y));
         }
+        for (const tile of this.context.getAdditionalInteractTiles?.(actor) ?? []) result.add(tile);
         return result;
     }
 
@@ -560,6 +583,10 @@ export class WorldPlayerActionController {
         return this.context.getLoot().some((loot) =>
             !loot.opened && manhattan(actorTile, { x: loot.x, y: loot.y }) <= 1
         );
+    }
+
+    private hasAdditionalInteractTarget(actor: FieldActor): boolean {
+        return (this.context.getAdditionalInteractTiles?.(actor).size ?? 0) > 0;
     }
 
     private getFilteredActionTiles(action: 'move' | 'attack' | 'interact', actor: FieldActor, tiles: Set<string>): Set<string> {

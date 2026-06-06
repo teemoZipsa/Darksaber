@@ -550,6 +550,8 @@ export class WorldEngine {
                 selectEnemy: (enemyId) => this.selectionController.selectEnemy(enemyId),
                 selectLoot: (lootId) => this.selectionController.selectLoot(lootId),
                 filterActionTiles: (action, actor, tiles) => this.filterIntroTutorialActionTiles(action, actor, tiles),
+                getAdditionalInteractTiles: (actor) => this.storyScenarioController.getInspectableFieldEventTiles(actor),
+                interactAtTile: (actor, tile) => this.storyScenarioController.playFieldEventAt(tile, actor),
                 onActionCompleted: (action) => this.advanceIntroTutorialStep(action),
             },
             {

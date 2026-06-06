@@ -448,6 +448,44 @@ test('story interior completion restores the previous world map at the return ti
     assert.ok(harness.logs.some((entry) => entry.includes('으.. 분하다.. | 억울하지만.. 여기선 일단 물러나야겠군..')));
 });
 
+test('Burgos field events can be inspected once inside the local interior', () => {
+    const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === BURGOS_CASTLE_DUNGEON_ID);
+    const quest = getStoryQuestByDungeonId(BURGOS_CASTLE_DUNGEON_ID);
+    assert.ok(dungeon);
+    assert.ok(quest);
+
+    const player = new Player(24, 9);
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ player, raidSession });
+
+    harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+
+    const inspectable = harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any);
+    assert.equal(inspectable.has('25,9'), true);
+
+    assert.equal(harness.controller.playFieldEventAt({ x: 25, y: 9 }, { id: 'hero', entity: player } as any), true);
+    assert.ok(harness.logs.some((entry) => entry.includes('열쇠를 얻었습니다.')));
+    assert.equal(harness.controller.playFieldEventAt({ x: 25, y: 9 }, { id: 'hero', entity: player } as any), false);
+});
+
+test('Burgos local field events are disabled during network scenario play', () => {
+    const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === BURGOS_CASTLE_DUNGEON_ID);
+    const quest = getStoryQuestByDungeonId(BURGOS_CASTLE_DUNGEON_ID);
+    assert.ok(dungeon);
+    assert.ok(quest);
+
+    const player = new Player(24, 9);
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ player, raidSession, isNetworkRaid: true });
+
+    harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+
+    assert.equal(harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any).size, 0);
+    assert.equal(harness.controller.playFieldEventAt({ x: 25, y: 9 }, { id: 'hero', entity: player } as any), false);
+});
+
 test('normal enemy loot is auto-collected into the backpack', () => {
     const bag = new GridInventory(4, 4);
     const logs: string[] = [];

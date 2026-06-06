@@ -88,6 +88,7 @@ test('Burgos interior uses a dedicated original-inspired route and event sequenc
     assert.ok(sequence.fieldEvents.some((event) => event.id === 'cain_son_relic'));
     assert.ok(sequence.fieldEvents.every((event) => event.originalSource === 'MAP/01set.arc:01.evt'));
     assert.ok(sequence.fieldEvents.every((event) => event.steps.length > 0));
+    assert.ok(sequence.fieldEvents.every((event) => event.triggerTiles.length > 0));
 });
 
 test('Burgos scenario event keys exist in both languages without snapshotting full text', () => {

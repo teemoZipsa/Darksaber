@@ -49,6 +49,8 @@ interface ControllerOptions {
     logs?: string[];
     reopened?: { value: number };
     spentCosts?: number[];
+    additionalInteractTiles?: Set<string>;
+    interactAtTile?: WorldPlayerActionContext['interactAtTile'];
 }
 
 function makeController(actor: FieldActor, remainingAp: number, options: ControllerOptions = {}): WorldPlayerActionController {
@@ -104,6 +106,8 @@ function makeController(actor: FieldActor, remainingAp: number, options: Control
         setReservedAction: () => undefined,
         selectEnemy: () => undefined,
         selectLoot: () => undefined,
+        getAdditionalInteractTiles: () => options.additionalInteractTiles ?? new Set(),
+        interactAtTile: options.interactAtTile,
     };
     return new WorldPlayerActionController(context, {
         log: (message) => {
@@ -241,6 +245,30 @@ test('partial ATB keeps attack, magic, tool, and movement available when costs c
     assert.equal(states.find((state) => state.type === 'tool')?.enabled, true);
     assert.equal(states.find((state) => state.type === 'move')?.enabled, true);
     assert.equal(states.find((state) => state.type === 'attack')?.costLabel, '행동력 -25%');
+});
+
+test('inspect action can execute a non-loot scenario interaction tile', () => {
+    const actor = makeActor('hero', 0, 0);
+    const logs: string[] = [];
+    const spentCosts: number[] = [];
+    const interacted: { tile: { x: number; y: number } | null } = { tile: null };
+    const controller = makeController(actor, getActionApCost('interact'), {
+        logs,
+        spentCosts,
+        additionalInteractTiles: new Set(['1,0']),
+        interactAtTile: (_actor, tile) => {
+            interacted.tile = { ...tile };
+            return true;
+        },
+    });
+
+    assert.equal(controller.getTurnActionStates(actor).find((state) => state.type === 'open')?.enabled, true);
+
+    controller.execute('open');
+    controller.handleTargetClick({ x: 1, y: 0 }, { kind: 'ground', tile: { x: 1, y: 0 } });
+
+    assert.deepEqual(interacted.tile, { x: 1, y: 0 });
+    assert.deepEqual(spentCosts, [getActionApCost('interact')]);
 });
 
 test('defend applies guard and the integrated counter readiness', () => {
