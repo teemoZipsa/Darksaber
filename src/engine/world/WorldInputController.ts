@@ -58,6 +58,11 @@ export class WorldInputController {
     }
 
     public process(input: InputManager, camera: Camera): void {
+        if (input.justPressed('KeyM')) {
+            this.context.minimapUI.toggle();
+            return;
+        }
+
         if (this.context.minimapUI.handleInput(input)) return;
 
         // Combat log claims wheel/drag inside its region first.
@@ -90,11 +95,6 @@ export class WorldInputController {
         }
 
         if (this.isInputLockedByReservation()) return;
-
-        if (input.justPressed('KeyM')) {
-            this.context.minimapUI.toggle();
-            return;
-        }
 
         if (input.mouseJustDown && this.context.minimapUI.onClick(input.uiMouseX, input.uiMouseY)) {
             return;

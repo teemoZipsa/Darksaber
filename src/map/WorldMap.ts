@@ -240,6 +240,8 @@ const TOWN_EXIT_FORMATION_OFFSETS: TilePoint[] = [
     { x: 0, y: 1 },
     { x: 1, y: 0 },
 ];
+const MIN_TOWN_INTERACTION_RADIUS_TILES = 14;
+const TOWN_INTERACTION_RADIUS_PER_CHUNK = 5;
 
 interface TreeDecorationConfig {
     widthTiles: number;
@@ -593,7 +595,7 @@ export class WorldMap {
             return this.isCoastOceanChunk(chunkX, chunkY) ? TileType.WATER : TileType.DEEP_WATER;
         }
         if (biome === 'town') {
-            const town = this.getTownAtTile(tx, ty);
+            const town = this.getTownTerrainAtTile(tx, ty);
             return town ? this.computeTownTile(tx, ty, town) : TileType.GRASS;
         }
 
@@ -1080,6 +1082,16 @@ export class WorldMap {
     }
 
     public getTownAtTile(tx: number, ty: number): TownInfo | null {
+        for (const town of this.getTowns()) {
+            const center = this.getTownCenterTile(town);
+            const dx = tx - center.x;
+            const dy = ty - center.y;
+            if (Math.sqrt(dx * dx + dy * dy) <= this.getTownInteractionRadiusTiles(town)) return town;
+        }
+        return null;
+    }
+
+    private getTownTerrainAtTile(tx: number, ty: number): TownInfo | null {
         const { chunkX, chunkY } = this.tileToChunk(tx, ty);
         for (const town of this.getTowns()) {
             const dx = chunkX - town.chunkX;
@@ -1089,17 +1101,27 @@ export class WorldMap {
         return null;
     }
 
+    private getTownCenterTile(town: TownInfo): TilePoint {
+        return {
+            x: town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+            y: town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+        };
+    }
+
+    private getTownInteractionRadiusTiles(town: TownInfo): number {
+        return Math.max(MIN_TOWN_INTERACTION_RADIUS_TILES, town.radius * TOWN_INTERACTION_RADIUS_PER_CHUNK);
+    }
+
     public getTownSpawnTile(town: TownInfo): TilePoint {
-        const centerX = town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
-        const centerY = town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
-        const maxRadius = Math.max(4, town.radius * CHUNK_SIZE);
+        const center = this.getTownCenterTile(town);
+        const maxRadius = this.getTownInteractionRadiusTiles(town);
 
         for (let radius = 0; radius <= maxRadius; radius++) {
             for (let dy = -radius; dy <= radius; dy++) {
                 for (let dx = -radius; dx <= radius; dx++) {
                     if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
-                    const tx = centerX + dx;
-                    const ty = centerY + dy;
+                    const tx = center.x + dx;
+                    const ty = center.y + dy;
                     if (this.isWalkable(tx, ty) && this.getTownAtTile(tx, ty)?.id === town.id) {
                         return { x: tx, y: ty };
                     }
@@ -1107,7 +1129,7 @@ export class WorldMap {
             }
         }
 
-        return { x: centerX, y: centerY };
+        return center;
     }
 
     public getTownExitTile(town: TownInfo): TilePoint {
@@ -1121,9 +1143,8 @@ export class WorldMap {
     }
 
     private computeTownExitTile(town: TownInfo): TilePoint {
-        const centerX = town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
-        const centerY = town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
-        const searchRadius = Math.max(8, town.radius * CHUNK_SIZE + CHUNK_SIZE);
+        const center = this.getTownCenterTile(town);
+        const searchRadius = this.getTownInteractionRadiusTiles(town) + 12;
         let bestSafeRoadExit: { tile: TilePoint; score: number } | null = null;
         let bestSafeExit: { tile: TilePoint; score: number } | null = null;
         let bestRoadExit: { tile: TilePoint; score: number } | null = null;
@@ -1131,8 +1152,8 @@ export class WorldMap {
 
         for (let dy = -searchRadius; dy <= searchRadius; dy++) {
             for (let dx = -searchRadius; dx <= searchRadius; dx++) {
-                const tx = centerX + dx;
-                const ty = centerY + dy;
+                const tx = center.x + dx;
+                const ty = center.y + dy;
                 if (!this.isWalkable(tx, ty) || this.getTownAtTile(tx, ty)?.id === town.id) continue;
                 const score = dx * dx + dy * dy;
                 const candidate = { tile: { x: tx, y: ty }, score };

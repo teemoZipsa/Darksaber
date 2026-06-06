@@ -127,3 +127,27 @@ test('clicking the active actor body while action menu is open does not dismiss 
     assert.ok(!calls.includes('dismissActionMenuTurn'));
     assert.ok(!calls.includes('switchParty'));
 });
+
+test('M key toggles the full minimap before full-map pointer handling can consume input', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    let minimapHandleCalls = 0;
+    context.minimapUI = {
+        handleInput: () => {
+            minimapHandleCalls += 1;
+            return true;
+        },
+        onClick: () => false,
+        toggle: () => calls.push('toggleMinimap'),
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput({
+        mouseIsDown: true,
+        justPressed: (code: string) => code === 'KeyM',
+    }), makeCamera());
+
+    assert.deepEqual(calls, ['toggleMinimap']);
+    assert.equal(minimapHandleCalls, 0);
+});

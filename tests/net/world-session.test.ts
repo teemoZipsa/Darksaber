@@ -5,6 +5,7 @@ import { getNormalizedMonsterBalance } from '../../src/data/original/originalMon
 import { Enemy } from '../../src/entity/Enemy';
 import type { ActorSnapshot, AutoLootGrantMessage, WorldJoinMessage } from '../../src/net/WorldProtocol';
 import { WorldMap } from '../../src/map/WorldMap';
+import { CHUNK_SIZE } from '../../src/map/Chunk';
 import { WorldResumeFailedError, WorldSession } from '../../server/WorldSession';
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
@@ -978,7 +979,24 @@ test('cleared field nests respawn after five minutes away from active actors', (
     session.tick(respawnAt + 1);
     assert.equal(state.monsterIds.length, 0, 'nest should not respawn inside the 18-tile safety radius');
 
-    serverActor.tile = { x: state.centerTile.x + 19, y: state.centerTile.y };
+    const stateChunkX = Math.floor(state.centerTile.x / CHUNK_SIZE);
+    const stateChunkY = Math.floor(state.centerTile.y / CHUNK_SIZE);
+    let outsideSafeTile: { x: number; y: number } | null = null;
+    for (let distance = 19; distance < CHUNK_SIZE && !outsideSafeTile; distance++) {
+        for (let dy = -distance; dy <= distance && !outsideSafeTile; dy++) {
+            const dxAbs = distance - Math.abs(dy);
+            for (const dx of dxAbs === 0 ? [0] : [-dxAbs, dxAbs]) {
+                const tile = { x: state.centerTile.x + dx, y: state.centerTile.y + dy };
+                if (Math.floor(tile.x / CHUNK_SIZE) !== stateChunkX) continue;
+                if (Math.floor(tile.y / CHUNK_SIZE) !== stateChunkY) continue;
+                if (!internals.worldMap.isWalkable(tile.x, tile.y)) continue;
+                outsideSafeTile = tile;
+                break;
+            }
+        }
+    }
+    assert.ok(outsideSafeTile, 'test fixture should find a same-chunk tile outside the 18-tile safety radius');
+    serverActor.tile = outsideSafeTile;
     session.tick(respawnAt + 1_001);
     assert.ok(state.monsterIds.length > 0, 'nest should respawn once the timer passed and actors are outside 18 tiles');
 });

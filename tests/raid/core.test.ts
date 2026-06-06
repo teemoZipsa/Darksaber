@@ -636,6 +636,11 @@ test('WorldMap exposes walkable non-town exits for every town', () => {
     assert.ok(kaosia);
     const kaosiaExit = world.getTownExitTile(kaosia);
     assert.equal(world.getTileAt(kaosiaExit.x, kaosiaExit.y), TileType.ROAD);
+    const kaosiaCenter = chunkCenter(kaosia.chunkX, kaosia.chunkY);
+    assert.ok(
+        Math.hypot(kaosiaExit.x - kaosiaCenter.x, kaosiaExit.y - kaosiaCenter.y) <= 20,
+        'Kaosia exit should place players just outside the castle, not at the edge of the old chunk-radius town area',
+    );
 });
 
 test('rest facility data matches every world town and keeps menu ids unique', () => {
