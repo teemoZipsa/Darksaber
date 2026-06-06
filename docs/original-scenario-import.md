@@ -21,6 +21,7 @@
   - Example: `node scripts/extract-original-arc.mjs`
   - Use `--manifest-only` to inspect archive tables without unpacking files.
   - Use `--all` only when bitmap/audio members are needed.
+- `scripts/analyze-original-burgos-map.mjs` extracts and summarizes `MAP/01.mrc`, `01t.mrc`, `01hmap.BMP`, and `01set.arc` into `outputs/original_burgos_map_analysis/burgos-map-summary.json`.
 - Original `.arc` files use the `0901` archive table. For Burgos dialogue verification, `Compress.dll` exports (`OpenArcFile`, `UnpackAFile`, `GetPointer`, `GetBuf2Size`) were used from 32-bit PowerShell to unpack CP949 text members.
 - The scanner reports byte/word counts, stable hashes, opcode candidates, coordinate candidates, text-reference candidates, scene-reference candidates, and `MAP` file manifest entries.
 - The scanner is intentionally descriptive only; it does not rewrite game data.
@@ -29,7 +30,7 @@
 
 | Episode | Dungeon | Status | Scene Candidate | Global Candidate | Map Candidates | Notes |
 |---|---|---|---|---|---|---|
-| 1 | `burgos_castle` | verified-v1 | `Wlib/scene1.lsc` | `Glib/gscene1.lsc` | `MAP/01.mrc`, `MAP/01t.mrc`, `MAP/01hmap.BMP`, `MAP/01set.arc` | v1 layout split into gatehouse, barracks, great hall, inner keep, and throne room. Entry sequence uses `01.DEO`; Cain's son/key handoff are connected as local `01.evt` inspect events. |
+| 1 | `burgos_castle` | verified-v1 | `Wlib/scene1.lsc` | `Glib/gscene1.lsc` | `MAP/01.mrc`, `MAP/01t.mrc`, `MAP/01hmap.BMP`, `MAP/01set.arc` | v1 layout split into gatehouse, barracks, great hall, inner keep, and throne room. Entry sequence uses `01.DEO`; Cain's son/key handoff are connected as local `01.evt` inspect events. Doors and blocked paths are represented in layout metadata. |
 | 2 | `zamora_fortress` | candidate | `Wlib/scene2.lsc` | `Glib/gscene2.lsc` | `MAP/02.*` | Follow after Burgos validation. |
 | 3 | `etna_volcano` | candidate | `Wlib/scene3.lsc` | `Glib/gscene3.lsc` | `MAP/03.*` | Indoor volcanic layout. |
 | 4 | `arcadia_plain` | candidate | `Wlib/scene4.lsc` | `Glib/gscene4.lsc` | `MAP/04.*` | Outdoor adaptation; prefer original coordinates. |

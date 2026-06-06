@@ -2,7 +2,7 @@ import type { TilePoint } from '../field/FieldPathing';
 import { TILE_PROPERTIES, TileType } from '../map/Tile';
 
 export type StoryInteriorTheme = 'castle' | 'volcano' | 'temple' | 'pyramid' | 'ament';
-export type StoryInteriorPropKind = 'torch' | 'crate' | 'banner' | 'sealedDoor' | 'throne' | 'bossSeal' | 'rubble';
+export type StoryInteriorPropKind = 'torch' | 'crate' | 'banner' | 'door' | 'sealedDoor' | 'throne' | 'bossSeal' | 'rubble';
 
 export interface StoryInteriorRoom {
     id: string;
@@ -24,6 +24,20 @@ export interface StoryInteriorTileOverride {
     type: TileType;
 }
 
+export interface StoryInteriorDoor {
+    id: string;
+    tile: TilePoint;
+    connects: string[];
+    originalTile?: TilePoint;
+    sealed?: boolean;
+}
+
+export interface StoryInteriorBlockedPath {
+    id: string;
+    tile: TilePoint;
+    originalTile?: TilePoint;
+}
+
 export interface StoryInteriorLayout {
     dungeonId: string;
     displayNameKey: string;
@@ -36,6 +50,8 @@ export interface StoryInteriorLayout {
     bossTile: TilePoint;
     rooms: StoryInteriorRoom[];
     props: StoryInteriorProp[];
+    doors?: StoryInteriorDoor[];
+    blockedPaths?: StoryInteriorBlockedPath[];
     walkableAreas?: StoryInteriorRoom[];
     tileOverrides?: StoryInteriorTileOverride[];
 }
@@ -85,20 +101,33 @@ const BURGOS_WALKABLE_AREAS: StoryInteriorRoom[] = [
     { id: 'throneRoom', nameKey: 'story.interior.room.burgosThroneRoom', x: 27, y: 7, width: 5, height: 5 },
 ];
 
+const BURGOS_DOORS: StoryInteriorDoor[] = [
+    { id: 'front_gate', tile: { x: 1, y: 9 }, connects: ['entry'], originalTile: { x: 14, y: 28 } },
+    { id: 'west_barracks_door', tile: { x: 8, y: 7 }, connects: ['gatehouse', 'westBarracks'], originalTile: { x: 9, y: 10 } },
+    { id: 'east_barracks_door', tile: { x: 8, y: 11 }, connects: ['gatehouse', 'eastBarracks'], originalTile: { x: 30, y: 10 } },
+    { id: 'great_hall_door', tile: { x: 14, y: 9 }, connects: ['gatehouse', 'greatHall'], originalTile: { x: 14, y: 28 } },
+    { id: 'inner_keep_door', tile: { x: 21, y: 9 }, connects: ['greatHall', 'innerKeep'], originalTile: { x: 19, y: 10 } },
+    { id: 'throne_room_seal', tile: { x: 27, y: 9 }, connects: ['innerKeep', 'throneRoom'], originalTile: { x: 19, y: 7 }, sealed: true },
+];
+
+const BURGOS_BLOCKED_PATHS: StoryInteriorBlockedPath[] = [
+    { id: 'west_barracks_north_rubble', tile: { x: 8, y: 5 }, originalTile: { x: 8, y: 5 } },
+    { id: 'east_barracks_south_rubble', tile: { x: 8, y: 13 }, originalTile: { x: 8, y: 13 } },
+    { id: 'great_hall_north_barricade', tile: { x: 14, y: 6 }, originalTile: { x: 12, y: 28 } },
+    { id: 'great_hall_south_barricade', tile: { x: 14, y: 12 }, originalTile: { x: 16, y: 28 } },
+    { id: 'central_rubble_north', tile: { x: 17, y: 8 }, originalTile: { x: 18, y: 9 } },
+    { id: 'central_rubble_south', tile: { x: 17, y: 10 }, originalTile: { x: 20, y: 9 } },
+    { id: 'inner_keep_north_barricade', tile: { x: 20, y: 6 }, originalTile: { x: 18, y: 7 } },
+    { id: 'inner_keep_south_barricade', tile: { x: 20, y: 12 }, originalTile: { x: 20, y: 10 } },
+    { id: 'throne_approach_north_wall', tile: { x: 24, y: 6 }, originalTile: { x: 18, y: 7 } },
+    { id: 'throne_approach_south_wall', tile: { x: 24, y: 12 }, originalTile: { x: 20, y: 10 } },
+    { id: 'throne_room_north_pillar', tile: { x: 28, y: 8 }, originalTile: { x: 18, y: 7 } },
+    { id: 'throne_room_south_pillar', tile: { x: 28, y: 10 }, originalTile: { x: 20, y: 10 } },
+];
+
 const BURGOS_TILE_OVERRIDES: StoryInteriorTileOverride[] = [
     { tile: { x: 1, y: 9 }, type: TileType.DUNGEON_ENTRANCE },
-    { tile: { x: 8, y: 5 }, type: TileType.WALL },
-    { tile: { x: 8, y: 13 }, type: TileType.WALL },
-    { tile: { x: 14, y: 6 }, type: TileType.WALL },
-    { tile: { x: 14, y: 12 }, type: TileType.WALL },
-    { tile: { x: 17, y: 8 }, type: TileType.WALL },
-    { tile: { x: 17, y: 10 }, type: TileType.WALL },
-    { tile: { x: 20, y: 6 }, type: TileType.WALL },
-    { tile: { x: 20, y: 12 }, type: TileType.WALL },
-    { tile: { x: 24, y: 6 }, type: TileType.WALL },
-    { tile: { x: 24, y: 12 }, type: TileType.WALL },
-    { tile: { x: 28, y: 8 }, type: TileType.WALL },
-    { tile: { x: 28, y: 10 }, type: TileType.WALL },
+    ...BURGOS_BLOCKED_PATHS.map((path) => ({ tile: { ...path.tile }, type: TileType.WALL })),
     { tile: { x: 4, y: 9 }, type: TileType.ROAD },
     { tile: { x: 5, y: 9 }, type: TileType.ROAD },
     { tile: { x: 6, y: 9 }, type: TileType.ROAD },
@@ -173,12 +202,18 @@ const BURGOS_CASTLE_LAYOUT: StoryInteriorLayout = {
         { kind: 'crate', tile: { x: 10, y: 13 } },
         { kind: 'banner', tile: { x: 16, y: 7 } },
         { kind: 'banner', tile: { x: 16, y: 11 } },
+        { kind: 'door', tile: { x: 8, y: 7 } },
+        { kind: 'door', tile: { x: 8, y: 11 } },
+        { kind: 'door', tile: { x: 14, y: 9 } },
+        { kind: 'door', tile: { x: 21, y: 9 } },
         { kind: 'rubble', tile: { x: 17, y: 8 } },
         { kind: 'rubble', tile: { x: 17, y: 10 } },
         { kind: 'sealedDoor', tile: { x: 27, y: 9 }, labelKey: 'story.interior.prop.sealedDoor' },
         { kind: 'bossSeal', tile: { x: 30, y: 9 }, labelKey: 'story.interior.prop.bossSeal' },
         { kind: 'throne', tile: { x: 31, y: 9 } },
     ],
+    doors: BURGOS_DOORS.map((door) => ({ ...door, tile: { ...door.tile }, originalTile: door.originalTile ? { ...door.originalTile } : undefined })),
+    blockedPaths: BURGOS_BLOCKED_PATHS.map((path) => ({ ...path, tile: { ...path.tile }, originalTile: path.originalTile ? { ...path.originalTile } : undefined })),
     walkableAreas: BURGOS_WALKABLE_AREAS.map((room) => ({ ...room })),
     tileOverrides: BURGOS_TILE_OVERRIDES.map((override) => ({ ...override, tile: { ...override.tile } })),
 };

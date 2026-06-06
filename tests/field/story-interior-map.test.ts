@@ -91,6 +91,28 @@ test('Burgos interior uses a dedicated original-inspired route and event sequenc
     assert.ok(sequence.fieldEvents.every((event) => event.triggerTiles.length > 0));
 });
 
+test('Burgos interior exposes original-inspired doors, blocked paths, and event access', () => {
+    const layout = getStoryInteriorLayout('burgos_castle');
+    assert.ok(layout);
+    const map = new StoryInteriorMap(layout);
+
+    assert.ok(layout.doors?.some((door) => door.id === 'throne_room_seal' && door.sealed));
+    assert.ok(layout.doors?.every((door) => map.isWalkable(door.tile.x, door.tile.y)));
+    assert.equal(layout.blockedPaths?.length, 12);
+    for (const blocked of layout.blockedPaths ?? []) {
+        assert.equal(map.isWalkable(blocked.tile.x, blocked.tile.y), false, blocked.id);
+    }
+
+    const sequence = getStoryScenarioEventSequence('burgos_castle');
+    assert.ok(sequence);
+    const eventTiles = sequence.fieldEvents.flatMap((event) => event.triggerTiles);
+    assert.ok(eventTiles.length > 0);
+    for (const tile of eventTiles) {
+        assert.equal(map.isWalkable(tile.x, tile.y), true, `${tile.x},${tile.y}`);
+        assert.equal(hasWalkablePath(map, layout.playerStart, tile), true, `${tile.x},${tile.y}`);
+    }
+});
+
 test('Burgos scenario event keys exist in both languages without snapshotting full text', () => {
     const sequence = getStoryScenarioEventSequence('burgos_castle');
     assert.ok(sequence);

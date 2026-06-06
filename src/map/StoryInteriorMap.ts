@@ -266,6 +266,15 @@ export class StoryInteriorMap extends WorldMap {
                 ctx.fillStyle = 'rgba(40, 20, 20, 0.55)';
                 ctx.fillRect(sx + 11, sy + 8, TILE_SIZE - 22, TILE_SIZE - 16);
                 break;
+            case 'door':
+                ctx.fillStyle = 'rgba(10, 8, 12, 0.44)';
+                ctx.fillRect(sx + 4, sy + 3, TILE_SIZE - 8, TILE_SIZE - 6);
+                ctx.strokeStyle = 'rgba(183, 130, 69, 0.9)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(sx + 7, sy + 5, TILE_SIZE - 14, TILE_SIZE - 10);
+                ctx.fillStyle = 'rgba(255, 218, 142, 0.28)';
+                ctx.fillRect(sx + TILE_SIZE - 11, sy + TILE_SIZE / 2 - 2, 3, 4);
+                break;
             case 'sealedDoor':
                 ctx.fillStyle = 'rgba(10, 8, 12, 0.74)';
                 ctx.fillRect(sx - 3, sy - 6, TILE_SIZE + 6, TILE_SIZE + 12);
