@@ -1,7 +1,11 @@
 import type { PlayerData } from '../../data/PlayerData';
 import { getStoryQuestByDungeonId, isStoryQuestAvailable, type StoryQuestDefinition } from '../../data/StoryQuestData';
 import { getStoryScenarioByDungeonId } from '../../data/StoryScenarioData';
-import { getStoryScenarioEventSequence, type StoryScenarioEventStep } from '../../data/StoryScenarioEventData';
+import {
+    getStoryScenarioEventSequence,
+    type StoryScenarioEventStep,
+    type StoryScenarioFieldEvent,
+} from '../../data/StoryScenarioEventData';
 import { getStoryScenarioMonsterLayout } from '../../data/StoryScenarioMonsterData';
 import { getMonsterDefinition } from '../../data/MonsterCatalog';
 import { getStoryInteriorLayout, isStoryInteriorDungeon, type StoryInteriorLayout } from '../../data/StoryInteriorData';
@@ -111,7 +115,7 @@ export class WorldStoryScenarioController {
 
         const actorTile = this.context.actorTile(actor);
         for (const event of sequence.fieldEvents) {
-            if (this.completedFieldEventKeys.has(this.fieldEventKey(active.dungeonId, event.id))) continue;
+            if (this.isFieldEventCompleted(active.dungeonId, event)) continue;
             for (const tile of event.triggerTiles) {
                 if (manhattan(actorTile, tile) <= 1) result.add(`${tile.x},${tile.y}`);
             }
@@ -124,8 +128,9 @@ export class WorldStoryScenarioController {
         const event = sequence?.fieldEvents.find((candidate) => candidate.id === eventId);
         if (!event) return false;
         const key = this.fieldEventKey(dungeonId, event.id);
-        if (this.completedFieldEventKeys.has(key)) return false;
+        if (this.isFieldEventCompleted(dungeonId, event)) return false;
         this.completedFieldEventKeys.add(key);
+        if (event.runtimeFlag) this.context.raidSession.setScenarioFlag(dungeonId, event.runtimeFlag);
         for (const step of event.steps) this.playStoryScenarioEventStep(step);
         return true;
     }
@@ -138,7 +143,7 @@ export class WorldStoryScenarioController {
         if (!sequence || manhattan(this.context.actorTile(actor), tile) > 1) return false;
 
         const event = sequence.fieldEvents.find((candidate) =>
-            !this.completedFieldEventKeys.has(this.fieldEventKey(active.dungeonId, candidate.id))
+            !this.isFieldEventCompleted(active.dungeonId, candidate)
             && candidate.triggerTiles.some((triggerTile) => triggerTile.x === tile.x && triggerTile.y === tile.y)
         );
         if (!event) return false;
@@ -427,6 +432,11 @@ export class WorldStoryScenarioController {
 
     private fieldEventKey(dungeonId: string, eventId: string): string {
         return `${dungeonId}:${eventId}`;
+    }
+
+    private isFieldEventCompleted(dungeonId: string, event: StoryScenarioFieldEvent): boolean {
+        if (this.completedFieldEventKeys.has(this.fieldEventKey(dungeonId, event.id))) return true;
+        return event.runtimeFlag ? this.context.raidSession.hasScenarioFlag(dungeonId, event.runtimeFlag) : false;
     }
 
     private clearFieldEventState(dungeonId: string): void {

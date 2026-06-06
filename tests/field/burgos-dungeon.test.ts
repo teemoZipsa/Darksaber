@@ -464,9 +464,34 @@ test('Burgos field events can be inspected once inside the local interior', () =
     const inspectable = harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any);
     assert.equal(inspectable.has('25,9'), true);
 
+    assert.equal(raidSession.hasScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key'), false);
     assert.equal(harness.controller.playFieldEventAt({ x: 25, y: 9 }, { id: 'hero', entity: player } as any), true);
     assert.ok(harness.logs.some((entry) => entry.includes('열쇠를 얻었습니다.')));
+    assert.equal(raidSession.hasScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key'), true);
+    assert.equal(
+        harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any).has('25,9'),
+        false
+    );
     assert.equal(harness.controller.playFieldEventAt({ x: 25, y: 9 }, { id: 'hero', entity: player } as any), false);
+});
+
+test('Burgos Cain field event records a raid-scoped relic flag without permanent rewards', () => {
+    const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === BURGOS_CASTLE_DUNGEON_ID);
+    const quest = getStoryQuestByDungeonId(BURGOS_CASTLE_DUNGEON_ID);
+    assert.ok(dungeon);
+    assert.ok(quest);
+
+    const player = new Player(8, 12);
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ player, raidSession });
+
+    harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+
+    assert.equal(harness.controller.playFieldEventAt({ x: 9, y: 12 }, { id: 'hero', entity: player } as any), true);
+    assert.equal(raidSession.hasScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'cain_necklace'), true);
+    assert.ok(harness.logs.some((entry) => entry.includes('케인의 목걸이를 얻었습니다.')));
+    assert.equal(harness.controller.playFieldEventAt({ x: 9, y: 12 }, { id: 'hero', entity: player } as any), false);
 });
 
 test('Burgos local field events are disabled during network scenario play', () => {
