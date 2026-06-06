@@ -1,8 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { getStoryScenarioEventSequence } from '../../src/data/StoryScenarioEventData';
 import { getStoryInteriorLayout, getStoryInteriorTileAt, STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
 import { TileType } from '../../src/map/Tile';
 import { StoryInteriorMap } from '../../src/map/StoryInteriorMap';
+
+function hasWalkablePath(map: StoryInteriorMap, from: { x: number; y: number }, to: { x: number; y: number }): boolean {
+    const bounds = map.getBoundsTiles();
+    const queue = [{ ...from }];
+    const seen = new Set<string>([`${from.x},${from.y}`]);
+    for (let index = 0; index < queue.length; index++) {
+        const tile = queue[index];
+        if (tile.x === to.x && tile.y === to.y) return true;
+        for (const next of [
+            { x: tile.x + 1, y: tile.y },
+            { x: tile.x - 1, y: tile.y },
+            { x: tile.x, y: tile.y + 1 },
+            { x: tile.x, y: tile.y - 1 },
+        ]) {
+            const key = `${next.x},${next.y}`;
+            if (seen.has(key)) continue;
+            if (next.x < 0 || next.y < 0 || next.x >= bounds.width || next.y >= bounds.height) continue;
+            if (!map.isWalkable(next.x, next.y)) continue;
+            seen.add(key);
+            queue.push(next);
+        }
+    }
+    return false;
+}
 
 test('solo interior layouts expose walkable entry, player, guard, and boss tiles', () => {
     assert.ok(STORY_INTERIOR_LAYOUTS.length > 0);
@@ -32,4 +57,30 @@ test('story interior map renders fixed Burgos bounds and localized display name'
     assert.equal(map.getDungeons().length, 0);
     assert.equal(map.isWalkable(layout.playerStart.x, layout.playerStart.y), true);
     assert.equal(map.isWalkable(-1, layout.playerStart.y), false);
+});
+
+test('Burgos interior uses a dedicated original-inspired route and event sequence', () => {
+    const layout = getStoryInteriorLayout('burgos_castle');
+    assert.ok(layout);
+    const map = new StoryInteriorMap(layout);
+
+    assert.deepEqual(map.getBoundsTiles(), { width: 34, height: 19 });
+    assert.ok(layout.rooms.some((room) => room.id === 'gatehouse'));
+    assert.ok(layout.rooms.some((room) => room.id === 'westBarracks'));
+    assert.ok(layout.rooms.some((room) => room.id === 'eastBarracks'));
+    assert.ok(layout.rooms.some((room) => room.id === 'greatHall'));
+    assert.ok(layout.rooms.some((room) => room.id === 'innerKeep'));
+    assert.ok(layout.rooms.some((room) => room.id === 'throneRoom'));
+    assert.equal(getStoryInteriorTileAt(layout, 17, 8), TileType.WALL);
+    assert.equal(getStoryInteriorTileAt(layout, 17, 9), TileType.ROAD);
+    assert.equal(getStoryInteriorTileAt(layout, layout.bossTile.x, layout.bossTile.y), TileType.STONE);
+    assert.equal(hasWalkablePath(map, layout.playerStart, layout.bossTile), true);
+
+    const sequence = getStoryScenarioEventSequence('burgos_castle');
+    assert.ok(sequence);
+    assert.equal(sequence.originalSources.sceneScript, 'Wlib/scene1.lsc');
+    assert.equal(sequence.originalSources.globalScript, 'Glib/gscene1.lsc');
+    assert.ok(sequence.originalSources.mapFiles.includes('MAP/01.mrc'));
+    assert.equal(sequence.entry.filter((step) => step.kind === 'dialogue').length, 2);
+    assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
 });

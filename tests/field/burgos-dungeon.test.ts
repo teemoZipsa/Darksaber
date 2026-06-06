@@ -403,6 +403,9 @@ test('local story interior uses the shared monster ids and normalized stats', ()
     assert.equal(harness.selectedActorId, 'hero');
     assert.equal(harness.turnStateCleared, true);
     assert.equal(harness.cameraFollowed, true);
+    assert.ok(harness.logs.some((entry) => entry.includes('시선 이동: 부르고스성 성문')));
+    assert.ok(harness.logs.some((entry) => entry.includes('키스라:')));
+    assert.ok(harness.logs.some((entry) => entry.includes('부르고스성 경비병')));
     const guard = harness.fieldEnemies.find((entry) => entry.enemy.id.endsWith('_guard_0'))?.enemy;
     const boss = harness.fieldEnemies.find((entry) => entry.enemy.id.endsWith('_boss'))?.enemy;
     assert.ok(guard);
@@ -442,6 +445,7 @@ test('story interior completion restores the previous world map at the return ti
     assert.deepEqual(harness.placedNear, { x: 12, y: 13 });
     assert.equal(raidSession.activeDungeonId, null);
     assert.equal(raidSession.isDungeonCleared(BURGOS_CASTLE_DUNGEON_ID), true);
+    assert.ok(harness.logs.some((entry) => entry.includes('키스라를 제압했습니다')));
 });
 
 test('normal enemy loot is auto-collected into the backpack', () => {

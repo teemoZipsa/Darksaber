@@ -1,6 +1,7 @@
 import type { PlayerData } from '../../data/PlayerData';
 import { getStoryQuestByDungeonId, isStoryQuestAvailable, type StoryQuestDefinition } from '../../data/StoryQuestData';
 import { getStoryScenarioByDungeonId } from '../../data/StoryScenarioData';
+import { getStoryScenarioEventSequence, type StoryScenarioEventStep } from '../../data/StoryScenarioEventData';
 import { getStoryScenarioMonsterLayout } from '../../data/StoryScenarioMonsterData';
 import { getMonsterDefinition } from '../../data/MonsterCatalog';
 import { getStoryInteriorLayout, isStoryInteriorDungeon, type StoryInteriorLayout } from '../../data/StoryInteriorData';
@@ -255,6 +256,7 @@ export class WorldStoryScenarioController {
         this.context.setFieldEnemies(enemies);
 
         this.context.followCameraToPlayer();
+        this.playStoryScenarioSequence(dungeon.id, 'entry');
         this.context.log(formatT('story.interior.enterLog', { dungeon: dungeon.nameKr }));
         this.context.log(t(storyQuest.enterLogKey));
     }
@@ -280,6 +282,7 @@ export class WorldStoryScenarioController {
         this.context.clearSelection();
         this.context.clearFieldTurnState();
         const scenario = getStoryScenarioByDungeonId(dungeonId);
+        this.playStoryScenarioSequence(dungeonId, 'bossDefeat');
         if (completedInterior && scenario) {
             this.context.log(formatT('story.interior.returnLog', { dungeon: scenario.dungeonNameKr }));
         }
@@ -368,5 +371,29 @@ export class WorldStoryScenarioController {
         const actor = this.context.getControlledActor();
         if (!actor) return null;
         return `${this.context.getWorldMap().getRealm()}:${dungeon.id}:${actor.entity.gridX},${actor.entity.gridY}`;
+    }
+
+    private playStoryScenarioSequence(dungeonId: string, phase: 'entry' | 'bossDefeat'): void {
+        const sequence = getStoryScenarioEventSequence(dungeonId);
+        if (!sequence) return;
+        for (const step of sequence[phase]) this.playStoryScenarioEventStep(step);
+    }
+
+    private playStoryScenarioEventStep(step: StoryScenarioEventStep): void {
+        switch (step.kind) {
+            case 'focus':
+                this.context.log(formatT('story.event.focusLog', { target: t(step.labelKey) }));
+                break;
+            case 'dialogue':
+                this.context.log(formatT('story.event.dialogueLog', {
+                    speaker: t(step.speakerNameKey),
+                    line: t(step.textKey),
+                }));
+                break;
+            case 'combatStart':
+            case 'objective':
+                this.context.log(t(step.labelKey));
+                break;
+        }
     }
 }
