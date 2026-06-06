@@ -452,6 +452,38 @@ test('story interior completion restores the previous world map at the return ti
     assert.ok(harness.logs.some((entry) => entry.includes('으.. 분하다.. | 억울하지만.. 여기선 일단 물러나야겠군..')));
 });
 
+test('Zamora local story interior plays original entry flow before Fenris objective', () => {
+    const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === ZAMORA_FORTRESS_DUNGEON_ID);
+    const quest = getStoryQuestByDungeonId(ZAMORA_FORTRESS_DUNGEON_ID);
+    const interior = getStoryInteriorLayout(ZAMORA_FORTRESS_DUNGEON_ID);
+    assert.ok(dungeon);
+    assert.ok(quest);
+    assert.ok(interior);
+
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ raidSession });
+
+    harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+
+    assert.equal(raidSession.activeDungeonId, ZAMORA_FORTRESS_DUNGEON_ID);
+    assert.equal(harness.fieldEnemies.length, 5);
+    assert.deepEqual(harness.placedNear, interior.playerStart);
+    assert.ok(harness.worldMap instanceof StoryInteriorMap);
+    assert.ok(harness.logs.some((entry) => entry.includes('시선 이동: 자모라 요새 감금실')));
+    assert.ok(harness.logs.some((entry) => entry.includes('펜리스: 자아, 공주')));
+    assert.ok(harness.logs.some((entry) => entry.includes('공주: 싫다. 절대')));
+    assert.ok(harness.logs.some((entry) => entry.includes('승리조건 : 펜리스의 처치')));
+
+    const boss = harness.fieldEnemies.find((entry) => entry.enemy.isBoss)?.enemy;
+    assert.ok(boss);
+    harness.controller.completeDungeonIfBossDefeated(boss);
+
+    assert.equal(raidSession.isDungeonCleared(ZAMORA_FORTRESS_DUNGEON_ID), true);
+    assert.ok(harness.logs.includes('펜리스의 처치'));
+    assert.ok(harness.logs.includes('자모라 요새 목표 달성. 다른 마을로 생환하면 2화가 완료됩니다.'));
+});
+
 test('Burgos field events can be inspected once inside the local interior', () => {
     const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === BURGOS_CASTLE_DUNGEON_ID);
     const quest = getStoryQuestByDungeonId(BURGOS_CASTLE_DUNGEON_ID);

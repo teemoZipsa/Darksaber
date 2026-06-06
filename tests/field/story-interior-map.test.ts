@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getStoryScenarioEventSequence } from '../../src/data/StoryScenarioEventData';
+import { getStoryScenarioEventSequence, STORY_SCENARIO_EVENT_SEQUENCES } from '../../src/data/StoryScenarioEventData';
 import { getStoryInteriorLayout, getStoryInteriorTileAt, STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
 import { i18n } from '../../src/i18n/LanguageManager';
 import { TileType } from '../../src/map/Tile';
@@ -152,22 +152,36 @@ test('Zamora Fortress uses a dedicated original-inspired interior route', () => 
     }
 });
 
-test('Burgos scenario event keys exist in both languages without snapshotting full text', () => {
-    const sequence = getStoryScenarioEventSequence('burgos_castle');
+test('Zamora Fortress exposes original episode 2 entry event flow', () => {
+    const sequence = getStoryScenarioEventSequence('zamora_fortress');
     assert.ok(sequence);
 
+    assert.equal(sequence.originalSources.sceneScript, 'Wlib/scene2.lsc');
+    assert.equal(sequence.originalSources.globalScript, 'Glib/gscene2.lsc');
+    assert.ok(sequence.originalSources.mapFiles.includes('MAP/02.mrc'));
+    assert.ok(sequence.originalSources.mapFiles.includes('MAP/02set.arc'));
+    assert.equal(sequence.entry.filter((step) => step.kind === 'dialogue').length, 12);
+    assert.equal(sequence.entry.filter((step) => step.kind === 'combatStart').length, 1);
+    assert.equal(sequence.fieldEvents.length, 0);
+    assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
+});
+
+test('story scenario event keys exist in both languages without snapshotting full text', () => {
     const keys = new Set<string>();
-    const collect = (step: (typeof sequence.entry)[number]) => {
+    const collect = (step: (typeof STORY_SCENARIO_EVENT_SEQUENCES)[number]['entry'][number]) => {
         if ('labelKey' in step) keys.add(step.labelKey);
         if ('speakerNameKey' in step) keys.add(step.speakerNameKey);
         if ('textKey' in step) keys.add(step.textKey);
     };
-    sequence.entry.forEach(collect);
-    sequence.bossDefeat.forEach(collect);
-    sequence.fieldEvents.forEach((event) => {
-        if (event.markerLabelKey) keys.add(event.markerLabelKey);
-        event.steps.forEach(collect);
-    });
+
+    for (const sequence of STORY_SCENARIO_EVENT_SEQUENCES) {
+        sequence.entry.forEach(collect);
+        sequence.bossDefeat.forEach(collect);
+        sequence.fieldEvents.forEach((event) => {
+            if (event.markerLabelKey) keys.add(event.markerLabelKey);
+            event.steps.forEach(collect);
+        });
+    }
 
     for (const key of keys) {
         assert.notEqual(i18n.strings.ko[key as keyof typeof i18n.strings.ko], undefined, `missing ko key ${key}`);
