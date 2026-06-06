@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Character } from '../../src/character/Character';
 import { PartyManager } from '../../src/character/PartyManager';
 import type { GameManager } from '../../src/engine/GameManager';
 import { WorldRaidOutcomeController, type WorldRaidOutcomeContext } from '../../src/engine/world/WorldRaidOutcomeController';
@@ -80,7 +81,7 @@ function createController() {
     const getOutcome = (): RaidOutcome | null =>
         (controller as unknown as { raidResultUI: { outcome: RaidOutcome | null } }).raidResultUI.outcome;
 
-    return { controller, playerData, raidSession, party, getOutcome };
+    return { controller, playerData, raidSession, party, gameManager, getOutcome };
 }
 
 test('Burgos objective grants episode 1 completion and bomb only after survival', () => {
@@ -119,6 +120,22 @@ test('Burgos objective does not grant episode 1 reward on raid failure', () => {
     assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_01_ID), false);
     assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), false);
     assert.equal(getOutcome()?.questRewards, undefined);
+});
+
+test('raid failure grants a basic recovery set instead of leaving the party empty', () => {
+    const { controller, raidSession, party, gameManager, getOutcome } = createController();
+    const hero = new Character('hero', 'Hero', 'infantry');
+    party.addToRoster(hero);
+    party.deployCharacter(hero);
+    raidSession.beginRaidFromTown('central_castle');
+
+    controller.completeFailure('DEAD');
+
+    assert.equal(hero.equipment.get('weapon')?.item.id, 'short_sword');
+    assert.equal(hero.equipment.get('shield')?.item.id, 'wooden_shield');
+    assert.equal(hero.equipment.get('body')?.item.id, 'battle_t1_body');
+    assert.deepEqual(gameManager.inventory.items.map((placed) => placed.item.id), ['herb_cheap', 'herb_cheap', 'mp_potion']);
+    assert.ok(getOutcome()?.notes?.some((note) => note.includes('기본 보급품 지급')));
 });
 
 test('Burgos field event items are preserved as quest items only after survival', () => {

@@ -1,7 +1,9 @@
 import type { PartyManager } from '../../character/PartyManager';
 import { Character } from '../../character/Character';
-import { getItemDef } from '../../data/ItemDB';
+import { getClassLine } from '../../data/ClassTree';
+import { getItemDef, type ItemDef } from '../../data/ItemDB';
 import type { PlayerData } from '../../data/PlayerData';
+import type { PlacedItem } from '../../inventory/GridInventory';
 import { STORY_SCENARIO_EVENT_SEQUENCES } from '../../data/StoryScenarioEventData';
 import { STORY_QUESTS, type StoryQuestReward } from '../../data/StoryQuestData';
 import { t } from '../../i18n/LanguageManager';
@@ -116,6 +118,7 @@ export class WorldRaidOutcomeController {
             const character = this.context.party.getCharacters().find((candidate) => candidate.id === lost.characterId);
             character?.unequip(lost.slot);
         }
+        const recoveryNotes = this.applyRaidFailureRecoveryKit();
 
         const returnTown = this.context.getTownById(raidSession.departureTownId) ?? this.context.getCurrentHubTown();
         raidSession.failBackToTown(returnTown.id);
@@ -138,10 +141,55 @@ export class WorldRaidOutcomeController {
             secured: [],
             lost: mergeSnapshots(loss.backpackLost),
             equipmentLost: loss.equipmentLost,
-            notes: [result === 'MIA' ? '시간 초과로 실종 처리되었습니다.' : '출격조가 전멸했습니다.'],
+            notes: [
+                result === 'MIA' ? '시간 초과로 실종 처리되었습니다.' : '출격조가 전멸했습니다.',
+                ...recoveryNotes,
+            ],
         };
         this.showRaidResult(outcome, returnTown);
         this.context.log(result === 'MIA' ? '시간 초과. 손실이 적용되었습니다.' : '전멸. 손실이 적용되었습니다.');
+        if (recoveryNotes.length > 0) this.context.log('기본 보급품을 지급했습니다.');
+    }
+
+    private applyRaidFailureRecoveryKit(): string[] {
+        let equippedCount = 0;
+        for (const character of this.context.party.getCharacters()) {
+            equippedCount += this.equipRecoveryItemIfEmpty(character, 'short_sword') ? 1 : 0;
+            equippedCount += this.equipRecoveryItemIfEmpty(character, 'wooden_shield') ? 1 : 0;
+            equippedCount += this.equipRecoveryItemIfEmpty(character, this.getRecoveryBodyArmorId(character)) ? 1 : 0;
+        }
+
+        const backpackIds = ['herb_cheap', 'herb_cheap', 'mp_potion'];
+        let backpackCount = 0;
+        for (const itemId of backpackIds) {
+            const item = getItemDef(itemId);
+            if (item && this.context.gameManager.inventory.autoPlace(item)) backpackCount += 1;
+        }
+
+        if (equippedCount === 0 && backpackCount === 0) return [];
+        return [`기본 보급품 지급: 장비 ${equippedCount}개, 소모품 ${backpackCount}개`];
+    }
+
+    private equipRecoveryItemIfEmpty(character: Character, itemId: string): boolean {
+        const item = getItemDef(itemId);
+        if (!item || item.slot === 'consumable' || character.equipment.has(item.slot)) return false;
+        character.equip(this.createRecoveryPlacedItem(item));
+        return true;
+    }
+
+    private getRecoveryBodyArmorId(character: Character): string {
+        const branch = getClassLine(character.classLineId)?.branch ?? 'battle';
+        return `${branch}_t1_body`;
+    }
+
+    private createRecoveryPlacedItem(item: ItemDef): PlacedItem {
+        return {
+            item,
+            gridX: 0,
+            gridY: 0,
+            durability: item.maxDurability,
+            quantity: 1,
+        };
     }
 
     private completeStoryQuestRewards(): string[] {

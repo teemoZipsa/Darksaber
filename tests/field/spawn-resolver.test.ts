@@ -91,7 +91,17 @@ test('nest generation is deterministic for the same seed/chunk/context', () => {
     const a = pickNestForChunk(ctx, true);
     const b = pickNestForChunk(ctx, true);
     assert.deepEqual(a, b);
-    assert.ok(a && a.monsters.length >= 4 && a.monsters.length <= 6, 'pack size 4-6');
+    assert.ok(a && a.monsters.length >= 3 && a.monsters.length <= 6, 'danger-scaled pack size');
+});
+
+test('starter danger nests use level 1 small packs near Kaosia', () => {
+    const ctx: SpawnContext = { realm: 'mortal', chunkX: 37, chunkY: 41, biome: 'grass', seed: 'server:start' };
+    assert.ok(getFieldDanger(ctx.chunkX, ctx.chunkY, ctx.realm) <= 2);
+
+    const nest = pickNestForChunk(ctx, true);
+    assert.ok(nest);
+    assert.ok(nest.monsters.length >= 2 && nest.monsters.length <= 3, 'starter pack size 2-3');
+    assert.deepEqual([...new Set(nest.monsters.map((monster) => monster.level))], [1]);
 });
 
 test('no nests spawn on ocean or town chunks', () => {
