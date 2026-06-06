@@ -1,10 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getStoryScenarioEventSequence, STORY_SCENARIO_EVENT_SEQUENCES } from '../../src/data/StoryScenarioEventData';
+import {
+    getStoryScenarioFieldEventPlacements,
+    getStoryScenarioFieldEventTiles,
+} from '../../src/data/StoryScenarioFieldEventPlacement';
 import { getStoryInteriorLayout, getStoryInteriorTileAt, STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
 import { i18n } from '../../src/i18n/LanguageManager';
 import { TileType } from '../../src/map/Tile';
 import { StoryInteriorMap } from '../../src/map/StoryInteriorMap';
+import { WorldMap } from '../../src/map/WorldMap';
 
 function hasWalkablePath(map: StoryInteriorMap, from: { x: number; y: number }, to: { x: number; y: number }): boolean {
     const bounds = map.getBoundsTiles();
@@ -268,6 +273,30 @@ test('episodes 4 through 6 expose original field scenario event flows', () => {
     assert.ok(village.fieldEvents.some((event) => event.id === 'remote_village_poison_02'));
     assert.ok(village.fieldEvents.some((event) => event.id === 'remote_village_dark_root'));
     assert.equal(village.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
+});
+
+test('outdoor field event placement is deterministic, walkable, and shared by callers', () => {
+    const worldMap = new WorldMap();
+    for (const dungeonId of ['arcadia_plain', 'cacaora_highland', 'remote_village']) {
+        const sequence = getStoryScenarioEventSequence(dungeonId);
+        assert.ok(sequence);
+        const placements = getStoryScenarioFieldEventPlacements(dungeonId, worldMap);
+        const expectedTileCount = sequence.fieldEvents.reduce((sum, event) => sum + event.triggerTiles.length, 0);
+        assert.equal(placements.length, expectedTileCount);
+
+        const uniqueTiles = new Set(placements.map((placement) => `${placement.tile.x},${placement.tile.y}`));
+        assert.equal(uniqueTiles.size, placements.length);
+        assert.ok(placements.every((placement) => worldMap.isWalkable(placement.tile.x, placement.tile.y)));
+
+        for (const event of sequence.fieldEvents) {
+            const eventTiles = getStoryScenarioFieldEventTiles(dungeonId, event, worldMap);
+            const placementTiles = placements
+                .filter((placement) => placement.eventId === event.id)
+                .sort((a, b) => a.triggerIndex - b.triggerIndex)
+                .map((placement) => placement.tile);
+            assert.deepEqual(eventTiles, placementTiles);
+        }
+    }
 });
 
 test('story scenario event keys exist in both languages without snapshotting full text', () => {

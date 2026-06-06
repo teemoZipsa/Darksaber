@@ -337,6 +337,8 @@ export class WorldRaidLifecycleController {
             onLootGrant: (grant) => this.context.openNetworkLoot(grant),
             onAutoLootGrant: (grant) => this.context.handleNetworkAutoLootGrant(grant),
             onInventoryConsumed: (message) => this.context.handleNetworkInventoryConsumed(message),
+            onScenarioFieldEventResult: (message) => this.context.storyScenarioController.applyNetworkScenarioFieldEventResult(message),
+            onScenarioFieldEventBroadcast: (message) => this.context.storyScenarioController.applyNetworkScenarioFieldEventBroadcast(message),
             onRaidResult: (result) => this.handleNetworkRaidResult(result),
             onActionRejected: (rejection) => this.context.handleNetworkActionRejected(rejection),
             onErrorMessage: (error) => this.context.log(formatWorldServerErrorLog(error)),

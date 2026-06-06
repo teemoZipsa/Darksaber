@@ -29,7 +29,7 @@ See `docs/monster-balance.md` for the detailed model and tests.
 
 ## 5. World Engine Controllers
 - `WorldEngine` is the field-loop orchestrator; domain flows should move into `src/engine/world/*` controllers when they become self-contained.
-- `WorldStoryScenarioController` owns story dungeon arrival, local story-interior entry/exit, network scenario entry state, and story objective completion.
+- `WorldStoryScenarioController` owns story dungeon arrival, local story-interior entry/exit, network scenario entry state, outdoor story field-event presentation, and story objective completion.
 - `WorldNetworkSyncController` owns client-side network snapshot application, network combat event presentation, network loot grants, and pending network move/loot state.
 - `WorldTutorialController` owns intro tutorial state, training map setup/teardown, tutorial action gating, and tutorial HUD rendering.
 - `WorldRaidLifecycleController` owns town entry, network raid deploy/resume, network raid result handling, raid timer expiry, and extraction-town arrival checks.
@@ -41,3 +41,8 @@ See `docs/monster-balance.md` for the detailed model and tests.
 - `WorldTurnStateController` owns active turn id, ready queue, remaining AP, major-action flag, reserved action state, and pure turn lifecycle state transitions.
   Other world controllers should access turn state through its explicit methods rather than `WorldEngine` compatibility accessors.
 - `WorldEngine` should access active story-interior state through the controller instead of owning that state directly.
+
+## 6. Network Story Field Events
+- Outdoor story field events use deterministic original-coordinate placement from `src/data/StoryScenarioFieldEventPlacement.ts`; the client and server share the same placement function.
+- Network raids submit only `dungeonId` and `eventId` for outdoor field-event interaction. `server/WorldSession.ts` validates actor ownership, active scenario, distance, completion scope, and rewards from server-side scenario data.
+- Field-event completion is tracked as viewer-specific `playerFieldEventFlagsByDungeonId` plus session-wide `sharedFieldEventFlagsByDungeonId` in `ScenarioSnapshot`. True multi-account party progression remains a future party-system migration.

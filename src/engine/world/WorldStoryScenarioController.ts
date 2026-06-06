@@ -3,6 +3,11 @@ import { getItemDef } from '../../data/ItemDB';
 import { getStoryQuestByDungeonId, isStoryQuestAvailable, type StoryQuestDefinition } from '../../data/StoryQuestData';
 import { getStoryScenarioByDungeonId } from '../../data/StoryScenarioData';
 import {
+    getStoryScenarioFieldEventFlag,
+    getStoryScenarioFieldEventScope,
+    getStoryScenarioFieldEventTiles,
+} from '../../data/StoryScenarioFieldEventPlacement';
+import {
     getStoryScenarioEventSequence,
     type StoryScenarioEventStep,
     type StoryScenarioFieldEvent,
@@ -17,6 +22,11 @@ import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
 import { manhattan, type TilePoint } from '../../field/FieldPathing';
 import { StoryInteriorMap } from '../../map/StoryInteriorMap';
 import type { WorldDungeonInfo, WorldMap } from '../../map/WorldMap';
+import type {
+    ScenarioFieldEventBroadcastMessage,
+    ScenarioFieldEventResultMessage,
+    ScenarioFieldEventRewardResult,
+} from '../../net/WorldProtocol';
 import type { WorldRaidSession } from './WorldRaidSession';
 
 export interface WorldStoryInteriorState {
@@ -28,6 +38,7 @@ export interface WorldStoryInteriorState {
 
 export interface WorldStoryScenarioNetworkClient {
     sendScenarioEnter(actorId: string, dungeonId: string): string;
+    sendScenarioFieldEventInteract(actorId: string, dungeonId: string, eventId: string): string;
 }
 
 export interface WorldStoryScenarioPendingEnter {
@@ -69,8 +80,10 @@ export class WorldStoryScenarioController {
     private activeInterior: WorldStoryInteriorState | null = null;
     private dismissedDungeonVisitKey: string | null = null;
     private pendingNetworkScenarioEnter: WorldStoryScenarioPendingEnter | null = null;
+    private readonly pendingNetworkFieldEventIntentIds: Set<string> = new Set();
     private readonly networkScenarioEnteredDungeonIds: Set<string> = new Set();
     private readonly completedFieldEventKeys: Set<string> = new Set();
+    private readonly presentationQueue: StoryScenarioEventStep[] = [];
 
     constructor(context: WorldStoryScenarioContext) {
         this.context = context;
@@ -86,6 +99,7 @@ export class WorldStoryScenarioController {
 
     public resetNetworkState(): void {
         this.pendingNetworkScenarioEnter = null;
+        this.pendingNetworkFieldEventIntentIds.clear();
         this.networkScenarioEnteredDungeonIds.clear();
     }
 
@@ -137,13 +151,12 @@ export class WorldStoryScenarioController {
         const sequence = getStoryScenarioEventSequence(dungeonId);
         const event = sequence?.fieldEvents.find((candidate) => candidate.id === eventId);
         if (!event) return false;
-        const key = this.fieldEventKey(dungeonId, event.id);
         if (this.isFieldEventCompleted(dungeonId, event)) return false;
-        this.completedFieldEventKeys.add(key);
-        if (event.runtimeFlag) this.context.raidSession.setScenarioFlag(dungeonId, event.runtimeFlag);
+        this.completedFieldEventKeys.add(this.fieldEventKey(dungeonId, event.id));
+        this.context.raidSession.setScenarioFlag(dungeonId, getStoryScenarioFieldEventFlag(event));
         this.syncActiveInteriorDoorLocks();
         this.syncActiveInteriorInspectMarkers();
-        for (const step of event.steps) this.playStoryScenarioEventStep(step);
+        this.enqueueStoryScenarioPresentation(event.steps);
         this.applyFieldEventRewards(event);
         return true;
     }
@@ -166,6 +179,13 @@ export class WorldStoryScenarioController {
             && this.getScenarioFieldEventTiles(dungeonId, candidate).some((triggerTile) => triggerTile.x === tile.x && triggerTile.y === tile.y)
         );
         if (!event) return false;
+        if (this.context.isNetworkRaid()) {
+            const client = this.context.getNetworkRaidClient();
+            if (!client) return false;
+            const intentId = client.sendScenarioFieldEventInteract(actor.id, dungeonId, event.id);
+            this.pendingNetworkFieldEventIntentIds.add(intentId);
+            return true;
+        }
         return this.playFieldEvent(dungeonId, event.id);
     }
 
@@ -381,8 +401,13 @@ export class WorldStoryScenarioController {
         activeDungeonId?: string | null;
         enteredDungeonIds?: readonly string[];
         completedDungeonIds?: readonly string[];
+        playerFieldEventFlagsByDungeonId?: Record<string, readonly string[]>;
+        sharedFieldEventFlagsByDungeonId?: Record<string, readonly string[]>;
     } | undefined): void {
         if (!scenarioSnapshot) return;
+
+        this.applyNetworkScenarioFieldEventFlags(scenarioSnapshot.playerFieldEventFlagsByDungeonId);
+        this.applyNetworkScenarioFieldEventFlags(scenarioSnapshot.sharedFieldEventFlagsByDungeonId);
 
         const enteredDungeonIds = scenarioSnapshot.enteredDungeonIds ?? [];
         const completedDungeonIds = scenarioSnapshot.completedDungeonIds ?? [];
@@ -447,13 +472,35 @@ export class WorldStoryScenarioController {
         }
     }
 
+    public applyNetworkScenarioFieldEventResult(result: ScenarioFieldEventResultMessage): void {
+        this.pendingNetworkFieldEventIntentIds.delete(result.intentId);
+        this.markNetworkFieldEventComplete(result.dungeonId, result.eventId, result.flag);
+        this.enqueueStoryScenarioPresentation(result.presentationSteps);
+        for (const reward of result.rewards) this.applyNetworkFieldEventReward(reward);
+    }
+
+    public applyNetworkScenarioFieldEventBroadcast(message: ScenarioFieldEventBroadcastMessage): void {
+        const event = getStoryScenarioEventSequence(message.dungeonId)?.fieldEvents
+            .find((candidate) => candidate.id === message.eventId);
+        if (!event || getStoryScenarioFieldEventScope(event) !== 'shared') return;
+        if (this.isFieldEventCompleted(message.dungeonId, event)) return;
+        this.markNetworkFieldEventComplete(message.dungeonId, message.eventId, message.flag);
+        this.enqueueStoryScenarioPresentation(message.presentationSteps);
+    }
+
     public handleNetworkActionRejected(intentId: string, reason: string): boolean {
-        if (this.pendingNetworkScenarioEnter?.intentId !== intentId) return false;
-        const visitKey = this.pendingNetworkScenarioEnter.visitKey;
-        this.pendingNetworkScenarioEnter = null;
-        this.dismissedDungeonVisitKey = visitKey;
-        this.context.log(`시나리오 진입 실패: ${reason}`);
-        return true;
+        if (this.pendingNetworkScenarioEnter?.intentId === intentId) {
+            const visitKey = this.pendingNetworkScenarioEnter.visitKey;
+            this.pendingNetworkScenarioEnter = null;
+            this.dismissedDungeonVisitKey = visitKey;
+            this.context.log(`시나리오 진입 실패: ${reason}`);
+            return true;
+        }
+        if (this.pendingNetworkFieldEventIntentIds.delete(intentId)) {
+            this.context.log(`시나리오 이벤트 실패: ${reason}`);
+            return true;
+        }
+        return false;
     }
 
     private getCurrentDungeonVisitKey(dungeon: WorldDungeonInfo): string | null {
@@ -481,16 +528,7 @@ export class WorldStoryScenarioController {
 
     private getScenarioFieldEventTiles(dungeonId: string, event: StoryScenarioFieldEvent): TilePoint[] {
         if (this.activeInterior?.dungeonId === dungeonId) return event.triggerTiles;
-
-        const origin = getOriginalFieldScenarioOrigin(dungeonId);
-        const dungeon = this.context.getWorldMap().getDungeons().find((entry) => entry.id === dungeonId);
-        if (!origin || !dungeon) return event.triggerTiles;
-
-        const center = this.context.getWorldMap().getDungeonEntranceTile(dungeon);
-        return event.triggerTiles.map((tile) => ({
-            x: center.x + clampFieldEventOffset(tile.x - origin.x),
-            y: center.y + clampFieldEventOffset(tile.y - origin.y),
-        }));
+        return getStoryScenarioFieldEventTiles(dungeonId, event, this.context.getWorldMap());
     }
 
     private syncActiveInteriorDoorLocks(): void {
@@ -578,7 +616,7 @@ export class WorldStoryScenarioController {
     private isFieldEventCompleted(dungeonId: string, event: StoryScenarioFieldEvent): boolean {
         if (this.completedFieldEventKeys.has(this.fieldEventKey(dungeonId, event.id))) return true;
         if (event.questItemId && this.context.playerData.hasQuestItem(event.questItemId)) return true;
-        return event.runtimeFlag ? this.context.raidSession.hasScenarioFlag(dungeonId, event.runtimeFlag) : false;
+        return this.context.raidSession.hasScenarioFlag(dungeonId, getStoryScenarioFieldEventFlag(event));
     }
 
     private clearFieldEventState(dungeonId: string): void {
@@ -604,21 +642,46 @@ export class WorldStoryScenarioController {
                 break;
         }
     }
-}
 
-function getOriginalFieldScenarioOrigin(dungeonId: string): TilePoint | null {
-    switch (dungeonId) {
-        case 'arcadia_plain':
-            return { x: 11, y: 39 };
-        case 'cacaora_highland':
-            return { x: 24, y: 39 };
-        case 'remote_village':
-            return { x: 19, y: 34 };
-        default:
-            return null;
+    private enqueueStoryScenarioPresentation(steps: readonly StoryScenarioEventStep[]): void {
+        this.presentationQueue.push(...steps.map((step) => ({ ...step })));
+        this.flushStoryScenarioPresentationQueue();
     }
-}
 
-function clampFieldEventOffset(delta: number): number {
-    return Math.max(-4, Math.min(4, Math.round(delta / 6)));
+    private flushStoryScenarioPresentationQueue(): void {
+        while (this.presentationQueue.length > 0) {
+            const step = this.presentationQueue.shift();
+            if (step) this.playStoryScenarioEventStep(step);
+        }
+    }
+
+    private applyNetworkScenarioFieldEventFlags(flagsByDungeonId: Record<string, readonly string[]> | undefined): void {
+        if (!flagsByDungeonId) return;
+        for (const [dungeonId, flags] of Object.entries(flagsByDungeonId)) {
+            for (const flag of flags) {
+                this.context.raidSession.setScenarioFlag(dungeonId, flag);
+            }
+        }
+    }
+
+    private markNetworkFieldEventComplete(dungeonId: string, eventId: string, flag: string): void {
+        this.completedFieldEventKeys.add(this.fieldEventKey(dungeonId, eventId));
+        if (flag) this.context.raidSession.setScenarioFlag(dungeonId, flag);
+    }
+
+    private applyNetworkFieldEventReward(reward: ScenarioFieldEventRewardResult): void {
+        if (reward.type === 'gold') {
+            this.context.playerData.addGold(reward.amount);
+            this.context.log(formatT('story.event.reward.gold', { amount: reward.amount }));
+            return;
+        }
+
+        const item = getItemDef(reward.itemId);
+        const label = item?.nameKr ?? reward.itemId;
+        if (item && this.context.autoPlaceRewardItem(reward.itemId)) {
+            this.context.log(formatT('story.event.reward.item', { item: label }));
+        } else {
+            this.context.log(formatT('story.event.reward.itemFull', { item: label }));
+        }
+    }
 }

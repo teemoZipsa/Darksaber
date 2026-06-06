@@ -20,6 +20,8 @@ import { getItemDef } from '../../src/data/ItemDB';
 import { PlayerData } from '../../src/data/PlayerData';
 import { getStoryQuestByDungeonId } from '../../src/data/StoryQuestData';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { getStoryScenarioEventSequence } from '../../src/data/StoryScenarioEventData';
+import { getStoryScenarioFieldEventTiles } from '../../src/data/StoryScenarioFieldEventPlacement';
 import { Enemy } from '../../src/entity/Enemy';
 import { LootObject } from '../../src/entity/LootObject';
 import { Player } from '../../src/entity/Player';
@@ -59,6 +61,7 @@ function createStoryScenarioHarness(options: {
     fieldEnemies?: { enemy: Enemy; home: { x: number; y: number }; path: { x: number; y: number }[] }[];
     worldMap?: WorldMap;
     isNetworkRaid?: boolean;
+    networkClient?: { sendScenarioEnter(actorId: string, dungeonId: string): string; sendScenarioFieldEventInteract(actorId: string, dungeonId: string, eventId: string): string };
 } = {}) {
     const player = options.player ?? new Player(0, 0);
     const raidSession = options.raidSession ?? new WorldRaidSession('central_castle');
@@ -94,7 +97,7 @@ function createStoryScenarioHarness(options: {
         },
         isEntityMoving: () => false,
         isNetworkRaid: () => options.isNetworkRaid ?? false,
-        getNetworkRaidClient: () => null,
+        getNetworkRaidClient: () => options.networkClient ?? null,
         isRaidOutcomeVisible: () => false,
         isTownVisible: () => false,
         isFusionTempleVisible: () => false,
@@ -749,25 +752,54 @@ test('network field scenario entry plays original episode 4 event flow once', ()
 
 test('network field scenario events expose world inspect tiles and one-shot rewards', () => {
     const worldMap = new WorldMap();
-    const arcadia = worldMap.getDungeons().find((entry) => entry.id === ARCADIA_PLAIN_DUNGEON_ID);
-    assert.ok(arcadia);
-    const arcadiaCenter = worldMap.getDungeonEntranceTile(arcadia);
-    const player = new Player(arcadiaCenter.x, arcadiaCenter.y - 1);
+    const sequence = getStoryScenarioEventSequence(ARCADIA_PLAIN_DUNGEON_ID);
+    const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'arcadia_gold_chest_01');
+    assert.ok(event);
+    const [eventTile] = getStoryScenarioFieldEventTiles(ARCADIA_PLAIN_DUNGEON_ID, event, worldMap);
+    const player = new Player(eventTile.x, eventTile.y + 1);
     const playerData = new PlayerData();
     const raidSession = new WorldRaidSession('central_castle');
     raidSession.beginRaidFromTown('central_castle');
     raidSession.startDungeonEncounter(ARCADIA_PLAIN_DUNGEON_ID);
-    const harness = createStoryScenarioHarness({ player, playerData, raidSession, worldMap, isNetworkRaid: true });
+    const sentFieldEvents: Array<{ actorId: string; dungeonId: string; eventId: string }> = [];
+    const harness = createStoryScenarioHarness({
+        player,
+        playerData,
+        raidSession,
+        worldMap,
+        isNetworkRaid: true,
+        networkClient: {
+            sendScenarioEnter: () => 'unused',
+            sendScenarioFieldEventInteract: (actorId, dungeonId, eventId) => {
+                sentFieldEvents.push({ actorId, dungeonId, eventId });
+                return 'field-event-intent-1';
+            },
+        },
+    });
 
     const inspectable = harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any);
-    assert.equal(inspectable.has(`${arcadiaCenter.x},${arcadiaCenter.y - 1}`), true);
+    assert.equal(inspectable.has(`${eventTile.x},${eventTile.y}`), true);
 
-    assert.equal(harness.controller.playFieldEventAt({ x: arcadiaCenter.x, y: arcadiaCenter.y - 1 }, { id: 'hero', entity: player } as any), true);
+    assert.equal(harness.controller.playFieldEventAt(eventTile, { id: 'hero', entity: player } as any), true);
+    assert.deepEqual(sentFieldEvents, [{ actorId: 'hero', dungeonId: ARCADIA_PLAIN_DUNGEON_ID, eventId: 'arcadia_gold_chest_01' }]);
+    assert.equal(playerData.gold, 500);
+    assert.equal(raidSession.hasScenarioFlag(ARCADIA_PLAIN_DUNGEON_ID, 'arcadia_gold_chest_01'), false);
+
+    harness.controller.applyNetworkScenarioFieldEventResult({
+        type: 'SCENARIO_FIELD_EVENT_RESULT',
+        intentId: 'field-event-intent-1',
+        dungeonId: ARCADIA_PLAIN_DUNGEON_ID,
+        eventId: 'arcadia_gold_chest_01',
+        scope: 'player',
+        flag: 'arcadia_gold_chest_01',
+        presentationSteps: event.steps,
+        rewards: [{ type: 'gold', amount: 100 }],
+    });
     assert.equal(playerData.gold, 600);
     assert.equal(raidSession.hasScenarioFlag(ARCADIA_PLAIN_DUNGEON_ID, 'arcadia_gold_chest_01'), true);
     assert.ok(harness.logs.includes('%s가(이) 상자를 열었습니다.'));
     assert.ok(harness.logs.includes('100 GOLD를 얻었습니다.'));
-    assert.equal(harness.controller.playFieldEventAt({ x: arcadiaCenter.x, y: arcadiaCenter.y - 1 }, { id: 'hero', entity: player } as any), false);
+    assert.equal(harness.controller.playFieldEventAt(eventTile, { id: 'hero', entity: player } as any), false);
 });
 
 test('episodes 5 and 6 field scenario inspect events map to current world scenario entrances', () => {
@@ -777,8 +809,11 @@ test('episodes 5 and 6 field scenario inspect events map to current world scenar
     assert.ok(cacaora);
     assert.ok(village);
 
-    const cacaoraCenter = worldMap.getDungeonEntranceTile(cacaora);
-    const cacaoraPlayer = new Player(cacaoraCenter.x - 1, cacaoraCenter.y - 1);
+    const cacaoraSequence = getStoryScenarioEventSequence(CACAORA_HIGHLAND_DUNGEON_ID);
+    const cacaoraEvent = cacaoraSequence?.fieldEvents.find((event) => event.id === 'cacaora_gold_chest_01');
+    assert.ok(cacaoraEvent);
+    const [cacaoraTile] = getStoryScenarioFieldEventTiles(CACAORA_HIGHLAND_DUNGEON_ID, cacaoraEvent, worldMap);
+    const cacaoraPlayer = new Player(cacaoraTile.x, cacaoraTile.y + 1);
     const cacaoraRaid = new WorldRaidSession('central_castle');
     cacaoraRaid.beginRaidFromTown('central_castle');
     cacaoraRaid.startDungeonEncounter(CACAORA_HIGHLAND_DUNGEON_ID);
@@ -787,13 +822,30 @@ test('episodes 5 and 6 field scenario inspect events map to current world scenar
         raidSession: cacaoraRaid,
         worldMap,
         isNetworkRaid: true,
+        networkClient: {
+            sendScenarioEnter: () => 'unused',
+            sendScenarioFieldEventInteract: () => 'cacaora-field-intent',
+        },
     });
 
-    assert.equal(cacaoraHarness.controller.playFieldEventAt({ x: cacaoraCenter.x - 1, y: cacaoraCenter.y - 1 }, { id: 'hero', entity: cacaoraPlayer } as any), true);
+    assert.equal(cacaoraHarness.controller.playFieldEventAt(cacaoraTile, { id: 'hero', entity: cacaoraPlayer } as any), true);
+    cacaoraHarness.controller.applyNetworkScenarioFieldEventResult({
+        type: 'SCENARIO_FIELD_EVENT_RESULT',
+        intentId: 'cacaora-field-intent',
+        dungeonId: CACAORA_HIGHLAND_DUNGEON_ID,
+        eventId: 'cacaora_gold_chest_01',
+        scope: 'player',
+        flag: 'cacaora_gold_chest_01',
+        presentationSteps: cacaoraEvent.steps,
+        rewards: [{ type: 'gold', amount: 100 }],
+    });
     assert.equal(cacaoraRaid.hasScenarioFlag(CACAORA_HIGHLAND_DUNGEON_ID, 'cacaora_gold_chest_01'), true);
 
-    const villageCenter = worldMap.getDungeonEntranceTile(village);
-    const villagePlayer = new Player(villageCenter.x - 1, villageCenter.y - 1);
+    const villageSequence = getStoryScenarioEventSequence(REMOTE_VILLAGE_DUNGEON_ID);
+    const villageEvent = villageSequence?.fieldEvents.find((event) => event.id === 'remote_village_healer_01');
+    assert.ok(villageEvent);
+    const [villageTile] = getStoryScenarioFieldEventTiles(REMOTE_VILLAGE_DUNGEON_ID, villageEvent, worldMap);
+    const villagePlayer = new Player(villageTile.x, villageTile.y + 1);
     const villageRaid = new WorldRaidSession('central_castle');
     villageRaid.beginRaidFromTown('central_castle');
     villageRaid.startDungeonEncounter(REMOTE_VILLAGE_DUNGEON_ID);
@@ -802,9 +854,23 @@ test('episodes 5 and 6 field scenario inspect events map to current world scenar
         raidSession: villageRaid,
         worldMap,
         isNetworkRaid: true,
+        networkClient: {
+            sendScenarioEnter: () => 'unused',
+            sendScenarioFieldEventInteract: () => 'village-field-intent',
+        },
     });
 
-    assert.equal(villageHarness.controller.playFieldEventAt({ x: villageCenter.x - 1, y: villageCenter.y - 1 }, { id: 'hero', entity: villagePlayer } as any), true);
+    assert.equal(villageHarness.controller.playFieldEventAt(villageTile, { id: 'hero', entity: villagePlayer } as any), true);
+    villageHarness.controller.applyNetworkScenarioFieldEventResult({
+        type: 'SCENARIO_FIELD_EVENT_RESULT',
+        intentId: 'village-field-intent',
+        dungeonId: REMOTE_VILLAGE_DUNGEON_ID,
+        eventId: 'remote_village_healer_01',
+        scope: 'player',
+        flag: 'remote_village_healer_01',
+        presentationSteps: villageEvent.steps,
+        rewards: [],
+    });
     assert.equal(villageRaid.hasScenarioFlag(REMOTE_VILLAGE_DUNGEON_ID, 'remote_village_healer_01'), true);
     assert.ok(villageHarness.logs.includes('체력이 회복되었습니다.'));
 });

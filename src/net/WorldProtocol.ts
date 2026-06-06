@@ -1,6 +1,7 @@
 import type { StatusEffect } from '../combat/StatusEffects';
 import type { MarketSnapshot } from '../data/MarketData';
 import type { CharacterStats } from '../data/Stats';
+import type { StoryScenarioEventStep } from '../data/StoryScenarioEventData';
 import type { EnemyRole } from '../field/EnemyAI';
 import type { WorldLootContainerType } from '../loot/WorldLootTypes';
 
@@ -127,6 +128,8 @@ export interface ScenarioSnapshot {
     enteredDungeonIds: string[];
     activeDungeonId: string | null;
     completedDungeonIds: string[];
+    playerFieldEventFlagsByDungeonId?: Record<string, string[]>;
+    sharedFieldEventFlagsByDungeonId?: Record<string, string[]>;
 }
 
 export interface WorldSnapshot {
@@ -208,6 +211,14 @@ export interface ScenarioEnterMessage {
     dungeonId: string;
 }
 
+export interface ScenarioFieldEventInteractMessage {
+    type: 'SCENARIO_FIELD_EVENT_INTERACT';
+    intentId: string;
+    actorId: string;
+    dungeonId: string;
+    eventId: string;
+}
+
 export interface MarketHelloMessage {
     type: 'MARKET_HELLO';
     clientId: string;
@@ -257,6 +268,7 @@ export type WorldClientMessage =
     | LootPickupMessage
     | AutoLootResolveMessage
     | ScenarioEnterMessage
+    | ScenarioFieldEventInteractMessage
     | MarketClientMessage;
 
 export interface WorldWelcomeMessage {
@@ -323,6 +335,32 @@ export interface RaidResultMessage {
     completedDungeonIds: string[];
 }
 
+export type ScenarioFieldEventScope = 'player' | 'shared';
+
+export type ScenarioFieldEventRewardResult =
+    | { type: 'gold'; amount: number }
+    | { type: 'item'; itemId: string };
+
+export interface ScenarioFieldEventResultMessage {
+    type: 'SCENARIO_FIELD_EVENT_RESULT';
+    intentId: string;
+    dungeonId: string;
+    eventId: string;
+    scope: ScenarioFieldEventScope;
+    flag: string;
+    presentationSteps: StoryScenarioEventStep[];
+    rewards: ScenarioFieldEventRewardResult[];
+}
+
+export interface ScenarioFieldEventBroadcastMessage {
+    type: 'SCENARIO_FIELD_EVENT_BROADCAST';
+    dungeonId: string;
+    eventId: string;
+    scope: 'shared';
+    flag: string;
+    presentationSteps: StoryScenarioEventStep[];
+}
+
 export interface WorldErrorMessage {
     type: 'ERROR';
     code: string;
@@ -361,6 +399,8 @@ export type WorldServerMessage =
     | AutoLootGrantMessage
     | InventoryConsumedMessage
     | CombatEventMessage
+    | ScenarioFieldEventResultMessage
+    | ScenarioFieldEventBroadcastMessage
     | RaidResultMessage
     | WorldErrorMessage
     | ServerHeartbeatAckMessage

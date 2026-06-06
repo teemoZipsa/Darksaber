@@ -38,6 +38,7 @@ export interface StoryScenarioFieldEvent {
     originalSource: string;
     originalEventId: string;
     trigger: string;
+    scope?: 'player' | 'shared';
     triggerTiles: TilePoint[];
     runtimeFlag?: string;
     questItemId?: string;

@@ -443,6 +443,7 @@ function shouldSendImmediateSnapshots(message: WorldClientMessage, replies: read
         && message.type !== 'LOOT_PICKUP'
         && message.type !== 'AUTO_LOOT_RESOLVE'
         && message.type !== 'SCENARIO_ENTER'
+        && message.type !== 'SCENARIO_FIELD_EVENT_INTERACT'
     ) {
         return false;
     }

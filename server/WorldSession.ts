@@ -32,6 +32,12 @@ import {
 import { getStoryQuestByDungeonId } from '../src/data/StoryQuestData';
 import { getStoryScenarioByDungeonId, type StoryScenarioDefinition, type StoryScenarioMissionKind } from '../src/data/StoryScenarioData';
 import { getStoryScenarioMonsterLayout } from '../src/data/StoryScenarioMonsterData';
+import { getStoryScenarioEventSequence, type StoryScenarioFieldEvent } from '../src/data/StoryScenarioEventData';
+import {
+    getStoryScenarioFieldEventFlag,
+    getStoryScenarioFieldEventScope,
+    getStoryScenarioFieldEventTiles,
+} from '../src/data/StoryScenarioFieldEventPlacement';
 import {
     getStoryInteriorLayout,
     getStoryInteriorTileAt,
@@ -96,6 +102,8 @@ import {
     type LootSnapshot,
     type NetFacing,
     type RaidResultMessage,
+    type ScenarioFieldEventResultMessage,
+    type ScenarioFieldEventRewardResult,
     type WorldClientMessage,
     type WorldJoinMessage,
     type WorldPlayerSnapshot,
@@ -149,6 +157,7 @@ interface ServerPlayer {
     completedQuestIds: Set<string>;
     enteredDungeonIds: Set<string>;
     completedDungeonIds: Set<string>;
+    fieldEventFlagsByDungeonId: Map<string, Set<string>>;
     activeDungeonId: string | null;
     active: boolean;
     ghost: boolean;
@@ -236,6 +245,7 @@ export class WorldSession {
     private readonly enemies = new Map<string, ServerEnemy>();
     private readonly nestStates = new Map<string, FieldNestState>();
     private readonly scenarioStates = new Map<string, ServerScenarioState>();
+    private readonly sharedScenarioFieldEventFlags = new Map<string, Set<string>>();
     private readonly loot = new Map<string, LootObject>();
     private readonly lootLocks = new Map<string, LootLock>();
     private readonly autoLootPending = new Map<string, AutoLootPending>();
@@ -305,6 +315,7 @@ export class WorldSession {
             completedQuestIds: new Set(sanitizeStringArray(context.completedQuestIds ?? message.completedQuestIds)),
             enteredDungeonIds: new Set(),
             completedDungeonIds: new Set(),
+            fieldEventFlagsByDungeonId: new Map(),
             activeDungeonId: null,
             active: true,
             ghost: false,
@@ -407,6 +418,8 @@ export class WorldSession {
                 return this.handleAutoLootResolve(playerId, message.lootId, message.acceptedCells);
             case 'SCENARIO_ENTER':
                 return this.handleScenarioEnter(playerId, message, now);
+            case 'SCENARIO_FIELD_EVENT_INTERACT':
+                return this.handleScenarioFieldEventInteract(playerId, message, now);
             case 'WORLD_LEAVE':
                 this.log(`leave player=${playerId} reason=${message.reason}`);
                 return {
@@ -567,6 +580,10 @@ export class WorldSession {
                 enteredDungeonIds: fallbackPlayer ? [...fallbackPlayer.enteredDungeonIds] : [],
                 activeDungeonId: fallbackPlayer?.activeDungeonId ?? null,
                 completedDungeonIds: fallbackPlayer ? [...fallbackPlayer.completedDungeonIds] : [],
+                playerFieldEventFlagsByDungeonId: fallbackPlayer
+                    ? scenarioFlagSnapshot(fallbackPlayer.fieldEventFlagsByDungeonId)
+                    : {},
+                sharedFieldEventFlagsByDungeonId: scenarioFlagSnapshot(this.sharedScenarioFieldEventFlags),
             },
         };
     }
@@ -1004,6 +1021,63 @@ export class WorldSession {
 
         this.log(`scenario enter player=${playerId} dungeon=${dungeonId} enemies=${state.enemyIds.length}`);
         return { replies: [], broadcasts: [] };
+    }
+
+    private handleScenarioFieldEventInteract(
+        playerId: string,
+        message: Extract<WorldClientMessage, { type: 'SCENARIO_FIELD_EVENT_INTERACT' }>,
+        _now: number
+    ): WorldSessionMessageResult {
+        const player = this.players.get(playerId);
+        const actor = this.actors.get(message.actorId);
+        const validationError = this.validateScenarioActor(player, actor);
+        if (validationError) return reject(message.intentId, validationError);
+
+        const dungeonId = typeof message.dungeonId === 'string' ? message.dungeonId.trim() : '';
+        const eventId = typeof message.eventId === 'string' ? message.eventId.trim() : '';
+        if (!dungeonId || !eventId) return reject(message.intentId, 'Scenario field event request is malformed.');
+        if (getStoryInteriorLayout(dungeonId)) return reject(message.intentId, 'Interior scenario events are not network-interactable.');
+        if (player!.activeDungeonId !== dungeonId) return reject(message.intentId, 'Scenario is not active for this player.');
+
+        const sequence = getStoryScenarioEventSequence(dungeonId);
+        const event = sequence?.fieldEvents.find((candidate) => candidate.id === eventId);
+        if (!event) return reject(message.intentId, 'Scenario field event does not exist.');
+
+        const flag = getStoryScenarioFieldEventFlag(event);
+        const scope = getStoryScenarioFieldEventScope(event);
+        if (this.isScenarioFieldEventFlagComplete(player!, dungeonId, flag, scope)) {
+            return reject(message.intentId, 'Scenario field event is already complete.');
+        }
+
+        const triggerTiles = getStoryScenarioFieldEventTiles(dungeonId, event, this.worldMap);
+        if (!triggerTiles.some((tile) => manhattan(actor!.tile, tile) <= 1)) {
+            return reject(message.intentId, 'Scenario field event is too far away.');
+        }
+
+        this.markScenarioFieldEventFlagComplete(player!, dungeonId, flag, scope);
+        const rewards = this.applyScenarioFieldEventRewards(player!, event);
+        const result: ScenarioFieldEventResultMessage = {
+            type: 'SCENARIO_FIELD_EVENT_RESULT',
+            intentId: message.intentId,
+            dungeonId,
+            eventId: event.id,
+            scope,
+            flag,
+            presentationSteps: event.steps.map((step) => ({ ...step })),
+            rewards,
+        };
+        const broadcasts: WorldServerMessage[] = scope === 'shared'
+            ? [{
+                type: 'SCENARIO_FIELD_EVENT_BROADCAST',
+                dungeonId,
+                eventId: event.id,
+                scope: 'shared',
+                flag,
+                presentationSteps: event.steps.map((step) => ({ ...step })),
+            }]
+            : [];
+        this.log(`scenario field event player=${playerId} dungeon=${dungeonId} event=${event.id} scope=${scope}`);
+        return { replies: [result], broadcasts };
     }
 
     private validateScenarioActor(player: ServerPlayer | undefined, actor: ServerActor | undefined): string | null {
@@ -1660,6 +1734,58 @@ export class WorldSession {
         this.scenarioStates.delete(playerId);
     }
 
+    private isScenarioFieldEventFlagComplete(
+        player: ServerPlayer,
+        dungeonId: string,
+        flag: string,
+        scope: 'player' | 'shared'
+    ): boolean {
+        const store = scope === 'shared' ? this.sharedScenarioFieldEventFlags : player.fieldEventFlagsByDungeonId;
+        return store.get(dungeonId)?.has(flag) ?? false;
+    }
+
+    private markScenarioFieldEventFlagComplete(
+        player: ServerPlayer,
+        dungeonId: string,
+        flag: string,
+        scope: 'player' | 'shared'
+    ): void {
+        const store = scope === 'shared' ? this.sharedScenarioFieldEventFlags : player.fieldEventFlagsByDungeonId;
+        let flags = store.get(dungeonId);
+        if (!flags) {
+            flags = new Set();
+            store.set(dungeonId, flags);
+        }
+        flags.add(flag);
+        this.markSaveDirty(player.id);
+    }
+
+    private applyScenarioFieldEventRewards(
+        player: ServerPlayer,
+        event: StoryScenarioFieldEvent
+    ): ScenarioFieldEventRewardResult[] {
+        const results: ScenarioFieldEventRewardResult[] = [];
+        for (const reward of event.rewards ?? []) {
+            if (reward.type === 'gold') {
+                results.push({ type: 'gold', amount: reward.amount });
+                continue;
+            }
+
+            const item = getItemDef(reward.itemId);
+            if (!item) continue;
+            this.addCarriedItemQuantity(player.id, item.id, 1);
+            this.addCarriedWeight(player.id, getPlacedItemWeight({ item, quantity: 1 }));
+            this.addSavePlacedItem(player, {
+                item,
+                durability: item.maxDurability,
+                quantity: 1,
+            });
+            this.markSaveDirty(player.id);
+            results.push({ type: 'item', itemId: item.id });
+        }
+        return results;
+    }
+
     private ensureContentNear(spawnTile: TilePoint, departureTownId: string | null | undefined, now: number): void {
         if (!this.hasNearbyLiveEnemy(spawnTile, FIELD_NEST_NEARBY_ENEMY_DISTANCE)) {
             this.spawnEnemiesNear(spawnTile, now, true);
@@ -2199,6 +2325,14 @@ function reject(intentId: string, reason: string): WorldSessionMessageResult {
         replies: [{ type: 'ACTION_REJECTED', intentId, reason } satisfies ActionRejectedMessage],
         broadcasts: [],
     };
+}
+
+function scenarioFlagSnapshot(flagsByDungeonId: Map<string, Set<string>>): Record<string, string[]> {
+    const snapshot: Record<string, string[]> = {};
+    for (const [dungeonId, flags] of flagsByDungeonId) {
+        snapshot[dungeonId] = [...flags].sort();
+    }
+    return snapshot;
 }
 
 function createActorEvent(
