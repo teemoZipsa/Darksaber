@@ -5,18 +5,19 @@
 - Local source root: `C:\Users\Seonkyu\Downloads\saver200010_extracted\Saver_Files\Saver`
 - Event/script candidates: `Glib/gscene*.lsc`, `Wlib/scene*.lsc`
 - Map candidates: `MAP/*.mrc`, `MAP/*t.mrc`, `MAP/*hmap.bmp`, `MAP/*set.arc`
-- Text/name candidates: `Glib/GameLib.ltn`, `Glib/GameLib.lnm`, `Glib/GameLib.lce`
+- Text/name candidates: `MAP/*set.arc` members (`*.DEO`, `*.evt`, `*.srf`), `gameres/duty.arc`, `Glib/GameLib.ltn`, `Glib/GameLib.lnm`, `Glib/GameLib.lce`
 
 ## Import Policy
 
 - Indoor story dungeons should follow original map structure, doors, blocked paths, boss positions, and event order as closely as the current combat model allows.
 - Outdoor story missions should prefer original coordinates/hmaps first, then adjust only where the current world map would break movement or combat.
-- Dialogue is keyed separately from event flow. Current checked-in lines are implementation text; original full-line extraction should remain behind tooling until release policy is decided.
+- Dialogue is keyed separately from event flow. Burgos v1 scenario lines use original CP949 text extracted from `MAP/01set.arc` (`01.DEO`, `01.evt`, `01.srf`).
 - Tests should validate event order, key presence, and counts, not snapshot full original dialogue.
 
 ## Tooling
 
 - `scripts/scan-original-scenario.mjs` scans `.lsc` files as little-endian 4-byte words and emits JSON summaries.
+- Original `.arc` files use the `0901` archive table. For Burgos dialogue verification, `Compress.dll` exports (`OpenArcFile`, `UnpackAFile`, `GetPointer`, `GetBuf2Size`) were used from 32-bit PowerShell to unpack CP949 text members.
 - The scanner reports byte/word counts, stable hashes, opcode candidates, coordinate candidates, text-reference candidates, scene-reference candidates, and `MAP` file manifest entries.
 - The scanner is intentionally descriptive only; it does not rewrite game data.
 

@@ -363,11 +363,11 @@ export const i18n = {
             'story.event.speaker.hero': '일행',
             'story.event.speaker.kisra': '키스라',
             'story.event.ep01.focus.gate': '부르고스성 성문',
-            'story.event.ep01.dialogue.01': '성 안쪽에서 적의 움직임이 느껴진다. 키스라를 찾아 끝내야 한다.',
-            'story.event.ep01.dialogue.02': '여기까지 들어오다니, 목숨을 버릴 각오는 되어 있겠지.',
-            'story.event.ep01.dialogue.03': '이 성이 무너져도 끝난 것은 아니다.',
-            'story.event.ep01.combatStart': '부르고스성 경비병들이 길을 막아섰습니다.',
-            'story.event.ep01.objective': '키스라를 제압했습니다. 입구로 돌아가 생환하십시오.',
+            'story.event.ep01.dialogue.01': '적의 습격을 받았다는 왕궁이 왜이리 조용한| 건가? 어딘가에 적군이 매복해 있을텐데..',
+            'story.event.ep01.dialogue.02': '크하하하 하룻강아지 범 무서운줄 모른다더니.| 내 오늘이 네놈 제삿날이 되게 해주마.',
+            'story.event.ep01.dialogue.03': '으.. 분하다.. | 억울하지만.. 여기선 일단 물러나야겠군..',
+            'story.event.ep01.combatStart': '승리조건 : 늑대인간(키스라)의 처치',
+            'story.event.ep01.objective': '늑대인간(키스라)의 처치',
             
             // Shop
             'shop.title': '🏪 상점',
@@ -1191,11 +1191,11 @@ export const i18n = {
             'story.event.speaker.hero': 'Party',
             'story.event.speaker.kisra': 'Kisra',
             'story.event.ep01.focus.gate': 'Burgos Castle Gate',
-            'story.event.ep01.dialogue.01': 'Movement stirs inside the castle. We find Kisra and end this.',
-            'story.event.ep01.dialogue.02': 'You made it this far. Then you are ready to throw your lives away.',
-            'story.event.ep01.dialogue.03': 'Even if this castle falls, this is not over.',
-            'story.event.ep01.combatStart': 'Burgos Castle guards block the passage.',
-            'story.event.ep01.objective': 'Kisra has been defeated. Return to the entrance and extract.',
+            'story.event.ep01.dialogue.01': 'Why is the palace that was attacked by the enemy so quiet? They must be lying in ambush somewhere.',
+            'story.event.ep01.dialogue.02': 'Hahaha, a puppy knows no fear of the tiger. I will make this day your funeral day.',
+            'story.event.ep01.dialogue.03': 'Ugh.. how bitter.. | It pains me, but for now I must withdraw..',
+            'story.event.ep01.combatStart': 'Victory condition: defeat the werewolf Kisra',
+            'story.event.ep01.objective': 'Defeat the werewolf Kisra',
             
             // Shop
             'shop.title': '🏪 Merchant',
