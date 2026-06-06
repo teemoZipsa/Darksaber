@@ -422,6 +422,7 @@ export const i18n = {
             'story.event.ep02.dialogue.12': '용기는 가상하다만 여기가 너의 무덤자리가| 될것이다.',
             'story.event.ep02.combatStart': '승리조건 : 펜리스의 처치',
             'story.event.ep02.objective': '공주 구출',
+            'story.event.ep02.princess.marker.captive': '감금된 공주',
             
             // Shop
             'shop.title': '🏪 상점',
@@ -1305,6 +1306,7 @@ export const i18n = {
             'story.event.ep02.dialogue.12': 'Your courage is admirable, but this place will be your grave.',
             'story.event.ep02.combatStart': 'Victory condition: defeat Fenris',
             'story.event.ep02.objective': 'Rescue the princess',
+            'story.event.ep02.princess.marker.captive': 'Captive Princess',
             
             // Shop
             'shop.title': '🏪 Merchant',

@@ -470,6 +470,7 @@ test('Zamora local story interior plays original entry flow before Fenris object
     assert.equal(harness.fieldEnemies.length, 5);
     assert.deepEqual(harness.placedNear, interior.playerStart);
     assert.ok(harness.worldMap instanceof StoryInteriorMap);
+    assert.deepEqual(harness.worldMap.getInspectMarkers().map((marker) => marker.id), ['zamora_princess_captive:28,9']);
     assert.ok(harness.logs.some((entry) => entry.includes('시선 이동: 자모라 요새 감금실')));
     assert.ok(harness.logs.some((entry) => entry.includes('펜리스: 자아, 공주')));
     assert.ok(harness.logs.some((entry) => entry.includes('공주: 싫다. 절대')));
@@ -480,6 +481,7 @@ test('Zamora local story interior plays original entry flow before Fenris object
     harness.controller.completeDungeonIfBossDefeated(boss);
 
     assert.equal(raidSession.isDungeonCleared(ZAMORA_FORTRESS_DUNGEON_ID), true);
+    assert.equal(raidSession.hasScenarioFlag(ZAMORA_FORTRESS_DUNGEON_ID, 'princess_rescued'), true);
     assert.ok(harness.logs.includes('공주 구출'));
     assert.ok(harness.logs.includes('자모라 요새 공주 구출 완료. 다른 마을로 생환하면 2화가 완료됩니다.'));
 });

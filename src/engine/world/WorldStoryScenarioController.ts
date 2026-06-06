@@ -339,6 +339,10 @@ export class WorldStoryScenarioController {
         options: { clearEnemies?: boolean } = {}
     ): void {
         this.context.raidSession.completeDungeonEncounter(dungeonId);
+        const eventSequence = getStoryScenarioEventSequence(dungeonId);
+        if (eventSequence?.objectiveRuntimeFlag) {
+            this.context.raidSession.setScenarioFlag(dungeonId, eventSequence.objectiveRuntimeFlag);
+        }
         if (options.clearEnemies ?? true) this.context.setFieldEnemies([]);
         const completedInterior = this.activeInterior?.dungeonId === dungeonId ? this.activeInterior : null;
         if (this.activeInterior?.dungeonId === dungeonId) {
@@ -476,13 +480,21 @@ export class WorldStoryScenarioController {
             return;
         }
 
-        worldMap.setInspectMarkers(sequence.fieldEvents
+        const fieldEventMarkers = sequence.fieldEvents
             .filter((event) => !this.isFieldEventCompleted(active.dungeonId, event))
             .flatMap((event) => event.triggerTiles.map((tile) => ({
                 id: `${event.id}:${tile.x},${tile.y}`,
                 tile,
                 labelKey: event.markerLabelKey,
-            }))));
+            })));
+        const scenarioMarkers = (sequence.markers ?? [])
+            .filter((marker) => !marker.hideWhenRuntimeFlag || !this.context.raidSession.hasScenarioFlag(active.dungeonId, marker.hideWhenRuntimeFlag))
+            .map((marker) => ({
+                id: `${marker.id}:${marker.tile.x},${marker.tile.y}`,
+                tile: marker.tile,
+                labelKey: marker.markerLabelKey,
+            }));
+        worldMap.setInspectMarkers([...fieldEventMarkers, ...scenarioMarkers]);
     }
 
     private getLockedDoorAt(tile: TilePoint): NonNullable<StoryInteriorLayout['doors']>[number] | null {

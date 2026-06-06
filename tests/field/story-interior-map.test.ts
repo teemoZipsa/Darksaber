@@ -145,6 +145,7 @@ test('Zamora Fortress uses a dedicated original-inspired interior route', () => 
     assert.equal(layout.objectiveKey, 'story.interior.zamora_fortress.objective');
     assert.equal(getStoryInteriorTileAt(layout, 17, 8), TileType.WALL);
     assert.equal(getStoryInteriorTileAt(layout, 17, 10), TileType.ROAD);
+    assert.equal(map.isWalkable(28, 9), true);
     assert.equal(map.getDisplayName(), '자모라 요새 내부');
     assert.equal(hasWalkablePath(map, layout.playerStart, layout.bossTile), true);
 
@@ -164,6 +165,18 @@ test('Zamora Fortress exposes original episode 2 entry event flow', () => {
     assert.equal(sequence.entry.filter((step) => step.kind === 'dialogue').length, 12);
     assert.equal(sequence.entry.filter((step) => step.kind === 'combatStart').length, 1);
     assert.equal(sequence.fieldEvents.length, 0);
+    assert.equal(sequence.objectiveRuntimeFlag, 'princess_rescued');
+    assert.deepEqual(sequence.markers?.map((marker) => ({
+        id: marker.id,
+        tile: marker.tile,
+        markerLabelKey: marker.markerLabelKey,
+        hideWhenRuntimeFlag: marker.hideWhenRuntimeFlag,
+    })), [{
+        id: 'zamora_princess_captive',
+        tile: { x: 28, y: 9 },
+        markerLabelKey: 'story.event.ep02.princess.marker.captive',
+        hideWhenRuntimeFlag: 'princess_rescued',
+    }]);
     assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
 });
 
@@ -178,6 +191,7 @@ test('story scenario event keys exist in both languages without snapshotting ful
     for (const sequence of STORY_SCENARIO_EVENT_SEQUENCES) {
         sequence.entry.forEach(collect);
         sequence.bossDefeat.forEach(collect);
+        sequence.markers?.forEach((marker) => keys.add(marker.markerLabelKey));
         sequence.fieldEvents.forEach((event) => {
             if (event.markerLabelKey) keys.add(event.markerLabelKey);
             event.steps.forEach(collect);

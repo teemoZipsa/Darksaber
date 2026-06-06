@@ -16,7 +16,7 @@
 - Burgos throne-room seal at `{ x: 27, y: 9 }` is locked in local story-interior play until the raid has `burgos_key` or the player owns persistent `quest_burgos_key`.
 - Burgos survivor and Cain's son inspect markers are generated from `StoryScenarioFieldEvent.triggerTiles` and disappear once the corresponding runtime flag or persistent quest item exists.
 - Cain's necklace is shown as an Episode 1 optional quest objective while held as the in-raid `cain_necklace` flag or persistent `quest_cain_necklace`.
-- Zamora v1 entry flow uses original CP949 text extracted from `MAP/02set.arc` (`02.DEO`). The scenario goal is princess rescue, while the tactical combat condition remains defeating Fenris.
+- Zamora v1 entry flow uses original CP949 text extracted from `MAP/02set.arc` (`02.DEO`). The scenario goal is princess rescue, while the tactical combat condition remains defeating Fenris. The captive princess marker is shown in the Fenris chamber until the in-raid `princess_rescued` flag is set.
 - Tests should validate event order, key presence, and counts, not snapshot full original dialogue.
 
 ## Tooling

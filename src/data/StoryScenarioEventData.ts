@@ -13,9 +13,18 @@ export interface StoryScenarioEventSequence {
         globalScript: string;
         mapFiles: string[];
     };
+    objectiveRuntimeFlag?: string;
+    markers?: StoryScenarioMarker[];
     entry: StoryScenarioEventStep[];
     fieldEvents: StoryScenarioFieldEvent[];
     bossDefeat: StoryScenarioEventStep[];
+}
+
+export interface StoryScenarioMarker {
+    id: string;
+    tile: TilePoint;
+    markerLabelKey: string;
+    hideWhenRuntimeFlag?: string;
 }
 
 export interface StoryScenarioFieldEvent {
@@ -211,6 +220,15 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             globalScript: 'Glib/gscene2.lsc',
             mapFiles: ['MAP/02.mrc', 'MAP/02t.mrc', 'MAP/02hmap.BMP', 'MAP/02set.arc'],
         },
+        objectiveRuntimeFlag: 'princess_rescued',
+        markers: [
+            {
+                id: 'zamora_princess_captive',
+                tile: { x: 28, y: 9 },
+                markerLabelKey: 'story.event.ep02.princess.marker.captive',
+                hideWhenRuntimeFlag: 'princess_rescued',
+            },
+        ],
         entry: [
             { kind: 'focus', target: { x: 27, y: 10 }, labelKey: 'story.event.ep02.focus.chamber' },
             {
