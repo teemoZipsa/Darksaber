@@ -519,6 +519,7 @@ export class WorldEngine {
                 isActorAt: (actor, tile) => this.isActorAt(actor, tile),
                 isEntityMoving: (entity) => this.isEntityMoving(entity),
                 isFieldPassable: (query) => this.movementController.isFieldPassable(query),
+                getBlockedMoveMessage: (tile) => this.storyScenarioController.getLockedDoorMessage(tile),
                 spendAp: (cost) => this.spendAp(cost),
                 isMajorActionUsed: () => this.turnStateController.isMajorActionUsed(),
                 markMajorActionUsed: () => this.turnStateController.markMajorActionUsed(),

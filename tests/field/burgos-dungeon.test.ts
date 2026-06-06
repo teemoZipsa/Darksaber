@@ -17,6 +17,7 @@ import {
 } from '../../src/data/MonsterCatalog';
 import { getNormalizedMonsterBalance } from '../../src/data/original/originalMonsterBalance';
 import { getItemDef } from '../../src/data/ItemDB';
+import { PlayerData } from '../../src/data/PlayerData';
 import { getStoryQuestByDungeonId } from '../../src/data/StoryQuestData';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import { Enemy } from '../../src/entity/Enemy';
@@ -49,12 +50,14 @@ const MONSTER_PUBLIC_PATH = ['public', ...MONSTER_SPRITE_PATH.split('/').filter(
 function createStoryScenarioHarness(options: {
     player?: Player;
     raidSession?: WorldRaidSession;
+    playerData?: PlayerData;
     fieldEnemies?: { enemy: Enemy; home: { x: number; y: number }; path: { x: number; y: number }[] }[];
     worldMap?: WorldMap;
     isNetworkRaid?: boolean;
 } = {}) {
     const player = options.player ?? new Player(0, 0);
     const raidSession = options.raidSession ?? new WorldRaidSession('central_castle');
+    const playerData = options.playerData ?? new PlayerData();
     let worldMap = options.worldMap ?? new WorldMap();
     let fieldEnemies = options.fieldEnemies ?? [];
     let selectionCleared = false;
@@ -65,7 +68,7 @@ function createStoryScenarioHarness(options: {
     const logs: string[] = [];
 
     const controller = new WorldStoryScenarioController({
-        playerData: {} as any,
+        playerData,
         raidSession,
         getWorldMap: () => worldMap,
         setWorldMap: (nextWorldMap) => { worldMap = nextWorldMap; },
@@ -473,6 +476,45 @@ test('Burgos field events can be inspected once inside the local interior', () =
         false
     );
     assert.equal(harness.controller.playFieldEventAt({ x: 25, y: 9 }, { id: 'hero', entity: player } as any), false);
+});
+
+test('Burgos throne room seal unlocks after the survivor key event', () => {
+    const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === BURGOS_CASTLE_DUNGEON_ID);
+    const quest = getStoryQuestByDungeonId(BURGOS_CASTLE_DUNGEON_ID);
+    assert.ok(dungeon);
+    assert.ok(quest);
+
+    const player = new Player(24, 9);
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ player, raidSession });
+
+    harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+
+    assert.equal(harness.worldMap.isWalkable(27, 9), false);
+    assert.equal(harness.controller.getLockedDoorMessage({ x: 27, y: 9 }), '문이 잠겨 있습니다. 부르고스성 열쇠가 필요합니다.');
+
+    assert.equal(harness.controller.playFieldEventAt({ x: 25, y: 9 }, { id: 'hero', entity: player } as any), true);
+
+    assert.equal(harness.worldMap.isWalkable(27, 9), true);
+    assert.equal(harness.controller.getLockedDoorMessage({ x: 27, y: 9 }), null);
+});
+
+test('Burgos throne room seal starts unlocked when the persistent key item is owned', () => {
+    const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === BURGOS_CASTLE_DUNGEON_ID);
+    const quest = getStoryQuestByDungeonId(BURGOS_CASTLE_DUNGEON_ID);
+    assert.ok(dungeon);
+    assert.ok(quest);
+
+    const playerData = new PlayerData();
+    playerData.addQuestItem('quest_burgos_key');
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ raidSession, playerData });
+
+    harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+
+    assert.equal(harness.worldMap.isWalkable(27, 9), true);
 });
 
 test('Burgos Cain field event records a raid-scoped relic flag before survival reward', () => {

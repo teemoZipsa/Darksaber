@@ -58,6 +58,7 @@ export interface WorldPlayerActionContext {
     isActorAt: (actor: FieldActor, tile: TilePoint) => boolean;
     isEntityMoving: (entity: FieldActor['entity'] | Enemy) => boolean;
     isFieldPassable: (query: FieldPassableQuery) => boolean;
+    getBlockedMoveMessage?: (tile: TilePoint, actor: FieldActor) => string | null;
     spendAp: (cost: number) => boolean;
     isMajorActionUsed: () => boolean;
     markMajorActionUsed: () => void;
@@ -225,7 +226,10 @@ export class WorldPlayerActionController {
 
         const selectedTileKey = tileKey(tile.x, tile.y);
         if (!this.actionTiles.has(selectedTileKey)) {
-            this.sink.log(t('field.action.moveInvalid'));
+            const blockedMessage = this.actionMode === 'move'
+                ? this.context.getBlockedMoveMessage?.(tile, actor)
+                : null;
+            this.sink.log(blockedMessage ?? t('field.action.moveInvalid'));
             this.clearTargeting();
             return;
         }
@@ -512,7 +516,7 @@ export class WorldPlayerActionController {
         const path = pathResult.path;
         if (path.length === 0 && !this.context.isActorAt(actor, tile)) {
             this.context.clearActorIntent(actor);
-            this.sink.log(t('field.action.movePathMissing'));
+            this.sink.log(this.context.getBlockedMoveMessage?.(tile, actor) ?? t('field.action.movePathMissing'));
             return false;
         }
 

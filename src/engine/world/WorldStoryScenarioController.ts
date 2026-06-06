@@ -90,7 +90,10 @@ export class WorldStoryScenarioController {
     public enterInteriorMap(dungeonId: string, returnTile: TilePoint): StoryInteriorLayout | null {
         const layout = getStoryInteriorLayout(dungeonId);
         if (!layout) return null;
-        if (this.activeInterior?.dungeonId === dungeonId) return layout;
+        if (this.activeInterior?.dungeonId === dungeonId) {
+            this.syncActiveInteriorDoorLocks();
+            return layout;
+        }
 
         const previousWorldMap = this.activeInterior?.previousWorldMap ?? this.context.getWorldMap();
         this.context.setWorldMap(new StoryInteriorMap(layout));
@@ -102,6 +105,7 @@ export class WorldStoryScenarioController {
         };
         this.context.getWorldMap().loot = [];
         this.dismissedDungeonVisitKey = null;
+        this.syncActiveInteriorDoorLocks();
         return layout;
     }
 
@@ -131,8 +135,15 @@ export class WorldStoryScenarioController {
         if (this.isFieldEventCompleted(dungeonId, event)) return false;
         this.completedFieldEventKeys.add(key);
         if (event.runtimeFlag) this.context.raidSession.setScenarioFlag(dungeonId, event.runtimeFlag);
+        this.syncActiveInteriorDoorLocks();
         for (const step of event.steps) this.playStoryScenarioEventStep(step);
         return true;
+    }
+
+    public getLockedDoorMessage(tile: TilePoint): string | null {
+        const door = this.getLockedDoorAt(tile);
+        if (!door) return null;
+        return t(door.lockedLogKey ?? 'story.interior.lockedDoor');
     }
 
     public playFieldEventAt(tile: TilePoint, actor: FieldActor | null = this.context.getControlledActor()): boolean {
@@ -432,6 +443,36 @@ export class WorldStoryScenarioController {
 
     private fieldEventKey(dungeonId: string, eventId: string): string {
         return `${dungeonId}:${eventId}`;
+    }
+
+    private syncActiveInteriorDoorLocks(): void {
+        const active = this.activeInterior;
+        const worldMap = this.context.getWorldMap();
+        if (!active || !(worldMap instanceof StoryInteriorMap)) return;
+        if (this.context.isNetworkRaid()) {
+            worldMap.setLockedTiles([]);
+            return;
+        }
+        worldMap.setLockedTiles((active.layout.doors ?? [])
+            .filter((door) => this.isDoorLocked(active.dungeonId, door))
+            .map((door) => door.tile));
+    }
+
+    private getLockedDoorAt(tile: TilePoint): NonNullable<StoryInteriorLayout['doors']>[number] | null {
+        const active = this.activeInterior;
+        if (!active || this.context.isNetworkRaid()) return null;
+        return (active.layout.doors ?? []).find((door) =>
+            door.tile.x === tile.x
+            && door.tile.y === tile.y
+            && this.isDoorLocked(active.dungeonId, door)
+        ) ?? null;
+    }
+
+    private isDoorLocked(dungeonId: string, door: NonNullable<StoryInteriorLayout['doors']>[number]): boolean {
+        if (!door.sealed || (!door.requiredRuntimeFlag && !door.requiredQuestItemId)) return false;
+        if (door.requiredRuntimeFlag && this.context.raidSession.hasScenarioFlag(dungeonId, door.requiredRuntimeFlag)) return false;
+        if (door.requiredQuestItemId && this.context.playerData.hasQuestItem(door.requiredQuestItemId)) return false;
+        return true;
     }
 
     private isFieldEventCompleted(dungeonId: string, event: StoryScenarioFieldEvent): boolean {

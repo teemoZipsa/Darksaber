@@ -30,6 +30,9 @@ export interface StoryInteriorDoor {
     connects: string[];
     originalTile?: TilePoint;
     sealed?: boolean;
+    requiredRuntimeFlag?: string;
+    requiredQuestItemId?: string;
+    lockedLogKey?: string;
 }
 
 export interface StoryInteriorBlockedPath {
@@ -107,7 +110,16 @@ const BURGOS_DOORS: StoryInteriorDoor[] = [
     { id: 'east_barracks_door', tile: { x: 8, y: 11 }, connects: ['gatehouse', 'eastBarracks'], originalTile: { x: 30, y: 10 } },
     { id: 'great_hall_door', tile: { x: 14, y: 9 }, connects: ['gatehouse', 'greatHall'], originalTile: { x: 14, y: 28 } },
     { id: 'inner_keep_door', tile: { x: 21, y: 9 }, connects: ['greatHall', 'innerKeep'], originalTile: { x: 19, y: 10 } },
-    { id: 'throne_room_seal', tile: { x: 27, y: 9 }, connects: ['innerKeep', 'throneRoom'], originalTile: { x: 19, y: 7 }, sealed: true },
+    {
+        id: 'throne_room_seal',
+        tile: { x: 27, y: 9 },
+        connects: ['innerKeep', 'throneRoom'],
+        originalTile: { x: 19, y: 7 },
+        sealed: true,
+        requiredRuntimeFlag: 'burgos_key',
+        requiredQuestItemId: 'quest_burgos_key',
+        lockedLogKey: 'story.event.ep01.field.key.lockedDoor',
+    },
 ];
 
 const BURGOS_BLOCKED_PATHS: StoryInteriorBlockedPath[] = [

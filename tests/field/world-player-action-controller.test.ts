@@ -51,6 +51,8 @@ interface ControllerOptions {
     spentCosts?: number[];
     additionalInteractTiles?: Set<string>;
     interactAtTile?: WorldPlayerActionContext['interactAtTile'];
+    isFieldPassable?: WorldPlayerActionContext['isFieldPassable'];
+    getBlockedMoveMessage?: WorldPlayerActionContext['getBlockedMoveMessage'];
 }
 
 function makeController(actor: FieldActor, remainingAp: number, options: ControllerOptions = {}): WorldPlayerActionController {
@@ -71,7 +73,8 @@ function makeController(actor: FieldActor, remainingAp: number, options: Control
         getLoot: () => [],
         isActorAt: (_actor, tile) => _actor.entity.gridX === tile.x && _actor.entity.gridY === tile.y,
         isEntityMoving: () => false,
-        isFieldPassable: () => true,
+        isFieldPassable: options.isFieldPassable ?? (() => true),
+        getBlockedMoveMessage: options.getBlockedMoveMessage,
         spendAp: (cost) => {
             options.spentCosts?.push(cost);
             return true;
@@ -269,6 +272,21 @@ test('inspect action can execute a non-loot scenario interaction tile', () => {
 
     assert.deepEqual(interacted.tile, { x: 1, y: 0 });
     assert.deepEqual(spentCosts, [getActionApCost('interact')]);
+});
+
+test('blocked story door reports a scenario-specific movement message', () => {
+    const actor = makeActor('hero', 0, 0);
+    const logs: string[] = [];
+    const controller = makeController(actor, getActionApCost('move'), {
+        logs,
+        isFieldPassable: (query) => !(query.x === 1 && query.y === 0),
+        getBlockedMoveMessage: (tile) => tile.x === 1 && tile.y === 0 ? '문이 잠겨 있습니다.' : null,
+    });
+
+    controller.execute('move');
+    controller.handleTargetClick({ x: 1, y: 0 }, { kind: 'ground', tile: { x: 1, y: 0 } });
+
+    assert.equal(logs[logs.length - 1], '문이 잠겨 있습니다.');
 });
 
 test('defend applies guard and the integrated counter readiness', () => {

@@ -60,10 +60,12 @@ const THEME_COLORS = {
 
 export class StoryInteriorMap extends WorldMap {
     private readonly layout: StoryInteriorLayout;
+    private readonly lockedTileKeys: Set<string>;
 
-    constructor(layout: StoryInteriorLayout) {
+    constructor(layout: StoryInteriorLayout, options: { lockedTiles?: readonly TilePoint[] } = {}) {
         super('mortal', { validateTownSpawns: false });
         this.layout = layout;
+        this.lockedTileKeys = new Set((options.lockedTiles ?? []).map((tile) => this.tileKey(tile.x, tile.y)));
     }
 
     public getDisplayName(): string {
@@ -133,11 +135,21 @@ export class StoryInteriorMap extends WorldMap {
     }
 
     public getTileAt(tx: number, ty: number): TileType {
+        if (this.lockedTileKeys.has(this.tileKey(tx, ty))) return TileType.WALL;
         return getStoryInteriorTileAt(this.layout, tx, ty);
     }
 
     public isWalkable(tx: number, ty: number): boolean {
         return Boolean(TILE_PROPERTIES[this.getTileAt(tx, ty)]?.walkable);
+    }
+
+    public setLockedTiles(tiles: readonly TilePoint[]): void {
+        this.lockedTileKeys.clear();
+        for (const tile of tiles) this.lockedTileKeys.add(this.tileKey(tile.x, tile.y));
+    }
+
+    public isTileLocked(tx: number, ty: number): boolean {
+        return this.lockedTileKeys.has(this.tileKey(tx, ty));
     }
 
     public render(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number, vw: number, vh: number): void {
@@ -197,6 +209,10 @@ export class StoryInteriorMap extends WorldMap {
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
         ctx.lineWidth = 1;
         ctx.strokeRect(sx + 0.5, sy + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+    }
+
+    private tileKey(x: number, y: number): string {
+        return `${x},${y}`;
     }
 
     private renderRoomTrim(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number): void {
