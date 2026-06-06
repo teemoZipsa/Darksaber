@@ -167,6 +167,65 @@ const BURGOS_TILE_OVERRIDES: StoryInteriorTileOverride[] = [
     { tile: { x: 29, y: 9 }, type: TileType.ROAD },
 ];
 
+const ZAMORA_WALKABLE_AREAS: StoryInteriorRoom[] = [
+    { id: 'zamoraGate', nameKey: 'story.interior.room.zamoraGate', x: 2, y: 8, width: 6, height: 5 },
+    { id: 'zamoraWestCrypt', nameKey: 'story.interior.room.zamoraWestCrypt', x: 7, y: 4, width: 7, height: 5 },
+    { id: 'zamoraEastCrypt', nameKey: 'story.interior.room.zamoraEastCrypt', x: 7, y: 12, width: 7, height: 5 },
+    { id: 'zamoraCrossHall', nameKey: 'story.interior.room.zamoraCrossHall', x: 7, y: 9, width: 14, height: 3 },
+    { id: 'zamoraCentralKeep', nameKey: 'story.interior.room.zamoraCentralKeep', x: 13, y: 7, width: 8, height: 7 },
+    { id: 'zamoraNorthRampart', nameKey: 'story.interior.room.zamoraNorthRampart', x: 16, y: 3, width: 8, height: 5 },
+    { id: 'zamoraSouthRampart', nameKey: 'story.interior.room.zamoraSouthRampart', x: 16, y: 13, width: 8, height: 5 },
+    { id: 'zamoraFenrisChamber', nameKey: 'story.interior.room.zamoraFenrisChamber', x: 23, y: 7, width: 7, height: 7 },
+];
+
+const ZAMORA_DOORS: StoryInteriorDoor[] = [
+    { id: 'front_gate', tile: { x: 1, y: 10 }, connects: ['entry'], originalTile: { x: 21, y: 17 } },
+    { id: 'west_crypt_door', tile: { x: 10, y: 8 }, connects: ['zamoraGate', 'zamoraWestCrypt'], originalTile: { x: 20, y: 22 } },
+    { id: 'east_crypt_door', tile: { x: 10, y: 12 }, connects: ['zamoraGate', 'zamoraEastCrypt'], originalTile: { x: 22, y: 20 } },
+    { id: 'central_keep_door', tile: { x: 14, y: 10 }, connects: ['zamoraCrossHall', 'zamoraCentralKeep'], originalTile: { x: 21, y: 17 } },
+    { id: 'fenris_chamber_seal', tile: { x: 23, y: 10 }, connects: ['zamoraCentralKeep', 'zamoraFenrisChamber'], originalTile: { x: 22, y: 20 }, sealed: true },
+];
+
+const ZAMORA_BLOCKED_PATHS: StoryInteriorBlockedPath[] = [
+    { id: 'west_crypt_broken_arch', tile: { x: 8, y: 6 }, originalTile: { x: 19, y: 21 } },
+    { id: 'east_crypt_broken_arch', tile: { x: 8, y: 14 }, originalTile: { x: 20, y: 22 } },
+    { id: 'north_rampart_collapse', tile: { x: 18, y: 5 }, originalTile: { x: 21, y: 17 } },
+    { id: 'south_rampart_collapse', tile: { x: 18, y: 15 }, originalTile: { x: 22, y: 20 } },
+    { id: 'central_pillar_north', tile: { x: 17, y: 8 }, originalTile: { x: 20, y: 22 } },
+    { id: 'central_pillar_south', tile: { x: 17, y: 12 }, originalTile: { x: 19, y: 21 } },
+    { id: 'fenris_chamber_north_pillar', tile: { x: 25, y: 8 }, originalTile: { x: 21, y: 17 } },
+    { id: 'fenris_chamber_south_pillar', tile: { x: 25, y: 12 }, originalTile: { x: 22, y: 20 } },
+];
+
+const ZAMORA_TILE_OVERRIDES: StoryInteriorTileOverride[] = [
+    { tile: { x: 1, y: 10 }, type: TileType.DUNGEON_ENTRANCE },
+    ...ZAMORA_BLOCKED_PATHS.map((path) => ({ tile: { ...path.tile }, type: TileType.WALL })),
+    { tile: { x: 4, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 5, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 6, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 7, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 8, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 9, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 10, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 11, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 12, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 13, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 14, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 16, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 17, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 18, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 19, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 20, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 21, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 22, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 23, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 24, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 25, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 26, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 27, y: 10 }, type: TileType.ROAD },
+];
+
 function layout(dungeonId: string, theme: StoryInteriorTheme): StoryInteriorLayout {
     return {
         dungeonId,
@@ -230,9 +289,55 @@ const BURGOS_CASTLE_LAYOUT: StoryInteriorLayout = {
     tileOverrides: BURGOS_TILE_OVERRIDES.map((override) => ({ ...override, tile: { ...override.tile } })),
 };
 
+const ZAMORA_FORTRESS_LAYOUT: StoryInteriorLayout = {
+    dungeonId: 'zamora_fortress',
+    displayNameKey: 'story.interior.zamora_fortress.name',
+    width: 32,
+    height: 21,
+    theme: 'castle',
+    entryTile: { x: 1, y: 10 },
+    playerStart: { x: 4, y: 10 },
+    guardTiles: [
+        { x: 9, y: 7 },
+        { x: 9, y: 13 },
+        { x: 14, y: 9 },
+        { x: 14, y: 11 },
+        { x: 20, y: 6 },
+        { x: 20, y: 14 },
+        { x: 23, y: 9 },
+        { x: 23, y: 11 },
+    ],
+    bossTile: { x: 27, y: 10 },
+    rooms: [
+        { id: 'entry', nameKey: 'story.interior.room.entryHall', x: 2, y: 8, width: 6, height: 5 },
+        ...ZAMORA_WALKABLE_AREAS.map((room) => ({ ...room })),
+        { id: 'bossRoom', nameKey: 'story.interior.room.bossRoom', x: 23, y: 7, width: 7, height: 7 },
+    ],
+    props: [
+        { kind: 'torch', tile: { x: 3, y: 8 } },
+        { kind: 'torch', tile: { x: 3, y: 12 } },
+        { kind: 'crate', tile: { x: 11, y: 5 } },
+        { kind: 'crate', tile: { x: 11, y: 15 } },
+        { kind: 'banner', tile: { x: 15, y: 8 } },
+        { kind: 'banner', tile: { x: 15, y: 12 } },
+        { kind: 'door', tile: { x: 10, y: 8 } },
+        { kind: 'door', tile: { x: 10, y: 12 } },
+        { kind: 'door', tile: { x: 14, y: 10 } },
+        { kind: 'rubble', tile: { x: 17, y: 8 } },
+        { kind: 'rubble', tile: { x: 17, y: 12 } },
+        { kind: 'sealedDoor', tile: { x: 23, y: 10 }, labelKey: 'story.interior.prop.sealedDoor' },
+        { kind: 'bossSeal', tile: { x: 27, y: 10 }, labelKey: 'story.interior.prop.bossSeal' },
+        { kind: 'throne', tile: { x: 28, y: 10 } },
+    ],
+    doors: ZAMORA_DOORS.map((door) => ({ ...door, tile: { ...door.tile }, originalTile: door.originalTile ? { ...door.originalTile } : undefined })),
+    blockedPaths: ZAMORA_BLOCKED_PATHS.map((path) => ({ ...path, tile: { ...path.tile }, originalTile: path.originalTile ? { ...path.originalTile } : undefined })),
+    walkableAreas: ZAMORA_WALKABLE_AREAS.map((room) => ({ ...room })),
+    tileOverrides: ZAMORA_TILE_OVERRIDES.map((override) => ({ ...override, tile: { ...override.tile } })),
+};
+
 export const STORY_INTERIOR_LAYOUTS: StoryInteriorLayout[] = [
     BURGOS_CASTLE_LAYOUT,
-    layout('zamora_fortress', 'castle'),
+    ZAMORA_FORTRESS_LAYOUT,
     layout('etna_volcano', 'volcano'),
     layout('sagrajas_temple', 'temple'),
     layout('pyramid_inside', 'pyramid'),

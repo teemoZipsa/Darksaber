@@ -127,6 +127,31 @@ test('Burgos interior exposes original-inspired doors, blocked paths, and event 
     );
 });
 
+test('Zamora Fortress uses a dedicated original-inspired interior route', () => {
+    const layout = getStoryInteriorLayout('zamora_fortress');
+    assert.ok(layout);
+    const map = new StoryInteriorMap(layout);
+
+    assert.deepEqual(map.getBoundsTiles(), { width: 32, height: 21 });
+    assert.ok(layout.rooms.some((room) => room.id === 'zamoraGate'));
+    assert.ok(layout.rooms.some((room) => room.id === 'zamoraWestCrypt'));
+    assert.ok(layout.rooms.some((room) => room.id === 'zamoraEastCrypt'));
+    assert.ok(layout.rooms.some((room) => room.id === 'zamoraCentralKeep'));
+    assert.ok(layout.rooms.some((room) => room.id === 'zamoraNorthRampart'));
+    assert.ok(layout.rooms.some((room) => room.id === 'zamoraSouthRampart'));
+    assert.ok(layout.rooms.some((room) => room.id === 'zamoraFenrisChamber'));
+    assert.ok(layout.doors?.some((door) => door.id === 'fenris_chamber_seal' && door.sealed));
+    assert.equal(layout.blockedPaths?.length, 8);
+    assert.equal(getStoryInteriorTileAt(layout, 17, 8), TileType.WALL);
+    assert.equal(getStoryInteriorTileAt(layout, 17, 10), TileType.ROAD);
+    assert.equal(map.getDisplayName(), '자모라 요새 내부');
+    assert.equal(hasWalkablePath(map, layout.playerStart, layout.bossTile), true);
+
+    for (const blocked of layout.blockedPaths ?? []) {
+        assert.equal(map.isWalkable(blocked.tile.x, blocked.tile.y), false, blocked.id);
+    }
+});
+
 test('Burgos scenario event keys exist in both languages without snapshotting full text', () => {
     const sequence = getStoryScenarioEventSequence('burgos_castle');
     assert.ok(sequence);
