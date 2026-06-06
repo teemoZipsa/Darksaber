@@ -908,6 +908,8 @@
 #ui-overlay .ds-quest__name { font-size: 14px; font-weight: 600; color: var(--ds-text); }
 #ui-overlay .ds-quest__desc { font-size: 12px; color: var(--ds-text-dim); }
 #ui-overlay .ds-quest__objective { font-size: 12px; color: var(--ds-text-muted); line-height: 1.35; }
+#ui-overlay .ds-quest__side-objective { padding-left: 8px; color: var(--ds-text-dim); }
+#ui-overlay .ds-quest__side-objective.is-complete { color: var(--ds-accent-bright); }
 #ui-overlay .ds-quest__state { font-size: 11px; color: var(--ds-accent-bright); white-space: nowrap; }
 #ui-overlay .ds-quest__reward { font-size: 12px; color: var(--ds-accent); flex: none; }
 #ui-overlay .ds-quest__note { text-align: center; font-size: 11px; color: var(--ds-text-dim); padding-top: 6px; }

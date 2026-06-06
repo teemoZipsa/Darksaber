@@ -28,15 +28,23 @@ export interface StoryQuestRewardView {
     owned: boolean;
 }
 
+export interface StoryQuestSideObjectiveView {
+    labelKey: string;
+    completed: boolean;
+}
+
 export interface StoryQuestView {
     quest: StoryQuestDefinition;
     status: StoryQuestStatus;
     rewardView: StoryQuestRewardView;
+    sideObjectives: StoryQuestSideObjectiveView[];
 }
 
 export const MAIN_QUEST_EPISODE_01_ID = 'main:episode_01_burgos';
 export const MAIN_QUEST_EPISODE_02_ID = 'main:episode_02_zamora';
 export const QUEST_BOMB_ITEM_ID = 'quest_bomb';
+export const BURGOS_KEY_ITEM_ID = 'quest_burgos_key';
+export const CAIN_NECKLACE_ITEM_ID = 'quest_cain_necklace';
 export const STORY_CLERIC_EP02_ID = 'story_cleric_ep02';
 
 export const STORY_QUESTS: StoryQuestDefinition[] = STORY_SCENARIOS.map((scenario, index) => ({
@@ -56,7 +64,7 @@ export const STORY_QUESTS: StoryQuestDefinition[] = STORY_SCENARIOS.map((scenari
 
 export function getStoryQuestViews(
     playerData: PlayerData,
-    raidSession: Pick<WorldRaidSession, 'isDungeonCleared'> | null
+    raidSession: (Pick<WorldRaidSession, 'isDungeonCleared'> & Partial<Pick<WorldRaidSession, 'hasScenarioFlag'>>) | null
 ): StoryQuestView[] {
     return STORY_QUESTS.filter((quest) => isStoryQuestAvailable(quest, playerData)).map((quest) => {
         const completed = playerData.isCleared(quest.id);
@@ -68,6 +76,7 @@ export function getStoryQuestViews(
                 reward: quest.reward,
                 owned: isStoryRewardOwned(quest.reward, playerData),
             },
+            sideObjectives: getStoryQuestSideObjectives(quest, playerData, raidSession),
         };
     });
 }
@@ -96,4 +105,17 @@ export function getCompanionRewards(reward: StoryQuestReward): StoryCompanionRew
     if (reward.type === 'companion') return [reward];
     if (reward.type === 'bundle') return reward.rewards.flatMap(getCompanionRewards);
     return [];
+}
+
+function getStoryQuestSideObjectives(
+    quest: StoryQuestDefinition,
+    playerData: PlayerData,
+    raidSession: (Partial<Pick<WorldRaidSession, 'hasScenarioFlag'>>) | null
+): StoryQuestSideObjectiveView[] {
+    if (quest.id !== MAIN_QUEST_EPISODE_01_ID) return [];
+    return [{
+        labelKey: 'story.ep01.sideObjective.cainNecklace',
+        completed: playerData.hasQuestItem(CAIN_NECKLACE_ITEM_ID)
+            || (raidSession?.hasScenarioFlag?.(quest.dungeonId, 'cain_necklace') ?? false),
+    }];
 }

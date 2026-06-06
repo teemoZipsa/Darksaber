@@ -177,6 +177,8 @@ test('story episodes 1 through 20 are chained and fully localized', () => {
             assert.ok(en[key], `missing en story key ${key}`);
         }
     }
+    assert.ok(ko['story.ep01.sideObjective.cainNecklace']);
+    assert.ok(en['story.ep01.sideObjective.cainNecklace']);
 });
 
 test('player data guards gold and normalizes old save shapes', () => {

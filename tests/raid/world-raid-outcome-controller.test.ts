@@ -13,6 +13,8 @@ import { BURGOS_CASTLE_DUNGEON_ID, ZAMORA_FORTRESS_DUNGEON_ID } from '../../src/
 import {
     MAIN_QUEST_EPISODE_01_ID,
     MAIN_QUEST_EPISODE_02_ID,
+    BURGOS_KEY_ITEM_ID,
+    CAIN_NECKLACE_ITEM_ID,
     QUEST_BOMB_ITEM_ID,
     STORY_CLERIC_EP02_ID,
     getStoryQuestViews,
@@ -36,9 +38,6 @@ const DESTINATION_TOWN: TownInfo = {
     chunkY: 0,
     radius: 1,
 };
-
-const BURGOS_KEY_ITEM_ID = 'quest_burgos_key';
-const CAIN_NECKLACE_ITEM_ID = 'quest_cain_necklace';
 
 function markBurgosObjectiveComplete(raidSession: WorldRaidSession): void {
     raidSession.startDungeonEncounter(BURGOS_CASTLE_DUNGEON_ID);
@@ -160,6 +159,27 @@ test('episode 2 quest is hidden until episode 1 is completed', () => {
         getStoryQuestViews(playerData, null).map((view) => view.quest.id),
         [MAIN_QUEST_EPISODE_01_ID, MAIN_QUEST_EPISODE_02_ID]
     );
+});
+
+test('Burgos Cain necklace appears as an optional quest objective', () => {
+    const playerData = new PlayerData();
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+
+    const initial = getStoryQuestViews(playerData, raidSession).find((view) => view.quest.id === MAIN_QUEST_EPISODE_01_ID);
+    assert.deepEqual(initial?.sideObjectives, [{
+        labelKey: 'story.ep01.sideObjective.cainNecklace',
+        completed: false,
+    }]);
+
+    raidSession.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'cain_necklace');
+    const inRaid = getStoryQuestViews(playerData, raidSession).find((view) => view.quest.id === MAIN_QUEST_EPISODE_01_ID);
+    assert.equal(inRaid?.sideObjectives[0]?.completed, true);
+
+    const survived = new PlayerData();
+    survived.addQuestItem(CAIN_NECKLACE_ITEM_ID);
+    const persisted = getStoryQuestViews(survived, null).find((view) => view.quest.id === MAIN_QUEST_EPISODE_01_ID);
+    assert.equal(persisted?.sideObjectives[0]?.completed, true);
 });
 
 test('Zamora objective grants episode 2 completion and cleric companion only after survival', () => {
