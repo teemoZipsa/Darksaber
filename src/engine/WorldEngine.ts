@@ -159,14 +159,6 @@ export class WorldEngine {
         this.turnStateController.activeTurnActorId = actorId;
     }
 
-    private get readyQueue(): string[] {
-        return this.turnStateController.readyQueue;
-    }
-
-    private set readyQueue(queue: string[]) {
-        this.turnStateController.readyQueue = queue;
-    }
-
     private get remainingActionPoints(): number {
         return this.turnStateController.remainingActionPoints;
     }
@@ -309,9 +301,8 @@ export class WorldEngine {
             clearFieldTurnState: () => this.clearFieldTurnState(),
             setCurrentPhaseToRaid: () => { this.currentPhase = 'raid'; },
             setActiveTurn: (actorId, remainingActionPoints, majorActionUsed) => {
-                this.activeTurnActorId = actorId;
-                this.remainingActionPoints = remainingActionPoints;
-                this.majorActionUsedThisTurn = majorActionUsed;
+                if (actorId) this.turnStateController.setActiveTurn(actorId, remainingActionPoints, majorActionUsed);
+                else this.turnStateController.endActiveTurn();
             },
             getTurnActionStates: (actor) => this.playerActionController.getTurnActionStates(actor),
             openActionMenu: (states) => this.actionMenuUI.open(states),
@@ -1335,9 +1326,7 @@ export class WorldEngine {
             this.closeActionMenu();
             return;
         }
-        const carryover = this.remainingActionPoints >= FIELD_MAX_ACTION_GAUGE
-            ? 0
-            : this.remainingActionPoints;
+        const carryover = this.turnStateController.getDismissCarryover();
         this.endActorTurn(actor, '대기', carryover);
     }
 
@@ -1375,7 +1364,7 @@ export class WorldEngine {
     private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = this.remainingActionPoints): void {
         if (actor.id === this.activeTurnActorId) this.networkIntentController.submitEndTurn(actor, reason);
         actor.entity.actionGauge = Math.max(0, Math.min(FIELD_MAX_ACTION_GAUGE, atbCarryover));
-        this.turnStateController.clearActiveTurn();
+        this.turnStateController.endActiveTurn();
         this.clearActorIntent(actor);
         this.closeActionMenu();
         this.closeTacticalMenu();
@@ -1387,15 +1376,16 @@ export class WorldEngine {
 
     private endEnemyTurn(enemy: Enemy): void {
         enemy.actionGauge = 0;
-        this.turnStateController.clearActiveTurn();
+        this.turnStateController.endActiveTurn();
     }
 
     private startNextReadyTurn(): void {
         this.clearInvalidActiveTurn();
-        if (this.activeTurnActorId || this.reservedAction) return;
+        if (this.turnStateController.isReadyTurnBlocked()) return;
 
-        while (this.readyQueue.length > 0) {
-            const actorId = this.turnStateController.shiftReadyActorId()!;
+        while (this.turnStateController.hasReadyActors()) {
+            const actorId = this.turnStateController.shiftReadyActorId();
+            if (!actorId) return;
             const actor = this.partyActors.find((candidate) => candidate.id === actorId);
             if (actor) {
                 if (actor.character.isDead) continue;
@@ -1411,15 +1401,15 @@ export class WorldEngine {
     }
 
     private clearInvalidActiveTurn(): void {
-        if (!this.activeTurnActorId) return;
+        const cleared = this.turnStateController.clearInvalidActiveTurn((actorId) => {
+            const activePartyActor = this.partyActors.find((actor) => actor.id === actorId);
+            if (activePartyActor && !activePartyActor.character.isDead && activePartyActor.character.stats.hp > 0) return true;
 
-        const activePartyActor = this.partyActors.find((actor) => actor.id === this.activeTurnActorId);
-        if (activePartyActor && !activePartyActor.character.isDead && activePartyActor.character.stats.hp > 0) return;
+            const activeEnemy = this.fieldEnemies.find((entry) => entry.enemy.id === actorId)?.enemy;
+            return activeEnemy !== undefined && activeEnemy.stats.hp > 0;
+        });
+        if (!cleared) return;
 
-        const activeEnemy = this.fieldEnemies.find((entry) => entry.enemy.id === this.activeTurnActorId)?.enemy;
-        if (activeEnemy && activeEnemy.stats.hp > 0) return;
-
-        this.turnStateController.clearActiveTurn();
         this.closeActionMenu();
         this.closeTacticalMenu();
         this.playerActionController.clearTargeting();
@@ -1481,8 +1471,7 @@ export class WorldEngine {
     private beginActorTurn(actor: FieldActor): void {
         const index = this.partyActors.indexOf(actor);
         if (index >= 0) this.switchToPartyMember(index);
-        this.turnStateController.setActiveTurn(actor.id, FIELD_MAX_ACTION_GAUGE);
-        actor.entity.actionGauge = FIELD_MAX_ACTION_GAUGE;
+        actor.entity.actionGauge = this.turnStateController.beginActorTurn(actor.id);
         this.selectionController.selectActor(actor.id);
         if (!this.processActorTurnStartStatuses(actor)) {
             this.endActorTurn(actor, '상태이상');
@@ -1503,7 +1492,7 @@ export class WorldEngine {
 
     private beginEnemyTurn(entry: FieldEnemy): void {
         const enemy = entry.enemy;
-        this.turnStateController.setActiveTurn(enemy.id, 0);
+        this.turnStateController.beginEnemyTurn(enemy.id);
         this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'READY');
 
         if (!this.processEnemyTurnStartStatuses(entry)) {

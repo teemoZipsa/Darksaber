@@ -37,7 +37,7 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
     const engine = Object.create(WorldEngine.prototype) as any;
     engine.turnStateController = new WorldTurnStateController();
     engine.activeTurnActorId = actor.id;
-    engine.readyQueue = [];
+    engine.turnStateController.readyQueue = [];
     engine.remainingActionPoints = 6;
     engine.majorActionUsedThisTurn = false;
     engine.reservedAction = null;
@@ -179,7 +179,10 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
 test('world turn state controller owns queue, AP, and active-turn clearing', () => {
     const controller = new WorldTurnStateController();
 
-    controller.setActiveTurn('hero', 40);
+    assert.equal(controller.beginActorTurn('hero'), 100);
+    assert.equal(controller.getDismissCarryover(), 0);
+    controller.remainingActionPoints = 40;
+    assert.equal(controller.getDismissCarryover(), 40);
     assert.equal(controller.markMajorActionUsed(), undefined);
     assert.equal(controller.majorActionUsedThisTurn, true);
     assert.equal(controller.spendAp(20, 100), true);
@@ -187,9 +190,11 @@ test('world turn state controller owns queue, AP, and active-turn clearing', () 
     assert.equal(controller.enqueueReadyActor('hero'), true);
     assert.equal(controller.enqueueReadyActor('hero'), false);
     assert.deepEqual(controller.readyQueue, ['hero']);
+    assert.equal(controller.isReadyTurnBlocked(), true);
     assert.equal(controller.hasTurnActivity(), true);
 
-    controller.clearActiveTurn();
+    assert.equal(controller.clearInvalidActiveTurn((actorId) => actorId === 'hero'), false);
+    assert.equal(controller.clearInvalidActiveTurn(() => false), true);
     assert.equal(controller.activeTurnActorId, null);
     assert.equal(controller.remainingActionPoints, 0);
     assert.equal(controller.majorActionUsedThisTurn, false);
@@ -197,6 +202,12 @@ test('world turn state controller owns queue, AP, and active-turn clearing', () 
 
     assert.equal(controller.shiftReadyActorId(), 'hero');
     assert.equal(controller.hasTurnActivity(), false);
+
+    controller.beginEnemyTurn('enemy');
+    assert.equal(controller.activeTurnActorId, 'enemy');
+    assert.equal(controller.remainingActionPoints, 0);
+    controller.endActiveTurn();
+    assert.equal(controller.activeTurnActorId, null);
 });
 
 function makeActorSnapshot(overrides: Partial<ActorSnapshot> = {}): ActorSnapshot {

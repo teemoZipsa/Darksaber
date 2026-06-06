@@ -1,4 +1,4 @@
-import { enqueueReadyActor as enqueueFieldReadyActor } from '../../field/FieldActionEconomy';
+import { FIELD_MAX_ACTION_GAUGE, enqueueReadyActor as enqueueFieldReadyActor } from '../../field/FieldActionEconomy';
 import type { FieldIntent } from '../../field/FieldTypes';
 
 export class WorldTurnStateController {
@@ -23,6 +23,10 @@ export class WorldTurnStateController {
         this.reservedAction = null;
     }
 
+    public endActiveTurn(): void {
+        this.clearActiveTurn();
+    }
+
     public setActiveTurn(actorId: string, remainingActionPoints: number, majorActionUsed = false): void {
         this.activeTurnActorId = actorId;
         this.remainingActionPoints = remainingActionPoints;
@@ -30,16 +34,44 @@ export class WorldTurnStateController {
         this.reservedAction = null;
     }
 
+    public beginActorTurn(actorId: string): number {
+        this.setActiveTurn(actorId, FIELD_MAX_ACTION_GAUGE);
+        return this.remainingActionPoints;
+    }
+
+    public beginEnemyTurn(enemyId: string): void {
+        this.setActiveTurn(enemyId, 0);
+    }
+
+    public clearInvalidActiveTurn(isActiveTurnValid: (actorId: string) => boolean): boolean {
+        if (!this.activeTurnActorId) return false;
+        if (isActiveTurnValid(this.activeTurnActorId)) return false;
+        this.clearActiveTurn();
+        return true;
+    }
+
     public enqueueReadyActor(actorId: string): boolean {
         return enqueueFieldReadyActor(this.readyQueue, actorId);
+    }
+
+    public hasReadyActors(): boolean {
+        return this.readyQueue.length > 0;
     }
 
     public shiftReadyActorId(): string | null {
         return this.readyQueue.shift() ?? null;
     }
 
+    public isReadyTurnBlocked(): boolean {
+        return this.activeTurnActorId !== null || this.reservedAction !== null;
+    }
+
     public hasTurnActivity(): boolean {
         return this.activeTurnActorId !== null || this.readyQueue.length > 0 || this.reservedAction !== null;
+    }
+
+    public getDismissCarryover(): number {
+        return this.remainingActionPoints >= FIELD_MAX_ACTION_GAUGE ? 0 : this.remainingActionPoints;
     }
 
     public markMajorActionUsed(): void {
