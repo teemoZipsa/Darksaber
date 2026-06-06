@@ -48,6 +48,9 @@ class ImageStub {
 
 const MONSTER_PUBLIC_PATH = ['public', ...MONSTER_SPRITE_PATH.split('/').filter(Boolean)];
 const ETNA_VOLCANO_DUNGEON_ID = 'etna_volcano';
+const ARCADIA_PLAIN_DUNGEON_ID = 'arcadia_plain';
+const CACAORA_HIGHLAND_DUNGEON_ID = 'cacaora_highland';
+const REMOTE_VILLAGE_DUNGEON_ID = 'remote_village';
 
 function createStoryScenarioHarness(options: {
     player?: Player;
@@ -742,6 +745,68 @@ test('network field scenario entry plays original episode 4 event flow once', ()
     });
 
     assert.equal(harness.logs.length, logCount);
+});
+
+test('network field scenario events expose world inspect tiles and one-shot rewards', () => {
+    const worldMap = new WorldMap();
+    const arcadia = worldMap.getDungeons().find((entry) => entry.id === ARCADIA_PLAIN_DUNGEON_ID);
+    assert.ok(arcadia);
+    const arcadiaCenter = worldMap.getDungeonEntranceTile(arcadia);
+    const player = new Player(arcadiaCenter.x, arcadiaCenter.y - 1);
+    const playerData = new PlayerData();
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    raidSession.startDungeonEncounter(ARCADIA_PLAIN_DUNGEON_ID);
+    const harness = createStoryScenarioHarness({ player, playerData, raidSession, worldMap, isNetworkRaid: true });
+
+    const inspectable = harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any);
+    assert.equal(inspectable.has(`${arcadiaCenter.x},${arcadiaCenter.y - 1}`), true);
+
+    assert.equal(harness.controller.playFieldEventAt({ x: arcadiaCenter.x, y: arcadiaCenter.y - 1 }, { id: 'hero', entity: player } as any), true);
+    assert.equal(playerData.gold, 600);
+    assert.equal(raidSession.hasScenarioFlag(ARCADIA_PLAIN_DUNGEON_ID, 'arcadia_gold_chest_01'), true);
+    assert.ok(harness.logs.includes('%s가(이) 상자를 열었습니다.'));
+    assert.ok(harness.logs.includes('100 GOLD를 얻었습니다.'));
+    assert.equal(harness.controller.playFieldEventAt({ x: arcadiaCenter.x, y: arcadiaCenter.y - 1 }, { id: 'hero', entity: player } as any), false);
+});
+
+test('episodes 5 and 6 field scenario inspect events map to current world scenario entrances', () => {
+    const worldMap = new WorldMap();
+    const cacaora = worldMap.getDungeons().find((entry) => entry.id === CACAORA_HIGHLAND_DUNGEON_ID);
+    const village = worldMap.getDungeons().find((entry) => entry.id === REMOTE_VILLAGE_DUNGEON_ID);
+    assert.ok(cacaora);
+    assert.ok(village);
+
+    const cacaoraCenter = worldMap.getDungeonEntranceTile(cacaora);
+    const cacaoraPlayer = new Player(cacaoraCenter.x - 1, cacaoraCenter.y - 1);
+    const cacaoraRaid = new WorldRaidSession('central_castle');
+    cacaoraRaid.beginRaidFromTown('central_castle');
+    cacaoraRaid.startDungeonEncounter(CACAORA_HIGHLAND_DUNGEON_ID);
+    const cacaoraHarness = createStoryScenarioHarness({
+        player: cacaoraPlayer,
+        raidSession: cacaoraRaid,
+        worldMap,
+        isNetworkRaid: true,
+    });
+
+    assert.equal(cacaoraHarness.controller.playFieldEventAt({ x: cacaoraCenter.x - 1, y: cacaoraCenter.y - 1 }, { id: 'hero', entity: cacaoraPlayer } as any), true);
+    assert.equal(cacaoraRaid.hasScenarioFlag(CACAORA_HIGHLAND_DUNGEON_ID, 'cacaora_gold_chest_01'), true);
+
+    const villageCenter = worldMap.getDungeonEntranceTile(village);
+    const villagePlayer = new Player(villageCenter.x - 1, villageCenter.y - 1);
+    const villageRaid = new WorldRaidSession('central_castle');
+    villageRaid.beginRaidFromTown('central_castle');
+    villageRaid.startDungeonEncounter(REMOTE_VILLAGE_DUNGEON_ID);
+    const villageHarness = createStoryScenarioHarness({
+        player: villagePlayer,
+        raidSession: villageRaid,
+        worldMap,
+        isNetworkRaid: true,
+    });
+
+    assert.equal(villageHarness.controller.playFieldEventAt({ x: villageCenter.x - 1, y: villageCenter.y - 1 }, { id: 'hero', entity: villagePlayer } as any), true);
+    assert.equal(villageRaid.hasScenarioFlag(REMOTE_VILLAGE_DUNGEON_ID, 'remote_village_healer_01'), true);
+    assert.ok(villageHarness.logs.includes('체력이 회복되었습니다.'));
 });
 
 test('normal enemy loot is auto-collected into the backpack', () => {

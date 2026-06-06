@@ -114,17 +114,19 @@ export class WorldStoryScenarioController {
     }
 
     public getInspectableFieldEventTiles(actor: FieldActor | null): Set<string> {
-        const active = this.activeInterior;
         const result = new Set<string>();
-        if (!active || !actor || this.context.isNetworkRaid()) return result;
+        if (!actor) return result;
 
-        const sequence = getStoryScenarioEventSequence(active.dungeonId);
+        const dungeonId = this.getFieldEventDungeonId();
+        if (!dungeonId) return result;
+
+        const sequence = getStoryScenarioEventSequence(dungeonId);
         if (!sequence) return result;
 
         const actorTile = this.context.actorTile(actor);
         for (const event of sequence.fieldEvents) {
-            if (this.isFieldEventCompleted(active.dungeonId, event)) continue;
-            for (const tile of event.triggerTiles) {
+            if (this.isFieldEventCompleted(dungeonId, event)) continue;
+            for (const tile of this.getScenarioFieldEventTiles(dungeonId, event)) {
                 if (manhattan(actorTile, tile) <= 1) result.add(`${tile.x},${tile.y}`);
             }
         }
@@ -153,18 +155,18 @@ export class WorldStoryScenarioController {
     }
 
     public playFieldEventAt(tile: TilePoint, actor: FieldActor | null = this.context.getControlledActor()): boolean {
-        const active = this.activeInterior;
-        if (!active || !actor || this.context.isNetworkRaid()) return false;
+        const dungeonId = this.getFieldEventDungeonId();
+        if (!dungeonId || !actor) return false;
 
-        const sequence = getStoryScenarioEventSequence(active.dungeonId);
+        const sequence = getStoryScenarioEventSequence(dungeonId);
         if (!sequence || manhattan(this.context.actorTile(actor), tile) > 1) return false;
 
         const event = sequence.fieldEvents.find((candidate) =>
-            !this.isFieldEventCompleted(active.dungeonId, candidate)
-            && candidate.triggerTiles.some((triggerTile) => triggerTile.x === tile.x && triggerTile.y === tile.y)
+            !this.isFieldEventCompleted(dungeonId, candidate)
+            && this.getScenarioFieldEventTiles(dungeonId, candidate).some((triggerTile) => triggerTile.x === tile.x && triggerTile.y === tile.y)
         );
         if (!event) return false;
-        return this.playFieldEvent(active.dungeonId, event.id);
+        return this.playFieldEvent(dungeonId, event.id);
     }
 
     public exitActiveInterior(options: { placePartyAtReturn?: boolean } = {}): void {
@@ -470,6 +472,27 @@ export class WorldStoryScenarioController {
         return `${dungeonId}:${eventId}`;
     }
 
+    private getFieldEventDungeonId(): string | null {
+        if (this.activeInterior) return this.context.isNetworkRaid() ? null : this.activeInterior.dungeonId;
+        const dungeonId = this.context.raidSession.activeDungeonId;
+        if (!dungeonId || isStoryInteriorDungeon(dungeonId)) return null;
+        return dungeonId;
+    }
+
+    private getScenarioFieldEventTiles(dungeonId: string, event: StoryScenarioFieldEvent): TilePoint[] {
+        if (this.activeInterior?.dungeonId === dungeonId) return event.triggerTiles;
+
+        const origin = getOriginalFieldScenarioOrigin(dungeonId);
+        const dungeon = this.context.getWorldMap().getDungeons().find((entry) => entry.id === dungeonId);
+        if (!origin || !dungeon) return event.triggerTiles;
+
+        const center = this.context.getWorldMap().getDungeonEntranceTile(dungeon);
+        return event.triggerTiles.map((tile) => ({
+            x: center.x + clampFieldEventOffset(tile.x - origin.x),
+            y: center.y + clampFieldEventOffset(tile.y - origin.y),
+        }));
+    }
+
     private syncActiveInteriorDoorLocks(): void {
         const active = this.activeInterior;
         const worldMap = this.context.getWorldMap();
@@ -581,4 +604,21 @@ export class WorldStoryScenarioController {
                 break;
         }
     }
+}
+
+function getOriginalFieldScenarioOrigin(dungeonId: string): TilePoint | null {
+    switch (dungeonId) {
+        case 'arcadia_plain':
+            return { x: 11, y: 39 };
+        case 'cacaora_highland':
+            return { x: 24, y: 39 };
+        case 'remote_village':
+            return { x: 19, y: 34 };
+        default:
+            return null;
+    }
+}
+
+function clampFieldEventOffset(delta: number): number {
+    return Math.max(-4, Math.min(4, Math.round(delta / 6)));
 }
