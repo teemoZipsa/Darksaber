@@ -13,6 +13,7 @@ import { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { getCarryAtbMultiplier, getPartyCarriedWeight } from '../inventory/CarryWeight';
 import { PlayerData } from '../data/PlayerData';
+import { getItemDef } from '../data/ItemDB';
 import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
 import { getClassAttackProfile } from '../data/AttackPatternProfiles';
 import { formatT, t } from '../i18n/LanguageManager';
@@ -243,6 +244,13 @@ export class WorldEngine {
             followCameraToPlayer: () => {
                 this.camera.followTile(this.player.gridX, this.player.gridY);
                 this.camera.snapToTarget();
+            },
+            autoPlaceRewardItem: (itemId) => {
+                const item = getItemDef(itemId);
+                if (!item) return false;
+                const placed = this.gameManager.inventory.autoPlace(item);
+                if (placed) placed.acquiredInRaid = true;
+                return Boolean(placed);
             },
             log: (message) => this.addCombatLog(message),
         });

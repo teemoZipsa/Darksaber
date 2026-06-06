@@ -62,6 +62,7 @@ export interface StoryInteriorInspectMarker {
     id: string;
     tile: TilePoint;
     labelKey?: string;
+    kind?: 'person' | 'chest';
 }
 
 export class StoryInteriorMap extends WorldMap {
@@ -284,12 +285,24 @@ export class StoryInteriorMap extends WorldMap {
         ctx.ellipse(cx, sy + TILE_SIZE - 8, 15, 6, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = '#5f4a42';
-        ctx.fillRect(sx + 9, sy + 17, TILE_SIZE - 14, 7);
-        ctx.fillStyle = '#b19a7a';
-        ctx.beginPath();
-        ctx.arc(sx + 12, sy + 18, 4, 0, Math.PI * 2);
-        ctx.fill();
+        if (marker.kind === 'chest') {
+            ctx.fillStyle = '#5b3922';
+            ctx.fillRect(sx + 8, sy + 15, TILE_SIZE - 16, 12);
+            ctx.fillStyle = '#8a5b2f';
+            ctx.fillRect(sx + 7, sy + 12, TILE_SIZE - 14, 7);
+            ctx.strokeStyle = '#d6a85f';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(sx + 8, sy + 13, TILE_SIZE - 16, 13);
+            ctx.fillStyle = '#f1d58b';
+            ctx.fillRect(cx - 2, sy + 17, 4, 5);
+        } else {
+            ctx.fillStyle = '#5f4a42';
+            ctx.fillRect(sx + 9, sy + 17, TILE_SIZE - 14, 7);
+            ctx.fillStyle = '#b19a7a';
+            ctx.beginPath();
+            ctx.arc(sx + 12, sy + 18, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         ctx.strokeStyle = '#f1d58b';
         ctx.lineWidth = 2;

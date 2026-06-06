@@ -1,4 +1,5 @@
 import type { PlayerData } from '../../data/PlayerData';
+import { getItemDef } from '../../data/ItemDB';
 import { getStoryQuestByDungeonId, isStoryQuestAvailable, type StoryQuestDefinition } from '../../data/StoryQuestData';
 import { getStoryScenarioByDungeonId } from '../../data/StoryScenarioData';
 import {
@@ -59,6 +60,7 @@ export interface WorldStoryScenarioContext {
     isTownVisible(): boolean;
     isFusionTempleVisible(): boolean;
     followCameraToPlayer(): void;
+    autoPlaceRewardItem(itemId: string): boolean;
     log(message: string): void;
 }
 
@@ -140,6 +142,7 @@ export class WorldStoryScenarioController {
         this.syncActiveInteriorDoorLocks();
         this.syncActiveInteriorInspectMarkers();
         for (const step of event.steps) this.playStoryScenarioEventStep(step);
+        this.applyFieldEventRewards(event);
         return true;
     }
 
@@ -486,6 +489,7 @@ export class WorldStoryScenarioController {
                 id: `${event.id}:${tile.x},${tile.y}`,
                 tile,
                 labelKey: event.markerLabelKey,
+                kind: event.markerKind,
             })));
         const scenarioMarkers = (sequence.markers ?? [])
             .filter((marker) => !marker.hideWhenRuntimeFlag || !this.context.raidSession.hasScenarioFlag(active.dungeonId, marker.hideWhenRuntimeFlag))
@@ -493,8 +497,27 @@ export class WorldStoryScenarioController {
                 id: `${marker.id}:${marker.tile.x},${marker.tile.y}`,
                 tile: marker.tile,
                 labelKey: marker.markerLabelKey,
+                kind: marker.markerKind,
             }));
         worldMap.setInspectMarkers([...fieldEventMarkers, ...scenarioMarkers]);
+    }
+
+    private applyFieldEventRewards(event: StoryScenarioFieldEvent): void {
+        for (const reward of event.rewards ?? []) {
+            if (reward.type === 'gold') {
+                this.context.playerData.addGold(reward.amount);
+                this.context.log(formatT('story.event.reward.gold', { amount: reward.amount }));
+                continue;
+            }
+
+            const item = getItemDef(reward.itemId);
+            const label = item?.nameKr ?? reward.itemId;
+            if (item && this.context.autoPlaceRewardItem(reward.itemId)) {
+                this.context.log(formatT('story.event.reward.item', { item: label }));
+            } else {
+                this.context.log(formatT('story.event.reward.itemFull', { item: label }));
+            }
+        }
     }
 
     private getLockedDoorAt(tile: TilePoint): NonNullable<StoryInteriorLayout['doors']>[number] | null {

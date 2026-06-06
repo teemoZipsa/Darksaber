@@ -164,7 +164,11 @@ test('Zamora Fortress exposes original episode 2 entry event flow', () => {
     assert.ok(sequence.originalSources.mapFiles.includes('MAP/02set.arc'));
     assert.equal(sequence.entry.filter((step) => step.kind === 'dialogue').length, 12);
     assert.equal(sequence.entry.filter((step) => step.kind === 'combatStart').length, 1);
-    assert.equal(sequence.fieldEvents.length, 0);
+    assert.equal(sequence.fieldEvents.length, 8);
+    assert.equal(sequence.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'gold' && reward.amount === 100)).length, 4);
+    assert.equal(sequence.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 300)).length, 4);
+    assert.ok(sequence.fieldEvents.every((event) => event.originalSource === 'MAP/02set.arc:02.evt'));
+    assert.ok(sequence.fieldEvents.every((event) => event.markerKind === 'chest'));
     assert.equal(sequence.objectiveRuntimeFlag, 'princess_rescued');
     assert.deepEqual(sequence.markers?.map((marker) => ({
         id: marker.id,

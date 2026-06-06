@@ -370,6 +370,9 @@ export const i18n = {
             'story.interior.lockedDoor': '문이 잠겨 있습니다.',
             'story.event.focusLog': '시선 이동: {target}',
             'story.event.dialogueLog': '{speaker}: {line}',
+            'story.event.reward.gold': '{amount} GOLD를 얻었습니다.',
+            'story.event.reward.item': '{item}을(를) 얻었습니다.',
+            'story.event.reward.itemFull': '배낭 공간이 부족하여 {item}을(를) 얻지 못했습니다.',
             'story.event.speaker.hero': '일행',
             'story.event.speaker.kisra': '키스라',
             'story.event.speaker.isrant': '이스란트',
@@ -423,6 +426,8 @@ export const i18n = {
             'story.event.ep02.combatStart': '승리조건 : 펜리스의 처치',
             'story.event.ep02.objective': '공주 구출',
             'story.event.ep02.princess.marker.captive': '감금된 공주',
+            'story.event.ep02.chest.marker': '상자',
+            'story.event.ep02.chest.opened': '상자를 열었습니다.',
             
             // Shop
             'shop.title': '🏪 상점',
@@ -1254,6 +1259,9 @@ export const i18n = {
             'story.interior.lockedDoor': 'The door is locked.',
             'story.event.focusLog': 'Focus: {target}',
             'story.event.dialogueLog': '{speaker}: {line}',
+            'story.event.reward.gold': 'Obtained {amount} GOLD.',
+            'story.event.reward.item': 'Obtained {item}.',
+            'story.event.reward.itemFull': 'Backpack full. Could not take {item}.',
             'story.event.speaker.hero': 'Party',
             'story.event.speaker.kisra': 'Kisra',
             'story.event.speaker.isrant': 'Isrant',
@@ -1307,6 +1315,8 @@ export const i18n = {
             'story.event.ep02.combatStart': 'Victory condition: defeat Fenris',
             'story.event.ep02.objective': 'Rescue the princess',
             'story.event.ep02.princess.marker.captive': 'Captive Princess',
+            'story.event.ep02.chest.marker': 'Chest',
+            'story.event.ep02.chest.opened': 'Opened a chest.',
             
             // Shop
             'shop.title': '🏪 Merchant',

@@ -66,6 +66,7 @@ function createStoryScenarioHarness(options: {
     let selectedActorId: string | null = null;
     let placedNear: { x: number; y: number } | null = null;
     let cameraFollowed = false;
+    const rewardItemIds: string[] = [];
     const logs: string[] = [];
 
     const controller = new WorldStoryScenarioController({
@@ -94,6 +95,10 @@ function createStoryScenarioHarness(options: {
         isTownVisible: () => false,
         isFusionTempleVisible: () => false,
         followCameraToPlayer: () => { cameraFollowed = true; },
+        autoPlaceRewardItem: (itemId) => {
+            rewardItemIds.push(itemId);
+            return true;
+        },
         log: (message) => logs.push(message),
     });
 
@@ -108,6 +113,7 @@ function createStoryScenarioHarness(options: {
         get turnStateCleared() { return turnStateCleared; },
         get placedNear() { return placedNear; },
         get cameraFollowed() { return cameraFollowed; },
+        get rewardItemIds() { return rewardItemIds; },
     };
 }
 
@@ -470,7 +476,8 @@ test('Zamora local story interior plays original entry flow before Fenris object
     assert.equal(harness.fieldEnemies.length, 5);
     assert.deepEqual(harness.placedNear, interior.playerStart);
     assert.ok(harness.worldMap instanceof StoryInteriorMap);
-    assert.deepEqual(harness.worldMap.getInspectMarkers().map((marker) => marker.id), ['zamora_princess_captive:28,9']);
+    assert.ok(harness.worldMap.getInspectMarkers().some((marker) => marker.id === 'zamora_princess_captive:28,9'));
+    assert.equal(harness.worldMap.getInspectMarkers().filter((marker) => marker.kind === 'chest').length, 8);
     assert.ok(harness.logs.some((entry) => entry.includes('시선 이동: 자모라 요새 감금실')));
     assert.ok(harness.logs.some((entry) => entry.includes('펜리스: 자아, 공주')));
     assert.ok(harness.logs.some((entry) => entry.includes('공주: 싫다. 절대')));
@@ -484,6 +491,37 @@ test('Zamora local story interior plays original entry flow before Fenris object
     assert.equal(raidSession.hasScenarioFlag(ZAMORA_FORTRESS_DUNGEON_ID, 'princess_rescued'), true);
     assert.ok(harness.logs.includes('공주 구출'));
     assert.ok(harness.logs.includes('자모라 요새 공주 구출 완료. 다른 마을로 생환하면 2화가 완료됩니다.'));
+});
+
+test('Zamora chest events grant raid rewards once per chest', () => {
+    const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === ZAMORA_FORTRESS_DUNGEON_ID);
+    const quest = getStoryQuestByDungeonId(ZAMORA_FORTRESS_DUNGEON_ID);
+    assert.ok(dungeon);
+    assert.ok(quest);
+
+    const player = new Player(10, 5);
+    const playerData = new PlayerData();
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ player, playerData, raidSession });
+
+    harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+    assert.ok(harness.worldMap instanceof StoryInteriorMap);
+    assert.ok(harness.worldMap.getInspectMarkers().some((marker) => marker.id === 'zamora_gold_chest_01:11,5' && marker.kind === 'chest'));
+
+    assert.equal(harness.controller.playFieldEventAt({ x: 11, y: 5 }, { id: 'hero', entity: player } as any), true);
+    assert.equal(playerData.gold, 600);
+    assert.equal(raidSession.hasScenarioFlag(ZAMORA_FORTRESS_DUNGEON_ID, 'zamora_gold_chest_01'), true);
+    assert.ok(harness.logs.includes('상자를 열었습니다.'));
+    assert.ok(harness.logs.includes('100 GOLD를 얻었습니다.'));
+    assert.equal(harness.worldMap.getInspectMarkers().some((marker) => marker.id === 'zamora_gold_chest_01:11,5'), false);
+    assert.equal(harness.controller.playFieldEventAt({ x: 11, y: 5 }, { id: 'hero', entity: player } as any), false);
+
+    assert.equal(harness.controller.playFieldEvent(ZAMORA_FORTRESS_DUNGEON_ID, 'zamora_item_chest_05'), true);
+    assert.deepEqual(harness.rewardItemIds, ['herb_common']);
+    assert.equal(raidSession.hasScenarioFlag(ZAMORA_FORTRESS_DUNGEON_ID, 'zamora_item_chest_05'), true);
+    assert.ok(harness.logs.includes('흔한 약초을(를) 얻었습니다.'));
+    assert.equal(harness.controller.playFieldEvent(ZAMORA_FORTRESS_DUNGEON_ID, 'zamora_item_chest_05'), false);
 });
 
 test('Burgos field events can be inspected once inside the local interior', () => {

@@ -24,8 +24,13 @@ export interface StoryScenarioMarker {
     id: string;
     tile: TilePoint;
     markerLabelKey: string;
+    markerKind?: 'person' | 'chest';
     hideWhenRuntimeFlag?: string;
 }
+
+export type StoryScenarioFieldEventReward =
+    | { type: 'gold'; amount: number }
+    | { type: 'item'; itemId: string; originalItemId?: number };
 
 export interface StoryScenarioFieldEvent {
     id: string;
@@ -36,6 +41,8 @@ export interface StoryScenarioFieldEvent {
     runtimeFlag?: string;
     questItemId?: string;
     markerLabelKey?: string;
+    markerKind?: 'person' | 'chest';
+    rewards?: StoryScenarioFieldEventReward[];
     steps: StoryScenarioEventStep[];
 }
 
@@ -226,6 +233,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 id: 'zamora_princess_captive',
                 tile: { x: 28, y: 9 },
                 markerLabelKey: 'story.event.ep02.princess.marker.captive',
+                markerKind: 'person',
                 hideWhenRuntimeFlag: 'princess_rescued',
             },
         ],
@@ -318,7 +326,104 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             },
             { kind: 'combatStart', labelKey: 'story.event.ep02.combatStart', focus: { x: 27, y: 10 } },
         ],
-        fieldEvents: [],
+        fieldEvents: [
+            {
+                id: 'zamora_gold_chest_01',
+                originalSource: 'MAP/02set.arc:02.evt',
+                originalEventId: 'EVENT 01',
+                trigger: 'treasure chest GOLD 100',
+                triggerTiles: [{ x: 11, y: 5 }],
+                runtimeFlag: 'zamora_gold_chest_01',
+                markerLabelKey: 'story.event.ep02.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'gold', amount: 100 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep02.chest.opened', focus: { x: 11, y: 5 } }],
+            },
+            {
+                id: 'zamora_gold_chest_02',
+                originalSource: 'MAP/02set.arc:02.evt',
+                originalEventId: 'EVENT 02',
+                trigger: 'treasure chest GOLD 100',
+                triggerTiles: [{ x: 11, y: 15 }],
+                runtimeFlag: 'zamora_gold_chest_02',
+                markerLabelKey: 'story.event.ep02.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'gold', amount: 100 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep02.chest.opened', focus: { x: 11, y: 15 } }],
+            },
+            {
+                id: 'zamora_gold_chest_03',
+                originalSource: 'MAP/02set.arc:02.evt',
+                originalEventId: 'EVENT 03',
+                trigger: 'treasure chest GOLD 100',
+                triggerTiles: [{ x: 20, y: 6 }],
+                runtimeFlag: 'zamora_gold_chest_03',
+                markerLabelKey: 'story.event.ep02.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'gold', amount: 100 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep02.chest.opened', focus: { x: 20, y: 6 } }],
+            },
+            {
+                id: 'zamora_gold_chest_04',
+                originalSource: 'MAP/02set.arc:02.evt',
+                originalEventId: 'EVENT 04',
+                trigger: 'treasure chest GOLD 100',
+                triggerTiles: [{ x: 20, y: 14 }],
+                runtimeFlag: 'zamora_gold_chest_04',
+                markerLabelKey: 'story.event.ep02.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'gold', amount: 100 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep02.chest.opened', focus: { x: 20, y: 14 } }],
+            },
+            {
+                id: 'zamora_item_chest_05',
+                originalSource: 'MAP/02set.arc:02.evt',
+                originalEventId: 'EVENT 05',
+                trigger: 'treasure chest GETITEM 300',
+                triggerTiles: [{ x: 9, y: 7 }],
+                runtimeFlag: 'zamora_item_chest_05',
+                markerLabelKey: 'story.event.ep02.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep02.chest.opened', focus: { x: 9, y: 7 } }],
+            },
+            {
+                id: 'zamora_item_chest_06',
+                originalSource: 'MAP/02set.arc:02.evt',
+                originalEventId: 'EVENT 06',
+                trigger: 'treasure chest GETITEM 300',
+                triggerTiles: [{ x: 9, y: 13 }],
+                runtimeFlag: 'zamora_item_chest_06',
+                markerLabelKey: 'story.event.ep02.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep02.chest.opened', focus: { x: 9, y: 13 } }],
+            },
+            {
+                id: 'zamora_item_chest_07',
+                originalSource: 'MAP/02set.arc:02.evt',
+                originalEventId: 'EVENT 07',
+                trigger: 'treasure chest GETITEM 300',
+                triggerTiles: [{ x: 24, y: 8 }],
+                runtimeFlag: 'zamora_item_chest_07',
+                markerLabelKey: 'story.event.ep02.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep02.chest.opened', focus: { x: 24, y: 8 } }],
+            },
+            {
+                id: 'zamora_item_chest_08',
+                originalSource: 'MAP/02set.arc:02.evt',
+                originalEventId: 'EVENT 08',
+                trigger: 'treasure chest GETITEM 300',
+                triggerTiles: [{ x: 24, y: 12 }],
+                runtimeFlag: 'zamora_item_chest_08',
+                markerLabelKey: 'story.event.ep02.chest.marker',
+                markerKind: 'chest',
+                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                steps: [{ kind: 'objective', labelKey: 'story.event.ep02.chest.opened', focus: { x: 24, y: 12 } }],
+            },
+        ],
         bossDefeat: [
             { kind: 'objective', labelKey: 'story.event.ep02.objective', focus: { x: 1, y: 10 } },
         ],
