@@ -227,6 +227,69 @@ const ZAMORA_TILE_OVERRIDES: StoryInteriorTileOverride[] = [
     { tile: { x: 27, y: 10 }, type: TileType.ROAD },
 ];
 
+const ETNA_WALKABLE_AREAS: StoryInteriorRoom[] = [
+    { id: 'etnaMouth', nameKey: 'story.interior.room.etnaMouth', x: 12, y: 31, width: 6, height: 4 },
+    { id: 'etnaLowerTunnel', nameKey: 'story.interior.room.etnaLowerTunnel', x: 13, y: 24, width: 4, height: 8 },
+    { id: 'etnaWestSteamVent', nameKey: 'story.interior.room.etnaWestSteamVent', x: 5, y: 22, width: 9, height: 5 },
+    { id: 'etnaEastAshShelf', nameKey: 'story.interior.room.etnaEastAshShelf', x: 16, y: 20, width: 8, height: 5 },
+    { id: 'etnaMagmaBridge', nameKey: 'story.interior.room.etnaMagmaBridge', x: 12, y: 15, width: 8, height: 7 },
+    { id: 'etnaUpperTunnel', nameKey: 'story.interior.room.etnaUpperTunnel', x: 13, y: 8, width: 5, height: 8 },
+    { id: 'etnaGanomasLair', nameKey: 'story.interior.room.etnaGanomasLair', x: 10, y: 3, width: 10, height: 6 },
+];
+
+const ETNA_DOORS: StoryInteriorDoor[] = [
+    { id: 'cave_mouth', tile: { x: 15, y: 34 }, connects: ['entry'], originalTile: { x: 15, y: 2 } },
+    { id: 'lower_tunnel_choke', tile: { x: 15, y: 24 }, connects: ['etnaMouth', 'etnaLowerTunnel'], originalTile: { x: 17, y: 3 } },
+    { id: 'magma_bridge_choke', tile: { x: 15, y: 21 }, connects: ['etnaLowerTunnel', 'etnaMagmaBridge'], originalTile: { x: 25, y: 25 } },
+    { id: 'ganomas_lair_choke', tile: { x: 15, y: 8 }, connects: ['etnaUpperTunnel', 'etnaGanomasLair'], originalTile: { x: 25, y: 25 }, sealed: true },
+];
+
+const ETNA_BLOCKED_PATHS: StoryInteriorBlockedPath[] = [
+    { id: 'lower_lava_west_1', tile: { x: 12, y: 27 }, originalTile: { x: 14, y: 20 } },
+    { id: 'lower_lava_east_1', tile: { x: 17, y: 27 }, originalTile: { x: 18, y: 20 } },
+    { id: 'west_vent_lava', tile: { x: 9, y: 23 }, originalTile: { x: 13, y: 25 } },
+    { id: 'east_shelf_lava', tile: { x: 20, y: 22 }, originalTile: { x: 25, y: 25 } },
+    { id: 'bridge_lava_west_1', tile: { x: 12, y: 17 }, originalTile: { x: 20, y: 33 } },
+    { id: 'bridge_lava_west_2', tile: { x: 12, y: 19 }, originalTile: { x: 20, y: 35 } },
+    { id: 'bridge_lava_east_1', tile: { x: 19, y: 17 }, originalTile: { x: 30, y: 33 } },
+    { id: 'bridge_lava_east_2', tile: { x: 19, y: 19 }, originalTile: { x: 30, y: 35 } },
+    { id: 'upper_lava_west', tile: { x: 13, y: 11 }, originalTile: { x: 24, y: 47 } },
+    { id: 'upper_lava_east', tile: { x: 17, y: 12 }, originalTile: { x: 27, y: 50 } },
+];
+
+const ETNA_TILE_OVERRIDES: StoryInteriorTileOverride[] = [
+    { tile: { x: 15, y: 34 }, type: TileType.DUNGEON_ENTRANCE },
+    ...ETNA_BLOCKED_PATHS.map((path) => ({ tile: { ...path.tile }, type: TileType.LAVA })),
+    { tile: { x: 15, y: 32 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 31 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 30 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 29 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 28 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 27 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 26 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 25 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 24 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 23 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 22 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 21 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 20 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 19 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 18 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 17 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 16 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 15 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 14 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 13 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 12 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 11 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 10 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 9 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 8 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 7 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 6 }, type: TileType.ROAD },
+    { tile: { x: 15, y: 5 }, type: TileType.ROAD },
+];
+
 function layout(dungeonId: string, theme: StoryInteriorTheme): StoryInteriorLayout {
     return {
         dungeonId,
@@ -337,10 +400,52 @@ const ZAMORA_FORTRESS_LAYOUT: StoryInteriorLayout = {
     tileOverrides: ZAMORA_TILE_OVERRIDES.map((override) => ({ ...override, tile: { ...override.tile } })),
 };
 
+const ETNA_VOLCANO_LAYOUT: StoryInteriorLayout = {
+    dungeonId: 'etna_volcano',
+    displayNameKey: 'story.interior.etna_volcano.name',
+    width: 30,
+    height: 36,
+    theme: 'volcano',
+    entryTile: { x: 15, y: 34 },
+    playerStart: { x: 15, y: 32 },
+    guardTiles: [
+        { x: 10, y: 24 },
+        { x: 21, y: 22 },
+        { x: 14, y: 20 },
+        { x: 16, y: 18 },
+        { x: 14, y: 12 },
+        { x: 16, y: 10 },
+        { x: 12, y: 6 },
+        { x: 18, y: 6 },
+    ],
+    bossTile: { x: 15, y: 5 },
+    objectiveKey: 'story.interior.etna_volcano.objective',
+    rooms: [
+        { id: 'entry', nameKey: 'story.interior.room.entryHall', x: 12, y: 31, width: 6, height: 4 },
+        ...ETNA_WALKABLE_AREAS.map((room) => ({ ...room })),
+        { id: 'bossRoom', nameKey: 'story.interior.room.bossRoom', x: 10, y: 3, width: 10, height: 6 },
+    ],
+    props: [
+        { kind: 'torch', tile: { x: 13, y: 31 } },
+        { kind: 'torch', tile: { x: 17, y: 31 } },
+        { kind: 'rubble', tile: { x: 12, y: 27 } },
+        { kind: 'rubble', tile: { x: 17, y: 27 } },
+        { kind: 'rubble', tile: { x: 12, y: 17 } },
+        { kind: 'rubble', tile: { x: 19, y: 19 } },
+        { kind: 'sealedDoor', tile: { x: 15, y: 8 }, labelKey: 'story.interior.prop.sealedDoor' },
+        { kind: 'bossSeal', tile: { x: 15, y: 5 }, labelKey: 'story.interior.prop.bossSeal' },
+        { kind: 'banner', tile: { x: 14, y: 4 } },
+    ],
+    doors: ETNA_DOORS.map((door) => ({ ...door, tile: { ...door.tile }, originalTile: door.originalTile ? { ...door.originalTile } : undefined })),
+    blockedPaths: ETNA_BLOCKED_PATHS.map((path) => ({ ...path, tile: { ...path.tile }, originalTile: path.originalTile ? { ...path.originalTile } : undefined })),
+    walkableAreas: ETNA_WALKABLE_AREAS.map((room) => ({ ...room })),
+    tileOverrides: ETNA_TILE_OVERRIDES.map((override) => ({ ...override, tile: { ...override.tile } })),
+};
+
 export const STORY_INTERIOR_LAYOUTS: StoryInteriorLayout[] = [
     BURGOS_CASTLE_LAYOUT,
     ZAMORA_FORTRESS_LAYOUT,
-    layout('etna_volcano', 'volcano'),
+    ETNA_VOLCANO_LAYOUT,
     layout('sagrajas_temple', 'temple'),
     layout('pyramid_inside', 'pyramid'),
     layout('ament_gate', 'ament'),

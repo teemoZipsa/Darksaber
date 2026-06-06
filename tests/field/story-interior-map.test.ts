@@ -154,6 +154,34 @@ test('Zamora Fortress uses a dedicated original-inspired interior route', () => 
     }
 });
 
+test('Etna Volcano uses a dedicated vertical lava cave route', () => {
+    const layout = getStoryInteriorLayout('etna_volcano');
+    assert.ok(layout);
+    const map = new StoryInteriorMap(layout);
+
+    assert.deepEqual(map.getBoundsTiles(), { width: 30, height: 36 });
+    assert.equal(layout.theme, 'volcano');
+    assert.equal(layout.objectiveKey, 'story.interior.etna_volcano.objective');
+    assert.ok(layout.rooms.some((room) => room.id === 'etnaMouth'));
+    assert.ok(layout.rooms.some((room) => room.id === 'etnaLowerTunnel'));
+    assert.ok(layout.rooms.some((room) => room.id === 'etnaWestSteamVent'));
+    assert.ok(layout.rooms.some((room) => room.id === 'etnaEastAshShelf'));
+    assert.ok(layout.rooms.some((room) => room.id === 'etnaMagmaBridge'));
+    assert.ok(layout.rooms.some((room) => room.id === 'etnaUpperTunnel'));
+    assert.ok(layout.rooms.some((room) => room.id === 'etnaGanomasLair'));
+    assert.ok(layout.doors?.some((door) => door.id === 'ganomas_lair_choke' && door.sealed));
+    assert.equal(layout.blockedPaths?.length, 10);
+    assert.equal(getStoryInteriorTileAt(layout, 12, 27), TileType.LAVA);
+    assert.equal(getStoryInteriorTileAt(layout, 15, 20), TileType.ROAD);
+    assert.equal(map.isWalkable(12, 27), false);
+    assert.equal(map.getDisplayName(), '에트나 화산 내부');
+    assert.equal(hasWalkablePath(map, layout.playerStart, layout.bossTile), true);
+
+    for (const blocked of layout.blockedPaths ?? []) {
+        assert.equal(map.isWalkable(blocked.tile.x, blocked.tile.y), false, blocked.id);
+    }
+});
+
 test('Zamora Fortress exposes original episode 2 entry event flow', () => {
     const sequence = getStoryScenarioEventSequence('zamora_fortress');
     assert.ok(sequence);

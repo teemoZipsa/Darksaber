@@ -223,6 +223,14 @@ export class StoryInteriorMap extends WorldMap {
                 ctx.fillStyle = 'rgba(255, 220, 155, 0.08)';
                 ctx.fillRect(sx + 4, sy + 4, TILE_SIZE - 8, TILE_SIZE - 8);
                 break;
+            case TileType.LAVA:
+                ctx.fillStyle = '#4d140f';
+                ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+                ctx.fillStyle = '#c23a20';
+                ctx.fillRect(sx + 3, sy + 6, TILE_SIZE - 6, TILE_SIZE - 12);
+                ctx.fillStyle = 'rgba(255, 170, 58, 0.34)';
+                ctx.fillRect(sx + 8, sy + 10, TILE_SIZE - 16, TILE_SIZE - 20);
+                break;
             default:
                 ctx.fillStyle = (x + y) % 2 === 0 ? colors.floor : colors.floorAlt;
                 ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
