@@ -1,9 +1,9 @@
 import type { PartyManager } from '../../character/PartyManager';
 import { Character } from '../../character/Character';
-import { getClassLine } from '../../data/ClassTree';
 import { getItemDef, type ItemDef } from '../../data/ItemDB';
 import type { PlayerData } from '../../data/PlayerData';
 import type { PlacedItem } from '../../inventory/GridInventory';
+import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../../data/StarterKitData';
 import { STORY_SCENARIO_EVENT_SEQUENCES } from '../../data/StoryScenarioEventData';
 import { STORY_QUESTS, type StoryQuestReward } from '../../data/StoryQuestData';
 import { t } from '../../i18n/LanguageManager';
@@ -154,14 +154,12 @@ export class WorldRaidOutcomeController {
     private applyRaidFailureRecoveryKit(): string[] {
         let equippedCount = 0;
         for (const character of this.context.party.getCharacters()) {
-            equippedCount += this.equipRecoveryItemIfEmpty(character, 'short_sword') ? 1 : 0;
-            equippedCount += this.equipRecoveryItemIfEmpty(character, 'wooden_shield') ? 1 : 0;
+            equippedCount += this.equipRecoveryItemIfEmpty(character, STARTER_WEAPON_ITEM_ID) ? 1 : 0;
             equippedCount += this.equipRecoveryItemIfEmpty(character, this.getRecoveryBodyArmorId(character)) ? 1 : 0;
         }
 
-        const backpackIds = ['herb_cheap', 'herb_cheap', 'mp_potion'];
         let backpackCount = 0;
-        for (const itemId of backpackIds) {
+        for (const itemId of STARTER_CONSUMABLE_ITEM_IDS) {
             const item = getItemDef(itemId);
             if (item && this.context.gameManager.inventory.autoPlace(item)) backpackCount += 1;
         }
@@ -178,8 +176,7 @@ export class WorldRaidOutcomeController {
     }
 
     private getRecoveryBodyArmorId(character: Character): string {
-        const branch = getClassLine(character.classLineId)?.branch ?? 'battle';
-        return `${branch}_t1_body`;
+        return getStarterBodyArmorId(character.classLineId);
     }
 
     private createRecoveryPlacedItem(item: ItemDef): PlacedItem {

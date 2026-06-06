@@ -132,7 +132,7 @@ test('raid failure grants a basic recovery set instead of leaving the party empt
     controller.completeFailure('DEAD');
 
     assert.equal(hero.equipment.get('weapon')?.item.id, 'short_sword');
-    assert.equal(hero.equipment.get('shield')?.item.id, 'wooden_shield');
+    assert.equal(hero.equipment.has('shield'), false);
     assert.equal(hero.equipment.get('body')?.item.id, 'battle_t1_body');
     assert.deepEqual(gameManager.inventory.items.map((placed) => placed.item.id), ['herb_cheap', 'herb_cheap', 'mp_potion']);
     assert.ok(getOutcome()?.notes?.some((note) => note.includes('기본 보급품 지급')));

@@ -11,10 +11,11 @@ import { GameState } from './GameState';
 import { WorldEngine } from './WorldEngine';
 import { PartyManager } from '../character/PartyManager';
 import { Character } from '../character/Character';
-import { GridInventory } from '../inventory/GridInventory';
+import { GridInventory, type PlacedItem } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
-import { ITEMS } from '../data/ItemDB';
+import { ITEMS, type ItemDef, type ItemSlot } from '../data/ItemDB';
 import { getClassLine } from '../data/ClassTree';
+import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../data/StarterKitData';
 import { getStoryCompanionRewards } from '../data/StoryQuestData';
 import { renderGameTitle } from '../ui/UITheme';
 import { t } from '../i18n/LanguageManager';
@@ -98,14 +99,6 @@ export class GameManager {
         this.playerData = new PlayerData();
         this.playerData.load();
         this.syncStoryCompanionsToRoster();
-
-        // Give starter items
-        const sword = ITEMS.find(i => i.id === 'short_sword');
-        if (sword) this.inventory.autoPlace(sword);
-        const herb = ITEMS.find(i => i.id === 'herb_cheap');
-        if (herb) { this.inventory.autoPlace(herb); this.inventory.autoPlace(herb); }
-        const mpPot = ITEMS.find(i => i.id === 'mp_potion');
-        if (mpPot) this.inventory.autoPlace(mpPot);
 
         this.inventoryUI = new InventoryUI(this.inventory);
         this.partyUI = new PartyUI(this.party);
@@ -309,6 +302,8 @@ export class GameManager {
         const charId = `player_${Date.now()}`;
         const char = new Character(charId, name.trim() || 'Hero', classId);
         char.gender = gender;
+        this.applyStarterEquipment(char);
+        this.grantStarterConsumables();
         this.party.addToRoster(char);
         this.party.deployCharacter(char);
         this.party.switchTo(0);
@@ -376,6 +371,8 @@ export class GameManager {
             this.party.addToRoster(character);
             characters.set(character.id, character);
         }
+        const selected = characters.get(selectedCharacter.id);
+        if (selected) this.loadEquipmentFromSave(save, selected);
 
         const deployIds = activeIds.length > 0 ? activeIds : [selectedCharacter.id];
         for (const id of deployIds.slice(0, this.party.MAX_ACTIVE_PARTY_SIZE)) {
@@ -394,6 +391,31 @@ export class GameManager {
         for (const entry of save.inventory.items) this.placeSavedInventoryItem(entry);
     }
 
+    private loadEquipmentFromSave(save: CharacterSave, character: Character): void {
+        const entries = readSavedEquipmentEntries(save.equipment);
+        for (const entry of entries) {
+            const item = ITEMS.find((candidate) => candidate.id === entry.itemId);
+            if (!item || item.slot !== entry.slot) continue;
+            const placed = this.createPlacedItem(item, entry);
+            character.equipment.set(item.slot, placed);
+        }
+    }
+
+    private applyStarterEquipment(character: Character): void {
+        for (const itemId of [STARTER_WEAPON_ITEM_ID, getStarterBodyArmorId(character.classLineId)]) {
+            const item = ITEMS.find((candidate) => candidate.id === itemId);
+            if (!item || item.slot === 'consumable' || character.equipment.has(item.slot)) continue;
+            character.equip(this.createPlacedItem(item, null));
+        }
+    }
+
+    private grantStarterConsumables(): void {
+        for (const itemId of STARTER_CONSUMABLE_ITEM_IDS) {
+            const item = ITEMS.find((candidate) => candidate.id === itemId);
+            if (item) this.inventory.autoPlace(item);
+        }
+    }
+
     private placeSavedInventoryItem(entry: InventorySaveItem): void {
         const item = ITEMS.find((candidate) => candidate.id === entry.itemId);
         if (!item) return;
@@ -402,6 +424,16 @@ export class GameManager {
         placed.quantity = Math.max(1, Math.floor(entry.quantity));
         placed.durability = Math.max(0, Math.min(item.maxDurability, Math.floor(entry.durability)));
         placed.acquiredInRaid = entry.acquiredInRaid;
+    }
+
+    private createPlacedItem(item: ItemDef, entry: SavedEquipmentEntry | null): PlacedItem {
+        return {
+            item,
+            gridX: entry?.gridX ?? 0,
+            gridY: entry?.gridY ?? 0,
+            quantity: entry?.quantity ?? 1,
+            durability: Math.max(0, Math.min(item.maxDurability, Math.floor(entry?.durability ?? item.maxDurability))),
+        };
     }
 
     // ─── Pause menu (DOM overlay) ─────────────────────────────────
@@ -707,6 +739,15 @@ interface SavedRosterEntry {
     skillUpgradeLevels: Record<string, number>;
 }
 
+interface SavedEquipmentEntry {
+    slot: ItemSlot;
+    itemId: string;
+    gridX: number;
+    gridY: number;
+    quantity: number;
+    durability: number;
+}
+
 function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter): SavedRosterEntry[] {
     const rawCharacters = Array.isArray(save.rosterSnapshot.characters) ? save.rosterSnapshot.characters : [];
     const entries = rawCharacters.flatMap((raw): SavedRosterEntry[] => {
@@ -744,6 +785,26 @@ function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter
             baseStats: selectedCharacter.baseStats,
             magicLoadout: [],
             skillUpgradeLevels: {},
+        });
+    }
+    return entries;
+}
+
+function readSavedEquipmentEntries(equipment: Record<string, unknown>): SavedEquipmentEntry[] {
+    const slots: ItemSlot[] = ['weapon', 'shield', 'head', 'body', 'boots', 'accessory', 'accessory2'];
+    const entries: SavedEquipmentEntry[] = [];
+    for (const slot of slots) {
+        const raw = equipment[slot];
+        if (!isRecord(raw)) continue;
+        const itemId = typeof raw.itemId === 'string' ? raw.itemId : null;
+        if (!itemId) continue;
+        entries.push({
+            slot,
+            itemId,
+            gridX: positiveInt(raw.gridX, 0),
+            gridY: positiveInt(raw.gridY, 0),
+            quantity: positiveInt(raw.quantity, 1),
+            durability: positiveInt(raw.durability, Number.MAX_SAFE_INTEGER),
         });
     }
     return entries;

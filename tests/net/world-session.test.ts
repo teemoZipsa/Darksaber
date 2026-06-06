@@ -86,6 +86,26 @@ test('join spawns each player at their origin hub external exit tile', () => {
     assert.deepEqual(forestActor?.tile, forestExit);
 });
 
+test('default character saves start with the shared no-shield basic kit', () => {
+    const save = createDefaultCharacterSave(authCharacter('starter'));
+    const equipment = save.equipment as Record<string, { itemId?: string }>;
+
+    assert.equal(equipment.weapon?.itemId, 'short_sword');
+    assert.equal(equipment.body?.itemId, 'battle_t1_body');
+    assert.equal(Object.prototype.hasOwnProperty.call(equipment, 'shield'), false);
+    assert.deepEqual(save.inventory.items.map((item) => item.itemId), ['herb_cheap', 'herb_cheap', 'mp_potion']);
+});
+
+test('default character saves use class-branch body armor', () => {
+    const mage = { ...authCharacter('starter-mage'), classKey: 'mage' as const };
+    const save = createDefaultCharacterSave(mage);
+    const equipment = save.equipment as Record<string, { itemId?: string }>;
+
+    assert.equal(equipment.weapon?.itemId, 'short_sword');
+    assert.equal(equipment.body?.itemId, 'magic_t1_body');
+    assert.equal(Object.prototype.hasOwnProperty.call(equipment, 'shield'), false);
+});
+
 test('server tick keeps passive enemy ATB idle for every client snapshot', () => {
     const session = new WorldSession();
     const a = session.join(joinMessage('central_castle', 'hero-a'), 0);
