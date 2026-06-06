@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getStoryScenarioEventSequence } from '../../src/data/StoryScenarioEventData';
 import { getStoryInteriorLayout, getStoryInteriorTileAt, STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
+import { i18n } from '../../src/i18n/LanguageManager';
 import { TileType } from '../../src/map/Tile';
 import { StoryInteriorMap } from '../../src/map/StoryInteriorMap';
 
@@ -81,6 +82,30 @@ test('Burgos interior uses a dedicated original-inspired route and event sequenc
     assert.equal(sequence.originalSources.sceneScript, 'Wlib/scene1.lsc');
     assert.equal(sequence.originalSources.globalScript, 'Glib/gscene1.lsc');
     assert.ok(sequence.originalSources.mapFiles.includes('MAP/01.mrc'));
-    assert.equal(sequence.entry.filter((step) => step.kind === 'dialogue').length, 2);
+    assert.equal(sequence.entry.filter((step) => step.kind === 'dialogue').length, 7);
     assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
+    assert.equal(sequence.fieldEvents.length, 2);
+    assert.ok(sequence.fieldEvents.some((event) => event.id === 'cain_son_relic'));
+    assert.ok(sequence.fieldEvents.every((event) => event.originalSource === 'MAP/01set.arc:01.evt'));
+    assert.ok(sequence.fieldEvents.every((event) => event.steps.length > 0));
+});
+
+test('Burgos scenario event keys exist in both languages without snapshotting full text', () => {
+    const sequence = getStoryScenarioEventSequence('burgos_castle');
+    assert.ok(sequence);
+
+    const keys = new Set<string>();
+    const collect = (step: (typeof sequence.entry)[number]) => {
+        if ('labelKey' in step) keys.add(step.labelKey);
+        if ('speakerNameKey' in step) keys.add(step.speakerNameKey);
+        if ('textKey' in step) keys.add(step.textKey);
+    };
+    sequence.entry.forEach(collect);
+    sequence.bossDefeat.forEach(collect);
+    sequence.fieldEvents.forEach((event) => event.steps.forEach(collect));
+
+    for (const key of keys) {
+        assert.notEqual(i18n.strings.ko[key as keyof typeof i18n.strings.ko], undefined, `missing ko key ${key}`);
+        assert.notEqual(i18n.strings.en[key as keyof typeof i18n.strings.en], undefined, `missing en key ${key}`);
+    }
 });
