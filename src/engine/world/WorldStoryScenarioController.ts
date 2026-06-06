@@ -92,6 +92,7 @@ export class WorldStoryScenarioController {
         if (!layout) return null;
         if (this.activeInterior?.dungeonId === dungeonId) {
             this.syncActiveInteriorDoorLocks();
+            this.syncActiveInteriorInspectMarkers();
             return layout;
         }
 
@@ -106,6 +107,7 @@ export class WorldStoryScenarioController {
         this.context.getWorldMap().loot = [];
         this.dismissedDungeonVisitKey = null;
         this.syncActiveInteriorDoorLocks();
+        this.syncActiveInteriorInspectMarkers();
         return layout;
     }
 
@@ -136,6 +138,7 @@ export class WorldStoryScenarioController {
         this.completedFieldEventKeys.add(key);
         if (event.runtimeFlag) this.context.raidSession.setScenarioFlag(dungeonId, event.runtimeFlag);
         this.syncActiveInteriorDoorLocks();
+        this.syncActiveInteriorInspectMarkers();
         for (const step of event.steps) this.playStoryScenarioEventStep(step);
         return true;
     }
@@ -458,6 +461,30 @@ export class WorldStoryScenarioController {
             .map((door) => door.tile));
     }
 
+    private syncActiveInteriorInspectMarkers(): void {
+        const active = this.activeInterior;
+        const worldMap = this.context.getWorldMap();
+        if (!active || !(worldMap instanceof StoryInteriorMap)) return;
+        if (this.context.isNetworkRaid()) {
+            worldMap.setInspectMarkers([]);
+            return;
+        }
+
+        const sequence = getStoryScenarioEventSequence(active.dungeonId);
+        if (!sequence) {
+            worldMap.setInspectMarkers([]);
+            return;
+        }
+
+        worldMap.setInspectMarkers(sequence.fieldEvents
+            .filter((event) => !this.isFieldEventCompleted(active.dungeonId, event))
+            .flatMap((event) => event.triggerTiles.map((tile) => ({
+                id: `${event.id}:${tile.x},${tile.y}`,
+                tile,
+                labelKey: event.markerLabelKey,
+            }))));
+    }
+
     private getLockedDoorAt(tile: TilePoint): NonNullable<StoryInteriorLayout['doors']>[number] | null {
         const active = this.activeInterior;
         if (!active || this.context.isNetworkRaid()) return null;
@@ -477,6 +504,7 @@ export class WorldStoryScenarioController {
 
     private isFieldEventCompleted(dungeonId: string, event: StoryScenarioFieldEvent): boolean {
         if (this.completedFieldEventKeys.has(this.fieldEventKey(dungeonId, event.id))) return true;
+        if (event.questItemId && this.context.playerData.hasQuestItem(event.questItemId)) return true;
         return event.runtimeFlag ? this.context.raidSession.hasScenarioFlag(dungeonId, event.runtimeFlag) : false;
     }
 

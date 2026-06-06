@@ -89,6 +89,7 @@ test('Burgos interior uses a dedicated original-inspired route and event sequenc
     assert.ok(sequence.fieldEvents.every((event) => event.originalSource === 'MAP/01set.arc:01.evt'));
     assert.ok(sequence.fieldEvents.every((event) => event.steps.length > 0));
     assert.ok(sequence.fieldEvents.every((event) => event.triggerTiles.length > 0));
+    assert.ok(sequence.fieldEvents.every((event) => event.markerLabelKey));
 });
 
 test('Burgos interior exposes original-inspired doors, blocked paths, and event access', () => {
@@ -111,6 +112,19 @@ test('Burgos interior exposes original-inspired doors, blocked paths, and event 
         assert.equal(map.isWalkable(tile.x, tile.y), true, `${tile.x},${tile.y}`);
         assert.equal(hasWalkablePath(map, layout.playerStart, tile), true, `${tile.x},${tile.y}`);
     }
+
+    map.setInspectMarkers(sequence.fieldEvents.map((event) => ({
+        id: event.id,
+        tile: event.triggerTiles[0],
+        labelKey: event.markerLabelKey,
+    })));
+    assert.deepEqual(
+        map.getInspectMarkers().map((marker) => ({ id: marker.id, tile: marker.tile, labelKey: marker.labelKey })),
+        [
+            { id: 'burgos_key_handoff', tile: { x: 25, y: 9 }, labelKey: 'story.event.ep01.field.key.marker' },
+            { id: 'cain_son_relic', tile: { x: 9, y: 12 }, labelKey: 'story.event.ep01.field.cain.marker' },
+        ]
+    );
 });
 
 test('Burgos scenario event keys exist in both languages without snapshotting full text', () => {
@@ -125,7 +139,10 @@ test('Burgos scenario event keys exist in both languages without snapshotting fu
     };
     sequence.entry.forEach(collect);
     sequence.bossDefeat.forEach(collect);
-    sequence.fieldEvents.forEach((event) => event.steps.forEach(collect));
+    sequence.fieldEvents.forEach((event) => {
+        if (event.markerLabelKey) keys.add(event.markerLabelKey);
+        event.steps.forEach(collect);
+    });
 
     for (const key of keys) {
         assert.notEqual(i18n.strings.ko[key as keyof typeof i18n.strings.ko], undefined, `missing ko key ${key}`);

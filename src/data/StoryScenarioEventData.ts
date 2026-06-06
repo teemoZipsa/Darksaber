@@ -26,6 +26,7 @@ export interface StoryScenarioFieldEvent {
     triggerTiles: TilePoint[];
     runtimeFlag?: string;
     questItemId?: string;
+    markerLabelKey?: string;
     steps: StoryScenarioEventStep[];
 }
 
@@ -103,6 +104,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 triggerTiles: [{ x: 25, y: 9 }],
                 runtimeFlag: 'burgos_key',
                 questItemId: 'quest_burgos_key',
+                markerLabelKey: 'story.event.ep01.field.key.marker',
                 steps: [
                     {
                         kind: 'dialogue',
@@ -143,6 +145,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 triggerTiles: [{ x: 9, y: 12 }],
                 runtimeFlag: 'cain_necklace',
                 questItemId: 'quest_cain_necklace',
+                markerLabelKey: 'story.event.ep01.field.cain.marker',
                 steps: [
                     {
                         kind: 'dialogue',

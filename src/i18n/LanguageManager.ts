@@ -386,12 +386,14 @@ export const i18n = {
             'story.event.ep01.field.key.04': '이것을 가지고....|부디.. 폐하를...',
             'story.event.ep01.field.key.result': '열쇠를 얻었습니다.',
             'story.event.ep01.field.key.lockedDoor': '문이 잠겨 있습니다. 부르고스성 열쇠가 필요합니다.',
+            'story.event.ep01.field.key.marker': '생존자',
             'story.event.ep01.field.cain.01': '당신이 혹시 케인의 아들입니까?',
             'story.event.ep01.field.cain.02': '그렇습니다만.. ',
             'story.event.ep01.field.cain.03': '케인씨의 부탁을 받고 |당신을 구하러 왔소.',
             'story.event.ep01.field.cain.04': '고맙소만..커헉..난 이미 틀렸소.|대신 아버님께.. |이것을.. 전해.. 주시오..',
             'story.event.ep01.field.cain.05': '아버님께서...| 내가 성으로 오던..날.. |주신 물건이요... 나의.. 유품이라...|생각하시고..허억...',
             'story.event.ep01.field.cain.result': '%s가 케인의 목걸이를 얻었습니다.',
+            'story.event.ep01.field.cain.marker': '케인의 아들',
             'story.event.ep01.field.cain.06': '이런.. ',
             
             // Shop
@@ -1240,12 +1242,14 @@ export const i18n = {
             'story.event.ep01.field.key.04': 'Take this.... Please.. His Majesty...',
             'story.event.ep01.field.key.result': 'Obtained a key.',
             'story.event.ep01.field.key.lockedDoor': 'The door is locked. The Burgos Castle key is required.',
+            'story.event.ep01.field.key.marker': 'Survivor',
             'story.event.ep01.field.cain.01': "Are you Cain's son?",
             'story.event.ep01.field.cain.02': 'Yes...',
             'story.event.ep01.field.cain.03': 'Cain asked me to come and save you.',
             'story.event.ep01.field.cain.04': 'Thank you, but.. cough.. I am already done for. Please.. give this.. to my father..',
             'story.event.ep01.field.cain.05': 'My father... gave it to me.. on the day I came to the castle.. Please think of it.. as my keepsake... hah...',
             'story.event.ep01.field.cain.result': '%s obtained Cain\'s necklace.',
+            'story.event.ep01.field.cain.marker': "Cain's Son",
             'story.event.ep01.field.cain.06': 'No...',
             
             // Shop

@@ -58,9 +58,16 @@ const THEME_COLORS = {
     },
 } as const;
 
+export interface StoryInteriorInspectMarker {
+    id: string;
+    tile: TilePoint;
+    labelKey?: string;
+}
+
 export class StoryInteriorMap extends WorldMap {
     private readonly layout: StoryInteriorLayout;
     private readonly lockedTileKeys: Set<string>;
+    private inspectMarkers: StoryInteriorInspectMarker[] = [];
 
     constructor(layout: StoryInteriorLayout, options: { lockedTiles?: readonly TilePoint[] } = {}) {
         super('mortal', { validateTownSpawns: false });
@@ -152,6 +159,20 @@ export class StoryInteriorMap extends WorldMap {
         return this.lockedTileKeys.has(this.tileKey(tx, ty));
     }
 
+    public setInspectMarkers(markers: readonly StoryInteriorInspectMarker[]): void {
+        this.inspectMarkers = markers.map((marker) => ({
+            ...marker,
+            tile: { ...marker.tile },
+        }));
+    }
+
+    public getInspectMarkers(): StoryInteriorInspectMarker[] {
+        return this.inspectMarkers.map((marker) => ({
+            ...marker,
+            tile: { ...marker.tile },
+        }));
+    }
+
     public render(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number, vw: number, vh: number): void {
         const minX = Math.max(0, Math.floor(cameraX / TILE_SIZE) - 1);
         const minY = Math.max(0, Math.floor(cameraY / TILE_SIZE) - 1);
@@ -170,6 +191,7 @@ export class StoryInteriorMap extends WorldMap {
 
         this.renderRoomTrim(ctx, cameraX, cameraY);
         this.renderInteriorProps(ctx, cameraX, cameraY);
+        this.renderInspectMarkers(ctx, cameraX, cameraY);
         this.renderGate(ctx, cameraX, cameraY);
 
         for (const obj of this.loot) {
@@ -245,6 +267,52 @@ export class StoryInteriorMap extends WorldMap {
         for (const prop of this.layout.props) {
             this.renderInteriorProp(ctx, prop, prop.tile.x * TILE_SIZE - cameraX, prop.tile.y * TILE_SIZE - cameraY);
         }
+    }
+
+    private renderInspectMarkers(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number): void {
+        for (const marker of this.inspectMarkers) {
+            this.renderInspectMarker(ctx, marker, marker.tile.x * TILE_SIZE - cameraX, marker.tile.y * TILE_SIZE - cameraY);
+        }
+    }
+
+    private renderInspectMarker(ctx: CanvasRenderingContext2D, marker: StoryInteriorInspectMarker, sx: number, sy: number): void {
+        ctx.save();
+        const cx = sx + TILE_SIZE / 2;
+
+        ctx.fillStyle = 'rgba(10, 8, 8, 0.62)';
+        ctx.beginPath();
+        ctx.ellipse(cx, sy + TILE_SIZE - 8, 15, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#5f4a42';
+        ctx.fillRect(sx + 9, sy + 17, TILE_SIZE - 14, 7);
+        ctx.fillStyle = '#b19a7a';
+        ctx.beginPath();
+        ctx.arc(sx + 12, sy + 18, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#f1d58b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, sy + 7, 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx, sy + 14);
+        ctx.lineTo(cx, sy + 18);
+        ctx.stroke();
+
+        if (marker.labelKey) {
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillStyle = '#f1d58b';
+            const label = t(marker.labelKey);
+            ctx.strokeText(label, cx, sy - 2);
+            ctx.fillText(label, cx, sy - 2);
+        }
+        ctx.restore();
     }
 
     private renderInteriorProp(ctx: CanvasRenderingContext2D, prop: StoryInteriorProp, sx: number, sy: number): void {

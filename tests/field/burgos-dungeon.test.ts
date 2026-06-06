@@ -32,6 +32,7 @@ import { GridInventory } from '../../src/inventory/GridInventory';
 import { generateWorldLootNear } from '../../src/loot/WorldLootGenerator';
 import { BURGOS_CASTLE_HMAP_ROWS, BURGOS_CASTLE_HMAP_SIZE } from '../../src/map/BurgosCastleHmap';
 import { getStoryInteriorLayout, isStoryInteriorDungeon } from '../../src/data/StoryInteriorData';
+import { StoryInteriorMap } from '../../src/map/StoryInteriorMap';
 import { NEUTRAL_BIRD_SPRITE_SRC, WorldMap } from '../../src/map/WorldMap';
 import { TileType } from '../../src/map/Tile';
 
@@ -464,6 +465,12 @@ test('Burgos field events can be inspected once inside the local interior', () =
 
     harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
 
+    assert.ok(harness.worldMap instanceof StoryInteriorMap);
+    assert.deepEqual(harness.worldMap.getInspectMarkers().map((marker) => marker.id).sort(), [
+        'burgos_key_handoff:25,9',
+        'cain_son_relic:9,12',
+    ]);
+
     const inspectable = harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any);
     assert.equal(inspectable.has('25,9'), true);
 
@@ -475,7 +482,27 @@ test('Burgos field events can be inspected once inside the local interior', () =
         harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any).has('25,9'),
         false
     );
+    assert.deepEqual(harness.worldMap.getInspectMarkers().map((marker) => marker.id), ['cain_son_relic:9,12']);
     assert.equal(harness.controller.playFieldEventAt({ x: 25, y: 9 }, { id: 'hero', entity: player } as any), false);
+});
+
+test('Burgos inspect markers skip events with persistent quest items', () => {
+    const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === BURGOS_CASTLE_DUNGEON_ID);
+    const quest = getStoryQuestByDungeonId(BURGOS_CASTLE_DUNGEON_ID);
+    assert.ok(dungeon);
+    assert.ok(quest);
+
+    const playerData = new PlayerData();
+    playerData.addQuestItem('quest_burgos_key');
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ raidSession, playerData });
+
+    harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+
+    assert.ok(harness.worldMap instanceof StoryInteriorMap);
+    assert.deepEqual(harness.worldMap.getInspectMarkers().map((marker) => marker.id), ['cain_son_relic:9,12']);
+    assert.equal(harness.controller.playFieldEvent(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key_handoff'), false);
 });
 
 test('Burgos throne room seal unlocks after the survivor key event', () => {
