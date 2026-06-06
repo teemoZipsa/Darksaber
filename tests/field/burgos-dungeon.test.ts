@@ -47,6 +47,7 @@ class ImageStub {
 (globalThis as unknown as { Image: typeof ImageStub }).Image = ImageStub;
 
 const MONSTER_PUBLIC_PATH = ['public', ...MONSTER_SPRITE_PATH.split('/').filter(Boolean)];
+const ETNA_VOLCANO_DUNGEON_ID = 'etna_volcano';
 
 function createStoryScenarioHarness(options: {
     player?: Player;
@@ -524,6 +525,36 @@ test('Zamora chest events grant raid rewards once per chest', () => {
     assert.equal(harness.controller.playFieldEvent(ZAMORA_FORTRESS_DUNGEON_ID, 'zamora_item_chest_05'), false);
 });
 
+test('Etna chest events grant original episode 3 raid rewards once per chest', () => {
+    const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === ETNA_VOLCANO_DUNGEON_ID);
+    const quest = getStoryQuestByDungeonId(ETNA_VOLCANO_DUNGEON_ID);
+    assert.ok(dungeon);
+    assert.ok(quest);
+
+    const player = new Player(12, 33);
+    const playerData = new PlayerData();
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ player, playerData, raidSession });
+
+    harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+    assert.ok(harness.worldMap instanceof StoryInteriorMap);
+    assert.ok(harness.worldMap.getInspectMarkers().some((marker) => marker.id === 'etna_gold_chest_01:13,33' && marker.kind === 'chest'));
+
+    assert.equal(harness.controller.playFieldEventAt({ x: 13, y: 33 }, { id: 'hero', entity: player } as any), true);
+    assert.equal(playerData.gold, 600);
+    assert.equal(raidSession.hasScenarioFlag(ETNA_VOLCANO_DUNGEON_ID, 'etna_gold_chest_01'), true);
+    assert.ok(harness.logs.includes('%s가(이) 상자를 열었습니다.'));
+    assert.ok(harness.logs.includes('100 GOLD를 얻었습니다.'));
+    assert.equal(harness.worldMap.getInspectMarkers().some((marker) => marker.id === 'etna_gold_chest_01:13,33'), false);
+    assert.equal(harness.controller.playFieldEventAt({ x: 13, y: 33 }, { id: 'hero', entity: player } as any), false);
+
+    assert.equal(harness.controller.playFieldEvent(ETNA_VOLCANO_DUNGEON_ID, 'etna_item_chest_05'), true);
+    assert.deepEqual(harness.rewardItemIds, ['herb_common']);
+    assert.equal(raidSession.hasScenarioFlag(ETNA_VOLCANO_DUNGEON_ID, 'etna_item_chest_05'), true);
+    assert.equal(harness.controller.playFieldEvent(ETNA_VOLCANO_DUNGEON_ID, 'etna_item_chest_05'), false);
+});
+
 test('Burgos field events can be inspected once inside the local interior', () => {
     const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === BURGOS_CASTLE_DUNGEON_ID);
     const quest = getStoryQuestByDungeonId(BURGOS_CASTLE_DUNGEON_ID);
@@ -803,6 +834,39 @@ test('Zamora Fenris defeat clears only the dungeon encounter, not raid success',
     assert.equal(harness.turnStateCleared, true);
     assert.equal(raidSuccessShown, false);
     assert.ok(harness.logs.includes('자모라 요새 공주 구출 완료. 다른 마을로 생환하면 2화가 완료됩니다.'));
+});
+
+test('Etna Ganomas defeat plays original sword event and clears only the dungeon encounter', () => {
+    const boss = new Enemy('etna_ganomas', 100, 100, '가노마스', 5, '#d86a3a', 'boss');
+    boss.isBoss = true;
+    const guard = new Enemy('etna_guard_0', 98, 98, '불의 수호병', 3, '#d86a3a', 'bruiser');
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    raidSession.startDungeonEncounter(ETNA_VOLCANO_DUNGEON_ID);
+
+    const worldMap = new WorldMap();
+    worldMap.loot = [{ id: 'preexisting_loot' } as any, { id: 'corpse_etna_ganomas' } as any];
+    const harness = createStoryScenarioHarness({
+        raidSession,
+        worldMap,
+        fieldEnemies: [
+            { enemy: boss, home: { x: boss.gridX, y: boss.gridY }, path: [] },
+            { enemy: guard, home: { x: guard.gridX, y: guard.gridY }, path: [] },
+        ],
+    });
+
+    harness.controller.completeDungeonIfBossDefeated(boss);
+
+    assert.equal(raidSession.active, true);
+    assert.equal(raidSession.activeDungeonId, null);
+    assert.equal(raidSession.isDungeonCleared(ETNA_VOLCANO_DUNGEON_ID), true);
+    assert.deepEqual(harness.fieldEnemies, []);
+    assert.deepEqual(harness.worldMap.loot.map((loot) => loot.id), ['preexisting_loot', 'corpse_etna_ganomas']);
+    assert.equal(harness.selectionCleared, true);
+    assert.equal(harness.turnStateCleared, true);
+    assert.ok(harness.logs.includes("%S님이 전설의 보검'을 얻었습니다."));
+    assert.ok(harness.logs.includes('시나리오 클리어'));
+    assert.ok(harness.logs.includes('에트나 화산 목표 달성. 다른 마을로 생환하면 3화가 완료됩니다.'));
 });
 
 test('Airship objective completion keeps variant monsters as optional encounters', () => {

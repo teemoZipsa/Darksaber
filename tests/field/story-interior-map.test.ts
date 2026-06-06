@@ -212,6 +212,29 @@ test('Zamora Fortress exposes original episode 2 entry event flow', () => {
     assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
 });
 
+test('Etna Volcano exposes original episode 3 entry, chest, and Ganomas event flow', () => {
+    const layout = getStoryInteriorLayout('etna_volcano');
+    const sequence = getStoryScenarioEventSequence('etna_volcano');
+    assert.ok(layout);
+    assert.ok(sequence);
+    const map = new StoryInteriorMap(layout);
+
+    assert.equal(sequence.originalSources.sceneScript, 'Wlib/scene3.lsc');
+    assert.equal(sequence.originalSources.globalScript, 'Glib/gscene3.lsc');
+    assert.ok(sequence.originalSources.mapFiles.includes('MAP/03.mrc'));
+    assert.ok(sequence.originalSources.mapFiles.includes('MAP/03set.arc'));
+    assert.equal(sequence.entry.filter((step) => step.kind === 'dialogue').length, 10);
+    assert.equal(sequence.entry.filter((step) => step.kind === 'combatStart').length, 1);
+    assert.equal(sequence.fieldEvents.length, 8);
+    assert.equal(sequence.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'gold' && reward.amount === 100)).length, 4);
+    assert.equal(sequence.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 300)).length, 4);
+    assert.ok(sequence.fieldEvents.every((event) => event.originalSource === 'MAP/03set.arc:03.evt'));
+    assert.ok(sequence.fieldEvents.every((event) => event.markerKind === 'chest'));
+    assert.ok(sequence.fieldEvents.every((event) => event.triggerTiles.every((tile) => map.isWalkable(tile.x, tile.y))));
+    assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
+    assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
+});
+
 test('story scenario event keys exist in both languages without snapshotting full text', () => {
     const keys = new Set<string>();
     const collect = (step: (typeof STORY_SCENARIO_EVENT_SEQUENCES)[number]['entry'][number]) => {
