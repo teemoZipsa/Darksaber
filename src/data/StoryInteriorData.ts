@@ -51,6 +51,7 @@ export interface StoryInteriorLayout {
     playerStart: TilePoint;
     guardTiles: TilePoint[];
     bossTile: TilePoint;
+    objectiveKey?: string;
     rooms: StoryInteriorRoom[];
     props: StoryInteriorProp[];
     doors?: StoryInteriorDoor[];
@@ -308,6 +309,7 @@ const ZAMORA_FORTRESS_LAYOUT: StoryInteriorLayout = {
         { x: 23, y: 11 },
     ],
     bossTile: { x: 27, y: 10 },
+    objectiveKey: 'story.interior.zamora_fortress.objective',
     rooms: [
         { id: 'entry', nameKey: 'story.interior.room.entryHall', x: 2, y: 8, width: 6, height: 5 },
         ...ZAMORA_WALKABLE_AREAS.map((room) => ({ ...room })),

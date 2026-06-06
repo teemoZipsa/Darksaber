@@ -16,7 +16,7 @@
 - Burgos throne-room seal at `{ x: 27, y: 9 }` is locked in local story-interior play until the raid has `burgos_key` or the player owns persistent `quest_burgos_key`.
 - Burgos survivor and Cain's son inspect markers are generated from `StoryScenarioFieldEvent.triggerTiles` and disappear once the corresponding runtime flag or persistent quest item exists.
 - Cain's necklace is shown as an Episode 1 optional quest objective while held as the in-raid `cain_necklace` flag or persistent `quest_cain_necklace`.
-- Zamora v1 entry flow uses original CP949 text extracted from `MAP/02set.arc` (`02.DEO`) and reuses the local story-interior objective completion path for Fenris.
+- Zamora v1 entry flow uses original CP949 text extracted from `MAP/02set.arc` (`02.DEO`). The scenario goal is princess rescue, while the tactical combat condition remains defeating Fenris.
 - Tests should validate event order, key presence, and counts, not snapshot full original dialogue.
 
 ## Tooling
@@ -37,7 +37,7 @@
 | Episode | Dungeon | Status | Scene Candidate | Global Candidate | Map Candidates | Notes |
 |---|---|---|---|---|---|---|
 | 1 | `burgos_castle` | verified-v1 | `Wlib/scene1.lsc` | `Glib/gscene1.lsc` | `MAP/01.mrc`, `MAP/01t.mrc`, `MAP/01hmap.BMP`, `MAP/01set.arc` | v1 layout split into gatehouse, barracks, great hall, inner keep, and throne room. Entry sequence uses `01.DEO`; Cain's son/key handoff are connected as local `01.evt` inspect events. Doors and blocked paths are represented in layout metadata. |
-| 2 | `zamora_fortress` | event-v1 | `Wlib/scene2.lsc` | `Glib/gscene2.lsc` | `MAP/02.mrc`, `MAP/02t.mrc`, `MAP/02hmap.BMP`, `MAP/02set.arc` | `02.mrc`/`02t.mrc` are 40x40 and `02hmap.BMP` is 138x138. `02set.arc` contains `02.DEO`, `02.evt`, `02.srf`, `02A.DEE`, and `02B.DEE`; v1 layout is split into gatehouse, crypt wings, cross hall, ramparts, central keep, and Fenris chamber. Entry sequence uses `02.DEO`; chest/reward events in `02.evt` remain follow-up. |
+| 2 | `zamora_fortress` | event-v1 | `Wlib/scene2.lsc` | `Glib/gscene2.lsc` | `MAP/02.mrc`, `MAP/02t.mrc`, `MAP/02hmap.BMP`, `MAP/02set.arc` | `02.mrc`/`02t.mrc` are 40x40 and `02hmap.BMP` is 138x138. `02set.arc` contains `02.DEO`, `02.evt`, `02.srf`, `02A.DEE`, and `02B.DEE`; v1 layout is split into gatehouse, crypt wings, cross hall, ramparts, central keep, and Fenris chamber. Entry sequence uses `02.DEO`; objective text is princess rescue and combat condition is Fenris defeat. Chest/reward events in `02.evt` remain follow-up. |
 | 3 | `etna_volcano` | candidate | `Wlib/scene3.lsc` | `Glib/gscene3.lsc` | `MAP/03.*` | Indoor volcanic layout. |
 | 4 | `arcadia_plain` | candidate | `Wlib/scene4.lsc` | `Glib/gscene4.lsc` | `MAP/04.*` | Outdoor adaptation; prefer original coordinates. |
 | 5 | `cacaora_highland` | candidate | `Wlib/scene5.lsc` | `Glib/gscene5.lsc` | `MAP/05.*` | Outdoor adaptation. |

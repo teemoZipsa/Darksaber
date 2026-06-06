@@ -480,8 +480,8 @@ test('Zamora local story interior plays original entry flow before Fenris object
     harness.controller.completeDungeonIfBossDefeated(boss);
 
     assert.equal(raidSession.isDungeonCleared(ZAMORA_FORTRESS_DUNGEON_ID), true);
-    assert.ok(harness.logs.includes('펜리스의 처치'));
-    assert.ok(harness.logs.includes('자모라 요새 목표 달성. 다른 마을로 생환하면 2화가 완료됩니다.'));
+    assert.ok(harness.logs.includes('공주 구출'));
+    assert.ok(harness.logs.includes('자모라 요새 공주 구출 완료. 다른 마을로 생환하면 2화가 완료됩니다.'));
 });
 
 test('Burgos field events can be inspected once inside the local interior', () => {
@@ -762,7 +762,7 @@ test('Zamora Fenris defeat clears only the dungeon encounter, not raid success',
     assert.equal(harness.selectionCleared, true);
     assert.equal(harness.turnStateCleared, true);
     assert.equal(raidSuccessShown, false);
-    assert.ok(harness.logs.includes('자모라 요새 목표 달성. 다른 마을로 생환하면 2화가 완료됩니다.'));
+    assert.ok(harness.logs.includes('자모라 요새 공주 구출 완료. 다른 마을로 생환하면 2화가 완료됩니다.'));
 });
 
 test('Airship objective completion keeps variant monsters as optional encounters', () => {

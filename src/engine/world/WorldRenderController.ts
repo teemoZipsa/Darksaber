@@ -2,6 +2,7 @@ import type { PartyManager } from '../../character/PartyManager';
 import type { PlayerData } from '../../data/PlayerData';
 import type { Player } from '../../entity/Player';
 import { TILE_SIZE } from '../../map/Chunk';
+import { StoryInteriorMap } from '../../map/StoryInteriorMap';
 import type { WorldMap } from '../../map/WorldMap';
 import type { ActionMenuUI } from '../../ui/ActionMenuUI';
 import type { EntityInfoUI } from '../../ui/EntityInfoUI';
@@ -153,6 +154,9 @@ export class WorldRenderController {
             : null;
         const activeDungeonId = this.context.raidSession.activeDungeonId;
         const storyInteriorActive = Boolean(activeDungeonId && worldMap.getDungeons().length === 0);
+        const storyInteriorObjectiveKey = worldMap instanceof StoryInteriorMap
+            ? worldMap.getLayout().objectiveKey ?? 'story.interior.objective'
+            : 'story.interior.objective';
 
         return {
             worldTime: this.context.getWorldTime(),
@@ -202,6 +206,7 @@ export class WorldRenderController {
                 active: storyInteriorActive,
                 dungeonId: storyInteriorActive ? activeDungeonId : null,
                 title: storyInteriorActive ? worldMap.getDisplayName() : '',
+                objectiveKey: storyInteriorObjectiveKey,
                 enemiesLeft: storyInteriorActive
                     ? this.context.getFieldEnemies().filter((entry) => entry.enemy.stats.hp > 0).length
                     : 0,
@@ -228,7 +233,7 @@ export class WorldRenderController {
         ctx.fillText(model.storyInterior.title, x + bannerW / 2, y + 8);
         ctx.font = '12px sans-serif';
         ctx.fillStyle = '#cdbb92';
-        ctx.fillText(t('story.interior.objective'), x + bannerW / 2, y + 27);
+        ctx.fillText(t(model.storyInterior.objectiveKey), x + bannerW / 2, y + 27);
         ctx.fillStyle = '#9fb4c8';
         ctx.fillText(formatT('story.interior.enemyCount', { count: model.storyInterior.enemiesLeft }), x + bannerW / 2, y + 42);
         ctx.restore();

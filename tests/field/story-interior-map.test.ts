@@ -142,6 +142,7 @@ test('Zamora Fortress uses a dedicated original-inspired interior route', () => 
     assert.ok(layout.rooms.some((room) => room.id === 'zamoraFenrisChamber'));
     assert.ok(layout.doors?.some((door) => door.id === 'fenris_chamber_seal' && door.sealed));
     assert.equal(layout.blockedPaths?.length, 8);
+    assert.equal(layout.objectiveKey, 'story.interior.zamora_fortress.objective');
     assert.equal(getStoryInteriorTileAt(layout, 17, 8), TileType.WALL);
     assert.equal(getStoryInteriorTileAt(layout, 17, 10), TileType.ROAD);
     assert.equal(map.getDisplayName(), '자모라 요새 내부');
