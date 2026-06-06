@@ -36,11 +36,8 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
     const calls: string[] = [];
     const engine = Object.create(WorldEngine.prototype) as any;
     engine.turnStateController = new WorldTurnStateController();
-    engine.activeTurnActorId = actor.id;
+    engine.turnStateController.setActiveTurn(actor.id, 6);
     engine.turnStateController.readyQueue = [];
-    engine.remainingActionPoints = 6;
-    engine.majorActionUsedThisTurn = false;
-    engine.reservedAction = null;
     engine.partyActors = [actor];
     engine.fieldEnemies = [];
     engine.remotePartyActors = new Map();
@@ -138,11 +135,11 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
         setFieldEnemies: (enemies) => { engine.fieldEnemies = enemies; },
         getControlledActor: () => engine.getControlledActor(),
         setPlayer: (player) => { engine.player = player; },
-        getActiveTurnActorId: () => engine.activeTurnActorId,
-        setActiveTurnActorId: (actorId) => { engine.activeTurnActorId = actorId; },
-        getRemainingActionPoints: () => engine.remainingActionPoints,
-        setRemainingActionPoints: (points) => { engine.remainingActionPoints = points; },
-        setMajorActionUsedThisTurn: (used) => { engine.majorActionUsedThisTurn = used; },
+        getActiveTurnActorId: () => engine.turnStateController.getActiveTurnActorId(),
+        setActiveTurnActorId: (actorId) => engine.turnStateController.setActiveTurnActorId(actorId),
+        getRemainingActionPoints: () => engine.turnStateController.getRemainingActionPoints(),
+        setRemainingActionPoints: (points) => engine.turnStateController.setRemainingActionPoints(points),
+        setMajorActionUsedThisTurn: (used) => engine.turnStateController.setMajorActionUsedThisTurn(used),
         hasSelection: () => engine.selectionController.hasSelection(),
         selectActor: (actorId) => engine.selectionController.selectActor(actorId),
         selectLoot: (lootId) => engine.selectionController.selectLoot(lootId),
@@ -239,10 +236,10 @@ test('active actor turn ends instead of reopening when counter damage downs the 
 
     engine.resumeOrEndActiveTurn(actor);
 
-    assert.equal(engine.activeTurnActorId, null);
-    assert.equal(engine.remainingActionPoints, 0);
-    assert.equal(engine.majorActionUsedThisTurn, false);
-    assert.equal(engine.reservedAction, null);
+    assert.equal(engine.turnStateController.getActiveTurnActorId(), null);
+    assert.equal(engine.turnStateController.getRemainingActionPoints(), 0);
+    assert.equal(engine.turnStateController.getMajorActionUsedThisTurn(), false);
+    assert.equal(engine.turnStateController.getReservedAction(), null);
     assert.equal(actor.entity.actionGauge, 0);
     assert.equal(actor.queuedIntent, null);
     assert.ok(engine.combatLog.includes('hero 턴 종료: 행동 불능'));
@@ -257,8 +254,8 @@ test('ready queue is unblocked if active turn points at a downed actor', () => {
 
     engine.startNextReadyTurn();
 
-    assert.equal(engine.activeTurnActorId, null);
-    assert.equal(engine.remainingActionPoints, 0);
+    assert.equal(engine.turnStateController.getActiveTurnActorId(), null);
+    assert.equal(engine.turnStateController.getRemainingActionPoints(), 0);
     assert.ok(calls.includes('clearTargeting'));
     assert.ok(calls.includes('resetMagic'));
 });
@@ -268,22 +265,22 @@ test('major action flag is set explicitly and cleared on turn end', () => {
     actor.entity.actionGauge = 100;
     const { engine } = makeEngineHarness(actor);
 
-    engine.markMajorActionUsed();
-    assert.equal(engine.majorActionUsedThisTurn, true);
+    engine.turnStateController.markMajorActionUsed();
+    assert.equal(engine.turnStateController.getMajorActionUsedThisTurn(), true);
 
     engine.endActorTurn(actor, 'test');
-    assert.equal(engine.majorActionUsedThisTurn, false);
+    assert.equal(engine.turnStateController.getMajorActionUsedThisTurn(), false);
 });
 
 test('dismissing an untouched full action menu resets ATB so charging can resume', () => {
     const actor = makeActor('hero');
     actor.entity.actionGauge = 100;
     const { engine } = makeEngineHarness(actor);
-    engine.remainingActionPoints = 100;
+    engine.turnStateController.setRemainingActionPoints(100);
 
     engine.dismissActionMenuTurn();
 
-    assert.equal(engine.activeTurnActorId, null);
+    assert.equal(engine.turnStateController.getActiveTurnActorId(), null);
     assert.equal(actor.entity.actionGauge, 0);
     assert.ok(engine.combatLog.includes('hero 턴 종료: 대기'));
 });
@@ -292,11 +289,11 @@ test('dismissing a partial action menu keeps remaining ATB as carryover', () => 
     const actor = makeActor('hero');
     actor.entity.actionGauge = 60;
     const { engine } = makeEngineHarness(actor);
-    engine.remainingActionPoints = 60;
+    engine.turnStateController.setRemainingActionPoints(60);
 
     engine.dismissActionMenuTurn();
 
-    assert.equal(engine.activeTurnActorId, null);
+    assert.equal(engine.turnStateController.getActiveTurnActorId(), null);
     assert.equal(actor.entity.actionGauge, 60);
     assert.ok(engine.combatLog.includes('hero 턴 종료: 대기'));
 });
@@ -305,10 +302,10 @@ test('spending AP falls back to active actor gauge when remaining turn gauge is 
     const actor = makeActor('hero');
     actor.entity.actionGauge = 100;
     const { engine } = makeEngineHarness(actor);
-    engine.remainingActionPoints = 0;
+    engine.turnStateController.setRemainingActionPoints(0);
 
     assert.equal(engine.spendAp(getActionApCost('move')), true);
-    assert.equal(engine.remainingActionPoints, 80);
+    assert.equal(engine.turnStateController.getRemainingActionPoints(), 80);
     assert.equal(actor.entity.actionGauge, 80);
 });
 
@@ -317,11 +314,11 @@ test('network raid AP uses server remaining points instead of local actor gauge'
     actor.entity.actionGauge = 100;
     const { engine } = makeEngineHarness(actor);
     engine.isNetworkRaid = true;
-    engine.remainingActionPoints = 20;
+    engine.turnStateController.setRemainingActionPoints(20);
 
     assert.equal(engine.getSpendableActionGauge(), 20);
     assert.equal(engine.spendAp(getActionApCost('move')), true);
-    assert.equal(engine.remainingActionPoints, 0);
+    assert.equal(engine.turnStateController.getRemainingActionPoints(), 0);
     assert.equal(actor.entity.actionGauge, 0);
 });
 
@@ -394,14 +391,14 @@ test('network snapshot treats local player actorIds as owned and prefers actor r
     assert.equal(engine.partyActors.length, 1);
     assert.equal(engine.partyActors[0].id, 'server-hero');
     assert.equal(engine.remotePartyActors.size, 0);
-    assert.equal(engine.activeTurnActorId, 'server-hero');
-    assert.equal(engine.remainingActionPoints, 30);
+    assert.equal(engine.turnStateController.getActiveTurnActorId(), 'server-hero');
+    assert.equal(engine.turnStateController.getRemainingActionPoints(), 30);
 });
 
 test('network move reopens the action menu when the server confirms the moved tile and ATB remains', () => {
     const actor = makeActor('hero');
     const { engine, calls } = makeEngineHarness(actor);
-    engine.remainingActionPoints = 80;
+    engine.turnStateController.setRemainingActionPoints(80);
     engine.networkSyncController.trackPendingMove('move-1', actor.id, { x: 1, y: 0 }, []);
 
     engine.networkSyncController.reopenPendingMoveMenu([{ id: actor.id, tile: { x: 1, y: 0 } }]);
@@ -412,7 +409,7 @@ test('network move reopens the action menu when the server confirms the moved ti
 test('network move rejection reopens the action menu when the actor can still act', () => {
     const actor = makeActor('hero');
     const { engine, calls } = makeEngineHarness(actor);
-    engine.remainingActionPoints = 80;
+    engine.turnStateController.setRemainingActionPoints(80);
     engine.networkSyncController.trackPendingMove('move-1', actor.id, { x: 1, y: 0 }, [{ x: 1, y: 0 }]);
 
     engine.handleNetworkActionRejected({ type: 'ACTION_REJECTED', intentId: 'move-1', reason: 'blocked' });

@@ -39,4 +39,5 @@ See `docs/monster-balance.md` for the detailed model and tests.
 - `WorldCombatFeedbackController` owns grouped combat feedback priority, camera shake dispatch, and hitstop dispatch.
 - `WorldNetworkIntentController` owns client-side network intent submission and pending move preview registration.
 - `WorldTurnStateController` owns active turn id, ready queue, remaining AP, major-action flag, reserved action state, and pure turn lifecycle state transitions.
+  Other world controllers should access turn state through its explicit methods rather than `WorldEngine` compatibility accessors.
 - `WorldEngine` should access active story-interior state through the controller instead of owning that state directly.

@@ -34,6 +34,38 @@ export class WorldTurnStateController {
         this.reservedAction = null;
     }
 
+    public getActiveTurnActorId(): string | null {
+        return this.activeTurnActorId;
+    }
+
+    public setActiveTurnActorId(actorId: string | null): void {
+        this.activeTurnActorId = actorId;
+    }
+
+    public getRemainingActionPoints(): number {
+        return this.remainingActionPoints;
+    }
+
+    public setRemainingActionPoints(points: number): void {
+        this.remainingActionPoints = points;
+    }
+
+    public getMajorActionUsedThisTurn(): boolean {
+        return this.majorActionUsedThisTurn;
+    }
+
+    public setMajorActionUsedThisTurn(used: boolean): void {
+        this.majorActionUsedThisTurn = used;
+    }
+
+    public getReservedAction(): FieldIntent | null {
+        return this.reservedAction;
+    }
+
+    public setReservedAction(intent: FieldIntent | null): void {
+        this.reservedAction = intent;
+    }
+
     public beginActorTurn(actorId: string): number {
         this.setActiveTurn(actorId, FIELD_MAX_ACTION_GAUGE);
         return this.remainingActionPoints;
@@ -76,6 +108,10 @@ export class WorldTurnStateController {
 
     public markMajorActionUsed(): void {
         if (this.activeTurnActorId) this.majorActionUsedThisTurn = true;
+    }
+
+    public isMajorActionUsed(): boolean {
+        return this.majorActionUsedThisTurn;
     }
 
     public spendAp(cost: number, fallbackGauge: number): boolean {

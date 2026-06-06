@@ -52,7 +52,7 @@ import {
     isTerrainLineOfSightBlocking,
     TerrainActorTraits,
 } from '../field/TerrainRules';
-import type { AttackCue, FieldActor, FieldEnemy, FieldHitParty, FieldIntent } from '../field/FieldTypes';
+import type { AttackCue, FieldActor, FieldEnemy, FieldHitParty } from '../field/FieldTypes';
 import {
     getActorAttackTargetFailure as resolveActorAttackTargetFailure,
     type AttackTargetFailure,
@@ -150,38 +150,6 @@ export class WorldEngine {
     private effectManager = new EffectManager();
     private attackCues: AttackCue[] = [];
     private worldTime: number = 0;
-
-    private get activeTurnActorId(): string | null {
-        return this.turnStateController.activeTurnActorId;
-    }
-
-    private set activeTurnActorId(actorId: string | null) {
-        this.turnStateController.activeTurnActorId = actorId;
-    }
-
-    private get remainingActionPoints(): number {
-        return this.turnStateController.remainingActionPoints;
-    }
-
-    private set remainingActionPoints(points: number) {
-        this.turnStateController.remainingActionPoints = points;
-    }
-
-    private get majorActionUsedThisTurn(): boolean {
-        return this.turnStateController.majorActionUsedThisTurn;
-    }
-
-    private set majorActionUsedThisTurn(used: boolean) {
-        this.turnStateController.majorActionUsedThisTurn = used;
-    }
-
-    private get reservedAction(): FieldIntent | null {
-        return this.turnStateController.reservedAction;
-    }
-
-    private set reservedAction(intent: FieldIntent | null) {
-        this.turnStateController.reservedAction = intent;
-    }
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -338,11 +306,11 @@ export class WorldEngine {
             setFieldEnemies: (fieldEnemies) => { this.fieldEnemies = fieldEnemies; },
             getControlledActor: () => this.getControlledActor(),
             setPlayer: (player) => { this.player = player; },
-            getActiveTurnActorId: () => this.activeTurnActorId,
-            setActiveTurnActorId: (actorId) => { this.activeTurnActorId = actorId; },
-            getRemainingActionPoints: () => this.remainingActionPoints,
-            setRemainingActionPoints: (points) => { this.remainingActionPoints = points; },
-            setMajorActionUsedThisTurn: (used) => { this.majorActionUsedThisTurn = used; },
+            getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
+            setActiveTurnActorId: (actorId) => this.turnStateController.setActiveTurnActorId(actorId),
+            getRemainingActionPoints: () => this.turnStateController.getRemainingActionPoints(),
+            setRemainingActionPoints: (points) => this.turnStateController.setRemainingActionPoints(points),
+            setMajorActionUsedThisTurn: (used) => this.turnStateController.setMajorActionUsedThisTurn(used),
             hasSelection: () => this.selectionController.hasSelection(),
             selectActor: (actorId) => this.selectionController.selectActor(actorId),
             selectLoot: (lootId) => this.selectionController.selectLoot(lootId),
@@ -477,8 +445,8 @@ export class WorldEngine {
                 getBoundsTiles: () => this.worldMap.getBoundsTiles(),
                 hasFieldLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to),
                 spendAp: (cost) => this.spendAp(cost),
-                isMajorActionUsed: () => this.majorActionUsedThisTurn,
-                markMajorActionUsed: () => this.markMajorActionUsed(),
+                isMajorActionUsed: () => this.turnStateController.isMajorActionUsed(),
+                markMajorActionUsed: () => this.turnStateController.markMajorActionUsed(),
                 submitNetworkSkillIntent: (actor, skill, targetEnemy) => this.submitNetworkSkillIntent(actor, skill.id, targetEnemy?.id),
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
@@ -519,8 +487,8 @@ export class WorldEngine {
                 getInventoryItems: () => this.gameManager.inventory.items,
                 removeInventoryItem: (placed) => this.gameManager.inventory.remove(placed),
                 spendAp: (cost) => this.spendAp(cost),
-                isMajorActionUsed: () => this.majorActionUsedThisTurn,
-                markMajorActionUsed: () => this.markMajorActionUsed(),
+                isMajorActionUsed: () => this.turnStateController.isMajorActionUsed(),
+                markMajorActionUsed: () => this.turnStateController.markMajorActionUsed(),
                 submitNetworkUseItem: (actor, itemId) => this.submitNetworkUseItemIntent(actor, itemId),
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
@@ -538,8 +506,8 @@ export class WorldEngine {
                 getPartyActors: () => this.partyActors,
                 getFieldEnemies: () => this.fieldEnemies,
                 getRemainingActionPoints: () => this.getSpendableActionGauge(),
-                getReservedAction: () => this.reservedAction,
-                getActiveTurnActorId: () => this.activeTurnActorId,
+                getReservedAction: () => this.turnStateController.getReservedAction(),
+                getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
                 getActorTerrainMovementBudget: (actor) => this.getActorTerrainMovementBudget(actor),
                 getActorTerrainStepCost: (actor, tile) => this.getActorTerrainStepCost(actor, tile),
                 getActorAttackProfile: (actor) => this.getActorAttackProfile(actor),
@@ -552,8 +520,8 @@ export class WorldEngine {
                 isEntityMoving: (entity) => this.isEntityMoving(entity),
                 isFieldPassable: (query) => this.movementController.isFieldPassable(query),
                 spendAp: (cost) => this.spendAp(cost),
-                isMajorActionUsed: () => this.majorActionUsedThisTurn,
-                markMajorActionUsed: () => this.markMajorActionUsed(),
+                isMajorActionUsed: () => this.turnStateController.isMajorActionUsed(),
+                markMajorActionUsed: () => this.turnStateController.markMajorActionUsed(),
                 getFanfareLeaderId: () => this.fanfareLeaderActorId,
                 setFanfareLeaderId: (actorId) => {
                     this.fanfareLeaderActorId = actorId;
@@ -578,7 +546,7 @@ export class WorldEngine {
                 resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
                 endActorTurn: (actor, reason, atbCarryover) => this.endActorTurn(actor, reason, atbCarryover),
                 clearActorIntent: (actor) => this.clearActorIntent(actor),
-                setReservedAction: (intent) => { this.reservedAction = intent; },
+                setReservedAction: (intent) => this.turnStateController.setReservedAction(intent),
                 selectEnemy: (enemyId) => this.selectionController.selectEnemy(enemyId),
                 selectLoot: (lootId) => this.selectionController.selectLoot(lootId),
                 filterActionTiles: (action, actor, tiles) => this.filterIntroTutorialActionTiles(action, actor, tiles),
@@ -685,9 +653,9 @@ export class WorldEngine {
             getPartyActors: () => this.partyActors,
             getTutorialActors: () => this.tutorialController.getInstructor() ? [this.tutorialController.getInstructor()!] : [],
             getFieldEnemies: () => this.fieldEnemies,
-            getActiveTurnActorId: () => this.activeTurnActorId,
+            getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
             getRemainingActionPoints: () => this.getSpendableActionGauge(),
-            getMajorActionUsedThisTurn: () => this.majorActionUsedThisTurn,
+            getMajorActionUsedThisTurn: () => this.turnStateController.getMajorActionUsedThisTurn(),
             getHoverTile: () => this.hoverTile,
             getPathPreviewTiles: (actor) => this.getPathPreviewTiles(actor),
             getAttackCues: () => this.attackCues,
@@ -706,8 +674,8 @@ export class WorldEngine {
             tacticalController: this.tacticalController,
             getCanvasSize: () => ({ width: this.canvas.width, height: this.canvas.height }),
             getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
-            getActiveTurnActorId: () => this.activeTurnActorId,
-            getReservedAction: () => this.reservedAction,
+            getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
+            getReservedAction: () => this.turnStateController.getReservedAction(),
             getControlledActor: () => this.getControlledActor(),
             getPartyActors: () => this.partyActors,
             getHoverTile: () => this.hoverTile,
@@ -796,7 +764,7 @@ export class WorldEngine {
         const partyMovement = this.movementController.updatePartyActors({
             dt,
             controlled: this.getFanfareLeaderActor(),
-            activeTurnActorId: this.activeTurnActorId,
+            activeTurnActorId: this.turnStateController.getActiveTurnActorId(),
             followRepathTimer: this.followRepathTimer,
         });
         this.followRepathTimer = partyMovement.followRepathTimer;
@@ -804,7 +772,7 @@ export class WorldEngine {
 
         const enemyMovement = this.movementController.updateEnemies({
             dt,
-            activeTurnActorId: this.activeTurnActorId,
+            activeTurnActorId: this.turnStateController.getActiveTurnActorId(),
         });
         for (const enemyId of enemyMovement.readyEnemyIds) this.turnStateController.enqueueReadyActor(enemyId);
         this.updateRestingActors(dt);
@@ -1025,10 +993,6 @@ export class WorldEngine {
 
     private closeTacticalMenu(): void {
         this.tacticalController.close();
-    }
-
-    private markMajorActionUsed(): void {
-        this.turnStateController.markMajorActionUsed();
     }
 
     private updateRestingActors(dt: number): void {
@@ -1253,8 +1217,9 @@ export class WorldEngine {
     }
 
     private getActivePartyTurnActor(): FieldActor | null {
-        if (!this.activeTurnActorId) return null;
-        return this.partyActors.find((actor) => actor.id === this.activeTurnActorId && !actor.character.isDead) ?? null;
+        const activeTurnActorId = this.turnStateController.getActiveTurnActorId();
+        if (!activeTurnActorId) return null;
+        return this.partyActors.find((actor) => actor.id === activeTurnActorId && !actor.character.isDead) ?? null;
     }
 
     private switchToNextAliveActor(): void {
@@ -1268,7 +1233,7 @@ export class WorldEngine {
     private switchToPartyMember(index: number): boolean {
         const actor = this.partyActors[index];
         if (!actor || actor.character.isDead) return false;
-        if (this.tutorialController.isActive() && actor.id !== this.activeTurnActorId) {
+        if (this.tutorialController.isActive() && actor.id !== this.turnStateController.getActiveTurnActorId()) {
             this.addIntroTutorialBlockedLog();
             return false;
         }
@@ -1292,11 +1257,11 @@ export class WorldEngine {
         if (!actor) return;
         this.selectionController.selectActor(actor.id);
 
-        if (!this.activeTurnActorId && actor.entity.actionGauge >= FIELD_MAX_ACTION_GAUGE) {
+        if (!this.turnStateController.getActiveTurnActorId() && actor.entity.actionGauge >= FIELD_MAX_ACTION_GAUGE) {
             this.beginActorTurn(actor);
         }
 
-        if (actor.id !== this.activeTurnActorId) {
+        if (actor.id !== this.turnStateController.getActiveTurnActorId()) {
             this.addCombatLog('아직 행동 순서가 아닙니다.');
             return;
         }
@@ -1333,12 +1298,12 @@ export class WorldEngine {
     private spendAp(cost: number): boolean {
         if (!this.turnStateController.spendAp(cost, this.getSpendableActionGauge())) return false;
         const actor = this.getActivePartyTurnActor();
-        if (actor) actor.entity.actionGauge = this.remainingActionPoints;
+        if (actor) actor.entity.actionGauge = this.turnStateController.getRemainingActionPoints();
         return true;
     }
 
     private resumeOrEndActiveTurn(actor: FieldActor): void {
-        if (actor.id !== this.activeTurnActorId) return;
+        if (actor.id !== this.turnStateController.getActiveTurnActorId()) return;
         if (actor.character.isDead || actor.character.stats.hp <= 0) {
             this.endActorTurn(actor, '행동 불능', 0);
             return;
@@ -1347,22 +1312,22 @@ export class WorldEngine {
             this.reopenActionMenu(actor);
             return;
         }
-        this.endActorTurn(actor, '행동 게이지 부족', this.remainingActionPoints);
+        this.endActorTurn(actor, '행동 게이지 부족', this.turnStateController.getRemainingActionPoints());
     }
 
     private reopenActionMenu(actor: FieldActor): void {
-        if (actor.id !== this.activeTurnActorId) return;
+        if (actor.id !== this.turnStateController.getActiveTurnActorId()) return;
         if (actor.character.isDead || actor.character.stats.hp <= 0) return;
-        if (this.remainingActionPoints <= 0 && actor.entity.actionGauge >= MIN_FIELD_ACTION_GAUGE_COST) {
-            this.remainingActionPoints = Math.floor(actor.entity.actionGauge);
+        if (this.turnStateController.getRemainingActionPoints() <= 0 && actor.entity.actionGauge >= MIN_FIELD_ACTION_GAUGE_COST) {
+            this.turnStateController.setRemainingActionPoints(Math.floor(actor.entity.actionGauge));
         }
         this.selectionController.selectActor(actor.id);
         this.closeTacticalMenu();
         this.actionMenuUI.open(this.getActionMenuStates(actor));
     }
 
-    private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = this.remainingActionPoints): void {
-        if (actor.id === this.activeTurnActorId) this.networkIntentController.submitEndTurn(actor, reason);
+    private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = this.turnStateController.getRemainingActionPoints()): void {
+        if (actor.id === this.turnStateController.getActiveTurnActorId()) this.networkIntentController.submitEndTurn(actor, reason);
         actor.entity.actionGauge = Math.max(0, Math.min(FIELD_MAX_ACTION_GAUGE, atbCarryover));
         this.turnStateController.endActiveTurn();
         this.clearActorIntent(actor);
@@ -1396,7 +1361,7 @@ export class WorldEngine {
             const enemyEntry = this.fieldEnemies.find((entry) => entry.enemy.id === actorId);
             if (!enemyEntry || enemyEntry.enemy.stats.hp <= 0) continue;
             this.beginEnemyTurn(enemyEntry);
-            if (this.activeTurnActorId) return;
+            if (this.turnStateController.getActiveTurnActorId()) return;
         }
     }
 
@@ -1481,7 +1446,7 @@ export class WorldEngine {
         this.addCombatLog(formatT('field.log.turnStart', {
             name: actor.character.name,
             gauge: t('ui.actionGauge'),
-            value: this.remainingActionPoints,
+            value: this.turnStateController.getRemainingActionPoints(),
         }));
         if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
         else {
@@ -1585,12 +1550,12 @@ export class WorldEngine {
     }
 
     private getSpendableActionGauge(): number {
-        if (this.activeTurnActorId && this.isNetworkRaid) {
-            return Math.max(0, Math.floor(this.remainingActionPoints));
+        if (this.turnStateController.getActiveTurnActorId() && this.isNetworkRaid) {
+            return Math.max(0, Math.floor(this.turnStateController.getRemainingActionPoints()));
         }
         const actor = this.getActivePartyTurnActor();
-        if (!actor) return this.remainingActionPoints;
-        return Math.max(this.remainingActionPoints, Math.floor(actor.entity.actionGauge));
+        if (!actor) return this.turnStateController.getRemainingActionPoints();
+        return Math.max(this.turnStateController.getRemainingActionPoints(), Math.floor(actor.entity.actionGauge));
     }
 
     private hasFieldLineOfSight(from: TilePoint, to: TilePoint): boolean {
@@ -1642,7 +1607,7 @@ export class WorldEngine {
     }
 
     private clearIntent(): void {
-        if (this.reservedAction) return;
+        if (this.turnStateController.getReservedAction()) return;
         const actor = this.getControlledActor();
         if (actor) this.clearActorIntent(actor);
         this.selectionController.selectActor(actor?.id ?? null);
