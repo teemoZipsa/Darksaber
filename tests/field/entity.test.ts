@@ -125,6 +125,16 @@ test('entity image loaders ignore stale callbacks and support instant positionin
     }
 });
 
+test('entity faces the actual step direction while interpolating to a grid target', () => {
+    const entity = new Entity('e1', 0, 0, '#fff');
+    entity.facing = 'right';
+
+    entity.setGridPosition(0, 2);
+    entity.update(0.016);
+
+    assert.equal(entity.facing, 'down');
+});
+
 test('loot objects retain overflow items and sanitize grid sizes', () => {
     const sword = getItemDef('short_sword');
     assert.ok(sword);

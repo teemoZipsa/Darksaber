@@ -476,6 +476,18 @@ test('network move path preview drops tiles already reached during interpolation
     assert.deepEqual(engine.getPathPreviewTiles(actor), [{ x: 2, y: 0 }]);
 });
 
+test('local move path preview includes the current interpolation target', () => {
+    const actor = makeActor('hero');
+    const { engine } = makeEngineHarness(actor);
+    actor.entity.gridX = 1;
+    actor.entity.gridY = 0;
+    actor.entity.pixelX = 0.25;
+    actor.entity.pixelY = 0;
+    actor.path = [{ x: 2, y: 0 }];
+
+    assert.deepEqual(engine.getPathPreviewTiles(actor), [{ x: 1, y: 0 }, { x: 2, y: 0 }]);
+});
+
 test('grid snapshot without sockets restores placed items with an empty socket list', () => {
     const actor = makeActor('hero');
     const { engine } = makeEngineHarness(actor);

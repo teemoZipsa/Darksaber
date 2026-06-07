@@ -66,6 +66,12 @@ export class FieldMagicMenu {
         this.open = true;
     }
 
+    public updateSlots(slots: FieldMagicSlot[]): void {
+        if (!this.open) return;
+        this.slots = slots;
+        if (this.hoveredIndex !== null && this.hoveredIndex >= slots.length) this.hoveredIndex = null;
+    }
+
     public hide(): void {
         this.open = false;
         this.hoveredIndex = null;

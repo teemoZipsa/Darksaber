@@ -770,6 +770,7 @@ export class WorldEngine {
             return;
         }
 
+        this.refreshOpenActionMenuState();
         this.inputController.process(input, camera);
 
         const partyMovement = this.movementController.updatePartyActors({
@@ -787,6 +788,7 @@ export class WorldEngine {
         });
         for (const enemyId of enemyMovement.readyEnemyIds) this.turnStateController.enqueueReadyActor(enemyId);
         this.refreshEnemyIntentPreviews();
+        this.refreshOpenActionMenuState();
         this.updateRestingActors(dt);
         this.effectManager.update(dt);
         this.floatingText.update(dt);
@@ -932,6 +934,7 @@ export class WorldEngine {
     }
 
     private updateNetworkRaid(dt: number, input: InputManager, camera: Camera): void {
+        this.refreshOpenActionMenuState();
         this.inputController.process(input, camera);
         for (const actor of this.partyActors) actor.entity.update(dt);
         for (const entry of this.fieldEnemies) entry.enemy.update(dt);
@@ -941,6 +944,7 @@ export class WorldEngine {
         this.updateAttackCues(dt);
         this.refreshLootState();
         this.storyScenarioController.checkDungeonArrival();
+        this.refreshOpenActionMenuState();
 
         const controlled = this.getControlledActor();
         if (controlled) this.player = controlled.entity;
@@ -1293,6 +1297,16 @@ export class WorldEngine {
         this.actionMenuUI.close();
     }
 
+    private refreshOpenActionMenuState(): void {
+        if (!this.actionMenuUI.getIsOpen()) return;
+        const actor = this.getActivePartyTurnActor();
+        if (!actor) {
+            this.closeActionMenu();
+            return;
+        }
+        this.actionMenuUI.updateStates(this.getActionMenuStates(actor));
+    }
+
     private dismissActionMenuTurn(): void {
         if (this.tutorialController.isActive()) {
             const actor = this.getActivePartyTurnActor();
@@ -1566,6 +1580,13 @@ export class WorldEngine {
         if (!actor) return [];
         const networkPreview = this.networkSyncController.getPathPreviewTiles(actor);
         if (networkPreview) return networkPreview;
+        if (this.isEntityMoving(actor.entity)) {
+            const currentTarget = this.actorTile(actor);
+            const [nextStep] = actor.path;
+            if (!nextStep || nextStep.x !== currentTarget.x || nextStep.y !== currentTarget.y) {
+                return [currentTarget, ...actor.path];
+            }
+        }
         return actor.path;
     }
 

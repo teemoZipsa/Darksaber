@@ -113,7 +113,7 @@ export class WorldMagicController {
     /** Refresh per-slot MP affordability while the menu is open. */
     public updateMp(_mp: number): void {
         const actor = this.context.getActivePartyTurnActor();
-        if (actor && this.menu.isVisible()) this.menu.show(this.buildSlots(actor));
+        if (actor && this.menu.isVisible()) this.menu.updateSlots(this.buildSlots(actor));
     }
 
     public handleMenuMouseDown(x: number, y: number): void {

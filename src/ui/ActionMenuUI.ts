@@ -125,6 +125,15 @@ export class ActionMenuUI {
 
     public open(states?: ActionMenuSlotState[] | ActionType[]): void {
         this.isOpen = true;
+        this.setSlotStates(states);
+    }
+
+    public updateStates(states?: ActionMenuSlotState[] | ActionType[]): void {
+        if (!this.isOpen) return;
+        this.setSlotStates(states);
+    }
+
+    private setSlotStates(states?: ActionMenuSlotState[] | ActionType[]): void {
         if (!states || states.length === 0) {
             this.setDefaultSlotStates();
             return;

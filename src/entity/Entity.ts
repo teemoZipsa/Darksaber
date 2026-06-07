@@ -242,7 +242,20 @@ export class Entity {
             this.stepTargetX = Math.round(this.pixelX);
             this.stepTargetY = this.pixelY + Math.sign(remainY);
         }
+        this.faceStepTarget();
         this.stepping = true;
+    }
+
+    private faceStepTarget(): void {
+        const dx = this.stepTargetX - this.pixelX;
+        const dy = this.stepTargetY - this.pixelY;
+        if (Math.abs(dx) > Math.abs(dy)) {
+            if (dx > 0) this.facing = 'right';
+            else if (dx < 0) this.facing = 'left';
+        } else {
+            if (dy > 0) this.facing = 'down';
+            else if (dy < 0) this.facing = 'up';
+        }
     }
 
     private hasActionMotionForFacing(facing: EntityFacing): boolean {
