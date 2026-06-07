@@ -78,6 +78,15 @@ export const NEW_MONSTER_IDS = [
     '634R', '635R', '636R', '637R', '638R', '639R',
 ] as const;
 
+/** Original final-scenario demons used only by authored story encounters. */
+export const FINAL_STORY_MONSTER_IDS = [
+    '729R',
+    '730R',
+    '731R',
+    '732R',
+    '733R',
+] as const;
+
 /** Renderable legacy sprites kept out of automatic field spawn pools until authored. */
 export const RESERVED_RENDERABLE_MONSTER_IDS = [
     '206R',
@@ -87,6 +96,7 @@ export const RESERVED_RENDERABLE_MONSTER_IDS = [
 export const MONSTER_IDS = [
     ...GENERAL_MONSTER_IDS,
     ...NEW_MONSTER_IDS,
+    ...FINAL_STORY_MONSTER_IDS,
     ...RESERVED_RENDERABLE_MONSTER_IDS,
     BURGOS_BOSS_MONSTER_ID,
     ZAMORA_FENRIS_BOSS_MONSTER_ID,
@@ -343,6 +353,33 @@ export const MONSTER_DEFINITIONS: Record<MonsterId, MonsterDefinition> = {
         id: '639R', name: '제국 병사', sprite: '639R.png', role: 'tank',
         level: 16, levelBand: [14, 20], family: 'human', spawnTags: ['castle', 'ament', 'sand'],
         color: '#3a8888', frameSize: 32, renderScale: 1.16, aggroRange: 6, ...commonFrame,
+    },
+
+    // ── 700 series: original final-scenario demons (authored story only) ──
+    '729R': {
+        id: '729R', name: '서큐버스', sprite: '637R.png', role: 'healer',
+        level: 20, levelBand: [20, 20], family: 'demon', spawnTags: ['special', 'ament'],
+        color: '#b04aa0', frameSize: 32, renderScale: 1.28, aggroRange: 8, ...commonFrame,
+    },
+    '730R': {
+        id: '730R', name: '베라모드', sprite: '638R.png', role: 'bruiser',
+        level: 21, levelBand: [21, 21], family: 'demon', spawnTags: ['special', 'ament'],
+        color: '#b04040', frameSize: 32, renderScale: 1.3, aggroRange: 8, ...commonFrame,
+    },
+    '731R': {
+        id: '731R', name: '벨제뷔트', sprite: '636R.png', role: 'support',
+        level: 22, levelBand: [22, 22], family: 'demon', spawnTags: ['special', 'ament'],
+        color: '#7850b8', frameSize: 32, renderScale: 1.3, aggroRange: 8, ...commonFrame,
+    },
+    '732R': {
+        id: '732R', name: '아스타로스', sprite: '634R.png', role: 'tank',
+        level: 23, levelBand: [23, 23], family: 'demon', spawnTags: ['special', 'ament'],
+        color: '#6c5f90', frameSize: 32, renderScale: 1.32, aggroRange: 8, ...commonFrame,
+    },
+    '733R': {
+        id: '733R', name: '네르갈', sprite: '638R.png', role: 'boss',
+        level: 24, levelBand: [24, 24], family: 'demon', spawnTags: ['special', 'ament'],
+        color: '#2f2f68', frameSize: 32, renderScale: 1.65, aggroRange: 9, ...commonFrame,
     },
 
     '791R': {

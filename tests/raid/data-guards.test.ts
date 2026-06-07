@@ -5,6 +5,7 @@ import { getMasterClass, isMasterClassLineId } from '../../src/data/ClassTree';
 import { getItemDef, ITEMS } from '../../src/data/ItemDB';
 import {
     GENERAL_MONSTER_IDS,
+    FINAL_STORY_MONSTER_IDS,
     NEW_MONSTER_IDS,
     RESERVED_RENDERABLE_MONSTER_IDS,
     getMonsterDefinitionSafe,
@@ -138,18 +139,24 @@ test('original monster ledger stays separate from renderable spawn catalog', () 
         assert.ok(getMonsterDefinitionSafe(id));
         assert.equal(authoredSpawnIds.has(id), false);
     }
+    for (const id of FINAL_STORY_MONSTER_IDS) {
+        assert.equal(isMonsterId(id), true);
+        assert.ok(getMonsterDefinitionSafe(id));
+        assert.equal(authoredSpawnIds.has(id), false);
+        assert.ok(getOriginalMonsterRow(id));
+    }
 
     assert.ok(getOriginalMonsterRow('206R'));
     assert.ok(getOriginalMonsterRow('791R'));
     assert.equal(getOriginalMonsterRow('634R'), null);
 });
 
-test('story episodes 1 through 20 are chained and fully localized', () => {
-    assert.deepEqual(STORY_SCENARIOS.map((scenario) => scenario.episode), Array.from({ length: 20 }, (_, i) => i + 1));
-    assert.equal(STORY_QUESTS.length, 20);
+test('story episodes 1 through 22 are chained and fully localized', () => {
+    assert.deepEqual(STORY_SCENARIOS.map((scenario) => scenario.episode), Array.from({ length: 22 }, (_, i) => i + 1));
+    assert.equal(STORY_QUESTS.length, 22);
     assert.deepEqual(
         STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'soloInterior').map((scenario) => scenario.episode),
-        [1, 2, 3, 7, 13, 18, 19, 20]
+        [1, 2, 3, 7, 13, 18, 19, 20, 21, 22]
     );
     assert.deepEqual(
         STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'vehicle').map((scenario) => scenario.episode),

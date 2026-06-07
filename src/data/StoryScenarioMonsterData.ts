@@ -43,6 +43,8 @@ export const STORY_SCENARIO_MONSTER_LAYOUTS = {
     ament_gate: { bossMonsterId: '638R', guardMonsterIds: ['634R', '636R', '639R'] },
     ament_1f: { bossMonsterId: '636R', guardMonsterIds: ['636R', '637R', '638R'] },
     ament_2f: { bossMonsterId: '638R', guardMonsterIds: ['636R', '638R', '639R'] },
+    nergal_castle: { bossMonsterId: '733R', guardMonsterIds: ['729R', '730R', '731R', '732R'] },
+    flame_castle: { bossMonsterId: '730R', guardMonsterIds: ['215R', '224R', '225R', '307R'] },
 } satisfies Record<string, StoryScenarioMonsterLayout>;
 
 export function getStoryScenarioMonsterLayout(scenario: StoryScenarioDefinition): StoryScenarioMonsterLayout {

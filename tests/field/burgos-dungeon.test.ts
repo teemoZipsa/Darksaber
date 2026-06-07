@@ -378,10 +378,10 @@ test('Burgos boss corpse loot includes a guaranteed rune', () => {
     assert.ok(engine.worldMap.loot[0].inventory.items.some((placed: { item: { slot: string } }) => placed.item.slot === 'rune'));
 });
 
-test('story episodes 3 through 20 have map entrances and server-session objective data', () => {
+test('story episodes 3 through 22 have map entrances and server-session objective data', () => {
     const world = new WorldMap();
 
-    for (const scenario of STORY_SCENARIOS.filter((entry) => entry.episode >= 3 && entry.episode <= 20)) {
+    for (const scenario of STORY_SCENARIOS.filter((entry) => entry.episode >= 3 && entry.episode <= 22)) {
         const quest = getStoryQuestByDungeonId(scenario.dungeonId);
         assert.ok(quest, `missing quest for episode ${scenario.episode}`);
 

@@ -99,6 +99,15 @@ interface TileRoute {
     noiseSalt: number;
 }
 
+interface ScenarioWaterBasin {
+    center: RoutePoint;
+    radiusX: number;
+    radiusY: number;
+    innerRadius: number;
+    outerRadius: number;
+    noiseSalt: number;
+}
+
 const ROAD_ROUTES: TileRoute[] = [
     {
         points: [
@@ -215,6 +224,50 @@ const RIVER_ROUTES: TileRoute[] = [
         ],
         width: 2.1,
         noiseSalt: 202,
+    },
+];
+
+const SCENARIO_WATER_ROUTES: TileRoute[] = [
+    {
+        points: [
+            { chunkX: 32, chunkY: 25 },
+            { chunkX: 33, chunkY: 28 },
+            { chunkX: 33, chunkY: 32 },
+            { chunkX: 34, chunkY: 36 },
+            { chunkX: 34, chunkY: 48 },
+        ],
+        width: 3.8,
+        noiseSalt: 303,
+    },
+    {
+        points: [
+            { chunkX: 47, chunkY: 59 },
+            { chunkX: 48, chunkY: 63 },
+            { chunkX: 50, chunkY: 69 },
+            { chunkX: 52, chunkY: 75 },
+        ],
+        width: 4.7,
+        noiseSalt: 301,
+    },
+    {
+        points: [
+            { chunkX: 43, chunkY: 72 },
+            { chunkX: 47, chunkY: 73 },
+            { chunkX: 52, chunkY: 75 },
+        ],
+        width: 5.1,
+        noiseSalt: 302,
+    },
+];
+
+const SCENARIO_WATER_BASINS: ScenarioWaterBasin[] = [
+    {
+        center: { chunkX: 41, chunkY: 72 },
+        radiusX: CHUNK_SIZE * 6.3,
+        radiusY: CHUNK_SIZE * 5.1,
+        innerRadius: 0.43,
+        outerRadius: 1.02,
+        noiseSalt: 321,
     },
 ];
 
@@ -488,6 +541,26 @@ export class WorldMap {
         return RIVER_ROUTES.some((route) => this.isRouteTile(tx, ty, route, 1.65));
     }
 
+    private isScenarioWaterRouteTile(tx: number, ty: number): boolean {
+        return SCENARIO_WATER_ROUTES.some((route) => this.isRouteTile(tx, ty, route, route.width * 0.55));
+    }
+
+    private isScenarioWaterBasinTile(tx: number, ty: number): boolean {
+        return SCENARIO_WATER_BASINS.some((basin) => {
+            const center = this.routePointToTile(basin.center);
+            const dx = (tx - center.x) / basin.radiusX;
+            const dy = (ty - center.y) / basin.radiusY;
+            const dist = Math.hypot(dx, dy);
+            const raggedEdge = (this.fbm(tx, ty, 0.032, basin.noiseSalt) - 0.5) * 0.12;
+            const coast = dist + raggedEdge;
+            return coast >= basin.innerRadius && coast <= basin.outerRadius;
+        });
+    }
+
+    private isScenarioWaterTile(tx: number, ty: number): boolean {
+        return this.isScenarioWaterRouteTile(tx, ty) || this.isScenarioWaterBasinTile(tx, ty);
+    }
+
     private computeTownTile(tx: number, ty: number, town: TownInfo): TileType {
         const centerX = town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
         const centerY = town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
@@ -599,6 +672,10 @@ export class WorldMap {
             return town ? this.computeTownTile(tx, ty, town) : TileType.GRASS;
         }
 
+        if (this.isScenarioWaterTile(tx, ty)) {
+            return this.isRoadTile(tx, ty) ? TileType.ROAD : TileType.WATER;
+        }
+
         if (biome === 'special') {
             const dx = localX - CHUNK_SIZE / 2;
             const dy = localY - CHUNK_SIZE / 2;
@@ -640,7 +717,10 @@ export class WorldMap {
         // Roads/rivers stay on top of the feathered edge so the travel network
         // and its bridges remain connected; only the scenario interior wins, so
         // connecting roads tuck under a dungeon core instead of carving through it.
-        if (sample.weight < HMAP_BLEND_BAND && (this.isRoadTile(tx, ty) || this.isRiverTile(tx, ty))) {
+        if (this.isScenarioWaterTile(tx, ty) && sample.tile !== TileType.DUNGEON_ENTRANCE && sample.tile !== TileType.ROAD) {
+            return null;
+        }
+        if (sample.weight < HMAP_BLEND_BAND && (this.isRoadTile(tx, ty) || this.isRiverTile(tx, ty) || this.isScenarioWaterTile(tx, ty))) {
             return null;
         }
         return sample.tile;

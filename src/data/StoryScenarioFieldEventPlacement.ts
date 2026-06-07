@@ -75,6 +75,20 @@ export function getOriginalFieldScenarioOrigin(dungeonId: string): TilePoint | n
             return { x: 24, y: 39 };
         case 'remote_village':
             return { x: 19, y: 34 };
+        case 'sagunto_port':
+            return { x: 10, y: 9 };
+        case 'oasis':
+            return { x: 6, y: 3 };
+        case 'pyramid_front':
+            return { x: 20, y: 25 };
+        case 'skeria':
+            return { x: 28, y: 33 };
+        case 'skeria_2':
+            return { x: 45, y: 53 };
+        case 'valhalla_plain':
+            return { x: 21, y: 20 };
+        case 'airship':
+            return { x: 21, y: 23 };
         default:
             return null;
     }
