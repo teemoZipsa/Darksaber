@@ -786,6 +786,7 @@ export class WorldEngine {
             activeTurnActorId: this.turnStateController.getActiveTurnActorId(),
         });
         for (const enemyId of enemyMovement.readyEnemyIds) this.turnStateController.enqueueReadyActor(enemyId);
+        this.refreshEnemyIntentPreviews();
         this.updateRestingActors(dt);
         this.effectManager.update(dt);
         this.floatingText.update(dt);
@@ -924,6 +925,7 @@ export class WorldEngine {
         }
         for (const entry of this.fieldEnemies) {
             entry.path = [];
+            entry.previewIntent = null;
             entry.enemy.actionGauge = 0;
             entry.enemy.isAggro = false;
         }
@@ -1481,6 +1483,12 @@ export class WorldEngine {
         this.applyCombatResult(this.enemyTurnController.beginEnemyTurn(entry));
         this.interruptRestingForDamage(beforeHpByActorId);
         this.endEnemyTurn(enemy);
+    }
+
+    private refreshEnemyIntentPreviews(): void {
+        for (const entry of this.fieldEnemies) {
+            entry.previewIntent = this.enemyTurnController.previewEnemyIntent(entry);
+        }
     }
 
     private getActorById(actorId: string): FieldActor | null {

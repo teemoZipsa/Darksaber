@@ -37,6 +37,9 @@ export const i18n = {
             'action.label.rest': '휴식',
             'action.label.fanfare': '빵빠레',
             'action.label.open': '조사',
+            'enemy.intent.buff': '강화',
+            'enemy.intent.debuff': '약화',
+            'enemy.intent.special': '특수',
 
             // General
             'btn.deploy': '출격',
@@ -1475,6 +1478,9 @@ export const i18n = {
             'action.label.rest': 'Rest',
             'action.label.fanfare': 'Fanfare',
             'action.label.open': 'Inspect',
+            'enemy.intent.buff': 'Buff',
+            'enemy.intent.debuff': 'Debuff',
+            'enemy.intent.special': 'Special',
 
             // General
             'btn.deploy': 'DEPLOY',

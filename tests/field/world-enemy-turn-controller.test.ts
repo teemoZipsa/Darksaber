@@ -204,6 +204,35 @@ test('aggro enemy turn chases when out of range and attacks once adjacent', () =
     }
 });
 
+test('enemy intent preview is shown before the stored decision is consumed', () => {
+    const previousRandom = Math.random;
+    Math.random = () => 0;
+
+    try {
+        const actor = makeActor('hero', 1, 0);
+        actor.character.stats.def = 0;
+        const enemyEntry = makeEnemyEntry('enemy', 0, 0);
+        enemyEntry.enemy.stats.atk = 30;
+        enemyEntry.enemy.stats.critRate = 0;
+        const { controller, events } = makeHarness([actor], [enemyEntry]);
+
+        const preview = controller.previewEnemyIntent(enemyEntry);
+
+        assert.equal(preview?.kind, 'attack');
+        assert.equal(enemyEntry.enemy.aiMemory.turnCount, 0);
+        enemyEntry.previewIntent = preview;
+
+        const result = controller.beginEnemyTurn(enemyEntry);
+
+        assert.equal(result.executed, true);
+        assert.equal(enemyEntry.previewIntent, null);
+        assert.equal(enemyEntry.enemy.aiMemory.turnCount, 1);
+        assert.ok(events.includes('attack-cue'));
+    } finally {
+        Math.random = previousRandom;
+    }
+});
+
 test('immobilized move decision emits root feedback without moving', () => {
     const target = makeActor('hero', 3, 0);
     const rooted = makeEnemyEntry('rooted', 0, 0);

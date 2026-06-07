@@ -78,20 +78,45 @@ export class WorldEnemyTurnController {
 
     public beginEnemyTurn(entry: FieldEnemy): CombatResult {
         const result = createCombatResult(false);
+        const decision = this.prepareEnemyTurnDecision(entry);
+        if (!decision) return result;
+
+        return this.executeEnemyDecision(entry, decision);
+    }
+
+    public previewEnemyIntent(entry: FieldEnemy): EnemyAIDecision | null {
+        const enemy = entry.enemy;
+        if (enemy.stats.hp <= 0 || isEntityMoving(enemy)) return null;
+        const aliveActors = this.context.getPartyActors().filter((actor) => !actor.character.isDead);
+        const closest = this.movement.findClosestActor(this.enemyTile(enemy), aliveActors);
+        if (!closest) return null;
+
+        if (!this.resolveEnemyAggro(entry, closest, false)) return null;
+
+        return this.decideEnemyIntent(entry, aliveActors, enemy.aiMemory.turnCount + 1);
+    }
+
+    private prepareEnemyTurnDecision(entry: FieldEnemy): EnemyAIDecision | null {
         const enemy = entry.enemy;
         const aliveActors = this.context.getPartyActors().filter((actor) => !actor.character.isDead);
         const closest = this.movement.findClosestActor(this.enemyTile(enemy), aliveActors);
-        if (!closest) return result;
-
-        const enemyTile = this.enemyTile(enemy);
-        const distanceToTarget = manhattan(enemyTile, this.actorTile(closest));
-        const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
-        enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
-        if (!enemy.isAggro && this.movement.hasAggroAllyNear(entry, enemy.aiProfile.assistRange)) enemy.isAggro = true;
-        if (!enemy.isAggro || isEntityMoving(enemy)) return result;
+        if (!closest) return null;
+        if (!this.resolveEnemyAggro(entry, closest, true) || isEntityMoving(enemy)) {
+            entry.previewIntent = null;
+            return null;
+        }
 
         enemy.aiMemory.turnCount += 1;
-        const decision = decideEnemyAction({
+        const preview = entry.previewIntent;
+        entry.previewIntent = null;
+        if (preview && this.isPreviewStillValid(preview)) return preview;
+
+        return this.decideEnemyIntent(entry, aliveActors, enemy.aiMemory.turnCount);
+    }
+
+    private decideEnemyIntent(entry: FieldEnemy, aliveActors: FieldActor[], turnCount: number): EnemyAIDecision {
+        const enemy = entry.enemy;
+        return decideEnemyAction({
             self: this.toEnemyAIUnit(enemy),
             targets: aliveActors.map((actor) => this.toActorAIUnit(actor)),
             allies: this.context.getFieldEnemies()
@@ -99,11 +124,39 @@ export class WorldEnemyTurnController {
                 .filter((candidate) => candidate.stats.hp > 0)
                 .map((candidate) => this.toEnemyAIUnit(candidate)),
             profile: enemy.aiProfile,
-            turnCount: enemy.aiMemory.turnCount,
+            turnCount,
             hasLineOfSight: (from, to) => this.context.hasFieldLineOfSight(from, to),
         });
+    }
 
-        return this.executeEnemyDecision(entry, decision);
+    private resolveEnemyAggro(entry: FieldEnemy, closest: FieldActor, mutate: boolean): boolean {
+        const enemy = entry.enemy;
+        const enemyTile = this.enemyTile(enemy);
+        const distanceToTarget = manhattan(enemyTile, this.actorTile(closest));
+        const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
+        let isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
+        if (!isAggro && this.movement.hasAggroAllyNear(entry, enemy.aiProfile.assistRange)) isAggro = true;
+        if (mutate) enemy.isAggro = isAggro;
+        return isAggro;
+    }
+
+    private isPreviewStillValid(decision: EnemyAIDecision): boolean {
+        switch (decision.kind) {
+            case 'attack':
+            case 'moveToward':
+            case 'moveAway':
+            case 'debuffTarget':
+            case 'bossPattern':
+                return this.context.getActorById(decision.targetId) !== null;
+            case 'healAlly':
+            case 'buffAlly': {
+                const ally = this.context.getEnemyById(decision.allyId);
+                return Boolean(ally && ally.stats.hp > 0);
+            }
+            case 'guard':
+            case 'wait':
+                return true;
+        }
     }
 
     public executeEnemyDecision(entry: FieldEnemy, decision: EnemyAIDecision): CombatResult {
