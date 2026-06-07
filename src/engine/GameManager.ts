@@ -560,7 +560,7 @@ export class GameManager {
                     break;
                 }
 
-                if (this.input.justPressed('KeyJ')) {
+                if (SettingsManager.isKeybindingJustPressed('world.questJournal', this.input)) {
                     this.toggleQuestJournal();
                 }
                 if (this.questJournalOpen) {
@@ -573,22 +573,22 @@ export class GameManager {
                     break;
                 }
 
-                if (this.input.justPressed('KeyI')) {
+                if (SettingsManager.isKeybindingJustPressed('world.inventory', this.input)) {
                     this.inventoryUI.toggle();
                     if (this.inventoryUI.isVisible() && this.charUI.isVisible()) this.charUI.toggle();
                     if (this.inventoryUI.isVisible() && this.partyUI.isVisible()) this.partyUI.toggle();
                 }
-                if (this.input.justPressed('KeyP')) {
+                if (SettingsManager.isKeybindingJustPressed('world.party', this.input)) {
                     this.partyUI.toggle();
                     if (this.partyUI.isVisible() && this.inventoryUI.isVisible()) this.inventoryUI.toggle();
                     if (this.partyUI.isVisible() && this.charUI.isVisible()) this.charUI.toggle();
                 }
-                if (this.input.justPressed('KeyC')) {
+                if (SettingsManager.isKeybindingJustPressed('world.character', this.input)) {
                     this.charUI.toggle();
                     if (this.charUI.isVisible() && this.inventoryUI.isVisible()) this.inventoryUI.toggle();
                     if (this.charUI.isVisible() && this.partyUI.isVisible()) this.partyUI.toggle();
                 }
-                if (this.input.justPressed('KeyK')) {
+                if (SettingsManager.isKeybindingJustPressed('world.magicLoadout', this.input)) {
                     this.toggleMagicLoadout();
                 }
                 if (this.magicLoadoutOpen) {

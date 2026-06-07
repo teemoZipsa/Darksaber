@@ -151,3 +151,26 @@ test('M key toggles the full minimap before full-map pointer handling can consum
     assert.deepEqual(calls, ['toggleMinimap']);
     assert.equal(minimapHandleCalls, 0);
 });
+
+test('action menu hotkeys execute the matching radial slot', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.actionMenuUI = {
+        getIsOpen: () => true,
+        onClick: () => null,
+        onMouseMove: () => undefined,
+        getActionResult: (type: string) => ({ type, enabled: true }),
+    } as any;
+    context.playerActionController = {
+        getMode: () => null,
+        execute: (type: string) => calls.push(`execute:${type}`),
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput({
+        justPressed: (code: string) => code === 'KeyE',
+    }), makeCamera());
+
+    assert.deepEqual(calls, ['execute:attack']);
+});

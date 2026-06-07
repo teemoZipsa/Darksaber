@@ -11,6 +11,7 @@ import { tileKey } from '../../field/FieldPathing';
 import { getSkillIconCell } from '../../ui/DarksaberIconRegistry';
 import { DarksaberSpriteAtlas } from '../../ui/DarksaberSpriteAtlas';
 import { formatT, t } from '../../i18n/LanguageManager';
+import { SettingsManager } from '../SettingsManager';
 
 const PARTY_ACTOR_IMAGE_RENDER_SCALE = 1.12;
 
@@ -570,9 +571,9 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
  */
 function renderKeyHintStrip(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
     const segments: { key: string; label: string }[] = [
-        { key: 'Tab', label: '교체' },
-        { key: 'M',   label: '지도' },
-        { key: 'I',   label: '인벤' },
+        { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.nextActor')), label: '교체' },
+        { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.minimap')), label: '지도' },
+        { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.inventory')), label: '인벤' },
         { key: 'ESC', label: '메뉴' },
     ];
 

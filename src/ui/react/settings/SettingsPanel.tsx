@@ -7,8 +7,8 @@
  * stay live. Labels are localized via t(); language toggle re-renders live.
  */
 
-import type { CSSProperties, ReactNode } from 'react';
-import { SettingsManager } from '../../../engine/SettingsManager';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { SettingsManager, type KeybindingDefinition, type KeybindingId } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
 import { i18n, t } from '../../../i18n/LanguageManager';
 import { useStore, useUiVersion } from '../UiContext';
@@ -19,6 +19,11 @@ const S = SettingsManager;
 const styles = {
     sectionBody: { display: 'flex', flexDirection: 'column', gap: 6 } as CSSProperties,
     sliderWrap: { display: 'flex', alignItems: 'center', gap: 8 } as CSSProperties,
+    keyGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 } as CSSProperties,
+    keyRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minWidth: 0 } as CSSProperties,
+    keyLabel: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as CSSProperties,
+    keyButton: { minWidth: 58, padding: '4px 8px' } as CSSProperties,
+    keyActions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 2 } as CSSProperties,
     footer: { textAlign: 'center', color: 'var(--ds-text-dim)', fontSize: 12, padding: '8px 0 14px' } as CSSProperties,
 };
 
@@ -91,10 +96,92 @@ function Slider({ label, value, onChange, sfx }: { label: string; value: number;
     );
 }
 
+function KeybindingButton({
+    definition,
+    capturing,
+    setCapturing,
+}: {
+    definition: KeybindingDefinition;
+    capturing: KeybindingId | null;
+    setCapturing: (id: KeybindingId | null) => void;
+}) {
+    const isCapturing = capturing === definition.id;
+    const label = t(definition.labelKey);
+    const value = isCapturing ? t('settings.keyListening') : S.getKeyLabel(S.getKeybinding(definition.id));
+
+    return (
+        <div style={styles.keyRow}>
+            <span style={styles.keyLabel}>{label}</span>
+            <button
+                className={`ds-btn${isCapturing ? ' is-active' : ''}`}
+                style={styles.keyButton}
+                aria-label={`${label}: ${value}`}
+                title={label}
+                onClick={() => setCapturing(isCapturing ? null : definition.id)}
+            >
+                {value}
+            </button>
+        </div>
+    );
+}
+
+function KeybindingSection({ capturing, setCapturing }: { capturing: KeybindingId | null; setCapturing: (id: KeybindingId | null) => void }) {
+    const actionBindings = S.getKeybindingDefinitions('action');
+    const worldBindings = S.getKeybindingDefinitions('world');
+
+    return (
+        <Section title={t('settings.keybindings')}>
+            <div className="ds-section__title" style={{ marginTop: 0 }}>{t('settings.keybindingsAction')}</div>
+            <div style={styles.keyGrid}>
+                {actionBindings.map((definition) => (
+                    <KeybindingButton key={definition.id} definition={definition} capturing={capturing} setCapturing={setCapturing} />
+                ))}
+            </div>
+            <div className="ds-section__title" style={{ marginTop: 4 }}>{t('settings.keybindingsWorld')}</div>
+            <div style={styles.keyGrid}>
+                {worldBindings.map((definition) => (
+                    <KeybindingButton key={definition.id} definition={definition} capturing={capturing} setCapturing={setCapturing} />
+                ))}
+            </div>
+            <div style={styles.keyActions}>
+                <button
+                    className="ds-btn"
+                    onClick={() => { S.resetKeybindings(); setCapturing(null); AudioManager.playUi('ui.confirm'); }}
+                    title={t('settings.keyResetAll')}
+                >
+                    {t('settings.keyResetAll')}
+                </button>
+            </div>
+        </Section>
+    );
+}
+
 export function SettingsPanel() {
     useUiVersion(); // keep control values live
     const store = useStore();
-    const panelStyle = { width: 440, '--ds-scale': S.getUIScale() } as CSSProperties;
+    const [capturing, setCapturing] = useState<KeybindingId | null>(null);
+    const panelStyle = { width: 520, maxHeight: 'min(760px, 92vh)', overflowY: 'auto', '--ds-scale': S.getUIScale() } as CSSProperties;
+
+    useEffect(() => {
+        if (!capturing) return undefined;
+        const onKeyDown = (event: KeyboardEvent) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.code === 'Escape') {
+                setCapturing(null);
+                return;
+            }
+            if (S.isAllowedKeybindingCode(event.code)) {
+                S.setKeybinding(capturing, event.code);
+                AudioManager.playUi('ui.confirm');
+            } else {
+                AudioManager.playUi('ui.error');
+            }
+            setCapturing(null);
+        };
+        window.addEventListener('keydown', onKeyDown, true);
+        return () => window.removeEventListener('keydown', onKeyDown, true);
+    }, [capturing]);
 
     return (
         <div className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
@@ -126,6 +213,8 @@ export function SettingsPanel() {
                 <Section title={t('settings.languageSection')}>
                     <Row label={t('settings.lang')}><Cycle label={t('settings.lang')} value={t('settings.langValue')} onCycle={() => i18n.toggleLanguage()} /></Row>
                 </Section>
+
+                <KeybindingSection capturing={capturing} setCapturing={setCapturing} />
             </div>
 
             <div style={styles.footer}>

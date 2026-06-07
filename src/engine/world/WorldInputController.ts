@@ -1,6 +1,6 @@
 import type { Enemy } from '../../entity/Enemy';
 import type { LootObject } from '../../entity/LootObject';
-import type { ActionMenuUI } from '../../ui/ActionMenuUI';
+import type { ActionMenuUI, ActionType } from '../../ui/ActionMenuUI';
 import type { EntityInfoUI } from '../../ui/EntityInfoUI';
 import type { Camera } from '../Camera';
 import type { InputManager } from '../InputManager';
@@ -16,8 +16,20 @@ import type { WorldSelectionController } from './WorldSelectionController';
 import type { WorldTacticalController } from './WorldTacticalController';
 import type { MinimapUI } from '../../ui/MinimapUI';
 import { CombatLogUI } from '../../ui/CombatLogUI';
+import { SettingsManager, type KeybindingId } from '../SettingsManager';
 
 type WorldInputFieldHit = FieldHit<FieldHitParty, Enemy, LootObject>;
+
+const ACTION_HOTKEYS: ReadonlyArray<{ keybindingId: KeybindingId; action: ActionType }> = [
+    { keybindingId: 'action.move', action: 'move' },
+    { keybindingId: 'action.tool', action: 'tool' },
+    { keybindingId: 'action.attack', action: 'attack' },
+    { keybindingId: 'action.magic', action: 'magic' },
+    { keybindingId: 'action.defend', action: 'defend' },
+    { keybindingId: 'action.rest', action: 'rest' },
+    { keybindingId: 'action.fanfare', action: 'fanfare' },
+    { keybindingId: 'action.open', action: 'open' },
+];
 
 export interface WorldInputContext {
     actionMenuUI: ActionMenuUI;
@@ -58,7 +70,7 @@ export class WorldInputController {
     }
 
     public process(input: InputManager, camera: Camera): void {
-        if (input.justPressed('KeyM')) {
+        if (SettingsManager.isKeybindingJustPressed('world.minimap', input)) {
             this.context.minimapUI.toggle();
             return;
         }
@@ -93,6 +105,7 @@ export class WorldInputController {
         if (input.mouseJustDown && this.context.actionMenuUI.getIsOpen()) {
             if (this.handleActionMenuSlotClick(input, camera)) return;
         }
+        if (this.context.actionMenuUI.getIsOpen() && this.handleActionMenuHotkey(input)) return;
 
         if (this.isInputLockedByReservation()) return;
 
@@ -130,7 +143,7 @@ export class WorldInputController {
         } else if (this.context.magicController.getState().mode === 'targeting') {
             if (input.mouseJustDown) this.context.magicController.handleTargetClick(this.context.getHoverTile());
         } else {
-            if (input.justPressed('Tab')) this.context.switchToNextAliveActor();
+            if (SettingsManager.isKeybindingJustPressed('world.nextActor', input)) this.context.switchToNextAliveActor();
             if (input.mouseJustDown) this.handleFieldClick(this.context.getHoverTile(), input, camera);
         }
     }
@@ -207,12 +220,27 @@ export class WorldInputController {
     private handleActionMenuSlotClick(input: InputManager, camera: Camera): boolean {
         const result = this.context.actionMenuUI.onClick(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
         if (!result) return false;
+        this.executeActionMenuResult(result);
+        return true;
+    }
+
+    private handleActionMenuHotkey(input: InputManager): boolean {
+        for (const { keybindingId, action } of ACTION_HOTKEYS) {
+            if (!SettingsManager.isKeybindingJustPressed(keybindingId, input)) continue;
+            const result = this.context.actionMenuUI.getActionResult(action);
+            if (!result) return false;
+            this.executeActionMenuResult(result);
+            return true;
+        }
+        return false;
+    }
+
+    private executeActionMenuResult(result: { type: ActionType; enabled: boolean; disabledReason?: string }): void {
         if (result.enabled) {
             this.context.playerActionController.execute(result.type);
         } else {
             this.context.log(result.disabledReason ?? '지금 사용할 수 없는 행동입니다.');
         }
-        return true;
     }
 
     private handleFieldRightClick(tile: TilePoint, input: InputManager): void {
