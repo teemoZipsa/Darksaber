@@ -174,3 +174,35 @@ test('action menu hotkeys execute the matching radial slot', () => {
 
     assert.deepEqual(calls, ['execute:attack']);
 });
+
+test('magic menu hotkeys select the matching radial magic slot', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.actionMenuUI = {
+        getIsOpen: () => false,
+        onClick: () => null,
+        onMouseMove: () => undefined,
+    } as any;
+    context.magicController = {
+        isVisible: () => true,
+        isActive: () => true,
+        getState: () => ({ mode: 'menu' }),
+        onMouseMove: () => undefined,
+        updateHoverPreview: () => undefined,
+        updateMp: () => undefined,
+        handleMenuIndex: (index: number) => {
+            calls.push(`magicSlot:${index}`);
+            return true;
+        },
+        handleMenuDigit: () => false,
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput({
+        mouseJustDown: false,
+        justPressed: (code: string) => code === 'KeyR',
+    }), makeCamera());
+
+    assert.deepEqual(calls, ['magicSlot:3']);
+});

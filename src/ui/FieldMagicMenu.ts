@@ -12,6 +12,7 @@ import type { Skill } from '../data/SkillDB';
 import { UI, Parchment } from './UITheme';
 import { getSkillIconCell } from './DarksaberIconRegistry';
 import { DarksaberSpriteAtlas, MICON_CELL_SIZE } from './DarksaberSpriteAtlas';
+import { SettingsManager, type KeybindingId } from '../engine/SettingsManager';
 
 export interface FieldMagicSlot {
     skill: Skill;
@@ -24,6 +25,17 @@ export interface FieldMagicSlot {
 export type FieldMagicClickResult =
     | { kind: 'select'; index: number }
     | { kind: 'cancel' };
+
+const MAGIC_SLOT_KEYBINDINGS: readonly KeybindingId[] = [
+    'action.move',
+    'action.tool',
+    'action.attack',
+    'action.magic',
+    'action.defend',
+    'action.rest',
+    'action.fanfare',
+    'action.open',
+] as const;
 
 export class FieldMagicMenu {
     private static readonly ICON_ANIMATION_ROWS = 5;
@@ -106,7 +118,7 @@ export class FieldMagicMenu {
             const slot = this.slots[i];
             const { x, y } = this.slotPosition(i);
             const hovered = this.hoveredIndex === i;
-            this.drawSlot(ctx, slot, x, y, hovered);
+            this.drawSlot(ctx, slot, i, x, y, hovered);
         }
         this.renderHoveredDetail(ctx);
         ctx.restore();
@@ -133,6 +145,7 @@ export class FieldMagicMenu {
     private drawSlot(
         ctx: CanvasRenderingContext2D,
         slot: FieldMagicSlot,
+        index: number,
         x: number,
         y: number,
         hovered: boolean
@@ -144,6 +157,7 @@ export class FieldMagicMenu {
         }
 
         this.drawSkillIcon(ctx, slot, x, y, r);
+        this.drawHotkeyLabel(ctx, index, x, y, r, slot.enabled);
 
         if (hovered) {
             const label = slot.skill.nameKr;
@@ -197,6 +211,31 @@ export class FieldMagicMenu {
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#fff';
         ctx.fillText(slot.skill.icon, x, y + 1);
+        ctx.restore();
+    }
+
+    private drawHotkeyLabel(ctx: CanvasRenderingContext2D, index: number, x: number, y: number, r: number, enabled: boolean): void {
+        const keybindingId = MAGIC_SLOT_KEYBINDINGS[index];
+        if (!keybindingId) return;
+        const label = SettingsManager.getKeyLabel(SettingsManager.getKeybinding(keybindingId));
+        const badgeX = x - r * 0.58;
+        const badgeY = y - r * 0.58;
+
+        ctx.save();
+        ctx.font = `bold 9px ${UI.fontPrimary}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const w = Math.max(12, ctx.measureText(label).width + 6);
+        const h = 12;
+        ctx.fillStyle = enabled ? 'rgba(20, 14, 8, 0.86)' : 'rgba(12, 12, 12, 0.72)';
+        ctx.strokeStyle = enabled ? '#d4a050' : '#6f6048';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.rect(badgeX - w / 2, badgeY - h / 2, w, h);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = enabled ? '#f0c050' : '#9c8c70';
+        ctx.fillText(label, badgeX, badgeY + 0.5);
         ctx.restore();
     }
 

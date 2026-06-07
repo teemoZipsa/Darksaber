@@ -128,8 +128,10 @@ export class WorldInputController {
             this.context.magicController.updateMp(this.context.getControlledActor()?.character.stats.mp ?? 0);
             if (input.mouseRightJustDown) {
                 this.cancelMagicSelection();
+            } else if (this.handleMagicHotkeys(input)) {
+                /* handled by configured radial hotkey */
             } else if (this.handleMagicDigitKeys(input)) {
-                /* handled by number key */
+                /* handled by legacy number key */
             } else if (input.mouseJustDown) {
                 this.context.magicController.handleMenuMouseDown(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
             }
@@ -231,6 +233,16 @@ export class WorldInputController {
             if (!result) return false;
             this.executeActionMenuResult(result);
             return true;
+        }
+        return false;
+    }
+
+    private handleMagicHotkeys(input: InputManager): boolean {
+        for (let i = 0; i < ACTION_HOTKEYS.length; i++) {
+            const { keybindingId } = ACTION_HOTKEYS[i];
+            if (SettingsManager.isKeybindingJustPressed(keybindingId, input)) {
+                return this.context.magicController.handleMenuIndex(i);
+            }
         }
         return false;
     }

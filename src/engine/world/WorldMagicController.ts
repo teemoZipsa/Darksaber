@@ -133,6 +133,13 @@ export class WorldMagicController {
         if (this.state.mode !== 'menu') return false;
         const index = this.menu.indexForDigit(digit);
         if (index === null) return false;
+        return this.handleMenuIndex(index);
+    }
+
+    /** Hotkey selection by radial slot index while the radial menu is open. */
+    public handleMenuIndex(index: number): boolean {
+        if (this.state.mode !== 'menu') return false;
+        if (!this.menu.getSlot(index)) return false;
         this.selectSlot(index);
         return true;
     }
