@@ -30,19 +30,19 @@ test('original monster normalization keeps early monsters below a fresh fighter'
         fighter.stats,
         monster.stats,
         TileType.GRASS,
-        { random: () => 0.3 }
+        { random: () => 0.1 }
     );
     const monsterHit = CombatFormulas.calcPhysicalDamage(
         monster.stats,
         fighter.stats,
         TileType.GRASS,
-        { random: () => 0.3 }
+        { random: () => 0.1 }
     );
 
     assert.ok(playerHit.damage > 0);
     assert.ok(monsterHit.damage > 0);
-    assert.ok(Math.ceil(monster.stats.maxHp / playerHit.damage) <= 3);
-    assert.ok(Math.ceil(fighter.stats.maxHp / monsterHit.damage) >= 12);
+    assert.ok(Math.ceil(monster.stats.maxHp / playerHit.damage) <= 2);
+    assert.ok(Math.ceil(fighter.stats.maxHp / monsterHit.damage) >= 20);
 });
 
 test('normalization preserves original raw stat ordering within the starter band', () => {
@@ -63,6 +63,9 @@ test('normalization falls back for catalog monsters without original rows', () =
     assert.equal(balance.source, 'fallback');
     assert.equal(balance.original, null);
     assert.deepEqual(balance.stats, fallback);
+    assert.ok(fallback.maxHp < 400);
+    assert.ok(fallback.atk < 125);
+    assert.ok(fallback.def < 90);
 });
 
 test('monster balance report exposes raw and normalized values side by side', () => {

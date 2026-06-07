@@ -39,6 +39,16 @@ const RAW_BASELINE = {
     magDef: 40,
 } as const;
 
+const MONSTER_SOFTENING = {
+    hp: 0.85,
+    mp: 0.9,
+    offense: 0.8,
+    defense: 0.85,
+    hitRatePenalty: 5,
+    crit: 0.8,
+    evasion: 0.75,
+} as const;
+
 export function getNormalizedMonsterBalance(
     monsterId: string | number | undefined,
     level: number
@@ -61,12 +71,12 @@ export function getNormalizedMonsterBalance(
     const magAtkRaw = pairedRaw(c.magAtkLo, c.magAtkHi);
     const magDefRaw = pairedRaw(c.magDefLo, c.magDefHi);
 
-    const maxHp = scaleCurve(78 + safeLevel * 18, hpRaw, RAW_BASELINE.hp, 0.28);
-    const maxMp = scaleCurve(16 + safeLevel * 4, mpRaw, RAW_BASELINE.mp, 0.22);
-    const atk = scaleCurve(28 + safeLevel * 4.5, atkRaw, RAW_BASELINE.atk, 0.3);
-    const def = scaleCurve(15 + safeLevel * 2.7, defRaw, RAW_BASELINE.def, 0.28);
-    const magAtk = scaleCurve(18 + safeLevel * 3.8, magAtkRaw, RAW_BASELINE.magAtk, 0.28);
-    const magDef = scaleCurve(13 + safeLevel * 2.6, magDefRaw, RAW_BASELINE.magDef, 0.28);
+    const maxHp = softenStat(scaleCurve(78 + safeLevel * 18, hpRaw, RAW_BASELINE.hp, 0.28), MONSTER_SOFTENING.hp);
+    const maxMp = softenStat(scaleCurve(16 + safeLevel * 4, mpRaw, RAW_BASELINE.mp, 0.22), MONSTER_SOFTENING.mp);
+    const atk = softenCombatStat(scaleCurve(28 + safeLevel * 4.5, atkRaw, RAW_BASELINE.atk, 0.3), MONSTER_SOFTENING.offense);
+    const def = softenCombatStat(scaleCurve(15 + safeLevel * 2.7, defRaw, RAW_BASELINE.def, 0.28), MONSTER_SOFTENING.defense);
+    const magAtk = softenCombatStat(scaleCurve(18 + safeLevel * 3.8, magAtkRaw, RAW_BASELINE.magAtk, 0.28), MONSTER_SOFTENING.offense);
+    const magDef = softenCombatStat(scaleCurve(13 + safeLevel * 2.6, magDefRaw, RAW_BASELINE.magDef, 0.28), MONSTER_SOFTENING.defense);
     const spd = roundToTenth(clamp(11 + Math.min(safeLevel, 20) * 0.3 + ((c.spd ?? 18) - 18) * 0.18, 8, 24));
 
     return {
@@ -82,11 +92,11 @@ export function getNormalizedMonsterBalance(
             magAtk,
             magDef,
             spd,
-            hitRate: Math.round(clamp(78 + Math.min(safeLevel, 20) * 0.8 + ((c.hitRate ?? 70) - 70) * 0.18, 55, 115)),
-            critRate: Math.round(clamp(4 + (c.critRate ?? 5) * 0.25, 3, 18)),
-            evasion: Math.round(clamp((c.evasion ?? 0) * 0.4, 0, 25)),
-            magHit: Math.round(clamp(78 + Math.min(safeLevel, 20) * 0.8 + ((c.magHit ?? 70) - 70) * 0.18, 55, 115)),
-            magEva: Math.round(clamp((c.magEva ?? 0) * 0.4, 0, 25)),
+            hitRate: Math.round(clamp(78 + Math.min(safeLevel, 20) * 0.8 + ((c.hitRate ?? 70) - 70) * 0.18 - MONSTER_SOFTENING.hitRatePenalty, 50, 110)),
+            critRate: Math.round(clamp((4 + (c.critRate ?? 5) * 0.25) * MONSTER_SOFTENING.crit, 2, 15)),
+            evasion: Math.round(clamp((c.evasion ?? 0) * 0.4 * MONSTER_SOFTENING.evasion, 0, 20)),
+            magHit: Math.round(clamp(78 + Math.min(safeLevel, 20) * 0.8 + ((c.magHit ?? 70) - 70) * 0.18 - MONSTER_SOFTENING.hitRatePenalty, 50, 110)),
+            magEva: Math.round(clamp((c.magEva ?? 0) * 0.4 * MONSTER_SOFTENING.evasion, 0, 20)),
             mov: 2,
         }),
     };
@@ -95,17 +105,20 @@ export function getNormalizedMonsterBalance(
 export function createFallbackMonsterStats(level: number): CharacterStats {
     const safeLevel = normalizeLevel(level);
     return createBaseStats({
-        maxHp: 80 + safeLevel * 22,
-        hp: 80 + safeLevel * 22,
-        maxMp: 25 + safeLevel * 5,
-        mp: 25 + safeLevel * 5,
-        atk: 35 + safeLevel * 7,
-        def: 20 + safeLevel * 5,
-        magAtk: 25 + safeLevel * 4,
-        magDef: 18 + safeLevel * 4,
+        maxHp: softenStat(80 + safeLevel * 22, MONSTER_SOFTENING.hp),
+        hp: softenStat(80 + safeLevel * 22, MONSTER_SOFTENING.hp),
+        maxMp: softenStat(25 + safeLevel * 5, MONSTER_SOFTENING.mp),
+        mp: softenStat(25 + safeLevel * 5, MONSTER_SOFTENING.mp),
+        atk: softenCombatStat(35 + safeLevel * 7, MONSTER_SOFTENING.offense),
+        def: softenCombatStat(20 + safeLevel * 5, MONSTER_SOFTENING.defense),
+        magAtk: softenCombatStat(25 + safeLevel * 4, MONSTER_SOFTENING.offense),
+        magDef: softenCombatStat(18 + safeLevel * 4, MONSTER_SOFTENING.defense),
         spd: 13 + safeLevel * 0.4,
-        hitRate: 88 + safeLevel,
-        magHit: 88 + safeLevel,
+        hitRate: 88 + safeLevel - MONSTER_SOFTENING.hitRatePenalty,
+        critRate: 3,
+        evasion: 8,
+        magHit: 88 + safeLevel - MONSTER_SOFTENING.hitRatePenalty,
+        magEva: 4,
         mov: 2,
     });
 }
@@ -138,6 +151,14 @@ function scaleCurve(base: number, raw: number | null, baseline: number, influenc
     const rawLog = Math.log(raw / baseline);
     const factor = 1 + clamp(rawLog, -0.45, 1.1) * influence;
     return Math.max(1, Math.round(base * factor));
+}
+
+function softenStat(value: number, multiplier: number): number {
+    return Math.max(1, Math.round(value * multiplier));
+}
+
+function softenCombatStat(value: number, multiplier: number): number {
+    return Math.max(1, roundToTenth(value * multiplier));
 }
 
 function pairedRaw(lo: number | null, hi: number | null): number | null {
