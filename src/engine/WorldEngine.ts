@@ -86,6 +86,7 @@ import { WorldSelectionController } from './world/WorldSelectionController';
 import { WorldFieldSpawnController } from './world/WorldFieldSpawnController';
 import { WorldRenderController } from './world/WorldRenderController';
 import { WorldInputController } from './world/WorldInputController';
+import { NetworkRaidState, type NetworkRaidCloseReason } from './world/NetworkRaidState';
 import { HitStop } from './world/HitStop';
 import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
 import { NetworkRaidClient, WorldServerError, type NetworkRaidStatus } from '../net/NetworkRaidClient';
@@ -172,15 +173,10 @@ export class WorldEngine {
     private partyActors: FieldActor[] = [];
     private fieldEnemies: FieldEnemy[] = [];
     private remotePartyActors: Map<string, FieldActor> = new Map();
-    private networkRaidClient: NetworkRaidClient | null = null;
-    private isNetworkRaid = false;
-    private isNetworkRaidConnecting = false;
-    private networkWasReconnecting = false;
-    private networkPlayerId: string | null = null;
+    private networkRaid = new NetworkRaidState();
     private pendingNetworkMoveReopen: { intentId: string; actorId: string; tile: TilePoint } | null = null;
     private networkMovePathPreview: { actorId: string; target: TilePoint; path: TilePoint[] } | null = null;
     private pendingNetworkScenarioEnter: { intentId: string; dungeonId: string; visitKey: string | null } | null = null;
-    private readonly networkScenarioEnteredDungeonIds: Set<string> = new Set();
     private pendingLootPicks = new Map<string, { placed: PlacedItem; source: { gridX: number; gridY: number }; at: number; timedOut?: boolean }>();
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
@@ -445,9 +441,9 @@ export class WorldEngine {
                 openLoot: (loot) => this.openLoot(loot),
                 openMagic: (actor) => this.openFieldMagic(actor),
                 openTool: (actor) => this.openFieldTool(actor),
-                hasCastableFieldSkill: (actor) => (this.isNetworkRaid || this.introTutorialActive) && this.magicController.hasCastableFieldSkill(actor.character),
-                hasUsableCombatTool: (actor) => (this.isNetworkRaid || this.introTutorialActive) && this.toolController.hasUsableCombatTool(actor),
-                getCombatToolAvailability: (actor) => (this.isNetworkRaid || this.introTutorialActive)
+                hasCastableFieldSkill: (actor) => (this.getNetworkRaidState().isActive() || this.introTutorialActive) && this.magicController.hasCastableFieldSkill(actor.character),
+                hasUsableCombatTool: (actor) => (this.getNetworkRaidState().isActive() || this.introTutorialActive) && this.toolController.hasUsableCombatTool(actor),
+                getCombatToolAvailability: (actor) => (this.getNetworkRaidState().isActive() || this.introTutorialActive)
                     ? this.toolController.getCombatToolAvailability(actor)
                     : { hasRecoveryConsumable: false, hasEffectiveRecovery: false },
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
@@ -560,8 +556,9 @@ export class WorldEngine {
             onUnhandledEscape: () => this.gameManager.openPauseMenu(),
         });
         this.gameManager.inventoryUI.onRaidLootSecured = (placed, source) => {
-            if (!this.isNetworkRaid || !this.networkRaidClient || !source || !this.selectionController.lootId) return;
-            const intentId = this.networkRaidClient.sendLootPickup(this.selectionController.lootId, source.gridX, source.gridY);
+            const client = this.getNetworkRaidState().getClient();
+            if (!this.getNetworkRaidState().isActive() || !client || !source || !this.selectionController.lootId) return;
+            const intentId = client.sendLootPickup(this.selectionController.lootId, source.gridX, source.gridY);
             this.pendingLootPicks.set(intentId, { placed, source, at: Date.now() });
             this.purgeStaleLootPicks();
         };
@@ -581,6 +578,20 @@ export class WorldEngine {
 
         camera.followTile(this.player.gridX, this.player.gridY);
         camera.snapToTarget();
+    }
+
+    private getNetworkRaidState(): NetworkRaidState {
+        if (!this.networkRaid) {
+            this.networkRaid = new NetworkRaidState();
+            const legacy = this as unknown as {
+                isNetworkRaid?: boolean;
+                networkPlayerId?: string | null;
+                networkRaidClient?: NetworkRaidClient | null;
+            };
+            if (legacy.networkRaidClient) this.networkRaid.setClient(legacy.networkRaidClient);
+            if (legacy.isNetworkRaid) this.networkRaid.activate(legacy.networkPlayerId ?? '');
+        }
+        return this.networkRaid;
     }
 
     public update(dt: number, input: InputManager, camera: Camera): void {
@@ -620,7 +631,7 @@ export class WorldEngine {
             return;
         }
 
-        if (this.isNetworkRaid) {
+        if (this.getNetworkRaidState().isActive()) {
             this.updateNetworkRaid(dt, input, camera);
             return;
         }
@@ -1194,12 +1205,11 @@ export class WorldEngine {
     }
 
     private openTown(town: TownInfo): void {
-        if (this.isNetworkRaid) {
+        if (this.getNetworkRaidState().isActive()) {
             // Reaching town while still flagged as a network raid means the player is
             // abandoning the run client-side, so tell the server instead of going silent.
             this.closeNetworkRaidClient(true);
-            this.isNetworkRaid = false;
-            this.networkPlayerId = null;
+            this.getNetworkRaidState().deactivate();
         }
         this.closeFieldOverlays();
         AudioManager.stopBgm(600);
@@ -1209,7 +1219,7 @@ export class WorldEngine {
     }
 
     private async beginRaidFromCurrentHub(requestedRealm?: WorldRealmId): Promise<void> {
-        if (this.isNetworkRaidConnecting) return;
+        if (this.getNetworkRaidState().isConnecting()) return;
         this.clearIntroTutorialStateForNetworkRaid();
         const targetRealm = requestedRealm ?? this.worldMap.getRealm();
         if (this.worldMap.getRealm() !== targetRealm) this.worldMap.setRealm(targetRealm);
@@ -1221,7 +1231,7 @@ export class WorldEngine {
             this.townSession.show(town);
             return;
         }
-        this.isNetworkRaidConnecting = true;
+        this.getNetworkRaidState().setConnecting(true);
         this.addCombatLog(t('mp.deployConnecting'));
         const isResumeJoin = NetworkRaidClient.hasStoredResumeToken();
 
@@ -1242,8 +1252,7 @@ export class WorldEngine {
             this.applyServerCompletedQuestIds(welcome.completedQuestIds);
             this.townSession.hide();
             this.closeFieldOverlays();
-            this.networkPlayerId = welcome.playerId;
-            this.isNetworkRaid = true;
+            this.getNetworkRaidState().activate(welcome.playerId);
             this.currentPhase = 'raid';
             this.raidSession.beginRaidFromTown(town.id);
             this.dismissedDungeonVisitKey = null;
@@ -1253,7 +1262,7 @@ export class WorldEngine {
             }
             this.remotePartyActors.clear();
             this.pendingNetworkScenarioEnter = null;
-            this.networkScenarioEnteredDungeonIds.clear();
+            this.getNetworkRaidState().clearScenarioEntries();
             this.partyActors = [];
             this.placePartyNear(welcome.spawnTile);
             this.player = this.getControlledActor()?.entity ?? this.player;
@@ -1279,8 +1288,7 @@ export class WorldEngine {
                 window.setTimeout(() => window.location.reload(), 250);
                 return;
             }
-            this.isNetworkRaid = false;
-            this.networkPlayerId = null;
+            this.getNetworkRaidState().deactivate();
             this.closeNetworkRaidClient(false);
             const errorMessage = getWorldServerErrorMessage(error);
             console.error('[Darksaber] World deploy failed', error);
@@ -1290,7 +1298,7 @@ export class WorldEngine {
             this.townSession.show(town);
             this.townSession.setDeployError(formatT('mp.deployFailed', { message: errorMessage }));
         } finally {
-            this.isNetworkRaidConnecting = false;
+            this.getNetworkRaidState().setConnecting(false);
         }
     }
 
@@ -1307,8 +1315,9 @@ export class WorldEngine {
         authContext: { accessToken: string; characterId: string }
     ) {
         this.closeNetworkRaidClient(false);
-        this.networkRaidClient = this.createNetworkRaidClient();
-        return this.networkRaidClient.connectAndJoin({
+        const client = this.createNetworkRaidClient();
+        this.getNetworkRaidState().setClient(client);
+        return client.connectAndJoin({
             accessToken: authContext.accessToken,
             characterId: authContext.characterId,
             originHubId: town.id,
@@ -1406,18 +1415,17 @@ export class WorldEngine {
                 this.addCombatLog(formatNetworkStatusLog(status));
                 break;
             case 'connected':
-                this.addCombatLog(this.networkWasReconnecting
+                this.addCombatLog(this.getNetworkRaidState().statusWasReconnecting(status)
                     ? formatReconnectRestoredLog()
                     : formatNetworkStatusLog(status));
-                this.networkWasReconnecting = false;
                 break;
             case 'reconnecting':
-                this.networkWasReconnecting = true;
+                this.getNetworkRaidState().statusWasReconnecting(status);
                 this.addCombatLog(formatNetworkStatusLog(status));
                 break;
             case 'disconnected':
                 this.addCombatLog(formatNetworkStatusLog(status));
-                this.networkWasReconnecting = false;
+                this.getNetworkRaidState().statusWasReconnecting(status);
                 break;
             case 'idle':
                 break;
@@ -1489,10 +1497,10 @@ export class WorldEngine {
         const localCharacters = this.party.getCharacters();
         const localCharacterIds = new Set(localCharacters.map((character) => character.id));
         const localPlayerActorIds = new Set(
-            snapshot.players.find((player) => player.playerId === this.networkPlayerId)?.actorIds ?? []
+            snapshot.players.find((player) => player.playerId === this.getNetworkRaidState().playerId())?.actorIds ?? []
         );
         const isOwnActorSnapshot = (actor: ActorSnapshot): boolean =>
-            actor.ownerPlayerId === this.networkPlayerId
+            actor.ownerPlayerId === this.getNetworkRaidState().playerId()
             || localPlayerActorIds.has(actor.id)
             || (actor.localActorId ? localCharacterIds.has(actor.localActorId) : false);
         const liveActorSnapshots = snapshot.partyActors.filter((actor) => !actor.isGhost);
@@ -1693,7 +1701,7 @@ export class WorldEngine {
             }
         }
 
-        this.networkRaidClient?.sendAutoLootResolve(grant.lootId, acceptedCells);
+        this.getNetworkRaidState().getClient()?.sendAutoLootResolve(grant.lootId, acceptedCells);
         if (acquiredNames.length > 0) {
             this.addCombatLog(`${grant.sourceName} ${t('raid.autoLoot')}: ${acquiredNames.join(', ')}`);
         }
@@ -1808,8 +1816,7 @@ export class WorldEngine {
         const completedSet = new Set(completedDungeonIds);
 
         for (const dungeonId of enteredDungeonIds) {
-            if (this.networkScenarioEnteredDungeonIds.has(dungeonId)) continue;
-            this.networkScenarioEnteredDungeonIds.add(dungeonId);
+            if (!this.getNetworkRaidState().markScenarioEntered(dungeonId)) continue;
             const storyQuest = getStoryQuestByDungeonId(dungeonId);
             if (storyQuest) this.addCombatLog(t(storyQuest.enterLogKey));
             const scenario = getStoryScenarioByDungeonId(dungeonId);
@@ -1872,10 +1879,9 @@ export class WorldEngine {
     }
 
     private handleNetworkRaidResult(result: RaidResultMessage): void {
-        if (result.playerId !== this.networkPlayerId) return;
+        if (result.playerId !== this.getNetworkRaidState().playerId()) return;
         this.closeNetworkRaidClient(false);
-        this.isNetworkRaid = false;
-        this.networkPlayerId = null;
+        this.getNetworkRaidState().deactivate();
         this.raidSession.elapsedSeconds = result.elapsedSeconds;
         this.raidSession.kills = result.kills;
         this.applyNetworkScenarioResult(result.completedDungeonIds);
@@ -1891,11 +1897,10 @@ export class WorldEngine {
     }
 
     private handleNetworkGraceExpired(): void {
-        if (!this.isNetworkRaid || !this.raidSession.active) return;
+        if (!this.getNetworkRaidState().isActive() || !this.raidSession.active) return;
         this.addCombatLog(t('mp.graceExpired'));
         this.closeNetworkRaidClient(false);
-        this.isNetworkRaid = false;
-        this.networkPlayerId = null;
+        this.getNetworkRaidState().deactivate();
         this.raidOutcomeController.completeFailure('MIA');
     }
 
@@ -1908,14 +1913,11 @@ export class WorldEngine {
         }
     }
 
-    private closeNetworkRaidClient(sendLeave: boolean, reason: 'town' | 'wipe' | 'manual' = 'manual'): void {
+    private closeNetworkRaidClient(sendLeave: boolean, reason: NetworkRaidCloseReason = 'manual'): void {
         this.pendingLootPicks.clear();
         this.pendingNetworkScenarioEnter = null;
         this.remotePartyActors.clear();
-        if (!this.networkRaidClient) return;
-        if (sendLeave) this.networkRaidClient.leave(reason);
-        else this.networkRaidClient.close();
-        this.networkRaidClient = null;
+        this.getNetworkRaidState().closeClient(sendLeave, reason);
     }
 
     private checkTempleArrival(): void {
@@ -1984,7 +1986,7 @@ export class WorldEngine {
             return;
         }
 
-        if (this.isNetworkRaid) {
+        if (this.getNetworkRaidState().isActive()) {
             this.enterNetworkStoryDungeon(dungeon);
             return;
         }
@@ -1994,11 +1996,12 @@ export class WorldEngine {
 
     private enterNetworkStoryDungeon(dungeon: WorldDungeonInfo): void {
         const actor = this.getControlledActor();
-        if (!actor || !this.networkRaidClient) return;
+        const client = this.getNetworkRaidState().getClient();
+        if (!actor || !client) return;
 
         const visitKey = this.getCurrentDungeonVisitKey(dungeon);
         this.dismissedDungeonVisitKey = visitKey;
-        const intentId = this.networkRaidClient.sendScenarioEnter(actor.id, dungeon.id);
+        const intentId = client.sendScenarioEnter(actor.id, dungeon.id);
         this.pendingNetworkScenarioEnter = { intentId, dungeonId: dungeon.id, visitKey };
         this.addCombatLog(`${dungeon.nameKr} 서버 시나리오 진입 요청.`);
     }
@@ -2114,7 +2117,7 @@ export class WorldEngine {
 
     private returnToMortalWorld(): void {
         this.fusionTempleUI.hide();
-        if (this.isNetworkRaid || this.currentPhase === 'raid') {
+        if (this.getNetworkRaidState().isActive() || this.currentPhase === 'raid') {
             void this.beginRaidFromCurrentHub('mortal');
             return;
         }
@@ -2378,18 +2381,11 @@ export class WorldEngine {
         payload: unknown,
         options: { requireOpen?: boolean } = {}
     ): string | null {
-        const client = this.getNetworkIntentClient(options.requireOpen ?? true);
-        return client ? client.sendIntent(actorId, kind, payload) : null;
-    }
-
-    private getNetworkIntentClient(requireOpen: boolean): NetworkRaidClient | null {
-        if (!this.isNetworkRaid || !this.networkRaidClient) return null;
-        if (requireOpen && !this.networkRaidClient.getIsOpen()) return null;
-        return this.networkRaidClient;
+        return this.getNetworkRaidState().sendIntent(actorId, kind, payload, options);
     }
 
     private tryActorAttack(actor: FieldActor, enemy: Enemy): boolean {
-        if (this.isNetworkRaid) {
+        if (this.getNetworkRaidState().isActive()) {
             return Boolean(this.sendNetworkIntent(actor.id, 'attack', { targetId: enemy.id }, { requireOpen: false }));
         }
         if (!this.introTutorialActive) {
@@ -2469,7 +2465,7 @@ export class WorldEngine {
         if (options.clearEnemies ?? true) this.fieldEnemies = [];
         const completedInterior = this.activeStoryInterior?.dungeonId === dungeonId ? this.activeStoryInterior : null;
         if (this.activeStoryInterior?.dungeonId === dungeonId) {
-            this.exitActiveStoryInterior({ placePartyAtReturn: !this.isNetworkRaid });
+            this.exitActiveStoryInterior({ placePartyAtReturn: !this.getNetworkRaidState().isActive() });
         }
         this.selectionController.clear();
         this.clearFieldTurnState();
@@ -2524,7 +2520,7 @@ export class WorldEngine {
     }
 
     private openLoot(loot: LootObject): void {
-        if (this.isNetworkRaid) {
+        if (this.getNetworkRaidState().isActive()) {
             this.selectionController.selectLoot(loot.id);
             this.addCombatLog(`${loot.sourceLabel} 서버 점유 요청.`);
             this.sendNetworkIntent(this.requireControlledActor().id, 'interact', { lootId: loot.id });
@@ -2544,7 +2540,7 @@ export class WorldEngine {
     }
 
     private openFieldMagic(actor: FieldActor): void {
-        if (!this.isNetworkRaid && !this.introTutorialActive) {
+        if (!this.getNetworkRaidState().isActive() && !this.introTutorialActive) {
             this.addCombatLog('서버 세션 밖에서는 마법을 사용할 수 없습니다.');
             this.reopenActionMenu(actor);
             return;
@@ -2553,7 +2549,7 @@ export class WorldEngine {
     }
 
     private openFieldTool(actor: FieldActor): void {
-        if (!this.isNetworkRaid && !this.introTutorialActive) {
+        if (!this.getNetworkRaidState().isActive() && !this.introTutorialActive) {
             this.addCombatLog('서버 세션 밖에서는 도구를 사용할 수 없습니다.');
             this.reopenActionMenu(actor);
             return;
@@ -2585,12 +2581,12 @@ export class WorldEngine {
     }
 
     private getFanfareFollowerCount(actor: FieldActor): number {
-        if (this.isNetworkRaid) return 0;
+        if (this.getNetworkRaidState().isActive()) return 0;
         return this.getLocalPartyActors().filter((candidate) => candidate !== actor && !candidate.character.isDead).length;
     }
 
     private getFanfareLeaderActor(): FieldActor | null {
-        if (!this.fanfareLeaderActorId || this.isNetworkRaid) return null;
+        if (!this.fanfareLeaderActorId || this.getNetworkRaidState().isActive()) return null;
         const leader = this.getLocalPartyActors().find((actor) => actor.id === this.fanfareLeaderActorId && !actor.character.isDead) ?? null;
         if (!leader) this.fanfareLeaderActorId = null;
         return leader;
@@ -2987,7 +2983,7 @@ export class WorldEngine {
     }
 
     private getSpendableActionGauge(): number {
-        if (this.activeTurnActorId && this.isNetworkRaid) {
+        if (this.activeTurnActorId && this.getNetworkRaidState().isActive()) {
             return Math.max(0, Math.floor(this.remainingActionPoints));
         }
         const actor = this.getActivePartyTurnActor();
