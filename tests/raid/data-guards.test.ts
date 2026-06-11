@@ -189,6 +189,67 @@ test('player data guards gold and normalizes old save shapes', () => {
     }
 });
 
+test('player data writes and loads a canonical character save snapshot', () => {
+    const previousStorage = globalThis.localStorage;
+    const store = new Map<string, string>();
+    globalThis.localStorage = {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, value: string) => { store.set(key, value); },
+        removeItem: (key: string) => { store.delete(key); },
+        clear: () => { store.clear(); },
+        key: (index: number) => Array.from(store.keys())[index] ?? null,
+        get length() { return store.size; },
+    };
+
+    try {
+        const player = new PlayerData();
+        player.gold = 777;
+        player.currentHubTownId = 's_coast_town';
+        player.pendingRestMenuId = 'hearty_breakfast';
+        player.inventory = [{
+            uid: 'bag-1',
+            itemId: 'short_sword',
+            gridX: 2,
+            gridY: 3,
+            durability: 4,
+            quantity: 1,
+            acquiredInRaid: true,
+            sockets: ['rune_el'],
+        }];
+        player.save();
+
+        const raw = JSON.parse(store.get('sin_eater_save') ?? '{}') as Record<string, unknown>;
+        const save = asRecord(raw.characterSave);
+        assert.equal(asRecord(save.questState).gold, 777);
+        assert.equal(asRecord(save.hubLocation).townId, 's_coast_town');
+        const inventory = asRecord(save.inventory);
+        const savedItem = asRecord((inventory.items as unknown[])[0]);
+        assert.equal(savedItem.uid, 'bag-1');
+        assert.deepEqual(savedItem.sockets, ['rune_el']);
+
+        store.set('sin_eater_save', JSON.stringify({
+            gold: 1,
+            currentHubTownId: 'central_castle',
+            inventory: [],
+            equipped: {},
+            lastSaved: '',
+            characterSave: {
+                ...save,
+                questState: { ...asRecord(save.questState), gold: 999 },
+                hubLocation: { ...asRecord(save.hubLocation), townId: 'w_forest_village' },
+            },
+        }));
+        const loaded = new PlayerData();
+        loaded.load();
+        assert.equal(loaded.gold, 999);
+        assert.equal(loaded.currentHubTownId, 'w_forest_village');
+        assert.equal(loaded.inventory[0].uid, 'bag-1');
+        assert.deepEqual(loaded.inventory[0].sockets, ['rune_el']);
+    } finally {
+        globalThis.localStorage = previousStorage;
+    }
+});
+
 test('socket loot handles injected random values outside Math.random range', () => {
     assert.equal(rollChestGem(() => Number.NaN), null);
     assert.equal(rollBossRune(1, () => Number.NaN), null);
@@ -229,3 +290,9 @@ test('skill visual profiles fall back for malformed runtime data', () => {
     assert.ok(profile.spriteSize > 0);
     assert.ok(profile.duration > 0);
 });
+
+function asRecord(value: unknown): Record<string, unknown> {
+    assert.equal(typeof value, 'object');
+    assert.notEqual(value, null);
+    return value as Record<string, unknown>;
+}

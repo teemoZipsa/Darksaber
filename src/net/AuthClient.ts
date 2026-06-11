@@ -26,12 +26,14 @@ export interface AuthCharacter {
 }
 
 export interface InventorySaveItem {
+    uid?: string;
     itemId: string;
     gridX: number;
     gridY: number;
     quantity: number;
     durability: number;
     acquiredInRaid?: boolean;
+    sockets?: string[];
 }
 
 export interface CharacterSave {

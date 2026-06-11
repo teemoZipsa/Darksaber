@@ -11,6 +11,8 @@ import {
     type MarketContract,
     type MarketState,
 } from './MarketData';
+import { getItemDef } from './ItemDB';
+import type { CharacterSave, InventorySaveItem } from '../net/AuthClient';
 
 export interface InventoryItem {
     uid: string;         // Unique ID for this specific instance
@@ -35,10 +37,13 @@ export interface SaveData {
     pendingRestMenuId: string | null;
     inventory: InventoryItem[];
     equipped: { [slot: string]: InventoryItem | null };
+    characterSave?: CharacterSave;
     /** ISO date string of last save */
     lastSaved: string;
 }
 const SAVE_KEY = 'sin_eater_save';
+const LOCAL_CHARACTER_ID = 'local_player';
+type CharacterSaveProvider = () => Partial<Pick<CharacterSave, 'inventory' | 'equipment' | 'partySnapshot' | 'rosterSnapshot'>>;
 const DEFAULT_EQUIPPED: Record<string, InventoryItem | null> = {
     weapon: null,
     shield: null,
@@ -61,6 +66,12 @@ export class PlayerData {
     public pendingRestMenuId: string | null = null;
     public inventory: InventoryItem[] = [];
     public equipped: Record<string, InventoryItem | null> = { ...DEFAULT_EQUIPPED };
+    private localSaveRevision: number = 0;
+    private characterSaveProvider: CharacterSaveProvider | null = null;
+
+    public setCharacterSaveProvider(provider: CharacterSaveProvider | null): void {
+        this.characterSaveProvider = provider;
+    }
 
     /** Add gold */
     public addGold(amount: number): void {
@@ -109,6 +120,17 @@ export class PlayerData {
     // ═══════════════════════════════════════════════════════════
 
     public save(): void {
+        const lastSaved = new Date().toISOString();
+        const characterSave = this.toCharacterSave(lastSaved, Math.max(1, this.localSaveRevision + 1));
+        const runtimePatch = this.characterSaveProvider?.();
+        const patchedCharacterSave: CharacterSave = {
+            ...characterSave,
+            ...runtimePatch,
+            characterId: characterSave.characterId,
+            saveVersion: characterSave.saveVersion,
+            revision: characterSave.revision,
+            updatedAt: characterSave.updatedAt,
+        };
         const data: SaveData = {
             gold: this.gold,
             clearedStages: Array.from(this.clearedStages),
@@ -121,10 +143,12 @@ export class PlayerData {
             pendingRestMenuId: this.pendingRestMenuId,
             inventory: this.inventory,
             equipped: this.equipped,
-            lastSaved: new Date().toISOString(),
+            characterSave: patchedCharacterSave,
+            lastSaved,
         };
         try {
             localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+            this.localSaveRevision = patchedCharacterSave.revision;
         } catch { /* silent */ }
     }
 
@@ -135,6 +159,10 @@ export class PlayerData {
             const parsed: unknown = JSON.parse(raw);
             if (!isRecord(parsed)) return;
             const data = parsed as Partial<SaveData>;
+            if (isRecord(data.characterSave)) {
+                this.applyCharacterSave(data.characterSave as CharacterSave);
+                return;
+            }
             this.gold = normalizeLoadedGold(data.gold);
             this.clearedStages = new Set(normalizeStringArray(data.clearedStages));
             this.questItems = new Set(normalizeStringArray(data.questItems));
@@ -146,7 +174,69 @@ export class PlayerData {
             this.pendingRestMenuId = typeof data.pendingRestMenuId === 'string' ? data.pendingRestMenuId : null;
             this.inventory = normalizeInventory(data.inventory);
             this.equipped = normalizeEquipped(data.equipped);
+            this.localSaveRevision = 0;
         } catch { /* silent — start fresh */ }
+    }
+
+    public toCharacterSave(updatedAt: string = new Date().toISOString(), revision: number = Math.max(1, this.localSaveRevision)): CharacterSave {
+        return {
+            characterId: LOCAL_CHARACTER_ID,
+            saveVersion: 1,
+            revision,
+            hubLocation: {
+                realm: 'mortal',
+                townId: this.currentHubTownId,
+                pendingRestMenuId: this.pendingRestMenuId,
+            },
+            questState: {
+                gold: this.gold,
+                clearedStageIds: Array.from(this.clearedStages),
+                questItemIds: Array.from(this.questItems),
+                storyCompanionIds: Array.from(this.storyCompanions),
+                marketState: this.marketState,
+                marketCycle: this.marketCycle,
+                marketContracts: this.marketContracts,
+            },
+            inventory: {
+                width: 10,
+                height: 6,
+                items: this.inventory.map(toInventorySaveItem),
+            },
+            equipment: { ...this.equipped },
+            partySnapshot: {
+                activeCharacterIds: [LOCAL_CHARACTER_ID],
+            },
+            rosterSnapshot: {
+                characters: [{
+                    id: LOCAL_CHARACTER_ID,
+                    name: 'Hero',
+                    classKey: 'infantry',
+                    gender: 'M',
+                    tier: 1,
+                    level: 1,
+                    exp: 0,
+                    baseStats: {},
+                }],
+            },
+            updatedAt,
+        };
+    }
+
+    public applyCharacterSave(save: CharacterSave): void {
+        const hubLocation = isRecord(save.hubLocation) ? save.hubLocation : {};
+        const questState = isRecord(save.questState) ? save.questState : {};
+        this.gold = normalizeLoadedGold(questState.gold);
+        this.clearedStages = new Set(normalizeStringArray(questState.clearedStageIds ?? questState.completedQuestIds));
+        this.questItems = new Set(normalizeStringArray(questState.questItemIds));
+        this.storyCompanions = new Set(normalizeStringArray(questState.storyCompanionIds));
+        this.marketState = normalizeMarketState(questState.marketState);
+        this.marketCycle = normalizeMarketCycle(questState.marketCycle);
+        this.marketContracts = normalizeMarketContracts(questState.marketContracts, this.marketCycle);
+        this.currentHubTownId = typeof hubLocation.townId === 'string' ? hubLocation.townId : 'central_castle';
+        this.pendingRestMenuId = typeof hubLocation.pendingRestMenuId === 'string' ? hubLocation.pendingRestMenuId : null;
+        this.inventory = normalizeInventorySnapshot(save.inventory);
+        this.equipped = normalizeEquipped(save.equipment);
+        this.localSaveRevision = finiteFloor(save.revision, 0);
     }
 }
 
@@ -178,6 +268,13 @@ function normalizeInventory(value: unknown): InventoryItem[] {
         : [];
 }
 
+function normalizeInventorySnapshot(value: unknown): InventoryItem[] {
+    if (!isRecord(value) || !Array.isArray(value.items)) return [];
+    return value.items
+        .map((entry, index) => normalizeInventorySaveItem(entry, index))
+        .filter((item): item is InventoryItem => item !== null);
+}
+
 function normalizeInventoryItem(value: unknown): InventoryItem | null {
     if (!isRecord(value)) return null;
     if (typeof value.uid !== 'string' || typeof value.itemId !== 'string') return null;
@@ -197,6 +294,25 @@ function normalizeInventoryItem(value: unknown): InventoryItem | null {
     };
 }
 
+function normalizeInventorySaveItem(value: unknown, index: number): InventoryItem | null {
+    if (!isRecord(value)) return null;
+    if (typeof value.itemId !== 'string') return null;
+    const gridX = finiteFloor(value.gridX, 0);
+    const gridY = finiteFloor(value.gridY, 0);
+    return {
+        uid: typeof value.uid === 'string' && value.uid
+            ? value.uid
+            : `save_${value.itemId}_${gridX}_${gridY}_${index}`,
+        itemId: value.itemId,
+        gridX,
+        gridY,
+        durability: normalizeDurability(value.itemId, value.durability),
+        quantity: normalizeQuantity(value.quantity),
+        acquiredInRaid: value.acquiredInRaid === true,
+        sockets: normalizeStringArray(value.sockets),
+    };
+}
+
 function normalizeEquipped(value: unknown): Record<string, InventoryItem | null> {
     const result: Record<string, InventoryItem | null> = { ...DEFAULT_EQUIPPED };
     if (!isRecord(value)) return result;
@@ -208,4 +324,28 @@ function normalizeEquipped(value: unknown): Record<string, InventoryItem | null>
 
 function finiteFloor(value: unknown, fallback: number): number {
     return typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : fallback;
+}
+
+function toInventorySaveItem(item: InventoryItem): InventorySaveItem {
+    return {
+        uid: item.uid,
+        itemId: item.itemId,
+        gridX: finiteFloor(item.gridX, 0),
+        gridY: finiteFloor(item.gridY, 0),
+        quantity: normalizeQuantity(item.quantity),
+        durability: normalizeDurability(item.itemId, item.durability),
+        ...(item.acquiredInRaid ? { acquiredInRaid: true } : {}),
+        ...(item.sockets.length > 0 ? { sockets: item.sockets } : {}),
+    };
+}
+
+function normalizeQuantity(value: unknown): number {
+    return typeof value === 'number' && Number.isFinite(value)
+        ? Math.max(1, Math.floor(value))
+        : 1;
+}
+
+function normalizeDurability(itemId: string, value: unknown): number {
+    if (typeof value === 'number' && Number.isFinite(value)) return Math.max(0, Math.floor(value));
+    return getItemDef(itemId)?.maxDurability ?? 0;
 }

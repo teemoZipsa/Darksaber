@@ -49,12 +49,14 @@ export interface AuthCharacter {
 }
 
 export interface InventorySaveItem {
+    uid?: string;
     itemId: string;
     gridX: number;
     gridY: number;
     quantity: number;
     durability: number;
     acquiredInRaid?: boolean;
+    sockets?: string[];
 }
 
 export interface InventorySaveSnapshot {
@@ -944,9 +946,23 @@ function normalizeInventorySnapshot(snapshot: InventorySaveSnapshot): InventoryS
                 quantity: clampInt(entry.quantity, 1, 999, 1),
                 durability: clampInt(entry.durability, 0, item.maxDurability, item.maxDurability),
                 ...(entry.acquiredInRaid ? { acquiredInRaid: true } : {}),
+                ...withOptionalUid(entry.uid),
+                ...withOptionalSockets(entry.sockets),
             }];
         }),
     };
+}
+
+function withOptionalUid(value: unknown): { uid: string } | {} {
+    return typeof value === 'string' && value.length > 0 ? { uid: value.slice(0, 80) } : {};
+}
+
+function withOptionalSockets(value: unknown): { sockets: string[] } | {} {
+    if (!Array.isArray(value)) return {};
+    const sockets = value.filter((entry): entry is string => {
+        return typeof entry === 'string' && ITEMS.some((candidate) => candidate.id === entry);
+    });
+    return sockets.length > 0 ? { sockets } : {};
 }
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {

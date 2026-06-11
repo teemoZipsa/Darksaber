@@ -11,7 +11,7 @@ import { GameState } from './GameState';
 import { WorldEngine } from './WorldEngine';
 import { PartyManager } from '../character/PartyManager';
 import { Character } from '../character/Character';
-import { GridInventory } from '../inventory/GridInventory';
+import { GridInventory, type PlacedItem } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
 import { ITEMS } from '../data/ItemDB';
 import { getClassLine } from '../data/ClassTree';
@@ -97,15 +97,10 @@ export class GameManager {
         this.stash = new GridInventory(15, 10);
         this.playerData = new PlayerData();
         this.playerData.load();
+        this.playerData.setCharacterSaveProvider(() => this.buildLocalCharacterSavePatch());
         this.syncStoryCompanionsToRoster();
 
-        // Give starter items
-        const sword = ITEMS.find(i => i.id === 'short_sword');
-        if (sword) this.inventory.autoPlace(sword);
-        const herb = ITEMS.find(i => i.id === 'herb_cheap');
-        if (herb) { this.inventory.autoPlace(herb); this.inventory.autoPlace(herb); }
-        const mpPot = ITEMS.find(i => i.id === 'mp_potion');
-        if (mpPot) this.inventory.autoPlace(mpPot);
+        this.loadInitialSoloInventory();
 
         this.inventoryUI = new InventoryUI(this.inventory);
         this.partyUI = new PartyUI(this.party);
@@ -261,6 +256,36 @@ export class GameManager {
             .catch(() => { /* best-effort; local save already applied, retried on next change */ });
     }
 
+    private buildLocalCharacterSavePatch(): Partial<Pick<CharacterSave, 'inventory' | 'equipment' | 'partySnapshot' | 'rosterSnapshot'>> {
+        return {
+            inventory: this.buildInventorySaveSnapshot(),
+            equipment: this.buildEquipmentSaveSnapshot(),
+            partySnapshot: {
+                activeCharacterIds: this.party.getCharacters().map((character) => character.id),
+            },
+            rosterSnapshot: this.buildRosterSnapshot(),
+        };
+    }
+
+    private buildInventorySaveSnapshot(): CharacterSave['inventory'] {
+        return {
+            width: this.inventory.width,
+            height: this.inventory.height,
+            items: this.inventory.items.map(placedItemToSaveItem),
+        };
+    }
+
+    private buildEquipmentSaveSnapshot(): Record<string, unknown> {
+        return {
+            characters: this.party.getRoster().map((character) => ({
+                id: character.id,
+                slots: Object.fromEntries(
+                    [...character.equipment.entries()].map(([slot, placed]) => [slot, placedItemToSaveItem(placed)])
+                ),
+            })),
+        };
+    }
+
     /** Serialize the current roster into the persisted rosterSnapshot shape. */
     private buildRosterSnapshot(): Record<string, unknown> {
         return {
@@ -330,8 +355,8 @@ export class GameManager {
         this.stash.clear();
         this.loadRosterFromSave(session.character, session.save);
         this.loadInventoryFromSave(session.save);
-        this.playerData.currentHubTownId = readTownId(session.save);
-        this.playerData.clearedStages = new Set(session.accountProgress.completedQuests);
+        this.playerData.applyCharacterSave(session.save);
+        this.playerData.clearedStages = new Set([...this.playerData.clearedStages, ...session.accountProgress.completedQuests]);
         this.syncStoryCompanionsToRoster();
         this.onActiveCharacterChanged();
         this.startIntroTutorialOnWorldInit = false;
@@ -345,6 +370,21 @@ export class GameManager {
 
     public getNetworkAuthContext(): { accessToken: string; characterId: string } | null {
         return this.networkAuthContext;
+    }
+
+    private loadInitialSoloInventory(): void {
+        const localSave = this.playerData.toCharacterSave();
+        if (localSave.inventory.items.length > 0) {
+            this.loadInventoryFromSave(localSave);
+            return;
+        }
+
+        const sword = ITEMS.find(i => i.id === 'short_sword');
+        if (sword) this.inventory.autoPlace(sword);
+        const herb = ITEMS.find(i => i.id === 'herb_cheap');
+        if (herb) { this.inventory.autoPlace(herb); this.inventory.autoPlace(herb); }
+        const mpPot = ITEMS.find(i => i.id === 'mp_potion');
+        if (mpPot) this.inventory.autoPlace(mpPot);
     }
 
     public syncStoryCompanionsToRoster(): void {
@@ -402,6 +442,10 @@ export class GameManager {
         placed.quantity = Math.max(1, Math.floor(entry.quantity));
         placed.durability = Math.max(0, Math.min(item.maxDurability, Math.floor(entry.durability)));
         placed.acquiredInRaid = entry.acquiredInRaid;
+        placed.sockets = (entry.sockets ?? []).flatMap((itemId) => {
+            const socket = ITEMS.find((candidate) => candidate.id === itemId);
+            return socket ? [socket] : [];
+        });
     }
 
     // ─── Pause menu (DOM overlay) ─────────────────────────────────
@@ -749,12 +793,20 @@ function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter
     return entries;
 }
 
-function readTownId(save: CharacterSave): string {
-    return typeof save.hubLocation.townId === 'string' ? save.hubLocation.townId : 'central_castle';
-}
-
 function readStringArray(value: unknown): string[] {
     return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
+}
+
+function placedItemToSaveItem(placed: PlacedItem): InventorySaveItem {
+    return {
+        itemId: placed.item.id,
+        gridX: placed.gridX,
+        gridY: placed.gridY,
+        quantity: Math.max(1, Math.floor(placed.quantity)),
+        durability: Math.max(0, Math.floor(placed.durability)),
+        ...(placed.acquiredInRaid ? { acquiredInRaid: true } : {}),
+        ...(placed.sockets && placed.sockets.length > 0 ? { sockets: placed.sockets.map((item) => item.id) } : {}),
+    };
 }
 
 function readNumberRecord(value: unknown): Record<string, number> {
