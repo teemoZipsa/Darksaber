@@ -38,6 +38,7 @@ const WS_IDLE_TIMEOUT_MS = Math.max(10_000, Math.floor(Number(process.env.WORLD_
 export const WORLD_SAVE_AUTOSAVE_MS = clampInt(Number(process.env.WORLD_SAVE_AUTOSAVE_MS ?? 90_000), 60_000, 120_000);
 const WORLD_SAVE_RETRY_LIMIT = Math.max(1, Math.floor(Number(process.env.WORLD_SAVE_RETRY_LIMIT ?? 3)));
 const WORLD_SAVE_RETRY_BASE_MS = Math.max(100, Math.floor(Number(process.env.WORLD_SAVE_RETRY_BASE_MS ?? 750)));
+const WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS = Math.max(1_000, Math.floor(Number(process.env.WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS ?? 8_000)));
 const allowedOrigins = parseAllowedOrigins(process.env.AUTH_ALLOWED_ORIGINS);
 const authStoreKind = process.env.DATABASE_URL ? 'postgres' : 'memory';
 const jwtSecret = process.env.AUTH_JWT_SECRET ?? process.env.JWT_SECRET ?? (process.env.NODE_ENV === 'production' ? '' : 'darksaber-dev-jwt-secret-change-me');
@@ -105,6 +106,10 @@ server.listen(PORT, HOST, () => {
     console.log(`Darksaber world server started on ws://${hostLabel}:${PORT}`);
     console.log(`Auth store: ${authStoreKind}`);
 });
+
+let shutdownStarted = false;
+process.once('SIGINT', () => { void shutdownWorldServer('SIGINT'); });
+process.once('SIGTERM', () => { void shutdownWorldServer('SIGTERM'); });
 
 wss.on('connection', (ws: WebSocket, request) => {
     const origin = typeof request.headers.origin === 'string' ? request.headers.origin : null;
@@ -645,6 +650,34 @@ function cleanupSocket(ws: WebSocket): void {
     void flushCharacterSave(binding.sessionKey, binding.playerId, 'socket_close', true);
     cleanupJoinedSocket(ws, binding);
     sessions.get(binding.sessionKey)?.disconnect(binding.playerId);
+}
+
+async function shutdownWorldServer(signal: NodeJS.Signals): Promise<void> {
+    if (shutdownStarted) return;
+    shutdownStarted = true;
+    console.log(`Received ${signal}; flushing world saves before shutdown.`);
+    for (const ws of wss.clients) ws.close(1001, 'server shutting down');
+    const flush = flushAllCharacterSaves('shutdown');
+    await Promise.race([
+        flush,
+        sleep(WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS).then(() => {
+            console.error(`World save shutdown flush exceeded ${WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS}ms.`);
+        }),
+    ]);
+    await closeServers();
+    process.exit(0);
+}
+
+async function flushAllCharacterSaves(reason: string): Promise<void> {
+    const trackers = [...saveTrackers.values()];
+    await Promise.allSettled(
+        trackers.map((tracker) => flushCharacterSave(tracker.sessionKey, tracker.playerId, reason, true))
+    );
+}
+
+async function closeServers(): Promise<void> {
+    await new Promise<void>((resolve) => wss.close(() => resolve()));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
 }
 
 function cleanupJoinedSocket(ws: WebSocket, binding: SocketBinding): void {
