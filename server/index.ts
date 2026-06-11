@@ -8,6 +8,7 @@ import 'dotenv/config';
 import { WebSocketServer, WebSocket, type RawData } from 'ws';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
+import { isAbsolute, resolve } from 'node:path';
 import { createBaseStats, type CharacterStats } from '../src/data/Stats';
 import { isMarketClientMessage, WORLD_PROTOCOL_VERSION } from '../src/net/WorldProtocol';
 import type {
@@ -26,6 +27,7 @@ import { WorldResumeFailedError, WorldSession, WORLD_TICK_MS, type WorldCharacte
 import { authenticateAccessToken, createAuthHttpHandler } from './AuthHttp';
 import { InMemoryAuthStore, PostgresAuthStore, type AccountProgress, type AuthAccount, type AuthCharacter, type AuthStore, type CharacterSave } from './AuthStore';
 import type { JwtOptions } from './AuthCrypto';
+import { replayWorldSaveSpool, WorldSaveSpool } from './WorldSaveSpool';
 
 const PORT = Number(process.env.PORT ?? 8765);
 const HOST = process.env.HOST;
@@ -53,6 +55,17 @@ const authStore: AuthStore = process.env.DATABASE_URL
     ? new PostgresAuthStore(process.env.DATABASE_URL)
     : new InMemoryAuthStore();
 await authStore.initialize();
+const worldSaveSpool = new WorldSaveSpool({
+    persistPath: resolveServerPersistPath(process.env.WORLD_SAVE_SPOOL_PATH, './.runtime/world-save-spool.json'),
+});
+const replayedWorldSaves = await replayWorldSaveSpool(authStore, worldSaveSpool, {
+    retryLimit: WORLD_SAVE_RETRY_LIMIT,
+    retryBaseMs: WORLD_SAVE_RETRY_BASE_MS,
+    logger: (message) => console.error(message),
+});
+if (replayedWorldSaves.applied > 0 || replayedWorldSaves.failed > 0) {
+    console.log(`World save spool replay applied=${replayedWorldSaves.applied} failed=${replayedWorldSaves.failed}`);
+}
 const handleAuthHttpRequest = createAuthHttpHandler({
     store: authStore,
     jwt: jwtOptions,
@@ -554,6 +567,8 @@ function consumeSessionSaveDirtyPlayers(sessionKey: string, session: WorldSessio
     for (const playerId of session.consumeSaveDirtyPlayerIds()) {
         const tracker = saveTrackers.get(socketPlayerKey(sessionKey, playerId));
         if (!tracker) continue;
+        const patch = session.createCharacterSavePatch(playerId);
+        if (patch) spoolPendingCharacterSave(tracker, patch, 'dirty');
         tracker.dirty = true;
         tracker.lastDirtyAt = Date.now();
     }
@@ -568,9 +583,11 @@ async function flushCharacterSave(sessionKey: string, playerId: string, reason: 
     const patch = session?.createCharacterSavePatch(playerId);
     if (!patch) {
         tracker.dirty = false;
+        worldSaveSpool.remove(key);
         return;
     }
 
+    spoolPendingCharacterSave(tracker, patch, reason);
     tracker.saving = true;
     tracker.dirty = false;
     const isFinalPatch = Boolean(session?.hasFinalCharacterSavePatch(playerId));
@@ -578,6 +595,7 @@ async function flushCharacterSave(sessionKey: string, playerId: string, reason: 
         const updatedRevision = await updateCharacterSaveWithRetry(tracker, patch);
         tracker.expectedRevision = updatedRevision;
         tracker.lastSavedAt = Date.now();
+        worldSaveSpool.remove(key);
         if (isFinalPatch) {
             session?.consumeFinalCharacterSavePatch(playerId);
             saveTrackers.delete(key);
@@ -591,6 +609,23 @@ async function flushCharacterSave(sessionKey: string, playerId: string, reason: 
         console.error(`Failed to flush character save (${reason}):`, error instanceof Error ? error.message : error);
     } finally {
         tracker.saving = false;
+    }
+}
+
+function spoolPendingCharacterSave(tracker: PlayerSaveTracker, patch: WorldCharacterSavePatch, reason: string): void {
+    try {
+        worldSaveSpool.upsert({
+            key: socketPlayerKey(tracker.sessionKey, tracker.playerId),
+            sessionKey: tracker.sessionKey,
+            playerId: tracker.playerId,
+            accountId: tracker.accountId,
+            characterId: tracker.characterId,
+            expectedRevision: tracker.expectedRevision,
+            patch,
+            reason,
+        });
+    } catch (error) {
+        console.error('Failed to spool pending world save:', error instanceof Error ? error.message : error);
     }
 }
 
@@ -849,6 +884,11 @@ function clampInt(value: number, min: number, max: number): number {
 
 function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function resolveServerPersistPath(envPath: string | undefined, fallbackRelative: string): string {
+    if (envPath) return isAbsolute(envPath) ? envPath : resolve(process.cwd(), envPath);
+    return fileURLToPath(new URL(fallbackRelative, import.meta.url));
 }
 
 function stableHash(value: string): number {
