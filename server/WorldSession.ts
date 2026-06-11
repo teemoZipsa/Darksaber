@@ -108,7 +108,8 @@ import {
     type WorldSnapshot,
     type WorldWelcomeMessage,
 } from '../src/net/WorldProtocol';
-import type { CharacterSave, InventorySaveItem, InventorySaveSnapshot } from './AuthStore';
+import type { CharacterSave } from './AuthStore';
+import { cloneCharacterSave, WorldSessionSaveState, type WorldCharacterSavePatch } from './WorldSessionSaveState';
 
 export const WORLD_TICK_MS = 100;
 export const DISCONNECT_GRACE_MS = 30_000;
@@ -224,7 +225,7 @@ export interface WorldJoinContext {
     saveSnapshot?: CharacterSave;
 }
 
-export type WorldCharacterSavePatch = Partial<Omit<CharacterSave, 'characterId' | 'revision' | 'updatedAt'>>;
+export type { WorldCharacterSavePatch } from './WorldSessionSaveState';
 
 export class WorldResumeFailedError extends Error {
     public constructor(message = 'Resume token is expired or unknown.') {
@@ -245,8 +246,7 @@ export class WorldSession {
     private readonly lootLocks = new Map<string, LootLock>();
     private readonly autoLootPending = new Map<string, AutoLootPending>();
     private readonly generatedLootChunks = new Set<string>();
-    private readonly saveDirtyPlayerIds = new Set<string>();
-    private readonly finalSavePatches = new Map<string, WorldCharacterSavePatch>();
+    private readonly saveState = new WorldSessionSaveState();
     private readonly restingRecoveryTimers = new Map<string, number>();
     private seq = 0;
     private nextPlayerId = 1;
@@ -587,24 +587,20 @@ export class WorldSession {
     }
 
     public consumeSaveDirtyPlayerIds(): string[] {
-        const playerIds = [...this.saveDirtyPlayerIds];
-        this.saveDirtyPlayerIds.clear();
-        return playerIds;
+        return this.saveState.consumeDirtyPlayerIds();
     }
 
     public createCharacterSavePatch(playerId: string, hubTownId?: string): WorldCharacterSavePatch | null {
         const player = this.players.get(playerId);
-        return player ? this.buildCharacterSavePatch(player, hubTownId) : this.finalSavePatches.get(playerId) ?? null;
+        return this.saveState.createPatch(player, playerId, hubTownId);
     }
 
     public hasFinalCharacterSavePatch(playerId: string): boolean {
-        return this.finalSavePatches.has(playerId);
+        return this.saveState.hasFinalPatch(playerId);
     }
 
     public consumeFinalCharacterSavePatch(playerId: string): WorldCharacterSavePatch | null {
-        const patch = this.finalSavePatches.get(playerId) ?? null;
-        this.finalSavePatches.delete(playerId);
-        return patch;
+        return this.saveState.consumeFinalPatch(playerId);
     }
 
     public getDebugCounts(): WorldSessionDebugCounts {
@@ -1921,67 +1917,19 @@ export class WorldSession {
     }
 
     private markSaveDirty(playerId: string): void {
-        this.saveDirtyPlayerIds.add(playerId);
+        this.saveState.markDirty(playerId);
     }
 
     private captureFinalSavePatch(player: ServerPlayer, hubTownId?: string): void {
-        const patch = this.buildCharacterSavePatch(player, hubTownId);
-        if (patch) this.finalSavePatches.set(player.id, patch);
-    }
-
-    private buildCharacterSavePatch(player: ServerPlayer, hubTownId?: string): WorldCharacterSavePatch | null {
-        const save = player.saveSnapshot;
-        if (!save) return null;
-        save.questState = {
-            ...save.questState,
-            completedQuestIds: [...player.completedQuestIds],
-        };
-        if (hubTownId) {
-            save.hubLocation = {
-                ...save.hubLocation,
-                townId: hubTownId,
-            };
-        }
-        return {
-            saveVersion: save.saveVersion,
-            hubLocation: cloneRecord(save.hubLocation),
-            questState: cloneRecord(save.questState),
-            inventory: cloneInventorySnapshot(save.inventory),
-            equipment: cloneRecord(save.equipment),
-            partySnapshot: cloneRecord(save.partySnapshot),
-            rosterSnapshot: cloneRecord(save.rosterSnapshot),
-        };
+        this.saveState.captureFinalPatch(player, hubTownId);
     }
 
     private removeSaveItemQuantity(player: ServerPlayer, itemId: string, quantity: number): void {
-        const inventory = player.saveSnapshot?.inventory;
-        if (!inventory || quantity <= 0) return;
-        let remaining = Math.floor(quantity);
-        for (const item of [...inventory.items]) {
-            if (item.itemId !== itemId || remaining <= 0) continue;
-            const consumed = Math.min(Math.max(1, item.quantity), remaining);
-            item.quantity -= consumed;
-            remaining -= consumed;
-            if (item.quantity <= 0) {
-                inventory.items = inventory.items.filter((entry) => entry !== item);
-            }
-        }
+        this.saveState.removeItemQuantity(player, itemId, quantity);
     }
 
     private addSavePlacedItem(player: ServerPlayer, placed: { item: { id: string; maxDurability: number }; durability: number; quantity: number; sockets?: Array<{ id: string }> }): void {
-        const inventory = player.saveSnapshot?.inventory;
-        if (!inventory || placed.quantity <= 0) return;
-        const slot = findFreeInventorySlot(inventory, placed.item.id);
-        if (!slot) return;
-        const item: InventorySaveItem = {
-            itemId: placed.item.id,
-            gridX: slot.x,
-            gridY: slot.y,
-            durability: Number.isFinite(placed.durability) ? placed.durability : placed.item.maxDurability,
-            quantity: Math.max(1, Math.floor(placed.quantity)),
-            acquiredInRaid: true,
-        };
-        inventory.items.push(item);
+        this.saveState.addPlacedItem(player, placed);
     }
 
     private getLearnedSkillIds(actor: ServerActor): Set<string> {
@@ -2147,56 +2095,6 @@ export function gridToSnapshot(grid: { width: number; height: number; items: Arr
             sockets: placed.sockets?.map((item) => item.id),
         })),
     };
-}
-
-function cloneCharacterSave(save: CharacterSave | undefined): CharacterSave | undefined {
-    if (!save) return undefined;
-    return {
-        ...save,
-        hubLocation: cloneRecord(save.hubLocation),
-        questState: cloneRecord(save.questState),
-        inventory: cloneInventorySnapshot(save.inventory),
-        equipment: cloneRecord(save.equipment),
-        partySnapshot: cloneRecord(save.partySnapshot),
-        rosterSnapshot: cloneRecord(save.rosterSnapshot),
-    };
-}
-
-function cloneInventorySnapshot(inventory: InventorySaveSnapshot): InventorySaveSnapshot {
-    return {
-        width: inventory.width,
-        height: inventory.height,
-        items: inventory.items.map((item) => ({ ...item })),
-    };
-}
-
-function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
-    return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
-}
-
-function findFreeInventorySlot(inventory: InventorySaveSnapshot, itemId: string): TilePoint | null {
-    const item = getItemDef(itemId);
-    if (!item) return null;
-    for (let y = 0; y <= inventory.height - item.gridH; y++) {
-        for (let x = 0; x <= inventory.width - item.gridW; x++) {
-            if (canPlaceSavedItem(inventory, x, y, item.gridW, item.gridH)) return { x, y };
-        }
-    }
-    return null;
-}
-
-function canPlaceSavedItem(inventory: InventorySaveSnapshot, x: number, y: number, width: number, height: number): boolean {
-    for (const placed of inventory.items) {
-        const item = getItemDef(placed.itemId);
-        const itemWidth = item?.gridW ?? 1;
-        const itemHeight = item?.gridH ?? 1;
-        const overlaps = x < placed.gridX + itemWidth
-            && x + width > placed.gridX
-            && y < placed.gridY + itemHeight
-            && y + height > placed.gridY;
-        if (overlaps) return false;
-    }
-    return true;
 }
 
 function reject(intentId: string, reason: string): WorldSessionMessageResult {
