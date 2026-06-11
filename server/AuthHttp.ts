@@ -20,7 +20,9 @@ import {
     type AuthSession,
     type AuthStore,
     type CharacterSave,
+    type SaveUpdateInput,
 } from './AuthStore';
+import { normalizeLoadout } from '../src/magic/MagicLoadout';
 
 export interface AuthHttpOptions {
     store: AuthStore;
@@ -58,6 +60,7 @@ const DEFAULT_REFRESH_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const JSON_LIMIT_BYTES = 1024 * 256;
 const LOGIN_FAILURE_WINDOW_MS = 1000 * 60 * 10;
 const LOGIN_FAILURE_LIMIT = 5;
+const CLIENT_SAVE_PATCH_FIELDS = new Set(['rosterSnapshot']);
 
 const loginFailures = new Map<string, RateLimitEntry>();
 
@@ -293,17 +296,12 @@ async function routeAuthRequest(context: HandlerContext, options: AuthHttpOption
             const body = await readJsonObject(request);
             const expectedRevision = readNumber(body.expectedRevision, 'expectedRevision');
             const patch = isRecord(body.save) ? body.save : isRecord(body.patch) ? body.patch : {};
+            const save = await options.store.getCharacterSave(auth.account.id, characterId);
+            if (!save) throw new HttpError(404, 'character_not_found', 'Character save was not found.');
+            const clientPatch = buildClientSavePatch(patch, save);
             const result = await options.store.updateCharacterSave(auth.account.id, characterId, {
                 expectedRevision,
-                patch: {
-                    saveVersion: readOptionalNumber(patch.saveVersion),
-                    hubLocation: isRecord(patch.hubLocation) ? patch.hubLocation : undefined,
-                    questState: isRecord(patch.questState) ? patch.questState : undefined,
-                    inventory: isRecord(patch.inventory) ? patch.inventory as unknown as CharacterSave['inventory'] : undefined,
-                    equipment: isRecord(patch.equipment) ? patch.equipment : undefined,
-                    partySnapshot: isRecord(patch.partySnapshot) ? patch.partySnapshot : undefined,
-                    rosterSnapshot: isRecord(patch.rosterSnapshot) ? patch.rosterSnapshot : undefined,
-                },
+                patch: clientPatch,
             });
             if (result.status === 'not_found') throw new HttpError(404, 'character_not_found', 'Character save was not found.');
             if (result.status === 'conflict') {
@@ -436,8 +434,67 @@ function readNumber(value: unknown, field: string): number {
     return Math.floor(value);
 }
 
-function readOptionalNumber(value: unknown): number | undefined {
-    return typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : undefined;
+function buildClientSavePatch(patch: Record<string, unknown>, currentSave: CharacterSave): SaveUpdateInput['patch'] {
+    for (const field of Object.keys(patch)) {
+        if (!CLIENT_SAVE_PATCH_FIELDS.has(field)) {
+            throw new HttpError(400, 'forbidden_save_field', `${field} cannot be patched by the client.`);
+        }
+    }
+
+    const next: SaveUpdateInput['patch'] = {};
+    if (isRecord(patch.rosterSnapshot)) {
+        next.rosterSnapshot = mergeClientRosterSnapshot(currentSave.rosterSnapshot, patch.rosterSnapshot);
+    }
+    return next;
+}
+
+function mergeClientRosterSnapshot(current: Record<string, unknown>, incoming: Record<string, unknown>): Record<string, unknown> {
+    const currentCharacters = Array.isArray(current.characters) ? current.characters : [];
+    const incomingById = new Map<string, Record<string, unknown>>();
+    if (Array.isArray(incoming.characters)) {
+        for (const raw of incoming.characters) {
+            if (!isRecord(raw) || typeof raw.id !== 'string') continue;
+            incomingById.set(raw.id, raw);
+        }
+    }
+
+    return {
+        ...current,
+        characters: currentCharacters.map((raw) => {
+            if (!isRecord(raw) || typeof raw.id !== 'string') return raw;
+            const incomingCharacter = incomingById.get(raw.id);
+            if (!incomingCharacter) return raw;
+            return mergeClientRosterCharacter(raw, incomingCharacter);
+        }),
+    };
+}
+
+function mergeClientRosterCharacter(current: Record<string, unknown>, incoming: Record<string, unknown>): Record<string, unknown> {
+    const owner = readLoadoutOwner(current);
+    if (!owner || !Array.isArray(incoming.magicLoadout)) return current;
+    return {
+        ...current,
+        magicLoadout: normalizeLoadout(readStringArray(incoming.magicLoadout), owner),
+    };
+}
+
+function readLoadoutOwner(character: Record<string, unknown>): { classLineId: string; currentTier: number } | null {
+    const classLineId = typeof character.classKey === 'string'
+        ? character.classKey
+        : typeof character.classLineId === 'string'
+            ? character.classLineId
+            : null;
+    const tier = typeof character.tier === 'number' && Number.isFinite(character.tier)
+        ? character.tier
+        : typeof character.currentTier === 'number' && Number.isFinite(character.currentTier)
+            ? character.currentTier
+            : null;
+    if (!classLineId || tier === null) return null;
+    return { classLineId, currentTier: Math.max(1, Math.floor(tier)) };
+}
+
+function readStringArray(value: unknown[]): string[] {
+    return value.filter((entry): entry is string => typeof entry === 'string');
 }
 
 function bearerToken(request: IncomingMessage): string | null {

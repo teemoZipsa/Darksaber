@@ -176,8 +176,7 @@ export class AuthClient {
      */
     public async updateCharacterSave(
         characterId: string,
-        patch: Partial<Pick<CharacterSave,
-            'saveVersion' | 'hubLocation' | 'questState' | 'inventory' | 'equipment' | 'partySnapshot' | 'rosterSnapshot'>>,
+        patch: Partial<Pick<CharacterSave, 'rosterSnapshot'>>,
         expectedRevision: number
     ): Promise<CharacterSave> {
         const response = await this.request<{ save: CharacterSave }>(

@@ -119,7 +119,12 @@ test('character APIs enforce ownership and save revision conflicts', async () =>
             body: {
                 expectedRevision: 1,
                 save: {
-                    hubLocation: { realm: 'mortal', townId: 'w_forest_village' },
+                    rosterSnapshot: {
+                        characters: [{
+                            id: characterId,
+                            magicLoadout: [],
+                        }],
+                    },
                 },
             },
         });
@@ -132,12 +137,111 @@ test('character APIs enforce ownership and save revision conflicts', async () =>
             body: {
                 expectedRevision: 1,
                 save: {
-                    hubLocation: { realm: 'mortal', townId: 'central_castle' },
+                    rosterSnapshot: {
+                        characters: [{
+                            id: characterId,
+                            magicLoadout: [],
+                        }],
+                    },
                 },
             },
         });
         assert.equal(stale.status, 409);
         assert.equal(stale.body.error, 'revision_conflict');
+    } finally {
+        await harness.close();
+    }
+});
+
+test('character save HTTP rejects client-authoritative save fields', async () => {
+    const harness = await createHarness();
+    try {
+        const registered = await harness.request('/auth/register', {
+            method: 'POST',
+            body: { loginName: 'saveguard01', password: 'password-1234' },
+        });
+        const created = await harness.request('/characters', {
+            method: 'POST',
+            accessToken: String(registered.body.accessToken),
+            body: { name: 'Guarded', classKey: 'infantry', gender: 'M' },
+        });
+        assert.equal(created.status, 201);
+        const characterId = String(asRecord(created.body.character).id);
+
+        for (const forbidden of ['inventory', 'equipment', 'questState']) {
+            const attempted = await harness.request(`/characters/${characterId}/save`, {
+                method: 'PATCH',
+                accessToken: String(registered.body.accessToken),
+                body: {
+                    expectedRevision: 1,
+                    save: {
+                        [forbidden]: forbidden === 'inventory'
+                            ? { width: 10, height: 6, items: [{ itemId: 'void_crystal', gridX: 0, gridY: 0, quantity: 999, durability: 1 }] }
+                            : { forged: true },
+                    },
+                },
+            });
+            assert.equal(attempted.status, 400);
+            assert.equal(attempted.body.error, 'forbidden_save_field');
+        }
+    } finally {
+        await harness.close();
+    }
+});
+
+test('character save HTTP preserves authoritative roster fields', async () => {
+    const harness = await createHarness();
+    try {
+        const registered = await harness.request('/auth/register', {
+            method: 'POST',
+            body: { loginName: 'rosterguard01', password: 'password-1234' },
+        });
+        const created = await harness.request('/characters', {
+            method: 'POST',
+            accessToken: String(registered.body.accessToken),
+            body: { name: 'RosterGuard', classKey: 'infantry', gender: 'M' },
+        });
+        assert.equal(created.status, 201);
+        const characterId = String(asRecord(created.body.character).id);
+        const originalSave = asRecord(created.body.save);
+        const originalRoster = asRecord(originalSave.rosterSnapshot);
+        const originalCharacter = asRecord((originalRoster.characters as unknown[])[0]);
+
+        const updated = await harness.request(`/characters/${characterId}/save`, {
+            method: 'PATCH',
+            accessToken: String(registered.body.accessToken),
+            body: {
+                expectedRevision: 1,
+                save: {
+                    rosterSnapshot: {
+                        characters: [{
+                            id: characterId,
+                            name: 'Forged',
+                            classKey: 'magic',
+                            tier: 7,
+                            level: 99,
+                            exp: 999999,
+                            baseStats: { hp: 9999, attack: 9999 },
+                            skillUpgradeLevels: { inf_t1: 5 },
+                            magicLoadout: ['inf_t1'],
+                        }],
+                    },
+                },
+            },
+        });
+
+        assert.equal(updated.status, 200);
+        const updatedSave = asRecord(updated.body.save);
+        const updatedRoster = asRecord(updatedSave.rosterSnapshot);
+        const updatedCharacter = asRecord((updatedRoster.characters as unknown[])[0]);
+        assert.equal(updatedCharacter.name, originalCharacter.name);
+        assert.equal(updatedCharacter.classKey, originalCharacter.classKey);
+        assert.equal(updatedCharacter.tier, originalCharacter.tier);
+        assert.equal(updatedCharacter.level, originalCharacter.level);
+        assert.equal(updatedCharacter.exp, originalCharacter.exp);
+        assert.deepEqual(updatedCharacter.baseStats, originalCharacter.baseStats);
+        assert.equal(updatedCharacter.skillUpgradeLevels, undefined);
+        assert.ok(Array.isArray(updatedCharacter.magicLoadout));
     } finally {
         await harness.close();
     }
