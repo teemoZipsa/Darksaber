@@ -109,6 +109,7 @@ import {
     type InventoryItemCountSnapshot,
     type LootGrantMessage,
     type LootSnapshot,
+    type PlayerIntentKind,
     type RaidResultMessage,
     type WorldRealmId,
     type WorldSnapshot,
@@ -2348,8 +2349,8 @@ export class WorldEngine {
     }
 
     private submitNetworkMoveIntent(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean {
-        if (!this.isNetworkRaid || !this.networkRaidClient) return false;
-        const intentId = this.networkRaidClient.sendIntent(actor.id, 'move', { tile, path, apCost, pathCost });
+        const intentId = this.sendNetworkIntent(actor.id, 'move', { tile, path, apCost, pathCost }, { requireOpen: false });
+        if (!intentId) return false;
         this.pendingNetworkMoveReopen = { intentId, actorId: actor.id, tile: { ...tile } };
         this.networkMovePathPreview = {
             actorId: actor.id,
@@ -2360,28 +2361,36 @@ export class WorldEngine {
     }
 
     private submitNetworkActionIntent(actor: FieldActor, action: 'defend' | 'rest'): boolean {
-        if (!this.isNetworkRaid || !this.networkRaidClient?.getIsOpen()) return false;
-        this.networkRaidClient.sendIntent(actor.id, action, {});
-        return true;
+        return Boolean(this.sendNetworkIntent(actor.id, action, {}));
     }
 
     private submitNetworkUseItemIntent(actor: FieldActor, itemId: string): boolean {
-        if (!this.isNetworkRaid || !this.networkRaidClient?.getIsOpen()) return false;
-        this.networkRaidClient.sendIntent(actor.id, 'useItem', { itemId });
-        return true;
+        return Boolean(this.sendNetworkIntent(actor.id, 'useItem', { itemId }));
     }
 
     private submitNetworkSkillIntent(actor: FieldActor, skillId: string, targetId?: string): boolean {
-        if (!this.isNetworkRaid || !this.networkRaidClient?.getIsOpen()) return false;
-        this.networkRaidClient.sendIntent(actor.id, 'castSkill', { skillId, targetId });
-        return true;
+        return Boolean(this.sendNetworkIntent(actor.id, 'castSkill', { skillId, targetId }));
+    }
+
+    private sendNetworkIntent(
+        actorId: string,
+        kind: PlayerIntentKind,
+        payload: unknown,
+        options: { requireOpen?: boolean } = {}
+    ): string | null {
+        const client = this.getNetworkIntentClient(options.requireOpen ?? true);
+        return client ? client.sendIntent(actorId, kind, payload) : null;
+    }
+
+    private getNetworkIntentClient(requireOpen: boolean): NetworkRaidClient | null {
+        if (!this.isNetworkRaid || !this.networkRaidClient) return null;
+        if (requireOpen && !this.networkRaidClient.getIsOpen()) return null;
+        return this.networkRaidClient;
     }
 
     private tryActorAttack(actor: FieldActor, enemy: Enemy): boolean {
         if (this.isNetworkRaid) {
-            if (!this.networkRaidClient) return false;
-            this.networkRaidClient.sendIntent(actor.id, 'attack', { targetId: enemy.id });
-            return true;
+            return Boolean(this.sendNetworkIntent(actor.id, 'attack', { targetId: enemy.id }, { requireOpen: false }));
         }
         if (!this.introTutorialActive) {
             this.addCombatLog('서버 세션 밖에서는 전투 행동을 실행할 수 없습니다.');
@@ -2518,7 +2527,7 @@ export class WorldEngine {
         if (this.isNetworkRaid) {
             this.selectionController.selectLoot(loot.id);
             this.addCombatLog(`${loot.sourceLabel} 서버 점유 요청.`);
-            this.networkRaidClient?.sendIntent(this.requireControlledActor().id, 'interact', { lootId: loot.id });
+            this.sendNetworkIntent(this.requireControlledActor().id, 'interact', { lootId: loot.id });
             return;
         }
         if (!this.introTutorialActive) {
@@ -2707,9 +2716,7 @@ export class WorldEngine {
     }
 
     private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = this.remainingActionPoints): void {
-        if (this.isNetworkRaid && this.networkRaidClient && actor.id === this.activeTurnActorId) {
-            this.networkRaidClient.sendIntent(actor.id, 'endTurn', { reason });
-        }
+        if (actor.id === this.activeTurnActorId) this.sendNetworkIntent(actor.id, 'endTurn', { reason }, { requireOpen: false });
         actor.entity.actionGauge = Math.max(0, Math.min(FIELD_MAX_ACTION_GAUGE, atbCarryover));
         this.activeTurnActorId = null;
         this.remainingActionPoints = 0;
