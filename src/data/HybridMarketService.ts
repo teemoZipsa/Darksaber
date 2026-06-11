@@ -1,4 +1,4 @@
-import { formatT, i18n } from '../i18n/LanguageManager';
+import { formatT, i18n, t } from '../i18n/LanguageManager';
 import {
     DEFAULT_WORLD_SERVER_URL,
     WORLD_PROTOCOL_VERSION,
@@ -27,23 +27,9 @@ import {
     TRADE_GOOD_SELL_MULTIPLIERS,
 } from './ShopData';
 import type { MarketService } from './MarketService';
-import type { TownId } from './TownFacilityData';
+import { getTownNameKey } from './TownFacilityData';
 
 const CLIENT_ID_KEY = 'darksaber_market_client_id';
-
-const TOWN_LABELS: Record<TownId, { ko: string; en: string }> = {
-    central_castle: { ko: '카오시아', en: 'Kaosia' },
-    w_forest_village: { ko: '벨퓌어스', en: 'Belfuers' },
-    s_coast_town: { ko: '시시리오', en: 'Sicilio' },
-    e_stronghold: { ko: '엔트리아', en: 'Entria' },
-    se_port: { ko: '아리크나', en: 'Arikna' },
-    nw_desert_city: { ko: '사막의 전초기지', en: 'Desert Outpost' },
-    sw_hideout: { ko: '남부 은신처', en: 'Southern Refuge' },
-    e_outpost: { ko: '동부 전초기지', en: 'Eastern Outpost' },
-    master_sanctum: { ko: '마스터 성역', en: 'Master Sanctum' },
-    astral_keep: { ko: '성좌 요새', en: 'Astral Keep' },
-    ember_citadel: { ko: '홍염 성채', en: 'Ember Citadel' },
-};
 
 export class HybridMarketService implements MarketService {
     private readonly server: ServerMarketService;
@@ -314,7 +300,7 @@ function itemLabel(item: ItemDef): string {
 }
 
 function townLabel(townId: string): string {
-    const labels = TOWN_LABELS[townId as TownId];
-    if (!labels) return townId;
-    return i18n.lang === 'ko' ? labels.ko : labels.en;
+    const key = getTownNameKey(townId);
+    const label = t(key);
+    return label === key ? townId : label;
 }

@@ -79,6 +79,20 @@ export const TOWN_FACILITIES: Record<TownId, TownFacilityId[]> = {
     ember_citadel: ['storage', 'shrine', 'specialty_trader', 'blacksmith'],
 };
 
+export const TOWN_NAME_KEYS: Record<TownId, string> = {
+    central_castle: 'town.name.central_castle',
+    w_forest_village: 'town.name.w_forest_village',
+    s_coast_town: 'town.name.s_coast_town',
+    e_stronghold: 'town.name.e_stronghold',
+    se_port: 'town.name.se_port',
+    nw_desert_city: 'town.name.nw_desert_city',
+    sw_hideout: 'town.name.sw_hideout',
+    e_outpost: 'town.name.e_outpost',
+    master_sanctum: 'town.name.master_sanctum',
+    astral_keep: 'town.name.astral_keep',
+    ember_citadel: 'town.name.ember_citadel',
+};
+
 function hasOwnKey<T extends object>(
     obj: T,
     key: string | undefined,
@@ -102,6 +116,10 @@ export function getTownFacilities(townId: string): TownFacilityId[] {
     return isTownId(townId)
         ? [...TOWN_FACILITIES[townId]]
         : ['storage', 'general_store', 'rumors'];
+}
+
+export function getTownNameKey(townId: string): string {
+    return isTownId(townId) ? TOWN_NAME_KEYS[townId] : townId;
 }
 
 export function hasTownFacility(townId: string, facilityId: TownFacilityId): boolean {

@@ -138,6 +138,19 @@ export const i18n = {
             'lobby.title': '은신처',
             'lobby.stash': '창고',
             'lobby.roster': '대기소',
+
+            // Town names
+            'town.name.central_castle': '카오시아',
+            'town.name.w_forest_village': '벨퓌어스',
+            'town.name.s_coast_town': '시시리오',
+            'town.name.e_stronghold': '엔트리아',
+            'town.name.se_port': '아리크나',
+            'town.name.nw_desert_city': '사막의 전초기지',
+            'town.name.sw_hideout': '남부 은신처',
+            'town.name.e_outpost': '동부 전초기지',
+            'town.name.master_sanctum': '마스터 성역',
+            'town.name.astral_keep': '성좌 요새',
+            'town.name.ember_citadel': '홍염 성채',
             
             // Inventory
             'inv.title': '⚔️ 장비 및 소지품',
@@ -950,6 +963,19 @@ export const i18n = {
             'lobby.title': 'HIDEOUT',
             'lobby.stash': 'Stash',
             'lobby.roster': 'Roster',
+
+            // Town names
+            'town.name.central_castle': 'Kaosia',
+            'town.name.w_forest_village': 'Belfuers',
+            'town.name.s_coast_town': 'Sicilio',
+            'town.name.e_stronghold': 'Entria',
+            'town.name.se_port': 'Arikna',
+            'town.name.nw_desert_city': 'Desert Outpost',
+            'town.name.sw_hideout': 'Southern Refuge',
+            'town.name.e_outpost': 'Eastern Outpost',
+            'town.name.master_sanctum': 'Master Sanctum',
+            'town.name.astral_keep': 'Astral Keep',
+            'town.name.ember_citadel': 'Ember Citadel',
             
             // Inventory
             'inv.title': '⚔️ Equipment & Inventory',

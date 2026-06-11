@@ -20,6 +20,7 @@ import type { Skill } from '../../src/data/SkillDB';
 import {
     TOWN_FACILITIES,
     getTownFacilities,
+    getTownNameKey,
     isTownFacilityId,
     isTownId,
 } from '../../src/data/TownFacilityData';
@@ -35,6 +36,21 @@ test('town facility guards reject prototype keys and return copies', () => {
     const fallbackFacilities = getTownFacilities('__missing__');
     fallbackFacilities.push('shrine');
     assert.deepEqual(getTownFacilities('__missing__'), ['storage', 'general_store', 'rumors']);
+});
+
+test('town name keys resolve in both supported languages', () => {
+    const previousLang = i18n.lang;
+    try {
+        for (const lang of ['ko', 'en'] as const) {
+            i18n.setLanguage(lang);
+            for (const townId of Object.keys(TOWN_FACILITIES)) {
+                const key = getTownNameKey(townId);
+                assert.notEqual(i18n.t(key), key);
+            }
+        }
+    } finally {
+        i18n.setLanguage(previousLang);
+    }
 });
 
 test('class and stat guards reject loose ids and clamp resources', () => {
