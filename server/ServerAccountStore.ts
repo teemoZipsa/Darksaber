@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { STORY_QUESTS } from '../src/data/StoryQuestData';
@@ -106,15 +106,11 @@ export class ServerAccountStore {
 
     private load(): void {
         if (!this.persistPath || !existsSync(this.persistPath)) return;
-        try {
-            const parsed = JSON.parse(readFileSync(this.persistPath, 'utf8')) as Partial<AccountDbFile>;
-            if (!Array.isArray(parsed.accounts)) return;
-            for (const raw of parsed.accounts) {
-                const account = normalizeAccountRecord(raw);
-                if (account) this.accounts.set(account.accountId, account);
-            }
-        } catch {
-            this.accounts.clear();
+        const parsed = readAccountDbFile(this.persistPath);
+        if (!parsed || !Array.isArray(parsed.accounts)) return;
+        for (const raw of parsed.accounts) {
+            const account = normalizeAccountRecord(raw);
+            if (account) this.accounts.set(account.accountId, account);
         }
     }
 
@@ -133,7 +129,7 @@ export class ServerAccountStore {
             version: 1,
             accounts: [...this.accounts.values()].map(cloneAccount),
         };
-        writeFileSync(this.persistPath, JSON.stringify(payload, null, 2), 'utf8');
+        writeFileAtomically(this.persistPath, JSON.stringify(payload, null, 2));
     }
 }
 
@@ -180,4 +176,39 @@ function cloneAccount(account: ServerAccountRecord): ServerAccountRecord {
         ...account,
         completedQuestIds: [...account.completedQuestIds],
     };
+}
+
+function readAccountDbFile(persistPath: string): Partial<AccountDbFile> | null {
+    return readJsonFile(persistPath) ?? readJsonFile(backupPath(persistPath));
+}
+
+function readJsonFile(path: string): Partial<AccountDbFile> | null {
+    if (!existsSync(path)) return null;
+    try {
+        return JSON.parse(readFileSync(path, 'utf8')) as Partial<AccountDbFile>;
+    } catch {
+        return null;
+    }
+}
+
+function writeFileAtomically(persistPath: string, contents: string): void {
+    const tmpPath = `${persistPath}.tmp-${process.pid}-${Date.now()}-${randomBytes(4).toString('hex')}`;
+    try {
+        writeFileSync(tmpPath, contents, 'utf8');
+        if (existsSync(persistPath)) {
+            try {
+                copyFileSync(persistPath, backupPath(persistPath));
+            } catch {
+                // Best-effort only; the atomic rename below is the authoritative write.
+            }
+        }
+        renameSync(tmpPath, persistPath);
+    } catch (error) {
+        rmSync(tmpPath, { force: true });
+        throw error;
+    }
+}
+
+function backupPath(persistPath: string): string {
+    return `${persistPath}.bak`;
 }
