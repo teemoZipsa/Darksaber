@@ -109,6 +109,7 @@ import {
     type WorldWelcomeMessage,
 } from '../src/net/WorldProtocol';
 import type { CharacterSave } from './AuthStore';
+import { WorldSessionLootState, type WorldSessionLootLock } from './WorldSessionLootState';
 import { cloneCharacterSave, WorldSessionSaveState, type WorldCharacterSavePatch } from './WorldSessionSaveState';
 
 export const WORLD_TICK_MS = 100;
@@ -184,16 +185,6 @@ interface ServerScenarioState {
     completed: boolean;
 }
 
-interface LootLock {
-    playerId: string;
-    lastTouchedAt: number;
-}
-
-interface AutoLootPending {
-    playerId: string;
-    createdAt: number;
-}
-
 export interface WorldSessionTickResult {
     events: CombatEventMessage[];
     perPlayerMessages: Array<{ playerId: string; message: WorldServerMessage }>;
@@ -243,8 +234,7 @@ export class WorldSession {
     private readonly nestStates = new Map<string, FieldNestState>();
     private readonly scenarioStates = new Map<string, ServerScenarioState>();
     private readonly loot = new Map<string, LootObject>();
-    private readonly lootLocks = new Map<string, LootLock>();
-    private readonly autoLootPending = new Map<string, AutoLootPending>();
+    private readonly lootState = new WorldSessionLootState(AUTO_LOOT_RESPONSE_MS);
     private readonly generatedLootChunks = new Set<string>();
     private readonly saveState = new WorldSessionSaveState();
     private readonly restingRecoveryTimers = new Map<string, number>();
@@ -543,7 +533,7 @@ export class WorldSession {
                 isBoss: entry.enemy.isBoss,
             }));
         const loot = [...this.loot.values()]
-            .filter((lootObject) => !this.autoLootPending.has(lootObject.id))
+            .filter((lootObject) => !this.lootState.isAutoLootPending(lootObject.id))
             .filter(() => !viewer?.activeDungeonId)
             .map((lootObject) => this.toLootSnapshot(lootObject));
         const readyActors = partyActors
@@ -611,7 +601,7 @@ export class WorldSession {
             activePlayers,
             ghostPlayers,
             enemies,
-            lootLocks: this.lootLocks.size,
+            lootLocks: this.lootState.lockCount(),
         };
     }
 
@@ -878,15 +868,13 @@ export class WorldSession {
         if (!lootId) return reject(intentId, 'Interact payload must include lootId.');
         if (this.players.get(playerId)?.activeDungeonId) return reject(intentId, 'Loot is not visible.');
         const lootObject = this.loot.get(lootId);
-        if (!lootObject || lootObject.opened || this.autoLootPending.has(lootId)) return reject(intentId, 'Loot is not available.');
+        if (!lootObject || lootObject.opened || this.lootState.isAutoLootPending(lootId)) return reject(intentId, 'Loot is not available.');
         if (actor.remainingAp < INTERACT_AP_COST) return reject(intentId, 'No action available to inspect loot.');
         if (manhattan(actor.tile, { x: lootObject.x, y: lootObject.y }) > 1) return reject(intentId, 'Loot is too far away.');
 
-        const lock = this.lootLocks.get(lootId);
-        if (lock && lock.playerId !== playerId) return reject(intentId, 'Loot is already occupied.');
+        if (this.lootState.occupy(lootId, playerId, now) === 'occupied_by_other') return reject(intentId, 'Loot is already occupied.');
 
         this.spendActorGauge(actor, INTERACT_AP_COST);
-        this.lootLocks.set(lootId, { playerId, lastTouchedAt: now });
         this.finishActorIfSpent(actor);
         return {
             replies: [{
@@ -907,9 +895,8 @@ export class WorldSession {
         now: number
     ): WorldSessionMessageResult {
         const lootObject = this.loot.get(lootId);
-        if (!lootObject || this.autoLootPending.has(lootId)) return reject(intentId, 'Loot does not exist.');
-        const lock = this.lootLocks.get(lootId);
-        if (!lock || lock.playerId !== playerId) return reject(intentId, 'Loot is not occupied by this player.');
+        if (!lootObject || this.lootState.isAutoLootPending(lootId)) return reject(intentId, 'Loot does not exist.');
+        if (!this.lootState.isOccupiedBy(lootId, playerId)) return reject(intentId, 'Loot is not occupied by this player.');
 
         const placed = lootObject.inventory.getAt(gridX, gridY);
         if (!placed) return reject(intentId, 'No item at requested loot cell.');
@@ -921,9 +908,9 @@ export class WorldSession {
             this.addSavePlacedItem(player, placed);
             this.markSaveDirty(playerId);
         }
-        lock.lastTouchedAt = now;
+        this.lootState.touch(lootId, now);
         lootObject.opened = lootObject.inventory.items.length === 0;
-        if (lootObject.opened) this.lootLocks.delete(lootId);
+        if (lootObject.opened) this.lootState.releaseLoot(lootId);
 
         return {
             replies: [{
@@ -940,9 +927,8 @@ export class WorldSession {
         lootId: string,
         acceptedCells: Array<{ gridX: number; gridY: number }>
     ): WorldSessionMessageResult {
-        const pending = this.autoLootPending.get(lootId);
         const lootObject = this.loot.get(lootId);
-        if (!pending || pending.playerId !== playerId || !lootObject) return { replies: [], broadcasts: [] };
+        if (!this.lootState.consumeAutoLootPending(lootId, playerId) || !lootObject) return { replies: [], broadcasts: [] };
 
         const removed = new Set<object>();
         let acceptedWeight = 0;
@@ -959,11 +945,10 @@ export class WorldSession {
         this.addCarriedWeight(playerId, acceptedWeight);
         if (acceptedWeight > 0 || removed.size > 0) this.markSaveDirty(playerId);
 
-        this.autoLootPending.delete(lootId);
         lootObject.opened = lootObject.inventory.items.length === 0;
         if (lootObject.opened) {
             this.loot.delete(lootId);
-            this.lootLocks.delete(lootId);
+            this.lootState.releaseLoot(lootId);
         }
         return { replies: [], broadcasts: [] };
     }
@@ -1843,7 +1828,7 @@ export class WorldSession {
             kind: 'corpse',
         });
         this.loot.set(id, loot);
-        this.autoLootPending.set(id, { playerId, createdAt: now });
+        this.lootState.createAutoLootPending(id, playerId, now);
         return {
             type: 'AUTO_LOOT_GRANT',
             lootId: id,
@@ -2047,37 +2032,35 @@ export class WorldSession {
             kind: lootObject.kind,
             containerType: lootObject.containerType,
             opened: lootObject.opened,
-            lockedByPlayerId: this.lootLocks.get(lootObject.id)?.playerId,
+            lockedByPlayerId: this.lootState.getLockPlayerId(lootObject.id),
             gridSnapshot: gridToSnapshot(lootObject.inventory),
         };
     }
 
     private releaseLootLocksForPlayer(playerId: string): void {
-        for (const [lootId, lock] of this.lootLocks) {
-            if (lock.playerId === playerId) this.lootLocks.delete(lootId);
-        }
+        this.lootState.releaseLocksForPlayer(playerId);
     }
 
     private releaseExpiredAutoLoot(now: number): void {
-        for (const [lootId, pending] of this.autoLootPending) {
-            if (now - pending.createdAt <= AUTO_LOOT_RESPONSE_MS) continue;
-            this.autoLootPending.delete(lootId);
+        this.lootState.releaseExpiredAutoLoot(now, (lootId) => {
             const lootObject = this.loot.get(lootId);
-            if (!lootObject) continue;
+            if (!lootObject) return;
             lootObject.opened = lootObject.inventory.items.length === 0;
             if (lootObject.opened) this.loot.delete(lootId);
-        }
+        });
     }
 
     private releaseExpiredLootLocks(now: number): void {
-        for (const [lootId, lock] of this.lootLocks) {
-            const actor = this.players.get(lock.playerId)?.actorIds
-                .map((actorId) => this.actors.get(actorId))
-                .find(Boolean);
-            const lootObject = this.loot.get(lootId);
-            const tooFar = actor && lootObject && manhattan(actor.tile, { x: lootObject.x, y: lootObject.y }) > 2;
-            if (now - lock.lastTouchedAt > 15_000 || tooFar || !actor || !lootObject) this.lootLocks.delete(lootId);
-        }
+        this.lootState.releaseExpiredLocks(now, (lock) => this.shouldReleaseLootLock(lock));
+    }
+
+    private shouldReleaseLootLock(lock: WorldSessionLootLock): boolean {
+        const actor = this.players.get(lock.playerId)?.actorIds
+            .map((actorId) => this.actors.get(actorId))
+            .find(Boolean);
+        const lootObject = this.loot.get(lock.lootId);
+        const tooFar = actor && lootObject && manhattan(actor.tile, { x: lootObject.x, y: lootObject.y }) > 2;
+        return Boolean(tooFar || !actor || !lootObject);
     }
 }
 
