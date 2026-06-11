@@ -23,10 +23,3 @@ Work from **`docs/ui-tasks.md`**. When a task is finished and type-checks:
 1. Tick its checkbox `- [x]` in `docs/ui-tasks.md`.
 2. Commit that file together with the change.
 That checklist + `git log` is the shared "done" record across machines/tools.
-
-## Scope (IMPORTANT — stay in your lane)
-Do **only** the tasks listed under "Codex-safe tasks" in `docs/ui-tasks.md`.
-**Do NOT** edit `src/engine/GameManager.ts`, `src/ui/react/OverlayRoot.tsx`,
-`src/ui/react/UiStore.ts`, or attempt the inventory drag-grid / new panel wiring —
-those are reserved for the main migration effort and editing them will cause merge
-conflicts. When unsure, leave it and note it in the checklist.
