@@ -257,6 +257,14 @@ test('raid loot transfers mark acquired items and report original loot cells', (
     assert.equal(movedByClick.acquiredInRaid, true);
     assert.match(inv.takeAll(), /전리품 획득/);
     assert.equal(movedByTakeAll.acquiredInRaid, true);
+    const previousLang = i18n.lang;
+    try {
+        i18n.lang = 'en';
+        assert.equal(inv.takeAll(), 'No loot to take.');
+        assert.equal(inv.sortBag(), 'Backpack sorted.');
+    } finally {
+        i18n.lang = previousLang;
+    }
 
     assert.deepEqual(secured, [
         { itemId: 'herb_cheap', source: { gridX: 2, gridY: 1 } },

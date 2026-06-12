@@ -16,6 +16,7 @@
 import { GridInventory, PlacedItem } from './GridInventory';
 import { ItemDef, ItemSlot } from '../data/ItemDB';
 import { Character } from '../character/Character';
+import { formatT, t } from '../i18n/LanguageManager';
 
 /** Which container a dragged item currently lives in. */
 export type InvGridKind = 'bag' | 'ext';
@@ -205,7 +206,9 @@ export class InventoryUI {
             this.externalGrid.remove(placed);
             if (!this.inventory.autoPlaceExisting(placed)) {
                 this.externalGrid.placeExisting(placed, source, sourceY); // put it back
-                const msg = moved > 0 ? `${moved}개 획득, 배낭이 가득 찼습니다.` : '배낭이 가득 찼습니다.';
+                const msg = moved > 0
+                    ? formatT('inventory.feedback.partialTakeAll', { count: moved })
+                    : t('inventory.feedback.backpackFull');
                 this.setFeedback(msg);
                 return msg;
             }
@@ -215,7 +218,9 @@ export class InventoryUI {
             }
             moved++;
         }
-        const msg = moved > 0 ? `${moved}개 전리품 획득.` : '가져갈 전리품이 없습니다.';
+        const msg = moved > 0
+            ? formatT('inventory.feedback.takeAll', { count: moved })
+            : t('inventory.feedback.noLoot');
         this.setFeedback(msg);
         return msg;
     }
@@ -223,7 +228,7 @@ export class InventoryUI {
     /** Repack the backpack by size/value. Returns feedback text. */
     public sortBag(): string {
         this.inventory.sort();
-        const msg = '배낭을 정리했습니다.';
+        const msg = t('inventory.feedback.sorted');
         this.setFeedback(msg);
         return msg;
     }
@@ -254,6 +259,6 @@ export class InventoryUI {
                 this.externalGrid.autoPlaceExisting(placed);
             }
         }
-        this.setFeedback('전리품 획득이 취소되었습니다.');
+        this.setFeedback(t('inventory.feedback.lootReverted'));
     }
 }
