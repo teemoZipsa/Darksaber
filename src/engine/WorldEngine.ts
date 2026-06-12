@@ -2079,7 +2079,7 @@ export class WorldEngine {
             candidates: getFusionCandidates(this.party),
             canEnterMasterWorld: hasActiveMasterCharacter(this.party),
         });
-        this.addCombatLog(this.worldMap.getRealm() === 'master' ? '현세의 문에 도착했습니다.' : '융합의 신전에 들어섰습니다.');
+        this.addCombatLog(t(this.worldMap.getRealm() === 'master' ? 'field.log.templeMasterGate' : 'field.log.templeFusion'));
     }
 
     private performTempleFusion(branch: MasterBranch): void {
@@ -2100,7 +2100,7 @@ export class WorldEngine {
 
     private enterMasterWorld(): void {
         if (!hasActiveMasterCharacter(this.party)) {
-            this.addCombatLog('마스터 클래스가 있어야 마스터 월드에 들어갈 수 있습니다.');
+            this.addCombatLog(t('field.log.masterClassRequired'));
             return;
         }
 
@@ -2124,7 +2124,7 @@ export class WorldEngine {
         this.worldMap.loot = [];
         this.clearFieldTurnState();
         this.dismissedTempleVisitKey = this.getCurrentTempleVisitKey();
-        this.addCombatLog('현세의 융합 신전으로 돌아왔습니다.');
+        this.addCombatLog(t('field.log.returnedToMortalTemple'));
     }
 
     private getCurrentTempleVisitKey(): string | null {
@@ -2277,7 +2277,7 @@ export class WorldEngine {
         }
         if (arrival.kind === 'departureBlocked') {
             if (this.raidSession.shouldReportDepartureBlock(arrival.townId)) {
-                this.addCombatLog('출발한 마을로는 생환할 수 없습니다. 다른 마을로 이동하세요.');
+                this.addCombatLog(t('field.log.departureTownBlocked'));
             }
             return;
         }

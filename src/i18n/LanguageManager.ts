@@ -762,6 +762,11 @@ export const i18n = {
             'field.log.serverLootOnly': '서버 세션 밖에서는 전리품을 열 수 없습니다.',
             'field.log.serverMagicOnly': '서버 세션 밖에서는 마법을 사용할 수 없습니다.',
             'field.log.serverToolOnly': '서버 세션 밖에서는 도구를 사용할 수 없습니다.',
+            'field.log.templeMasterGate': '현세의 문에 도착했습니다.',
+            'field.log.templeFusion': '융합의 신전에 들어섰습니다.',
+            'field.log.masterClassRequired': '마스터 클래스가 있어야 마스터 월드에 들어갈 수 있습니다.',
+            'field.log.returnedToMortalTemple': '현세의 융합 신전으로 돌아왔습니다.',
+            'field.log.departureTownBlocked': '출발한 마을로는 생환할 수 없습니다. 다른 마을로 이동하세요.',
 
             // Tactical markers
             'tactical.ping.position': '위치 핑',
@@ -1612,6 +1617,11 @@ export const i18n = {
             'field.log.serverLootOnly': 'Loot can only be opened in a server session.',
             'field.log.serverMagicOnly': 'Magic can only be used in a server session.',
             'field.log.serverToolOnly': 'Tools can only be used in a server session.',
+            'field.log.templeMasterGate': 'Arrived at the gate to the mortal world.',
+            'field.log.templeFusion': 'Entered the fusion temple.',
+            'field.log.masterClassRequired': 'A master class is required to enter the master world.',
+            'field.log.returnedToMortalTemple': 'Returned to the fusion temple in the mortal world.',
+            'field.log.departureTownBlocked': 'You cannot extract back to the town you departed from. Move to another town.',
 
             // Tactical markers
             'tactical.ping.position': 'Ping Location',
