@@ -20,6 +20,7 @@ import {
 import { manhattan, type TilePoint } from '../../field/FieldPathing';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
 import type { TerrainActorTraits } from '../../field/TerrainRules';
+import { formatT } from '../../i18n/LanguageManager';
 import {
     type CombatResult,
     WorldCombatController,
@@ -155,12 +156,12 @@ export class WorldEnemyTurnController {
                 enemy.statuses = applyStatus(enemy.statuses, createStatus('guard'));
                 this.sink.spawnStatus(enemy.gridX, enemy.gridY, 'GUARD');
                 this.sink.spawnBuffEffect(enemy.gridX, enemy.gridY);
-                this.sink.log(`${enemy.name}: 방어 태세`);
+                this.logEnemy('field.enemyLog.guard', { enemy: enemy.name });
                 return result;
             case 'bossPattern':
                 return this.executeBossPattern(entry, decision.pattern, decision.targetId);
             case 'wait':
-                this.sink.log(`${enemy.name}: 대기`);
+                this.logEnemy('field.enemyLog.wait', { enemy: enemy.name });
                 return result;
         }
     }
@@ -185,7 +186,7 @@ export class WorldEnemyTurnController {
 
     private enemyIsImmobilized(enemy: Enemy): boolean {
         if (!hasStatus(enemy.statuses, 'immobilize')) return false;
-        this.sink.log(`${enemy.name}: 이동불가`);
+        this.logEnemy('field.enemyLog.immobilized', { enemy: enemy.name });
         this.sink.spawnStatus(enemy.gridX, enemy.gridY, 'ROOT');
         return true;
     }
@@ -199,21 +200,21 @@ export class WorldEnemyTurnController {
         if (healed <= 0) return;
         this.sink.spawnHeal(ally.gridX, ally.gridY, healed);
         this.sink.spawnHealEffect(ally.gridX, ally.gridY);
-        this.sink.log(`${caster.name} → ${ally.name} ${healed} 회복`);
+        this.logEnemy('field.enemyLog.healAlly', { caster: caster.name, ally: ally.name, amount: healed });
     }
 
     private enemyBuffAlly(caster: Enemy, ally: Enemy, status: StatusKind): void {
         ally.statuses = applyStatus(ally.statuses, createStatus(status));
         this.sink.spawnStatus(ally.gridX, ally.gridY, 'BUFF');
         this.sink.spawnBuffEffect(ally.gridX, ally.gridY);
-        this.sink.log(`${caster.name} → ${ally.name} 강화`);
+        this.logEnemy('field.enemyLog.buffAlly', { caster: caster.name, ally: ally.name });
     }
 
     private enemyDebuffActor(caster: Enemy, actor: FieldActor, status: StatusKind): void {
         actor.character.statuses = applyStatus(actor.character.statuses, createStatus(status));
         this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'WEAK');
         this.sink.spawnDebuffEffect(actor.entity.gridX, actor.entity.gridY);
-        this.sink.log(`${caster.name} → ${actor.character.name} 약화`);
+        this.logEnemy('field.enemyLog.debuffTarget', { caster: caster.name, target: actor.character.name });
     }
 
     private executeBossPattern(entry: FieldEnemy, pattern: BossPattern, targetId: string): CombatResult {
@@ -227,7 +228,7 @@ export class WorldEnemyTurnController {
                 enemy.statuses = applyStatus(enemy.statuses, createStatus('allUp', { durationTurns: 4, magnitude: 1.3 }));
                 this.sink.spawnStatus(enemy.gridX, enemy.gridY, 'ENRAGE');
                 this.sink.spawnDarkEffect(enemy.gridX, enemy.gridY);
-                this.sink.log(`${enemy.name}: 광폭화`);
+                this.logEnemy('field.enemyLog.enrage', { enemy: enemy.name });
                 return result;
             case 'darkPulse': {
                 this.sink.spawnDarkEffect(enemy.gridX, enemy.gridY);
@@ -238,7 +239,7 @@ export class WorldEnemyTurnController {
                     this.movement.enemyStepToward(entry, target, 2);
                     return result;
                 }
-                this.sink.log(`${enemy.name}: 암흑 파동 (${victims.length}명)`);
+                this.logEnemy('field.enemyLog.darkPulse', { enemy: enemy.name, count: victims.length });
                 const feedbackGroupId = this.sink.beginFeedbackGroup?.();
                 for (const victim of victims) mergeCombatResult(result, this.enemySpellDamage(enemy, victim, 0.7, 'dark', feedbackGroupId));
                 if (feedbackGroupId) this.sink.flushFeedbackGroup?.(feedbackGroupId);
@@ -248,14 +249,14 @@ export class WorldEnemyTurnController {
                 const victims = this.context.getPartyActors().filter((actor) =>
                     !actor.character.isDead && manhattan(this.enemyTile(enemy), this.actorTile(actor)) <= 1
                 );
-                this.sink.log(`${enemy.name}: 휩쓸기`);
+                this.logEnemy('field.enemyLog.cleave', { enemy: enemy.name });
                 const feedbackGroupId = this.sink.beginFeedbackGroup?.();
                 for (const victim of victims) mergeCombatResult(result, this.enemyAttack(enemy, victim, 1, feedbackGroupId));
                 if (feedbackGroupId) this.sink.flushFeedbackGroup?.(feedbackGroupId);
                 return result;
             }
             case 'voidBolt':
-                this.sink.log(`${enemy.name}: 공허 탄환`);
+                this.logEnemy('field.enemyLog.voidBolt', { enemy: enemy.name });
                 this.sink.spawnAttackCue(this.enemyTile(enemy), this.actorTile(target), '#b86cff', 'BOLT');
                 return this.enemySpellDamage(enemy, target, 1, 'dark');
         }
@@ -272,9 +273,13 @@ export class WorldEnemyTurnController {
         actor.character.stats.hp = Math.max(0, actor.character.stats.hp - damage);
         this.sink.spawnElementEffect(element, actor.entity.gridX, actor.entity.gridY, damage > 0 ? feedbackGroupId : undefined);
         this.sink.spawnDamage(actor.entity.gridX, actor.entity.gridY, damage, false, false);
-        this.sink.log(`${enemy.name} → ${actor.character.name} ${damage} 마법 피해`);
+        this.logEnemy('field.enemyLog.spellDamage', { enemy: enemy.name, target: actor.character.name, damage });
         if (actor.character.stats.hp <= 0 && !actor.character.isDead) result.downedCharacterIds.push(actor.character.id);
         return result;
+    }
+
+    private logEnemy(key: string, vars: Record<string, string | number>): void {
+        this.sink.log(formatT(key, vars));
     }
 
     private toEnemyAIUnit(enemy: Enemy): EnemyAIUnit {

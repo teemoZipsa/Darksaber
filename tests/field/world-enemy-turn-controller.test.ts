@@ -14,6 +14,7 @@ import {
 } from '../../src/engine/world/WorldEnemyTurnController';
 import { WorldMovementController } from '../../src/engine/world/WorldMovementController';
 import { TileType } from '../../src/map/Tile';
+import { i18n, type Language } from '../../src/i18n/LanguageManager';
 
 class ImageStub {
     public src = '';
@@ -205,21 +206,27 @@ test('aggro enemy turn chases when out of range and attacks once adjacent', () =
 });
 
 test('immobilized move decision emits root feedback without moving', () => {
-    const target = makeActor('hero', 3, 0);
-    const rooted = makeEnemyEntry('rooted', 0, 0);
-    rooted.enemy.statuses = [createStatus('immobilize')];
-    const { controller, events } = makeHarness([target], [rooted]);
+    const previousLang: Language = i18n.lang;
+    try {
+        i18n.lang = 'en';
+        const target = makeActor('hero', 3, 0);
+        const rooted = makeEnemyEntry('rooted', 0, 0);
+        rooted.enemy.statuses = [createStatus('immobilize')];
+        const { controller, events } = makeHarness([target], [rooted]);
 
-    controller.executeEnemyDecision(rooted, {
-        kind: 'moveToward',
-        targetId: target.id,
-        desiredRange: 1,
-        reason: 'test',
-    });
+        controller.executeEnemyDecision(rooted, {
+            kind: 'moveToward',
+            targetId: target.id,
+            desiredRange: 1,
+            reason: 'test',
+        });
 
-    assert.deepEqual({ x: rooted.enemy.gridX, y: rooted.enemy.gridY }, { x: 0, y: 0 });
-    assert.ok(events.includes('ROOT'));
-    assert.ok(events.some((event) => event.includes('rooted:')));
+        assert.deepEqual({ x: rooted.enemy.gridX, y: rooted.enemy.gridY }, { x: 0, y: 0 });
+        assert.ok(events.includes('ROOT'));
+        assert.ok(events.includes('rooted: immobilized'));
+    } finally {
+        i18n.lang = previousLang;
+    }
 });
 
 test('support decisions and boss spell pattern mutate state and return combat result', () => {
