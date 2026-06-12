@@ -2177,7 +2177,7 @@ export class WorldEngine {
 
             const effective = getEffectiveStatsForCharacter(actor.character);
             if (resting.sourceType !== 'action' && actor.character.stats.hp >= effective.maxHp && actor.character.stats.mp >= effective.maxMp) {
-                this.stopResting(actor, `${actor.character.name}: 휴식 완료`);
+                this.stopResting(actor, formatT('field.log.restComplete', { name: actor.character.name }));
                 continue;
             }
 
@@ -2204,7 +2204,7 @@ export class WorldEngine {
             if (hpGain > 0 || mpGain > 0) this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
 
             if (resting.sourceType !== 'action' && actor.character.stats.hp >= effective.maxHp && actor.character.stats.mp >= effective.maxMp) {
-                this.stopResting(actor, `${actor.character.name}: 휴식 완료`);
+                this.stopResting(actor, formatT('field.log.restComplete', { name: actor.character.name }));
             }
         }
     }
@@ -2226,7 +2226,7 @@ export class WorldEngine {
             const beforeHp = beforeHpByActorId.get(actor.id);
             if (beforeHp === undefined) continue;
             if (actor.character.stats.hp < beforeHp) {
-                this.stopResting(actor, `${actor.character.name}: 피해로 휴식 중단`);
+                this.stopResting(actor, formatT('field.log.restInterruptedDamage', { name: actor.character.name }));
                 removeActionStanceStatusesFromCarrier(actor.character);
             }
         }
@@ -2466,17 +2466,19 @@ export class WorldEngine {
 
     private awardDefeatExp(actor: FieldActor, enemy: Enemy): void {
         const canGainExp = this.canCharacterGainExpInCurrentRealm(actor.character);
-        this.addCombatLog(canGainExp ? `${enemy.name} 처치! +${enemy.expReward} EXP` : `${enemy.name} 처치!`);
+        this.addCombatLog(canGainExp
+            ? formatT('field.log.enemyDefeatedExp', { enemy: enemy.name, exp: enemy.expReward })
+            : formatT('field.log.enemyDefeated', { enemy: enemy.name }));
         if (canGainExp) {
             const expResult = actor.character.gainExp(enemy.expReward);
             if (expResult.promoted && expResult.newTierName) {
-                this.addCombatLog(`${actor.character.name} 승급: ${expResult.newTierName}`);
+                this.addCombatLog(formatT('field.log.actorPromoted', { name: actor.character.name, tier: expResult.newTierName }));
             }
             if (expResult.emblemUnlocked) {
-                this.addCombatLog(`${actor.character.name}: 융합 문장 각성`);
+                this.addCombatLog(formatT('field.log.emblemUnlocked', { name: actor.character.name }));
             }
         } else {
-            this.addCombatLog('이 월드에서는 해당 티어가 성장하지 않습니다.');
+            this.addCombatLog(t('field.log.noGrowthRealm'));
         }
     }
 
@@ -2490,27 +2492,27 @@ export class WorldEngine {
         const index = this.partyActors.indexOf(actor);
         if (index === this.party.getActiveIndex()) {
             const next = this.party.markActiveDead();
-            this.addCombatLog(`${actor.character.name} 쓰러짐`);
+            this.addCombatLog(formatT('field.log.actorDown', { name: actor.character.name }));
             this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'DOWN');
             if (next) {
                 const nextIndex = this.partyActors.findIndex((candidate) => candidate.character === next);
                 if (nextIndex >= 0) this.switchToPartyMember(nextIndex);
             } else {
-                this.addCombatLog('출격조 전원 행동 불능');
+                this.addCombatLog(t('field.log.partyAllDown'));
             }
             return;
         }
 
         actor.character.isDead = true;
         actor.character.exp = 0;
-        this.addCombatLog(`${actor.character.name} 쓰러짐`);
+        this.addCombatLog(formatT('field.log.actorDown', { name: actor.character.name }));
         this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'DOWN');
     }
 
     private openLoot(loot: LootObject): void {
         if (this.getNetworkRaidState().isActive()) {
             this.selectionController.selectLoot(loot.id);
-            this.addCombatLog(`${loot.sourceLabel} 서버 점유 요청.`);
+            this.addCombatLog(formatT('field.log.lootLockRequest', { source: loot.sourceLabel }));
             this.sendNetworkIntent(this.requireControlledActor().id, 'interact', { lootId: loot.id });
             return;
         }
@@ -2519,7 +2521,7 @@ export class WorldEngine {
             return;
         }
         this.selectionController.selectLoot(loot.id);
-        this.addCombatLog(`${loot.sourceLabel} 검색 중.`);
+        this.addCombatLog(formatT('field.log.lootSearch', { source: loot.sourceLabel }));
         this.clearControlledPath();
         this.requireControlledActor().queuedIntent = null;
 
@@ -2608,7 +2610,7 @@ export class WorldEngine {
         }
         if (!this.party.getCharacters().includes(actor.character)) {
             this.selectionController.selectActor(actor.id);
-            this.addCombatLog(`${actor.character.name}: 원격 플레이어는 표시 전용입니다.`);
+            this.addCombatLog(formatT('field.log.remoteDisplayOnly', { name: actor.character.name }));
             return false;
         }
         if (!this.party.switchTo(index)) return false;
@@ -2617,7 +2619,7 @@ export class WorldEngine {
         this.playerActionController.clearTargeting();
         this.closeActionMenu();
         this.closeTacticalMenu();
-        this.addCombatLog(`${actor.character.name} 조작`);
+        this.addCombatLog(formatT('field.log.actorControl', { name: actor.character.name }));
         return true;
     }
 
@@ -2631,7 +2633,7 @@ export class WorldEngine {
         }
 
         if (actor.id !== this.activeTurnActorId) {
-            this.addCombatLog('아직 행동 순서가 아닙니다.');
+            this.addCombatLog(t('field.log.notTurn'));
             return;
         }
 
@@ -2663,7 +2665,7 @@ export class WorldEngine {
         const carryover = this.remainingActionPoints >= FIELD_MAX_ACTION_GAUGE
             ? 0
             : this.remainingActionPoints;
-        this.endActorTurn(actor, '대기', carryover);
+        this.endActorTurn(actor, 'field.log.reason.wait', carryover);
     }
 
     private spendAp(cost: number): boolean {
@@ -2678,14 +2680,14 @@ export class WorldEngine {
     private resumeOrEndActiveTurn(actor: FieldActor): void {
         if (actor.id !== this.activeTurnActorId) return;
         if (actor.character.isDead || actor.character.stats.hp <= 0) {
-            this.endActorTurn(actor, '행동 불능', 0);
+            this.endActorTurn(actor, 'field.log.reason.incapacitated', 0);
             return;
         }
         if (this.playerActionController.hasExecutableAction(actor)) {
             this.reopenActionMenu(actor);
             return;
         }
-        this.endActorTurn(actor, '행동 게이지 부족', this.remainingActionPoints);
+        this.endActorTurn(actor, 'field.log.reason.gaugeLow', this.remainingActionPoints);
     }
 
     private reopenActionMenu(actor: FieldActor): void {
@@ -2700,6 +2702,7 @@ export class WorldEngine {
     }
 
     private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = this.remainingActionPoints): void {
+        const reasonLabel = reason.startsWith('field.log.reason.') ? t(reason) : reason;
         if (actor.id === this.activeTurnActorId) this.sendNetworkIntent(actor.id, 'endTurn', { reason }, { requireOpen: false });
         actor.entity.actionGauge = Math.max(0, Math.min(FIELD_MAX_ACTION_GAUGE, atbCarryover));
         this.activeTurnActorId = null;
@@ -2712,7 +2715,7 @@ export class WorldEngine {
         this.playerActionController.clearTargeting();
         this.magicController.reset();
         this.toolController?.reset();
-        this.addCombatLog(`${actor.character.name} 턴 종료: ${reason}`);
+        this.addCombatLog(formatT('field.log.turnEnd', { name: actor.character.name, reason: reasonLabel }));
     }
 
     private endEnemyTurn(enemy: Enemy): void {
@@ -2766,17 +2769,17 @@ export class WorldEngine {
     private processActorTurnStartStatuses(actor: FieldActor): boolean {
         const result = resolveTurnStartStatuses(getEffectiveStatsForCharacter(actor.character), actor.character.statuses);
         actor.character.statuses = result.statuses;
-        if (result.expiredReaction) this.addCombatLog(`${actor.character.name}: 방어/반격 태세 해제`);
+        if (result.expiredReaction) this.addCombatLog(formatT('field.log.statusReactionExpired', { name: actor.character.name }));
         if (result.poisonDamage > 0) {
             this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, result.poisonDamage, false, false);
             this.effectManager.spawnDebuffEffect(actor.entity.gridX, actor.entity.gridY);
-            this.addCombatLog(`${actor.character.name}: 독 ${result.poisonDamage} 피해`);
-            this.stopResting(actor, `${actor.character.name}: 피해로 휴식 중단`);
+            this.addCombatLog(formatT('field.log.statusPoisonDamage', { name: actor.character.name, value: result.poisonDamage }));
+            this.stopResting(actor, formatT('field.log.restInterruptedDamage', { name: actor.character.name }));
         }
         if (result.regenHealing > 0) {
             this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, result.regenHealing);
             this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
-            this.addCombatLog(`${actor.character.name}: 재생 ${result.regenHealing} 회복`);
+            this.addCombatLog(formatT('field.log.statusRegenHealing', { name: actor.character.name, value: result.regenHealing }));
         }
         const effective = getEffectiveStatsForCharacter(actor.character);
         actor.character.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.character.stats.hp + result.hpDelta));
@@ -2792,16 +2795,16 @@ export class WorldEngine {
         const enemy = entry.enemy;
         const result = resolveTurnStartStatuses(getEffectiveStatsForEnemy(enemy), enemy.statuses);
         enemy.statuses = result.statuses;
-        if (result.expiredReaction) this.addCombatLog(`${enemy.name}: 방어/반격 태세 해제`);
+        if (result.expiredReaction) this.addCombatLog(formatT('field.log.statusReactionExpired', { name: enemy.name }));
         if (result.poisonDamage > 0) {
             this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, result.poisonDamage, false, false);
             this.effectManager.spawnDebuffEffect(enemy.gridX, enemy.gridY);
-            this.addCombatLog(`${enemy.name}: 독 ${result.poisonDamage} 피해`);
+            this.addCombatLog(formatT('field.log.statusPoisonDamage', { name: enemy.name, value: result.poisonDamage }));
         }
         if (result.regenHealing > 0) {
             this.floatingText.spawnHeal(enemy.gridX, enemy.gridY, result.regenHealing);
             this.effectManager.spawnHealEffect(enemy.gridX, enemy.gridY);
-            this.addCombatLog(`${enemy.name}: 재생 ${result.regenHealing} 회복`);
+            this.addCombatLog(formatT('field.log.statusRegenHealing', { name: enemy.name, value: result.regenHealing }));
         }
         enemy.stats.hp = Math.max(0, Math.min(enemy.stats.maxHp, enemy.stats.hp + result.hpDelta));
 
@@ -2823,7 +2826,7 @@ export class WorldEngine {
         actor.entity.actionGauge = FIELD_MAX_ACTION_GAUGE;
         this.selectionController.selectActor(actor.id);
         if (!this.processActorTurnStartStatuses(actor)) {
-            this.endActorTurn(actor, '상태이상');
+            this.endActorTurn(actor, 'field.log.reason.statusBlocked');
             return;
         }
         this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'READY');
@@ -2832,7 +2835,7 @@ export class WorldEngine {
             gauge: t('ui.actionGauge'),
             value: this.remainingActionPoints,
         }));
-        if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
+        if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, 'field.log.reason.noExecutableAction');
         else {
             this.closeTacticalMenu();
             this.actionMenuUI.open(this.getActionMenuStates(actor));
