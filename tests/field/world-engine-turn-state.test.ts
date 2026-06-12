@@ -322,6 +322,49 @@ test('network raid AP uses server remaining points instead of local actor gauge'
     assert.equal(actor.entity.actionGauge, 0);
 });
 
+test('world update freezes field simulation while story presentation is active', () => {
+    const actor = makeActor('hero');
+    const engine = Object.create(WorldEngine.prototype) as any;
+    const calls: string[] = [];
+    engine.worldTime = 0;
+    engine.player = actor.entity;
+    engine.townSession = {
+        sync: () => calls.push('syncTown'),
+        isVisible: () => false,
+    };
+    engine.raidOutcomeController = { isVisible: () => false };
+    engine.fusionTempleUI = { isVisible: () => false };
+    engine.tutorialController = {
+        isActive: () => false,
+        isCompletePending: () => false,
+    };
+    engine.isNetworkRaid = false;
+    engine.storyScenarioController = {
+        isPresentationActive: () => true,
+        updatePresentation: (dt: number) => calls.push(`presentation:${dt}`),
+    };
+    engine.effectManager = { update: () => calls.push('effects') };
+    engine.floatingText = { update: () => calls.push('floatingText') };
+    engine.updateAttackCues = () => calls.push('attackCues');
+    engine.getControlledActor = () => actor;
+    engine.inputController = { process: () => calls.push('input') };
+    engine.movementController = {
+        updatePartyActors: () => {
+            calls.push('partyMovement');
+            return { followRepathTimer: 0, readyActorIds: [] };
+        },
+        updateEnemies: () => {
+            calls.push('enemyMovement');
+            return { readyEnemyIds: [] };
+        },
+    };
+    const camera = { update: () => calls.push('camera') };
+
+    engine.update(0.5, {} as any, camera as any);
+
+    assert.deepEqual(calls, ['syncTown', 'presentation:0.5', 'effects', 'floatingText', 'attackCues', 'camera']);
+});
+
 test('intro tutorial uses only the currently active party character', () => {
     const lead = new Character('lead', 'Lead', 'infantry');
     const active = new Character('active', 'Active', 'cavalry');

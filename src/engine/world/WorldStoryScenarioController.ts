@@ -10,6 +10,7 @@ import {
 import {
     getStoryScenarioEventStepDurationMs,
     getStoryScenarioEventSequence,
+    getStoryScenarioPresentationDurationMs,
     type StoryScenarioEventSequence,
     type StoryScenarioEventStep,
     type StoryScenarioFieldEvent,
@@ -88,6 +89,9 @@ export class WorldStoryScenarioController {
     private readonly completedFieldEventKeys: Set<string> = new Set();
     private readonly presentationQueue: StoryScenarioEventStep[] = [];
     private lastPresentationDurationMs = 0;
+    private presentationActive = false;
+    private presentationRemainingMs = 0;
+    private onPresentationComplete: (() => void) | null = null;
 
     constructor(context: WorldStoryScenarioContext) {
         this.context = context;
@@ -99,6 +103,16 @@ export class WorldStoryScenarioController {
 
     public getLastPresentationDurationMs(): number {
         return this.lastPresentationDurationMs;
+    }
+
+    public isPresentationActive(): boolean {
+        return this.presentationActive;
+    }
+
+    public updatePresentation(dt: number): void {
+        if (!this.presentationActive) return;
+        this.presentationRemainingMs -= Math.max(0, dt) * 1000;
+        this.advanceStoryScenarioPresentation();
     }
 
     public resetVisitState(): void {
@@ -376,8 +390,7 @@ export class WorldStoryScenarioController {
         const key = this.fieldEventKey(dungeonId, event.id);
         if (this.completedFieldEventKeys.has(key)) return false;
         this.completedFieldEventKeys.add(key);
-        this.beginStoryScenarioPresentation();
-        for (const step of event.steps) this.playStoryScenarioEventStep(step);
+        this.startStoryScenarioPresentation(event.steps);
         return true;
     }
 
@@ -394,18 +407,19 @@ export class WorldStoryScenarioController {
         if (eventSequence?.bossDefeatEvent) this.applyBossDefeatEventRewards(dungeonId, eventSequence.bossDefeatEvent);
         if (options.clearEnemies ?? true) this.context.setFieldEnemies([]);
         const completedInterior = this.activeInterior?.dungeonId === dungeonId ? this.activeInterior : null;
-        this.playStoryScenarioSequence(dungeonId, 'bossDefeat');
-        if (this.activeInterior?.dungeonId === dungeonId) {
-            this.exitActiveInterior({ placePartyAtReturn: !this.context.isNetworkRaid() });
-            this.context.followCameraToPlayer();
-        }
-        this.context.clearSelection();
-        this.context.clearFieldTurnState();
-        const scenario = getStoryScenarioByDungeonId(dungeonId);
-        if (completedInterior && scenario) {
-            this.context.log(formatT('story.interior.returnLog', { dungeon: scenario.dungeonNameKr }));
-        }
-        this.context.log(t(storyQuest.objectiveCompleteLogKey));
+        this.playStoryScenarioSequence(dungeonId, 'bossDefeat', () => {
+            if (this.activeInterior?.dungeonId === dungeonId) {
+                this.exitActiveInterior({ placePartyAtReturn: !this.context.isNetworkRaid() });
+                this.context.followCameraToPlayer();
+            }
+            this.context.clearSelection();
+            this.context.clearFieldTurnState();
+            const scenario = getStoryScenarioByDungeonId(dungeonId);
+            if (completedInterior && scenario) {
+                this.context.log(formatT('story.interior.returnLog', { dungeon: scenario.dungeonNameKr }));
+            }
+            this.context.log(t(storyQuest.objectiveCompleteLogKey));
+        });
     }
 
     public applyNetworkScenarioSnapshot(scenarioSnapshot: {
@@ -520,11 +534,9 @@ export class WorldStoryScenarioController {
         return `${this.context.getWorldMap().getRealm()}:${dungeon.id}:${actor.entity.gridX},${actor.entity.gridY}`;
     }
 
-    private playStoryScenarioSequence(dungeonId: string, phase: 'entry' | 'bossDefeat'): void {
+    private playStoryScenarioSequence(dungeonId: string, phase: 'entry' | 'bossDefeat', onComplete?: () => void): void {
         const sequence = getStoryScenarioEventSequence(dungeonId);
-        this.beginStoryScenarioPresentation();
-        if (!sequence) return;
-        for (const step of sequence[phase]) this.playStoryScenarioEventStep(step);
+        this.startStoryScenarioPresentation(sequence?.[phase] ?? [], onComplete);
     }
 
     private fieldEventKey(dungeonId: string, eventId: string): string {
@@ -650,7 +662,6 @@ export class WorldStoryScenarioController {
     }
 
     private playStoryScenarioEventStep(step: StoryScenarioEventStep): void {
-        this.lastPresentationDurationMs += getStoryScenarioEventStepDurationMs(step);
         switch (step.kind) {
             case 'focus':
                 this.context.focusCameraOnTile(step.target);
@@ -672,19 +683,45 @@ export class WorldStoryScenarioController {
     }
 
     private enqueueStoryScenarioPresentation(steps: readonly StoryScenarioEventStep[]): void {
+        this.startStoryScenarioPresentation(steps);
+    }
+
+    private startStoryScenarioPresentation(steps: readonly StoryScenarioEventStep[], onComplete?: () => void): void {
         this.beginStoryScenarioPresentation();
+        this.lastPresentationDurationMs = getStoryScenarioPresentationDurationMs(steps);
+        this.onPresentationComplete = onComplete ?? null;
         this.presentationQueue.push(...steps.map((step) => ({ ...step })));
-        this.flushStoryScenarioPresentationQueue();
+        this.presentationActive = this.presentationQueue.length > 0;
+        if (!this.presentationActive) {
+            const complete = this.onPresentationComplete;
+            this.onPresentationComplete = null;
+            complete?.();
+            return;
+        }
+        this.advanceStoryScenarioPresentation();
     }
 
     private beginStoryScenarioPresentation(): void {
+        this.presentationQueue.length = 0;
         this.lastPresentationDurationMs = 0;
+        this.presentationActive = false;
+        this.presentationRemainingMs = 0;
+        this.onPresentationComplete = null;
     }
 
-    private flushStoryScenarioPresentationQueue(): void {
-        while (this.presentationQueue.length > 0) {
+    private advanceStoryScenarioPresentation(): void {
+        while (this.presentationActive && this.presentationRemainingMs <= 0) {
             const step = this.presentationQueue.shift();
-            if (step) this.playStoryScenarioEventStep(step);
+            if (!step) {
+                this.presentationActive = false;
+                this.presentationRemainingMs = 0;
+                const onComplete = this.onPresentationComplete;
+                this.onPresentationComplete = null;
+                onComplete?.();
+                return;
+            }
+            this.playStoryScenarioEventStep(step);
+            this.presentationRemainingMs += getStoryScenarioEventStepDurationMs(step);
         }
     }
 

@@ -132,6 +132,13 @@ function createStoryScenarioHarness(options: {
     };
 }
 
+function drainStoryPresentation(controller: WorldStoryScenarioController): void {
+    for (let guard = 0; guard < 100 && controller.isPresentationActive(); guard++) {
+        controller.updatePresentation(10);
+    }
+    assert.equal(controller.isPresentationActive(), false);
+}
+
 function installLootController(engine: any, options: {
     bag?: GridInventory;
     logs?: string[];
@@ -449,6 +456,7 @@ test('local story interior uses the shared monster ids and normalized stats', ()
     assert.equal(harness.turnStateCleared, true);
     assert.equal(harness.cameraFollowed, true);
     assert.ok(harness.logs.some((entry) => entry.includes('시선 이동: 부르고스성 성문')));
+    drainStoryPresentation(harness.controller);
     assert.ok(harness.logs.some((entry) => entry.includes('키스라:')));
     assert.ok(harness.logs.some((entry) => entry.includes('승리조건 : 늑대인간(키스라)의 처치')));
     const guard = harness.fieldEnemies.find((entry) => entry.enemy.id.endsWith('_guard_0'))?.enemy;
@@ -485,6 +493,7 @@ test('story interior completion restores the previous world map at the return ti
     assert.notEqual(harness.worldMap, overworld);
 
     harness.controller.completeDungeonIfBossDefeated(boss);
+    drainStoryPresentation(harness.controller);
 
     assert.equal(harness.worldMap, overworld);
     assert.deepEqual(harness.placedNear, { x: 12, y: 13 });
@@ -514,6 +523,7 @@ test('Zamora local story interior plays original entry flow before Fenris object
     assert.ok(harness.worldMap.getInspectMarkers().some((marker) => marker.id === 'zamora_princess_captive:28,9'));
     assert.equal(harness.worldMap.getInspectMarkers().filter((marker) => marker.kind === 'chest').length, 8);
     assert.ok(harness.logs.some((entry) => entry.includes('시선 이동: 자모라 요새 감금실')));
+    drainStoryPresentation(harness.controller);
     assert.ok(harness.logs.some((entry) => entry.includes('펜리스: 자아, 공주')));
     assert.ok(harness.logs.some((entry) => entry.includes('공주: 싫다. 절대')));
     assert.ok(harness.logs.some((entry) => entry.includes('승리조건 : 펜리스의 처치')));
@@ -521,6 +531,7 @@ test('Zamora local story interior plays original entry flow before Fenris object
     const boss = harness.fieldEnemies.find((entry) => entry.enemy.isBoss)?.enemy;
     assert.ok(boss);
     harness.controller.completeDungeonIfBossDefeated(boss);
+    drainStoryPresentation(harness.controller);
 
     assert.equal(raidSession.isDungeonCleared(ZAMORA_FORTRESS_DUNGEON_ID), true);
     assert.equal(raidSession.hasScenarioFlag(ZAMORA_FORTRESS_DUNGEON_ID, 'princess_rescued'), true);
@@ -635,6 +646,7 @@ test('Burgos field events can be inspected once inside the local interior', () =
     const harness = createStoryScenarioHarness({ player, raidSession });
 
     harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+    drainStoryPresentation(harness.controller);
 
     assert.ok(harness.worldMap instanceof StoryInteriorMap);
     assert.deepEqual(harness.worldMap.getInspectMarkers().map((marker) => marker.id).sort(), [
@@ -647,6 +659,7 @@ test('Burgos field events can be inspected once inside the local interior', () =
 
     assert.equal(raidSession.hasScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key'), false);
     assert.equal(harness.controller.playFieldEventAt({ x: 25, y: 9 }, { id: 'hero', entity: player } as any), true);
+    drainStoryPresentation(harness.controller);
     assert.ok(harness.logs.some((entry) => entry.includes('열쇠를 얻었습니다.')));
     assert.equal(raidSession.hasScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key'), true);
     assert.equal(
@@ -727,8 +740,10 @@ test('Burgos Cain field event records a raid-scoped relic flag before survival r
     const harness = createStoryScenarioHarness({ player, raidSession });
 
     harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+    drainStoryPresentation(harness.controller);
 
     assert.equal(harness.controller.playFieldEventAt({ x: 9, y: 12 }, { id: 'hero', entity: player } as any), true);
+    drainStoryPresentation(harness.controller);
     assert.equal(raidSession.hasScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'cain_necklace'), true);
     assert.ok(harness.logs.some((entry) => entry.includes('케인의 목걸이를 얻었습니다.')));
     assert.equal(harness.controller.playFieldEventAt({ x: 9, y: 12 }, { id: 'hero', entity: player } as any), false);
@@ -761,6 +776,7 @@ test('network field scenario entry plays original episode 4 event flow once', ()
         activeDungeonId: 'arcadia_plain',
         completedDungeonIds: [],
     });
+    drainStoryPresentation(harness.controller);
 
     assert.equal(raidSession.activeDungeonId, 'arcadia_plain');
     assert.ok(harness.logs.some((entry) => entry.includes('알카디아 평원 진입.')));
@@ -899,6 +915,7 @@ test('episodes 5 and 6 field scenario inspect events map to current world scenar
         presentationSteps: villageEvent.steps,
         rewards: [],
     });
+    drainStoryPresentation(villageHarness.controller);
     assert.equal(villageRaid.hasScenarioFlag(REMOTE_VILLAGE_DUNGEON_ID, 'remote_village_healer_01'), true);
     assert.ok(villageHarness.logs.includes('체력이 회복되었습니다.'));
 });
@@ -1010,6 +1027,7 @@ test('Burgos boss defeat clears only the dungeon encounter, not raid success', (
     void raidSuccessShown;
 
     harness.controller.completeDungeonIfBossDefeated(boss);
+    drainStoryPresentation(harness.controller);
 
     assert.equal(raidSession.active, true);
     assert.equal(raidSession.activeDungeonId, null);
@@ -1044,6 +1062,7 @@ test('Zamora Fenris defeat clears only the dungeon encounter, not raid success',
     void raidSuccessShown;
 
     harness.controller.completeDungeonIfBossDefeated(boss);
+    drainStoryPresentation(harness.controller);
 
     assert.equal(raidSession.active, true);
     assert.equal(raidSession.activeDungeonId, null);
@@ -1076,6 +1095,7 @@ test('Etna Ganomas defeat plays original sword event and clears only the dungeon
     });
 
     harness.controller.completeDungeonIfBossDefeated(boss);
+    drainStoryPresentation(harness.controller);
 
     assert.equal(raidSession.active, true);
     assert.equal(raidSession.activeDungeonId, null);
@@ -1098,6 +1118,7 @@ test('late story boss clear GETITEM rewards are granted on boss defeat', () => {
     const harness = createStoryScenarioHarness({ raidSession });
 
     harness.controller.completeDungeonIfBossDefeated(boss);
+    drainStoryPresentation(harness.controller);
 
     assert.equal(raidSession.isDungeonCleared(BEELZEBUTH_HALL_DUNGEON_ID), true);
     assert.deepEqual(harness.rewardItemIds, ['orig_late_0984']);
@@ -1118,23 +1139,31 @@ test('late story presentation steps focus the camera on original event tiles', (
     harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
 
     assert.ok(harness.cameraFollowed);
-    assert.deepEqual(harness.cameraFocusTiles.slice(0, 2), [{ x: 22, y: 11 }, { x: 19, y: 7 }]);
+    assert.deepEqual(harness.cameraFocusTiles, [{ x: 22, y: 11 }]);
 
     const sequence = getStoryScenarioEventSequence('demon_fixers_den');
     assert.ok(sequence);
     assert.equal(harness.controller.getLastPresentationDurationMs(), getStoryScenarioPresentationDurationMs(sequence.entry));
+    assert.equal(harness.controller.isPresentationActive(), true);
+    harness.controller.updatePresentation(0.65);
+    assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 19, y: 7 });
+    drainStoryPresentation(harness.controller);
+
     const cacheEvent = sequence?.fieldEvents.find((event) => event.originalEventId === 'EVENT 91');
     assert.ok(cacheEvent);
     assert.equal(harness.controller.playFieldEvent('demon_fixers_den', cacheEvent.id), true);
     assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 33, y: 17 });
     assert.equal(harness.controller.getLastPresentationDurationMs(), getStoryScenarioPresentationDurationMs(cacheEvent.steps));
+    drainStoryPresentation(harness.controller);
 
     const boss = new Enemy('story_demon_fixers_den_boss', 22, 11, '마계 해결사', 9, '#7a3150', 'boss');
     boss.isBoss = true;
     harness.controller.completeDungeonIfBossDefeated(boss);
 
-    assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 22, y: 11 });
+    assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 19, y: 7 });
     assert.equal(harness.controller.getLastPresentationDurationMs(), getStoryScenarioPresentationDurationMs(sequence.bossDefeat));
+    drainStoryPresentation(harness.controller);
+    assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 22, y: 11 });
     assert.ok(harness.cameraFollowed);
 });
 
@@ -1152,6 +1181,7 @@ test('Airship objective completion keeps variant monsters as optional encounters
     });
 
     harness.controller.completeStoryDungeonObjective('airship', storyQuest, { clearEnemies: false });
+    drainStoryPresentation(harness.controller);
 
     assert.equal(raidSession.activeDungeonId, null);
     assert.equal(raidSession.isDungeonCleared('airship'), true);

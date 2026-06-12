@@ -767,6 +767,8 @@ export class WorldEngine {
             return;
         }
 
+        if (this.updateStoryPresentation(dt, camera)) return;
+
         if (this.tutorialController.isActive() && input.mouseRightJustDown) {
             this.addIntroTutorialBlockedLog();
             camera.followTile(this.player.gridX, this.player.gridY);
@@ -938,6 +940,8 @@ export class WorldEngine {
     }
 
     private updateNetworkRaid(dt: number, input: InputManager, camera: Camera): void {
+        if (this.updateStoryPresentation(dt, camera)) return;
+
         this.refreshOpenActionMenuState();
         this.inputController.process(input, camera);
         for (const actor of this.partyActors) actor.entity.update(dt);
@@ -954,6 +958,18 @@ export class WorldEngine {
         if (controlled) this.player = controlled.entity;
         camera.followTile(this.player.gridX, this.player.gridY);
         camera.update(dt);
+    }
+
+    private updateStoryPresentation(dt: number, camera: Camera): boolean {
+        if (!this.storyScenarioController.isPresentationActive()) return false;
+        this.storyScenarioController.updatePresentation(dt);
+        this.effectManager.update(dt);
+        this.floatingText.update(dt);
+        this.updateAttackCues(dt);
+        const controlled = this.getControlledActor();
+        if (controlled) this.player = controlled.entity;
+        camera.update(dt);
+        return true;
     }
 
     private applyNetworkSnapshot(snapshot: WorldSnapshot): void {
