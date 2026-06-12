@@ -95,8 +95,21 @@ function createManagerHarness() {
     return { actor, inventory, logs, manager: manager as unknown as GameManager, selected, world };
 }
 
-test('WorldEngine exposes network raid close hook for dev scenario handoff', () => {
-    assert.equal(typeof WorldEngine.prototype.closeNetworkRaidClient, 'function');
+test('WorldEngine close hook delegates to the raid lifecycle controller', () => {
+    const calls: Array<{ sendLeave: boolean; reason: string | undefined }> = [];
+    const engine = Object.create(WorldEngine.prototype) as unknown as {
+        closeNetworkRaidClient: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => void;
+        raidLifecycleController: { closeNetworkRaidClient: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => void };
+    };
+    engine.raidLifecycleController = {
+        closeNetworkRaidClient: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => {
+            calls.push({ sendLeave, reason });
+        },
+    };
+
+    engine.closeNetworkRaidClient(true, 'manual');
+
+    assert.deepEqual(calls, [{ sendLeave: true, reason: 'manual' }]);
 });
 
 test('dev story31 scenario launches local Demon Fixer Den without network raid state', () => {
