@@ -20,7 +20,10 @@ import { getItemDef } from '../../src/data/ItemDB';
 import { PlayerData } from '../../src/data/PlayerData';
 import { getStoryQuestByDungeonId } from '../../src/data/StoryQuestData';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
-import { getStoryScenarioEventSequence } from '../../src/data/StoryScenarioEventData';
+import {
+    getStoryScenarioEventSequence,
+    getStoryScenarioPresentationDurationMs,
+} from '../../src/data/StoryScenarioEventData';
 import { getStoryScenarioFieldEventTiles } from '../../src/data/StoryScenarioFieldEventPlacement';
 import { Enemy } from '../../src/entity/Enemy';
 import { LootObject } from '../../src/entity/LootObject';
@@ -1118,16 +1121,20 @@ test('late story presentation steps focus the camera on original event tiles', (
     assert.deepEqual(harness.cameraFocusTiles.slice(0, 2), [{ x: 22, y: 11 }, { x: 19, y: 7 }]);
 
     const sequence = getStoryScenarioEventSequence('demon_fixers_den');
+    assert.ok(sequence);
+    assert.equal(harness.controller.getLastPresentationDurationMs(), getStoryScenarioPresentationDurationMs(sequence.entry));
     const cacheEvent = sequence?.fieldEvents.find((event) => event.originalEventId === 'EVENT 91');
     assert.ok(cacheEvent);
     assert.equal(harness.controller.playFieldEvent('demon_fixers_den', cacheEvent.id), true);
     assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 33, y: 17 });
+    assert.equal(harness.controller.getLastPresentationDurationMs(), getStoryScenarioPresentationDurationMs(cacheEvent.steps));
 
     const boss = new Enemy('story_demon_fixers_den_boss', 22, 11, '마계 해결사', 9, '#7a3150', 'boss');
     boss.isBoss = true;
     harness.controller.completeDungeonIfBossDefeated(boss);
 
     assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 22, y: 11 });
+    assert.equal(harness.controller.getLastPresentationDurationMs(), getStoryScenarioPresentationDurationMs(sequence.bossDefeat));
     assert.ok(harness.cameraFollowed);
 });
 

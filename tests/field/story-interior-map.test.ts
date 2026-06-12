@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getStoryScenarioEventSequence, STORY_SCENARIO_EVENT_SEQUENCES } from '../../src/data/StoryScenarioEventData';
+import {
+    getStoryScenarioEventSequence,
+    getStoryScenarioEventStepDurationMs,
+    getStoryScenarioPresentationDurationMs,
+    STORY_SCENARIO_EVENT_SEQUENCES,
+} from '../../src/data/StoryScenarioEventData';
 import {
     getStoryScenarioFieldEventPlacements,
     getStoryScenarioFieldEventTiles,
@@ -1067,8 +1072,13 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         assert.ok(sequence.originalSources.mapFiles.includes(fact.setArc));
         assert.equal(sequence.entry.filter((step) => step.kind === 'combatStart').length, 1);
         assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
+        assert.equal(sequence.entry[0].durationMs, 650);
+        assert.ok(sequence.entry.every((step) => getStoryScenarioEventStepDurationMs(step) > 0), fact.dungeonId);
+        assert.ok(sequence.bossDefeat.every((step) => getStoryScenarioEventStepDurationMs(step) > 0), fact.dungeonId);
+        assert.ok(getStoryScenarioPresentationDurationMs(sequence.entry) >= 3150, fact.dungeonId);
         assert.deepEqual(sequence.fieldEvents.map((event) => event.originalEventId), expectedCaches.map((event) => `EVENT ${event.eventNumber}`));
         assert.deepEqual(sequence.fieldEvents.map((event) => event.triggerTiles[0]), expectedCaches.map((event) => event.tile));
+        assert.ok(sequence.fieldEvents.every((event) => event.steps.every((step) => getStoryScenarioEventStepDurationMs(step) === 700)), fact.dungeonId);
         const actualOriginalItemIds = sequence.fieldEvents.map((event) => {
             const reward = event.rewards?.[0];
             if (!reward || reward.type !== 'item') {

@@ -8,6 +8,7 @@ import {
     getStoryScenarioFieldEventTiles,
 } from '../../data/StoryScenarioFieldEventPlacement';
 import {
+    getStoryScenarioEventStepDurationMs,
     getStoryScenarioEventSequence,
     type StoryScenarioEventSequence,
     type StoryScenarioEventStep,
@@ -86,6 +87,7 @@ export class WorldStoryScenarioController {
     private readonly networkScenarioEnteredDungeonIds: Set<string> = new Set();
     private readonly completedFieldEventKeys: Set<string> = new Set();
     private readonly presentationQueue: StoryScenarioEventStep[] = [];
+    private lastPresentationDurationMs = 0;
 
     constructor(context: WorldStoryScenarioContext) {
         this.context = context;
@@ -93,6 +95,10 @@ export class WorldStoryScenarioController {
 
     public getActiveInterior(): WorldStoryInteriorState | null {
         return this.activeInterior;
+    }
+
+    public getLastPresentationDurationMs(): number {
+        return this.lastPresentationDurationMs;
     }
 
     public resetVisitState(): void {
@@ -370,6 +376,7 @@ export class WorldStoryScenarioController {
         const key = this.fieldEventKey(dungeonId, event.id);
         if (this.completedFieldEventKeys.has(key)) return false;
         this.completedFieldEventKeys.add(key);
+        this.beginStoryScenarioPresentation();
         for (const step of event.steps) this.playStoryScenarioEventStep(step);
         return true;
     }
@@ -515,6 +522,7 @@ export class WorldStoryScenarioController {
 
     private playStoryScenarioSequence(dungeonId: string, phase: 'entry' | 'bossDefeat'): void {
         const sequence = getStoryScenarioEventSequence(dungeonId);
+        this.beginStoryScenarioPresentation();
         if (!sequence) return;
         for (const step of sequence[phase]) this.playStoryScenarioEventStep(step);
     }
@@ -642,6 +650,7 @@ export class WorldStoryScenarioController {
     }
 
     private playStoryScenarioEventStep(step: StoryScenarioEventStep): void {
+        this.lastPresentationDurationMs += getStoryScenarioEventStepDurationMs(step);
         switch (step.kind) {
             case 'focus':
                 this.context.focusCameraOnTile(step.target);
@@ -663,8 +672,13 @@ export class WorldStoryScenarioController {
     }
 
     private enqueueStoryScenarioPresentation(steps: readonly StoryScenarioEventStep[]): void {
+        this.beginStoryScenarioPresentation();
         this.presentationQueue.push(...steps.map((step) => ({ ...step })));
         this.flushStoryScenarioPresentationQueue();
+    }
+
+    private beginStoryScenarioPresentation(): void {
+        this.lastPresentationDurationMs = 0;
     }
 
     private flushStoryScenarioPresentationQueue(): void {

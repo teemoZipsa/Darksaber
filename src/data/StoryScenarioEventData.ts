@@ -3,10 +3,34 @@ import { getOriginalLateStoryBossTile, getOriginalLateStoryCacheEvents } from '.
 import { getOriginalLateStoryItemsForSourceEvent } from './OriginalLateStoryItems';
 
 export type StoryScenarioEventStep =
-    | { kind: 'focus'; target: TilePoint; labelKey: string }
-    | { kind: 'dialogue'; speakerId: string; speakerNameKey: string; textKey: string; focus?: TilePoint }
-    | { kind: 'combatStart'; labelKey: string; focus?: TilePoint }
-    | { kind: 'objective'; labelKey: string; focus?: TilePoint };
+    | { kind: 'focus'; target: TilePoint; labelKey: string; durationMs?: number }
+    | { kind: 'dialogue'; speakerId: string; speakerNameKey: string; textKey: string; focus?: TilePoint; durationMs?: number }
+    | { kind: 'combatStart'; labelKey: string; focus?: TilePoint; durationMs?: number }
+    | { kind: 'objective'; labelKey: string; focus?: TilePoint; durationMs?: number };
+
+const DEFAULT_STORY_STEP_DURATION_MS: Record<StoryScenarioEventStep['kind'], number> = {
+    focus: 450,
+    dialogue: 1400,
+    combatStart: 900,
+    objective: 800,
+};
+
+const LATE_STORY_STEP_DURATION_MS = {
+    focus: 650,
+    dialogue: 1600,
+    combatStart: 900,
+    objective: 900,
+    cache: 700,
+} as const;
+
+export function getStoryScenarioEventStepDurationMs(step: StoryScenarioEventStep): number {
+    if (step.durationMs !== undefined) return Math.max(0, Math.floor(step.durationMs));
+    return DEFAULT_STORY_STEP_DURATION_MS[step.kind];
+}
+
+export function getStoryScenarioPresentationDurationMs(steps: readonly StoryScenarioEventStep[]): number {
+    return steps.reduce((sum, step) => sum + getStoryScenarioEventStepDurationMs(step), 0);
+}
 
 export interface StoryScenarioEventSequence {
     dungeonId: string;
@@ -135,7 +159,7 @@ function lateScenarioCacheEvent(
         markerLabelKey: `story.event.ep${String(episode).padStart(2, '0')}.cache.marker`,
         markerKind: 'chest',
         rewards: [{ type: 'item', itemId, originalItemId }],
-        steps: [{ kind: 'objective', labelKey: `story.event.ep${String(episode).padStart(2, '0')}.cache.recovered`, focus: { ...tile } }],
+        steps: [{ kind: 'objective', labelKey: `story.event.ep${String(episode).padStart(2, '0')}.cache.recovered`, focus: { ...tile }, durationMs: LATE_STORY_STEP_DURATION_MS.cache }],
     };
 }
 
@@ -160,17 +184,19 @@ function lateScenarioSequence(input: {
         speakerNameKey: dialogue.speakerNameKey,
         textKey: dialogue.textKey,
         focus: dialogue.focus ?? input.bossTile,
+        durationMs: LATE_STORY_STEP_DURATION_MS.dialogue,
     })) ?? Array.from({ length: input.dialogueCount }, (_, index) => ({
         kind: 'dialogue' as const,
         speakerId: index % 2 === 0 ? input.bossSpeakerId : 'hero',
         speakerNameKey: index % 2 === 0 ? input.bossSpeakerNameKey : 'story.event.speaker.hero',
         textKey: `story.event.ep${ep}.dialogue.${String(index + 1).padStart(2, '0')}`,
         focus: input.bossTile,
+        durationMs: LATE_STORY_STEP_DURATION_MS.dialogue,
     }));
     const entry: StoryScenarioEventStep[] = [
-        { kind: 'focus', target: input.bossTile, labelKey: `story.event.ep${ep}.focus.boss` },
+        { kind: 'focus', target: input.bossTile, labelKey: `story.event.ep${ep}.focus.boss`, durationMs: LATE_STORY_STEP_DURATION_MS.focus },
         ...dialogueSteps,
-        { kind: 'combatStart', labelKey: `story.event.ep${ep}.combatStart`, focus: input.bossTile },
+        { kind: 'combatStart', labelKey: `story.event.ep${ep}.combatStart`, focus: input.bossTile, durationMs: LATE_STORY_STEP_DURATION_MS.combatStart },
     ];
     const bossClearItems = getOriginalLateStoryItemsForSourceEvent(input.episode, 99);
     const bossDefeatEvent: StoryScenarioBossDefeatEvent | undefined = bossClearItems.length > 0 ? {
@@ -207,8 +233,9 @@ function lateScenarioSequence(input: {
                 speakerNameKey: dialogue.speakerNameKey,
                 textKey: dialogue.textKey,
                 focus: dialogue.focus ?? input.bossTile,
+                durationMs: LATE_STORY_STEP_DURATION_MS.dialogue,
             })) ?? []),
-            { kind: 'objective', labelKey: `story.event.ep${ep}.objective`, focus: input.bossTile },
+            { kind: 'objective', labelKey: `story.event.ep${ep}.objective`, focus: input.bossTile, durationMs: LATE_STORY_STEP_DURATION_MS.objective },
         ],
     };
 }
