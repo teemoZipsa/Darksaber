@@ -174,8 +174,6 @@ export class WorldEngine {
     private fieldEnemies: FieldEnemy[] = [];
     private remotePartyActors: Map<string, FieldActor> = new Map();
     private networkRaid = new NetworkRaidState();
-    private pendingNetworkMoveReopen: { intentId: string; actorId: string; tile: TilePoint } | null = null;
-    private networkMovePathPreview: { actorId: string; target: TilePoint; path: TilePoint[] } | null = null;
     private pendingNetworkScenarioEnter: { intentId: string; dungeonId: string; visitKey: string | null } | null = null;
     private pendingLootPicks = new Map<string, { placed: PlacedItem; source: { gridX: number; gridY: number }; at: number; timedOut?: boolean }>();
     private actionMenuUI = new ActionMenuUI();
@@ -1722,13 +1720,7 @@ export class WorldEngine {
     }
 
     private handleNetworkActionRejected(rejection: ActionRejectedMessage): void {
-        const rejectedMoveActorId = this.pendingNetworkMoveReopen?.intentId === rejection.intentId
-            ? this.pendingNetworkMoveReopen.actorId
-            : null;
-        if (this.pendingNetworkMoveReopen?.intentId === rejection.intentId) {
-            this.pendingNetworkMoveReopen = null;
-            this.clearNetworkMovePathPreview(rejectedMoveActorId);
-        }
+        const rejectedMoveActorId = this.getNetworkRaidState().consumeRejectedMoveActorId(rejection.intentId);
         if (this.pendingNetworkScenarioEnter?.intentId === rejection.intentId) {
             const visitKey = this.pendingNetworkScenarioEnter.visitKey;
             this.pendingNetworkScenarioEnter = null;
@@ -2354,12 +2346,7 @@ export class WorldEngine {
     private submitNetworkMoveIntent(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean {
         const intentId = this.sendNetworkIntent(actor.id, 'move', { tile, path, apCost, pathCost }, { requireOpen: false });
         if (!intentId) return false;
-        this.pendingNetworkMoveReopen = { intentId, actorId: actor.id, tile: { ...tile } };
-        this.networkMovePathPreview = {
-            actorId: actor.id,
-            target: { ...tile },
-            path: path.map((step) => ({ ...step })),
-        };
+        this.getNetworkRaidState().registerPendingMove(intentId, actor.id, tile, path);
         return true;
     }
 
@@ -2940,42 +2927,20 @@ export class WorldEngine {
 
     private getPathPreviewTiles(actor: FieldActor | null): TilePoint[] {
         if (!actor) return [];
-        if (this.networkMovePathPreview?.actorId === actor.id) return this.networkMovePathPreview.path;
-        return actor.path;
+        return this.getNetworkRaidState().getPathPreviewTiles(actor.id, actor.path);
     }
 
     private refreshNetworkMovePathPreview(): void {
-        const preview = this.networkMovePathPreview;
-        if (!preview) return;
-
-        const actor = this.partyActors.find((candidate) => candidate.id === preview.actorId);
-        if (!actor) {
-            this.networkMovePathPreview = null;
-            return;
-        }
-
-        while (preview.path.length > 0 && this.hasEntityReachedPreviewTile(actor, preview.path[0])) {
-            preview.path.shift();
-        }
-        if (preview.path.length === 0) {
-            this.networkMovePathPreview = null;
-            return;
-        }
-
-        const pendingMatches = this.pendingNetworkMoveReopen?.actorId === preview.actorId
-            && this.pendingNetworkMoveReopen.tile.x === preview.target.x
-            && this.pendingNetworkMoveReopen.tile.y === preview.target.y;
-        const atTarget = actor.entity.gridX === preview.target.x && actor.entity.gridY === preview.target.y;
-
-        if (atTarget && !this.isEntityMoving(actor.entity)) {
-            this.networkMovePathPreview = null;
-            return;
-        }
-        if (!pendingMatches && !atTarget) this.networkMovePathPreview = null;
-    }
-
-    private clearNetworkMovePathPreview(actorId: string | null): void {
-        if (!actorId || this.networkMovePathPreview?.actorId === actorId) this.networkMovePathPreview = null;
+        this.getNetworkRaidState().refreshMovePathPreview((actorId) => {
+            const actor = this.partyActors.find((candidate) => candidate.id === actorId);
+            if (!actor) return null;
+            return {
+                id: actor.id,
+                tile: { x: actor.entity.gridX, y: actor.entity.gridY },
+                isMoving: this.isEntityMoving(actor.entity),
+                hasReachedTile: (tile) => this.hasEntityReachedPreviewTile(actor, tile),
+            };
+        });
     }
 
     private hasEntityReachedPreviewTile(actor: FieldActor, tile: TilePoint): boolean {
@@ -2997,17 +2962,10 @@ export class WorldEngine {
     }
 
     private reopenPendingNetworkMoveMenu(ownSnapshots: ActorSnapshot[]): void {
-        const pending = this.pendingNetworkMoveReopen;
+        const snapshotKeys = new Set(ownSnapshots.map((actor) => `${actor.id}:${actor.tile.x},${actor.tile.y}`));
+        const pending = this.getNetworkRaidState().consumePendingMoveReopen(snapshotKeys);
         if (!pending) return;
 
-        const actorSnapshot = ownSnapshots.find((actor) => actor.id === pending.actorId);
-        if (!actorSnapshot) {
-            this.pendingNetworkMoveReopen = null;
-            return;
-        }
-        if (actorSnapshot.tile.x !== pending.tile.x || actorSnapshot.tile.y !== pending.tile.y) return;
-
-        this.pendingNetworkMoveReopen = null;
         const actor = this.partyActors.find((entry) => entry.id === pending.actorId);
         if (!actor || actor.id !== this.activeTurnActorId) return;
         if (this.remainingActionPoints < MIN_FIELD_ACTION_GAUGE_COST) return;

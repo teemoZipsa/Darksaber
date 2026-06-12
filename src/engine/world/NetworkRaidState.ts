@@ -1,7 +1,27 @@
 import { NetworkRaidClient, type NetworkRaidStatus } from '../../net/NetworkRaidClient';
+import type { TilePoint } from '../../field/FieldPathing';
 import type { PlayerIntentKind } from '../../net/WorldProtocol';
 
 export type NetworkRaidCloseReason = 'town' | 'wipe' | 'manual';
+
+export interface PendingNetworkMoveReopen {
+    intentId: string;
+    actorId: string;
+    tile: TilePoint;
+}
+
+export interface NetworkMovePathPreview {
+    actorId: string;
+    target: TilePoint;
+    path: TilePoint[];
+}
+
+export interface NetworkMovePreviewActor {
+    id: string;
+    tile: TilePoint;
+    isMoving: boolean;
+    hasReachedTile(tile: TilePoint): boolean;
+}
 
 export class NetworkRaidState {
     private client: NetworkRaidClient | null = null;
@@ -10,6 +30,8 @@ export class NetworkRaidState {
     private playerIdValue: string | null = null;
     private wasReconnecting = false;
     private readonly enteredDungeonIds = new Set<string>();
+    private pendingMoveReopen: PendingNetworkMoveReopen | null = null;
+    private movePathPreview: NetworkMovePathPreview | null = null;
 
     public getClient(): NetworkRaidClient | null {
         return this.client;
@@ -65,6 +87,72 @@ export class NetworkRaidState {
         return client ? client.sendIntent(actorId, kind, payload) : null;
     }
 
+    public registerPendingMove(intentId: string, actorId: string, tile: TilePoint, path: TilePoint[]): void {
+        this.pendingMoveReopen = { intentId, actorId, tile: { ...tile } };
+        this.movePathPreview = {
+            actorId,
+            target: { ...tile },
+            path: path.map((step) => ({ ...step })),
+        };
+    }
+
+    public consumeRejectedMoveActorId(intentId: string): string | null {
+        if (this.pendingMoveReopen?.intentId !== intentId) return null;
+        const actorId = this.pendingMoveReopen.actorId;
+        this.pendingMoveReopen = null;
+        this.clearMovePathPreview(actorId);
+        return actorId;
+    }
+
+    public getPathPreviewTiles(actorId: string, fallbackPath: TilePoint[]): TilePoint[] {
+        return this.movePathPreview?.actorId === actorId ? this.movePathPreview.path : fallbackPath;
+    }
+
+    public refreshMovePathPreview(resolveActor: (actorId: string) => NetworkMovePreviewActor | null): void {
+        const preview = this.movePathPreview;
+        if (!preview) return;
+        const actor = resolveActor(preview.actorId);
+        if (!actor) {
+            this.movePathPreview = null;
+            return;
+        }
+
+        while (preview.path.length > 0 && actor.hasReachedTile(preview.path[0])) {
+            preview.path.shift();
+        }
+        if (preview.path.length === 0) {
+            this.movePathPreview = null;
+            return;
+        }
+
+        const pendingMatches = this.pendingMoveReopen?.actorId === preview.actorId
+            && this.pendingMoveReopen.tile.x === preview.target.x
+            && this.pendingMoveReopen.tile.y === preview.target.y;
+        const atTarget = actor.tile.x === preview.target.x && actor.tile.y === preview.target.y;
+
+        if (atTarget && !actor.isMoving) {
+            this.movePathPreview = null;
+            return;
+        }
+        if (!pendingMatches && !atTarget) this.movePathPreview = null;
+    }
+
+    public consumePendingMoveReopen(ownActorIdsAtTiles: Set<string>): PendingNetworkMoveReopen | null {
+        const pending = this.pendingMoveReopen;
+        if (!pending) return null;
+        if (!ownActorIdsAtTiles.has(this.pendingMoveKey(pending.actorId, pending.tile))) return null;
+        this.pendingMoveReopen = null;
+        return pending;
+    }
+
+    public clearPendingMoveReopen(actorId: string): void {
+        if (this.pendingMoveReopen?.actorId === actorId) this.pendingMoveReopen = null;
+    }
+
+    private clearMovePathPreview(actorId: string | null): void {
+        if (!actorId || this.movePathPreview?.actorId === actorId) this.movePathPreview = null;
+    }
+
     public closeClient(sendLeave: boolean, reason: NetworkRaidCloseReason = 'manual'): void {
         if (!this.client) return;
         if (sendLeave) this.client.leave(reason);
@@ -87,5 +175,9 @@ export class NetworkRaidState {
         if (!this.active || !this.client) return null;
         if (requireOpen && !this.client.getIsOpen()) return null;
         return this.client;
+    }
+
+    private pendingMoveKey(actorId: string, tile: TilePoint): string {
+        return `${actorId}:${tile.x},${tile.y}`;
     }
 }
