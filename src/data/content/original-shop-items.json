@@ -22,7 +22,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "칼날을 숨길 수 있는 칼로 단도보다 작고 칼이 얇다"
+      "descriptionKr": "칼날을 숨길 수 있는 칼로 단도보다 작고 칼이 얇다",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_65_11",
@@ -46,7 +50,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "마법사용 짧은 지팡이"
+      "descriptionKr": "마법사용 짧은 지팡이",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_65_14",
@@ -70,7 +78,11 @@
       "hitRate": -10,
       "evasion": 0,
       "usableClasses": "보병, 비병, 기병, 수병, 창병, 궁병, 승려, 신관, 마교, 사교",
-      "descriptionKr": "공격력 위주의 단검"
+      "descriptionKr": "공격력 위주의 단검",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_65_15",
@@ -94,7 +106,11 @@
       "hitRate": -10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "일반적으로 사용하는 양날 검"
+      "descriptionKr": "일반적으로 사용하는 양날 검",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_65_22",
@@ -118,7 +134,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "정령의 힘이 깃든 지팡이"
+      "descriptionKr": "정령의 힘이 깃든 지팡이",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_66_01",
@@ -142,7 +162,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "공격 마법을 강화한다(어택마법 LV1UP)"
+      "descriptionKr": "공격 마법을 강화한다(어택마법 LV1UP)",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_02",
@@ -166,7 +190,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "불 계열 마법을 강화한다(파이어볼마법LV1UP)"
+      "descriptionKr": "불 계열 마법을 강화한다(파이어볼마법LV1UP)",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_66_03",
@@ -190,7 +218,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "물 계열 마법을 강화한다(프리즈마법LV1UP)"
+      "descriptionKr": "물 계열 마법을 강화한다(프리즈마법LV1UP)",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_66_04",
@@ -214,7 +246,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "청동제의 레이피어"
+      "descriptionKr": "청동제의 레이피어",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_05",
@@ -238,7 +274,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "청동제의 세이버"
+      "descriptionKr": "청동제의 세이버",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_06",
@@ -262,7 +302,11 @@
       "hitRate": -10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "청동제의 양날검"
+      "descriptionKr": "청동제의 양날검",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_07",
@@ -286,7 +330,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "철제의 레이피어"
+      "descriptionKr": "철제의 레이피어",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_08",
@@ -310,7 +358,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "철제의 세이버"
+      "descriptionKr": "철제의 세이버",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_09",
@@ -334,7 +386,11 @@
       "hitRate": -10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "철제의 양날검"
+      "descriptionKr": "철제의 양날검",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_10",
@@ -358,7 +414,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "은제의 레이피어"
+      "descriptionKr": "은제의 레이피어",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_11",
@@ -382,7 +442,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "은제의 세이버"
+      "descriptionKr": "은제의 세이버",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_12",
@@ -406,7 +470,11 @@
       "hitRate": -10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "은제의 양날검"
+      "descriptionKr": "은제의 양날검",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_14",
@@ -430,7 +498,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "비병, 기병, 창병",
-      "descriptionKr": "청동제의 랜스"
+      "descriptionKr": "청동제의 랜스",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_66_16",
@@ -454,7 +526,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "비병, 기병, 창병",
-      "descriptionKr": "철제의 스피어"
+      "descriptionKr": "철제의 스피어",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_66_18",
@@ -478,7 +554,11 @@
       "hitRate": -10,
       "evasion": 0,
       "usableClasses": "비병, 기병, 창병",
-      "descriptionKr": "철제의 할버트"
+      "descriptionKr": "철제의 할버트",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_66_19",
@@ -502,7 +582,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "비병, 기병, 창병",
-      "descriptionKr": "은제의 스피어"
+      "descriptionKr": "은제의 스피어",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_66_22",
@@ -526,7 +610,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "청동제의 활"
+      "descriptionKr": "청동제의 활",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_66_23",
@@ -550,7 +638,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "청동제의 석궁"
+      "descriptionKr": "청동제의 석궁",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_66_24",
@@ -574,7 +666,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "철제의 활"
+      "descriptionKr": "철제의 활",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_66_25",
@@ -598,7 +694,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "철제의 석궁"
+      "descriptionKr": "철제의 석궁",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_66_26",
@@ -622,7 +722,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "은제의 활"
+      "descriptionKr": "은제의 활",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_66_27",
@@ -646,7 +750,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "은데의 석궁"
+      "descriptionKr": "은데의 석궁",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_66_28",
@@ -670,7 +778,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "청동제의 로드"
+      "descriptionKr": "청동제의 로드",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_66_29",
@@ -694,7 +806,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "청동제의 스태프"
+      "descriptionKr": "청동제의 스태프",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_66_30",
@@ -718,7 +834,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "청동제의 완드"
+      "descriptionKr": "청동제의 완드",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_66_31",
@@ -742,7 +862,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "철제의 로드"
+      "descriptionKr": "철제의 로드",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_66_32",
@@ -766,7 +890,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "철제의 스태프"
+      "descriptionKr": "철제의 스태프",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_66_33",
@@ -790,7 +918,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "철제의 완드"
+      "descriptionKr": "철제의 완드",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_66_34",
@@ -814,7 +946,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "은제의 로드"
+      "descriptionKr": "은제의 로드",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_66_35",
@@ -838,7 +974,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "은제의 스태프"
+      "descriptionKr": "은제의 스태프",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_66_36",
@@ -862,7 +1002,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "은제의 완드"
+      "descriptionKr": "은제의 완드",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_66_37",
@@ -886,7 +1030,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "칼날의 끝이 휘어 있는 단검, 칼날이 매우 두껍다"
+      "descriptionKr": "칼날의 끝이 휘어 있는 단검, 칼날이 매우 두껍다",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_38",
@@ -910,7 +1058,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "칼날의 끝이 휘어 있는 단검, 칼날이 매우 두껍다"
+      "descriptionKr": "칼날의 끝이 휘어 있는 단검, 칼날이 매우 두껍다",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_39",
@@ -934,7 +1086,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "칼날의 끝이 휘어 있는 단검, 칼날이 매우 두껍다"
+      "descriptionKr": "칼날의 끝이 휘어 있는 단검, 칼날이 매우 두껍다",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_43",
@@ -958,7 +1114,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "얼음의 정령이 깃든 검, 상대를 얼리는 효과가 있다."
+      "descriptionKr": "얼음의 정령이 깃든 검, 상대를 얼리는 효과가 있다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_44",
@@ -982,7 +1142,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "얼음의 정령이 깃든 검, 상대를 얼리는 효과가 있다."
+      "descriptionKr": "얼음의 정령이 깃든 검, 상대를 얼리는 효과가 있다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_45",
@@ -1006,7 +1170,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "얼음의 정령이 깃든 검, 상대를 얼리는 효과가 있다."
+      "descriptionKr": "얼음의 정령이 깃든 검, 상대를 얼리는 효과가 있다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_46",
@@ -1030,7 +1198,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "번개의 정령이 깃든 검, 상대를 감전시킨다."
+      "descriptionKr": "번개의 정령이 깃든 검, 상대를 감전시킨다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_47",
@@ -1054,7 +1226,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "번개의 정령이 깃든 검, 상대를 감전시킨다."
+      "descriptionKr": "번개의 정령이 깃든 검, 상대를 감전시킨다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_48",
@@ -1078,7 +1254,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "번개의 정령이 깃든 검, 상대를 감전시킨다."
+      "descriptionKr": "번개의 정령이 깃든 검, 상대를 감전시킨다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_49",
@@ -1102,7 +1282,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "드래곤의 뼈로 만들어진 검, 두꺼운 드래곤의 피부를 뚫을 수 있는 검이다."
+      "descriptionKr": "드래곤의 뼈로 만들어진 검, 두꺼운 드래곤의 피부를 뚫을 수 있는 검이다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_50",
@@ -1126,7 +1310,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "드래곤의 뼈로 만들어진 검, 두꺼운 드래곤의 피부를 뚫을 수 있는 검이다."
+      "descriptionKr": "드래곤의 뼈로 만들어진 검, 두꺼운 드래곤의 피부를 뚫을 수 있는 검이다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_51",
@@ -1150,7 +1338,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "드래곤의 뼈로 만들어진 검, 두꺼운 드래곤의 피부를 뚫을 수 있는 검이다."
+      "descriptionKr": "드래곤의 뼈로 만들어진 검, 두꺼운 드래곤의 피부를 뚫을 수 있는 검이다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_66_52",
@@ -1174,7 +1366,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "비병, 기병, 창병",
-      "descriptionKr": "공격받은 적을 독에 중독시키는 창"
+      "descriptionKr": "공격받은 적을 독에 중독시키는 창",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_66_53",
@@ -1198,7 +1394,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "비병, 기병, 창병",
-      "descriptionKr": "공격받은 적을 독에 중독시키는 창"
+      "descriptionKr": "공격받은 적을 독에 중독시키는 창",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_66_54",
@@ -1222,7 +1422,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "비병, 기병, 창병",
-      "descriptionKr": "공격받은 적을 독에 중독시키는 창"
+      "descriptionKr": "공격받은 적을 독에 중독시키는 창",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_66_55",
@@ -1246,7 +1450,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "물질의 구성요소를 근본적으로 파괴하는 힘을 지닌 마의 지팡이"
+      "descriptionKr": "물질의 구성요소를 근본적으로 파괴하는 힘을 지닌 마의 지팡이",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_66_56",
@@ -1270,7 +1478,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "물질의 구성요소를 근본적으로 파괴하는 힘을 지닌 마의 지팡이"
+      "descriptionKr": "물질의 구성요소를 근본적으로 파괴하는 힘을 지닌 마의 지팡이",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_66_57",
@@ -1294,7 +1506,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "물질의 구성요소를 근본적으로 파괴하는 힘을 지닌 마의 지팡이"
+      "descriptionKr": "물질의 구성요소를 근본적으로 파괴하는 힘을 지닌 마의 지팡이",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_67_01",
@@ -1318,7 +1534,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "비병, 기병, 창병",
-      "descriptionKr": "미스릴로 제작된 스피어"
+      "descriptionKr": "미스릴로 제작된 스피어",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_67_02",
@@ -1342,7 +1562,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병 비병 기병 수병 창병",
-      "descriptionKr": "미스릴로 만들어진 방패"
+      "descriptionKr": "미스릴로 만들어진 방패",
+      "gridW": 2,
+      "gridH": 2,
+      "icon": "🛡️",
+      "color": "#8aa0b8"
     },
     {
       "id": "web_67_03",
@@ -1366,7 +1590,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "미스릴로 제작된 레이피어"
+      "descriptionKr": "미스릴로 제작된 레이피어",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_04",
@@ -1390,7 +1618,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "미스릴로 제작된 세이버"
+      "descriptionKr": "미스릴로 제작된 세이버",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_05",
@@ -1414,7 +1646,11 @@
       "hitRate": -10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "미스릴로 제작된 양날검"
+      "descriptionKr": "미스릴로 제작된 양날검",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_06",
@@ -1438,7 +1674,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "금으로 도금된 레이피어"
+      "descriptionKr": "금으로 도금된 레이피어",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_07",
@@ -1462,7 +1702,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "금으로 도금된 세이버"
+      "descriptionKr": "금으로 도금된 세이버",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_08",
@@ -1486,7 +1730,11 @@
       "hitRate": -10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "금으로 도금된 양날검"
+      "descriptionKr": "금으로 도금된 양날검",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_09",
@@ -1510,7 +1758,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "비병, 기병, 창병",
-      "descriptionKr": "미스릴로 제작된 랜스"
+      "descriptionKr": "미스릴로 제작된 랜스",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_67_10",
@@ -1534,7 +1786,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "비병, 기병, 창병",
-      "descriptionKr": "미스릴로 제작된 할버트"
+      "descriptionKr": "미스릴로 제작된 할버트",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_67_12",
@@ -1558,7 +1814,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "비병, 기병, 창병",
-      "descriptionKr": "금으로 도금된 랜스"
+      "descriptionKr": "금으로 도금된 랜스",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_67_13",
@@ -1582,7 +1842,11 @@
       "hitRate": -10,
       "evasion": 0,
       "usableClasses": "비병, 기병, 창병",
-      "descriptionKr": "금으로 도금된 할버트"
+      "descriptionKr": "금으로 도금된 할버트",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_67_14",
@@ -1606,7 +1870,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "미스릴로 제작된 활"
+      "descriptionKr": "미스릴로 제작된 활",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_67_15",
@@ -1630,7 +1898,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "미스릴로 제작된 석궁"
+      "descriptionKr": "미스릴로 제작된 석궁",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_67_16",
@@ -1654,7 +1926,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "금으로 도금된 활"
+      "descriptionKr": "금으로 도금된 활",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_67_17",
@@ -1678,7 +1954,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "금으로 도금된 석궁"
+      "descriptionKr": "금으로 도금된 석궁",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_67_18",
@@ -1702,7 +1982,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "미스릴로 제작된 로드"
+      "descriptionKr": "미스릴로 제작된 로드",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_67_19",
@@ -1726,7 +2010,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "미스릴로 제작된 스태프"
+      "descriptionKr": "미스릴로 제작된 스태프",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_67_20",
@@ -1750,7 +2038,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "미스릴로 제작된 완드"
+      "descriptionKr": "미스릴로 제작된 완드",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_67_21",
@@ -1774,7 +2066,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "금으로 제작된 로드"
+      "descriptionKr": "금으로 제작된 로드",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_67_22",
@@ -1798,7 +2094,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "금으로 제작된 스태프"
+      "descriptionKr": "금으로 제작된 스태프",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_67_23",
@@ -1822,7 +2122,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "금으로 제작된 완드"
+      "descriptionKr": "금으로 제작된 완드",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_67_24",
@@ -1846,7 +2150,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "별의 힘을 받은 검"
+      "descriptionKr": "별의 힘을 받은 검",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_25",
@@ -1870,7 +2178,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "별의 힘을 받은 검"
+      "descriptionKr": "별의 힘을 받은 검",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_28",
@@ -1894,7 +2206,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "얼음의 정령이 깃든 검, 상대를 얼리는 효과가 있다."
+      "descriptionKr": "얼음의 정령이 깃든 검, 상대를 얼리는 효과가 있다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_29",
@@ -1918,7 +2234,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "얼음의 정령이 깃든 검, 상대를 얼리는 효과가 있다."
+      "descriptionKr": "얼음의 정령이 깃든 검, 상대를 얼리는 효과가 있다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_30",
@@ -1942,7 +2262,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "금속류를 파괴할 수 있어 장갑이 두꺼운 적에게 강한 효과를 자랑한다."
+      "descriptionKr": "금속류를 파괴할 수 있어 장갑이 두꺼운 적에게 강한 효과를 자랑한다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_31",
@@ -1966,7 +2290,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "금속류를 파괴할 수 있어 장갑이 두꺼운 적에게 강한 효과를 자랑한다."
+      "descriptionKr": "금속류를 파괴할 수 있어 장갑이 두꺼운 적에게 강한 효과를 자랑한다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_32",
@@ -1990,7 +2318,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "세이버의 강화형, 날이 약간 두껍다."
+      "descriptionKr": "세이버의 강화형, 날이 약간 두껍다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_33",
@@ -2014,7 +2346,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "세이버의 강화형, 날이 약간 두껍다."
+      "descriptionKr": "세이버의 강화형, 날이 약간 두껍다.",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_34",
@@ -2038,7 +2374,11 @@
       "hitRate": -10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "공격시 적의 체력을 빼앗아 자신의 것으로 만드는 검"
+      "descriptionKr": "공격시 적의 체력을 빼앗아 자신의 것으로 만드는 검",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_35",
@@ -2062,7 +2402,11 @@
       "hitRate": -10,
       "evasion": 0,
       "usableClasses": "보병, 수병",
-      "descriptionKr": "공격시 적의 체력을 빼앗아 자신의 것으로 만드는 검"
+      "descriptionKr": "공격시 적의 체력을 빼앗아 자신의 것으로 만드는 검",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_67_36",
@@ -2086,7 +2430,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "높은 명중률을 자랑하는 암살자용 활"
+      "descriptionKr": "높은 명중률을 자랑하는 암살자용 활",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_67_37",
@@ -2110,7 +2458,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "높은 명중률을 자랑하는 암살자용 활"
+      "descriptionKr": "높은 명중률을 자랑하는 암살자용 활",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_67_38",
@@ -2134,7 +2486,11 @@
       "hitRate": 20,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "엘프들이 사용하는 석궁, 가볍고 빠르게 쏠 수 있다."
+      "descriptionKr": "엘프들이 사용하는 석궁, 가볍고 빠르게 쏠 수 있다.",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_67_39",
@@ -2158,7 +2514,11 @@
       "hitRate": 20,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "엘프들이 사용하는 석궁, 가볍고 빠르게 쏠 수 있다."
+      "descriptionKr": "엘프들이 사용하는 석궁, 가볍고 빠르게 쏠 수 있다.",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_67_40",
@@ -2182,7 +2542,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "궁병",
-      "descriptionKr": "번개의 힘이 깃든 활, 번개의 힘을 사용할 수 있다."
+      "descriptionKr": "번개의 힘이 깃든 활, 번개의 힘을 사용할 수 있다.",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_67_41",
@@ -2206,7 +2570,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "정령의 힘이 깃든 지팡이"
+      "descriptionKr": "정령의 힘이 깃든 지팡이",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_67_42",
@@ -2230,7 +2598,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "정령의 힘이 깃든 지팡이"
+      "descriptionKr": "정령의 힘이 깃든 지팡이",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_67_43",
@@ -2254,7 +2626,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "정령의 축복을 받은 완드, 치료의 힘을 지닌다."
+      "descriptionKr": "정령의 축복을 받은 완드, 치료의 힘을 지닌다.",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_67_44",
@@ -2278,7 +2654,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "정령의 축복을 받은 완드, 치료의 힘을 지닌다."
+      "descriptionKr": "정령의 축복을 받은 완드, 치료의 힘을 지닌다.",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_68_03",
@@ -2302,7 +2682,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "보병, 비병, 기병",
-      "descriptionKr": "바위도 부서버릴 수 있는 파괴력을 지닌 검"
+      "descriptionKr": "바위도 부서버릴 수 있는 파괴력을 지닌 검",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_68_04",
@@ -2326,7 +2710,11 @@
       "hitRate": -10,
       "evasion": 0,
       "usableClasses": "보병, 비병, 기병",
-      "descriptionKr": "옛 성인 가리디안이 마계를 봉인하기 위하여 사용했던 창"
+      "descriptionKr": "옛 성인 가리디안이 마계를 봉인하기 위하여 사용했던 창",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_68_07",
@@ -2350,7 +2738,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "수병, 창병, 궁병",
-      "descriptionKr": "브르고스궁에서 전설적으로 내려오는 신궁"
+      "descriptionKr": "브르고스궁에서 전설적으로 내려오는 신궁",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_68_08",
@@ -2374,7 +2766,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "토네이도 마법을 구사하는 지팡이"
+      "descriptionKr": "토네이도 마법을 구사하는 지팡이",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_68_09",
@@ -2398,7 +2794,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "빠른 속도와 정확한 명중률을 지닌 지팡이"
+      "descriptionKr": "빠른 속도와 정확한 명중률을 지닌 지팡이",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_69_01",
@@ -2422,7 +2822,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "보병, 비병, 기병",
-      "descriptionKr": "9단계 검"
+      "descriptionKr": "9단계 검",
+      "gridW": 1,
+      "gridH": 3,
+      "icon": "🗡️",
+      "color": "#b8a48c"
     },
     {
       "id": "web_69_03",
@@ -2446,7 +2850,11 @@
       "hitRate": 10,
       "evasion": 0,
       "usableClasses": "수병, 창병, 궁병",
-      "descriptionKr": "9단계 활"
+      "descriptionKr": "9단계 활",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_69_04",
@@ -2470,7 +2878,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "수병, 창병, 궁병",
-      "descriptionKr": "9단계 활"
+      "descriptionKr": "9단계 활",
+      "gridW": 2,
+      "gridH": 3,
+      "icon": "🏹",
+      "color": "#b9873c"
     },
     {
       "id": "web_69_05",
@@ -2494,7 +2906,11 @@
       "hitRate": 5,
       "evasion": 0,
       "usableClasses": "보병, 비병, 기병, 수병, 창병, 궁병",
-      "descriptionKr": "9단계 창"
+      "descriptionKr": "9단계 창",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_69_06",
@@ -2518,7 +2934,11 @@
       "hitRate": -10,
       "evasion": 0,
       "usableClasses": "보병, 비병, 기병, 수병, 창병, 궁병",
-      "descriptionKr": "9단계 창"
+      "descriptionKr": "9단계 창",
+      "gridW": 1,
+      "gridH": 5,
+      "icon": "🔱",
+      "color": "#9da8b4"
     },
     {
       "id": "web_69_07",
@@ -2542,7 +2962,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "9단계 지팡이"
+      "descriptionKr": "9단계 지팡이",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     },
     {
       "id": "web_69_08",
@@ -2566,7 +2990,11 @@
       "hitRate": 0,
       "evasion": 0,
       "usableClasses": "승려, 신관, 마교, 사교",
-      "descriptionKr": "9단계 지팡이"
+      "descriptionKr": "9단계 지팡이",
+      "gridW": 1,
+      "gridH": 4,
+      "icon": "🪄",
+      "color": "#8b5ed7"
     }
   ],
   "townItemIds": {
@@ -2687,5 +3115,13 @@
       "web_69_07",
       "web_69_08"
     ]
+  },
+  "descriptionLabels": {
+    "requiredLevel": "장착레벨",
+    "attackRange": "공격범위",
+    "magicRange": "마법범위",
+    "hitRate": "명중률",
+    "evasion": "회피율",
+    "usableClasses": "사용가능"
   }
 }
