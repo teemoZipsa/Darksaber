@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { dirname } from 'node:path';
 import {
     advanceMarketCycle,
@@ -155,12 +156,8 @@ export class ServerMarketSession {
     }
 
     private loadSnapshot(): MarketSnapshot {
-        if (!this.persistPath || !existsSync(this.persistPath)) return createDefaultMarketSnapshot();
-        try {
-            return normalizeMarketSnapshot(JSON.parse(readFileSync(this.persistPath, 'utf8')));
-        } catch {
-            return createDefaultMarketSnapshot();
-        }
+        if (!this.persistPath) return createDefaultMarketSnapshot();
+        return readMarketSnapshot(this.persistPath) ?? readMarketSnapshot(backupPath(this.persistPath)) ?? createDefaultMarketSnapshot();
     }
 
     private scheduleSave(): void {
@@ -174,8 +171,38 @@ export class ServerMarketSession {
     private saveNow(): void {
         if (!this.persistPath) return;
         mkdirSync(dirname(this.persistPath), { recursive: true });
-        writeFileSync(this.persistPath, JSON.stringify(this.snapshot, null, 2), 'utf8');
+        writeFileAtomically(this.persistPath, JSON.stringify(this.snapshot, null, 2));
     }
+}
+
+function readMarketSnapshot(path: string): MarketSnapshot | null {
+    if (!existsSync(path)) return null;
+    try {
+        return normalizeMarketSnapshot(JSON.parse(readFileSync(path, 'utf8')));
+    } catch {
+        return null;
+    }
+}
+
+function writeFileAtomically(persistPath: string, contents: string): void {
+    const tmpPath = `${persistPath}.tmp-${process.pid}-${Date.now()}-${randomBytes(4).toString('hex')}`;
+    try {
+        writeFileSync(tmpPath, contents, 'utf8');
+        if (existsSync(persistPath)) {
+            try {
+                copyFileSync(persistPath, backupPath(persistPath));
+            } catch {
+                // Best-effort only; the atomic rename below is the authoritative write.
+            }
+        }
+        renameSync(tmpPath, persistPath);
+    } finally {
+        rmSync(tmpPath, { force: true });
+    }
+}
+
+function backupPath(persistPath: string): string {
+    return `${persistPath}.bak`;
 }
 
 function tradeGoodIds(): string[] {
