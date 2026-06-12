@@ -1,0 +1,328 @@
+{
+  "23": {
+    "dungeonId": "beelzebuth_hall",
+    "setArc": "MAP/23set.arc",
+    "aiMember": "23.ai",
+    "eventMember": "23.evt",
+    "deoMember": "23.DEO",
+    "deeMember": "23.DEE",
+    "bossArea": { "char": 700, "x": 19, "y": 28, "radius": 15 },
+    "staging": [
+      { "char": 700, "x": 21, "y": 15 },
+      { "char": 701, "x": 18, "y": 15 }
+    ],
+    "guardAreas": [
+      { "char": 400, "x": 13, "y": 6, "radius": 10 },
+      { "char": 410, "x": 11, "y": 10, "radius": 10 },
+      { "char": 420, "x": 26, "y": 6, "radius": 10 },
+      { "char": 430, "x": 28, "y": 10, "radius": 20 },
+      { "char": 440, "x": 13, "y": 34, "radius": 20 },
+      { "char": 450, "x": 26, "y": 34, "radius": 20 },
+      { "char": 460, "x": 11, "y": 31, "radius": 20 },
+      { "char": 470, "x": 28, "y": 31, "radius": 20 },
+      { "char": 480, "x": 5, "y": 14, "radius": 15 },
+      { "char": 490, "x": 15, "y": 10, "radius": 15 },
+      { "char": 500, "x": 24, "y": 10, "radius": 15 },
+      { "char": 510, "x": 19, "y": 11, "radius": 15 },
+      { "char": 520, "x": 5, "y": 27, "radius": 15 },
+      { "char": 530, "x": 15, "y": 30, "radius": 15 },
+      { "char": 540, "x": 24, "y": 30, "radius": 10 },
+      { "char": 550, "x": 11, "y": 25, "radius": 10 },
+      { "char": 560, "x": 10, "y": 15, "radius": 10 },
+      { "char": 570, "x": 28, "y": 14, "radius": 10 },
+      { "char": 580, "x": 14, "y": 18, "radius": 10 },
+      { "char": 590, "x": 24, "y": 18, "radius": 10 },
+      { "char": 600, "x": 19, "y": 17, "radius": 10 },
+      { "char": 610, "x": 29, "y": 25, "radius": 10 },
+      { "char": 620, "x": 19, "y": 24, "radius": 10 }
+    ],
+    "cacheEvents": [
+      { "eventNumber": 91, "x": 19, "y": 19, "originalItemId": 1005, "currentItemId": "web_66_51" },
+      { "eventNumber": 92, "x": 15, "y": 27, "originalItemId": 1052, "currentItemId": "void_crystal" },
+      { "eventNumber": 93, "x": 15, "y": 27, "originalItemId": 986, "currentItemId": "magic_t6_body" },
+      { "eventNumber": 94, "x": 15, "y": 27, "originalItemId": 1010, "currentItemId": "shadow_cloak" }
+    ]
+  },
+  "24": {
+    "dungeonId": "astaroth_gate",
+    "setArc": "MAP/24set.arc",
+    "aiMember": "24.ai",
+    "eventMember": "24.evt",
+    "deoMember": "24.DEO",
+    "deeMember": "24.DEE",
+    "bossArea": { "char": 700, "x": 19, "y": 14, "radius": 10 },
+    "staging": [
+      { "char": 700, "x": 19, "y": 7 }
+    ],
+    "guardAreas": [
+      { "char": 400, "x": 8, "y": 31, "radius": 10 },
+      { "char": 410, "x": 15, "y": 33, "radius": 10 },
+      { "char": 420, "x": 19, "y": 33, "radius": 10 },
+      { "char": 430, "x": 23, "y": 33, "radius": 10 },
+      { "char": 440, "x": 31, "y": 31, "radius": 10 },
+      { "char": 450, "x": 13, "y": 29, "radius": 10 },
+      { "char": 460, "x": 26, "y": 29, "radius": 10 },
+      { "char": 470, "x": 20, "y": 26, "radius": 20 },
+      { "char": 480, "x": 20, "y": 22, "radius": 10 },
+      { "char": 490, "x": 24, "y": 19, "radius": 10 },
+      { "char": 500, "x": 15, "y": 19, "radius": 10 },
+      { "char": 510, "x": 8, "y": 14, "radius": 15 },
+      { "char": 520, "x": 31, "y": 14, "radius": 15 },
+      { "char": 530, "x": 13, "y": 15, "radius": 15 },
+      { "char": 540, "x": 26, "y": 15, "radius": 15 },
+      { "char": 550, "x": 19, "y": 9, "radius": 10 }
+    ],
+    "cacheEvents": [
+      { "eventNumber": 91, "x": 16, "y": 26, "originalItemId": 980, "currentItemId": "web_66_51" },
+      { "eventNumber": 92, "x": 27, "y": 11, "originalItemId": 992, "currentItemId": "void_crystal" },
+      { "eventNumber": 93, "x": 27, "y": 11, "originalItemId": 997, "currentItemId": "magic_t6_body" },
+      { "eventNumber": 94, "x": 27, "y": 11, "originalItemId": 1002, "currentItemId": "shadow_cloak" }
+    ]
+  },
+  "25": {
+    "dungeonId": "nergal_depths",
+    "setArc": "MAP/25set.arc",
+    "aiMember": "25.ai",
+    "eventMember": "25.evt",
+    "deoMember": "25.DEO",
+    "deeMember": "25.DEE",
+    "bossArea": { "char": 700, "x": 19, "y": 6, "radius": 8 },
+    "staging": [
+      { "char": 700, "x": 19, "y": 7 },
+      { "char": 0, "x": 19, "y": 23 }
+    ],
+    "guardAreas": [
+      { "char": 400, "x": 14, "y": 32, "radius": 8 },
+      { "char": 410, "x": 25, "y": 32, "radius": 8 },
+      { "char": 420, "x": 20, "y": 32, "radius": 8 },
+      { "char": 430, "x": 14, "y": 28, "radius": 8 },
+      { "char": 440, "x": 25, "y": 28, "radius": 8 },
+      { "char": 450, "x": 20, "y": 28, "radius": 8 },
+      { "char": 460, "x": 6, "y": 23, "radius": 8 },
+      { "char": 470, "x": 32, "y": 23, "radius": 8 },
+      { "char": 480, "x": 37, "y": 28, "radius": 8 },
+      { "char": 490, "x": 37, "y": 33, "radius": 8 },
+      { "char": 500, "x": 37, "y": 37, "radius": 8 },
+      { "char": 510, "x": 2, "y": 28, "radius": 8 },
+      { "char": 520, "x": 2, "y": 33, "radius": 8 },
+      { "char": 530, "x": 2, "y": 37, "radius": 8 },
+      { "char": 540, "x": 19, "y": 22, "radius": 8 },
+      { "char": 550, "x": 6, "y": 17, "radius": 8 },
+      { "char": 560, "x": 2, "y": 20, "radius": 8 },
+      { "char": 570, "x": 2, "y": 9, "radius": 8 },
+      { "char": 580, "x": 2, "y": 14, "radius": 8 },
+      { "char": 590, "x": 37, "y": 9, "radius": 8 },
+      { "char": 600, "x": 37, "y": 14, "radius": 8 },
+      { "char": 610, "x": 37, "y": 20, "radius": 8 },
+      { "char": 620, "x": 33, "y": 17, "radius": 8 },
+      { "char": 630, "x": 16, "y": 15, "radius": 8 },
+      { "char": 640, "x": 23, "y": 15, "radius": 8 },
+      { "char": 650, "x": 19, "y": 18, "radius": 8 },
+      { "char": 660, "x": 19, "y": 11, "radius": 8 },
+      { "char": 670, "x": 15, "y": 6, "radius": 8 },
+      { "char": 680, "x": 24, "y": 6, "radius": 8 }
+    ],
+    "cacheEvents": [
+      { "eventNumber": 91, "x": 12, "y": 18, "originalItemId": 1030, "currentItemId": "web_66_51" },
+      { "eventNumber": 92, "x": 12, "y": 32, "originalItemId": 1007, "currentItemId": "void_crystal" },
+      { "eventNumber": 93, "x": 12, "y": 32, "originalItemId": 1027, "currentItemId": "magic_t6_body" },
+      { "eventNumber": 94, "x": 12, "y": 32, "originalItemId": 1010, "currentItemId": "shadow_cloak" }
+    ]
+  },
+  "26": {
+    "dungeonId": "beast_mark_shrine",
+    "setArc": "MAP/26set.arc",
+    "aiMember": "26.ai",
+    "eventMember": "26.evt",
+    "deoMember": null,
+    "deeMember": null,
+    "bossArea": { "char": 700, "x": 36, "y": 3, "radius": 8 },
+    "staging": [],
+    "guardAreas": [
+      { "char": 400, "x": 5, "y": 17, "radius": 8 },
+      { "char": 410, "x": 17, "y": 16, "radius": 8 },
+      { "char": 420, "x": 28, "y": 16, "radius": 8 },
+      { "char": 430, "x": 11, "y": 23, "radius": 8 },
+      { "char": 440, "x": 36, "y": 26, "radius": 8 },
+      { "char": 450, "x": 10, "y": 30, "radius": 8 },
+      { "char": 460, "x": 25, "y": 30, "radius": 8 },
+      { "char": 470, "x": 23, "y": 21, "radius": 8 },
+      { "char": 480, "x": 4, "y": 3, "radius": 8 },
+      { "char": 490, "x": 10, "y": 7, "radius": 8 },
+      { "char": 500, "x": 18, "y": 2, "radius": 8 },
+      { "char": 510, "x": 28, "y": 5, "radius": 8 }
+    ],
+    "cacheEvents": [
+      { "eventNumber": 92, "x": 15, "y": 21, "originalItemId": 1168, "currentItemId": "void_crystal" }
+    ]
+  },
+  "27": {
+    "dungeonId": "chosen_mark_shrine",
+    "setArc": "MAP/27set.arc",
+    "aiMember": "27.ai",
+    "eventMember": "27.evt",
+    "deoMember": null,
+    "deeMember": null,
+    "bossArea": { "char": 700, "x": 20, "y": 16, "radius": 8 },
+    "staging": [],
+    "guardAreas": [
+      { "char": 400, "x": 17, "y": 22, "radius": 8 },
+      { "char": 410, "x": 4, "y": 19, "radius": 8 },
+      { "char": 420, "x": 10, "y": 16, "radius": 8 },
+      { "char": 430, "x": 26, "y": 23, "radius": 8 },
+      { "char": 440, "x": 30, "y": 17, "radius": 8 },
+      { "char": 450, "x": 24, "y": 9, "radius": 8 },
+      { "char": 460, "x": 16, "y": 3, "radius": 8 },
+      { "char": 470, "x": 5, "y": 6, "radius": 8 },
+      { "char": 480, "x": 34, "y": 4, "radius": 8 },
+      { "char": 490, "x": 36, "y": 26, "radius": 8 },
+      { "char": 500, "x": 36, "y": 14, "radius": 8 },
+      { "char": 510, "x": 22, "y": 2, "radius": 8 }
+    ],
+    "cacheEvents": [
+      { "eventNumber": 92, "x": 16, "y": 6, "originalItemId": 1169, "currentItemId": "void_crystal" },
+      { "eventNumber": 93, "x": 31, "y": 17, "originalItemId": 1170, "currentItemId": "magic_t6_body" }
+    ]
+  },
+  "28": {
+    "dungeonId": "ergion_keep",
+    "setArc": "MAP/28set.arc",
+    "aiMember": "28.ai",
+    "eventMember": "28.evt",
+    "deoMember": "28.DEO",
+    "deeMember": "28.DEE",
+    "bossArea": { "char": 700, "x": 19, "y": 10, "radius": 8 },
+    "staging": [
+      { "char": 700, "x": 19, "y": 7 },
+      { "char": 701, "x": 19, "y": 13 }
+    ],
+    "guardAreas": [
+      { "char": 400, "x": 12, "y": 28, "radius": 8 },
+      { "char": 410, "x": 12, "y": 23, "radius": 8 },
+      { "char": 420, "x": 12, "y": 18, "radius": 8 },
+      { "char": 430, "x": 12, "y": 12, "radius": 8 },
+      { "char": 440, "x": 4, "y": 11, "radius": 8 },
+      { "char": 450, "x": 6, "y": 31, "radius": 8 },
+      { "char": 460, "x": 33, "y": 31, "radius": 8 },
+      { "char": 470, "x": 27, "y": 28, "radius": 8 },
+      { "char": 480, "x": 27, "y": 23, "radius": 8 },
+      { "char": 490, "x": 27, "y": 18, "radius": 8 },
+      { "char": 500, "x": 29, "y": 12, "radius": 8 },
+      { "char": 510, "x": 35, "y": 11, "radius": 8 },
+      { "char": 520, "x": 13, "y": 5, "radius": 8 },
+      { "char": 530, "x": 26, "y": 5, "radius": 8 },
+      { "char": 540, "x": 19, "y": 15, "radius": 8 },
+      { "char": 550, "x": 19, "y": 24, "radius": 8 },
+      { "char": 560, "x": 19, "y": 31, "radius": 8 }
+    ],
+    "cacheEvents": [
+      { "eventNumber": 91, "x": 6, "y": 16, "originalItemId": 1104, "currentItemId": "web_66_51" },
+      { "eventNumber": 92, "x": 35, "y": 17, "originalItemId": 1108, "currentItemId": "lance" },
+      { "eventNumber": 93, "x": 14, "y": 31, "originalItemId": 1111, "currentItemId": "magic_t6_body" },
+      { "eventNumber": 94, "x": 2, "y": 7, "originalItemId": 1113, "currentItemId": "corrupted_blade" }
+    ]
+  },
+  "29": {
+    "dungeonId": "martani_bastion",
+    "setArc": "MAP/29set.arc",
+    "aiMember": "29.ai",
+    "eventMember": "29.evt",
+    "deoMember": "29.DEO",
+    "deeMember": "29.DEE",
+    "bossArea": { "char": 700, "x": 43, "y": 19, "radius": 8 },
+    "staging": [
+      { "char": 700, "x": 19, "y": 7 },
+      { "char": 701, "x": 19, "y": 13 }
+    ],
+    "guardAreas": [
+      { "char": 400, "x": 19, "y": 8, "radius": 8 },
+      { "char": 410, "x": 12, "y": 12, "radius": 8 },
+      { "char": 420, "x": 11, "y": 26, "radius": 8 },
+      { "char": 430, "x": 20, "y": 30, "radius": 8 },
+      { "char": 440, "x": 20, "y": 20, "radius": 8 },
+      { "char": 450, "x": 31, "y": 20, "radius": 8 },
+      { "char": 460, "x": 40, "y": 11, "radius": 8 },
+      { "char": 470, "x": 41, "y": 28, "radius": 8 },
+      { "char": 480, "x": 48, "y": 20, "radius": 8 },
+      { "char": 490, "x": 22, "y": 14, "radius": 8 },
+      { "char": 500, "x": 26, "y": 35, "radius": 8 },
+      { "char": 510, "x": 39, "y": 16, "radius": 8 },
+      { "char": 520, "x": 39, "y": 23, "radius": 8 }
+    ],
+    "cacheEvents": [
+      { "eventNumber": 91, "x": 35, "y": 13, "originalItemId": 1116, "currentItemId": "web_66_51" },
+      { "eventNumber": 92, "x": 40, "y": 20, "originalItemId": 1125, "currentItemId": "void_crystal" },
+      { "eventNumber": 93, "x": 55, "y": 24, "originalItemId": 1134, "currentItemId": "magic_t6_body" }
+    ]
+  },
+  "30": {
+    "dungeonId": "blin_watch",
+    "setArc": "MAP/30set.arc",
+    "aiMember": "30.ai",
+    "eventMember": "30.evt",
+    "deoMember": "30.DEO",
+    "deeMember": "30.DEE",
+    "bossArea": { "char": 700, "x": 20, "y": 19, "radius": 8 },
+    "staging": [
+      { "char": 700, "x": 19, "y": 7 },
+      { "char": 701, "x": 19, "y": 13 }
+    ],
+    "guardAreas": [
+      { "char": 400, "x": 7, "y": 32, "radius": 8 },
+      { "char": 410, "x": 12, "y": 35, "radius": 8 },
+      { "char": 420, "x": 32, "y": 32, "radius": 8 },
+      { "char": 430, "x": 28, "y": 36, "radius": 8 },
+      { "char": 440, "x": 7, "y": 8, "radius": 8 },
+      { "char": 450, "x": 11, "y": 5, "radius": 8 },
+      { "char": 460, "x": 29, "y": 7, "radius": 8 },
+      { "char": 470, "x": 33, "y": 4, "radius": 8 },
+      { "char": 480, "x": 7, "y": 17, "radius": 8 },
+      { "char": 490, "x": 33, "y": 17, "radius": 8 },
+      { "char": 500, "x": 19, "y": 12, "radius": 8 },
+      { "char": 510, "x": 20, "y": 29, "radius": 8 },
+      { "char": 520, "x": 12, "y": 19, "radius": 8 },
+      { "char": 530, "x": 28, "y": 19, "radius": 8 },
+      { "char": 540, "x": 20, "y": 22, "radius": 8 }
+    ],
+    "cacheEvents": [
+      { "eventNumber": 91, "x": 15, "y": 21, "originalItemId": 1119, "currentItemId": "web_66_51" },
+      { "eventNumber": 92, "x": 33, "y": 25, "originalItemId": 1128, "currentItemId": "void_crystal" },
+      { "eventNumber": 93, "x": 6, "y": 25, "originalItemId": 1137, "currentItemId": "magic_t6_body" },
+      { "eventNumber": 94, "x": 23, "y": 12, "originalItemId": 1143, "currentItemId": "shadow_cloak" }
+    ]
+  },
+  "31": {
+    "dungeonId": "demon_fixers_den",
+    "setArc": "MAP/31set.arc",
+    "aiMember": "31.ai",
+    "eventMember": "31.evt",
+    "deoMember": "31.DEO",
+    "deeMember": "31.DEE",
+    "bossArea": { "char": 700, "x": 22, "y": 11, "radius": 8 },
+    "staging": [
+      { "char": 700, "x": 19, "y": 7 },
+      { "char": 701, "x": 19, "y": 13 }
+    ],
+    "guardAreas": [
+      { "char": 400, "x": 11, "y": 44, "radius": 8 },
+      { "char": 410, "x": 16, "y": 39, "radius": 8 },
+      { "char": 420, "x": 26, "y": 34, "radius": 8 },
+      { "char": 430, "x": 9, "y": 34, "radius": 8 },
+      { "char": 440, "x": 36, "y": 26, "radius": 8 },
+      { "char": 450, "x": 14, "y": 23, "radius": 8 },
+      { "char": 460, "x": 30, "y": 21, "radius": 8 },
+      { "char": 470, "x": 4, "y": 19, "radius": 8 },
+      { "char": 480, "x": 22, "y": 17, "radius": 8 },
+      { "char": 490, "x": 30, "y": 13, "radius": 8 },
+      { "char": 500, "x": 3, "y": 9, "radius": 8 },
+      { "char": 510, "x": 37, "y": 8, "radius": 8 },
+      { "char": 520, "x": 15, "y": 4, "radius": 8 },
+      { "char": 530, "x": 29, "y": 2, "radius": 8 }
+    ],
+    "cacheEvents": [
+      { "eventNumber": 91, "x": 33, "y": 17, "originalItemId": 1122, "currentItemId": "web_66_51" },
+      { "eventNumber": 92, "x": 8, "y": 21, "originalItemId": 1131, "currentItemId": "void_crystal" },
+      { "eventNumber": 93, "x": 21, "y": 17, "originalItemId": 1140, "currentItemId": "magic_t6_body" }
+    ]
+  }
+}

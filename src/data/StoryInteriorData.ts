@@ -1,5 +1,6 @@
 import type { TilePoint } from '../field/FieldPathing';
 import { TILE_PROPERTIES, TileType } from '../map/Tile';
+import { getOriginalLateStoryBossTile, getOriginalLateStoryGuardTiles } from './OriginalLateStoryFacts';
 
 export type StoryInteriorTheme = 'castle' | 'volcano' | 'temple' | 'pyramid' | 'ament';
 export type StoryInteriorPropKind = 'torch' | 'crate' | 'banner' | 'door' | 'sealedDoor' | 'throne' | 'bossSeal' | 'rubble';
@@ -553,73 +554,15 @@ const FLAME_CASTLE_TILE_OVERRIDES: StoryInteriorTileOverride[] = [
     ...horizontalOverrides(27, 15, 24, TileType.ROAD),
 ];
 
-const BEELZEBUTH_HALL_GUARDS: TilePoint[] = [
-    { x: 13, y: 6 }, { x: 11, y: 10 }, { x: 26, y: 6 }, { x: 28, y: 10 },
-    { x: 13, y: 34 }, { x: 26, y: 34 }, { x: 11, y: 31 }, { x: 28, y: 31 },
-    { x: 5, y: 14 }, { x: 15, y: 10 }, { x: 24, y: 10 }, { x: 19, y: 11 },
-    { x: 5, y: 27 }, { x: 15, y: 30 }, { x: 24, y: 30 }, { x: 11, y: 25 },
-    { x: 10, y: 15 }, { x: 28, y: 14 }, { x: 14, y: 18 }, { x: 24, y: 18 },
-    { x: 19, y: 17 }, { x: 29, y: 25 }, { x: 19, y: 24 },
-];
-
-const ASTAROTH_GATE_GUARDS: TilePoint[] = [
-    { x: 8, y: 31 }, { x: 15, y: 33 }, { x: 19, y: 33 }, { x: 23, y: 33 },
-    { x: 31, y: 31 }, { x: 13, y: 29 }, { x: 26, y: 29 }, { x: 20, y: 26 },
-    { x: 20, y: 22 }, { x: 24, y: 19 }, { x: 15, y: 19 }, { x: 8, y: 14 },
-    { x: 31, y: 14 }, { x: 13, y: 15 }, { x: 26, y: 15 }, { x: 19, y: 9 },
-];
-
-const NERGAL_DEPTHS_GUARDS: TilePoint[] = [
-    { x: 14, y: 32 }, { x: 25, y: 32 }, { x: 20, y: 32 }, { x: 14, y: 28 },
-    { x: 25, y: 28 }, { x: 20, y: 28 }, { x: 6, y: 23 }, { x: 32, y: 23 },
-    { x: 37, y: 28 }, { x: 37, y: 33 }, { x: 37, y: 37 }, { x: 2, y: 28 },
-    { x: 2, y: 33 }, { x: 2, y: 37 }, { x: 19, y: 22 }, { x: 6, y: 17 },
-    { x: 2, y: 20 }, { x: 2, y: 9 }, { x: 2, y: 14 }, { x: 37, y: 9 },
-    { x: 37, y: 14 }, { x: 37, y: 20 }, { x: 33, y: 17 }, { x: 16, y: 15 },
-    { x: 23, y: 15 }, { x: 19, y: 18 }, { x: 19, y: 11 }, { x: 15, y: 6 },
-    { x: 24, y: 6 },
-];
-
-const BEAST_MARK_SHRINE_GUARDS: TilePoint[] = [
-    { x: 5, y: 17 }, { x: 17, y: 16 }, { x: 28, y: 16 }, { x: 11, y: 23 },
-    { x: 36, y: 26 }, { x: 10, y: 30 }, { x: 25, y: 30 }, { x: 23, y: 21 },
-    { x: 4, y: 3 }, { x: 10, y: 7 }, { x: 18, y: 2 }, { x: 28, y: 5 },
-];
-
-const CHOSEN_MARK_SHRINE_GUARDS: TilePoint[] = [
-    { x: 17, y: 22 }, { x: 4, y: 19 }, { x: 10, y: 16 }, { x: 26, y: 23 },
-    { x: 30, y: 17 }, { x: 24, y: 9 }, { x: 16, y: 3 }, { x: 5, y: 6 },
-    { x: 34, y: 4 }, { x: 36, y: 26 }, { x: 36, y: 14 }, { x: 22, y: 2 },
-];
-
-const ERGION_KEEP_GUARDS: TilePoint[] = [
-    { x: 12, y: 28 }, { x: 12, y: 23 }, { x: 12, y: 18 }, { x: 12, y: 12 },
-    { x: 4, y: 11 }, { x: 6, y: 31 }, { x: 33, y: 31 }, { x: 27, y: 28 },
-    { x: 27, y: 23 }, { x: 27, y: 18 }, { x: 29, y: 12 }, { x: 35, y: 11 },
-    { x: 13, y: 5 }, { x: 26, y: 5 }, { x: 19, y: 15 }, { x: 19, y: 24 },
-    { x: 19, y: 31 },
-];
-
-const MARTANI_BASTION_GUARDS: TilePoint[] = [
-    { x: 19, y: 8 }, { x: 12, y: 12 }, { x: 11, y: 26 }, { x: 20, y: 30 },
-    { x: 20, y: 20 }, { x: 31, y: 20 }, { x: 40, y: 11 }, { x: 41, y: 28 },
-    { x: 48, y: 20 }, { x: 22, y: 14 }, { x: 26, y: 35 }, { x: 39, y: 16 },
-    { x: 39, y: 23 },
-];
-
-const BLIN_WATCH_GUARDS: TilePoint[] = [
-    { x: 7, y: 32 }, { x: 12, y: 35 }, { x: 32, y: 32 }, { x: 28, y: 36 },
-    { x: 7, y: 8 }, { x: 11, y: 5 }, { x: 29, y: 7 }, { x: 33, y: 4 },
-    { x: 7, y: 17 }, { x: 33, y: 17 }, { x: 19, y: 12 }, { x: 20, y: 29 },
-    { x: 12, y: 19 }, { x: 28, y: 19 }, { x: 20, y: 22 },
-];
-
-const DEMON_FIXERS_DEN_GUARDS: TilePoint[] = [
-    { x: 11, y: 44 }, { x: 16, y: 39 }, { x: 26, y: 34 }, { x: 9, y: 34 },
-    { x: 36, y: 26 }, { x: 14, y: 23 }, { x: 30, y: 21 }, { x: 4, y: 19 },
-    { x: 22, y: 17 }, { x: 30, y: 13 }, { x: 3, y: 9 }, { x: 37, y: 8 },
-    { x: 15, y: 4 }, { x: 29, y: 2 },
-];
+const BEELZEBUTH_HALL_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(23);
+const ASTAROTH_GATE_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(24);
+const NERGAL_DEPTHS_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(25);
+const BEAST_MARK_SHRINE_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(26);
+const CHOSEN_MARK_SHRINE_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(27);
+const ERGION_KEEP_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(28);
+const MARTANI_BASTION_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(29);
+const BLIN_WATCH_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(30);
+const DEMON_FIXERS_DEN_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(31);
 
 interface LateOriginalInteriorConfig {
     dungeonId: string;
@@ -1156,7 +1099,7 @@ const BEELZEBUTH_HALL_LAYOUT = buildLateOriginalInterior({
     theme: 'ament',
     entryTile: { x: 19, y: 38 },
     playerStart: { x: 19, y: 31 },
-    bossTile: { x: 19, y: 28 },
+    bossTile: getOriginalLateStoryBossTile(23),
     guardTiles: BEELZEBUTH_HALL_GUARDS,
     rooms: [
         { id: 'beelzebuthNorthVault', nameKey: 'story.interior.room.beelzebuthNorthVault', x: 10, y: 5, width: 20, height: 10 },
@@ -1180,7 +1123,7 @@ const ASTAROTH_GATE_LAYOUT = buildLateOriginalInterior({
     theme: 'ament',
     entryTile: { x: 19, y: 36 },
     playerStart: { x: 19, y: 33 },
-    bossTile: { x: 19, y: 14 },
+    bossTile: getOriginalLateStoryBossTile(24),
     guardTiles: ASTAROTH_GATE_GUARDS,
     rooms: [
         { id: 'astarothOuterGate', nameKey: 'story.interior.room.astarothOuterGate', x: 7, y: 29, width: 26, height: 7 },
@@ -1201,7 +1144,7 @@ const NERGAL_DEPTHS_LAYOUT = buildLateOriginalInterior({
     theme: 'ament',
     entryTile: { x: 19, y: 38 },
     playerStart: { x: 19, y: 23 },
-    bossTile: { x: 19, y: 6 },
+    bossTile: getOriginalLateStoryBossTile(25),
     guardTiles: NERGAL_DEPTHS_GUARDS,
     rooms: [
         { id: 'nergalDepthsSouth', nameKey: 'story.interior.room.nergalDepthsSouth', x: 1, y: 27, width: 38, height: 12 },
@@ -1223,7 +1166,7 @@ const BEAST_MARK_SHRINE_LAYOUT = buildLateOriginalInterior({
     theme: 'temple',
     entryTile: { x: 15, y: 38 },
     playerStart: { x: 15, y: 37 },
-    bossTile: { x: 36, y: 3 },
+    bossTile: getOriginalLateStoryBossTile(26),
     guardTiles: BEAST_MARK_SHRINE_GUARDS,
     rooms: [
         { id: 'beastMarkSouthSeal', nameKey: 'story.interior.room.beastMarkSouthSeal', x: 2, y: 28, width: 34, height: 10 },
@@ -1243,7 +1186,7 @@ const CHOSEN_MARK_SHRINE_LAYOUT = buildLateOriginalInterior({
     theme: 'temple',
     entryTile: { x: 20, y: 28 },
     playerStart: { x: 20, y: 25 },
-    bossTile: { x: 20, y: 16 },
+    bossTile: getOriginalLateStoryBossTile(27),
     guardTiles: CHOSEN_MARK_SHRINE_GUARDS,
     rooms: [
         { id: 'chosenMarkSouthSeal', nameKey: 'story.interior.room.chosenMarkSouthSeal', x: 3, y: 18, width: 34, height: 9 },
@@ -1264,7 +1207,7 @@ const ERGION_KEEP_LAYOUT = buildLateOriginalInterior({
     theme: 'castle',
     entryTile: { x: 14, y: 34 },
     playerStart: { x: 14, y: 32 },
-    bossTile: { x: 19, y: 10 },
+    bossTile: getOriginalLateStoryBossTile(28),
     guardTiles: ERGION_KEEP_GUARDS,
     rooms: [
         { id: 'ergionSouthernKeep', nameKey: 'story.interior.room.ergionSouthernKeep', x: 5, y: 27, width: 30, height: 7 },
@@ -1288,7 +1231,7 @@ const MARTANI_BASTION_LAYOUT = buildLateOriginalInterior({
     theme: 'castle',
     entryTile: { x: 14, y: 36 },
     playerStart: { x: 14, y: 32 },
-    bossTile: { x: 43, y: 19 },
+    bossTile: getOriginalLateStoryBossTile(29),
     guardTiles: MARTANI_BASTION_GUARDS,
     rooms: [
         { id: 'martaniSouthBastion', nameKey: 'story.interior.room.martaniSouthBastion', x: 10, y: 26, width: 20, height: 10 },
@@ -1311,7 +1254,7 @@ const BLIN_WATCH_LAYOUT = buildLateOriginalInterior({
     theme: 'castle',
     entryTile: { x: 14, y: 36 },
     playerStart: { x: 14, y: 32 },
-    bossTile: { x: 20, y: 19 },
+    bossTile: getOriginalLateStoryBossTile(30),
     guardTiles: BLIN_WATCH_GUARDS,
     rooms: [
         { id: 'blinLowerWatch', nameKey: 'story.interior.room.blinLowerWatch', x: 6, y: 28, width: 28, height: 9 },
@@ -1334,7 +1277,7 @@ const DEMON_FIXERS_DEN_LAYOUT = buildLateOriginalInterior({
     theme: 'ament',
     entryTile: { x: 14, y: 45 },
     playerStart: { x: 14, y: 32 },
-    bossTile: { x: 22, y: 11 },
+    bossTile: getOriginalLateStoryBossTile(31),
     guardTiles: DEMON_FIXERS_DEN_GUARDS,
     rooms: [
         { id: 'demonFixerLowerDen', nameKey: 'story.interior.room.demonFixerLowerDen', x: 2, y: 32, width: 36, height: 14 },
