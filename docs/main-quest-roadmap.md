@@ -78,9 +78,9 @@
 남은 후속 작업은 새 실내 던전 추가가 아니라 완성도 점검이다.
 
 1. 각 실내맵의 목표 HUD와 입장/복귀/전리품 로그가 자연스럽게 보이는지 실제 플레이로 확인한다.
-   - 31화 마계 해결사의 소굴은 `npm run dev:raid:story31` 또는 `/?devStart=raid&devScenario=story31`로 바로 진입해 실내맵/대사/보상 동선을 점검할 수 있다.
+   - 완료: Chrome headless에서 `/?devStart=raid&devScenario=story31`로 바로 진입해 `StoryInteriorMap`, `demon_fixers_den`, DEV 상태 `story31 / interior-ready`, 보스 1명(마계 해결사 `{22,11}`), 경비 보스 오인 0개, 입장 로그를 확인했다.
 2. 23~31화 GETITEM 보상은 `src/data/content/original-late-story-items.json`에 원작 아이템 ID, 출처 이벤트, 원작 이름/스탯을 원장화했고 `orig_late_####` 아이템 정의로 지급한다. 원장은 `scripts/generate-late-story-item-defs.mjs`로 원작 `itemtbl.atr`에서 재생성할 수 있다.
-3. 컷신 발표 단계의 카메라 포커스, 단계별 duration, 실제 지연 재생, 연출 중 월드 입력/이동 동결, 23~31화 주인공 진입 이동 연출은 런타임에 연결했다. 다음 단계는 31화 실플레이 QA다.
+3. 컷신 발표 단계의 카메라 포커스, 단계별 duration, 실제 지연 재생, 연출 중 월드 입력/이동 동결, 23~31화 주인공 진입 이동 연출은 런타임에 연결했다.
 
 ## 필드 미션 후속 작업
 

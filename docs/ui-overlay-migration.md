@@ -39,6 +39,7 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
 ## 완료된 최종 수동 검증
 - **레이드 전리품 end-to-end** — `devStart=raid&devScenario=loot` 실제 레이드 화면에서 DOM 전리품 패널을 열고 Browser 포인터 드래그로 전리품을 배낭에 드롭. 외부 전리품 1→0, 배낭 4→5, DEV 상태 `picked:dev_raid_loot:0,0` 확인.
 - **실제 레이드 화면 어그로** — `devStart=raid&devScenario=aggro` 실제 레이드 화면에서 어그로 적의 추격 후 강제 인접 공격 로그/상태 배지 확인.
+- **31화 실내 시나리오 진입** — Chrome headless에서 `devStart=raid&devScenario=story31`로 `StoryInteriorMap`/`demon_fixers_den` 진입, DEV 상태 `story31 / interior-ready`, 보스 1명(마계 해결사 `{22,11}`), 경비 보스 오인 0개, 입장 로그 확인.
 
 ## 마을(Town) 이전 메모
 - `TownUI`는 더 이상 캔버스 크롬이나 storage 인벤토리를 그리지 않음. 상태·탭·소문·상점/인벤토리 모델 참조만 유지하고 React `TownScreen`/`InventoryPanel`이 그림.
