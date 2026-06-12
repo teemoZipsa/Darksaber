@@ -26,52 +26,58 @@ import {
     isTradeGoodItemId,
     TRADE_GOOD_SELL_MULTIPLIERS,
 } from './ShopData';
-import type { MarketService } from './MarketService';
+import { MarketSimulationService, type MarketService } from './MarketService';
 import { getTownNameKey } from './TownFacilityData';
 
 const CLIENT_ID_KEY = 'darksaber_market_client_id';
 
-export class HybridMarketService implements MarketService {
-    private readonly server: ServerMarketService;
+export interface HybridMarketServiceOptions {
+    useServerMarket?: boolean;
+}
 
-    constructor(_playerData: PlayerData) {
-        this.server = new ServerMarketService();
+export class HybridMarketService implements MarketService {
+    private readonly delegate: MarketService;
+
+    constructor(playerData: PlayerData, options: HybridMarketServiceOptions = {}) {
+        this.delegate = options.useServerMarket
+            ? new ServerMarketService()
+            : new MarketSimulationService(playerData);
     }
 
     public getBuyPrice(item: ItemDef, basePrice: number, townId: string | null | undefined): number {
-        return this.server.getBuyPrice(item, basePrice, townId);
+        return this.delegate.getBuyPrice(item, basePrice, townId);
     }
 
     public getSellPrice(item: ItemDef, basePrice: number, townId: string | null | undefined): number {
-        return this.server.getSellPrice(item, basePrice, townId);
+        return this.delegate.getSellPrice(item, basePrice, townId);
     }
 
     public getSellQuote(item: ItemDef, baseUnitPrice: number, townId: string | null | undefined, quantity?: number): MarketSellQuote {
-        return this.server.getSellQuote(item, baseUnitPrice, townId, quantity);
+        return this.delegate.getSellQuote(item, baseUnitPrice, townId, quantity);
     }
 
     public recordBuy(townId: string | null | undefined, itemId: string, quantity?: number): void {
-        this.server.recordBuy(townId, itemId, quantity);
+        this.delegate.recordBuy(townId, itemId, quantity);
     }
 
     public recordSell(townId: string | null | undefined, itemId: string, quantity?: number): void {
-        this.server.recordSell(townId, itemId, quantity);
+        this.delegate.recordSell(townId, itemId, quantity);
     }
 
     public rollTownVisit(townId: string): void {
-        this.server.rollTownVisit(townId);
+        this.delegate.rollTownVisit(townId);
     }
 
     public getMarketRumor(townId: string): string | null {
-        return this.server.getMarketRumor(townId);
+        return this.delegate.getMarketRumor(townId);
     }
 
     public getActiveContracts(townId?: string): MarketContract[] {
-        return this.server.getActiveContracts(townId);
+        return this.delegate.getActiveContracts(townId);
     }
 
     public advanceMarketCycle(): void {
-        this.server.advanceMarketCycle();
+        this.delegate.advanceMarketCycle();
     }
 }
 

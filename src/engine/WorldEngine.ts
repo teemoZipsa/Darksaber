@@ -253,6 +253,7 @@ export class WorldEngine {
             party: this.party,
             playerData: this.playerData,
             gameManager: this.gameManager,
+            useServerMarket: this.gameManager.getNetworkAuthContext() !== null,
             onDeploy: () => this.beginRaidFromCurrentHub(),
             log: (message) => this.addCombatLog(message),
         });

@@ -27,6 +27,7 @@ export interface WorldTownSessionOptions {
     party: PartyManager;
     playerData: PlayerData;
     gameManager: WorldTownSessionGameManager;
+    useServerMarket?: boolean;
     onDeploy: () => void;
     log: (message: string) => void;
 }
@@ -43,7 +44,7 @@ export class WorldTownSession {
         this.party = options.party;
         this.playerData = options.playerData;
         this.gameManager = options.gameManager;
-        this.marketService = new HybridMarketService(this.playerData);
+        this.marketService = new HybridMarketService(this.playerData, { useServerMarket: options.useServerMarket });
         this.log = options.log;
         this.ui = new TownUI(this.gameManager.inventory, this.gameManager.stash);
         this.configureTownUI(options.onDeploy);
