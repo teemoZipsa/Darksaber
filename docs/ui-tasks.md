@@ -87,7 +87,6 @@
 
 ## ⛔ 건드리지 말 것 (Opus/메인 예약 — 충돌·회귀 위험)
 - `src/inventory/InventoryUI.ts`, `src/inventory/GridInventory.ts` — 드래그 **해석 로직**(moveToCell/moveToEquip/quickMove). 평소에는 충돌 방지를 위해 조심하고, 명시 요청/조율이 있을 때만 테스트와 함께 수정.
-- `src/engine/GameManager.ts`, `src/engine/WorldEngine.ts`, `src/engine/world/*` — 상태/루프/세션 배선.
 - `src/ui/react/OverlayRoot.tsx`, `src/ui/react/UiStore.ts`, `src/ui/react/UiContext.tsx` — 오버레이 배선.
 - `src/ui/theme/darksaber-ui.css`의 **기존 토큰/공용 클래스**(`--ds-*`, `.ds-panel`, `.ds-btn`, `.ds-scrim`, `.ds-bar` 등). 새 컴포넌트 전용 클래스 추가는 OK, 공용 토큰 값 변경은 금지.
 
