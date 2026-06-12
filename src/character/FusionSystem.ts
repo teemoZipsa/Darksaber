@@ -7,6 +7,7 @@ import {
     getMasterClassLineId,
     type MasterBranch,
 } from '../data/ClassTree';
+import { formatT, i18n, t } from '../i18n/LanguageManager';
 
 export interface FusionRequirementStatus {
     classId: string;
@@ -66,7 +67,7 @@ export function fuseActivePartyBranch(party: PartyManager, branch: MasterBranch)
         return {
             success: false,
             absorbedCharacters: [],
-            message: '알 수 없는 융합 계통입니다.',
+            message: t('fusion.error.unknownBranch'),
         };
     }
 
@@ -76,7 +77,7 @@ export function fuseActivePartyBranch(party: PartyManager, branch: MasterBranch)
             success: false,
             branch,
             absorbedCharacters: [],
-            message: '융합 조건이 충족되지 않았습니다. 출격 중인 3명이 각 계통의 T7 Lv10과 문장을 갖춰야 합니다.',
+            message: t('fusion.error.requirements'),
         };
     }
 
@@ -91,7 +92,7 @@ export function fuseActivePartyBranch(party: PartyManager, branch: MasterBranch)
             success: false,
             branch,
             absorbedCharacters: [],
-            message: '융합 의식에 실패했습니다.',
+            message: t('fusion.error.failed'),
         };
     }
 
@@ -103,6 +104,9 @@ export function fuseActivePartyBranch(party: PartyManager, branch: MasterBranch)
         branch,
         masterCharacter: vessel,
         absorbedCharacters,
-        message: `${vessel.name}이(가) ${candidate.masterNameKr}로 융합했습니다.`,
+        message: formatT('fusion.success', {
+            name: vessel.name,
+            master: i18n.lang === 'en' ? candidate.masterNameEn : candidate.masterNameKr,
+        }),
     };
 }

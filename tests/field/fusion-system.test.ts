@@ -4,6 +4,7 @@ import { Character } from '../../src/character/Character';
 import { fuseActivePartyBranch, getFusionCandidates, hasActiveMasterCharacter } from '../../src/character/FusionSystem';
 import { PartyManager } from '../../src/character/PartyManager';
 import { getClassLine, isMasterClassLineId } from '../../src/data/ClassTree';
+import { i18n } from '../../src/i18n/LanguageManager';
 import { WorldMap } from '../../src/map/WorldMap';
 import { TileType } from '../../src/map/Tile';
 
@@ -67,6 +68,35 @@ test('active party fusion consumes three ready base classes into one T8 master c
     assert.equal(hasActiveMasterCharacter(party), true);
     assert.equal(isMasterClassLineId(party.getActive()?.classLineId ?? ''), true);
     assert.ok(getClassLine('master_battle'));
+});
+
+test('fusion result messages follow the active language', () => {
+    const previousLang = i18n.lang;
+    try {
+        i18n.lang = 'en';
+        const emptyParty = new PartyManager();
+        assert.equal(
+            fuseActivePartyBranch(emptyParty, 'battle').message,
+            'Fusion requirements are not met. The three deployed characters need T7 Lv10 and emblems for their lines.'
+        );
+
+        const party = new PartyManager();
+        const infantry = makeFusionReady('infantry', 'infantry');
+        const cavalry = makeFusionReady('cavalry', 'cavalry');
+        const flying = makeFusionReady('flying', 'flying');
+        for (const character of [infantry, cavalry, flying]) {
+            party.addToRoster(character);
+            assert.equal(party.deployCharacter(character), true);
+        }
+        party.switchTo(1);
+
+        assert.equal(
+            fuseActivePartyBranch(party, 'battle').message,
+            'cavalry fused into Battle Master.'
+        );
+    } finally {
+        i18n.lang = previousLang;
+    }
 });
 
 test('master class line promotes through T8 to T10', () => {

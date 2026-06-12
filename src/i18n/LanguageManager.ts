@@ -885,6 +885,10 @@ export const i18n = {
             'field.log.masterClassRequired': '마스터 클래스가 있어야 마스터 월드에 들어갈 수 있습니다.',
             'field.log.returnedToMortalTemple': '현세의 융합 신전으로 돌아왔습니다.',
             'field.log.departureTownBlocked': '출발한 마을로는 생환할 수 없습니다. 다른 마을로 이동하세요.',
+            'fusion.error.unknownBranch': '알 수 없는 융합 계통입니다.',
+            'fusion.error.requirements': '융합 조건이 충족되지 않았습니다. 출격 중인 3명이 각 계통의 T7 Lv10과 문장을 갖춰야 합니다.',
+            'fusion.error.failed': '융합 의식에 실패했습니다.',
+            'fusion.success': '{name}이(가) {master}로 융합했습니다.',
 
             // Tactical markers
             'tactical.ping.position': '위치 핑',
@@ -1858,6 +1862,10 @@ export const i18n = {
             'field.log.masterClassRequired': 'A master class is required to enter the master world.',
             'field.log.returnedToMortalTemple': 'Returned to the fusion temple in the mortal world.',
             'field.log.departureTownBlocked': 'You cannot extract back to the town you departed from. Move to another town.',
+            'fusion.error.unknownBranch': 'Unknown fusion branch.',
+            'fusion.error.requirements': 'Fusion requirements are not met. The three deployed characters need T7 Lv10 and emblems for their lines.',
+            'fusion.error.failed': 'The fusion ritual failed.',
+            'fusion.success': '{name} fused into {master}.',
 
             // Tactical markers
             'tactical.ping.position': 'Ping Location',
