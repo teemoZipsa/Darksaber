@@ -88,7 +88,8 @@ test('party followers only repath when a fanfare leader is supplied', () => {
     });
 
     assert.ok(follower.path.length > 0);
-    assert.equal(follower.queuedIntent?.kind, 'move');
+    assert.ok(follower.queuedIntent);
+    assert.equal((follower.queuedIntent as NonNullable<FieldActor['queuedIntent']>).kind, 'move');
 });
 
 test('movement honors world ground blockers on walkable terrain', () => {

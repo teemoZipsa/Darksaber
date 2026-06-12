@@ -1,5 +1,7 @@
 import type { StartingClassId } from '../data/characterClasses';
 import type { CharacterStats } from '../data/Stats';
+import type { CharacterSave, CharacterSavePatch } from '../shared/CharacterSave';
+export type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../shared/CharacterSave';
 
 export const DEFAULT_AUTH_SERVER_URL = readAuthServerUrl();
 
@@ -22,34 +24,6 @@ export interface AuthCharacter {
     exp: number;
     baseStats: CharacterStats;
     createdAt: string;
-    updatedAt: string;
-}
-
-export interface InventorySaveItem {
-    uid?: string;
-    itemId: string;
-    gridX: number;
-    gridY: number;
-    quantity: number;
-    durability: number;
-    acquiredInRaid?: boolean;
-    sockets?: string[];
-}
-
-export interface CharacterSave {
-    characterId: string;
-    saveVersion: number;
-    revision: number;
-    hubLocation: Record<string, unknown>;
-    questState: Record<string, unknown>;
-    inventory: {
-        width: number;
-        height: number;
-        items: InventorySaveItem[];
-    };
-    equipment: Record<string, unknown>;
-    partySnapshot: Record<string, unknown>;
-    rosterSnapshot: Record<string, unknown>;
     updatedAt: string;
 }
 
@@ -178,7 +152,7 @@ export class AuthClient {
      */
     public async updateCharacterSave(
         characterId: string,
-        patch: Partial<Pick<CharacterSave, 'rosterSnapshot'>>,
+        patch: Pick<CharacterSavePatch, 'rosterSnapshot'>,
         expectedRevision: number
     ): Promise<CharacterSave> {
         const response = await this.request<{ save: CharacterSave }>(

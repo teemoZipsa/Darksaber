@@ -12,7 +12,7 @@ import {
     type MarketState,
 } from './MarketData';
 import { getItemDef } from './ItemDB';
-import type { CharacterSave, InventorySaveItem } from '../net/AuthClient';
+import type { CharacterSave, CharacterSavePatch, InventorySaveItem } from '../net/AuthClient';
 
 export interface InventoryItem {
     uid: string;         // Unique ID for this specific instance
@@ -43,7 +43,7 @@ export interface SaveData {
 }
 const SAVE_KEY = 'sin_eater_save';
 const LOCAL_CHARACTER_ID = 'local_player';
-type CharacterSaveProvider = () => Partial<Pick<CharacterSave, 'inventory' | 'equipment' | 'partySnapshot' | 'rosterSnapshot'>>;
+type CharacterSaveProvider = () => Pick<CharacterSavePatch, 'inventory' | 'equipment' | 'partySnapshot' | 'rosterSnapshot'>;
 const DEFAULT_EQUIPPED: Record<string, InventoryItem | null> = {
     weapon: null,
     shield: null,

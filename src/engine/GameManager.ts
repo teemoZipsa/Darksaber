@@ -29,7 +29,7 @@ import { AudioManager } from './AudioManager';
 import type { UiStore } from '../ui/react/UiStore';
 import type { WorldTownSession } from './world/WorldTownSession';
 import type { WorldRaidSession } from './world/WorldRaidSession';
-import type { AccountProgress, AuthCharacter, AuthClient, CharacterSave, InventorySaveItem } from '../net/AuthClient';
+import type { AccountProgress, AuthCharacter, AuthClient, CharacterSave, CharacterSavePatch, InventorySaveItem } from '../net/AuthClient';
 import { normalizeLoadout, normalizeUpgradeLevels } from '../magic/MagicLoadout';
 import { getExpToNext as originalExpToNext } from '../data/original/originalProgression';
 
@@ -256,7 +256,7 @@ export class GameManager {
             .catch(() => { /* best-effort; local save already applied, retried on next change */ });
     }
 
-    private buildLocalCharacterSavePatch(): Partial<Pick<CharacterSave, 'inventory' | 'equipment' | 'partySnapshot' | 'rosterSnapshot'>> {
+    private buildLocalCharacterSavePatch(): Pick<CharacterSavePatch, 'inventory' | 'equipment' | 'partySnapshot' | 'rosterSnapshot'> {
         return {
             inventory: this.buildInventorySaveSnapshot(),
             equipment: this.buildEquipmentSaveSnapshot(),

@@ -1,7 +1,7 @@
 import { getItemDef } from '../src/data/ItemDB';
-import type { CharacterSave, InventorySaveItem, InventorySaveSnapshot } from './AuthStore';
+import type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from './AuthStore';
 
-export type WorldCharacterSavePatch = Partial<Omit<CharacterSave, 'characterId' | 'revision' | 'updatedAt'>>;
+export type WorldCharacterSavePatch = CharacterSavePatch;
 
 export interface WorldSessionSavePlayer {
     id: string;

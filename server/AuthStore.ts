@@ -4,6 +4,8 @@ import { CHAR_CLASSES, type StartingClassId } from '../src/data/characterClasses
 import { getClassLine } from '../src/data/ClassTree';
 import { ITEMS } from '../src/data/ItemDB';
 import { createBaseStats, getBaseStatsForClass, type CharacterStats } from '../src/data/Stats';
+import type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
+export type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
 
 export const CURRENT_SAVE_VERSION = 1;
 export const MAX_CHARACTER_SLOTS = 3;
@@ -48,36 +50,6 @@ export interface AuthCharacter {
     deletedAt: string | null;
 }
 
-export interface InventorySaveItem {
-    uid?: string;
-    itemId: string;
-    gridX: number;
-    gridY: number;
-    quantity: number;
-    durability: number;
-    acquiredInRaid?: boolean;
-    sockets?: string[];
-}
-
-export interface InventorySaveSnapshot {
-    width: number;
-    height: number;
-    items: InventorySaveItem[];
-}
-
-export interface CharacterSave {
-    characterId: string;
-    saveVersion: number;
-    revision: number;
-    hubLocation: Record<string, unknown>;
-    questState: Record<string, unknown>;
-    inventory: InventorySaveSnapshot;
-    equipment: Record<string, unknown>;
-    partySnapshot: Record<string, unknown>;
-    rosterSnapshot: Record<string, unknown>;
-    updatedAt: string;
-}
-
 export interface AccountProgress {
     accountId: string;
     completedQuests: string[];
@@ -109,7 +81,7 @@ export interface NewCharacterInput {
 
 export interface SaveUpdateInput {
     expectedRevision: number;
-    patch: Partial<Omit<CharacterSave, 'characterId' | 'revision' | 'updatedAt'>>;
+    patch: CharacterSavePatch;
 }
 
 export type SaveUpdateResult =
