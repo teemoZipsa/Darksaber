@@ -156,6 +156,13 @@ export const i18n = {
             'town.name.ember_citadel': '홍염 성채',
             'world.realm.mortal': '현세 월드',
             'world.realm.master': '마스터 월드',
+            'minimap.title.mini': '미니맵',
+            'minimap.title.full': '전체 지도',
+            'minimap.cycle': 'M 순환',
+            'minimap.coords': '좌표 {x}, {y}',
+            'minimap.opacity': '불투명도',
+            'minimap.loadFailed': '지도 불러오기 실패',
+            'minimap.footerCounts': '적 {enemies} · 루트 {loot} · 탈출구 {exits}',
             
             // Inventory
             'inv.title': '⚔️ 장비 및 소지품',
@@ -1165,6 +1172,13 @@ export const i18n = {
             'town.name.ember_citadel': 'Ember Citadel',
             'world.realm.mortal': 'Mortal World',
             'world.realm.master': 'Master World',
+            'minimap.title.mini': 'Minimap',
+            'minimap.title.full': 'Full Map',
+            'minimap.cycle': 'Cycle M',
+            'minimap.coords': 'Coords {x}, {y}',
+            'minimap.opacity': 'Opacity',
+            'minimap.loadFailed': 'Failed to load map',
+            'minimap.footerCounts': 'Enemies {enemies} · Loot {loot} · Exits {exits}',
             
             // Inventory
             'inv.title': '⚔️ Equipment & Inventory',
