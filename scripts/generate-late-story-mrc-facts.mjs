@@ -32,6 +32,23 @@ function parseArgs(argv) {
   return options;
 }
 
+function encodeRleRow(row) {
+  let encoded = '';
+  for (let index = 0; index < row.length;) {
+    const char = row[index];
+    let end = index + 1;
+    while (end < row.length && row[end] === char) end++;
+    const count = end - index;
+    encoded += count === 1 ? char : `${count}${char}`;
+    index = end;
+  }
+  return encoded;
+}
+
+function readLayerValue(bytes, dataOffset, cellCount, layer, index) {
+  return bytes[dataOffset + layer * cellCount + index];
+}
+
 function readMrc(path) {
   const bytes = readFileSync(path);
   const headerWordCount = bytes.readInt32LE(0);
@@ -46,6 +63,7 @@ function readMrc(path) {
   if (dataOffset < 16 || dataOffset >= bytes.length) throw new Error(`Invalid MRC data offset ${dataOffset}: ${path}`);
 
   const layerSummaries = [];
+  const visualRows = [];
   for (let layer = 0; layer < layerCount; layer++) {
     const counts = new Map();
     let nonZeroCells = 0;
@@ -56,7 +74,7 @@ function readMrc(path) {
     let maxY = -1;
 
     for (let index = 0; index < cellCount; index++) {
-      const value = bytes[dataOffset + layer * cellCount + index];
+      const value = readLayerValue(bytes, dataOffset, cellCount, layer, index);
       counts.set(value, (counts.get(value) ?? 0) + 1);
       if (value !== 0) nonZeroCells++;
       if (value !== 0 && value !== 255) {
@@ -85,6 +103,22 @@ function readMrc(path) {
     });
   }
 
+  for (let y = 0; y < height; y++) {
+    let row = '';
+    for (let x = 0; x < width; x++) {
+      const index = y * width + x;
+      let hasDetail = false;
+      let hasShadow = false;
+      for (let layer = 2; layer < layerCount; layer++) {
+        const value = readLayerValue(bytes, dataOffset, cellCount, layer, index);
+        if (value === 255) hasShadow = true;
+        else if (value !== 0) hasDetail = true;
+      }
+      row += hasDetail ? 'd' : hasShadow ? 's' : '.';
+    }
+    visualRows.push(encodeRleRow(row));
+  }
+
   return {
     byteLength: bytes.length,
     headerWordCount,
@@ -93,6 +127,7 @@ function readMrc(path) {
     dataOffset,
     layerCount,
     tailBytes,
+    visualRows,
     layerSummaries,
   };
 }

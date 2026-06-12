@@ -1,4 +1,5 @@
 import { formatT, t } from '../i18n/LanguageManager';
+import { getOriginalLateStoryMrcVisualSymbol, type OriginalLateStoryMrcVisualSymbol } from '../data/OriginalLateStoryMapFacts';
 import { getStoryInteriorTileAt, type StoryInteriorLayout, type StoryInteriorProp } from '../data/StoryInteriorData';
 import { TILE_SIZE } from './Chunk';
 import { TILE_PROPERTIES, TileType } from './Tile';
@@ -237,9 +238,43 @@ export class StoryInteriorMap extends WorldMap {
                 break;
         }
 
+        this.renderOriginalMrcVisual(ctx, tile, x, y, sx, sy);
+
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
         ctx.lineWidth = 1;
         ctx.strokeRect(sx + 0.5, sy + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+    }
+
+    private renderOriginalMrcVisual(ctx: CanvasRenderingContext2D, tile: TileType, x: number, y: number, sx: number, sy: number): void {
+        const fact = this.layout.originalMrc;
+        if (!fact || tile === TileType.DUNGEON_ENTRANCE) return;
+
+        const symbol = getOriginalLateStoryMrcVisualSymbol(fact, x, y);
+        if (!symbol || symbol === '.') return;
+
+        ctx.save();
+        if (symbol === 'd') {
+            ctx.fillStyle = tile === TileType.WALL ? 'rgba(214, 184, 112, 0.08)' : 'rgba(240, 200, 110, 0.12)';
+            ctx.fillRect(sx + 5, sy + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+            ctx.strokeStyle = tile === TileType.WALL ? 'rgba(0, 0, 0, 0.18)' : 'rgba(255, 236, 170, 0.12)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(sx + 7.5, sy + 7.5, TILE_SIZE - 15, TILE_SIZE - 15);
+        } else {
+            this.renderOriginalMrcShadow(ctx, symbol, sx, sy);
+        }
+        ctx.restore();
+    }
+
+    private renderOriginalMrcShadow(ctx: CanvasRenderingContext2D, symbol: OriginalLateStoryMrcVisualSymbol, sx: number, sy: number): void {
+        if (symbol !== 's') return;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.14)';
+        ctx.beginPath();
+        ctx.moveTo(sx + 4, sy + TILE_SIZE - 4);
+        ctx.lineTo(sx + TILE_SIZE - 4, sy + 4);
+        ctx.lineTo(sx + TILE_SIZE - 4, sy + 10);
+        ctx.lineTo(sx + 10, sy + TILE_SIZE - 4);
+        ctx.closePath();
+        ctx.fill();
     }
 
     private tileKey(x: number, y: number): string {

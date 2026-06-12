@@ -12,7 +12,7 @@ import {
     getOriginalLateStoryFact,
     getOriginalLateStoryGuardTiles,
 } from '../../src/data/OriginalLateStoryFacts';
-import { getOriginalLateStoryMrcFact } from '../../src/data/OriginalLateStoryMapFacts';
+import { getOriginalLateStoryMrcFact, getOriginalLateStoryMrcVisualSymbol } from '../../src/data/OriginalLateStoryMapFacts';
 import { i18n } from '../../src/i18n/LanguageManager';
 import { TileType } from '../../src/map/Tile';
 import { StoryInteriorMap } from '../../src/map/StoryInteriorMap';
@@ -1040,6 +1040,9 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         assert.deepEqual(map.getBoundsTiles(), { width: mrcFact.width, height: mrcFact.height });
         assert.equal(layout.originalMrc?.source, `MAP/${String(episode).padStart(2, '0')}.mrc`);
         assert.equal(layout.originalMrc?.layerCount, mrcFact.layerCount);
+        assert.equal(mrcFact.visualRows.length, mrcFact.height);
+        assert.ok(mrcFact.visualRows.every((row) => row.length > 0));
+        assert.notEqual(getOriginalLateStoryMrcVisualSymbol(mrcFact, layout.bossTile.x, layout.bossTile.y), null);
         assert.deepEqual(layout.bossTile, getOriginalLateStoryBossTile(episode));
         assert.deepEqual(layout.guardTiles, getOriginalLateStoryGuardTiles(episode));
         assert.equal(hasWalkablePath(map, layout.playerStart, layout.bossTile), true, fact.dungeonId);
@@ -1065,6 +1068,14 @@ test('episodes 23 through 31 use original late interior routes and events', () =
             }
         }
     }
+});
+
+test('late story MRC visual hints expose original detail and shadow cells', () => {
+    const beelzebuth = getOriginalLateStoryMrcFact(23);
+    const chosenMark = getOriginalLateStoryMrcFact(27);
+    assert.equal(getOriginalLateStoryMrcVisualSymbol(beelzebuth, 19, 28), 'd');
+    assert.equal(getOriginalLateStoryMrcVisualSymbol(chosenMark, 31, 17), 's');
+    assert.equal(getOriginalLateStoryMrcVisualSymbol(chosenMark, -1, 0), null);
 });
 
 test('outdoor field event placement is deterministic, walkable, and shared by callers', () => {
