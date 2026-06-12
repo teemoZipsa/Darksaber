@@ -10,7 +10,7 @@ import {
 } from '../../combat/StatusEffects';
 import type { Skill } from '../../data/SkillDB';
 import { getSkill } from '../../data/SkillDB';
-import { t } from '../../i18n/LanguageManager';
+import { formatT, t } from '../../i18n/LanguageManager';
 import {
     getEffectiveSkill,
     getUpgradeLevel,
@@ -145,26 +145,26 @@ export class WorldMagicController {
 
     public open(actor: FieldActor): void {
         if (hasStatus(actor.character.statuses, 'silence')) {
-            this.sink.log('침묵 상태로 마법을 사용할 수 없습니다.');
+            this.sink.log(t('field.magic.silenced'));
             this.context.reopenActionMenu(actor);
             return;
         }
         if (this.context.getRemainingActionPoints() < MAGIC_ACTION_GAUGE_COST) {
-            this.sink.log('마법을 사용할 행동력이 부족합니다.');
+            this.sink.log(t('field.magic.noAp'));
             this.context.reopenActionMenu(actor);
             return;
         }
 
         const slots = this.buildSlots(actor);
         if (slots.length === 0) {
-            this.sink.log('사용 가능한 마법이 없습니다.');
+            this.sink.log(t('field.magic.noSkills'));
             this.context.reopenActionMenu(actor);
             return;
         }
 
         this.state = { mode: 'menu' };
         this.menu.show(slots);
-        this.sink.log('마법을 선택하세요.');
+        this.sink.log(t('field.magic.selectSpell'));
     }
 
     /** Build radial slots from the character's equipped loadout (+ disable reasons). */
@@ -203,7 +203,7 @@ export class WorldMagicController {
 
         const targetTileKey = tileKey(tile.x, tile.y);
         if (!this.state.validTiles.has(targetTileKey)) {
-            this.sink.log('마법 사거리 밖입니다.');
+            this.sink.log(t('field.magic.outOfRange'));
             return;
         }
 
@@ -211,7 +211,7 @@ export class WorldMagicController {
             .map((entry) => entry.enemy)
             .find((candidate) => candidate.stats.hp > 0 && candidate.gridX === tile.x && candidate.gridY === tile.y);
         if (!enemy) {
-            this.sink.log('대상을 선택하세요.');
+            this.sink.log(t('field.magic.selectTarget'));
             return;
         }
 
@@ -252,14 +252,14 @@ export class WorldMagicController {
         if (!actor) return;
 
         if (this.context.getRemainingActionPoints() < MAGIC_ACTION_GAUGE_COST) {
-            this.sink.log('마법을 사용할 행동력이 부족합니다.');
+            this.sink.log(t('field.magic.noAp'));
             this.reset();
             this.context.reopenActionMenu(actor);
             return;
         }
 
         if (actor.character.stats.mp < skill.mpCost) {
-            this.sink.log(`MP 부족! (${skill.mpCost} 필요)`);
+            this.sink.log(formatT('field.magic.noMp', { cost: skill.mpCost }));
             this.reset();
             this.context.reopenActionMenu(actor);
             return;
@@ -273,22 +273,22 @@ export class WorldMagicController {
         const validTiles = this.computeTargetTiles(actor, skill);
         this.menu.hide();
         this.state = { mode: 'targeting', skill, validTiles, hoverAoeTiles: new Set() };
-        this.sink.log(`${skill.icon} ${skill.nameKr}: 대상을 선택하세요.`);
+        this.sink.log(formatT('field.magic.selectSkillTarget', { icon: skill.icon, skill: skill.nameKr }));
     }
 
     private cast(actor: FieldActor, skill: Skill, targetEnemy?: Enemy): void {
         if (this.context.getRemainingActionPoints() < MAGIC_ACTION_GAUGE_COST) {
-            this.sink.log('마법을 사용할 행동력이 부족합니다.');
+            this.sink.log(t('field.magic.noAp'));
             this.context.reopenActionMenu(actor);
             return;
         }
         if (actor.character.stats.mp < skill.mpCost) {
-            this.sink.log(`MP 부족! (${skill.mpCost} 필요)`);
+            this.sink.log(formatT('field.magic.noMp', { cost: skill.mpCost }));
             this.context.reopenActionMenu(actor);
             return;
         }
         if ((skill.type === 'damage' || skill.type === 'debuff' || skill.type === 'aoe') && !targetEnemy) {
-            this.sink.log('대상 없음!');
+            this.sink.log(t('field.magic.noTarget'));
             return;
         }
 
@@ -317,7 +317,7 @@ export class WorldMagicController {
         });
 
         if (!this.context.spendAp(MAGIC_ACTION_GAUGE_COST)) {
-            this.sink.log('마법을 사용할 행동력이 부족합니다.');
+            this.sink.log(t('field.magic.noAp'));
             this.context.reopenActionMenu(actor);
             return;
         }
@@ -375,7 +375,11 @@ export class WorldMagicController {
             if (enemyResult.isMiss) {
                 this.sink.spawnDamage(enemy.gridX, enemy.gridY, 0, false, true);
                 AudioManager.playSfx('sfx.miss', { volume: 0.58, rate: 0.03 });
-                this.sink.log(`${skill.nameKr} 명중 실패: ${enemy.name} (${Math.floor(enemyResult.hitChance ?? 0)}%)`);
+                this.sink.log(formatT('field.magic.missChance', {
+                    skill: skill.nameKr,
+                    target: enemy.name,
+                    chance: Math.floor(enemyResult.hitChance ?? 0),
+                }));
                 continue;
             }
 
@@ -397,7 +401,7 @@ export class WorldMagicController {
             const dead = enemy.takeDamage(guarded.damage);
             this.sink.spawnSkillEffect(skill, enemy.gridX, enemy.gridY, 'impact', guarded.damage > 0 ? feedbackGroupId : undefined);
             this.sink.spawnDamage(enemy.gridX, enemy.gridY, guarded.damage, false, false);
-            if (guarded.guarded) this.sink.log(`${enemy.name} 방어: 피해 감소`);
+            if (guarded.guarded) this.sink.log(formatT('field.combat.guardReduced', { target: enemy.name }));
             if (enemyResult.casterHpRestore !== undefined && enemyResult.casterHpRestore > 0) {
                 this.restoreCasterResources(actor, enemyResult.casterHpRestore, 0);
             }
@@ -437,7 +441,7 @@ export class WorldMagicController {
                 this.sink.spawnSkillEffect(skill, target.entity.gridX, target.entity.gridY, 'impact');
             }
         }
-        this.sink.log(`${skill.icon} ${skill.nameKr}: ${targets.length}명 강화`);
+        this.sink.log(formatT('field.magic.allyBuff', { icon: skill.icon, skill: skill.nameKr, count: targets.length }));
     }
 
     private getAlliedActors(actor: FieldActor, skill: Skill): FieldActor[] {
