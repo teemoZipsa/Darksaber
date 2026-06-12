@@ -174,7 +174,7 @@ test('network raid AP uses server remaining points instead of local actor gauge'
     const actor = makeActor('hero');
     actor.entity.actionGauge = 100;
     const { engine } = makeEngineHarness(actor);
-    engine.isNetworkRaid = true;
+    engine.getNetworkRaidState().activate('client-1');
     engine.remainingActionPoints = 20;
 
     assert.equal(engine.getSpendableActionGauge(), 20);
@@ -207,7 +207,7 @@ test('network snapshot resolves zero remaining gauge from ready actor action gau
 test('network snapshot treats local player actorIds as owned and prefers actor remaining AP', () => {
     const actor = makeActor('hero');
     const { engine } = makeEngineHarness(actor);
-    engine.networkPlayerId = 'client-1';
+    engine.getNetworkRaidState().activate('client-1');
 
     const snapshot: WorldSnapshot = {
         seq: 1,
@@ -286,13 +286,15 @@ test('network move stores a render-only path preview without queuing local movem
     const actor = makeActor('hero');
     const { engine } = makeEngineHarness(actor);
     const sent: unknown[] = [];
-    engine.isNetworkRaid = true;
-    engine.networkRaidClient = {
+    const client = {
+        getIsOpen: () => true,
         sendIntent: (...args: unknown[]) => {
             sent.push(args);
             return 'move-1';
         },
     };
+    engine.getNetworkRaidState().setClient(client);
+    engine.getNetworkRaidState().activate('client-1');
 
     const path = [{ x: 1, y: 0 }, { x: 2, y: 0 }];
     const submitted = engine.submitNetworkMoveIntent(actor, { x: 2, y: 0 }, path, getActionApCost('move'), 2);

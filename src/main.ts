@@ -34,6 +34,11 @@ type DevFieldActor = {
     path: DevTile[];
     queuedIntent: unknown;
 };
+type DevNetworkRaidState = {
+    activate: (playerId: string) => void;
+    deactivate: () => void;
+    setClient: (client: unknown) => void;
+};
 type DevWorldEngine = {
     partyActors: DevFieldActor[];
     fieldEnemies: Array<{ enemy: Enemy; home: DevTile; path: DevTile[] }>;
@@ -41,10 +46,8 @@ type DevWorldEngine = {
     selectionController: { selectActor: (actorId: string | null) => void; selectLoot: (lootId: string) => void };
     clearFieldTurnState: () => void;
     closeNetworkRaidClient?: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => void;
+    getNetworkRaidState: () => DevNetworkRaidState;
     addCombatLog?: (message: string) => void;
-    isNetworkRaid: boolean;
-    networkRaidClient: unknown;
-    networkPlayerId: string | null;
     currentPhase: string;
     player: DevEntity;
     activeTurnActorId: string | null;
@@ -196,7 +199,6 @@ function applyDevRaidScenario(manager: GameManager, scenario: DevRaidScenario): 
 
     world.closeNetworkRaidClient?.(false);
     world.currentPhase = 'raid';
-    world.networkPlayerId = 'dev-scenario';
     manager.inventoryUI.setActiveCharacter(actor.character as Parameters<typeof manager.inventoryUI.setActiveCharacter>[0]);
 
     if (scenario === 'aggro') applyDevAggroScenario(world, actor);
@@ -208,8 +210,7 @@ function getDevWorldEngine(manager: GameManager): DevWorldEngine | null {
 }
 
 function applyDevAggroScenario(world: DevWorldEngine, actor: DevFieldActor): void {
-    world.isNetworkRaid = false;
-    world.networkRaidClient = null;
+    world.getNetworkRaidState().deactivate();
     world.partyActors = [actor];
 
     const actorTile = findWalkableTile(world, { x: actor.entity.gridX, y: actor.entity.gridY });
@@ -258,8 +259,9 @@ function applyDevAggroScenario(world: DevWorldEngine, actor: DevFieldActor): voi
 }
 
 function applyDevLootScenario(manager: GameManager, world: DevWorldEngine, actor: DevFieldActor): void {
-    world.isNetworkRaid = true;
-    world.networkRaidClient = createDevLootClient();
+    const networkRaid = world.getNetworkRaidState();
+    networkRaid.setClient(createDevLootClient());
+    networkRaid.activate('dev-scenario');
     world.partyActors = [actor];
 
     const actorTile = findWalkableTile(world, { x: actor.entity.gridX, y: actor.entity.gridY });

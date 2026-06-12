@@ -441,9 +441,9 @@ export class WorldEngine {
                 openLoot: (loot) => this.openLoot(loot),
                 openMagic: (actor) => this.openFieldMagic(actor),
                 openTool: (actor) => this.openFieldTool(actor),
-                hasCastableFieldSkill: (actor) => (this.getNetworkRaidState().isActive() || this.introTutorialActive) && this.magicController.hasCastableFieldSkill(actor.character),
-                hasUsableCombatTool: (actor) => (this.getNetworkRaidState().isActive() || this.introTutorialActive) && this.toolController.hasUsableCombatTool(actor),
-                getCombatToolAvailability: (actor) => (this.getNetworkRaidState().isActive() || this.introTutorialActive)
+                hasCastableFieldSkill: (actor) => this.areServerStyleFieldActionsEnabled() && this.magicController.hasCastableFieldSkill(actor.character),
+                hasUsableCombatTool: (actor) => this.areServerStyleFieldActionsEnabled() && this.toolController.hasUsableCombatTool(actor),
+                getCombatToolAvailability: (actor) => this.areServerStyleFieldActionsEnabled()
                     ? this.toolController.getCombatToolAvailability(actor)
                     : { hasRecoveryConsumable: false, hasEffectiveRecovery: false },
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
@@ -557,7 +557,7 @@ export class WorldEngine {
         });
         this.gameManager.inventoryUI.onRaidLootSecured = (placed, source) => {
             const client = this.getNetworkRaidState().getClient();
-            if (!this.getNetworkRaidState().isActive() || !client || !source || !this.selectionController.lootId) return;
+            if (!this.isNetworkRaidActive() || !client || !source || !this.selectionController.lootId) return;
             const intentId = client.sendLootPickup(this.selectionController.lootId, source.gridX, source.gridY);
             this.pendingLootPicks.set(intentId, { placed, source, at: Date.now() });
             this.purgeStaleLootPicks();
@@ -581,17 +581,20 @@ export class WorldEngine {
     }
 
     private getNetworkRaidState(): NetworkRaidState {
-        if (!this.networkRaid) {
-            this.networkRaid = new NetworkRaidState();
-            const legacy = this as unknown as {
-                isNetworkRaid?: boolean;
-                networkPlayerId?: string | null;
-                networkRaidClient?: NetworkRaidClient | null;
-            };
-            if (legacy.networkRaidClient) this.networkRaid.setClient(legacy.networkRaidClient);
-            if (legacy.isNetworkRaid) this.networkRaid.activate(legacy.networkPlayerId ?? '');
-        }
+        if (!this.networkRaid) this.networkRaid = new NetworkRaidState();
         return this.networkRaid;
+    }
+
+    private isNetworkRaidActive(): boolean {
+        return this.getNetworkRaidState().isActive();
+    }
+
+    private areServerStyleFieldActionsEnabled(): boolean {
+        return this.isNetworkRaidActive() || this.introTutorialActive;
+    }
+
+    private areSoloFollowersEnabled(): boolean {
+        return !this.isNetworkRaidActive();
     }
 
     public update(dt: number, input: InputManager, camera: Camera): void {
@@ -631,7 +634,7 @@ export class WorldEngine {
             return;
         }
 
-        if (this.getNetworkRaidState().isActive()) {
+        if (this.isNetworkRaidActive()) {
             this.updateNetworkRaid(dt, input, camera);
             return;
         }
@@ -1205,7 +1208,7 @@ export class WorldEngine {
     }
 
     private openTown(town: TownInfo): void {
-        if (this.getNetworkRaidState().isActive()) {
+        if (this.isNetworkRaidActive()) {
             // Reaching town while still flagged as a network raid means the player is
             // abandoning the run client-side, so tell the server instead of going silent.
             this.closeNetworkRaidClient(true);
@@ -1887,7 +1890,7 @@ export class WorldEngine {
     }
 
     private handleNetworkGraceExpired(): void {
-        if (!this.getNetworkRaidState().isActive() || !this.raidSession.active) return;
+        if (!this.isNetworkRaidActive() || !this.raidSession.active) return;
         this.addCombatLog(t('mp.graceExpired'));
         this.closeNetworkRaidClient(false);
         this.getNetworkRaidState().deactivate();
@@ -1976,7 +1979,7 @@ export class WorldEngine {
             return;
         }
 
-        if (this.getNetworkRaidState().isActive()) {
+        if (this.isNetworkRaidActive()) {
             this.enterNetworkStoryDungeon(dungeon);
             return;
         }
@@ -2107,7 +2110,7 @@ export class WorldEngine {
 
     private returnToMortalWorld(): void {
         this.fusionTempleUI.hide();
-        if (this.getNetworkRaidState().isActive() || this.currentPhase === 'raid') {
+        if (this.isNetworkRaidActive() || this.currentPhase === 'raid') {
             void this.beginRaidFromCurrentHub('mortal');
             return;
         }
@@ -2370,7 +2373,7 @@ export class WorldEngine {
     }
 
     private tryActorAttack(actor: FieldActor, enemy: Enemy): boolean {
-        if (this.getNetworkRaidState().isActive()) {
+        if (this.isNetworkRaidActive()) {
             return Boolean(this.sendNetworkIntent(actor.id, 'attack', { targetId: enemy.id }, { requireOpen: false }));
         }
         if (!this.introTutorialActive) {
@@ -2450,7 +2453,7 @@ export class WorldEngine {
         if (options.clearEnemies ?? true) this.fieldEnemies = [];
         const completedInterior = this.activeStoryInterior?.dungeonId === dungeonId ? this.activeStoryInterior : null;
         if (this.activeStoryInterior?.dungeonId === dungeonId) {
-            this.exitActiveStoryInterior({ placePartyAtReturn: !this.getNetworkRaidState().isActive() });
+            this.exitActiveStoryInterior({ placePartyAtReturn: !this.isNetworkRaidActive() });
         }
         this.selectionController.clear();
         this.clearFieldTurnState();
@@ -2507,13 +2510,13 @@ export class WorldEngine {
     }
 
     private openLoot(loot: LootObject): void {
-        if (this.getNetworkRaidState().isActive()) {
+        if (this.isNetworkRaidActive()) {
             this.selectionController.selectLoot(loot.id);
             this.addCombatLog(formatT('field.log.lootLockRequest', { source: loot.sourceLabel }));
             this.sendNetworkIntent(this.requireControlledActor().id, 'interact', { lootId: loot.id });
             return;
         }
-        if (!this.introTutorialActive) {
+        if (!this.areServerStyleFieldActionsEnabled()) {
             this.addCombatLog(t('field.log.serverLootOnly'));
             return;
         }
@@ -2527,7 +2530,7 @@ export class WorldEngine {
     }
 
     private openFieldMagic(actor: FieldActor): void {
-        if (!this.getNetworkRaidState().isActive() && !this.introTutorialActive) {
+        if (!this.areServerStyleFieldActionsEnabled()) {
             this.addCombatLog(t('field.log.serverMagicOnly'));
             this.reopenActionMenu(actor);
             return;
@@ -2536,7 +2539,7 @@ export class WorldEngine {
     }
 
     private openFieldTool(actor: FieldActor): void {
-        if (!this.getNetworkRaidState().isActive() && !this.introTutorialActive) {
+        if (!this.areServerStyleFieldActionsEnabled()) {
             this.addCombatLog(t('field.log.serverToolOnly'));
             this.reopenActionMenu(actor);
             return;
@@ -2568,12 +2571,12 @@ export class WorldEngine {
     }
 
     private getFanfareFollowerCount(actor: FieldActor): number {
-        if (this.getNetworkRaidState().isActive()) return 0;
+        if (!this.areSoloFollowersEnabled()) return 0;
         return this.getLocalPartyActors().filter((candidate) => candidate !== actor && !candidate.character.isDead).length;
     }
 
     private getFanfareLeaderActor(): FieldActor | null {
-        if (!this.fanfareLeaderActorId || this.getNetworkRaidState().isActive()) return null;
+        if (!this.fanfareLeaderActorId || !this.areSoloFollowersEnabled()) return null;
         const leader = this.getLocalPartyActors().find((actor) => actor.id === this.fanfareLeaderActorId && !actor.character.isDead) ?? null;
         if (!leader) this.fanfareLeaderActorId = null;
         return leader;
@@ -2949,7 +2952,7 @@ export class WorldEngine {
     }
 
     private getSpendableActionGauge(): number {
-        if (this.activeTurnActorId && this.getNetworkRaidState().isActive()) {
+        if (this.activeTurnActorId && this.isNetworkRaidActive()) {
             return Math.max(0, Math.floor(this.remainingActionPoints));
         }
         const actor = this.getActivePartyTurnActor();
