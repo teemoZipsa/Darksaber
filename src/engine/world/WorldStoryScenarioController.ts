@@ -72,6 +72,7 @@ export interface WorldStoryScenarioContext {
     isTownVisible(): boolean;
     isFusionTempleVisible(): boolean;
     followCameraToPlayer(): void;
+    focusCameraOnTile(tile: TilePoint): void;
     autoPlaceRewardItem(itemId: string): boolean;
     log(message: string): void;
 }
@@ -386,13 +387,14 @@ export class WorldStoryScenarioController {
         if (eventSequence?.bossDefeatEvent) this.applyBossDefeatEventRewards(dungeonId, eventSequence.bossDefeatEvent);
         if (options.clearEnemies ?? true) this.context.setFieldEnemies([]);
         const completedInterior = this.activeInterior?.dungeonId === dungeonId ? this.activeInterior : null;
+        this.playStoryScenarioSequence(dungeonId, 'bossDefeat');
         if (this.activeInterior?.dungeonId === dungeonId) {
             this.exitActiveInterior({ placePartyAtReturn: !this.context.isNetworkRaid() });
+            this.context.followCameraToPlayer();
         }
         this.context.clearSelection();
         this.context.clearFieldTurnState();
         const scenario = getStoryScenarioByDungeonId(dungeonId);
-        this.playStoryScenarioSequence(dungeonId, 'bossDefeat');
         if (completedInterior && scenario) {
             this.context.log(formatT('story.interior.returnLog', { dungeon: scenario.dungeonNameKr }));
         }
@@ -642,9 +644,11 @@ export class WorldStoryScenarioController {
     private playStoryScenarioEventStep(step: StoryScenarioEventStep): void {
         switch (step.kind) {
             case 'focus':
+                this.context.focusCameraOnTile(step.target);
                 this.context.log(formatT('story.event.focusLog', { target: t(step.labelKey) }));
                 break;
             case 'dialogue':
+                if (step.focus) this.context.focusCameraOnTile(step.focus);
                 this.context.log(formatT('story.event.dialogueLog', {
                     speaker: t(step.speakerNameKey),
                     line: t(step.textKey),
@@ -652,6 +656,7 @@ export class WorldStoryScenarioController {
                 break;
             case 'combatStart':
             case 'objective':
+                if (step.focus) this.context.focusCameraOnTile(step.focus);
                 this.context.log(t(step.labelKey));
                 break;
         }

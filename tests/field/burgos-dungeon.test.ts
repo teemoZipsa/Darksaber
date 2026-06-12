@@ -75,6 +75,7 @@ function createStoryScenarioHarness(options: {
     let selectedActorId: string | null = null;
     let placedNear: { x: number; y: number } | null = null;
     let cameraFollowed = false;
+    const cameraFocusTiles: Array<{ x: number; y: number }> = [];
     const rewardItemIds: string[] = [];
     const logs: string[] = [];
 
@@ -104,6 +105,7 @@ function createStoryScenarioHarness(options: {
         isTownVisible: () => false,
         isFusionTempleVisible: () => false,
         followCameraToPlayer: () => { cameraFollowed = true; },
+        focusCameraOnTile: (tile) => { cameraFocusTiles.push({ ...tile }); },
         autoPlaceRewardItem: (itemId) => {
             rewardItemIds.push(itemId);
             return true;
@@ -122,6 +124,7 @@ function createStoryScenarioHarness(options: {
         get turnStateCleared() { return turnStateCleared; },
         get placedNear() { return placedNear; },
         get cameraFollowed() { return cameraFollowed; },
+        get cameraFocusTiles() { return cameraFocusTiles; },
         get rewardItemIds() { return rewardItemIds; },
     };
 }
@@ -1097,6 +1100,35 @@ test('late story boss clear GETITEM rewards are granted on boss defeat', () => {
     assert.deepEqual(harness.rewardItemIds, ['orig_late_0984']);
     assert.ok(harness.logs.some((entry) => entry.includes('실버애로우')));
     assert.ok(harness.logs.includes('시나리오 클리어'));
+});
+
+test('late story presentation steps focus the camera on original event tiles', () => {
+    const player = new Player(0, 0);
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ player, raidSession });
+    const dungeon = harness.worldMap.getDungeons().find((entry) => entry.id === 'demon_fixers_den');
+    const quest = getStoryQuestByDungeonId('demon_fixers_den');
+    assert.ok(dungeon);
+    assert.ok(quest);
+
+    harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+
+    assert.ok(harness.cameraFollowed);
+    assert.deepEqual(harness.cameraFocusTiles.slice(0, 2), [{ x: 22, y: 11 }, { x: 19, y: 7 }]);
+
+    const sequence = getStoryScenarioEventSequence('demon_fixers_den');
+    const cacheEvent = sequence?.fieldEvents.find((event) => event.originalEventId === 'EVENT 91');
+    assert.ok(cacheEvent);
+    assert.equal(harness.controller.playFieldEvent('demon_fixers_den', cacheEvent.id), true);
+    assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 33, y: 17 });
+
+    const boss = new Enemy('story_demon_fixers_den_boss', 22, 11, '마계 해결사', 9, '#7a3150', 'boss');
+    boss.isBoss = true;
+    harness.controller.completeDungeonIfBossDefeated(boss);
+
+    assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 22, y: 11 });
+    assert.ok(harness.cameraFollowed);
 });
 
 test('Airship objective completion keeps variant monsters as optional encounters', () => {

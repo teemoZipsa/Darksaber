@@ -245,6 +245,10 @@ export class WorldEngine {
                 this.camera.followTile(this.player.gridX, this.player.gridY);
                 this.camera.snapToTarget();
             },
+            focusCameraOnTile: (tile) => {
+                this.camera.followTile(tile.x, tile.y);
+                this.camera.snapToTarget();
+            },
             autoPlaceRewardItem: (itemId) => {
                 const item = getItemDef(itemId);
                 if (!item) return false;
