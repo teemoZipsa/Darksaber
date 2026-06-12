@@ -1,7 +1,7 @@
 import type { TilePoint } from '../field/FieldPathing';
 import { TILE_PROPERTIES, TileType } from '../map/Tile';
 import type { OriginalLateStoryMrcFact } from './OriginalLateStoryMapFacts';
-import { getOriginalLateStoryMrcFact } from './OriginalLateStoryMapFacts';
+import { getOriginalLateStoryMrcFact, getOriginalLateStoryMrcVisualSymbol } from './OriginalLateStoryMapFacts';
 import { getOriginalLateStoryBossTile, getOriginalLateStoryGuardTiles } from './OriginalLateStoryFacts';
 
 export type StoryInteriorTheme = 'castle' | 'volcano' | 'temple' | 'pyramid' | 'ament';
@@ -1331,7 +1331,9 @@ export function getStoryInteriorTileAt(layout: StoryInteriorLayout, tx: number, 
             && ty >= area.y
             && ty < area.y + area.height
         );
-        return inWalkableArea ? TileType.STONE : TileType.WALL;
+        if (inWalkableArea) return TileType.STONE;
+        const originalMrcSymbol = layout.originalMrc ? getOriginalLateStoryMrcVisualSymbol(layout.originalMrc, tx, ty) : null;
+        return originalMrcSymbol === 'd' || originalMrcSymbol === 's' ? TileType.STONE : TileType.WALL;
     }
 
     const inMainHall = tx >= 2 && tx <= 23 && ty >= 6 && ty <= 10;

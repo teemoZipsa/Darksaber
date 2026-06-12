@@ -1043,6 +1043,16 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         assert.equal(mrcFact.visualRows.length, mrcFact.height);
         assert.ok(mrcFact.visualRows.every((row) => row.length > 0));
         assert.notEqual(getOriginalLateStoryMrcVisualSymbol(mrcFact, layout.bossTile.x, layout.bossTile.y), null);
+        let originalMrcOpenCells = 0;
+        for (let y = 1; y < mrcFact.height - 1; y++) {
+            for (let x = 1; x < mrcFact.width - 1; x++) {
+                const symbol = getOriginalLateStoryMrcVisualSymbol(mrcFact, x, y);
+                if (symbol !== 'd' && symbol !== 's') continue;
+                originalMrcOpenCells++;
+                assert.notEqual(getStoryInteriorTileAt(layout, x, y), TileType.WALL, `${fact.dungeonId}:${x},${y}`);
+            }
+        }
+        assert.ok(originalMrcOpenCells > 0, fact.dungeonId);
         assert.deepEqual(layout.bossTile, getOriginalLateStoryBossTile(episode));
         assert.deepEqual(layout.guardTiles, getOriginalLateStoryGuardTiles(episode));
         assert.equal(hasWalkablePath(map, layout.playerStart, layout.bossTile), true, fact.dungeonId);
