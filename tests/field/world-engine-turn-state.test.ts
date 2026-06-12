@@ -6,6 +6,7 @@ import { Player } from '../../src/entity/Player';
 import { getActionApCost } from '../../src/field/FieldActionEconomy';
 import type { FieldActor } from '../../src/field/FieldTypes';
 import { WorldEngine } from '../../src/engine/WorldEngine';
+import { gridFromSnapshot } from '../../src/engine/world/NetworkSnapshotMapping';
 import type { ActorSnapshot, GridSnapshot, WorldSnapshot } from '../../src/net/WorldProtocol';
 
 class ImageStub {
@@ -344,8 +345,6 @@ test('network move path preview drops tiles already reached during interpolation
 });
 
 test('grid snapshot without sockets restores placed items with an empty socket list', () => {
-    const actor = makeActor('hero');
-    const { engine } = makeEngineHarness(actor);
     const snapshot: GridSnapshot = {
         width: 4,
         height: 4,
@@ -360,7 +359,7 @@ test('grid snapshot without sockets restores placed items with an empty socket l
         ],
     };
 
-    const grid = engine.gridFromSnapshot(snapshot);
+    const grid = gridFromSnapshot(snapshot);
 
     assert.equal(grid.items.length, 1);
     assert.deepEqual(grid.items[0].sockets, []);

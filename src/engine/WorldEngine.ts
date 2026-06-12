@@ -87,6 +87,14 @@ import { WorldFieldSpawnController } from './world/WorldFieldSpawnController';
 import { WorldRenderController } from './world/WorldRenderController';
 import { WorldInputController } from './world/WorldInputController';
 import { NetworkRaidState, type NetworkRaidCloseReason } from './world/NetworkRaidState';
+import {
+    applyMonsterSprite,
+    createNetworkLootFromSnapshot,
+    gridFromSnapshot,
+    reconcileNetworkEnemies,
+    reconcileNetworkLocalActors,
+    reconcileNetworkRemoteActors,
+} from './world/NetworkSnapshotMapping';
 import { classifyNetworkActorSnapshots } from './world/NetworkSnapshotOwnership';
 import { HitStop } from './world/HitStop';
 import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
@@ -104,11 +112,9 @@ import {
     type AutoLootCell,
     type AutoLootGrantMessage,
     type CombatEventMessage,
-    type GridSnapshot,
     type InventoryConsumedMessage,
     type InventoryItemCountSnapshot,
     type LootGrantMessage,
-    type LootSnapshot,
     type PlayerIntentKind,
     type RaidResultMessage,
     type WorldRealmId,
@@ -1484,84 +1490,12 @@ export class WorldEngine {
             playerId: this.getNetworkRaidState().playerId(),
             localCharacterIds,
         });
-        const ownByLocalId = new Map(ownSnapshots.map((actor) => [actor.localActorId ?? actor.id, actor]));
-        const nextLocalActors: FieldActor[] = [];
-
-        for (const character of localCharacters) {
-            const actorSnapshot = ownByLocalId.get(character.id);
-            const existing = previousActors.find((actor) => actor.character === character);
-            if (!actorSnapshot) {
-                continue;
-            }
-            const actor = existing ?? {
-                id: actorSnapshot.id,
-                character,
-                entity: new Player(actorSnapshot.tile.x, actorSnapshot.tile.y),
-                path: [],
-                queuedIntent: null,
-            };
-            this.applyActorSnapshot(actor, actorSnapshot);
-            nextLocalActors.push(actor);
-        }
-
-        const nextRemoteActors: FieldActor[] = [];
-        const seenRemoteIds = new Set<string>();
-        for (const actorSnapshot of remoteSnapshots) {
-            seenRemoteIds.add(actorSnapshot.id);
-            let actor = this.remotePartyActors.get(actorSnapshot.id);
-            if (!actor) {
-                const character = new Character(
-                    actorSnapshot.localActorId ?? actorSnapshot.id,
-                    actorSnapshot.name,
-                    actorSnapshot.classLineId
-                );
-                character.currentTier = actorSnapshot.currentTier;
-                actor = {
-                    id: actorSnapshot.id,
-                    character,
-                    entity: new Player(actorSnapshot.tile.x, actorSnapshot.tile.y),
-                    path: [],
-                    queuedIntent: null,
-                };
-                this.remotePartyActors.set(actorSnapshot.id, actor);
-            }
-            this.applyActorSnapshot(actor, actorSnapshot);
-            nextRemoteActors.push(actor);
-        }
-        for (const actorId of [...this.remotePartyActors.keys()]) {
-            if (!seenRemoteIds.has(actorId)) this.remotePartyActors.delete(actorId);
-        }
+        const nextLocalActors = reconcileNetworkLocalActors(previousActors, localCharacters, ownSnapshots);
+        const nextRemoteActors = reconcileNetworkRemoteActors(this.remotePartyActors, remoteSnapshots);
 
         this.partyActors = [...nextLocalActors, ...nextRemoteActors];
-        this.fieldEnemies = snapshot.enemies.map((enemySnapshot) => {
-            const existing = this.fieldEnemies.find((entry) => entry.enemy.id === enemySnapshot.id)?.enemy;
-            const enemy = existing ?? new Enemy(
-                enemySnapshot.id,
-                enemySnapshot.tile.x,
-                enemySnapshot.tile.y,
-                enemySnapshot.name,
-                enemySnapshot.level,
-                enemySnapshot.color,
-                enemySnapshot.role
-            );
-            enemy.gridX = enemySnapshot.tile.x;
-            enemy.gridY = enemySnapshot.tile.y;
-            enemy.stats = { ...enemySnapshot.stats };
-            enemy.statuses = enemySnapshot.statuses.map((status) => ({ ...status }));
-            enemy.actionGauge = enemySnapshot.actionGauge;
-            enemy.facing = enemySnapshot.facing;
-            enemy.isAggro = enemySnapshot.isAggro;
-            enemy.isBoss = enemySnapshot.isBoss;
-            enemy.color = enemySnapshot.color;
-            enemy.name = enemySnapshot.name;
-            if (enemySnapshot.monsterId && !enemy.walkSprite) this.applyMonsterSprite(enemy, enemySnapshot.monsterId);
-            return {
-                enemy,
-                home: { ...enemySnapshot.home },
-                path: [],
-            };
-        });
-        this.worldMap.loot = snapshot.loot.map((lootSnapshot) => this.createLootFromSnapshot(lootSnapshot));
+        this.fieldEnemies = reconcileNetworkEnemies(this.fieldEnemies, snapshot.enemies);
+        this.worldMap.loot = snapshot.loot.map((lootSnapshot) => createNetworkLootFromSnapshot(lootSnapshot));
 
         const controlled = this.getControlledActor();
         const ownReady = snapshot.readyActors.filter((actorId) => ownSnapshots.some((actor) => actor.id === actorId));
@@ -1588,79 +1522,15 @@ export class WorldEngine {
         this.applyNetworkScenarioSnapshot(snapshot.scenario);
     }
 
-    private applyActorSnapshot(actor: FieldActor, snapshot: ActorSnapshot): void {
-        actor.id = snapshot.id;
-        actor.character.stats = { ...snapshot.stats };
-        actor.character.statuses = snapshot.statuses.map((status) => ({ ...status }));
-        actor.character.isDead = snapshot.isDead;
-        actor.character.currentTier = snapshot.currentTier;
-        actor.character.level = snapshot.level;
-        actor.entity.gridX = snapshot.tile.x;
-        actor.entity.gridY = snapshot.tile.y;
-        actor.entity.actionGauge = snapshot.actionGauge;
-        actor.entity.facing = snapshot.facing;
-        actor.entity.label = snapshot.name;
-        actor.path = [];
-        actor.queuedIntent = null;
-    }
-
-    private applyMonsterSprite(enemy: Enemy, monsterId: string): void {
-        try {
-            const definition = getMonsterDefinition(monsterId as MonsterId);
-            enemy.setWalkSprite(
-                `${MONSTER_SPRITE_PATH}/${definition.sprite}`,
-                definition.frameSize,
-                definition.frameSize,
-                definition.frameCount,
-                definition.framesPerSecond,
-                MONSTER_ROW_BY_FACING,
-                definition.renderScale
-            );
-        } catch {
-            // Snapshot can still render with the fallback colored glyph.
-        }
-    }
-
-    private createLootFromSnapshot(snapshot: LootSnapshot): LootObject {
-        const loot = new LootObject(snapshot.id, snapshot.tile.x, snapshot.tile.y, [], {
-            sourceLabel: snapshot.sourceLabel,
-            kind: snapshot.kind,
-            containerType: snapshot.containerType,
-            gridW: snapshot.gridSnapshot.width,
-            gridH: snapshot.gridSnapshot.height,
-        });
-        loot.inventory = this.gridFromSnapshot(snapshot.gridSnapshot);
-        loot.opened = snapshot.opened;
-        return loot;
-    }
-
-    private gridFromSnapshot(snapshot: GridSnapshot): GridInventory {
-        const grid = new GridInventory(snapshot.width, snapshot.height);
-        for (const itemSnapshot of snapshot.items) {
-            const item = getItemDef(itemSnapshot.itemId);
-            if (!item) continue;
-            const placed = grid.place(item, itemSnapshot.gridX, itemSnapshot.gridY);
-            if (!placed) continue;
-            placed.durability = itemSnapshot.durability;
-            placed.quantity = itemSnapshot.quantity;
-            placed.acquiredInRaid = itemSnapshot.acquiredInRaid;
-            placed.sockets = (itemSnapshot.sockets ?? []).flatMap((itemId) => {
-                const socket = getItemDef(itemId);
-                return socket ? [socket] : [];
-            });
-        }
-        return grid;
-    }
-
     private openNetworkLoot(grant: LootGrantMessage): void {
-        const grid = this.gridFromSnapshot(grant.gridSnapshot);
+        const grid = gridFromSnapshot(grant.gridSnapshot);
         this.gameManager.inventoryUI.setExternalGrid(grid, formatT('field.log.lootSource', { source: grant.lootId }), { isRaidLoot: true });
         if (!this.gameManager.inventoryUI.isVisible()) this.gameManager.inventoryUI.toggle();
         this.selectionController.selectLoot(grant.lootId);
     }
 
     private handleNetworkAutoLootGrant(grant: AutoLootGrantMessage): void {
-        const grid = this.gridFromSnapshot(grant.gridSnapshot);
+        const grid = gridFromSnapshot(grant.gridSnapshot);
         const bag = this.gameManager.inventoryUI.getBag();
         const acceptedCells: AutoLootCell[] = [];
         const acquiredNames: string[] = [];
@@ -2024,7 +1894,7 @@ export class WorldEngine {
             );
             enemy.aggroRange = Math.max(guardDefinition.aggroRange, 8);
             enemy.isAggro = true;
-            this.applyMonsterSprite(enemy, guardDefinition.id);
+            applyMonsterSprite(enemy, guardDefinition.id);
             this.fieldEnemies.push({ enemy, home: { ...tile }, path: [] });
         }
 
@@ -2041,7 +1911,7 @@ export class WorldEngine {
             boss.aggroRange = 10;
             boss.isAggro = true;
             boss.isBoss = true;
-            this.applyMonsterSprite(boss, 'burgos_wolf_boss');
+            applyMonsterSprite(boss, 'burgos_wolf_boss');
             this.fieldEnemies.push({ enemy: boss, home: { ...layout.bossTile }, path: [] });
         }
 
