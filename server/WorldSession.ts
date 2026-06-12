@@ -46,6 +46,7 @@ import { CHUNK_TILES, nestMemberOffsets, pickNestForChunk, type FieldNest, type 
 import { Enemy } from '../src/entity/Enemy';
 import { LootObject } from '../src/entity/LootObject';
 import { getCarryAtbMultiplier, getPlacedItemWeight } from '../src/inventory/CarryWeight';
+import { getEnemyLootSourceLabel } from '../src/loot/LootLabels';
 import { generateWorldLootNear } from '../src/loot/WorldLootGenerator';
 import {
     ATTACK_AP_COST,
@@ -1772,7 +1773,7 @@ export class WorldSession {
         if (!herb) return;
         const id = `loot_${this.nextLootId++}`;
         this.loot.set(id, new LootObject(id, tile.x, tile.y, [herb], {
-            sourceLabel: `${enemy.name} 전리품`,
+            sourceLabel: getEnemyLootSourceLabel(enemy.name),
             kind: 'corpse',
         }));
     }
@@ -1783,7 +1784,7 @@ export class WorldSession {
 
         const id = `loot_${this.nextLootId++}`;
         const loot = new LootObject(id, enemy.gridX, enemy.gridY, [herb], {
-            sourceLabel: `${enemy.name} 전리품`,
+            sourceLabel: getEnemyLootSourceLabel(enemy.name),
             kind: 'corpse',
         });
         this.loot.set(id, loot);

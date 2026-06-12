@@ -6,6 +6,7 @@ import { CHUNK_SIZE } from '../map/Chunk';
 import { TileType } from '../map/Tile';
 import type { WorldMap } from '../map/WorldMap';
 import type { TownInfo } from '../map/BiomeMask';
+import { getWorldLootSourceLabel } from './LootLabels';
 import type { WorldLootContainerType } from './WorldLootTypes';
 
 export interface ExistingWorldLoot {
@@ -39,13 +40,6 @@ const DEFAULT_NEARBY_ACTIVE_LIMIT = 6;
 const NEARBY_ACTIVE_RANGE = 80;
 const LOOT_SPACING_TILES = 10;
 const DEPARTURE_TOWN_SAFE_RANGE = 18;
-
-const SOURCE_LABEL: Record<WorldLootContainerType, string> = {
-    supply_cache: '버려진 보급 상자',
-    traveler_pack: '전사자의 배낭',
-    regional_goods_crate: '지역 물자 상자',
-    sealed_reliquary: '봉인된 유물함',
-};
 
 const REGIONAL_TRADE_GOODS: Record<string, string[]> = {
     nw_desert_city: ['trade_desert_spice', 'trade_sun_ore'],
@@ -188,7 +182,7 @@ function createLootForChunk(
 
     const id = options.createId(containerType, chunkX, chunkY);
     return new LootObject(id, tile.x, tile.y, items, {
-        sourceLabel: SOURCE_LABEL[containerType],
+        sourceLabel: getWorldLootSourceLabel(containerType),
         kind: 'chest',
         containerType,
         gridW: containerType === 'traveler_pack' ? 4 : 5,

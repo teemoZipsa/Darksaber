@@ -1,5 +1,6 @@
 import type { ItemDef } from '../data/ItemDB';
 import { GridInventory } from '../inventory/GridInventory';
+import { getDefaultLootSourceLabel } from '../loot/LootLabels';
 import type { WorldLootContainerType } from '../loot/WorldLootTypes';
 
 export interface LootObjectOptions {
@@ -28,7 +29,7 @@ export class LootObject {
         this.id = id;
         this.x = x;
         this.y = y;
-        this.sourceLabel = options.sourceLabel || '전리품';
+        this.sourceLabel = options.sourceLabel || getDefaultLootSourceLabel();
         this.kind = options.kind || 'chest';
         this.containerType = options.containerType;
         this.inventory = new GridInventory(
