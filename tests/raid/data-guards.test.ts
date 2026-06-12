@@ -167,9 +167,9 @@ test('original monster ledger stays separate from renderable spawn catalog', () 
     assert.equal(getOriginalMonsterRow('634R'), null);
 });
 
-test('story episodes 1 through 22 are chained and fully localized', () => {
-    assert.deepEqual(STORY_SCENARIOS.map((scenario) => scenario.episode), Array.from({ length: 22 }, (_, i) => i + 1));
-    assert.equal(STORY_QUESTS.length, 22);
+test('story episodes 1 through 31 are chained and fully localized', () => {
+    assert.deepEqual(STORY_SCENARIOS.map((scenario) => scenario.episode), Array.from({ length: 31 }, (_, i) => i + 1));
+    assert.equal(STORY_QUESTS.length, 31);
     assert.deepEqual(
         STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'soloInterior').map((scenario) => scenario.episode),
         [1, 2, 3, 7, 13, 18, 19, 20, 21, 22]

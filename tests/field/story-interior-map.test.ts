@@ -1023,6 +1023,32 @@ test('Flame Castle exposes original episode 22 Beramode, relic, and clear flow',
     assert.equal(flame.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
 });
 
+test('episodes 23 through 31 expose late original field scenario shells', () => {
+    const expected = [
+        { dungeonId: 'beelzebuth_hall', episode: 23, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [1005, 1052, 986, 1010] },
+        { dungeonId: 'astaroth_gate', episode: 24, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [980, 992, 997, 1002] },
+        { dungeonId: 'nergal_depths', episode: 25, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [1030, 1007, 1027, 1010] },
+        { dungeonId: 'beast_mark_shrine', episode: 26, events: ['EVENT 92'], items: [1168] },
+        { dungeonId: 'chosen_mark_shrine', episode: 27, events: ['EVENT 92', 'EVENT 93'], items: [1169, 1170] },
+        { dungeonId: 'ergion_keep', episode: 28, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [1104, 1108, 1111, 1113] },
+        { dungeonId: 'martani_bastion', episode: 29, events: ['EVENT 91', 'EVENT 92', 'EVENT 93'], items: [1116, 1125, 1134] },
+        { dungeonId: 'blin_watch', episode: 30, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [1119, 1128, 1137, 1143] },
+        { dungeonId: 'demon_fixers_den', episode: 31, events: ['EVENT 91', 'EVENT 92', 'EVENT 93'], items: [1122, 1131, 1140] },
+    ];
+
+    for (const row of expected) {
+        const sequence = getStoryScenarioEventSequence(row.dungeonId);
+        assert.ok(sequence, `missing event sequence for ${row.dungeonId}`);
+        assert.equal(sequence.originalSources.sceneScript, `Wlib/scene${row.episode}.lsc`);
+        assert.ok(sequence.originalSources.mapFiles.includes(`MAP/${String(row.episode).padStart(2, '0')}set.arc`));
+        assert.equal(sequence.entry.filter((step) => step.kind === 'combatStart').length, 1);
+        assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
+        assert.deepEqual(sequence.fieldEvents.map((event) => event.originalEventId), row.events);
+        assert.deepEqual(sequence.fieldEvents.map((event) => event.rewards?.[0]?.originalItemId), row.items);
+        assert.ok(sequence.fieldEvents.every((event) => event.originalSource === `MAP/${String(row.episode).padStart(2, '0')}set.arc:${String(row.episode).padStart(2, '0')}.evt`));
+    }
+});
+
 test('outdoor field event placement is deterministic, walkable, and shared by callers', () => {
     const worldMap = new WorldMap();
     for (const dungeonId of ['arcadia_plain', 'cacaora_highland', 'remote_village', 'sagunto_port', 'oasis', 'pyramid_front', 'skeria', 'skeria_2', 'valhalla_plain', 'airship']) {

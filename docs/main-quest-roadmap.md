@@ -6,15 +6,15 @@
 
 ## 현재 구현 상태
 
-- 1~22화 메인 시나리오는 `src/data/StoryScenarioData.ts`에 데이터로 등록되어 있다.
-- 1~22화 월드맵 랜드마크/입구와 퀘스트 연결은 테스트로 검증된다.
+- 1~31화 메인 시나리오는 `src/data/StoryScenarioData.ts`에 데이터로 등록되어 있다.
+- 1~31화 월드맵 랜드마크/입구와 퀘스트 연결은 테스트로 검증된다.
 - 실내 미션은 별도 `StoryInteriorMap`으로 진입하고, 완료 후 원래 월드맵 입구로 복귀한다.
 - 실내 미션 보스 전리품은 실내가 아니라 원래 입구 타일에 남는다.
 - 시나리오 경비병/보스 몬스터 ID는 `src/data/StoryScenarioMonsterData.ts`에서 서버와 로컬 실내 진입이 공유한다.
 - 몬스터 능력치는 원작 `ability.json` raw 값을 직접 쓰지 않고 `src/data/original/originalMonsterBalance.ts`에서 현재 전투식에 맞게 정규화한다.
 - 대사, 컷신, 카메라 무빙, 원작 이벤트 연출은 아직 구현하지 않는다. 지금은 전투/맵 구성 우선.
 
-## 1~22화 진행 공간
+## 1~31화 진행 공간
 
 | 화 | 퀘스트 id | 진행 공간 | 현재 처리 | 목표 |
 |---|---|---|---|---|
@@ -40,6 +40,15 @@
 | 20 | `main:episode_20_ament_2f` | `ament_2f` | 실내 | 메피스토펠레스 처치 |
 | 21 | `main:episode_21_nergal_castle` | `nergal_castle` | 실내 | 네르갈 처치 |
 | 22 | `main:episode_22_flame_castle` | `flame_castle` | 실내 | 베라모드 처치 |
+| 23 | `main:episode_23_beelzebuth` | `beelzebuth_hall` | 필드 | 벨제뷔트 처치 |
+| 24 | `main:episode_24_astaroth` | `astaroth_gate` | 필드 | 아스타로스 처치 |
+| 25 | `main:episode_25_nergal_depths` | `nergal_depths` | 필드 | 네르갈 처치 |
+| 26 | `main:episode_26_beast_mark` | `beast_mark_shrine` | 필드 | 배마의 징표 수호자 처치 |
+| 27 | `main:episode_27_chosen_mark` | `chosen_mark_shrine` | 필드 | 택마의 징표 수호자 처치 |
+| 28 | `main:episode_28_ergion` | `ergion_keep` | 필드 | 에르기온 처치 |
+| 29 | `main:episode_29_martani` | `martani_bastion` | 필드 | 마르타니 처치 |
+| 30 | `main:episode_30_blin` | `blin_watch` | 필드 | 블린 처치 |
+| 31 | `main:episode_31_demon_fixers` | `demon_fixers_den` | 필드 | 마계 해결사 처치 |
 
 ## 원작 후반 구간 기준
 
@@ -50,8 +59,8 @@
 | 원작 구간 | 티어 기준 | 현재 구현 기준 |
 |---|---|---|
 | 1~20 | 7단 시나리오 | 1대륙 인간권/아멘트까지의 기본 구간. 현재 1~20화 구현 완료. |
-| 21~27 | 8단 시나리오 | 합체 이후 열리는 같은 대륙의 봉인 권역. 21~22화부터 이어서 구현한다. |
-| 28~33 | 9단 시나리오 | 더 깊은 후반 권역. 원작 스토리가 완결되지 않은 마지막 메인 구간으로 취급한다. |
+| 21~27 | 8단 시나리오 | 합체 이후 열리는 같은 대륙의 봉인 권역. 현재 21~27화 구현 완료. |
+| 28~33 | 9단 시나리오 | 더 깊은 후반 권역. 현재 28~31화 구현 완료, 32화는 원본 MAP 세트 확인됨, 33화는 MAP 세트 결손으로 보류. |
 | 34~46 | `Wlib/scene*.lsc` 후보 | 로컬 클라이언트에 scene 스크립트는 있으나 대응 `Glib/gsceneNN.lsc`, `MAP/NNset.arc`, `MAP/NN.mrc`가 없어 메인 로드맵 대상에서 보류한다. |
 
 ## 실내 미션 후속 작업

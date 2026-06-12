@@ -105,6 +105,76 @@ function ament1fTrapEvent(eventNumber: number, triggerTiles: TilePoint[]): Story
     };
 }
 
+function lateScenarioCacheEvent(
+    dungeonId: string,
+    episode: number,
+    eventNumber: number,
+    tile: TilePoint,
+    originalItemId: number,
+    itemId: string
+): StoryScenarioFieldEvent {
+    return {
+        id: `${dungeonId}_cache_${eventNumber}`,
+        originalSource: `MAP/${String(episode).padStart(2, '0')}set.arc:${String(episode).padStart(2, '0')}.evt`,
+        originalEventId: `EVENT ${eventNumber}`,
+        trigger: `COMMANDER original CHARPOS ${tile.x} ${tile.y} GETITEM ${originalItemId}`,
+        triggerTiles: [{ ...tile }],
+        runtimeFlag: `${dungeonId}_cache_${eventNumber}`,
+        markerLabelKey: `story.event.ep${String(episode).padStart(2, '0')}.cache.marker`,
+        markerKind: 'chest',
+        rewards: [{ type: 'item', itemId, originalItemId }],
+        steps: [{ kind: 'objective', labelKey: `story.event.ep${String(episode).padStart(2, '0')}.cache.recovered`, focus: { ...tile } }],
+    };
+}
+
+function lateScenarioSequence(input: {
+    dungeonId: string;
+    episode: number;
+    bossSpeakerId: string;
+    bossSpeakerNameKey: string;
+    bossTile: TilePoint;
+    globalScript: string;
+    mapFiles: string[];
+    dialogueCount: number;
+    caches: Array<{ eventNumber: number; tile: TilePoint; originalItemId: number; itemId: string }>;
+}): StoryScenarioEventSequence {
+    const ep = String(input.episode).padStart(2, '0');
+    const objectiveRuntimeFlag = `${input.dungeonId}_objective_complete`;
+    const entry: StoryScenarioEventStep[] = [
+        { kind: 'focus', target: input.bossTile, labelKey: `story.event.ep${ep}.focus.boss` },
+        ...Array.from({ length: input.dialogueCount }, (_, index) => ({
+            kind: 'dialogue' as const,
+            speakerId: index % 2 === 0 ? input.bossSpeakerId : 'hero',
+            speakerNameKey: index % 2 === 0 ? input.bossSpeakerNameKey : 'story.event.speaker.hero',
+            textKey: `story.event.ep${ep}.dialogue.${String(index + 1).padStart(2, '0')}`,
+            focus: input.bossTile,
+        })),
+        { kind: 'combatStart', labelKey: `story.event.ep${ep}.combatStart`, focus: input.bossTile },
+    ];
+
+    return {
+        dungeonId: input.dungeonId,
+        originalSources: {
+            sceneScript: `Wlib/scene${input.episode}.lsc`,
+            globalScript: input.globalScript,
+            mapFiles: input.mapFiles,
+        },
+        objectiveRuntimeFlag,
+        entry,
+        fieldEvents: input.caches.map((cache) => lateScenarioCacheEvent(
+            input.dungeonId,
+            input.episode,
+            cache.eventNumber,
+            cache.tile,
+            cache.originalItemId,
+            cache.itemId
+        )),
+        bossDefeat: [
+            { kind: 'objective', labelKey: `story.event.ep${ep}.objective`, focus: input.bossTile },
+        ],
+    };
+}
+
 export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     {
         dungeonId: 'burgos_castle',
@@ -2423,6 +2493,143 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { kind: 'objective', labelKey: 'story.event.ep22.objective', focus: { x: 19, y: 12 } },
         ],
     },
+    lateScenarioSequence({
+        dungeonId: 'beelzebuth_hall',
+        episode: 23,
+        bossSpeakerId: 'beelzebuth',
+        bossSpeakerNameKey: 'story.event.speaker.beelzebuth',
+        bossTile: { x: 21, y: 15 },
+        globalScript: 'missing',
+        mapFiles: ['MAP/23.mrc', 'MAP/23t.mrc', 'MAP/23hmap.bmp', 'MAP/23bg.bmp', 'MAP/23set.arc', 'MAP/2300.mrc', 'MAP/2300t.mrc', 'MAP/2300hmap.bmp'],
+        dialogueCount: 4,
+        caches: [
+            { eventNumber: 91, tile: { x: 19, y: 19 }, originalItemId: 1005, itemId: 'web_66_51' },
+            { eventNumber: 92, tile: { x: 15, y: 27 }, originalItemId: 1052, itemId: 'void_crystal' },
+            { eventNumber: 93, tile: { x: 15, y: 27 }, originalItemId: 986, itemId: 'magic_t6_body' },
+            { eventNumber: 94, tile: { x: 15, y: 27 }, originalItemId: 1010, itemId: 'shadow_cloak' },
+        ],
+    }),
+    lateScenarioSequence({
+        dungeonId: 'astaroth_gate',
+        episode: 24,
+        bossSpeakerId: 'astaroth',
+        bossSpeakerNameKey: 'story.event.speaker.astaroth',
+        bossTile: { x: 19, y: 7 },
+        globalScript: 'Glib/gscene24.lsc',
+        mapFiles: ['MAP/24.mrc', 'MAP/24t.mrc', 'MAP/24hmap.bmp', 'MAP/24bg.bmp', 'MAP/24set.arc', 'MAP/2400.mrc', 'MAP/2400t.mrc', 'MAP/2400hmap.bmp'],
+        dialogueCount: 1,
+        caches: [
+            { eventNumber: 91, tile: { x: 16, y: 26 }, originalItemId: 980, itemId: 'web_66_51' },
+            { eventNumber: 92, tile: { x: 27, y: 11 }, originalItemId: 992, itemId: 'void_crystal' },
+            { eventNumber: 93, tile: { x: 27, y: 11 }, originalItemId: 997, itemId: 'magic_t6_body' },
+            { eventNumber: 94, tile: { x: 27, y: 11 }, originalItemId: 1002, itemId: 'shadow_cloak' },
+        ],
+    }),
+    lateScenarioSequence({
+        dungeonId: 'nergal_depths',
+        episode: 25,
+        bossSpeakerId: 'nergal',
+        bossSpeakerNameKey: 'story.event.speaker.nergal',
+        bossTile: { x: 19, y: 7 },
+        globalScript: 'Glib/gscene25.lsc',
+        mapFiles: ['MAP/25.mrc', 'MAP/25t.mrc', 'MAP/25hmap.bmp', 'MAP/25bg.bmp', 'MAP/25set.arc', 'MAP/2500.mrc', 'MAP/2500t.mrc', 'MAP/2500hmap.bmp', 'MAP/2502.mrc', 'MAP/2502t.mrc', 'MAP/2510.mrc', 'MAP/2510t.mrc'],
+        dialogueCount: 6,
+        caches: [
+            { eventNumber: 91, tile: { x: 12, y: 18 }, originalItemId: 1030, itemId: 'web_66_51' },
+            { eventNumber: 92, tile: { x: 12, y: 32 }, originalItemId: 1007, itemId: 'void_crystal' },
+            { eventNumber: 93, tile: { x: 12, y: 32 }, originalItemId: 1027, itemId: 'magic_t6_body' },
+            { eventNumber: 94, tile: { x: 12, y: 32 }, originalItemId: 1010, itemId: 'shadow_cloak' },
+        ],
+    }),
+    lateScenarioSequence({
+        dungeonId: 'beast_mark_shrine',
+        episode: 26,
+        bossSpeakerId: 'markGuardian',
+        bossSpeakerNameKey: 'story.event.speaker.markGuardian',
+        bossTile: { x: 19, y: 7 },
+        globalScript: 'Glib/gscene26.lsc',
+        mapFiles: ['MAP/26.mrc', 'MAP/26t.mrc', 'MAP/26hmap.bmp', 'MAP/26bg.bmp', 'MAP/26set.arc', 'MAP/2600.mrc', 'MAP/2600t.mrc', 'MAP/2600hmap.bmp'],
+        dialogueCount: 1,
+        caches: [
+            { eventNumber: 92, tile: { x: 15, y: 21 }, originalItemId: 1168, itemId: 'void_crystal' },
+        ],
+    }),
+    lateScenarioSequence({
+        dungeonId: 'chosen_mark_shrine',
+        episode: 27,
+        bossSpeakerId: 'markGuardian',
+        bossSpeakerNameKey: 'story.event.speaker.markGuardian',
+        bossTile: { x: 19, y: 7 },
+        globalScript: 'Glib/gscene27.lsc',
+        mapFiles: ['MAP/27.mrc', 'MAP/27t.mrc', 'MAP/27hmap.bmp', 'MAP/27set.arc', 'MAP/2700.mrc', 'MAP/2700t.mrc', 'MAP/2700hmap.bmp'],
+        dialogueCount: 1,
+        caches: [
+            { eventNumber: 92, tile: { x: 16, y: 6 }, originalItemId: 1169, itemId: 'void_crystal' },
+            { eventNumber: 93, tile: { x: 31, y: 17 }, originalItemId: 1170, itemId: 'magic_t6_body' },
+        ],
+    }),
+    lateScenarioSequence({
+        dungeonId: 'ergion_keep',
+        episode: 28,
+        bossSpeakerId: 'ergion',
+        bossSpeakerNameKey: 'story.event.speaker.ergion',
+        bossTile: { x: 19, y: 7 },
+        globalScript: 'Glib/gscene28.lsc',
+        mapFiles: ['MAP/28.mrc', 'MAP/28t.mrc', 'MAP/28hmap.bmp', 'MAP/28bg.bmp', 'MAP/28set.arc', 'MAP/2800.mrc', 'MAP/2800t.mrc', 'MAP/2800hmap.bmp'],
+        dialogueCount: 4,
+        caches: [
+            { eventNumber: 91, tile: { x: 6, y: 16 }, originalItemId: 1104, itemId: 'web_66_51' },
+            { eventNumber: 92, tile: { x: 35, y: 17 }, originalItemId: 1108, itemId: 'lance' },
+            { eventNumber: 93, tile: { x: 14, y: 31 }, originalItemId: 1111, itemId: 'magic_t6_body' },
+            { eventNumber: 94, tile: { x: 2, y: 7 }, originalItemId: 1113, itemId: 'corrupted_blade' },
+        ],
+    }),
+    lateScenarioSequence({
+        dungeonId: 'martani_bastion',
+        episode: 29,
+        bossSpeakerId: 'martani',
+        bossSpeakerNameKey: 'story.event.speaker.martani',
+        bossTile: { x: 19, y: 7 },
+        globalScript: 'missing',
+        mapFiles: ['MAP/29.mrc', 'MAP/29t.mrc', 'MAP/29hmap.bmp', 'MAP/29bg.bmp', 'MAP/29set.arc', 'MAP/2900.mrc', 'MAP/2900t.mrc', 'MAP/2900hmap.bmp'],
+        dialogueCount: 4,
+        caches: [
+            { eventNumber: 91, tile: { x: 35, y: 13 }, originalItemId: 1116, itemId: 'web_66_51' },
+            { eventNumber: 92, tile: { x: 40, y: 20 }, originalItemId: 1125, itemId: 'void_crystal' },
+            { eventNumber: 93, tile: { x: 55, y: 24 }, originalItemId: 1134, itemId: 'magic_t6_body' },
+        ],
+    }),
+    lateScenarioSequence({
+        dungeonId: 'blin_watch',
+        episode: 30,
+        bossSpeakerId: 'blin',
+        bossSpeakerNameKey: 'story.event.speaker.blin',
+        bossTile: { x: 19, y: 7 },
+        globalScript: 'missing',
+        mapFiles: ['MAP/30.mrc', 'MAP/30t.mrc', 'MAP/30hmap.bmp', 'MAP/30bg.bmp', 'MAP/30set.arc', 'MAP/3000.mrc', 'MAP/3000t.mrc', 'MAP/3000hmap.bmp'],
+        dialogueCount: 4,
+        caches: [
+            { eventNumber: 91, tile: { x: 15, y: 21 }, originalItemId: 1119, itemId: 'web_66_51' },
+            { eventNumber: 92, tile: { x: 33, y: 25 }, originalItemId: 1128, itemId: 'void_crystal' },
+            { eventNumber: 93, tile: { x: 6, y: 25 }, originalItemId: 1137, itemId: 'magic_t6_body' },
+            { eventNumber: 94, tile: { x: 23, y: 12 }, originalItemId: 1143, itemId: 'shadow_cloak' },
+        ],
+    }),
+    lateScenarioSequence({
+        dungeonId: 'demon_fixers_den',
+        episode: 31,
+        bossSpeakerId: 'demonFixer',
+        bossSpeakerNameKey: 'story.event.speaker.demonFixer',
+        bossTile: { x: 19, y: 7 },
+        globalScript: 'missing',
+        mapFiles: ['MAP/31.mrc', 'MAP/31t.mrc', 'MAP/31hmap.bmp', 'MAP/31bg.bmp', 'MAP/31set.arc', 'MAP/3100.mrc', 'MAP/3100t.mrc'],
+        dialogueCount: 4,
+        caches: [
+            { eventNumber: 91, tile: { x: 33, y: 17 }, originalItemId: 1122, itemId: 'web_66_51' },
+            { eventNumber: 92, tile: { x: 8, y: 21 }, originalItemId: 1131, itemId: 'void_crystal' },
+            { eventNumber: 93, tile: { x: 21, y: 17 }, originalItemId: 1140, itemId: 'magic_t6_body' },
+        ],
+    }),
 ];
 
 export function getStoryScenarioEventSequence(dungeonId: string): StoryScenarioEventSequence | null {

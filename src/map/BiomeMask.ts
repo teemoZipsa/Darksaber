@@ -104,6 +104,8 @@ const LAND_ANCHORS: InfluenceAnchor[] = [
     { cx: 64, cy: 61, radius: 14, weight: 0.92 },
     { cx: 63, cy: 72, radius: 15, weight: 1.0 },
     { cx: 68, cy: 14, radius: 8, weight: 0.68 },
+    { cx: 73, cy: 18, radius: 9, weight: 0.72 },
+    { cx: 73, cy: 64, radius: 12, weight: 0.78 },
 
     // Small islands.
     { cx: 56, cy: 35, radius: 4, weight: 0.8 },
@@ -172,6 +174,15 @@ const BIOME_ANCHORS: BiomeAnchor[] = [
     { cx: 61, cy: 40, biome: 'stone',  weight: 0.95 }, // Ep18 Ament Entrance
     { cx: 64, cy: 37, biome: 'stone',  weight: 0.95 }, // Ep19 Ament 1F
     { cx: 67, cy: 34, biome: 'stone',  weight: 0.95 }, // Ep20 Ament 2F
+    { cx: 75, cy: 24, biome: 'stone',  weight: 0.95 }, // Ep23 Beelzebuth Hall
+    { cx: 76, cy: 20, biome: 'stone',  weight: 0.95 }, // Ep24 Astaroth Gate
+    { cx: 73, cy: 16, biome: 'snow',   weight: 0.9 },  // Ep25 Nergal Depths
+    { cx: 70, cy: 14, biome: 'snow',   weight: 0.85 }, // Ep26 Beast Mark Shrine
+    { cx: 67, cy: 12, biome: 'snow',   weight: 0.85 }, // Ep27 Chosen Mark Shrine
+    { cx: 70, cy: 55, biome: 'lava',   weight: 0.8 },  // Ep28 Ergion Keep
+    { cx: 72, cy: 60, biome: 'lava',   weight: 0.8 },  // Ep29 Martani Bastion
+    { cx: 74, cy: 66, biome: 'special', weight: 0.82 }, // Ep30 Blin Watch
+    { cx: 76, cy: 72, biome: 'special', weight: 0.82 }, // Ep31 Demon Fixer Den
 ];
 
 const SPECIAL_ZONES: SpecialZone[] = [

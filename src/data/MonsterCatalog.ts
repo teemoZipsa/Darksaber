@@ -85,6 +85,11 @@ export const FINAL_STORY_MONSTER_IDS = [
     '731R',
     '732R',
     '733R',
+    '748R',
+    '749R',
+    '750R',
+    '751R',
+    '752R',
 ] as const;
 
 /** Renderable legacy sprites kept out of automatic field spawn pools until authored. */
@@ -380,6 +385,31 @@ export const MONSTER_DEFINITIONS: Record<MonsterId, MonsterDefinition> = {
         id: '733R', name: '네르갈', sprite: '638R.png', role: 'boss',
         level: 24, levelBand: [24, 24], family: 'demon', spawnTags: ['special', 'ament'],
         color: '#2f2f68', frameSize: 32, renderScale: 1.65, aggroRange: 9, ...commonFrame,
+    },
+    '748R': {
+        id: '748R', name: '에르기온', sprite: '634R.png', role: 'bruiser',
+        level: 26, levelBand: [26, 26], family: 'demon', spawnTags: ['special', 'ament'],
+        color: '#7e4ec8', frameSize: 32, renderScale: 1.42, aggroRange: 9, ...commonFrame,
+    },
+    '749R': {
+        id: '749R', name: '마르타니', sprite: '636R.png', role: 'tank',
+        level: 27, levelBand: [27, 27], family: 'demon', spawnTags: ['special', 'ament'],
+        color: '#9a5a48', frameSize: 32, renderScale: 1.44, aggroRange: 9, ...commonFrame,
+    },
+    '750R': {
+        id: '750R', name: '블린', sprite: '637R.png', role: 'archer',
+        level: 28, levelBand: [28, 28], family: 'demon', spawnTags: ['special', 'ament'],
+        color: '#4f7798', frameSize: 32, renderScale: 1.46, aggroRange: 10, ...commonFrame,
+    },
+    '751R': {
+        id: '751R', name: '마계 해결사', sprite: '638R.png', role: 'support',
+        level: 29, levelBand: [29, 29], family: 'demon', spawnTags: ['special', 'ament'],
+        color: '#5f4a88', frameSize: 32, renderScale: 1.48, aggroRange: 10, ...commonFrame,
+    },
+    '752R': {
+        id: '752R', name: '제이드', sprite: '638R.png', role: 'boss',
+        level: 30, levelBand: [30, 30], family: 'demon', spawnTags: ['special', 'ament'],
+        color: '#263f72', frameSize: 32, renderScale: 1.7, aggroRange: 10, ...commonFrame,
     },
 
     '791R': {

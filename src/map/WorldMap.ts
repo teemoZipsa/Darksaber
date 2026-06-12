@@ -181,6 +181,9 @@ const ROAD_ROUTES: TileRoute[] = [
     {
         points: [
             { chunkX: 64, chunkY: 23 },
+            { chunkX: 73, chunkY: 16 },
+            { chunkX: 76, chunkY: 20 },
+            { chunkX: 75, chunkY: 24 },
             { chunkX: 67, chunkY: 34 },
             { chunkX: 64, chunkY: 37 },
             { chunkX: 61, chunkY: 40 },
@@ -188,6 +191,18 @@ const ROAD_ROUTES: TileRoute[] = [
         ],
         width: 2.1,
         noiseSalt: 107,
+    },
+    // Late demon branch: Ep28 -> Ep31 descends the eastern sealed continent.
+    {
+        points: [
+            { chunkX: 63, chunkY: 49 },
+            { chunkX: 70, chunkY: 55 },
+            { chunkX: 72, chunkY: 60 },
+            { chunkX: 74, chunkY: 66 },
+            { chunkX: 76, chunkY: 72 },
+        ],
+        width: 2.1,
+        noiseSalt: 109,
     },
     // North-west desert branch: desert city -> Oasis -> Pyramid cluster.
     {
