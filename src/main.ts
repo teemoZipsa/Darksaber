@@ -13,10 +13,11 @@ import { AuthApiError, AuthClient, type AuthSessionResponse } from './net/AuthCl
 import { Enemy } from './entity/Enemy';
 import { LootObject } from './entity/LootObject';
 import { getItemDef } from './data/ItemDB';
+import { getStoryQuestByDungeonId } from './data/StoryQuestData';
 import { t } from './i18n/LanguageManager';
 
 type DevStartMode = 'town' | 'raid' | 'tutorial';
-type DevRaidScenario = 'aggro' | 'loot';
+type DevRaidScenario = 'aggro' | 'loot' | 'story31';
 
 type DevTile = { x: number; y: number };
 type DevEntity = {
@@ -42,8 +43,15 @@ type DevNetworkRaidState = {
 type DevWorldEngine = {
     partyActors: DevFieldActor[];
     fieldEnemies: Array<{ enemy: Enemy; home: DevTile; path: DevTile[] }>;
-    worldMap: { loot: LootObject[]; isWalkable: (x: number, y: number) => boolean };
+    worldMap: {
+        loot: LootObject[];
+        isWalkable: (x: number, y: number) => boolean;
+        getDungeons?: () => Array<{ id: string; nameKr: string; x: number; y: number }>;
+    };
     selectionController: { selectActor: (actorId: string | null) => void; selectLoot: (lootId: string) => void };
+    storyScenarioController?: {
+        startLocalStoryInteriorDungeon: (dungeon: { id: string; nameKr: string; x: number; y: number }, storyQuest: NonNullable<ReturnType<typeof getStoryQuestByDungeonId>>) => void;
+    };
     clearFieldTurnState: () => void;
     closeNetworkRaidClient?: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => void;
     getNetworkRaidState: () => DevNetworkRaidState;
@@ -120,6 +128,7 @@ function getDevRaidScenario(): DevRaidScenario | null {
     const value = new URLSearchParams(window.location.search).get('devScenario');
     if (value === 'aggro') return 'aggro';
     if (value === 'loot') return 'loot';
+    if (value === 'story31') return 'story31';
     return null;
 }
 
@@ -202,7 +211,8 @@ function applyDevRaidScenario(manager: GameManager, scenario: DevRaidScenario): 
     manager.inventoryUI.setActiveCharacter(actor.character as Parameters<typeof manager.inventoryUI.setActiveCharacter>[0]);
 
     if (scenario === 'aggro') applyDevAggroScenario(world, actor);
-    else applyDevLootScenario(manager, world, actor);
+    else if (scenario === 'loot') applyDevLootScenario(manager, world, actor);
+    else applyDevStory31Scenario(world);
 }
 
 function getDevWorldEngine(manager: GameManager): DevWorldEngine | null {
@@ -291,6 +301,20 @@ function applyDevLootScenario(manager: GameManager, world: DevWorldEngine, actor
     setDevScenarioStatus('loot', 'loot-open');
 }
 
+function applyDevStory31Scenario(world: DevWorldEngine): void {
+    world.getNetworkRaidState().deactivate();
+    const dungeon = world.worldMap.getDungeons?.().find((candidate) => candidate.id === 'demon_fixers_den');
+    const quest = getStoryQuestByDungeonId('demon_fixers_den');
+    if (!dungeon || !quest || !world.storyScenarioController) {
+        console.warn('[Darksaber] Dev story31 scenario could not find the dungeon, quest, or controller.');
+        return;
+    }
+
+    world.storyScenarioController.startLocalStoryInteriorDungeon(dungeon, quest);
+    world.addCombatLog?.(t('dev.scenario.story31Ready'));
+    setDevScenarioStatus('story31', 'interior-ready');
+}
+
 function createDevLootClient(): unknown {
     let counter = 0;
     return {
@@ -367,6 +391,7 @@ function mountDevLauncher(): void {
         <a href="/?devStart=raid">${t('dev.launcher.raid')}</a>
         <a href="/?devStart=raid&devScenario=aggro">${t('dev.launcher.raidAggro')}</a>
         <a href="/?devStart=raid&devScenario=loot">${t('dev.launcher.raidLoot')}</a>
+        <a href="/?devStart=raid&devScenario=story31">${t('dev.launcher.raidStory31')}</a>
         <a href="/?devStart=tutorial">${t('dev.launcher.tutorial')}</a>
     `;
     document.body.appendChild(root);

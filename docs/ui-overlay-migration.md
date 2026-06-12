@@ -62,6 +62,7 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
   - `npm run dev:raid` 또는 `/?devStart=raid`: 마을 출격 경로를 통해 레이드 자동 진입.
   - `npm run dev:raid:aggro` 또는 `/?devStart=raid&devScenario=aggro`: 레이드 자동 진입 후 어그로 추격/공격 검증 상태 구성.
   - `npm run dev:raid:loot` 또는 `/?devStart=raid&devScenario=loot`: 레이드 자동 진입 후 전리품 DOM 패널 검증 상태 구성.
+  - `npm run dev:raid:story31` 또는 `/?devStart=raid&devScenario=story31`: 레이드 자동 진입 후 31화 마계 해결사의 소굴 실내맵으로 바로 진입.
   - `npm run dev:tutorial` 또는 `/?devStart=tutorial`: 캐릭터 생성 없이 튜토리얼 대련장으로 진입.
 - 타입체크: `npx tsc --noEmit`.
 - **헤드리스 프리뷰 주의**: 탭이 숨겨지면 브라우저가 `requestAnimationFrame`을 멈춰 루프가 정지 → 스크린샷/자동 tick 불가. 대응:
