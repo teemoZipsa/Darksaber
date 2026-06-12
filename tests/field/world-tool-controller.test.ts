@@ -7,6 +7,7 @@ import { getActionApCost } from '../../src/field/FieldActionEconomy';
 import type { FieldActor } from '../../src/field/FieldTypes';
 import { GridInventory } from '../../src/inventory/GridInventory';
 import { WorldToolController } from '../../src/engine/world/WorldToolController';
+import { i18n } from '../../src/i18n/LanguageManager';
 
 class ImageStub {
     public src = '';
@@ -61,6 +62,7 @@ function makeController(actor: FieldActor, inventory: GridInventory, ap: { value
 }
 
 test('combat tool use recovers, spends AP, and removes one item atomically', () => {
+    i18n.setLanguage('ko');
     const actor = makeActor();
     const inventory = new GridInventory(4, 4);
     const herb = getItemDef('herb_cheap');
@@ -79,6 +81,7 @@ test('combat tool use recovers, spends AP, and removes one item atomically', () 
     assert.equal(inventory.items.length, 0);
     assert.ok(events.includes('heal:50'));
     assert.ok(events.includes('resume'));
+    assert.ok(events.some((event) => /사용: HP \+50, MP \+0/.test(event)));
 });
 
 test('combat tool can be used again while enough partial ATB and effective recovery remain', () => {
@@ -104,6 +107,7 @@ test('combat tool can be used again while enough partial ATB and effective recov
 });
 
 test('combat tool fails without AP and does not mutate HP or inventory', () => {
+    i18n.setLanguage('ko');
     const actor = makeActor();
     const inventory = new GridInventory(4, 4);
     const herb = getItemDef('herb_cheap');
@@ -111,13 +115,15 @@ test('combat tool fails without AP and does not mutate HP or inventory', () => {
     inventory.autoPlace(herb);
     const toolApCost = getActionApCost('tool');
     const ap = { value: toolApCost - 1 };
-    const controller = makeController(actor, inventory, ap);
+    const events: string[] = [];
+    const controller = makeController(actor, inventory, ap, events);
 
     controller.useTool('herb_cheap');
 
     assert.equal(actor.character.stats.hp, 40);
     assert.equal(ap.value, toolApCost - 1);
     assert.equal(inventory.items.length, 1);
+    assert.ok(events.includes('도구를 사용할 행동력이 부족합니다.'));
 });
 
 test('tool availability requires effective recovery and excludes repair kit', () => {

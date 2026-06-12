@@ -8,6 +8,7 @@ import {
 } from '../../data/ItemDB';
 import type { PlacedItem } from '../../inventory/GridInventory';
 import { ToolUI, type ToolOptionView } from '../../ui/ToolUI';
+import { formatT, t } from '../../i18n/LanguageManager';
 
 interface ToolUseCandidate {
     placed: PlacedItem;
@@ -84,20 +85,20 @@ export class WorldToolController {
 
     public open(actor: FieldActor): void {
         if (this.context.getRemainingActionPoints() < TOOL_ACTION_GAUGE_COST) {
-            this.sink.log('도구를 사용할 행동력이 부족합니다.');
+            this.sink.log(t('field.log.toolApLow'));
             this.context.reopenActionMenu(actor);
             return;
         }
 
         const options = this.getToolOptions(actor);
         if (options.length === 0) {
-            this.sink.log('지금 사용할 수 있는 도구가 없습니다.');
+            this.sink.log(t('field.log.toolNone'));
             this.context.reopenActionMenu(actor);
             return;
         }
 
         this.toolUI.show(options);
-        this.sink.log('사용할 도구를 선택하세요.');
+        this.sink.log(t('field.log.toolSelect'));
     }
 
     public reset(): void {
@@ -126,25 +127,25 @@ export class WorldToolController {
 
         const candidate = this.getToolCandidates(actor).find((entry) => entry.placed.item.id === itemId);
         if (!candidate) {
-            this.sink.log('지금은 사용할 수 없는 도구입니다.');
+            this.sink.log(t('field.log.toolUnavailable'));
             this.context.reopenActionMenu(actor);
             return;
         }
 
         if (!this.context.getInventoryItems().includes(candidate.placed) || candidate.placed.quantity <= 0) {
-            this.sink.log('도구를 찾을 수 없습니다.');
+            this.sink.log(t('field.log.toolMissing'));
             this.context.reopenActionMenu(actor);
             return;
         }
 
         if (this.context.getRemainingActionPoints() < TOOL_ACTION_GAUGE_COST) {
-            this.sink.log('도구를 사용할 행동력이 부족합니다.');
+            this.sink.log(t('field.log.toolApLow'));
             this.context.reopenActionMenu(actor);
             return;
         }
 
         if (candidate.effectiveHp <= 0 && candidate.effectiveMp <= 0) {
-            this.sink.log('효과가 없습니다.');
+            this.sink.log(t('field.log.toolNoEffect'));
             this.context.reopenActionMenu(actor);
             return;
         }
@@ -155,7 +156,7 @@ export class WorldToolController {
         }
 
         if (!this.context.spendAp(TOOL_ACTION_GAUGE_COST)) {
-            this.sink.log('도구를 사용할 행동력이 부족합니다.');
+            this.sink.log(t('field.log.toolApLow'));
             this.context.reopenActionMenu(actor);
             return;
         }
@@ -176,7 +177,11 @@ export class WorldToolController {
             this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, `MP+${candidate.effectiveMp}`);
         }
         this.sink.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
-        this.sink.log(`${candidate.placed.item.nameKr} 사용: HP +${candidate.effectiveHp}, MP +${candidate.effectiveMp}`);
+        this.sink.log(formatT('field.log.toolUsed', {
+            item: candidate.placed.item.nameKr,
+            hp: candidate.effectiveHp,
+            mp: candidate.effectiveMp,
+        }));
         this.context.resumeOrEndActiveTurn(actor);
     }
 
