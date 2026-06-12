@@ -1,8 +1,8 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { randomBytes } from 'node:crypto';
 import type { AuthStore } from './AuthStore';
 import type { WorldCharacterSavePatch } from './WorldSession';
+import { writeFileAtomically } from './AtomicFile';
 
 export interface PendingWorldSave {
     key: string;
@@ -162,20 +162,7 @@ function clonePendingSave(entry: PendingWorldSave): PendingWorldSave {
 
 function atomicWriteJson(persistPath: string, value: WorldSaveSpoolFile): void {
     mkdirSync(dirname(persistPath), { recursive: true });
-    const tmpPath = `${persistPath}.tmp-${process.pid}-${Date.now()}-${randomBytes(4).toString('hex')}`;
-    try {
-        writeFileSync(tmpPath, JSON.stringify(value, null, 2), 'utf8');
-        if (existsSync(persistPath)) {
-            try {
-                copyFileSync(persistPath, backupPath(persistPath));
-            } catch {
-                // Backup is best-effort; the rename below is the durable write.
-            }
-        }
-        renameSync(tmpPath, persistPath);
-    } finally {
-        rmSync(tmpPath, { force: true });
-    }
+    writeFileAtomically(persistPath, JSON.stringify(value, null, 2), { backupPath: backupPath(persistPath) });
 }
 
 function backupPath(persistPath: string): string {

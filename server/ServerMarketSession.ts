@@ -1,5 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import {
     advanceMarketCycle,
@@ -23,6 +22,7 @@ import type {
     MarketServerMessage,
     MarketSnapshotMessage,
 } from '../src/net/WorldProtocol';
+import { writeFileAtomically } from './AtomicFile';
 
 export const MARKET_SERVER_CYCLE_MS = 5 * 60 * 1000;
 const CLIENT_RECOVERY_TOUCH_MS = 60 * 1000;
@@ -171,7 +171,7 @@ export class ServerMarketSession {
     private saveNow(): void {
         if (!this.persistPath) return;
         mkdirSync(dirname(this.persistPath), { recursive: true });
-        writeFileAtomically(this.persistPath, JSON.stringify(this.snapshot, null, 2));
+        writeFileAtomically(this.persistPath, JSON.stringify(this.snapshot, null, 2), { backupPath: backupPath(this.persistPath) });
     }
 }
 
@@ -181,23 +181,6 @@ function readMarketSnapshot(path: string): MarketSnapshot | null {
         return normalizeMarketSnapshot(JSON.parse(readFileSync(path, 'utf8')));
     } catch {
         return null;
-    }
-}
-
-function writeFileAtomically(persistPath: string, contents: string): void {
-    const tmpPath = `${persistPath}.tmp-${process.pid}-${Date.now()}-${randomBytes(4).toString('hex')}`;
-    try {
-        writeFileSync(tmpPath, contents, 'utf8');
-        if (existsSync(persistPath)) {
-            try {
-                copyFileSync(persistPath, backupPath(persistPath));
-            } catch {
-                // Best-effort only; the atomic rename below is the authoritative write.
-            }
-        }
-        renameSync(tmpPath, persistPath);
-    } finally {
-        rmSync(tmpPath, { force: true });
     }
 }
 
