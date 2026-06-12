@@ -12,6 +12,7 @@ import { formatT, i18n, t } from '../i18n/LanguageManager';
 export interface FusionRequirementStatus {
     classId: string;
     classNameKr: string;
+    classNameEn: string;
     character: Character | null;
     ready: boolean;
 }
@@ -42,6 +43,7 @@ export function getFusionCandidates(party: PartyManager): FusionCandidate[] {
             return {
                 classId,
                 classNameKr: classLine?.nameKr ?? classId,
+                classNameEn: classLine?.nameEn ?? classId,
                 character,
                 ready: Boolean(character?.isFusionReady()),
             };

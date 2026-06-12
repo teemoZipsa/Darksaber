@@ -896,6 +896,13 @@ export const i18n = {
             'fusion.error.requirements': '융합 조건이 충족되지 않았습니다. 출격 중인 3명이 각 계통의 T7 Lv10과 문장을 갖춰야 합니다.',
             'fusion.error.failed': '융합 의식에 실패했습니다.',
             'fusion.success': '{name}이(가) {master}로 융합했습니다.',
+            'fusionTemple.title': '융합의 신전',
+            'fusionTemple.masterGateTitle': '현세의 문',
+            'fusionTemple.desc': '출격 중인 세 계통의 전승자가 하나의 마스터 클래스로 융합합니다.',
+            'fusionTemple.masterGateDesc': '마스터 월드와 현세를 잇는 문',
+            'fusionTemple.fuse': '융합',
+            'fusionTemple.enterMasterWorld': '마스터 월드 입장',
+            'fusionTemple.returnToMortalWorld': '현세로 귀환',
 
             // Tactical markers
             'tactical.ping.position': '위치 핑',
@@ -1880,6 +1887,13 @@ export const i18n = {
             'fusion.error.requirements': 'Fusion requirements are not met. The three deployed characters need T7 Lv10 and emblems for their lines.',
             'fusion.error.failed': 'The fusion ritual failed.',
             'fusion.success': '{name} fused into {master}.',
+            'fusionTemple.title': 'Fusion Temple',
+            'fusionTemple.masterGateTitle': 'Mortal Gate',
+            'fusionTemple.desc': 'The three deployed lineage heirs fuse into one master class.',
+            'fusionTemple.masterGateDesc': 'A gate linking the master world and mortal world.',
+            'fusionTemple.fuse': 'Fuse',
+            'fusionTemple.enterMasterWorld': 'Enter Master World',
+            'fusionTemple.returnToMortalWorld': 'Return to Mortal World',
 
             // Tactical markers
             'tactical.ping.position': 'Ping Location',

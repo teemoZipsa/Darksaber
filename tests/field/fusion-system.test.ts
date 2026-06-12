@@ -56,6 +56,8 @@ test('active party fusion consumes three ready base classes into one T8 master c
     const candidates = getFusionCandidates(party);
     const battle = candidates.find((candidate) => candidate.branch === 'battle');
     assert.equal(battle?.canFuse, true);
+    assert.equal(battle?.masterNameEn, 'Battle Master');
+    assert.equal(battle?.requirements[0]?.classNameEn, 'Infantry');
 
     const result = fuseActivePartyBranch(party, 'battle');
 

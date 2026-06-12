@@ -1,6 +1,7 @@
 import type { FusionCandidate } from '../character/FusionSystem';
 import type { MasterBranch } from '../data/ClassTree';
 import type { InputManager } from '../engine/InputManager';
+import { i18n, t } from '../i18n/LanguageManager';
 import type { WorldRealm } from '../map/BiomeMask';
 import { UI, Parchment, drawParchmentPanel, drawParchmentButton, renderGameTitle } from './UITheme';
 
@@ -102,11 +103,11 @@ export class FusionTempleUI {
         ctx.textBaseline = 'top';
         ctx.font = `bold 28px ${UI.fontPrimary}`;
         ctx.fillStyle = this.state.realm === 'master' ? '#1f4878' : '#5a2d6e';
-        ctx.fillText(this.state.realm === 'master' ? '현세의 문' : '융합의 신전', x + panelW / 2, y + 28);
+        ctx.fillText(this.state.realm === 'master' ? t('fusionTemple.masterGateTitle') : t('fusionTemple.title'), x + panelW / 2, y + 28);
         ctx.font = `13px ${UI.fontPrimary}`;
         ctx.fillStyle = Parchment.textMid;
         ctx.fillText(
-            this.state.realm === 'master' ? '마스터 월드와 현세를 잇는 문' : '출격 중인 세 계통의 전승자가 하나의 마스터 클래스로 융합합니다.',
+            this.state.realm === 'master' ? t('fusionTemple.masterGateDesc') : t('fusionTemple.desc'),
             x + panelW / 2,
             y + 64
         );
@@ -134,20 +135,21 @@ export class FusionTempleUI {
             ctx.font = `bold 16px ${UI.fontPrimary}`;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
-            ctx.fillText(candidate.masterNameKr, rowX + 18, rowY + 14);
+            ctx.fillText(i18n.lang === 'en' ? candidate.masterNameEn : candidate.masterNameKr, rowX + 18, rowY + 14);
 
             ctx.font = `11px ${UI.fontPrimary}`;
             ctx.fillStyle = Parchment.textMid;
             const requirementText = candidate.requirements.map((requirement) => {
                 const mark = requirement.ready ? 'OK' : '--';
-                const name = requirement.character ? requirement.character.name : requirement.classNameKr;
-                return `${mark} ${requirement.classNameKr}:${name}`;
+                const className = i18n.lang === 'en' ? requirement.classNameEn : requirement.classNameKr;
+                const name = requirement.character ? requirement.character.name : className;
+                return `${mark} ${className}:${name}`;
             }).join('   ');
             ctx.fillText(requirementText, rowX + 18, rowY + 42);
 
             const button = {
                 rect: { x: rowX + rowW - 126, y: rowY + 18, w: 96, h: 36 },
-                label: '융합',
+                label: t('fusionTemple.fuse'),
                 disabled: !candidate.canFuse,
                 action: { kind: 'fuse', branch: candidate.branch } as TempleAction,
             };
@@ -158,7 +160,7 @@ export class FusionTempleUI {
 
         const enterButton = {
             rect: { x: x + panelW / 2 - 95, y: y + panelH - 86, w: 190, h: 42 },
-            label: '마스터 월드 입장',
+            label: t('fusionTemple.enterMasterWorld'),
             disabled: !this.state.canEnterMasterWorld,
             action: { kind: 'enterMasterWorld' } as TempleAction,
         };
@@ -187,7 +189,7 @@ export class FusionTempleUI {
 
         const returnButton = {
             rect: { x: x + panelW / 2 - 86, y: y + panelH - 92, w: 172, h: 42 },
-            label: '현세로 귀환',
+            label: t('fusionTemple.returnToMortalWorld'),
             disabled: false,
             action: { kind: 'returnToMortalWorld' } as TempleAction,
         };
