@@ -557,7 +557,7 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
     // Route subtitle
     ctx.fillStyle = Parchment.textMid;
     ctx.font = `12px ${UI.fontPrimary}`;
-    ctx.fillText(`${model.raid.departureTownId}  →  다른 마을 생환`, x + bannerW / 2, y + bannerH - 14);
+    ctx.fillText(formatT('raid.banner.extractOtherTown', { town: model.raid.departureTownId }), x + bannerW / 2, y + bannerH - 14);
 
     ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';
@@ -565,15 +565,15 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
 }
 
 /**
- * Compact bottom-right key-hint strip. Single thin line of inline `Key 설명`
+ * Compact bottom-right key-hint strip. Single thin line of inline key labels
  * pairs — no parchment chrome, just text with a subtle shadow for readability.
  */
 function renderKeyHintStrip(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
     const segments: { key: string; label: string }[] = [
-        { key: 'Tab', label: '교체' },
-        { key: 'M',   label: '지도' },
-        { key: 'I',   label: '인벤' },
-        { key: 'ESC', label: '메뉴' },
+        { key: 'Tab', label: t('field.keyHint.swap') },
+        { key: 'M',   label: t('field.keyHint.map') },
+        { key: 'I',   label: t('field.keyHint.inventory') },
+        { key: 'ESC', label: t('field.keyHint.menu') },
     ];
 
     ctx.save();
