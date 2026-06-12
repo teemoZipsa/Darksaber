@@ -22,12 +22,16 @@ export function getEnemyRoleLabel(role: EnemyRole): string {
 }
 
 export function getCombatLogColor(line: string): string {
-    if (line.includes('처치') || line.includes('치명')) return '#ffd15f';
-    if (line.includes('피해') || line.includes('약화') || line.includes('독')) return '#ff8a8a';
-    if (line.includes('회복') || line.includes('강화') || line.includes('방어')) return '#9dffb0';
-    if (line.includes('명중 실패') || line.includes('빗나감')) return '#d9d9e8';
-    if (line.includes('턴 시작') || line.includes('READY')) return '#88ddff';
+    if (matchesAnyLocalizedKeyword(line, 'field.logColor.gold')) return '#ffd15f';
+    if (matchesAnyLocalizedKeyword(line, 'field.logColor.danger')) return '#ff8a8a';
+    if (matchesAnyLocalizedKeyword(line, 'field.logColor.support')) return '#9dffb0';
+    if (matchesAnyLocalizedKeyword(line, 'field.logColor.miss')) return '#d9d9e8';
+    if (matchesAnyLocalizedKeyword(line, 'field.logColor.ready')) return '#88ddff';
     return 'rgba(255,255,255,0.78)';
+}
+
+function matchesAnyLocalizedKeyword(line: string, key: string): boolean {
+    return t(key).split('|').some((keyword) => keyword.length > 0 && line.includes(keyword));
 }
 
 export function getTacticalMarkerColor(marker: TacticalMarker): string {

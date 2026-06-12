@@ -18,15 +18,19 @@ test('field display maps enemy roles and log colors', () => {
         i18n.lang = 'ko';
         assert.equal(getEnemyRoleLabel('boss'), '보스 몬스터');
         assert.equal(getEnemyRoleLabel('bruiser'), '근접형 몬스터');
+        assert.equal(getCombatLogColor('고블린 처치!'), '#ffd15f');
+        assert.equal(getCombatLogColor('명중 실패'), '#d9d9e8');
+        assert.equal(getCombatLogColor('대기'), 'rgba(255,255,255,0.78)');
+
         i18n.lang = 'en';
         assert.equal(getEnemyRoleLabel('boss'), 'Boss monster');
         assert.equal(getEnemyRoleLabel('bruiser'), 'Melee monster');
+        assert.equal(getCombatLogColor('Goblin defeated'), '#ffd15f');
+        assert.equal(getCombatLogColor('Goblin missed'), '#d9d9e8');
+        assert.equal(getCombatLogColor('waiting'), 'rgba(255,255,255,0.78)');
     } finally {
         i18n.lang = previousLang;
     }
-    assert.equal(getCombatLogColor('고블린 처치!'), '#ffd15f');
-    assert.equal(getCombatLogColor('명중 실패'), '#d9d9e8');
-    assert.equal(getCombatLogColor('대기'), 'rgba(255,255,255,0.78)');
 });
 
 test('field display colors tactical markers by target priority', () => {
