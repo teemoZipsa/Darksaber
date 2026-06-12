@@ -60,14 +60,10 @@ import {
 } from '../src/field/FieldActionEconomy';
 import {
     FIELD_ATB_SCALE,
-    ENEMY_AGGRO_RANGE,
-    ENEMY_COMBAT_SIMULATION_RANGE,
-    ENEMY_EXIT_RANGE,
     ENEMY_LEASH_RANGE,
-    ENEMY_SIMULATION_ACTIVE_RANGE,
 } from '../src/field/FieldConfig';
 import { decideEnemyAction, type EnemyAIDecision, type EnemyAIUnit } from '../src/field/EnemyAI';
-import { advanceAtb, resolveAggroState } from '../src/field/FieldCombat';
+import { advanceAtb } from '../src/field/FieldCombat';
 import {
     findPathToAny,
     findPathWithCost,
@@ -111,6 +107,7 @@ import {
 import type { CharacterSave } from './AuthStore';
 import { WorldSessionLootState, type WorldSessionLootLock } from './WorldSessionLootState';
 import { cloneCharacterSave, WorldSessionSaveState, type WorldCharacterSavePatch } from './WorldSessionSaveState';
+import { WorldSessionEnemyState } from './WorldSessionEnemyState';
 
 export const WORLD_TICK_MS = 100;
 export const DISCONNECT_GRACE_MS = 30_000;
@@ -237,6 +234,7 @@ export class WorldSession {
     private readonly lootState = new WorldSessionLootState(AUTO_LOOT_RESPONSE_MS);
     private readonly generatedLootChunks = new Set<string>();
     private readonly saveState = new WorldSessionSaveState();
+    private readonly enemyState: WorldSessionEnemyState<ServerEnemy, ServerActor>;
     private readonly restingRecoveryTimers = new Map<string, number>();
     private seq = 0;
     private nextPlayerId = 1;
@@ -252,6 +250,10 @@ export class WorldSession {
         this.shardId = `${this.worldMap.getRealm()}`;
         this.ghostGraceMs = options.ghostGraceMs ?? DISCONNECT_GRACE_MS;
         this.logger = options.logger ?? (() => undefined);
+        this.enemyState = new WorldSessionEnemyState<ServerEnemy, ServerActor>({
+            getTargetableActors: (entry) => this.getTargetableActors(entry),
+            hasActiveActorWithin: (tile, distance, ownerPlayerId) => this.hasActiveActorWithin(tile, distance, ownerPlayerId),
+        });
     }
 
     public join(message: WorldJoinMessage, now: number = Date.now(), context: WorldJoinContext = {}): { playerId: string; welcome: WorldWelcomeMessage } {
@@ -466,18 +468,7 @@ export class WorldSession {
         for (const entry of this.enemies.values()) {
             const enemy = entry.enemy;
             if (enemy.stats.hp <= 0) continue;
-            if (!this.isEnemySimulationActive(entry)) {
-                enemy.actionGauge = 0;
-                enemy.isAggro = false;
-                continue;
-            }
-            if (!this.updateEnemyAggro(entry)) {
-                enemy.actionGauge = 0;
-                continue;
-            }
-            enemy.actionGauge = advanceAtb(enemy.actionGauge, getEffectiveStatsForEnemy(enemy).spd, dt, FIELD_ATB_SCALE * 0.7);
-            if (enemy.actionGauge >= 100) {
-                enemy.actionGauge = 100;
+            if (this.enemyState.advanceEnemy(entry, dt) === 'ready') {
                 events.push(...this.resolveEnemyTurn(entry, now));
                 enemy.actionGauge = 0;
             }
@@ -1127,48 +1118,16 @@ export class WorldSession {
         return autoLootGrant;
     }
 
-    private isEnemySimulationActive(entry: ServerEnemy): boolean {
-        const enemy = entry.enemy;
-        const range = enemy.isAggro ? ENEMY_COMBAT_SIMULATION_RANGE : ENEMY_SIMULATION_ACTIVE_RANGE;
-        return this.hasActiveActorWithin({ x: enemy.gridX, y: enemy.gridY }, range, entry.scenarioPlayerId);
-    }
-
-    private updateEnemyAggro(entry: ServerEnemy): boolean {
-        const enemy = entry.enemy;
-        const targets = this.getTargetableActors(entry);
-        const enemyTile = { x: enemy.gridX, y: enemy.gridY };
-        const closest = targets.reduce<ServerActor | null>((best, candidate) => {
-            if (!best) return candidate;
-            return manhattan(enemyTile, candidate.tile) < manhattan(enemyTile, best.tile) ? candidate : best;
-        }, null);
-        if (!closest) {
-            enemy.isAggro = false;
-            return false;
-        }
-
-        const distanceToTarget = manhattan(enemyTile, closest.tile);
-        const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
-        enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
-        return enemy.isAggro;
-    }
-
     private resolveEnemyTurn(entry: ServerEnemy, now: number): CombatEventMessage[] {
         const enemy = entry.enemy;
         const targets = this.getTargetableActors(entry);
-        const enemyTile = { x: enemy.gridX, y: enemy.gridY };
-        const closest = targets.reduce<ServerActor | null>((best, candidate) => {
-            if (!best) return candidate;
-            return manhattan(enemyTile, candidate.tile) < manhattan(enemyTile, best.tile) ? candidate : best;
-        }, null);
+        const closest = this.enemyState.findClosestTarget(entry, targets);
         if (!closest) {
             this.wanderEnemy(entry, now);
             return [];
         }
 
-        const distanceToTarget = manhattan(enemyTile, closest.tile);
-        const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
-        enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
-        if (!enemy.isAggro) {
+        if (!this.enemyState.refreshAggro(entry, closest)) {
             this.wanderEnemy(entry, now);
             return [];
         }
