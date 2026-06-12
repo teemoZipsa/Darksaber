@@ -11,6 +11,7 @@ import { STORY_SCENARIOS } from '../data/StoryScenarioData';
 import { isStoryInteriorDungeon } from '../data/StoryInteriorData';
 import { t } from '../i18n/LanguageManager';
 import WORLD_LOCATIONS from '../data/content/world-locations.json';
+import WORLD_MAP_ROUTES_JSON from '../data/content/world-map-routes.json';
 
 export interface TileBounds {
     width: number;
@@ -107,124 +108,14 @@ interface TileRoute {
     noiseSalt: number;
 }
 
-const ROAD_ROUTES: TileRoute[] = [
-    {
-        points: [
-            { chunkX: 16, chunkY: 11 },
-            { chunkX: 23, chunkY: 23 },
-            { chunkX: 30, chunkY: 35 },
-            { chunkX: 37, chunkY: 44 },
-        ],
-        width: 2.2,
-        noiseSalt: 101,
-    },
-    {
-        points: [
-            { chunkX: 10, chunkY: 52 },
-            { chunkX: 20, chunkY: 48 },
-            { chunkX: 28, chunkY: 45 },
-            { chunkX: 37, chunkY: 44 },
-        ],
-        width: 2.2,
-        noiseSalt: 102,
-    },
-    {
-        points: [
-            { chunkX: 37, chunkY: 44 },
-            { chunkX: 39, chunkY: 62 },
-            { chunkX: 41, chunkY: 80 },
-        ],
-        width: 2.3,
-        noiseSalt: 103,
-    },
-    {
-        points: [
-            { chunkX: 12, chunkY: 79 },
-            { chunkX: 24, chunkY: 82 },
-            { chunkX: 41, chunkY: 80 },
-        ],
-        width: 2.1,
-        noiseSalt: 104,
-    },
-    {
-        points: [
-            { chunkX: 64, chunkY: 23 },
-            { chunkX: 64, chunkY: 35 },
-            { chunkX: 63, chunkY: 49 },
-            { chunkX: 63, chunkY: 60 },
-            { chunkX: 63, chunkY: 72 },
-        ],
-        width: 2.1,
-        noiseSalt: 105,
-    },
-    // Main story spine: threads the central inland scenarios in episode order
-    // (Ep4 -> Ep3 -> Ep2 -> Ep1 -> Ep7 -> Ep6 -> Ep16 -> Ep5 -> Ep8 -> Ep10),
-    // tying into the central castle so the campaign reads as a single trail.
-    {
-        points: [
-            { chunkX: 43, chunkY: 17 },
-            { chunkX: 43, chunkY: 24 },
-            { chunkX: 37, chunkY: 44 },
-            { chunkX: 43, chunkY: 40 },
-            { chunkX: 47, chunkY: 40 },
-            { chunkX: 45, chunkY: 45 },
-            { chunkX: 47, chunkY: 48 },
-            { chunkX: 47, chunkY: 53 },
-            { chunkX: 47, chunkY: 59 },
-            { chunkX: 51, chunkY: 64 },
-        ],
-        width: 2.3,
-        noiseSalt: 106,
-    },
-    // Eastern Ament branch, kept on the east continent between its two towns.
-    {
-        points: [
-            { chunkX: 64, chunkY: 23 },
-            { chunkX: 67, chunkY: 34 },
-            { chunkX: 64, chunkY: 37 },
-            { chunkX: 61, chunkY: 40 },
-            { chunkX: 63, chunkY: 49 },
-        ],
-        width: 2.1,
-        noiseSalt: 107,
-    },
-    // North-west desert branch: desert city -> Oasis -> Pyramid cluster.
-    {
-        points: [
-            { chunkX: 16, chunkY: 11 },
-            { chunkX: 18, chunkY: 20 },
-            { chunkX: 21, chunkY: 16 },
-            { chunkX: 24, chunkY: 16 },
-        ],
-        width: 2.1,
-        noiseSalt: 108,
-    },
-];
+interface WorldMapRoutesContent {
+    roads: TileRoute[];
+    rivers: TileRoute[];
+}
 
-const RIVER_ROUTES: TileRoute[] = [
-    {
-        points: [
-            { chunkX: 32, chunkY: 25 },
-            { chunkX: 36, chunkY: 34 },
-            { chunkX: 34, chunkY: 48 },
-            { chunkX: 29, chunkY: 59 },
-            { chunkX: 21, chunkY: 72 },
-        ],
-        width: 2.4,
-        noiseSalt: 201,
-    },
-    {
-        points: [
-            { chunkX: 68, chunkY: 16 },
-            { chunkX: 66, chunkY: 31 },
-            { chunkX: 61, chunkY: 44 },
-            { chunkX: 65, chunkY: 58 },
-            { chunkX: 61, chunkY: 75 },
-        ],
-        width: 2.1,
-        noiseSalt: 202,
-    },
-];
+const WORLD_MAP_ROUTES = WORLD_MAP_ROUTES_JSON as WorldMapRoutesContent;
+const ROAD_ROUTES: TileRoute[] = WORLD_MAP_ROUTES.roads;
+const RIVER_ROUTES: TileRoute[] = WORLD_MAP_ROUTES.rivers;
 
 const DUNGEON_LANDMARKS: WorldDungeonInfo[] = [
     ...WORLD_LOCATION_CONTENT.beginnerDungeons,
