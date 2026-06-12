@@ -1061,8 +1061,12 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         assert.deepEqual(layout.bossTile, getOriginalLateStoryBossTile(episode));
         assert.deepEqual(layout.guardTiles, getOriginalLateStoryGuardTiles(episode));
         assert.equal(hasWalkablePath(map, layout.playerStart, layout.bossTile), true, fact.dungeonId);
-        for (const tile of [...layout.guardTiles, layout.entryTile, layout.playerStart, layout.bossTile]) {
+        const stagingTiles = fact.staging.map((position) => ({ x: position.x, y: position.y }));
+        for (const tile of [...layout.guardTiles, ...stagingTiles, layout.entryTile, layout.playerStart, layout.bossTile]) {
             assert.equal(map.isWalkable(tile.x, tile.y), true, `${fact.dungeonId}:${tile.x},${tile.y}`);
+        }
+        for (const tile of stagingTiles) {
+            assert.equal(hasWalkablePath(map, layout.playerStart, tile), true, `${fact.dungeonId}:staging:${tile.x},${tile.y}`);
         }
 
         const expectedCaches = getOriginalLateStoryCacheEvents(episode);
@@ -1078,6 +1082,13 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         assert.equal(entryMove.actorId, 'hero');
         assert.deepEqual(entryMove.target, { x: layout.playerStart.x, y: layout.playerStart.y - 1 });
         assert.equal(map.isWalkable(entryMove.target.x, entryMove.target.y), true, fact.dungeonId);
+        const entryFocusKeys = new Set(sequence.entry.flatMap((step) => {
+            const tile = step.kind === 'focus' ? step.target : step.focus;
+            return tile ? [`${tile.x},${tile.y}`] : [];
+        }));
+        for (const tile of stagingTiles) {
+            assert.equal(entryFocusKeys.has(`${tile.x},${tile.y}`), true, `${fact.dungeonId}:entry staging focus:${tile.x},${tile.y}`);
+        }
         assert.ok(sequence.entry.every((step) => getStoryScenarioEventStepDurationMs(step) > 0), fact.dungeonId);
         assert.ok(sequence.bossDefeat.every((step) => getStoryScenarioEventStepDurationMs(step) > 0), fact.dungeonId);
         assert.ok(getStoryScenarioPresentationDurationMs(sequence.entry) >= 3150, fact.dungeonId);
