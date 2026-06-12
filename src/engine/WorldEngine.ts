@@ -905,6 +905,10 @@ export class WorldEngine {
         return this.raidLifecycleController.beginRaidFromCurrentHub(requestedRealm);
     }
 
+    public closeNetworkRaidClient(sendLeave: boolean, reason: 'town' | 'wipe' | 'manual' = 'manual'): void {
+        this.raidLifecycleController.closeNetworkRaidClient(sendLeave, reason);
+    }
+
     private closeFieldOverlays(): void {
         if (this.gameManager.inventoryUI.isVisible()) this.gameManager.inventoryUI.toggle();
         if (this.gameManager.partyUI.isVisible()) this.gameManager.partyUI.toggle();
