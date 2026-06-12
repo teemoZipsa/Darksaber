@@ -1,3 +1,4 @@
+import STORY_INTERIORS_JSON from './content/story-interiors.json';
 import type { TilePoint } from '../field/FieldPathing';
 import { TILE_PROPERTIES, TileType } from '../map/Tile';
 
@@ -31,6 +32,11 @@ export interface StoryInteriorLayout {
     bossTile: TilePoint;
     rooms: StoryInteriorRoom[];
     props: StoryInteriorProp[];
+}
+
+interface StoryInteriorSpec {
+    dungeonId: string;
+    theme: StoryInteriorTheme;
 }
 
 const BASE_WIDTH = 26;
@@ -85,16 +91,9 @@ function layout(dungeonId: string, theme: StoryInteriorTheme): StoryInteriorLayo
     };
 }
 
-export const STORY_INTERIOR_LAYOUTS: StoryInteriorLayout[] = [
-    layout('burgos_castle', 'castle'),
-    layout('zamora_fortress', 'castle'),
-    layout('etna_volcano', 'volcano'),
-    layout('sagrajas_temple', 'temple'),
-    layout('pyramid_inside', 'pyramid'),
-    layout('ament_gate', 'ament'),
-    layout('ament_1f', 'ament'),
-    layout('ament_2f', 'ament'),
-];
+const STORY_INTERIOR_SPECS = STORY_INTERIORS_JSON as StoryInteriorSpec[];
+
+export const STORY_INTERIOR_LAYOUTS: StoryInteriorLayout[] = STORY_INTERIOR_SPECS.map((spec) => layout(spec.dungeonId, spec.theme));
 
 export function getStoryInteriorLayout(dungeonId: string): StoryInteriorLayout | null {
     return STORY_INTERIOR_LAYOUTS.find((entry) => entry.dungeonId === dungeonId) ?? null;

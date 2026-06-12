@@ -1,0 +1,10 @@
+[
+  { "dungeonId": "burgos_castle", "theme": "castle" },
+  { "dungeonId": "zamora_fortress", "theme": "castle" },
+  { "dungeonId": "etna_volcano", "theme": "volcano" },
+  { "dungeonId": "sagrajas_temple", "theme": "temple" },
+  { "dungeonId": "pyramid_inside", "theme": "pyramid" },
+  { "dungeonId": "ament_gate", "theme": "ament" },
+  { "dungeonId": "ament_1f", "theme": "ament" },
+  { "dungeonId": "ament_2f", "theme": "ament" }
+]
