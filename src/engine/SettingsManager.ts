@@ -2,6 +2,8 @@
  * Global settings manager for user preferences.
  * Saves and loads from localStorage to persist user choices across reloads.
  */
+import { t } from '../i18n/LanguageManager';
+
 export class SettingsManager {
     private static showGrid: boolean = false;
     private static showFPS: boolean = false;
@@ -113,7 +115,7 @@ export class SettingsManager {
     }
 
     public static getFPSLimitLabel(): string {
-        return this.fpsLimit === 0 ? '무제한' : `${this.fpsLimit}`;
+        return this.fpsLimit === 0 ? t('settings.fpsUnlimited') : `${this.fpsLimit}`;
     }
 
     /** Minimum frame interval in ms (0 = no limit) */
