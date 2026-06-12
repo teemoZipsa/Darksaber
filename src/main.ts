@@ -35,11 +35,6 @@ type DevFieldActor = {
     path: DevTile[];
     queuedIntent: unknown;
 };
-type DevNetworkRaidState = {
-    activate: (playerId: string) => void;
-    deactivate: () => void;
-    setClient: (client: unknown) => void;
-};
 type DevWorldEngine = {
     partyActors: DevFieldActor[];
     fieldEnemies: Array<{ enemy: Enemy; home: DevTile; path: DevTile[] }>;
@@ -54,9 +49,10 @@ type DevWorldEngine = {
     };
     clearFieldTurnState: () => void;
     closeNetworkRaidClient?: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => void;
-    getNetworkRaidState: () => DevNetworkRaidState;
     addCombatLog?: (message: string) => void;
     currentPhase: string;
+    isNetworkRaid?: boolean;
+    networkRaidClient?: unknown;
     player: DevEntity;
     activeTurnActorId: string | null;
     readyQueue: string[];
@@ -206,7 +202,7 @@ function applyDevRaidScenario(manager: GameManager, scenario: DevRaidScenario): 
         return;
     }
 
-    world.closeNetworkRaidClient?.(false);
+    deactivateDevNetworkRaid(world);
     world.currentPhase = 'raid';
     manager.inventoryUI.setActiveCharacter(actor.character as Parameters<typeof manager.inventoryUI.setActiveCharacter>[0]);
 
@@ -219,8 +215,14 @@ function getDevWorldEngine(manager: GameManager): DevWorldEngine | null {
     return (manager as unknown as { worldEngine?: DevWorldEngine }).worldEngine ?? null;
 }
 
+function deactivateDevNetworkRaid(world: DevWorldEngine): void {
+    world.closeNetworkRaidClient?.(false);
+    world.isNetworkRaid = false;
+    world.networkRaidClient = null;
+}
+
 function applyDevAggroScenario(world: DevWorldEngine, actor: DevFieldActor): void {
-    world.getNetworkRaidState().deactivate();
+    deactivateDevNetworkRaid(world);
     world.partyActors = [actor];
 
     const actorTile = findWalkableTile(world, { x: actor.entity.gridX, y: actor.entity.gridY });
@@ -269,9 +271,8 @@ function applyDevAggroScenario(world: DevWorldEngine, actor: DevFieldActor): voi
 }
 
 function applyDevLootScenario(manager: GameManager, world: DevWorldEngine, actor: DevFieldActor): void {
-    const networkRaid = world.getNetworkRaidState();
-    networkRaid.setClient(createDevLootClient());
-    networkRaid.activate('dev-scenario');
+    world.networkRaidClient = createDevLootClient();
+    world.isNetworkRaid = true;
     world.partyActors = [actor];
 
     const actorTile = findWalkableTile(world, { x: actor.entity.gridX, y: actor.entity.gridY });
@@ -302,7 +303,7 @@ function applyDevLootScenario(manager: GameManager, world: DevWorldEngine, actor
 }
 
 function applyDevStory31Scenario(world: DevWorldEngine): void {
-    world.getNetworkRaidState().deactivate();
+    deactivateDevNetworkRaid(world);
     const dungeon = world.worldMap.getDungeons?.().find((candidate) => candidate.id === 'demon_fixers_den');
     const quest = getStoryQuestByDungeonId('demon_fixers_den');
     if (!dungeon || !quest || !world.storyScenarioController) {
