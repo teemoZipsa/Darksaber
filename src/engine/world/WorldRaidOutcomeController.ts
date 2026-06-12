@@ -1,9 +1,12 @@
 import type { PartyManager } from '../../character/PartyManager';
 import { Character } from '../../character/Character';
-import { getItemDef } from '../../data/ItemDB';
+import { getItemDef, type ItemDef } from '../../data/ItemDB';
 import type { PlayerData } from '../../data/PlayerData';
+import type { PlacedItem } from '../../inventory/GridInventory';
+import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../../data/StarterKitData';
+import { STORY_SCENARIO_EVENT_SEQUENCES } from '../../data/StoryScenarioEventData';
 import { STORY_QUESTS, type StoryQuestReward } from '../../data/StoryQuestData';
-import { formatT, t } from '../../i18n/LanguageManager';
+import { t } from '../../i18n/LanguageManager';
 import type { TownInfo } from '../../map/BiomeMask';
 import {
     computeRaidFailureLoss,
@@ -71,8 +74,9 @@ export class WorldRaidOutcomeController {
             this.context.playerData.markCleared('quest:first_survival');
             this.context.playerData.addGold(200);
             goldReward = 200;
-            questRewards.push(formatT('raid.outcome.firstSurvivalQuest', { completed: t('quest.completed') }));
+            questRewards.push('퀘스트 완료: 첫 생환');
         }
+        questRewards.push(...this.completeScenarioRuntimeQuestItems());
         questRewards.push(...this.completeStoryQuestRewards());
 
         raidSession.completeAtTown(destination.id);
@@ -97,10 +101,10 @@ export class WorldRaidOutcomeController {
             equipmentLost: [],
             goldReward,
             questRewards,
-            notes: [t('raid.outcome.sessionOnlyNote')],
+            notes: ['전리품과 창고는 현재 세션에서만 유지됩니다.'],
         };
         this.showRaidResult(outcome, destination);
-        this.context.log(formatT('raid.outcome.survivedLog', { town: destination.nameKr }));
+        this.context.log(`${destination.nameKr} 생환 성공.`);
     }
 
     public completeFailure(result: Exclude<RaidResultType, 'SURVIVED'>): void {
@@ -114,6 +118,7 @@ export class WorldRaidOutcomeController {
             const character = this.context.party.getCharacters().find((candidate) => candidate.id === lost.characterId);
             character?.unequip(lost.slot);
         }
+        const recoveryNotes = this.applyRaidFailureRecoveryKit();
 
         const returnTown = this.context.getTownById(raidSession.departureTownId) ?? this.context.getCurrentHubTown();
         raidSession.failBackToTown(returnTown.id);
@@ -136,10 +141,52 @@ export class WorldRaidOutcomeController {
             secured: [],
             lost: mergeSnapshots(loss.backpackLost),
             equipmentLost: loss.equipmentLost,
-            notes: [t(result === 'MIA' ? 'raid.outcome.miaNote' : 'raid.outcome.deadNote')],
+            notes: [
+                result === 'MIA' ? '시간 초과로 실종 처리되었습니다.' : '출격조가 전멸했습니다.',
+                ...recoveryNotes,
+            ],
         };
         this.showRaidResult(outcome, returnTown);
-        this.context.log(t(result === 'MIA' ? 'raid.outcome.miaLog' : 'raid.outcome.deadLog'));
+        this.context.log(result === 'MIA' ? '시간 초과. 손실이 적용되었습니다.' : '전멸. 손실이 적용되었습니다.');
+        if (recoveryNotes.length > 0) this.context.log('기본 보급품을 지급했습니다.');
+    }
+
+    private applyRaidFailureRecoveryKit(): string[] {
+        let equippedCount = 0;
+        for (const character of this.context.party.getCharacters()) {
+            equippedCount += this.equipRecoveryItemIfEmpty(character, STARTER_WEAPON_ITEM_ID) ? 1 : 0;
+            equippedCount += this.equipRecoveryItemIfEmpty(character, this.getRecoveryBodyArmorId(character)) ? 1 : 0;
+        }
+
+        let backpackCount = 0;
+        for (const itemId of STARTER_CONSUMABLE_ITEM_IDS) {
+            const item = getItemDef(itemId);
+            if (item && this.context.gameManager.inventory.autoPlace(item)) backpackCount += 1;
+        }
+
+        if (equippedCount === 0 && backpackCount === 0) return [];
+        return [`기본 보급품 지급: 장비 ${equippedCount}개, 소모품 ${backpackCount}개`];
+    }
+
+    private equipRecoveryItemIfEmpty(character: Character, itemId: string): boolean {
+        const item = getItemDef(itemId);
+        if (!item || item.slot === 'consumable' || character.equipment.has(item.slot)) return false;
+        character.equip(this.createRecoveryPlacedItem(item));
+        return true;
+    }
+
+    private getRecoveryBodyArmorId(character: Character): string {
+        return getStarterBodyArmorId(character.classLineId);
+    }
+
+    private createRecoveryPlacedItem(item: ItemDef): PlacedItem {
+        return {
+            item,
+            gridX: 0,
+            gridY: 0,
+            durability: item.maxDurability,
+            quantity: 1,
+        };
     }
 
     private completeStoryQuestRewards(): string[] {
@@ -151,6 +198,22 @@ export class WorldRaidOutcomeController {
             this.context.playerData.markCleared(quest.id);
             rewards.push(`${t('quest.completed')}: ${t(quest.titleKey)}`);
             rewards.push(this.grantStoryQuestReward(quest.reward));
+        }
+        return rewards;
+    }
+
+    private completeScenarioRuntimeQuestItems(): string[] {
+        const rewards: string[] = [];
+        for (const sequence of STORY_SCENARIO_EVENT_SEQUENCES) {
+            for (const event of sequence.fieldEvents) {
+                if (!event.runtimeFlag || !event.questItemId) continue;
+                if (!this.context.raidSession.hasScenarioFlag(sequence.dungeonId, event.runtimeFlag)) continue;
+                if (this.context.playerData.hasQuestItem(event.questItemId)) continue;
+
+                this.context.playerData.addQuestItem(event.questItemId);
+                const item = getItemDef(event.questItemId);
+                rewards.push(`${t('quest.rewardItem')}: ${item?.nameKr ?? event.questItemId}`);
+            }
         }
         return rewards;
     }

@@ -42,6 +42,10 @@ function chunkCenter(chunkX: number, chunkY: number): { x: number; y: number } {
     };
 }
 
+function isWaterTile(tile: TileType): boolean {
+    return tile === TileType.WATER || tile === TileType.DEEP_WATER;
+}
+
 function inventoryCharacter(): Character {
     return { equipment: new Map() } as Character;
 }
@@ -644,6 +648,11 @@ test('WorldMap exposes walkable non-town exits for every town', () => {
     assert.ok(kaosia);
     const kaosiaExit = world.getTownExitTile(kaosia);
     assert.equal(world.getTileAt(kaosiaExit.x, kaosiaExit.y), TileType.ROAD);
+    const kaosiaCenter = chunkCenter(kaosia.chunkX, kaosia.chunkY);
+    assert.ok(
+        Math.hypot(kaosiaExit.x - kaosiaCenter.x, kaosiaExit.y - kaosiaCenter.y) <= 20,
+        'Kaosia exit should place players just outside the castle, not at the edge of the old chunk-radius town area',
+    );
 });
 
 test('rest facility data matches every world town and keeps menu ids unique', () => {
@@ -734,6 +743,51 @@ test('WorldMap lays deterministic rivers while road crossings remain walkable', 
     const bridge = chunkCenter(64, 35);
     assert.equal(world.getTileAt(bridge.x, bridge.y), TileType.ROAD);
     assert.ok(world.isWalkable(bridge.x, bridge.y), 'road crossing should stay walkable');
+});
+
+test('WorldMap connects harbor and island scenarios to coastal water', () => {
+    const world = new WorldMap();
+    const zamoraWaterAnchors = [
+        { label: 'Zamora upper river channel', chunkX: 33, chunkY: 28 },
+        { label: 'Zamora west fortress channel', chunkX: 33, chunkY: 32 },
+        { label: 'Zamora lower river channel', chunkX: 34, chunkY: 36 },
+    ];
+
+    for (const anchor of zamoraWaterAnchors) {
+        const tile = chunkCenter(anchor.chunkX, anchor.chunkY);
+        assert.ok(isWaterTile(world.getTileAt(tile.x, tile.y)), `${anchor.label} should be water`);
+    }
+
+    const zamoraEntrance = chunkCenter(34, 32);
+    assert.equal(world.getTileAt(zamoraEntrance.x, zamoraEntrance.y), TileType.DUNGEON_ENTRANCE);
+    assert.ok(world.isWalkable(zamoraEntrance.x, zamoraEntrance.y), 'Zamora entrance should stay walkable');
+
+    const saguntoWaterAnchors = [
+        { label: 'Sagunto harbor inlet', chunkX: 48, chunkY: 63 },
+        { label: 'Sagunto sea channel', chunkX: 50, chunkY: 69 },
+        { label: 'Sagunto open sea', chunkX: 52, chunkY: 75 },
+    ];
+
+    for (const anchor of saguntoWaterAnchors) {
+        const tile = chunkCenter(anchor.chunkX, anchor.chunkY);
+        assert.ok(isWaterTile(world.getTileAt(tile.x, tile.y)), `${anchor.label} should be water`);
+    }
+
+    const sicilioEntrance = chunkCenter(41, 72);
+    assert.equal(world.getTileAt(sicilioEntrance.x, sicilioEntrance.y), TileType.DUNGEON_ENTRANCE);
+    assert.ok(world.isWalkable(sicilioEntrance.x, sicilioEntrance.y), 'Sicilio entrance should stay walkable');
+
+    const sicilioCoastAnchors = [
+        { label: 'Sicilio west coast', chunkX: 37, chunkY: 72 },
+        { label: 'Sicilio north coast', chunkX: 41, chunkY: 67 },
+        { label: 'Sicilio east coast', chunkX: 47, chunkY: 72 },
+        { label: 'Sicilio south coast', chunkX: 41, chunkY: 77 },
+    ];
+
+    for (const anchor of sicilioCoastAnchors) {
+        const tile = chunkCenter(anchor.chunkX, anchor.chunkY);
+        assert.ok(isWaterTile(world.getTileAt(tile.x, tile.y)), `${anchor.label} should be water`);
+    }
 });
 
 test('WorldMap keeps near and far out-of-bounds water behavior', () => {

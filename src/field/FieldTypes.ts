@@ -2,6 +2,7 @@ import type { Character } from '../character/Character';
 import type { Skill } from '../data/SkillDB';
 import type { Enemy } from '../entity/Enemy';
 import type { Player } from '../entity/Player';
+import type { EnemyAIDecision } from './EnemyAI';
 import type { TilePoint } from './FieldPathing';
 
 export interface FieldIntent {
@@ -28,6 +29,7 @@ export interface FieldEnemy {
     enemy: Enemy;
     home: TilePoint;
     path: TilePoint[];
+    previewIntent?: EnemyAIDecision | null;
 }
 
 export type FieldHitParty = FieldActor & { gridX: number; gridY: number };

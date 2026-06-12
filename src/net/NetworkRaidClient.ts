@@ -13,6 +13,8 @@ import {
     type MarketSnapshotMessage,
     type PlayerIntentKind,
     type RaidResultMessage,
+    type ScenarioFieldEventBroadcastMessage,
+    type ScenarioFieldEventResultMessage,
     type WorldRealmId,
     type WorldClientMessage,
     type WorldErrorMessage,
@@ -43,6 +45,8 @@ export interface NetworkRaidClientOptions {
     onLootGrant?: (grant: LootGrantMessage) => void;
     onAutoLootGrant?: (grant: AutoLootGrantMessage) => void;
     onInventoryConsumed?: (message: InventoryConsumedMessage) => void;
+    onScenarioFieldEventResult?: (message: ScenarioFieldEventResultMessage) => void;
+    onScenarioFieldEventBroadcast?: (message: ScenarioFieldEventBroadcastMessage) => void;
     onRaidResult?: (result: RaidResultMessage) => void;
     onMarketSnapshot?: (message: MarketSnapshotMessage) => void;
     onMarketRecordAck?: (message: MarketRecordAckMessage) => void;
@@ -249,6 +253,22 @@ export class NetworkRaidClient {
         return intentId;
     }
 
+    public sendScenarioFieldEventInteract(
+        actorId: string,
+        dungeonId: string,
+        eventId: string,
+        intentId: string = createIntentId()
+    ): string {
+        this.send({
+            type: 'SCENARIO_FIELD_EVENT_INTERACT',
+            intentId,
+            actorId,
+            dungeonId,
+            eventId,
+        });
+        return intentId;
+    }
+
     public leave(reason: WorldLeaveMessage['reason']): void {
         this.send({ type: 'WORLD_LEAVE', reason });
         this.close();
@@ -320,6 +340,20 @@ export class NetworkRaidClient {
                 break;
             case 'INVENTORY_CONSUMED':
                 this.options.onInventoryConsumed?.(message);
+                break;
+            case 'SCENARIO_FIELD_EVENT_RESULT':
+                if (!isScenarioFieldEventResultMessage(message)) {
+                    this.reportBadMessage('Malformed SCENARIO_FIELD_EVENT_RESULT message.');
+                    return;
+                }
+                this.options.onScenarioFieldEventResult?.(message);
+                break;
+            case 'SCENARIO_FIELD_EVENT_BROADCAST':
+                if (!isScenarioFieldEventBroadcastMessage(message)) {
+                    this.reportBadMessage('Malformed SCENARIO_FIELD_EVENT_BROADCAST message.');
+                    return;
+                }
+                this.options.onScenarioFieldEventBroadcast?.(message);
                 break;
             case 'RAID_RESULT':
                 if (!isRaidResultMessage(message)) {
@@ -552,4 +586,26 @@ function isWorldErrorMessage(message: unknown): message is WorldErrorMessage {
     return message.type === 'ERROR'
         && typeof message.code === 'string'
         && typeof message.message === 'string';
+}
+
+function isScenarioFieldEventResultMessage(message: unknown): message is ScenarioFieldEventResultMessage {
+    if (!isRecord(message)) return false;
+    return message.type === 'SCENARIO_FIELD_EVENT_RESULT'
+        && typeof message.intentId === 'string'
+        && typeof message.dungeonId === 'string'
+        && typeof message.eventId === 'string'
+        && (message.scope === 'player' || message.scope === 'shared')
+        && typeof message.flag === 'string'
+        && Array.isArray(message.presentationSteps)
+        && Array.isArray(message.rewards);
+}
+
+function isScenarioFieldEventBroadcastMessage(message: unknown): message is ScenarioFieldEventBroadcastMessage {
+    if (!isRecord(message)) return false;
+    return message.type === 'SCENARIO_FIELD_EVENT_BROADCAST'
+        && typeof message.dungeonId === 'string'
+        && typeof message.eventId === 'string'
+        && message.scope === 'shared'
+        && typeof message.flag === 'string'
+        && Array.isArray(message.presentationSteps);
 }

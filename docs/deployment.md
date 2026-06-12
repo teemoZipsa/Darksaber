@@ -128,12 +128,22 @@ After deployment, copy the Vercel production origin back into Render's
 
 ## Production Deploy Command
 
-Keep automatic deploys disabled during normal development:
+Render server deploys are automatic after the Blueprint is synced:
 
-- Render: `render.yaml` uses `autoDeployTrigger: 'off'`
+- Render: `render.yaml` uses `autoDeployTrigger: 'commit'`
 - Vercel: `vercel.json` uses `git.deploymentEnabled: false`
 
-When you are ready to publish, set local secrets outside git:
+After this setting is active in Render, pushing to the service's linked branch
+triggers a Render rebuild/deploy. No local `RENDER_API_KEY` is needed for normal
+deploys. You still need a Render API key only for local status checks or manual
+deploys with `npm run render:*`.
+
+If the existing Render Blueprint has Auto Sync disabled, open the Render
+Dashboard once and run **Manual Sync** on the Blueprint, or turn Blueprint Auto
+Sync on. After that, future pushes to `main` deploy automatically.
+
+When you want explicit preflight checks plus manual Render/Vercel deployment,
+set local secrets outside git:
 
 ```powershell
 $env:RENDER_API_KEY="rnd_..."

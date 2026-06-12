@@ -50,3 +50,27 @@ test('world raid session tracks town transition and pending result town', () => 
     assert.equal(raid.consumePendingTownAfterResultId(), 'w_forest_village');
     assert.equal(raid.consumePendingTownAfterResultId(), null);
 });
+
+test('world raid session keeps scenario runtime flags until the raid lifecycle resets', () => {
+    const raid = new WorldRaidSession('central_castle');
+
+    raid.beginRaidFromTown('central_castle');
+    raid.startDungeonEncounter(BURGOS_CASTLE_DUNGEON_ID);
+    raid.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key');
+    raid.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key');
+    raid.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'cain_necklace');
+
+    assert.equal(raid.hasScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key'), true);
+    assert.deepEqual(raid.getScenarioFlags(BURGOS_CASTLE_DUNGEON_ID), ['burgos_key', 'cain_necklace']);
+
+    raid.completeDungeonEncounter(BURGOS_CASTLE_DUNGEON_ID);
+    assert.equal(raid.hasScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key'), true);
+
+    raid.completeAtTown('w_forest_village');
+    assert.deepEqual(raid.getScenarioFlags(BURGOS_CASTLE_DUNGEON_ID), []);
+
+    raid.beginRaidFromTown('w_forest_village');
+    raid.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key');
+    raid.failBackToTown('w_forest_village');
+    assert.equal(raid.hasScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key'), false);
+});

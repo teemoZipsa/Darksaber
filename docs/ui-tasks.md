@@ -33,6 +33,7 @@
 
 ## 완료된 이번 후속 작업
 
+- 완료: 원작 몬스터 `ability.json` row를 `originalMonsters` 원장으로 분리하고, 현재 전투식용 정규화 계층(`originalMonsterBalance`)을 추가. `Enemy`는 `monsterId`가 있으면 정규화 스탯을 사용하며, 서버 스폰과 로컬 실내 시나리오가 같은 `StoryScenarioMonsterData` 몬스터 ID 표를 공유한다. 세부 기준은 `docs/monster-balance.md`.
 - 완료: DEV 전용 시작 링크 추가. 개발 모드 기본 화면에서 Town/Raid/Tutorial 링크로 바로 진입 가능.
 - 완료: `devStart=town`은 튜토리얼을 건너뛰고 마을로 진입, `devStart=raid`는 마을 출격 경로를 통해 레이드에 자동 진입, `devStart=tutorial`은 캐릭터 생성 없이 튜토리얼 대련장으로 진입.
 - 완료: `npm run dev:town`, `npm run dev:raid`, `npm run dev:raid:aggro`, `npm run dev:raid:loot`, `npm run dev:tutorial` 스크립트 추가.
@@ -89,6 +90,8 @@
 - `src/inventory/InventoryUI.ts`, `src/inventory/GridInventory.ts` — 드래그 **해석 로직**(moveToCell/moveToEquip/quickMove). 평소에는 충돌 방지를 위해 조심하고, 명시 요청/조율이 있을 때만 테스트와 함께 수정.
 - `src/ui/react/OverlayRoot.tsx`, `src/ui/react/UiStore.ts`, `src/ui/react/UiContext.tsx` — 오버레이 배선.
 - `src/ui/theme/darksaber-ui.css`의 **기존 토큰/공용 클래스**(`--ds-*`, `.ds-panel`, `.ds-btn`, `.ds-scrim`, `.ds-bar` 등). 새 컴포넌트 전용 클래스 추가는 OK, 공용 토큰 값 변경은 금지.
+
+예외 기록: 2026-06-06 몬스터 밸런스 작업에서는 사용자 명시 승인으로 `WorldEngine.ts`의 로컬 실내 시나리오 몬스터 생성 지점만 좁게 수정했다. 이 예외는 UI/오버레이 배선 전체에 대한 일반 허가가 아니다.
 
 ## 검증 명령
 - 타입체크: `npx tsc --noEmit` (반드시 통과).

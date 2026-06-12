@@ -257,6 +257,18 @@ function weightedPick(pool: WeightedMonster[], rng: () => number): MonsterId {
 const NEST_CHANCE = 0.85; // share of land chunks that hold a nest
 const PACK_MIN = 4;
 const PACK_MAX = 6;
+const STARTER_DANGER_MAX = 2;
+const STARTER_PACK_MIN = 2;
+const STARTER_PACK_MAX = 3;
+const LOW_DANGER_MAX = 4;
+const LOW_DANGER_PACK_MIN = 3;
+const LOW_DANGER_PACK_MAX = 5;
+
+function resolvePackSizeRange(danger: number): { min: number; max: number } {
+    if (danger <= STARTER_DANGER_MAX) return { min: STARTER_PACK_MIN, max: STARTER_PACK_MAX };
+    if (danger <= LOW_DANGER_MAX) return { min: LOW_DANGER_PACK_MIN, max: LOW_DANGER_PACK_MAX };
+    return { min: PACK_MIN, max: PACK_MAX };
+}
 
 /** Roll a pack of monsters (with resolved levels) for a biome/danger. */
 export function rollPackMonsters(
@@ -270,7 +282,10 @@ export function rollPackMonsters(
     const out: SpawnedMonster[] = [];
     for (let i = 0; i < count; i++) {
         const monsterId = weightedPick(pool, rng);
-        out.push({ monsterId, level: resolveSpawnLevel(monsterId, danger) });
+        const level = danger <= STARTER_DANGER_MAX
+            ? 1
+            : resolveSpawnLevel(monsterId, danger);
+        out.push({ monsterId, level });
     }
     return out;
 }
@@ -291,7 +306,8 @@ export function pickNestForChunk(ctx: SpawnContext, force = false): FieldNest | 
     const pool = getRegionPacks(ctx.biome, danger);
     if (pool.length === 0) return null;
 
-    const count = PACK_MIN + Math.floor(rng() * (PACK_MAX - PACK_MIN + 1));
+    const packSize = resolvePackSizeRange(danger);
+    const count = packSize.min + Math.floor(rng() * (packSize.max - packSize.min + 1));
     const monsters = rollPackMonsters(ctx.biome, danger, count, rng);
     if (monsters.length === 0) return null;
 

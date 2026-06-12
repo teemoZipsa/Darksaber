@@ -13,8 +13,9 @@ import { PartyManager } from '../character/PartyManager';
 import { Character } from '../character/Character';
 import { GridInventory, type PlacedItem } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
-import { ITEMS } from '../data/ItemDB';
+import { ITEMS, type ItemDef, type ItemSlot } from '../data/ItemDB';
 import { getClassLine } from '../data/ClassTree';
+import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../data/StarterKitData';
 import { getStoryCompanionRewards } from '../data/StoryQuestData';
 import { renderGameTitle } from '../ui/UITheme';
 import { t } from '../i18n/LanguageManager';
@@ -29,7 +30,7 @@ import { AudioManager } from './AudioManager';
 import type { UiStore } from '../ui/react/UiStore';
 import type { WorldTownSession } from './world/WorldTownSession';
 import type { WorldRaidSession } from './world/WorldRaidSession';
-import type { AccountProgress, AuthCharacter, AuthClient, CharacterSave, CharacterSavePatch, InventorySaveItem } from '../net/AuthClient';
+import type { AccountProgress, AuthCharacter, AuthClient, CharacterSave, InventorySaveItem } from '../net/AuthClient';
 import { normalizeLoadout, normalizeUpgradeLevels } from '../magic/MagicLoadout';
 import { getExpToNext as originalExpToNext } from '../data/original/originalProgression';
 
@@ -97,10 +98,7 @@ export class GameManager {
         this.stash = new GridInventory(15, 10);
         this.playerData = new PlayerData();
         this.playerData.load();
-        this.playerData.setCharacterSaveProvider(() => this.buildLocalCharacterSavePatch());
         this.syncStoryCompanionsToRoster();
-
-        this.loadInitialSoloInventory();
 
         this.inventoryUI = new InventoryUI(this.inventory);
         this.partyUI = new PartyUI(this.party);
@@ -256,36 +254,6 @@ export class GameManager {
             .catch(() => { /* best-effort; local save already applied, retried on next change */ });
     }
 
-    private buildLocalCharacterSavePatch(): Pick<CharacterSavePatch, 'inventory' | 'equipment' | 'partySnapshot' | 'rosterSnapshot'> {
-        return {
-            inventory: this.buildInventorySaveSnapshot(),
-            equipment: this.buildEquipmentSaveSnapshot(),
-            partySnapshot: {
-                activeCharacterIds: this.party.getCharacters().map((character) => character.id),
-            },
-            rosterSnapshot: this.buildRosterSnapshot(),
-        };
-    }
-
-    private buildInventorySaveSnapshot(): CharacterSave['inventory'] {
-        return {
-            width: this.inventory.width,
-            height: this.inventory.height,
-            items: this.inventory.items.map(placedItemToSaveItem),
-        };
-    }
-
-    private buildEquipmentSaveSnapshot(): Record<string, unknown> {
-        return {
-            characters: this.party.getRoster().map((character) => ({
-                id: character.id,
-                slots: Object.fromEntries(
-                    [...character.equipment.entries()].map(([slot, placed]) => [slot, placedItemToSaveItem(placed)])
-                ),
-            })),
-        };
-    }
-
     /** Serialize the current roster into the persisted rosterSnapshot shape. */
     private buildRosterSnapshot(): Record<string, unknown> {
         return {
@@ -334,6 +302,8 @@ export class GameManager {
         const charId = `player_${Date.now()}`;
         const char = new Character(charId, name.trim() || 'Hero', classId);
         char.gender = gender;
+        this.applyStarterEquipment(char);
+        this.grantStarterConsumables();
         this.party.addToRoster(char);
         this.party.deployCharacter(char);
         this.party.switchTo(0);
@@ -355,8 +325,8 @@ export class GameManager {
         this.stash.clear();
         this.loadRosterFromSave(session.character, session.save);
         this.loadInventoryFromSave(session.save);
-        this.playerData.applyCharacterSave(session.save);
-        this.playerData.clearedStages = new Set([...this.playerData.clearedStages, ...session.accountProgress.completedQuests]);
+        this.playerData.currentHubTownId = readTownId(session.save);
+        this.playerData.clearedStages = new Set(session.accountProgress.completedQuests);
         this.syncStoryCompanionsToRoster();
         this.onActiveCharacterChanged();
         this.startIntroTutorialOnWorldInit = false;
@@ -370,21 +340,6 @@ export class GameManager {
 
     public getNetworkAuthContext(): { accessToken: string; characterId: string } | null {
         return this.networkAuthContext;
-    }
-
-    private loadInitialSoloInventory(): void {
-        const localSave = this.playerData.toCharacterSave();
-        if (localSave.inventory.items.length > 0) {
-            this.loadInventoryFromSave(localSave);
-            return;
-        }
-
-        const sword = ITEMS.find(i => i.id === 'short_sword');
-        if (sword) this.inventory.autoPlace(sword);
-        const herb = ITEMS.find(i => i.id === 'herb_cheap');
-        if (herb) { this.inventory.autoPlace(herb); this.inventory.autoPlace(herb); }
-        const mpPot = ITEMS.find(i => i.id === 'mp_potion');
-        if (mpPot) this.inventory.autoPlace(mpPot);
     }
 
     public syncStoryCompanionsToRoster(): void {
@@ -416,6 +371,8 @@ export class GameManager {
             this.party.addToRoster(character);
             characters.set(character.id, character);
         }
+        const selected = characters.get(selectedCharacter.id);
+        if (selected) this.loadEquipmentFromSave(save, selected);
 
         const deployIds = activeIds.length > 0 ? activeIds : [selectedCharacter.id];
         for (const id of deployIds.slice(0, this.party.MAX_ACTIVE_PARTY_SIZE)) {
@@ -434,6 +391,31 @@ export class GameManager {
         for (const entry of save.inventory.items) this.placeSavedInventoryItem(entry);
     }
 
+    private loadEquipmentFromSave(save: CharacterSave, character: Character): void {
+        const entries = readSavedEquipmentEntries(save.equipment);
+        for (const entry of entries) {
+            const item = ITEMS.find((candidate) => candidate.id === entry.itemId);
+            if (!item || item.slot !== entry.slot) continue;
+            const placed = this.createPlacedItem(item, entry);
+            character.equipment.set(item.slot, placed);
+        }
+    }
+
+    private applyStarterEquipment(character: Character): void {
+        for (const itemId of [STARTER_WEAPON_ITEM_ID, getStarterBodyArmorId(character.classLineId)]) {
+            const item = ITEMS.find((candidate) => candidate.id === itemId);
+            if (!item || item.slot === 'consumable' || character.equipment.has(item.slot)) continue;
+            character.equip(this.createPlacedItem(item, null));
+        }
+    }
+
+    private grantStarterConsumables(): void {
+        for (const itemId of STARTER_CONSUMABLE_ITEM_IDS) {
+            const item = ITEMS.find((candidate) => candidate.id === itemId);
+            if (item) this.inventory.autoPlace(item);
+        }
+    }
+
     private placeSavedInventoryItem(entry: InventorySaveItem): void {
         const item = ITEMS.find((candidate) => candidate.id === entry.itemId);
         if (!item) return;
@@ -442,10 +424,16 @@ export class GameManager {
         placed.quantity = Math.max(1, Math.floor(entry.quantity));
         placed.durability = Math.max(0, Math.min(item.maxDurability, Math.floor(entry.durability)));
         placed.acquiredInRaid = entry.acquiredInRaid;
-        placed.sockets = (entry.sockets ?? []).flatMap((itemId) => {
-            const socket = ITEMS.find((candidate) => candidate.id === itemId);
-            return socket ? [socket] : [];
-        });
+    }
+
+    private createPlacedItem(item: ItemDef, entry: SavedEquipmentEntry | null): PlacedItem {
+        return {
+            item,
+            gridX: entry?.gridX ?? 0,
+            gridY: entry?.gridY ?? 0,
+            quantity: entry?.quantity ?? 1,
+            durability: Math.max(0, Math.min(item.maxDurability, Math.floor(entry?.durability ?? item.maxDurability))),
+        };
     }
 
     // ─── Pause menu (DOM overlay) ─────────────────────────────────
@@ -572,7 +560,7 @@ export class GameManager {
                     break;
                 }
 
-                if (this.input.justPressed('KeyJ')) {
+                if (SettingsManager.isKeybindingJustPressed('world.questJournal', this.input)) {
                     this.toggleQuestJournal();
                 }
                 if (this.questJournalOpen) {
@@ -585,22 +573,22 @@ export class GameManager {
                     break;
                 }
 
-                if (this.input.justPressed('KeyI')) {
+                if (SettingsManager.isKeybindingJustPressed('world.inventory', this.input)) {
                     this.inventoryUI.toggle();
                     if (this.inventoryUI.isVisible() && this.charUI.isVisible()) this.charUI.toggle();
                     if (this.inventoryUI.isVisible() && this.partyUI.isVisible()) this.partyUI.toggle();
                 }
-                if (this.input.justPressed('KeyP')) {
+                if (SettingsManager.isKeybindingJustPressed('world.party', this.input)) {
                     this.partyUI.toggle();
                     if (this.partyUI.isVisible() && this.inventoryUI.isVisible()) this.inventoryUI.toggle();
                     if (this.partyUI.isVisible() && this.charUI.isVisible()) this.charUI.toggle();
                 }
-                if (this.input.justPressed('KeyC')) {
+                if (SettingsManager.isKeybindingJustPressed('world.character', this.input)) {
                     this.charUI.toggle();
                     if (this.charUI.isVisible() && this.inventoryUI.isVisible()) this.inventoryUI.toggle();
                     if (this.charUI.isVisible() && this.partyUI.isVisible()) this.partyUI.toggle();
                 }
-                if (this.input.justPressed('KeyK')) {
+                if (SettingsManager.isKeybindingJustPressed('world.magicLoadout', this.input)) {
                     this.toggleMagicLoadout();
                 }
                 if (this.magicLoadoutOpen) {
@@ -751,6 +739,15 @@ interface SavedRosterEntry {
     skillUpgradeLevels: Record<string, number>;
 }
 
+interface SavedEquipmentEntry {
+    slot: ItemSlot;
+    itemId: string;
+    gridX: number;
+    gridY: number;
+    quantity: number;
+    durability: number;
+}
+
 function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter): SavedRosterEntry[] {
     const rawCharacters = Array.isArray(save.rosterSnapshot.characters) ? save.rosterSnapshot.characters : [];
     const entries = rawCharacters.flatMap((raw): SavedRosterEntry[] => {
@@ -793,20 +790,32 @@ function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter
     return entries;
 }
 
-function readStringArray(value: unknown): string[] {
-    return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
+function readSavedEquipmentEntries(equipment: Record<string, unknown>): SavedEquipmentEntry[] {
+    const slots: ItemSlot[] = ['weapon', 'shield', 'head', 'body', 'boots', 'accessory', 'accessory2'];
+    const entries: SavedEquipmentEntry[] = [];
+    for (const slot of slots) {
+        const raw = equipment[slot];
+        if (!isRecord(raw)) continue;
+        const itemId = typeof raw.itemId === 'string' ? raw.itemId : null;
+        if (!itemId) continue;
+        entries.push({
+            slot,
+            itemId,
+            gridX: positiveInt(raw.gridX, 0),
+            gridY: positiveInt(raw.gridY, 0),
+            quantity: positiveInt(raw.quantity, 1),
+            durability: positiveInt(raw.durability, Number.MAX_SAFE_INTEGER),
+        });
+    }
+    return entries;
 }
 
-function placedItemToSaveItem(placed: PlacedItem): InventorySaveItem {
-    return {
-        itemId: placed.item.id,
-        gridX: placed.gridX,
-        gridY: placed.gridY,
-        quantity: Math.max(1, Math.floor(placed.quantity)),
-        durability: Math.max(0, Math.floor(placed.durability)),
-        ...(placed.acquiredInRaid ? { acquiredInRaid: true } : {}),
-        ...(placed.sockets && placed.sockets.length > 0 ? { sockets: placed.sockets.map((item) => item.id) } : {}),
-    };
+function readTownId(save: CharacterSave): string {
+    return typeof save.hubLocation.townId === 'string' ? save.hubLocation.townId : 'central_castle';
+}
+
+function readStringArray(value: unknown): string[] {
+    return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 }
 
 function readNumberRecord(value: unknown): Record<string, number> {

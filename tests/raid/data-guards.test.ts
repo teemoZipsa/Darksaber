@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
 import { getMasterClass, isMasterClassLineId } from '../../src/data/ClassTree';
 import { getItemDef, ITEMS } from '../../src/data/ItemDB';
-import { getMonsterDefinitionSafe, isMonsterId } from '../../src/data/MonsterCatalog';
+import {
+    GENERAL_MONSTER_IDS,
+    FINAL_STORY_MONSTER_IDS,
+    NEW_MONSTER_IDS,
+    RESERVED_RENDERABLE_MONSTER_IDS,
+    getMonsterDefinitionSafe,
+    isMonsterId,
+} from '../../src/data/MonsterCatalog';
 import { ORIGINAL_SHOP_ITEMS } from '../../src/data/OriginalShopItems';
 import { PlayerData } from '../../src/data/PlayerData';
 import { getRestFacility, REST_FACILITIES } from '../../src/data/RestFacilityData';
@@ -16,6 +23,11 @@ import { STORY_QUESTS, getStoryCompanionRewards } from '../../src/data/StoryQues
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import { STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
 import { i18n } from '../../src/i18n/LanguageManager';
+import {
+    ORIGINAL_MONSTER_COUNT,
+    getOriginalMonsterRow,
+    isOriginalMonsterId,
+} from '../../src/data/original/originalMonsters';
 import type { Skill } from '../../src/data/SkillDB';
 import {
     TOWN_FACILITIES,
@@ -89,6 +101,12 @@ test('shop and original item data expose guarded equipment fields', () => {
     const questBomb = getItemDef('quest_bomb');
     assert.ok(questBomb);
     assert.equal(getSellPrice(questBomb), 0);
+    const burgosKey = getItemDef('quest_burgos_key');
+    assert.ok(burgosKey);
+    assert.equal(getSellPrice(burgosKey), 0);
+    const cainNecklace = getItemDef('quest_cain_necklace');
+    assert.ok(cainNecklace);
+    assert.equal(getSellPrice(cainNecklace), 0);
 
     for (const inventory of Object.values(SHOP_INVENTORY_BY_TOWN_FACILITY)) {
         for (const entries of Object.values(inventory)) {
@@ -118,12 +136,43 @@ test('rest, monster, and starting class data reject unknown ids', () => {
     assert.ok(getStoryCompanionRewards().some((reward) => reward.classId === 'alchemist'));
 });
 
-test('story episodes 1 through 20 are chained and fully localized', () => {
-    assert.deepEqual(STORY_SCENARIOS.map((scenario) => scenario.episode), Array.from({ length: 20 }, (_, i) => i + 1));
-    assert.equal(STORY_QUESTS.length, 20);
+test('original monster ledger stays separate from renderable spawn catalog', () => {
+    assert.equal(ORIGINAL_MONSTER_COUNT, 451);
+    assert.equal(isOriginalMonsterId('302R'), true);
+    assert.equal(isOriginalMonsterId(302), true);
+    assert.equal(isOriginalMonsterId('__missing__'), false);
+
+    const originalSkeleton = getOriginalMonsterRow('302R');
+    assert.ok(originalSkeleton);
+    assert.equal(originalSkeleton.combat.hpLo, 135);
+    assert.equal(originalSkeleton.combat.atkLo, 105);
+    assert.equal(originalSkeleton.combat.defLo, 42);
+
+    assert.deepEqual([...RESERVED_RENDERABLE_MONSTER_IDS], ['206R', '791R']);
+    const authoredSpawnIds = new Set<string>([...GENERAL_MONSTER_IDS, ...NEW_MONSTER_IDS]);
+    for (const id of RESERVED_RENDERABLE_MONSTER_IDS) {
+        assert.equal(isMonsterId(id), true);
+        assert.ok(getMonsterDefinitionSafe(id));
+        assert.equal(authoredSpawnIds.has(id), false);
+    }
+    for (const id of FINAL_STORY_MONSTER_IDS) {
+        assert.equal(isMonsterId(id), true);
+        assert.ok(getMonsterDefinitionSafe(id));
+        assert.equal(authoredSpawnIds.has(id), false);
+        assert.ok(getOriginalMonsterRow(id));
+    }
+
+    assert.ok(getOriginalMonsterRow('206R'));
+    assert.ok(getOriginalMonsterRow('791R'));
+    assert.equal(getOriginalMonsterRow('634R'), null);
+});
+
+test('story episodes 1 through 22 are chained and fully localized', () => {
+    assert.deepEqual(STORY_SCENARIOS.map((scenario) => scenario.episode), Array.from({ length: 22 }, (_, i) => i + 1));
+    assert.equal(STORY_QUESTS.length, 22);
     assert.deepEqual(
         STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'soloInterior').map((scenario) => scenario.episode),
-        [1, 2, 3, 7, 13, 18, 19, 20]
+        [1, 2, 3, 7, 13, 18, 19, 20, 21, 22]
     );
     assert.deepEqual(
         STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'vehicle').map((scenario) => scenario.episode),
@@ -151,6 +200,8 @@ test('story episodes 1 through 20 are chained and fully localized', () => {
             assert.ok(en[key], `missing en story key ${key}`);
         }
     }
+    assert.ok(ko['story.ep01.sideObjective.cainNecklace']);
+    assert.ok(en['story.ep01.sideObjective.cainNecklace']);
 });
 
 test('player data guards gold and normalizes old save shapes', () => {

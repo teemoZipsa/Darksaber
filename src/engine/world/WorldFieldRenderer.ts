@@ -6,11 +6,14 @@ import { formatRaidTime, getTacticalMarkerColor } from '../../field/FieldDisplay
 import type { Entity } from '../../entity/Entity';
 import type { Skill } from '../../data/SkillDB';
 import type { TacticalMarker } from '../../field/TacticalMarkers';
+import type { EnemyAIDecision } from '../../field/EnemyAI';
+import type { FieldIntent } from '../../field/FieldTypes';
 import type { WorldRenderModel } from './WorldRenderModel';
 import { tileKey } from '../../field/FieldPathing';
 import { getSkillIconCell } from '../../ui/DarksaberIconRegistry';
 import { DarksaberSpriteAtlas } from '../../ui/DarksaberSpriteAtlas';
 import { formatT, t } from '../../i18n/LanguageManager';
+import { SettingsManager } from '../SettingsManager';
 
 const PARTY_ACTOR_IMAGE_RENDER_SCALE = 1.12;
 
@@ -122,6 +125,9 @@ export class WorldFieldRenderer {
                 ctx.strokeRect(px + 1, py + 1, TILE_SIZE - 2, TILE_SIZE - 2);
             }
 
+            if (hasIncomingEnemyIntent(model, actor.id)) renderIncomingIntentFrame(ctx, px, py, model.worldTime);
+            renderIntentBadge(ctx, px, py, getFieldIntentBadge(actor.queuedIntent));
+
             renderGauge(ctx, px + 4, py - 7, TILE_SIZE - 8, actor.entity.actionGauge / 100, '#39ff88');
             const effective = getEffectiveStatsForCharacter(actor.character);
             renderHpBar(ctx, px + 4, py + TILE_SIZE + 3, TILE_SIZE - 8, actor.character.stats.hp, effective.maxHp);
@@ -178,6 +184,8 @@ export class WorldFieldRenderer {
                 ctx.lineWidth = 3;
                 ctx.strokeRect(px + 3, py + 3, TILE_SIZE - 6, TILE_SIZE - 6);
             }
+
+            renderIntentBadge(ctx, px, py, getEnemyIntentBadge(entry.previewIntent));
 
             renderGauge(ctx, px + 5, py - 7, TILE_SIZE - 10, enemy.actionGauge / 100, '#ffb84d');
             renderHpBar(ctx, px + 5, py + TILE_SIZE + 3, TILE_SIZE - 10, enemy.stats.hp, enemy.stats.maxHp);
@@ -401,6 +409,143 @@ function drawScaledTileImage(
     ctx.drawImage(image, px + (TILE_SIZE - dw) / 2, py + (TILE_SIZE - dh) / 2, dw, dh);
 }
 
+type IntentBadge = {
+    label: string;
+    fill: string;
+    stroke: string;
+    text: string;
+    pulse?: boolean;
+};
+
+function getFieldIntentBadge(intent: FieldIntent | null): IntentBadge | null {
+    if (!intent) return null;
+    switch (intent.kind) {
+        case 'move':
+            return makeIntentBadge(t('action.label.move'), 'move');
+        case 'attack':
+            return makeIntentBadge(t('action.label.attack'), 'attack', true);
+        case 'magic':
+            return makeIntentBadge(t('action.label.magic'), 'magic', true);
+        case 'defend':
+            return makeIntentBadge(t('action.label.defend'), 'guard');
+        case 'rest':
+            return makeIntentBadge(t('action.label.rest'), 'rest');
+        case 'interact':
+            return makeIntentBadge(t('action.label.open'), 'inspect');
+        case 'tool':
+            return makeIntentBadge(t('action.label.tool'), 'inspect');
+    }
+}
+
+function getEnemyIntentBadge(intent: EnemyAIDecision | null | undefined): IntentBadge | null {
+    if (!intent) return null;
+    switch (intent.kind) {
+        case 'attack':
+            return makeIntentBadge(t('action.label.attack'), 'attack', true);
+        case 'moveToward':
+        case 'moveAway':
+            return makeIntentBadge(t('action.label.move'), 'move');
+        case 'guard':
+            return makeIntentBadge(t('action.label.defend'), 'guard');
+        case 'healAlly':
+            return makeIntentBadge(t('magic.type.heal'), 'rest');
+        case 'buffAlly':
+            return makeIntentBadge(t('enemy.intent.buff'), 'guard');
+        case 'debuffTarget':
+            return makeIntentBadge(t('enemy.intent.debuff'), 'magic', true);
+        case 'bossPattern':
+            return makeIntentBadge(t('enemy.intent.special'), 'attack', true);
+        case 'wait':
+            return null;
+    }
+}
+
+function makeIntentBadge(label: string, tone: 'move' | 'attack' | 'magic' | 'guard' | 'rest' | 'inspect', pulse = false): IntentBadge {
+    const colors = {
+        move: ['rgba(38, 28, 8, 0.86)', '#f3d66b', '#ffe89d'],
+        attack: ['rgba(62, 12, 12, 0.88)', '#ff6b6b', '#ffd0d0'],
+        magic: ['rgba(38, 12, 58, 0.88)', '#c889ff', '#f0d8ff'],
+        guard: ['rgba(16, 30, 50, 0.88)', '#8fc7ff', '#d8ecff'],
+        rest: ['rgba(12, 46, 30, 0.88)', '#71e59a', '#d4ffd9'],
+        inspect: ['rgba(12, 42, 54, 0.88)', '#72dfff', '#dcf7ff'],
+    } as const;
+    const [fill, stroke, text] = colors[tone];
+    return { label, fill, stroke, text, pulse };
+}
+
+function renderIntentBadge(ctx: CanvasRenderingContext2D, px: number, py: number, badge: IntentBadge | null): void {
+    if (!badge) return;
+
+    ctx.save();
+    ctx.font = `bold 10px ${UI.fontMono}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const w = Math.max(25, ctx.measureText(badge.label).width + 10);
+    const h = 14;
+    const x = Math.round(px + TILE_SIZE - w + 1);
+    const y = Math.round(py + TILE_SIZE - h + 1);
+    if (badge.pulse) {
+        ctx.shadowColor = badge.stroke;
+        ctx.shadowBlur = 4;
+    }
+    ctx.fillStyle = badge.fill;
+    ctx.strokeStyle = badge.stroke;
+    ctx.lineWidth = 1;
+    ctx.roundRect(x, y, w, h, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = badge.text;
+    ctx.fillText(badge.label, x + w / 2, y + h / 2 + 0.5);
+    ctx.restore();
+}
+
+function hasIncomingEnemyIntent(model: WorldRenderModel, actorId: string): boolean {
+    return model.fieldEnemies.some((entry) =>
+        entry.enemy.stats.hp > 0 && isEnemyIntentTargetingActor(entry.previewIntent, actorId)
+    );
+}
+
+function isEnemyIntentTargetingActor(intent: EnemyAIDecision | null | undefined, actorId: string): boolean {
+    if (!intent) return false;
+    switch (intent.kind) {
+        case 'attack':
+        case 'debuffTarget':
+        case 'bossPattern':
+            return intent.targetId === actorId;
+        default:
+            return false;
+    }
+}
+
+function renderIncomingIntentFrame(ctx: CanvasRenderingContext2D, px: number, py: number, worldTime: number): void {
+    const pulse = 0.5 + 0.5 * Math.sin(worldTime * 8);
+    const x = px + 2;
+    const y = py + 2;
+    const size = TILE_SIZE - 4;
+    const corner = 9;
+
+    ctx.save();
+    ctx.globalAlpha = 0.68 + pulse * 0.22;
+    ctx.strokeStyle = '#ff4d5e';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y + corner);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x + corner, y);
+    ctx.moveTo(x + size - corner, y);
+    ctx.lineTo(x + size, y);
+    ctx.lineTo(x + size, y + corner);
+    ctx.moveTo(x + size, y + size - corner);
+    ctx.lineTo(x + size, y + size);
+    ctx.lineTo(x + size - corner, y + size);
+    ctx.moveTo(x + corner, y + size);
+    ctx.lineTo(x, y + size);
+    ctx.lineTo(x, y + size - corner);
+    ctx.stroke();
+    ctx.restore();
+}
+
 function isEntityMoving(entity: Entity): boolean {
     return Math.abs(entity.pixelX - entity.gridX) > 0.01 || Math.abs(entity.pixelY - entity.gridY) > 0.01;
 }
@@ -557,7 +702,7 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
     // Route subtitle
     ctx.fillStyle = Parchment.textMid;
     ctx.font = `12px ${UI.fontPrimary}`;
-    ctx.fillText(formatT('raid.banner.extractOtherTown', { town: model.raid.departureTownId }), x + bannerW / 2, y + bannerH - 14);
+    ctx.fillText(`${model.raid.departureTownId}  →  다른 마을 생환`, x + bannerW / 2, y + bannerH - 14);
 
     ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';
@@ -565,15 +710,15 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
 }
 
 /**
- * Compact bottom-right key-hint strip. Single thin line of inline key labels
+ * Compact bottom-right key-hint strip. Single thin line of inline `Key 설명`
  * pairs — no parchment chrome, just text with a subtle shadow for readability.
  */
 function renderKeyHintStrip(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
     const segments: { key: string; label: string }[] = [
-        { key: 'Tab', label: t('field.keyHint.swap') },
-        { key: 'M',   label: t('field.keyHint.map') },
-        { key: 'I',   label: t('field.keyHint.inventory') },
-        { key: 'ESC', label: t('field.keyHint.menu') },
+        { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.nextActor')), label: '교체' },
+        { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.minimap')), label: '지도' },
+        { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.inventory')), label: '인벤' },
+        { key: 'ESC', label: '메뉴' },
     ];
 
     ctx.save();

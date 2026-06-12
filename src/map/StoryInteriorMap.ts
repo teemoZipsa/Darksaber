@@ -58,12 +58,22 @@ const THEME_COLORS = {
     },
 } as const;
 
+export interface StoryInteriorInspectMarker {
+    id: string;
+    tile: TilePoint;
+    labelKey?: string;
+    kind?: 'person' | 'chest';
+}
+
 export class StoryInteriorMap extends WorldMap {
     private readonly layout: StoryInteriorLayout;
+    private readonly lockedTileKeys: Set<string>;
+    private inspectMarkers: StoryInteriorInspectMarker[] = [];
 
-    constructor(layout: StoryInteriorLayout) {
+    constructor(layout: StoryInteriorLayout, options: { lockedTiles?: readonly TilePoint[] } = {}) {
         super('mortal', { validateTownSpawns: false });
         this.layout = layout;
+        this.lockedTileKeys = new Set((options.lockedTiles ?? []).map((tile) => this.tileKey(tile.x, tile.y)));
     }
 
     public getDisplayName(): string {
@@ -133,11 +143,35 @@ export class StoryInteriorMap extends WorldMap {
     }
 
     public getTileAt(tx: number, ty: number): TileType {
+        if (this.lockedTileKeys.has(this.tileKey(tx, ty))) return TileType.WALL;
         return getStoryInteriorTileAt(this.layout, tx, ty);
     }
 
     public isWalkable(tx: number, ty: number): boolean {
         return Boolean(TILE_PROPERTIES[this.getTileAt(tx, ty)]?.walkable);
+    }
+
+    public setLockedTiles(tiles: readonly TilePoint[]): void {
+        this.lockedTileKeys.clear();
+        for (const tile of tiles) this.lockedTileKeys.add(this.tileKey(tile.x, tile.y));
+    }
+
+    public isTileLocked(tx: number, ty: number): boolean {
+        return this.lockedTileKeys.has(this.tileKey(tx, ty));
+    }
+
+    public setInspectMarkers(markers: readonly StoryInteriorInspectMarker[]): void {
+        this.inspectMarkers = markers.map((marker) => ({
+            ...marker,
+            tile: { ...marker.tile },
+        }));
+    }
+
+    public getInspectMarkers(): StoryInteriorInspectMarker[] {
+        return this.inspectMarkers.map((marker) => ({
+            ...marker,
+            tile: { ...marker.tile },
+        }));
     }
 
     public render(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number, vw: number, vh: number): void {
@@ -158,6 +192,7 @@ export class StoryInteriorMap extends WorldMap {
 
         this.renderRoomTrim(ctx, cameraX, cameraY);
         this.renderInteriorProps(ctx, cameraX, cameraY);
+        this.renderInspectMarkers(ctx, cameraX, cameraY);
         this.renderGate(ctx, cameraX, cameraY);
 
         for (const obj of this.loot) {
@@ -188,6 +223,14 @@ export class StoryInteriorMap extends WorldMap {
                 ctx.fillStyle = 'rgba(255, 220, 155, 0.08)';
                 ctx.fillRect(sx + 4, sy + 4, TILE_SIZE - 8, TILE_SIZE - 8);
                 break;
+            case TileType.LAVA:
+                ctx.fillStyle = '#4d140f';
+                ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
+                ctx.fillStyle = '#c23a20';
+                ctx.fillRect(sx + 3, sy + 6, TILE_SIZE - 6, TILE_SIZE - 12);
+                ctx.fillStyle = 'rgba(255, 170, 58, 0.34)';
+                ctx.fillRect(sx + 8, sy + 10, TILE_SIZE - 16, TILE_SIZE - 20);
+                break;
             default:
                 ctx.fillStyle = (x + y) % 2 === 0 ? colors.floor : colors.floorAlt;
                 ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE);
@@ -197,6 +240,10 @@ export class StoryInteriorMap extends WorldMap {
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)';
         ctx.lineWidth = 1;
         ctx.strokeRect(sx + 0.5, sy + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+    }
+
+    private tileKey(x: number, y: number): string {
+        return `${x},${y}`;
     }
 
     private renderRoomTrim(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number): void {
@@ -229,6 +276,64 @@ export class StoryInteriorMap extends WorldMap {
         for (const prop of this.layout.props) {
             this.renderInteriorProp(ctx, prop, prop.tile.x * TILE_SIZE - cameraX, prop.tile.y * TILE_SIZE - cameraY);
         }
+    }
+
+    private renderInspectMarkers(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number): void {
+        for (const marker of this.inspectMarkers) {
+            this.renderInspectMarker(ctx, marker, marker.tile.x * TILE_SIZE - cameraX, marker.tile.y * TILE_SIZE - cameraY);
+        }
+    }
+
+    private renderInspectMarker(ctx: CanvasRenderingContext2D, marker: StoryInteriorInspectMarker, sx: number, sy: number): void {
+        ctx.save();
+        const cx = sx + TILE_SIZE / 2;
+
+        ctx.fillStyle = 'rgba(10, 8, 8, 0.62)';
+        ctx.beginPath();
+        ctx.ellipse(cx, sy + TILE_SIZE - 8, 15, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (marker.kind === 'chest') {
+            ctx.fillStyle = '#5b3922';
+            ctx.fillRect(sx + 8, sy + 15, TILE_SIZE - 16, 12);
+            ctx.fillStyle = '#8a5b2f';
+            ctx.fillRect(sx + 7, sy + 12, TILE_SIZE - 14, 7);
+            ctx.strokeStyle = '#d6a85f';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(sx + 8, sy + 13, TILE_SIZE - 16, 13);
+            ctx.fillStyle = '#f1d58b';
+            ctx.fillRect(cx - 2, sy + 17, 4, 5);
+        } else {
+            ctx.fillStyle = '#5f4a42';
+            ctx.fillRect(sx + 9, sy + 17, TILE_SIZE - 14, 7);
+            ctx.fillStyle = '#b19a7a';
+            ctx.beginPath();
+            ctx.arc(sx + 12, sy + 18, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.strokeStyle = '#f1d58b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, sy + 7, 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx, sy + 14);
+        ctx.lineTo(cx, sy + 18);
+        ctx.stroke();
+
+        if (marker.labelKey) {
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillStyle = '#f1d58b';
+            const label = t(marker.labelKey);
+            ctx.strokeText(label, cx, sy - 2);
+            ctx.fillText(label, cx, sy - 2);
+        }
+        ctx.restore();
     }
 
     private renderInteriorProp(ctx: CanvasRenderingContext2D, prop: StoryInteriorProp, sx: number, sy: number): void {
@@ -265,6 +370,15 @@ export class StoryInteriorMap extends WorldMap {
                 ctx.fillRect(sx + 8, sy + 4, TILE_SIZE - 16, TILE_SIZE - 8);
                 ctx.fillStyle = 'rgba(40, 20, 20, 0.55)';
                 ctx.fillRect(sx + 11, sy + 8, TILE_SIZE - 22, TILE_SIZE - 16);
+                break;
+            case 'door':
+                ctx.fillStyle = 'rgba(10, 8, 12, 0.44)';
+                ctx.fillRect(sx + 4, sy + 3, TILE_SIZE - 8, TILE_SIZE - 6);
+                ctx.strokeStyle = 'rgba(183, 130, 69, 0.9)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(sx + 7, sy + 5, TILE_SIZE - 14, TILE_SIZE - 10);
+                ctx.fillStyle = 'rgba(255, 218, 142, 0.28)';
+                ctx.fillRect(sx + TILE_SIZE - 11, sy + TILE_SIZE / 2 - 2, 3, 4);
                 break;
             case 'sealedDoor':
                 ctx.fillStyle = 'rgba(10, 8, 12, 0.74)';

@@ -25,6 +25,7 @@ export class WorldRaidSession {
     public readonly clearedDungeonIds: Set<string> = new Set();
     private pendingTownAfterResultId: string | null = null;
     private lastDepartureBlockTownId: string | null = null;
+    private readonly scenarioFlagsByDungeonId: Map<string, Set<string>> = new Map();
 
     constructor(initialHubTownId: string, limitSeconds: number = 30 * 60) {
         this.currentHubTownId = initialHubTownId;
@@ -36,6 +37,7 @@ export class WorldRaidSession {
         this.active = false;
         this.activeDungeonId = null;
         this.clearedDungeonIds.clear();
+        this.clearScenarioFlags();
         this.currentHubTownId = townId;
     }
 
@@ -47,6 +49,7 @@ export class WorldRaidSession {
         this.activeDungeonId = null;
         this.downedCharacterIds.clear();
         this.clearedDungeonIds.clear();
+        this.clearScenarioFlags();
         this.lastDepartureBlockTownId = null;
         this.pendingTownAfterResultId = null;
     }
@@ -74,6 +77,7 @@ export class WorldRaidSession {
         this.active = false;
         this.activeDungeonId = null;
         this.clearedDungeonIds.clear();
+        this.clearScenarioFlags();
         this.currentHubTownId = townId;
     }
 
@@ -81,6 +85,7 @@ export class WorldRaidSession {
         this.active = false;
         this.activeDungeonId = null;
         this.clearedDungeonIds.clear();
+        this.clearScenarioFlags();
         this.currentHubTownId = townId;
     }
 
@@ -104,6 +109,33 @@ export class WorldRaidSession {
 
     public isDungeonCleared(dungeonId: string): boolean {
         return this.clearedDungeonIds.has(dungeonId);
+    }
+
+    public setScenarioFlag(dungeonId: string, flag: string): void {
+        const normalizedFlag = flag.trim();
+        if (!dungeonId || !normalizedFlag) return;
+        let flags = this.scenarioFlagsByDungeonId.get(dungeonId);
+        if (!flags) {
+            flags = new Set();
+            this.scenarioFlagsByDungeonId.set(dungeonId, flags);
+        }
+        flags.add(normalizedFlag);
+    }
+
+    public hasScenarioFlag(dungeonId: string, flag: string): boolean {
+        return this.scenarioFlagsByDungeonId.get(dungeonId)?.has(flag) ?? false;
+    }
+
+    public getScenarioFlags(dungeonId: string): string[] {
+        return [...(this.scenarioFlagsByDungeonId.get(dungeonId) ?? [])].sort();
+    }
+
+    public clearScenarioFlags(dungeonId?: string): void {
+        if (dungeonId) {
+            this.scenarioFlagsByDungeonId.delete(dungeonId);
+            return;
+        }
+        this.scenarioFlagsByDungeonId.clear();
     }
 
     public clearDepartureBlock(): void {

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getItemDef } from '../../src/data/ItemDB';
+import { getNormalizedMonsterBalance } from '../../src/data/original/originalMonsterBalance';
 import { Enemy } from '../../src/entity/Enemy';
 import { Entity } from '../../src/entity/Entity';
 import { ExtractionZone } from '../../src/entity/ExtractionZone';
@@ -81,6 +82,16 @@ test('enemy role changes do not stack tuning or revive dead enemies', () => {
     assert.equal(enemy.isBoss, false);
 });
 
+test('enemy can initialize from normalized original monster balance', () => {
+    const enemy = new Enemy('e1', 0, 0, 'Ratman', 1, '#fff', 'bruiser', '304R');
+    const balance = getNormalizedMonsterBalance('304R', 1);
+
+    assert.equal(enemy.stats.maxHp, balance.stats.maxHp);
+    assert.equal(enemy.stats.atk, balance.stats.atk);
+    assert.equal(enemy.stats.def, balance.stats.def);
+    assert.ok(enemy.stats.atk < 65);
+});
+
 test('entity image loaders ignore stale callbacks and support instant positioning', () => {
     const { images, restore } = installImageStub();
     try {
@@ -112,6 +123,16 @@ test('entity image loaders ignore stale callbacks and support instant positionin
     } finally {
         restore();
     }
+});
+
+test('entity faces the actual step direction while interpolating to a grid target', () => {
+    const entity = new Entity('e1', 0, 0, '#fff');
+    entity.facing = 'right';
+
+    entity.setGridPosition(0, 2);
+    entity.update(0.016);
+
+    assert.equal(entity.facing, 'down');
 });
 
 test('loot objects retain overflow items and sanitize grid sizes', () => {

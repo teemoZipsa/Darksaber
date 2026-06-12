@@ -1,6 +1,6 @@
 import type { Enemy } from '../../entity/Enemy';
 import type { LootObject } from '../../entity/LootObject';
-import type { ActionMenuUI } from '../../ui/ActionMenuUI';
+import type { ActionMenuUI, ActionType } from '../../ui/ActionMenuUI';
 import type { EntityInfoUI } from '../../ui/EntityInfoUI';
 import type { Camera } from '../Camera';
 import type { InputManager } from '../InputManager';
@@ -16,8 +16,20 @@ import type { WorldSelectionController } from './WorldSelectionController';
 import type { WorldTacticalController } from './WorldTacticalController';
 import type { MinimapUI } from '../../ui/MinimapUI';
 import { CombatLogUI } from '../../ui/CombatLogUI';
+import { SettingsManager, type KeybindingId } from '../SettingsManager';
 
 type WorldInputFieldHit = FieldHit<FieldHitParty, Enemy, LootObject>;
+
+const ACTION_HOTKEYS: ReadonlyArray<{ keybindingId: KeybindingId; action: ActionType }> = [
+    { keybindingId: 'action.move', action: 'move' },
+    { keybindingId: 'action.tool', action: 'tool' },
+    { keybindingId: 'action.attack', action: 'attack' },
+    { keybindingId: 'action.magic', action: 'magic' },
+    { keybindingId: 'action.defend', action: 'defend' },
+    { keybindingId: 'action.rest', action: 'rest' },
+    { keybindingId: 'action.fanfare', action: 'fanfare' },
+    { keybindingId: 'action.open', action: 'open' },
+];
 
 export interface WorldInputContext {
     actionMenuUI: ActionMenuUI;
@@ -58,6 +70,11 @@ export class WorldInputController {
     }
 
     public process(input: InputManager, camera: Camera): void {
+        if (SettingsManager.isKeybindingJustPressed('world.minimap', input)) {
+            this.context.minimapUI.toggle();
+            return;
+        }
+
         if (this.context.minimapUI.handleInput(input)) return;
 
         // Combat log claims wheel/drag inside its region first.
@@ -88,13 +105,9 @@ export class WorldInputController {
         if (input.mouseJustDown && this.context.actionMenuUI.getIsOpen()) {
             if (this.handleActionMenuSlotClick(input, camera)) return;
         }
+        if (this.context.actionMenuUI.getIsOpen() && this.handleActionMenuHotkey(input)) return;
 
         if (this.isInputLockedByReservation()) return;
-
-        if (input.justPressed('KeyM')) {
-            this.context.minimapUI.toggle();
-            return;
-        }
 
         if (input.mouseJustDown && this.context.minimapUI.onClick(input.uiMouseX, input.uiMouseY)) {
             return;
@@ -115,8 +128,10 @@ export class WorldInputController {
             this.context.magicController.updateMp(this.context.getControlledActor()?.character.stats.mp ?? 0);
             if (input.mouseRightJustDown) {
                 this.cancelMagicSelection();
+            } else if (this.handleMagicHotkeys(input)) {
+                /* handled by configured radial hotkey */
             } else if (this.handleMagicDigitKeys(input)) {
-                /* handled by number key */
+                /* handled by legacy number key */
             } else if (input.mouseJustDown) {
                 this.context.magicController.handleMenuMouseDown(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
             }
@@ -130,7 +145,7 @@ export class WorldInputController {
         } else if (this.context.magicController.getState().mode === 'targeting') {
             if (input.mouseJustDown) this.context.magicController.handleTargetClick(this.context.getHoverTile());
         } else {
-            if (input.justPressed('Tab')) this.context.switchToNextAliveActor();
+            if (SettingsManager.isKeybindingJustPressed('world.nextActor', input)) this.context.switchToNextAliveActor();
             if (input.mouseJustDown) this.handleFieldClick(this.context.getHoverTile(), input, camera);
         }
     }
@@ -207,12 +222,37 @@ export class WorldInputController {
     private handleActionMenuSlotClick(input: InputManager, camera: Camera): boolean {
         const result = this.context.actionMenuUI.onClick(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
         if (!result) return false;
+        this.executeActionMenuResult(result);
+        return true;
+    }
+
+    private handleActionMenuHotkey(input: InputManager): boolean {
+        for (const { keybindingId, action } of ACTION_HOTKEYS) {
+            if (!SettingsManager.isKeybindingJustPressed(keybindingId, input)) continue;
+            const result = this.context.actionMenuUI.getActionResult(action);
+            if (!result) return false;
+            this.executeActionMenuResult(result);
+            return true;
+        }
+        return false;
+    }
+
+    private handleMagicHotkeys(input: InputManager): boolean {
+        for (let i = 0; i < ACTION_HOTKEYS.length; i++) {
+            const { keybindingId } = ACTION_HOTKEYS[i];
+            if (SettingsManager.isKeybindingJustPressed(keybindingId, input)) {
+                return this.context.magicController.handleMenuIndex(i);
+            }
+        }
+        return false;
+    }
+
+    private executeActionMenuResult(result: { type: ActionType; enabled: boolean; disabledReason?: string }): void {
         if (result.enabled) {
             this.context.playerActionController.execute(result.type);
         } else {
             this.context.log(result.disabledReason ?? t('field.input.actionUnavailable'));
         }
-        return true;
     }
 
     private handleFieldRightClick(tile: TilePoint, input: InputManager): void {

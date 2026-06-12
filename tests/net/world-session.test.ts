@@ -1,13 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBaseStats } from '../../src/data/Stats';
+import { getNormalizedMonsterBalance } from '../../src/data/original/originalMonsterBalance';
+import { Enemy } from '../../src/entity/Enemy';
 import type { ActorSnapshot, AutoLootGrantMessage, WorldJoinMessage } from '../../src/net/WorldProtocol';
 import { WorldMap } from '../../src/map/WorldMap';
+import { CHUNK_SIZE } from '../../src/map/Chunk';
 import { WorldResumeFailedError, WorldSession } from '../../server/WorldSession';
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { getStoryScenarioEventSequence } from '../../src/data/StoryScenarioEventData';
+import { getStoryScenarioFieldEventTiles } from '../../src/data/StoryScenarioFieldEventPlacement';
 import { getStoryInteriorLayout } from '../../src/data/StoryInteriorData';
-import { ENEMY_SIMULATION_ACTIVE_RANGE } from '../../src/field/FieldConfig';
+import { ENEMY_AGGRO_RANGE, ENEMY_SIMULATION_ACTIVE_RANGE } from '../../src/field/FieldConfig';
 
 function actor(id: string, overrides: Partial<ActorSnapshot> = {}): ActorSnapshot {
     return {
@@ -79,6 +84,26 @@ test('join spawns each player at their origin hub external exit tile', () => {
 
     assert.deepEqual(centralActor?.tile, centralExit);
     assert.deepEqual(forestActor?.tile, forestExit);
+});
+
+test('default character saves start with the shared no-shield basic kit', () => {
+    const save = createDefaultCharacterSave(authCharacter('starter'));
+    const equipment = save.equipment as Record<string, { itemId?: string }>;
+
+    assert.equal(equipment.weapon?.itemId, 'short_sword');
+    assert.equal(equipment.body?.itemId, 'battle_t1_body');
+    assert.equal(Object.prototype.hasOwnProperty.call(equipment, 'shield'), false);
+    assert.deepEqual(save.inventory.items.map((item) => item.itemId), ['herb_cheap', 'herb_cheap', 'mp_potion']);
+});
+
+test('default character saves use class-branch body armor', () => {
+    const mage = { ...authCharacter('starter-mage'), classKey: 'mage' as const };
+    const save = createDefaultCharacterSave(mage);
+    const equipment = save.equipment as Record<string, { itemId?: string }>;
+
+    assert.equal(equipment.weapon?.itemId, 'short_sword');
+    assert.equal(equipment.body?.itemId, 'magic_t1_body');
+    assert.equal(Object.prototype.hasOwnProperty.call(equipment, 'shield'), false);
 });
 
 test('server tick keeps passive enemy ATB idle for every client snapshot', () => {
@@ -535,6 +560,12 @@ test('server-owned scenario entry spawns objective enemies and records completio
     assert.equal(enteredSnapshot.scenario.activeDungeonId, 'burgos_castle');
     assert.ok(enteredSnapshot.scenario.enteredDungeonIds.includes('burgos_castle'));
     assert.ok(enteredSnapshot.enemies.some((enemy) => enemy.isBoss && enemy.name === '키스라'));
+    const guard = enteredSnapshot.enemies.find((enemy) => enemy.monsterId === '303R');
+    assert.ok(guard);
+    const guardBalance = getNormalizedMonsterBalance('303R', guard.level);
+    assert.equal(guardBalance.source, 'original');
+    assert.equal(guard.stats.maxHp, guardBalance.stats.maxHp);
+    assert.equal(guard.stats.atk, guardBalance.stats.atk);
     assert.deepEqual(enteredSnapshot.partyActors.find((entry) => entry.id === serverActor.id)?.tile, interior.playerStart);
 
     const bossEntry = [...internals.enemies.values()].find((entry: any) => entry.scenarioObjective);
@@ -687,6 +718,170 @@ test('bossless server scenarios complete immediately while keeping optional enem
     assert.ok(snapshot.enemies.filter((enemy) => enemy.id.startsWith('scenario_')).length >= 2);
 });
 
+test('server-authoritative field scenario events complete per player without trusting reward payloads', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const completedQuestIds = STORY_SCENARIOS
+        .filter((scenario) => scenario.episode < 4)
+        .map((scenario) => scenario.questId);
+    const joinedA = session.join({
+        ...joinMessage('central_castle', 'hero-a'),
+        completedQuestIds,
+    }, 0);
+    const joinedB = session.join({
+        ...joinMessage('central_castle', 'hero-b'),
+        completedQuestIds,
+    }, 0);
+    const internals = session as any;
+    const actorA = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedA.playerId);
+    const actorB = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedB.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === 'arcadia_plain');
+    const sequence = getStoryScenarioEventSequence('arcadia_plain');
+    const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'arcadia_gold_chest_01');
+    assert.ok(actorA);
+    assert.ok(actorB);
+    assert.ok(dungeon);
+    assert.ok(event);
+    actorA.tile = world.getDungeonEntranceTile(dungeon);
+    actorB.tile = world.getDungeonEntranceTile(dungeon);
+
+    session.handleMessage(joinedA.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-arcadia-a',
+        actorId: actorA.id,
+        dungeonId: 'arcadia_plain',
+    }, 1_000);
+    session.handleMessage(joinedB.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-arcadia-b',
+        actorId: actorB.id,
+        dungeonId: 'arcadia_plain',
+    }, 1_000);
+
+    const [eventTile] = getStoryScenarioFieldEventTiles('arcadia_plain', event, world);
+    actorA.tile = { x: eventTile.x, y: eventTile.y + 1 };
+    const result = session.handleMessage(joinedA.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'open-arcadia-gold-a',
+        actorId: actorA.id,
+        dungeonId: 'arcadia_plain',
+        eventId: 'arcadia_gold_chest_01',
+    }, 1_100);
+
+    const fieldResult = result.replies.find((message) => message.type === 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.equal(fieldResult?.type, 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.equal(fieldResult.scope, 'player');
+    assert.equal(fieldResult.flag, 'arcadia_gold_chest_01');
+    assert.deepEqual(fieldResult.rewards, [{ type: 'gold', amount: 100 }]);
+    assert.equal('amount' in (result.replies[0] as any) && (result.replies[0] as any).amount === 9999, false);
+
+    const snapshotA = session.createSnapshot(joinedA.playerId, 1_100);
+    const snapshotB = session.createSnapshot(joinedB.playerId, 1_100);
+    assert.deepEqual(snapshotA.scenario.playerFieldEventFlagsByDungeonId?.arcadia_plain, ['arcadia_gold_chest_01']);
+    assert.equal(snapshotB.scenario.playerFieldEventFlagsByDungeonId?.arcadia_plain, undefined);
+
+    const duplicate = session.handleMessage(joinedA.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'open-arcadia-gold-a-again',
+        actorId: actorA.id,
+        dungeonId: 'arcadia_plain',
+        eventId: 'arcadia_gold_chest_01',
+    }, 1_200);
+    assert.equal(duplicate.replies[0]?.type, 'ACTION_REJECTED');
+    assert.match(duplicate.replies[0]?.type === 'ACTION_REJECTED' ? duplicate.replies[0].reason : '', /already complete/);
+});
+
+test('server-authoritative field scenario events reject invalid actors and distant requests', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const completedQuestIds = STORY_SCENARIOS
+        .filter((scenario) => scenario.episode < 4)
+        .map((scenario) => scenario.questId);
+    const joinedA = session.join({ ...joinMessage('central_castle', 'hero-a'), completedQuestIds }, 0);
+    const joinedB = session.join({ ...joinMessage('central_castle', 'hero-b'), completedQuestIds }, 0);
+    const internals = session as any;
+    const actorA = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedA.playerId);
+    const actorB = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedB.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === 'arcadia_plain');
+    assert.ok(actorA);
+    assert.ok(actorB);
+    assert.ok(dungeon);
+    actorA.tile = world.getDungeonEntranceTile(dungeon);
+    session.handleMessage(joinedA.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-arcadia-invalid',
+        actorId: actorA.id,
+        dungeonId: 'arcadia_plain',
+    }, 1_000);
+
+    const wrongOwner = session.handleMessage(joinedA.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'wrong-owner-field-event',
+        actorId: actorB.id,
+        dungeonId: 'arcadia_plain',
+        eventId: 'arcadia_gold_chest_01',
+    }, 1_100);
+    assert.equal(wrongOwner.replies[0]?.type, 'ACTION_REJECTED');
+    assert.match(wrongOwner.replies[0]?.type === 'ACTION_REJECTED' ? wrongOwner.replies[0].reason : '', /not owned/);
+
+    actorA.tile = { x: actorA.tile.x + 20, y: actorA.tile.y + 20 };
+    const distant = session.handleMessage(joinedA.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'distant-field-event',
+        actorId: actorA.id,
+        dungeonId: 'arcadia_plain',
+        eventId: 'arcadia_gold_chest_01',
+    }, 1_200);
+    assert.equal(distant.replies[0]?.type, 'ACTION_REJECTED');
+    assert.match(distant.replies[0]?.type === 'ACTION_REJECTED' ? distant.replies[0].reason : '', /too far/);
+});
+
+test('shared field scenario event flags are included for late join snapshots', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const sequence = getStoryScenarioEventSequence('arcadia_plain');
+    const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'arcadia_child_rescue');
+    assert.ok(event);
+    const previousScope = event.scope;
+    event.scope = 'shared';
+    try {
+        const completedQuestIds = STORY_SCENARIOS
+            .filter((scenario) => scenario.episode < 4)
+            .map((scenario) => scenario.questId);
+        const joinedA = session.join({ ...joinMessage('central_castle', 'hero-a'), completedQuestIds }, 0);
+        const internals = session as any;
+        const actorA = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedA.playerId);
+        const dungeon = world.getDungeons().find((entry) => entry.id === 'arcadia_plain');
+        assert.ok(actorA);
+        assert.ok(dungeon);
+        actorA.tile = world.getDungeonEntranceTile(dungeon);
+        session.handleMessage(joinedA.playerId, {
+            type: 'SCENARIO_ENTER',
+            intentId: 'enter-arcadia-shared',
+            actorId: actorA.id,
+            dungeonId: 'arcadia_plain',
+        }, 1_000);
+        const [eventTile] = getStoryScenarioFieldEventTiles('arcadia_plain', event, world);
+        actorA.tile = { x: eventTile.x, y: eventTile.y + 1 };
+
+        const result = session.handleMessage(joinedA.playerId, {
+            type: 'SCENARIO_FIELD_EVENT_INTERACT',
+            intentId: 'shared-arcadia-child',
+            actorId: actorA.id,
+            dungeonId: 'arcadia_plain',
+            eventId: event.id,
+        }, 1_100);
+        assert.equal(result.replies[0]?.type, 'SCENARIO_FIELD_EVENT_RESULT');
+        assert.equal(result.replies[0]?.type === 'SCENARIO_FIELD_EVENT_RESULT' ? result.replies[0].scope : '', 'shared');
+
+        const joinedB = session.join({ ...joinMessage('central_castle', 'hero-b'), completedQuestIds }, 1_200);
+        const snapshotB = session.createSnapshot(joinedB.playerId, 1_200);
+        assert.deepEqual(snapshotB.scenario.sharedFieldEventFlagsByDungeonId?.arcadia_plain, ['arcadia_child_rescued']);
+    } finally {
+        event.scope = previousScope;
+    }
+});
+
 test('network auto-loot exposes unaccepted leftovers on the field', () => {
     const session = new WorldSession();
     const joined = session.join({
@@ -747,6 +942,21 @@ test('server generates nest content around roaming players', () => {
         Math.abs(Math.floor(enemy.tile.x / 32) - 67) <= 1
         && Math.abs(Math.floor(enemy.tile.y / 32) - 34) <= 1
     ));
+
+    const firstSpawned = spawned.find((enemy) => enemy.monsterId);
+    assert.ok(firstSpawned);
+    const expected = new Enemy(
+        'expected',
+        0,
+        0,
+        firstSpawned.name,
+        firstSpawned.level,
+        firstSpawned.color,
+        firstSpawned.role as Enemy['role'],
+        firstSpawned.monsterId
+    );
+    assert.equal(firstSpawned.stats.maxHp, expected.stats.maxHp);
+    assert.equal(firstSpawned.stats.atk, expected.stats.atk);
 });
 
 test('cleared field nests respawn after five minutes away from active actors', () => {
@@ -789,7 +999,24 @@ test('cleared field nests respawn after five minutes away from active actors', (
     session.tick(respawnAt + 1);
     assert.equal(state.monsterIds.length, 0, 'nest should not respawn inside the 18-tile safety radius');
 
-    serverActor.tile = { x: state.centerTile.x + 19, y: state.centerTile.y };
+    const stateChunkX = Math.floor(state.centerTile.x / CHUNK_SIZE);
+    const stateChunkY = Math.floor(state.centerTile.y / CHUNK_SIZE);
+    let outsideSafeTile: { x: number; y: number } | null = null;
+    for (let distance = ENEMY_AGGRO_RANGE + 1; distance < CHUNK_SIZE * 2 && !outsideSafeTile; distance++) {
+        for (let dy = -distance; dy <= distance && !outsideSafeTile; dy++) {
+            const dxAbs = distance - Math.abs(dy);
+            for (const dx of dxAbs === 0 ? [0] : [-dxAbs, dxAbs]) {
+                const tile = { x: state.centerTile.x + dx, y: state.centerTile.y + dy };
+                if (Math.abs(Math.floor(tile.x / CHUNK_SIZE) - stateChunkX) > 2) continue;
+                if (Math.abs(Math.floor(tile.y / CHUNK_SIZE) - stateChunkY) > 2) continue;
+                if (!internals.worldMap.isWalkable(tile.x, tile.y)) continue;
+                outsideSafeTile = tile;
+                break;
+            }
+        }
+    }
+    assert.ok(outsideSafeTile, 'test fixture should find a nearby tile outside the nest spawn safety radius');
+    serverActor.tile = outsideSafeTile;
     session.tick(respawnAt + 1_001);
-    assert.ok(state.monsterIds.length > 0, 'nest should respawn once the timer passed and actors are outside 18 tiles');
+    assert.ok(state.monsterIds.length > 0, 'nest should respawn once the timer passed and actors are outside the spawn safety radius');
 });

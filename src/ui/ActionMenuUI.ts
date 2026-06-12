@@ -9,12 +9,24 @@ import { t } from '../i18n/LanguageManager';
 import { ACTION_ICON_CELLS } from './DarksaberIconRegistry';
 import { DarksaberSpriteAtlas, MICON_CELL_SIZE } from './DarksaberSpriteAtlas';
 import { UI, Parchment } from './UITheme';
+import { SettingsManager, type KeybindingId } from '../engine/SettingsManager';
 
 const ACTION_ICON_ANIMATION_ROWS = 5;
 const ACTION_ICON_ANIMATION_MS = 280;
 
 export type ActionType = 'tool' | 'attack' | 'rest' | 'defend' | 'magic' | 'move' | 'open' | 'fanfare';
 export type ReadyCursorType = 'move' | 'attack';
+
+const ACTION_KEYBINDING_IDS: Record<ActionType, KeybindingId> = {
+    move: 'action.move',
+    tool: 'action.tool',
+    attack: 'action.attack',
+    magic: 'action.magic',
+    defend: 'action.defend',
+    rest: 'action.rest',
+    fanfare: 'action.fanfare',
+    open: 'action.open',
+};
 
 export interface ActionMenuSlotState {
     type: ActionType;
@@ -113,6 +125,15 @@ export class ActionMenuUI {
 
     public open(states?: ActionMenuSlotState[] | ActionType[]): void {
         this.isOpen = true;
+        this.setSlotStates(states);
+    }
+
+    public updateStates(states?: ActionMenuSlotState[] | ActionType[]): void {
+        if (!this.isOpen) return;
+        this.setSlotStates(states);
+    }
+
+    private setSlotStates(states?: ActionMenuSlotState[] | ActionType[]): void {
         if (!states || states.length === 0) {
             this.setDefaultSlotStates();
             return;
@@ -176,6 +197,16 @@ export class ActionMenuUI {
         return null;
     }
 
+    public getActionResult(type: ActionType): ActionMenuClickResult | null {
+        if (!this.isOpen || !this.slots.some((slot) => slot.type === type)) return null;
+        const state = this.getSlotState(type);
+        return {
+            type,
+            enabled: state.enabled,
+            disabledReason: state.disabledReason,
+        };
+    }
+
     public render(
         ctx: CanvasRenderingContext2D,
         playerScreenX: number,
@@ -208,8 +239,7 @@ export class ActionMenuUI {
 
             // Draw icon
             slot.iconDraw(ctx, ix, iy, r * 0.62, enabled);
-
-
+            this.drawHotkeyLabel(ctx, slot.type, ix, iy, r, enabled);
 
             if (isHovered || isHighlighted) {
                 const slotLabel = t(slot.labelKey);
@@ -394,6 +424,29 @@ export class ActionMenuUI {
         ctx.lineTo(x, y + size);
         ctx.lineTo(x, y + size - corner);
         ctx.stroke();
+        ctx.restore();
+    }
+
+    private drawHotkeyLabel(ctx: CanvasRenderingContext2D, type: ActionType, ix: number, iy: number, r: number, enabled: boolean): void {
+        const label = SettingsManager.getKeyLabel(SettingsManager.getKeybinding(ACTION_KEYBINDING_IDS[type]));
+        const badgeX = ix - r * 0.58;
+        const badgeY = iy - r * 0.58;
+
+        ctx.save();
+        ctx.font = `bold 9px ${UI.fontPrimary}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const w = Math.max(12, ctx.measureText(label).width + 6);
+        const h = 12;
+        ctx.fillStyle = enabled ? 'rgba(20, 14, 8, 0.86)' : 'rgba(12, 12, 12, 0.72)';
+        ctx.strokeStyle = enabled ? '#d4a050' : '#6f6048';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.rect(badgeX - w / 2, badgeY - h / 2, w, h);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = enabled ? '#f0c050' : '#9c8c70';
+        ctx.fillText(label, badgeX, badgeY + 0.5);
         ctx.restore();
     }
 

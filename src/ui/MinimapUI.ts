@@ -1,6 +1,5 @@
 import { TILE_PROPERTIES, TileType } from '../map/Tile';
 import type { WorldMapLandmark } from '../map/WorldMap';
-import { formatT, t } from '../i18n/LanguageManager';
 import { drawParchmentPanel, Parchment, UI } from './UITheme';
 
 interface MinimapEntity {
@@ -51,6 +50,8 @@ const FULL_MAX_ZOOM = 5;
 const FULL_MIN_OPACITY = 0.25;
 const FULL_MAX_OPACITY = 1;
 const FULL_MAP_BUILD_BUDGET_MS = 4;
+const FULL_CLOSE_BUTTON_SIZE = 22;
+const FULL_CLOSE_BUTTON_HIT_SIZE = 28;
 const FOOTER_INFO_H = 50;            // base footer height (gold/world + coords)
 const FOOTER_TERRAIN_LINE_H = 15;    // per terrain hover line
 const PANEL_W = 216;
@@ -127,6 +128,7 @@ export class MinimapUI {
     private fullMapOpacity = 1;
     private fullMapViewRect: Rect = { x: 0, y: 0, w: 0, h: 0 };
     private opacitySliderRect: Rect = { x: 0, y: 0, w: 0, h: 0 };
+    private fullMapCloseButtonRect: Rect = { x: 0, y: 0, w: 0, h: 0 };
     private isDraggingFullMap = false;
     private isDraggingOpacity = false;
     private lastDragX = 0;
@@ -147,6 +149,12 @@ export class MinimapUI {
         if (this.mode === 'mini') this.mode = 'full';
         else if (this.mode === 'full') this.mode = 'hidden';
         else this.mode = 'mini';
+        this.stopFullMapDrag();
+    }
+
+    public closeFullMap(): void {
+        if (this.mode !== 'full') return;
+        this.mode = 'hidden';
         this.stopFullMapDrag();
     }
 
@@ -176,9 +184,15 @@ export class MinimapUI {
         });
         const mapHit = this.pointInRect(mx, my, this.fullMapViewRect);
         const sliderHit = this.pointInRect(mx, my, this.opacitySliderRect);
+        const closeHit = this.pointInRect(mx, my, this.fullMapCloseButtonRect);
 
         if (input.mouseJustUp || !input.mouseIsDown) {
             this.stopFullMapDrag();
+        }
+
+        if (input.mouseJustDown && closeHit) {
+            this.closeFullMap();
+            return true;
         }
 
         if (input.mouseJustDown && sliderHit) {
@@ -262,13 +276,13 @@ export class MinimapUI {
         ctx.font = `bold 13px ${UI.fontPrimary}`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.fillText(t('minimap.title.mini'), this.panelX + 14, this.panelY + HEADER_H / 2);
+        ctx.fillText('미니맵', this.panelX + 14, this.panelY + HEADER_H / 2);
 
         // Header right hint
         ctx.fillStyle = Parchment.textMid;
         ctx.font = `11px ${UI.fontPrimary}`;
         ctx.textAlign = 'right';
-        ctx.fillText(t('minimap.cycle'), this.panelX + PANEL_W - 14, this.panelY + HEADER_H / 2);
+        ctx.fillText('M 순환', this.panelX + PANEL_W - 14, this.panelY + HEADER_H / 2);
 
         // ─── Map area ───────────────────────────────────────────
         ctx.fillStyle = '#1a140c';
@@ -342,7 +356,7 @@ export class MinimapUI {
             ctx.textAlign = 'left';
             ctx.fillStyle = Parchment.textMid;
             ctx.font = `12px ${UI.fontPrimary}`;
-            ctx.fillText(formatT('minimap.coords', { x: player.x, y: player.y }), footerX, footerY);
+            ctx.fillText(`좌표 ${player.x}, ${player.y}`, footerX, footerY);
             footerY += 17;
 
             if (terrainRows.length > 0) {
@@ -448,13 +462,14 @@ export class MinimapUI {
         ctx.font = `bold 15px ${UI.fontPrimary}`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.fillText(t('minimap.title.full'), this.panelX + 18, this.panelY + FULL_HEADER_H / 2);
+        ctx.fillText('전체 지도', this.panelX + 18, this.panelY + FULL_HEADER_H / 2);
 
         ctx.fillStyle = Parchment.textMid;
         ctx.font = `12px ${UI.fontPrimary}`;
         ctx.textAlign = 'right';
-        ctx.fillText(t('minimap.cycle'), this.panelX + panelW - 18, this.panelY + FULL_HEADER_H / 2);
+        ctx.fillText('M 닫기', this.panelX + panelW - 52, this.panelY + FULL_HEADER_H / 2);
         this.drawOpacitySlider(ctx, panelW);
+        this.drawFullMapCloseButton(ctx, panelW);
 
         const contentX = this.panelX + FULL_FRAME_PAD;
         const contentY = this.panelY + FULL_HEADER_H + 12;
@@ -483,6 +498,39 @@ export class MinimapUI {
         ctx.restore();
     }
 
+    private drawFullMapCloseButton(ctx: CanvasRenderingContext2D, panelW: number): void {
+        const size = FULL_CLOSE_BUTTON_SIZE;
+        const hitSize = FULL_CLOSE_BUTTON_HIT_SIZE;
+        const cx = this.panelX + panelW - 18;
+        const cy = this.panelY + FULL_HEADER_H / 2;
+        const x = cx - size / 2;
+        const y = cy - size / 2;
+        this.fullMapCloseButtonRect = {
+            x: cx - hitSize / 2,
+            y: cy - hitSize / 2,
+            w: hitSize,
+            h: hitSize,
+        };
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(58, 38, 24, 0.28)';
+        ctx.strokeStyle = Parchment.borderDark;
+        ctx.lineWidth = 1;
+        ctx.fillRect(x, y, size, size);
+        ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1);
+
+        ctx.strokeStyle = '#2d1f12';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(cx - 5, cy - 5);
+        ctx.lineTo(cx + 5, cy + 5);
+        ctx.moveTo(cx + 5, cy - 5);
+        ctx.lineTo(cx - 5, cy + 5);
+        ctx.stroke();
+        ctx.restore();
+    }
+
     private drawOpacitySlider(ctx: CanvasRenderingContext2D, panelW: number): void {
         const sliderW = Math.min(180, Math.max(72, panelW * 0.22));
         const sliderX = this.panelX + panelW - sliderW - 86;
@@ -498,7 +546,7 @@ export class MinimapUI {
         ctx.textBaseline = 'middle';
         ctx.fillStyle = Parchment.textMid;
         ctx.font = `11px ${UI.fontPrimary}`;
-        ctx.fillText(t('minimap.opacity'), sliderX - 8, sliderY + sliderH / 2);
+        ctx.fillText('불투명도', sliderX - 8, sliderY + sliderH / 2);
 
         ctx.fillStyle = 'rgba(43, 30, 14, 0.38)';
         ctx.fillRect(sliderX, sliderY, sliderW, sliderH);
@@ -548,7 +596,7 @@ export class MinimapUI {
             ctx.font = `13px ${UI.fontPrimary}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(t('minimap.loadFailed'), viewRect.x + viewRect.w / 2, viewRect.y + viewRect.h / 2);
+            ctx.fillText('지도 불러오기 실패', viewRect.x + viewRect.w / 2, viewRect.y + viewRect.h / 2);
         }
 
         ctx.restore();
@@ -732,11 +780,10 @@ export class MinimapUI {
         const zoneCount = this.config.getExtractionZones().length;
         const footerX = this.panelX + 18;
         const footerY = this.panelY + panelH - FULL_FOOTER_H + 10;
-        const coords = formatT('minimap.coords', { x: player.x, y: player.y });
         const leftText = footer
-            ? `${footer.worldName} · ${footer.gold} G · ${coords}`
-            : coords;
-        const rightText = formatT('minimap.footerCounts', { enemies: enemyCount, loot: lootCount, exits: zoneCount });
+            ? `${footer.worldName} · ${footer.gold} G · 좌표 ${player.x}, ${player.y}`
+            : `좌표 ${player.x}, ${player.y}`;
+        const rightText = `적 ${enemyCount} · 루트 ${lootCount} · 탈출구 ${zoneCount}`;
 
         ctx.fillStyle = Parchment.textMid;
         ctx.font = `12px ${UI.fontPrimary}`;

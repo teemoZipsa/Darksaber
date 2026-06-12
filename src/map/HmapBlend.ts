@@ -21,7 +21,7 @@ export interface HmapSample {
 }
 
 /** Width (in tiles) of the feathered transition ring at the hmap border. */
-export const HMAP_BLEND_BAND = 16;
+export const HMAP_BLEND_BAND = 10;
 
 function hash(x: number, y: number, salt = 0): number {
     let h = x * 374761393 + y * 668265263 + salt * 1442695041;

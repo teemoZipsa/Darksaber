@@ -3,6 +3,7 @@ import { Pool, type PoolClient } from 'pg';
 import { CHAR_CLASSES, type StartingClassId } from '../src/data/characterClasses';
 import { getClassLine } from '../src/data/ClassTree';
 import { ITEMS } from '../src/data/ItemDB';
+import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../src/data/StarterKitData';
 import { createBaseStats, getBaseStatsForClass, type CharacterStats } from '../src/data/Stats';
 import type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
 export type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
@@ -143,7 +144,7 @@ export function createDefaultCharacterSave(character: AuthCharacter, gender: str
             height: 6,
             items: createStarterInventoryItems(),
         },
-        equipment: {},
+        equipment: createStarterEquipment(character.classKey),
         partySnapshot: {
             activeCharacterIds: [character.id],
         },
@@ -845,10 +846,9 @@ function createDefaultAccountProgress(accountId: string, now: string = new Date(
 }
 
 function createStarterInventoryItems(): InventorySaveItem[] {
-    const starterIds = ['short_sword', 'herb_cheap', 'herb_cheap', 'mp_potion'];
     const occupied: boolean[][] = Array.from({ length: 6 }, () => Array.from({ length: 10 }, () => false));
     const items: InventorySaveItem[] = [];
-    for (const itemId of starterIds) {
+    for (const itemId of STARTER_CONSUMABLE_ITEM_IDS) {
         const item = ITEMS.find((candidate) => candidate.id === itemId);
         if (!item) continue;
         const slot = findOpenInventorySlot(occupied, item.gridW, item.gridH);
@@ -865,6 +865,27 @@ function createStarterInventoryItems(): InventorySaveItem[] {
         });
     }
     return items;
+}
+
+function createStarterEquipment(classKey: StartingClassId): Record<string, unknown> {
+    return {
+        ...createStarterEquipmentSlot('weapon', STARTER_WEAPON_ITEM_ID),
+        ...createStarterEquipmentSlot('body', getStarterBodyArmorId(classKey)),
+    };
+}
+
+function createStarterEquipmentSlot(slot: string, itemId: string): Record<string, unknown> {
+    const item = ITEMS.find((candidate) => candidate.id === itemId && candidate.slot === slot);
+    if (!item) return {};
+    return {
+        [slot]: {
+            itemId,
+            gridX: 0,
+            gridY: 0,
+            quantity: 1,
+            durability: item.maxDurability,
+        },
+    };
 }
 
 function findOpenInventorySlot(occupied: boolean[][], width: number, height: number): { gridX: number; gridY: number } | null {

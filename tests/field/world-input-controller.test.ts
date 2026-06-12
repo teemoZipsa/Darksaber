@@ -4,7 +4,6 @@ import { Character } from '../../src/character/Character';
 import { Player } from '../../src/entity/Player';
 import type { FieldActor, FieldHitParty } from '../../src/field/FieldTypes';
 import { WorldInputController, type WorldInputContext } from '../../src/engine/world/WorldInputController';
-import { i18n } from '../../src/i18n/LanguageManager';
 
 class ImageStub {
     public src = '';
@@ -129,21 +128,81 @@ test('clicking the active actor body while action menu is open does not dismiss 
     assert.ok(!calls.includes('switchParty'));
 });
 
-test('blocked field clicks use localized input logs', () => {
-    i18n.setLanguage('en');
+test('M key toggles the full minimap before full-map pointer handling can consume input', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    let minimapHandleCalls = 0;
+    context.minimapUI = {
+        handleInput: () => {
+            minimapHandleCalls += 1;
+            return true;
+        },
+        onClick: () => false,
+        toggle: () => calls.push('toggleMinimap'),
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput({
+        mouseIsDown: true,
+        justPressed: (code: string) => code === 'KeyM',
+    }), makeCamera());
+
+    assert.deepEqual(calls, ['toggleMinimap']);
+    assert.equal(minimapHandleCalls, 0);
+});
+
+test('action menu hotkeys execute the matching radial slot', () => {
     const actor = makeActor('hero');
     const calls: string[] = [];
     const context = makeContext(actor, calls);
     context.actionMenuUI = {
-        ...context.actionMenuUI,
-        getIsOpen: () => false,
+        getIsOpen: () => true,
+        onClick: () => null,
+        onMouseMove: () => undefined,
+        getActionResult: (type: string) => ({ type, enabled: true }),
     } as any;
-    context.resolveFieldHitAt = () => ({ kind: 'blocked' }) as any;
+    context.playerActionController = {
+        getMode: () => null,
+        execute: (type: string) => calls.push(`execute:${type}`),
+    } as any;
     const controller = new WorldInputController(context);
 
-    controller.process(makeInput(), makeCamera());
+    controller.process(makeInput({
+        justPressed: (code: string) => code === 'KeyE',
+    }), makeCamera());
 
-    assert.ok(calls.includes('clearIntent'));
-    assert.ok(calls.includes('log:That position cannot be reached.'));
-    i18n.setLanguage('ko');
+    assert.deepEqual(calls, ['execute:attack']);
+});
+
+test('magic menu hotkeys select the matching radial magic slot', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.actionMenuUI = {
+        getIsOpen: () => false,
+        onClick: () => null,
+        onMouseMove: () => undefined,
+    } as any;
+    context.magicController = {
+        isVisible: () => true,
+        isActive: () => true,
+        getState: () => ({ mode: 'menu' }),
+        onMouseMove: () => undefined,
+        updateHoverPreview: () => undefined,
+        updateMp: () => undefined,
+        handleMenuIndex: (index: number) => {
+            calls.push(`magicSlot:${index}`);
+            return true;
+        },
+        handleMenuDigit: () => false,
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput({
+        mouseJustDown: false,
+        justPressed: (code: string) => code === 'KeyR',
+    }), makeCamera());
+
+    assert.deepEqual(calls, ['magicSlot:3']);
 });

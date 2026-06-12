@@ -5,20 +5,16 @@
 
 import { Camera } from './Camera';
 import { InputManager } from './InputManager';
-import { AudioManager } from './AudioManager';
-import { SettingsManager } from './SettingsManager';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
-import { LootObject } from '../entity/LootObject';
+import type { LootObject } from '../entity/LootObject';
 import { PartyManager } from '../character/PartyManager';
 import { Character } from '../character/Character';
-import { GridInventory, type PlacedItem } from '../inventory/GridInventory';
+import { GridInventory } from '../inventory/GridInventory';
 import { getCarryAtbMultiplier, getPartyCarriedWeight } from '../inventory/CarryWeight';
 import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
-import { rollBossRune } from '../data/SocketLoot';
 import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
-import { normalizeLoadout } from '../magic/MagicLoadout';
 import { getClassAttackProfile } from '../data/AttackPatternProfiles';
 import { formatT, t } from '../i18n/LanguageManager';
 import {
@@ -27,34 +23,25 @@ import {
     getMonsterDefinition,
     type MonsterId,
 } from '../data/MonsterCatalog';
-import { getStoryQuestByDungeonId, isStoryQuestAvailable, type StoryQuestDefinition } from '../data/StoryQuestData';
-import { getStoryScenarioByDungeonId } from '../data/StoryScenarioData';
 import {
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
-    getStatus,
     hasStatus,
-    removeActionStanceStatusesFromCarrier,
     removeStatusesFromCarrier,
     resolveTurnStartStatuses,
 } from '../combat/StatusEffects';
-import { ActionMenuUI, type ActionMenuSlotState, type ActionType } from '../ui/ActionMenuUI';
+import { ActionMenuUI, type ActionMenuSlotState } from '../ui/ActionMenuUI';
 import { EntityInfoUI } from '../ui/EntityInfoUI';
 import { EffectManager } from '../ui/EffectManager';
 import { FusionTempleUI } from '../ui/FusionTempleUI';
 import { FloatingTextManager } from '../ui/FloatingTextManager';
 import { MinimapUI } from '../ui/MinimapUI';
 import type { GameManager } from './GameManager';
-import { WorldMap, type WorldDungeonInfo } from '../map/WorldMap';
-import { TutorialTrainingMap } from '../map/TutorialTrainingMap';
-import { StoryInteriorMap } from '../map/StoryInteriorMap';
-import { getStoryInteriorLayout, isStoryInteriorDungeon, type StoryInteriorLayout } from '../data/StoryInteriorData';
+import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
-import { fuseActivePartyBranch, getFusionCandidates, hasActiveMasterCharacter } from '../character/FusionSystem';
-import type { MasterBranch } from '../data/ClassTree';
 import { TilePoint, manhattan, tileKey } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
-import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST, enqueueReadyActor, type FieldApAction } from '../field/FieldActionEconomy';
+import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST, type FieldApAction } from '../field/FieldActionEconomy';
 import { hasLineOfSight } from '../field/LineOfSight';
 import {
     AttackPatternProfile,
@@ -66,8 +53,7 @@ import {
     isTerrainLineOfSightBlocking,
     TerrainActorTraits,
 } from '../field/TerrainRules';
-import { resolveTownArrival } from '../raid/RaidRules';
-import type { AttackCue, FieldActor, FieldEnemy, FieldHitParty, FieldIntent } from '../field/FieldTypes';
+import type { AttackCue, FieldActor, FieldEnemy, FieldHitParty } from '../field/FieldTypes';
 import {
     getActorAttackTargetFailure as resolveActorAttackTargetFailure,
     type AttackTargetFailure,
@@ -86,37 +72,24 @@ import { WorldSelectionController } from './world/WorldSelectionController';
 import { WorldFieldSpawnController } from './world/WorldFieldSpawnController';
 import { WorldRenderController } from './world/WorldRenderController';
 import { WorldInputController } from './world/WorldInputController';
-import { NetworkRaidState, type NetworkRaidCloseReason } from './world/NetworkRaidState';
+import { WorldStoryScenarioController } from './world/WorldStoryScenarioController';
+import { WorldNetworkSyncController } from './world/WorldNetworkSyncController';
+import { WorldTutorialController } from './world/WorldTutorialController';
+import { WorldRaidLifecycleController } from './world/WorldRaidLifecycleController';
+import { WorldTempleController } from './world/WorldTempleController';
+import { WorldRestingController } from './world/WorldRestingController';
+import { WorldLootController } from './world/WorldLootController';
+import { WorldCombatFeedbackController } from './world/WorldCombatFeedbackController';
+import { WorldNetworkIntentController } from './world/WorldNetworkIntentController';
+import { WorldTurnStateController } from './world/WorldTurnStateController';
+import type { CombatFeedbackKind } from './world/CombatFeedback';
+import { NetworkRaidClient } from '../net/NetworkRaidClient';
 import {
-    applyMonsterSprite,
-    createNetworkLootFromSnapshot,
-    gridFromSnapshot,
-    reconcileNetworkEnemies,
-    reconcileNetworkLocalActors,
-    reconcileNetworkRemoteActors,
-} from './world/NetworkSnapshotMapping';
-import { classifyNetworkActorSnapshots } from './world/NetworkSnapshotOwnership';
-import { HitStop } from './world/HitStop';
-import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
-import { NetworkRaidClient, WorldServerError, type NetworkRaidStatus } from '../net/NetworkRaidClient';
-import {
-    formatNetworkDeployFailure,
-    formatWorldServerErrorLog,
-    getWorldServerErrorMessage,
-} from '../net/NetworkRaidMessages';
-import { DEFAULT_AUTH_SERVER_URL } from '../net/AuthClient';
-import {
-    DEFAULT_WORLD_SERVER_URL,
     type ActionRejectedMessage,
-    type ActorSnapshot,
-    type AutoLootCell,
     type AutoLootGrantMessage,
     type CombatEventMessage,
     type InventoryConsumedMessage,
-    type InventoryItemCountSnapshot,
     type LootGrantMessage,
-    type PlayerIntentKind,
-    type RaidResultMessage,
     type WorldRealmId,
     type WorldSnapshot,
 } from '../net/WorldProtocol';
@@ -124,48 +97,6 @@ import {
 export interface WorldEngineOptions {
     startIntroTutorial?: boolean;
 }
-
-type IntroTutorialStep = 'move' | 'attack' | 'rest' | 'magic' | 'defeat';
-
-const INTRO_TUTORIAL_ACTOR_RENDER_SCALE = 1.16;
-
-const INTRO_TUTORIAL_INSTRUCTOR_ROW_BY_FACING: Record<'up' | 'down' | 'left' | 'right', number> = {
-    up: 0,
-    down: 1,
-    left: 3,
-    right: 2,
-};
-
-const INTRO_TUTORIAL_STEP_ACTION: Partial<Record<IntroTutorialStep, FieldApAction>> = {
-    move: 'move',
-    attack: 'attack',
-    rest: 'rest',
-    magic: 'magic',
-};
-
-const INTRO_TUTORIAL_NEXT_STEP: Record<IntroTutorialStep, IntroTutorialStep | null> = {
-    move: 'attack',
-    attack: 'rest',
-    rest: 'magic',
-    magic: 'defeat',
-    defeat: null,
-};
-
-const INTRO_TUTORIAL_STEP_NUMBER: Record<IntroTutorialStep, number> = {
-    move: 1,
-    attack: 2,
-    rest: 3,
-    magic: 4,
-    defeat: 5,
-};
-
-const INTRO_TUTORIAL_EXPECTED_ACTION: Record<IntroTutorialStep, ActionType> = {
-    move: 'move',
-    attack: 'attack',
-    rest: 'rest',
-    magic: 'magic',
-    defeat: 'attack',
-};
 
 export class WorldEngine {
     private canvas: HTMLCanvasElement;
@@ -178,9 +109,11 @@ export class WorldEngine {
     private partyActors: FieldActor[] = [];
     private fieldEnemies: FieldEnemy[] = [];
     private remotePartyActors: Map<string, FieldActor> = new Map();
-    private networkRaid = new NetworkRaidState();
-    private pendingNetworkScenarioEnter: { intentId: string; dungeonId: string; visitKey: string | null } | null = null;
-    private pendingLootPicks = new Map<string, { placed: PlacedItem; source: { gridX: number; gridY: number }; at: number; timedOut?: boolean }>();
+    private networkRaidClient: NetworkRaidClient | null = null;
+    private isNetworkRaid = false;
+    private isNetworkRaidConnecting = false;
+    private networkWasReconnecting = false;
+    private networkPlayerId: string | null = null;
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
     private fusionTempleUI = new FusionTempleUI();
@@ -200,30 +133,24 @@ export class WorldEngine {
     private fieldSpawnController: WorldFieldSpawnController;
     private renderController: WorldRenderController;
     private inputController: WorldInputController;
-    private activeTurnActorId: string | null = null;
-    private readyQueue: string[] = [];
-    private remainingActionPoints = 0;
-    private majorActionUsedThisTurn = false;
-    private reservedAction: FieldIntent | null = null;
-    private restingRecoveryTimers = new Map<string, number>();
+    private storyScenarioController: WorldStoryScenarioController;
+    private networkSyncController: WorldNetworkSyncController;
+    private tutorialController: WorldTutorialController;
+    private raidLifecycleController: WorldRaidLifecycleController;
+    private templeController: WorldTempleController;
+    private restingController: WorldRestingController;
+    private lootController: WorldLootController;
+    private combatFeedbackController: WorldCombatFeedbackController;
+    private networkIntentController: WorldNetworkIntentController;
+    private turnStateController = new WorldTurnStateController();
     private hoverTile: TilePoint = { x: -1, y: -1 };
     private combatLog: string[] = [];
-    private feedbackGroups = new Map<string, CombatFeedbackKind>();
     private followRepathTimer: number = 0;
     private fanfareLeaderActorId: string | null = null;
     private floatingText = new FloatingTextManager();
     private effectManager = new EffectManager();
     private attackCues: AttackCue[] = [];
     private worldTime: number = 0;
-    private dismissedTempleVisitKey: string | null = null;
-    private dismissedDungeonVisitKey: string | null = null;
-    private activeStoryInterior: { dungeonId: string; layout: StoryInteriorLayout; previousWorldMap: WorldMap; returnTile: TilePoint } | null = null;
-    private introTutorialActive = false;
-    private introTutorialEnemyId: string | null = null;
-    private introTutorialStep: IntroTutorialStep = 'move';
-    private introTutorialPreviousWorldMap: WorldMap | null = null;
-    private introTutorialInstructor: Player | null = null;
-    private introTutorialCompletePending = false;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -251,22 +178,180 @@ export class WorldEngine {
             getExtractionZones: () => this.worldMap.extractionZones,
             getLoot: () => this.worldMap.loot,
         });
+        this.combatFeedbackController = new WorldCombatFeedbackController({
+            getWorldTime: () => this.worldTime,
+            shakeCamera: (amount, durationMs) => this.camera.shake(amount, durationMs),
+        });
         const initialHubTownId = this.getTownById(this.playerData.currentHubTownId)?.id ?? 'central_castle';
         this.raidSession = new WorldRaidSession(initialHubTownId);
         this.townSession = new WorldTownSession({
             party: this.party,
             playerData: this.playerData,
             gameManager: this.gameManager,
-            useServerMarket: this.gameManager.getNetworkAuthContext() !== null,
             onDeploy: () => this.beginRaidFromCurrentHub(),
             log: (message) => this.addCombatLog(message),
         });
-        this.fusionTempleUI.onFuse = (branch) => this.performTempleFusion(branch);
-        this.fusionTempleUI.onEnterMasterWorld = () => this.enterMasterWorld();
-        this.fusionTempleUI.onReturnToMortalWorld = () => this.returnToMortalWorld();
-        this.fusionTempleUI.onClose = () => {
-            this.dismissedTempleVisitKey = this.getCurrentTempleVisitKey();
-        };
+        this.templeController = new WorldTempleController({
+            party: this.party,
+            raidSession: this.raidSession,
+            fusionTempleUI: this.fusionTempleUI,
+            getWorldMap: () => this.worldMap,
+            getControlledActor: () => this.getControlledActor(),
+            getFieldEnemies: () => this.fieldEnemies,
+            isNetworkRaid: () => this.isNetworkRaid,
+            getPhase: () => this.currentPhase,
+            setPhase: (phase) => { this.currentPhase = phase; },
+            beginRaidFromCurrentHub: (realm) => { void this.beginRaidFromCurrentHub(realm); },
+            closeFieldOverlays: () => this.closeFieldOverlays(),
+            clearFieldTurnState: () => this.clearFieldTurnState(),
+            placePartyNear: (tile) => this.placePartyNear(tile),
+            setPlayer: (player) => { this.player = player; },
+            setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
+            clearWorldLoot: () => { this.worldMap.loot = []; },
+            selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            log: (message) => this.addCombatLog(message),
+        });
+        this.restingController = new WorldRestingController({
+            getPartyActors: () => this.partyActors,
+            spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
+            spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
+            spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
+            log: (message) => this.addCombatLog(message),
+        });
+        this.storyScenarioController = new WorldStoryScenarioController({
+            playerData: this.playerData,
+            raidSession: this.raidSession,
+            getWorldMap: () => this.worldMap,
+            setWorldMap: (worldMap) => { this.worldMap = worldMap; },
+            getPlayer: () => this.player,
+            setPlayer: (player) => { this.player = player; },
+            getFieldEnemies: () => this.fieldEnemies,
+            setFieldEnemies: (fieldEnemies) => { this.fieldEnemies = fieldEnemies; },
+            getControlledActor: () => this.getControlledActor(),
+            actorTile: (actor) => this.actorTile(actor),
+            placePartyNear: (tile) => this.placePartyNear(tile),
+            clearFieldTurnState: () => this.clearFieldTurnState(),
+            closeFieldOverlays: () => this.closeFieldOverlays(),
+            selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            clearSelection: () => this.selectionController.clear(),
+            applyMonsterSprite: (enemy, monsterId) => this.applyMonsterSprite(enemy, monsterId),
+            isEntityMoving: (entity) => this.isEntityMoving(entity),
+            isNetworkRaid: () => this.isNetworkRaid,
+            getNetworkRaidClient: () => this.networkRaidClient,
+            isRaidOutcomeVisible: () => this.raidOutcomeController.isVisible(),
+            isTownVisible: () => this.townSession.isVisible(),
+            isFusionTempleVisible: () => this.fusionTempleUI.isVisible(),
+            followCameraToPlayer: () => {
+                this.camera.followTile(this.player.gridX, this.player.gridY);
+                this.camera.snapToTarget();
+            },
+            autoPlaceRewardItem: (itemId) => {
+                const item = getItemDef(itemId);
+                if (!item) return false;
+                const placed = this.gameManager.inventory.autoPlace(item);
+                if (placed) placed.acquiredInRaid = true;
+                return Boolean(placed);
+            },
+            log: (message) => this.addCombatLog(message),
+        });
+        this.tutorialController = new WorldTutorialController({
+            party: this.party,
+            raidSession: this.raidSession,
+            townSession: this.townSession,
+            getWorldMap: () => this.worldMap,
+            setWorldMap: (worldMap) => { this.worldMap = worldMap; },
+            getCurrentHubTown: () => this.getCurrentHubTown(),
+            openTown: (town) => this.openTown(town),
+            closeFieldOverlays: () => this.closeFieldOverlays(),
+            resetStoryVisitState: () => this.storyScenarioController.resetVisitState(),
+            resetPartyForRaid: () => this.party.resetForNewRaid(),
+            applyPendingRestForRaidStart: () => this.townSession.applyPendingRestForRaidStart(),
+            clearRemotePartyActors: () => this.remotePartyActors.clear(),
+            setFieldEnemies: (fieldEnemies) => { this.fieldEnemies = fieldEnemies; },
+            placePartyNear: (tile, overrideMembers) => this.placePartyNear(tile, overrideMembers),
+            getControlledActor: () => this.getControlledActor(),
+            getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
+            setPlayer: (player) => { this.player = player; },
+            getPlayer: () => this.player,
+            selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            clearFieldTurnState: () => this.clearFieldTurnState(),
+            setCurrentPhaseToRaid: () => { this.currentPhase = 'raid'; },
+            setActiveTurn: (actorId, remainingActionPoints, majorActionUsed) => {
+                if (actorId) this.turnStateController.setActiveTurn(actorId, remainingActionPoints, majorActionUsed);
+                else this.turnStateController.endActiveTurn();
+            },
+            getTurnActionStates: (actor) => this.playerActionController.getTurnActionStates(actor),
+            openActionMenu: (states) => this.actionMenuUI.open(states),
+            getEnemyById: (enemyId) => this.getEnemyById(enemyId),
+            actorTile: (actor) => this.actorTile(actor),
+            getActorAttackTargetFailureFromTile: (actor, casterTile, enemy) =>
+                this.getActorAttackTargetFailureFromTile(actor, casterTile, enemy),
+            updateEffects: (dt) => this.effectManager.update(dt),
+            updateFloatingText: (dt) => this.floatingText.update(dt),
+            updateAttackCues: (dt) => this.updateAttackCues(dt),
+            followCameraToPlayer: (camera, dt) => {
+                camera.followTile(this.player.gridX, this.player.gridY);
+                if (dt !== undefined) camera.update(dt);
+            },
+            snapCameraToActor: (actor) => {
+                this.camera.followTile(actor.entity.gridX, actor.entity.gridY);
+                this.camera.snapToTarget();
+            },
+            getLastCombatLog: () => this.combatLog[this.combatLog.length - 1],
+            log: (message) => this.addCombatLog(message),
+        });
+        this.networkSyncController = new WorldNetworkSyncController({
+            party: this.party,
+            gameManager: this.gameManager,
+            storyScenarioController: this.storyScenarioController,
+            getNetworkPlayerId: () => this.networkPlayerId,
+            getNetworkRaidClient: () => this.networkRaidClient,
+            getWorldMap: () => this.worldMap,
+            getPartyActors: () => this.partyActors,
+            setPartyActors: (actors) => { this.partyActors = actors; },
+            getRemotePartyActors: () => this.remotePartyActors,
+            getFieldEnemies: () => this.fieldEnemies,
+            setFieldEnemies: (fieldEnemies) => { this.fieldEnemies = fieldEnemies; },
+            getControlledActor: () => this.getControlledActor(),
+            setPlayer: (player) => { this.player = player; },
+            getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
+            setActiveTurnActorId: (actorId) => this.turnStateController.setActiveTurnActorId(actorId),
+            getRemainingActionPoints: () => this.turnStateController.getRemainingActionPoints(),
+            setRemainingActionPoints: (points) => this.turnStateController.setRemainingActionPoints(points),
+            setMajorActionUsedThisTurn: (used) => this.turnStateController.setMajorActionUsedThisTurn(used),
+            hasSelection: () => this.selectionController.hasSelection(),
+            selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            selectLoot: (lootId) => this.selectionController.selectLoot(lootId),
+            getActionMenuIsOpen: () => this.actionMenuUI.getIsOpen(),
+            getPlayerActionMode: () => this.playerActionController.getMode(),
+            hasExecutableAction: (actor) => this.playerActionController.hasExecutableAction(actor),
+            reopenActionMenu: (actor) => this.reopenActionMenu(actor),
+            getEnemyById: (enemyId) => this.getEnemyById(enemyId),
+            actorTile: (actor) => this.actorTile(actor),
+            enemyTile: (enemy) => this.enemyTile(enemy),
+            applyMonsterSprite: (enemy, monsterId) => this.applyMonsterSprite(enemy, monsterId),
+            isEntityMoving: (entity) => this.isEntityMoving(entity),
+            beginCombatFeedbackGroup: () => this.beginCombatFeedbackGroup(),
+            registerCombatFeedback: (kind, feedbackGroupId) => this.registerCombatFeedback(kind, feedbackGroupId),
+            flushCombatFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
+            spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
+            spawnKillEffect: (enemy, feedbackGroupId) => {
+                this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy);
+                this.registerCombatFeedback('kill', feedbackGroupId);
+            },
+            spawnDebuffEffect: (x, y) => this.effectManager.spawnDebuffEffect(x, y),
+            spawnHitEffect: (x, y) => this.effectManager.spawnHitEffect(x, y),
+            spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
+            spawnDamage: (x, y, amount, isCrit, isMiss) => this.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
+            spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
+            spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
+            log: (message) => this.addCombatLog(message),
+        });
+        this.networkIntentController = new WorldNetworkIntentController({
+            networkSyncController: this.networkSyncController,
+            isNetworkRaid: () => this.isNetworkRaid,
+            getNetworkRaidClient: () => this.networkRaidClient,
+        });
         this.combatController = new WorldCombatController({
             log: (message) => this.addCombatLog(message),
             spawnDamage: (x, y, amount, isCrit, isMiss) => this.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
@@ -291,7 +376,7 @@ export class WorldEngine {
                     this.completeIntroTutorial();
                     return;
                 }
-                this.completeDungeonIfBossDefeated(enemy);
+                this.storyScenarioController.completeDungeonIfBossDefeated(enemy);
             },
             flushFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
         });
@@ -344,6 +429,19 @@ export class WorldEngine {
             getEnemyById: (enemyId) => this.getEnemyById(enemyId),
             getLootById: (lootId) => this.worldMap.loot.find((candidate) => candidate.id === lootId) ?? null,
         });
+        this.lootController = new WorldLootController({
+            gameManager: this.gameManager,
+            selectionController: this.selectionController,
+            storyScenarioController: this.storyScenarioController,
+            networkSyncController: this.networkSyncController,
+            getWorldMap: () => this.worldMap,
+            isNetworkRaid: () => this.isNetworkRaid,
+            isLocalLootEnabled: () => this.tutorialController.isActive(),
+            getNetworkRaidClient: () => this.networkRaidClient,
+            getControlledActor: () => this.getControlledActor(),
+            clearControlledPath: () => this.clearControlledPath(),
+            log: (message) => this.addCombatLog(message),
+        });
         this.magicController = new WorldMagicController(
             {
                 getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
@@ -355,8 +453,8 @@ export class WorldEngine {
                 getBoundsTiles: () => this.worldMap.getBoundsTiles(),
                 hasFieldLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to),
                 spendAp: (cost) => this.spendAp(cost),
-                isMajorActionUsed: () => this.majorActionUsedThisTurn,
-                markMajorActionUsed: () => this.markMajorActionUsed(),
+                isMajorActionUsed: () => this.turnStateController.isMajorActionUsed(),
+                markMajorActionUsed: () => this.turnStateController.markMajorActionUsed(),
                 submitNetworkSkillIntent: (actor, skill, targetEnemy) => this.submitNetworkSkillIntent(actor, skill.id, targetEnemy?.id),
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
@@ -397,8 +495,8 @@ export class WorldEngine {
                 getInventoryItems: () => this.gameManager.inventory.items,
                 removeInventoryItem: (placed) => this.gameManager.inventory.remove(placed),
                 spendAp: (cost) => this.spendAp(cost),
-                isMajorActionUsed: () => this.majorActionUsedThisTurn,
-                markMajorActionUsed: () => this.markMajorActionUsed(),
+                isMajorActionUsed: () => this.turnStateController.isMajorActionUsed(),
+                markMajorActionUsed: () => this.turnStateController.markMajorActionUsed(),
                 submitNetworkUseItem: (actor, itemId) => this.submitNetworkUseItemIntent(actor, itemId),
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
@@ -416,8 +514,8 @@ export class WorldEngine {
                 getPartyActors: () => this.partyActors,
                 getFieldEnemies: () => this.fieldEnemies,
                 getRemainingActionPoints: () => this.getSpendableActionGauge(),
-                getReservedAction: () => this.reservedAction,
-                getActiveTurnActorId: () => this.activeTurnActorId,
+                getReservedAction: () => this.turnStateController.getReservedAction(),
+                getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
                 getActorTerrainMovementBudget: (actor) => this.getActorTerrainMovementBudget(actor),
                 getActorTerrainStepCost: (actor, tile) => this.getActorTerrainStepCost(actor, tile),
                 getActorAttackProfile: (actor) => this.getActorAttackProfile(actor),
@@ -429,9 +527,10 @@ export class WorldEngine {
                 isActorAt: (actor, tile) => this.isActorAt(actor, tile),
                 isEntityMoving: (entity) => this.isEntityMoving(entity),
                 isFieldPassable: (query) => this.movementController.isFieldPassable(query),
+                getBlockedMoveMessage: (tile) => this.storyScenarioController.getLockedDoorMessage(tile),
                 spendAp: (cost) => this.spendAp(cost),
-                isMajorActionUsed: () => this.majorActionUsedThisTurn,
-                markMajorActionUsed: () => this.markMajorActionUsed(),
+                isMajorActionUsed: () => this.turnStateController.isMajorActionUsed(),
+                markMajorActionUsed: () => this.turnStateController.markMajorActionUsed(),
                 getFanfareLeaderId: () => this.fanfareLeaderActorId,
                 setFanfareLeaderId: (actorId) => {
                     this.fanfareLeaderActorId = actorId;
@@ -445,9 +544,9 @@ export class WorldEngine {
                 openLoot: (loot) => this.openLoot(loot),
                 openMagic: (actor) => this.openFieldMagic(actor),
                 openTool: (actor) => this.openFieldTool(actor),
-                hasCastableFieldSkill: (actor) => this.areServerStyleFieldActionsEnabled() && this.magicController.hasCastableFieldSkill(actor.character),
-                hasUsableCombatTool: (actor) => this.areServerStyleFieldActionsEnabled() && this.toolController.hasUsableCombatTool(actor),
-                getCombatToolAvailability: (actor) => this.areServerStyleFieldActionsEnabled()
+                hasCastableFieldSkill: (actor) => (this.isNetworkRaid || this.tutorialController.isActive()) && this.magicController.hasCastableFieldSkill(actor.character),
+                hasUsableCombatTool: (actor) => (this.isNetworkRaid || this.tutorialController.isActive()) && this.toolController.hasUsableCombatTool(actor),
+                getCombatToolAvailability: (actor) => (this.isNetworkRaid || this.tutorialController.isActive())
                     ? this.toolController.getCombatToolAvailability(actor)
                     : { hasRecoveryConsumable: false, hasEffectiveRecovery: false },
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
@@ -456,10 +555,12 @@ export class WorldEngine {
                 resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
                 endActorTurn: (actor, reason, atbCarryover) => this.endActorTurn(actor, reason, atbCarryover),
                 clearActorIntent: (actor) => this.clearActorIntent(actor),
-                setReservedAction: (intent) => { this.reservedAction = intent; },
+                setReservedAction: (intent) => this.turnStateController.setReservedAction(intent),
                 selectEnemy: (enemyId) => this.selectionController.selectEnemy(enemyId),
                 selectLoot: (lootId) => this.selectionController.selectLoot(lootId),
                 filterActionTiles: (action, actor, tiles) => this.filterIntroTutorialActionTiles(action, actor, tiles),
+                getAdditionalInteractTiles: (actor) => this.storyScenarioController.getInspectableFieldEventTiles(actor),
+                interactAtTile: (actor, tile) => this.storyScenarioController.playFieldEventAt(tile, actor),
                 onActionCompleted: (action) => this.advanceIntroTutorialStep(action),
             },
             {
@@ -485,6 +586,50 @@ export class WorldEngine {
             },
             openTown: (town) => this.openTown(town),
             setPhase: (phase) => { this.currentPhase = phase; },
+            log: (message) => this.addCombatLog(message),
+        });
+        this.raidLifecycleController = new WorldRaidLifecycleController({
+            party: this.party,
+            playerData: this.playerData,
+            gameManager: this.gameManager,
+            raidSession: this.raidSession,
+            townSession: this.townSession,
+            raidOutcomeController: this.raidOutcomeController,
+            storyScenarioController: this.storyScenarioController,
+            networkSyncController: this.networkSyncController,
+            getWorldMap: () => this.worldMap,
+            getTownById: (townId) => this.getTownById(townId),
+            getCurrentHubTown: () => this.getCurrentHubTown(),
+            getNetworkRaidClient: () => this.networkRaidClient,
+            setNetworkRaidClient: (client) => { this.networkRaidClient = client; },
+            isNetworkRaid: () => this.isNetworkRaid,
+            setIsNetworkRaid: (isNetworkRaid) => { this.isNetworkRaid = isNetworkRaid; },
+            isNetworkRaidConnecting: () => this.isNetworkRaidConnecting,
+            setIsNetworkRaidConnecting: (isConnecting) => { this.isNetworkRaidConnecting = isConnecting; },
+            isNetworkWasReconnecting: () => this.networkWasReconnecting,
+            setNetworkWasReconnecting: (wasReconnecting) => { this.networkWasReconnecting = wasReconnecting; },
+            getNetworkPlayerId: () => this.networkPlayerId,
+            setNetworkPlayerId: (playerId) => { this.networkPlayerId = playerId; },
+            closeFieldOverlays: () => this.closeFieldOverlays(),
+            clearFieldTurnState: () => this.clearFieldTurnState(),
+            clearIntroTutorialStateForNetworkRaid: () => this.clearIntroTutorialStateForNetworkRaid(),
+            clearRemotePartyActors: () => this.remotePartyActors.clear(),
+            placePartyNear: (tile) => this.placePartyNear(tile),
+            getControlledActor: () => this.getControlledActor(),
+            setPlayer: (player) => { this.player = player; },
+            setPartyActors: (actors) => { this.partyActors = actors; },
+            setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
+            clearWorldLoot: () => { this.worldMap.loot = []; },
+            selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            syncCharacterMovementToClass: (character) => this.syncCharacterMovementToClass(character),
+            isTurnCombatActive: () => this.isTurnCombatActive(),
+            setPhase: (phase) => { this.currentPhase = phase; },
+            applyNetworkSnapshot: (snapshot) => this.applyNetworkSnapshot(snapshot),
+            handleNetworkCombatEvent: (event) => this.handleNetworkCombatEvent(event),
+            openNetworkLoot: (grant) => this.openNetworkLoot(grant),
+            handleNetworkAutoLootGrant: (grant) => this.handleNetworkAutoLootGrant(grant),
+            handleNetworkInventoryConsumed: (message) => this.handleNetworkInventoryConsumed(message),
+            handleNetworkActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
             log: (message) => this.addCombatLog(message),
         });
         this.tacticalController = new WorldTacticalController({
@@ -517,11 +662,11 @@ export class WorldEngine {
             getPlayer: () => this.player,
             getControlledActor: () => this.getControlledActor(),
             getPartyActors: () => this.partyActors,
-            getTutorialActors: () => this.introTutorialInstructor ? [this.introTutorialInstructor] : [],
+            getTutorialActors: () => this.tutorialController.getInstructor() ? [this.tutorialController.getInstructor()!] : [],
             getFieldEnemies: () => this.fieldEnemies,
-            getActiveTurnActorId: () => this.activeTurnActorId,
+            getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
             getRemainingActionPoints: () => this.getSpendableActionGauge(),
-            getMajorActionUsedThisTurn: () => this.majorActionUsedThisTurn,
+            getMajorActionUsedThisTurn: () => this.turnStateController.getMajorActionUsedThisTurn(),
             getHoverTile: () => this.hoverTile,
             getPathPreviewTiles: (actor) => this.getPathPreviewTiles(actor),
             getAttackCues: () => this.attackCues,
@@ -540,8 +685,8 @@ export class WorldEngine {
             tacticalController: this.tacticalController,
             getCanvasSize: () => ({ width: this.canvas.width, height: this.canvas.height }),
             getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
-            getActiveTurnActorId: () => this.activeTurnActorId,
-            getReservedAction: () => this.reservedAction,
+            getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
+            getReservedAction: () => this.turnStateController.getReservedAction(),
             getControlledActor: () => this.getControlledActor(),
             getPartyActors: () => this.partyActors,
             getHoverTile: () => this.hoverTile,
@@ -559,46 +704,21 @@ export class WorldEngine {
             getCombatLog: () => this.combatLog,
             onUnhandledEscape: () => this.gameManager.openPauseMenu(),
         });
-        this.gameManager.inventoryUI.onRaidLootSecured = (placed, source) => {
-            const client = this.getNetworkRaidState().getClient();
-            if (!this.isNetworkRaidActive() || !client || !source || !this.selectionController.lootId) return;
-            const intentId = client.sendLootPickup(this.selectionController.lootId, source.gridX, source.gridY);
-            this.pendingLootPicks.set(intentId, { placed, source, at: Date.now() });
-            this.purgeStaleLootPicks();
-        };
-
         this.spawnPartyAtCurrentHub();
         this.player = this.getControlledActor()?.entity ?? new Player(0, 0);
         this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
         if (options.startIntroTutorial) {
             this.startIntroTutorial();
         } else if (NetworkRaidClient.hasStoredResumeToken()) {
-            this.addCombatLog(t('mp.resumeAttempt'));
+            this.addCombatLog('월드 세션 재접속 중...');
             void this.beginRaidFromCurrentHub();
         } else {
             this.openTown(this.getCurrentHubTown());
-            this.addCombatLog(t('field.log.townReady'));
+            this.addCombatLog('마을에 도착했습니다. 출격 준비를 마치세요.');
         }
 
         camera.followTile(this.player.gridX, this.player.gridY);
         camera.snapToTarget();
-    }
-
-    private getNetworkRaidState(): NetworkRaidState {
-        if (!this.networkRaid) this.networkRaid = new NetworkRaidState();
-        return this.networkRaid;
-    }
-
-    private isNetworkRaidActive(): boolean {
-        return this.getNetworkRaidState().isActive();
-    }
-
-    private areServerStyleFieldActionsEnabled(): boolean {
-        return this.isNetworkRaidActive() || this.introTutorialActive;
-    }
-
-    private areSoloFollowersEnabled(): boolean {
-        return !this.isNetworkRaidActive();
     }
 
     public update(dt: number, input: InputManager, camera: Camera): void {
@@ -626,46 +746,49 @@ export class WorldEngine {
             return;
         }
 
-        if (this.introTutorialActive && this.introTutorialCompletePending) {
+        if (this.tutorialController.isActive() && this.tutorialController.isCompletePending()) {
             this.updateIntroTutorialCompletion(input, dt, camera);
             return;
         }
 
-        if (this.introTutorialActive && input.justPressed('Escape')) {
+        if (this.tutorialController.isActive() && input.justPressed('Escape')) {
             this.finishIntroTutorial(true);
             camera.followTile(this.player.gridX, this.player.gridY);
             camera.update(dt);
             return;
         }
 
-        if (this.isNetworkRaidActive()) {
+        if (this.isNetworkRaid) {
             this.updateNetworkRaid(dt, input, camera);
             return;
         }
 
-        if (this.introTutorialActive && input.mouseRightJustDown) {
+        if (this.tutorialController.isActive() && input.mouseRightJustDown) {
             this.addIntroTutorialBlockedLog();
             camera.followTile(this.player.gridX, this.player.gridY);
             camera.update(dt);
             return;
         }
 
+        this.refreshOpenActionMenuState();
         this.inputController.process(input, camera);
 
         const partyMovement = this.movementController.updatePartyActors({
             dt,
             controlled: this.getFanfareLeaderActor(),
-            activeTurnActorId: this.activeTurnActorId,
+            activeTurnActorId: this.turnStateController.getActiveTurnActorId(),
             followRepathTimer: this.followRepathTimer,
         });
         this.followRepathTimer = partyMovement.followRepathTimer;
-        for (const actorId of partyMovement.readyActorIds) enqueueReadyActor(this.readyQueue, actorId);
+        for (const actorId of partyMovement.readyActorIds) this.turnStateController.enqueueReadyActor(actorId);
 
         const enemyMovement = this.movementController.updateEnemies({
             dt,
-            activeTurnActorId: this.activeTurnActorId,
+            activeTurnActorId: this.turnStateController.getActiveTurnActorId(),
         });
-        for (const enemyId of enemyMovement.readyEnemyIds) enqueueReadyActor(this.readyQueue, enemyId);
+        for (const enemyId of enemyMovement.readyEnemyIds) this.turnStateController.enqueueReadyActor(enemyId);
+        this.refreshEnemyIntentPreviews();
+        this.refreshOpenActionMenuState();
         this.updateRestingActors(dt);
         this.effectManager.update(dt);
         this.floatingText.update(dt);
@@ -674,10 +797,10 @@ export class WorldEngine {
         this.refreshLootState();
         this.tacticalController.updateMarkers(dt);
         this.startNextReadyTurn();
-        this.updateRaidTimer(dt);
-        this.checkRaidEndConditions();
-        this.checkTempleArrival();
-        this.checkDungeonArrival();
+        this.raidLifecycleController.updateRaidTimer(dt);
+        this.raidLifecycleController.checkRaidEndConditions();
+        this.templeController.checkArrival();
+        this.storyScenarioController.checkDungeonArrival();
 
         const controlled = this.getControlledActor();
         if (controlled) this.player = controlled.entity;
@@ -699,490 +822,52 @@ export class WorldEngine {
     public getRaidSession(): WorldRaidSession { return this.raidSession; }
 
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
-        this.renderController.render(ctx, camera, width, height, { hideWorldHud: this.introTutorialActive });
-        if (this.introTutorialActive) this.renderIntroTutorialHud(ctx, width, height);
+        this.renderController.render(ctx, camera, width, height, { hideWorldHud: this.tutorialController.isActive() });
+        if (this.tutorialController.isActive()) this.renderIntroTutorialHud(ctx, width, height);
     }
 
     public startIntroTutorial(): void {
-        if (this.introTutorialActive) return;
-        const town = this.getCurrentHubTown();
-        const trainingMap = new TutorialTrainingMap();
-        this.introTutorialPreviousWorldMap = this.worldMap;
-        this.worldMap = trainingMap;
-        this.townSession.hide();
-        this.closeFieldOverlays();
-        this.currentPhase = 'raid';
-        this.raidSession.beginRaidFromTown(town.id);
-        this.dismissedDungeonVisitKey = null;
-        this.party.resetForNewRaid();
-        this.townSession.applyPendingRestForRaidStart();
-        this.remotePartyActors.clear();
-        this.fieldEnemies = [];
-        this.worldMap.loot = [];
-        this.placePartyNear(trainingMap.getPlayerStartTile(), this.getIntroTutorialCharacters());
-        this.player = this.getControlledActor()?.entity ?? this.player;
-        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-        this.clearFieldTurnState();
-        this.introTutorialInstructor = this.createIntroTutorialInstructor(trainingMap.getInstructorTile());
-
-        const actor = this.getControlledActor();
-        if (!actor) {
-            this.restoreIntroTutorialWorldMap();
-            this.openTown(town);
-            return;
-        }
-
-        const enemyTile = trainingMap.getPracticeEnemyTile();
-        const enemy = new Enemy('intro_tutorial_enemy', enemyTile.x, enemyTile.y, t('tutorial.world.enemy'), 1, '#b64048', 'bruiser');
-        enemy.aggroRange = 0;
-        enemy.expReward = 0;
-        enemy.stats.maxHp = 42;
-        enemy.stats.hp = 42;
-        enemy.stats.atk = 1;
-        enemy.stats.def = 0;
-        enemy.stats.spd = 0;
-        enemy.actionGauge = 0;
-        enemy.facing = 'left';
-        enemy.setWalkSprite(
-            `${MONSTER_SPRITE_PATH}/206R.png`,
-            32,
-            32,
-            3,
-            8,
-            MONSTER_ROW_BY_FACING,
-            INTRO_TUTORIAL_ACTOR_RENDER_SCALE
-        );
-        this.fieldEnemies = [{ enemy, home: enemyTile, path: [] }];
-        this.introTutorialActive = true;
-        this.introTutorialEnemyId = enemy.id;
-        this.introTutorialStep = 'move';
-        this.introTutorialCompletePending = false;
-
-        this.prepareIntroTutorialActorTurn(actor);
-        this.selectionController.selectActor(actor.id);
-        this.actionMenuUI.open(this.getActionMenuStates(actor));
-        this.camera.followTile(actor.entity.gridX, actor.entity.gridY);
-        this.camera.snapToTarget();
-        AudioManager.playBgm('bgm.tutorial.training', { fadeMs: 400 });
-        this.addCombatLog(t('tutorial.world.startLog'));
-        this.addCombatLog(t('tutorial.world.step.move.log'));
+        this.tutorialController.start();
     }
 
     private finishIntroTutorial(skipped: boolean): void {
-        this.restoreIntroTutorialWorldMap();
-        const town = this.getCurrentHubTown();
-        this.introTutorialActive = false;
-        this.introTutorialEnemyId = null;
-        this.introTutorialStep = 'move';
-        this.introTutorialInstructor = null;
-        this.introTutorialCompletePending = false;
-        this.fieldEnemies = [];
-        this.worldMap.loot = [];
-        this.remotePartyActors.clear();
-        this.placePartyNear(this.worldMap.getTownSpawnTile(town));
-        this.player = this.getControlledActor()?.entity ?? this.player;
-        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-        this.clearFieldTurnState();
-        this.openTown(town);
-        this.addCombatLog(t(skipped ? 'tutorial.world.skipLog' : 'tutorial.world.townLog'));
+        this.tutorialController.finish(skipped);
     }
 
     private completeIntroTutorial(): void {
-        if (!this.introTutorialActive || this.introTutorialCompletePending) return;
-        this.addCombatLog(t('tutorial.world.completeLog'));
-        this.introTutorialCompletePending = true;
-        this.clearFieldTurnState();
+        this.tutorialController.complete();
     }
 
     private updateIntroTutorialCompletion(input: InputManager, dt: number, camera: Camera): void {
-        this.effectManager.update(dt);
-        this.floatingText.update(dt);
-        this.updateAttackCues(dt);
-
-        if (input.mouseJustDown || input.justPressed('Enter') || input.justPressed('Space')) {
-            this.finishIntroTutorial(false);
-            camera.followTile(this.player.gridX, this.player.gridY);
-            camera.update(dt);
-            return;
-        }
-
-        camera.followTile(this.player.gridX, this.player.gridY);
-        camera.update(dt);
-    }
-
-    private restoreIntroTutorialWorldMap(): void {
-        if (!this.introTutorialPreviousWorldMap) return;
-        this.worldMap = this.introTutorialPreviousWorldMap;
-        this.introTutorialPreviousWorldMap = null;
-    }
-
-    private enterStoryInteriorMap(dungeonId: string, returnTile: TilePoint): StoryInteriorLayout | null {
-        const layout = getStoryInteriorLayout(dungeonId);
-        if (!layout) return null;
-        if (this.activeStoryInterior?.dungeonId === dungeonId) return layout;
-
-        const previousWorldMap = this.activeStoryInterior?.previousWorldMap ?? this.worldMap;
-        this.worldMap = new StoryInteriorMap(layout);
-        this.activeStoryInterior = {
-            dungeonId,
-            layout,
-            previousWorldMap,
-            returnTile: { ...returnTile },
-        };
-        this.worldMap.loot = [];
-        this.dismissedDungeonVisitKey = null;
-        return layout;
-    }
-
-    private exitActiveStoryInterior(options: { placePartyAtReturn?: boolean } = {}): void {
-        const active = this.activeStoryInterior;
-        if (!active) return;
-
-        this.worldMap = active.previousWorldMap;
-        this.activeStoryInterior = null;
-        if (options.placePartyAtReturn) {
-            this.placePartyNear(active.returnTile);
-            this.player = this.getControlledActor()?.entity ?? this.player;
-            this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-        }
+        this.tutorialController.updateCompletion(input, dt, camera);
     }
 
     private clearIntroTutorialStateForNetworkRaid(): void {
-        if (!this.introTutorialActive && !this.introTutorialPreviousWorldMap) return;
-        this.restoreIntroTutorialWorldMap();
-        this.introTutorialActive = false;
-        this.introTutorialEnemyId = null;
-        this.introTutorialStep = 'move';
-        this.introTutorialInstructor = null;
-        this.introTutorialCompletePending = false;
-        this.fieldEnemies = [];
-        this.worldMap.loot = [];
-        this.remotePartyActors.clear();
-        this.clearFieldTurnState();
-    }
-
-    private createIntroTutorialInstructor(tile: TilePoint): Player {
-        const instructor = new Player(tile.x, tile.y);
-        instructor.id = 'intro_tutorial_instructor';
-        instructor.label = t('tutorial.world.instructor');
-        instructor.color = '#f0c050';
-        instructor.facing = 'down';
-        instructor.setWalkSprite(
-            '/assets/images/characters/animations/infantry_t4_walk.png',
-            32,
-            32,
-            3,
-            6,
-            INTRO_TUTORIAL_INSTRUCTOR_ROW_BY_FACING,
-            INTRO_TUTORIAL_ACTOR_RENDER_SCALE
-        );
-        return instructor;
+        this.tutorialController.clearForNetworkRaid();
     }
 
     private advanceIntroTutorialStep(action: FieldApAction): void {
-        if (!this.introTutorialActive) return;
-        const expected = INTRO_TUTORIAL_STEP_ACTION[this.introTutorialStep];
-        if (action !== expected) return;
-
-        if (action === 'move') {
-            const actor = this.getActivePartyTurnActor() ?? this.getControlledActor();
-            if (actor && !this.canActorAttackIntroTutorialEnemyFrom(actor, this.actorTile(actor))) {
-                this.prepareIntroTutorialActorTurn(actor);
-                this.addCombatLog(t('tutorial.world.step.move.closeLog'));
-                return;
-            }
-        }
-
-        const next = INTRO_TUTORIAL_NEXT_STEP[this.introTutorialStep];
-        if (!next) return;
-        this.introTutorialStep = next;
-
-        const actor = this.getActivePartyTurnActor() ?? this.getControlledActor();
-        if (actor) this.prepareIntroTutorialActorTurn(actor);
-        this.addCombatLog(t(`tutorial.world.step.${next}.log`));
-    }
-
-    private canActorAttackIntroTutorialEnemyFrom(actor: FieldActor, casterTile: TilePoint): boolean {
-        const enemy = this.introTutorialEnemyId ? this.getEnemyById(this.introTutorialEnemyId) : null;
-        if (!enemy || enemy.stats.hp <= 0) return false;
-        return this.getActorAttackTargetFailureFromTile(actor, casterTile, enemy) === null;
+        this.tutorialController.advanceStep(action);
     }
 
     private isIntroTutorialEnemy(enemy: Enemy): boolean {
-        return this.introTutorialActive && enemy.id === this.introTutorialEnemyId;
+        return this.tutorialController.isTutorialEnemy(enemy);
     }
 
     private getActionMenuStates(actor: FieldActor): ActionMenuSlotState[] {
-        const states = this.playerActionController.getTurnActionStates(actor);
-        if (!this.introTutorialActive || this.introTutorialCompletePending) return states;
-
-        const expected = INTRO_TUTORIAL_EXPECTED_ACTION[this.introTutorialStep];
-        return states.map((state) => {
-            if (state.type === expected) {
-                return {
-                    ...state,
-                    highlighted: state.enabled,
-                    emphasisLabel: t(`tutorial.world.action.${expected}`),
-                };
-            }
-
-            return {
-                ...state,
-                enabled: false,
-                highlighted: false,
-                disabledReason: t('tutorial.world.blockedAction'),
-            };
-        });
+        return this.tutorialController.getActionMenuStates(actor);
     }
 
     private filterIntroTutorialActionTiles(action: 'move' | 'attack' | 'interact', actor: FieldActor, tiles: Set<string>): Set<string> {
-        if (!this.introTutorialActive || this.introTutorialCompletePending) return tiles;
-        if (this.introTutorialStep !== 'move' || action !== 'move') return tiles;
-
-        const focusedTiles = new Set<string>();
-        for (const key of tiles) {
-            const [xText, yText] = key.split(',');
-            const tile = { x: Number(xText), y: Number(yText) };
-            if (Number.isFinite(tile.x) && Number.isFinite(tile.y) && this.canActorAttackIntroTutorialEnemyFrom(actor, tile)) {
-                focusedTiles.add(key);
-            }
-        }
-        return focusedTiles.size > 0 ? focusedTiles : tiles;
+        return this.tutorialController.filterActionTiles(action, actor, tiles);
     }
 
     private addIntroTutorialBlockedLog(): void {
-        const message = t('tutorial.world.blockedInput');
-        if (this.combatLog[this.combatLog.length - 1] === message) return;
-        this.addCombatLog(message);
-    }
-
-    private prepareIntroTutorialActorTurn(actor: FieldActor): void {
-        this.activeTurnActorId = actor.id;
-        this.remainingActionPoints = FIELD_MAX_ACTION_GAUGE;
-        this.majorActionUsedThisTurn = false;
-        actor.entity.actionGauge = FIELD_MAX_ACTION_GAUGE;
+        this.tutorialController.addBlockedLog();
     }
 
     private renderIntroTutorialHud(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-        if (this.introTutorialCompletePending) {
-            this.renderIntroTutorialCompleteModal(ctx, width, height);
-            return;
-        }
-
-        const scale = SettingsManager.getUIScale();
-        const uiW = Math.floor(width / scale);
-        const uiH = Math.floor(height / scale);
-        const combatLogReserveW = 496;
-        const panelGap = 24;
-        const canFitBesideCombatLog = uiW >= combatLogReserveW + panelGap + 560 + 16;
-        const panelW = canFitBesideCombatLog
-            ? Math.min(720, uiW - combatLogReserveW - panelGap - 16)
-            : Math.min(720, uiW - 32);
-        const panelH = 196;
-        const x = canFitBesideCombatLog
-            ? combatLogReserveW + panelGap
-            : Math.max(16, Math.floor((uiW - panelW) / 2));
-        const y = canFitBesideCombatLog
-            ? Math.max(16, uiH - panelH - 18)
-            : Math.max(92, Math.floor(uiH * 0.16));
-        const expected = INTRO_TUTORIAL_EXPECTED_ACTION[this.introTutorialStep];
-
-        ctx.save();
-        ctx.scale(scale, scale);
-        ctx.fillStyle = 'rgba(12, 9, 8, 0.96)';
-        ctx.strokeStyle = '#d6b16d';
-        ctx.lineWidth = 2;
-        ctx.shadowColor = 'rgba(240, 192, 80, 0.28)';
-        ctx.shadowBlur = 18;
-        ctx.beginPath();
-        ctx.roundRect(x, y, panelW, panelH, 8);
-        ctx.fill();
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        ctx.fillStyle = 'rgba(240, 192, 80, 0.12)';
-        ctx.fillRect(x + 14, y + 42, panelW - 28, 52);
-        ctx.strokeStyle = 'rgba(240, 192, 80, 0.38)';
-        ctx.strokeRect(x + 14, y + 42, panelW - 28, 52);
-
-        ctx.fillStyle = '#f0c050';
-        ctx.font = '18px "DOSMyungjo", serif';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'alphabetic';
-        ctx.fillText(`${t('tutorial.world.title')} ${INTRO_TUTORIAL_STEP_NUMBER[this.introTutorialStep]}/5`, x + 18, y + 28);
-
-        ctx.fillStyle = '#120d0a';
-        ctx.fillRect(x + 18, y + 50, 92, 26);
-        ctx.strokeStyle = '#f0c050';
-        ctx.strokeRect(x + 18, y + 50, 92, 26);
-        ctx.fillStyle = '#ffe8a8';
-        ctx.font = 'bold 14px "DOSMyungjo", serif';
-        ctx.fillText(t('tutorial.world.instructor'), x + 28, y + 68);
-
-        ctx.fillStyle = '#e8e0d0';
-        ctx.font = 'bold 17px sans-serif';
-        this.drawWrappedText(ctx, t(`tutorial.world.dialogue.${this.introTutorialStep}`), x + 126, y + 59, panelW - 158, 21, 2);
-
-        ctx.fillStyle = '#ffd86b';
-        ctx.font = 'bold 26px "DOSMyungjo", serif';
-        this.drawWrappedText(ctx, t(`tutorial.world.press.${this.introTutorialStep}`), x + 18, y + 122, panelW - 36, 30, 2);
-
-        ctx.fillStyle = '#f6e0aa';
-        ctx.font = 'bold 14px sans-serif';
-        this.drawWrappedText(ctx, t(`tutorial.world.target.${this.introTutorialStep}`), x + 18, y + 156, panelW - 36, 18, 2);
-
-        ctx.fillStyle = '#a99773';
-        ctx.font = '12px sans-serif';
-        ctx.fillText(`${t('tutorial.world.onlyAction')}  ${t('tutorial.world.lineEsc')}`, x + 18, y + panelH - 16);
-
-        ctx.fillStyle = 'rgba(240, 192, 80, 0.2)';
-        ctx.fillRect(x + panelW - 128, y + 18, 110, 24);
-        ctx.strokeStyle = '#f0c050';
-        ctx.strokeRect(x + panelW - 128, y + 18, 110, 24);
-        ctx.fillStyle = '#ffe8a8';
-        ctx.font = 'bold 13px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(t(`tutorial.world.action.${expected}`), x + panelW - 73, y + 35);
-        ctx.textAlign = 'left';
-        ctx.restore();
-    }
-
-    private drawWrappedText(
-        ctx: CanvasRenderingContext2D,
-        text: string,
-        x: number,
-        y: number,
-        maxWidth: number,
-        lineHeight: number,
-        maxLines: number
-    ): void {
-        const words = text.split(/\s+/);
-        let line = '';
-        let lineCount = 0;
-
-        for (const word of words) {
-            const nextLine = line ? `${line} ${word}` : word;
-            if (ctx.measureText(nextLine).width > maxWidth && line) {
-                ctx.fillText(line, x, y + lineCount * lineHeight);
-                line = word;
-                lineCount++;
-                if (lineCount >= maxLines) return;
-            } else {
-                line = nextLine;
-            }
-        }
-
-        if (line && lineCount < maxLines) {
-            ctx.fillText(line, x, y + lineCount * lineHeight);
-        }
-    }
-
-    private renderIntroTutorialCompleteModal(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-        const scale = SettingsManager.getUIScale();
-        const uiW = Math.floor(width / scale);
-        const uiH = Math.floor(height / scale);
-        const panelW = Math.min(620, uiW - 40);
-        const panelH = Math.min(320, Math.max(286, uiH - 24));
-        const x = Math.floor((uiW - panelW) / 2);
-        const y = Math.floor((uiH - panelH) / 2);
-        const buttonW = Math.min(340, panelW - 72);
-        const buttonH = 48;
-        const buttonX = x + Math.floor((panelW - buttonW) / 2);
-        const buttonY = y + panelH - 88;
-        const nextBoxW = panelW - 92;
-        const nextBoxH = 44;
-        const nextBoxX = x + 46;
-        const nextBoxY = buttonY - nextBoxH - 18;
-        const crestX = x + panelW / 2;
-        const crestY = y + 54;
-
-        ctx.save();
-        ctx.scale(scale, scale);
-
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.68)';
-        ctx.fillRect(0, 0, uiW, uiH);
-
-        ctx.globalAlpha = 0.98;
-        ctx.fillStyle = '#15100d';
-        ctx.strokeStyle = '#d6b16d';
-        ctx.lineWidth = 2;
-        ctx.shadowColor = 'rgba(240, 192, 80, 0.32)';
-        ctx.shadowBlur = 24;
-        ctx.beginPath();
-        ctx.roundRect(x, y, panelW, panelH, 12);
-        ctx.fill();
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1;
-
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        ctx.strokeStyle = 'rgba(240, 192, 80, 0.36)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x + 34, crestY);
-        ctx.lineTo(crestX - 44, crestY);
-        ctx.moveTo(crestX + 44, crestY);
-        ctx.lineTo(x + panelW - 34, crestY);
-        ctx.stroke();
-
-        ctx.fillStyle = '#20150f';
-        ctx.strokeStyle = '#f0c050';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(crestX, crestY, 25, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = '#f0c050';
-        ctx.font = 'bold 26px "DOSMyungjo", serif';
-        ctx.fillText('✓', crestX, crestY + 1);
-
-        ctx.fillStyle = '#f0c050';
-        ctx.font = '30px "DOSMyungjo", serif';
-        ctx.fillText(t('tutorial.world.completeTitle'), x + panelW / 2, y + 114);
-
-        ctx.fillStyle = '#e8e0d0';
-        ctx.font = 'bold 16px sans-serif';
-        this.drawWrappedText(ctx, t('tutorial.world.completeLine'), x + panelW / 2, y + 150, panelW - 96, 22, 2);
-
-        ctx.fillStyle = 'rgba(240, 192, 80, 0.1)';
-        ctx.strokeStyle = 'rgba(240, 192, 80, 0.44)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.roundRect(nextBoxX, nextBoxY, nextBoxW, nextBoxH, 8);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#a99773';
-        ctx.font = '12px sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(t('tutorial.world.completeNextLabel'), nextBoxX + 18, nextBoxY + 15);
-
-        ctx.fillStyle = '#ffe8a8';
-        ctx.font = 'bold 16px "DOSMyungjo", serif';
-        ctx.fillText(t('tutorial.world.completeReward'), nextBoxX + 18, nextBoxY + 31);
-
-        ctx.fillStyle = '#f0c050';
-        ctx.strokeStyle = '#ffe8a8';
-        ctx.lineWidth = 2;
-        ctx.shadowColor = 'rgba(240, 192, 80, 0.45)';
-        ctx.shadowBlur = 14;
-        ctx.beginPath();
-        ctx.roundRect(buttonX, buttonY, buttonW, buttonH, 8);
-        ctx.fill();
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        ctx.fillStyle = '#1b1008';
-        ctx.font = 'bold 18px "DOSMyungjo", serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(t('tutorial.world.completeNext'), x + panelW / 2, buttonY + buttonH / 2 + 1);
-
-        ctx.fillStyle = '#a99773';
-        ctx.font = '12px sans-serif';
-        ctx.fillText(t('tutorial.world.completeInputHint'), x + panelW / 2, buttonY + buttonH + 22);
-        ctx.restore();
+        this.tutorialController.renderHud(ctx, width, height);
     }
 
     private spawnPartyAtCurrentHub(): void {
@@ -1196,11 +881,6 @@ export class WorldEngine {
         this.fanfareLeaderActorId = null;
     }
 
-    private getIntroTutorialCharacters(): Character[] {
-        const active = this.party.getActive() ?? this.party.getCharacters()[0];
-        return active ? [active] : [];
-    }
-
     private getTownById(townId: string): TownInfo | null {
         return this.worldMap.getTowns().find((town) => town.id === townId) ?? null;
     }
@@ -1212,155 +892,11 @@ export class WorldEngine {
     }
 
     private openTown(town: TownInfo): void {
-        if (this.isNetworkRaidActive()) {
-            // Reaching town while still flagged as a network raid means the player is
-            // abandoning the run client-side, so tell the server instead of going silent.
-            this.closeNetworkRaidClient(true);
-            this.getNetworkRaidState().deactivate();
-        }
-        this.closeFieldOverlays();
-        AudioManager.stopBgm(600);
-        this.currentPhase = 'town';
-        this.raidSession.enterTown(town.id);
-        this.townSession.show(town);
+        this.raidLifecycleController.openTown(town);
     }
 
     private async beginRaidFromCurrentHub(requestedRealm?: WorldRealmId): Promise<void> {
-        if (this.getNetworkRaidState().isConnecting()) return;
-        this.clearIntroTutorialStateForNetworkRaid();
-        const targetRealm = requestedRealm ?? this.worldMap.getRealm();
-        if (this.worldMap.getRealm() !== targetRealm) this.worldMap.setRealm(targetRealm);
-        const town = this.getCurrentHubTown();
-        const authContext = this.gameManager.getNetworkAuthContext();
-        if (!authContext) {
-            this.addCombatLog(t('mp.deployNoAuth'));
-            this.currentPhase = 'town';
-            this.townSession.show(town);
-            return;
-        }
-        this.getNetworkRaidState().setConnecting(true);
-        this.addCombatLog(t('mp.deployConnecting'));
-        const isResumeJoin = NetworkRaidClient.hasStoredResumeToken();
-
-        try {
-            let joinAuthContext = await this.refreshNetworkAuthContext(authContext) ?? authContext;
-            let welcome;
-            try {
-                welcome = await this.connectNetworkRaid(town, targetRealm, joinAuthContext);
-            } catch (error) {
-                if (!(error instanceof WorldServerError) || error.code !== 'AUTH_FAILED') throw error;
-                const refreshed = await this.refreshNetworkAuthContext(authContext, true);
-                if (!refreshed || refreshed.accessToken === joinAuthContext.accessToken) throw error;
-                this.addCombatLog(t('mp.deployRetryAuth'));
-                joinAuthContext = refreshed;
-                welcome = await this.connectNetworkRaid(town, targetRealm, joinAuthContext);
-            }
-
-            this.applyServerCompletedQuestIds(welcome.completedQuestIds);
-            this.townSession.hide();
-            this.closeFieldOverlays();
-            this.getNetworkRaidState().activate(welcome.playerId);
-            this.currentPhase = 'raid';
-            this.raidSession.beginRaidFromTown(town.id);
-            this.dismissedDungeonVisitKey = null;
-            if (!isResumeJoin) {
-                this.party.resetForNewRaid();
-                this.townSession.applyPendingRestForRaidStart();
-            }
-            this.remotePartyActors.clear();
-            this.pendingNetworkScenarioEnter = null;
-            this.getNetworkRaidState().clearScenarioEntries();
-            this.partyActors = [];
-            this.placePartyNear(welcome.spawnTile);
-            this.player = this.getControlledActor()?.entity ?? this.player;
-            this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-            this.fieldEnemies = [];
-            this.worldMap.loot = [];
-            this.clearFieldTurnState();
-            this.addCombatLog(isResumeJoin
-                ? formatT('mp.deployResumed', { world: this.worldMap.getDisplayName() })
-                : formatT('mp.deployStarted', { town: town.nameKr, world: this.worldMap.getDisplayName() }));
-        } catch (error) {
-            if (this.shouldReloadDevAutoStartAuth(error)) {
-                console.warn('[Darksaber] Dev auth expired after server restart; reloading to issue a fresh dev session.');
-                this.addCombatLog(t('mp.devAuthReload'));
-                this.currentPhase = 'town';
-                this.townSession.show(town);
-                this.townSession.setDeployError(t('mp.devAuthRefreshing'));
-                try {
-                    localStorage.removeItem('darksaber_world_resume_token');
-                } catch {
-                    // Ignore storage failures during dev recovery.
-                }
-                window.setTimeout(() => window.location.reload(), 250);
-                return;
-            }
-            this.getNetworkRaidState().deactivate();
-            this.closeNetworkRaidClient(false);
-            const errorMessage = getWorldServerErrorMessage(error);
-            console.error('[Darksaber] World deploy failed', error);
-            this.addCombatLog(formatNetworkDeployFailure(error));
-            this.addCombatLog(t('mp.deployUnavailable'));
-            this.currentPhase = 'town';
-            this.townSession.show(town);
-            this.townSession.setDeployError(formatT('mp.deployFailed', { message: errorMessage }));
-        } finally {
-            this.getNetworkRaidState().setConnecting(false);
-        }
-    }
-
-    private shouldReloadDevAutoStartAuth(error: unknown): boolean {
-        if (!import.meta.env.DEV) return false;
-        if (!(error instanceof WorldServerError) || error.code !== 'AUTH_FAILED') return false;
-        const devStart = new URLSearchParams(window.location.search).get('devStart');
-        return devStart === '1' || devStart === 'town';
-    }
-
-    private async connectNetworkRaid(
-        town: TownInfo,
-        requestedRealm: WorldRealmId,
-        authContext: { accessToken: string; characterId: string }
-    ) {
-        this.closeNetworkRaidClient(false);
-        const client = this.createNetworkRaidClient();
-        this.getNetworkRaidState().setClient(client);
-        return client.connectAndJoin({
-            accessToken: authContext.accessToken,
-            characterId: authContext.characterId,
-            originHubId: town.id,
-            partyComposition: this.createPartyCompositionSnapshot(town),
-            carriedWeight: getPartyCarriedWeight(this.gameManager.inventory.items, this.party.getCharacters()),
-            carriedItems: this.createCarriedItemCounts(),
-            completedQuestIds: Array.from(this.playerData.clearedStages),
-            requestedRealm,
-        });
-    }
-
-    private async refreshNetworkAuthContext(
-        authContext: { accessToken: string; characterId: string },
-        logFailure = false
-    ): Promise<{ accessToken: string; characterId: string } | null> {
-        try {
-            const response = await fetch(`${DEFAULT_AUTH_SERVER_URL}/auth/refresh`, {
-                method: 'POST',
-                credentials: 'include',
-            });
-            if (!response.ok) {
-                if (logFailure) this.addCombatLog(formatT('mp.authRefreshFailedHttp', { status: response.status }));
-                return null;
-            }
-            const parsed = await response.json() as unknown;
-            const accessToken = typeof parsed === 'object' && parsed !== null && 'accessToken' in parsed
-                && typeof (parsed as { accessToken?: unknown }).accessToken === 'string'
-                ? (parsed as { accessToken: string }).accessToken
-                : null;
-            if (!accessToken) return null;
-            this.gameManager.updateNetworkAccessToken(accessToken);
-            return { ...authContext, accessToken };
-        } catch (error) {
-            if (logFailure) this.addCombatLog(formatT('mp.authRefreshFailed', { message: error instanceof Error ? error.message : 'unknown error' }));
-            return null;
-        }
+        return this.raidLifecycleController.beginRaidFromCurrentHub(requestedRealm);
     }
 
     private closeFieldOverlays(): void {
@@ -1377,13 +913,9 @@ export class WorldEngine {
     }
 
     private clearFieldTurnState(): void {
-        this.activeTurnActorId = null;
-        this.readyQueue = [];
-        this.remainingActionPoints = 0;
-        this.majorActionUsedThisTurn = false;
-        this.reservedAction = null;
+        this.turnStateController.clear();
         this.fanfareLeaderActorId = null;
-        this.restingRecoveryTimers.clear();
+        this.restingController.clearTimers();
         this.closeActionMenu();
         this.magicController.reset();
         this.toolController?.reset();
@@ -1395,84 +927,24 @@ export class WorldEngine {
         }
         for (const entry of this.fieldEnemies) {
             entry.path = [];
+            entry.previewIntent = null;
             entry.enemy.actionGauge = 0;
             entry.enemy.isAggro = false;
         }
     }
 
-    private createNetworkRaidClient(): NetworkRaidClient {
-        return new NetworkRaidClient({
-            url: DEFAULT_WORLD_SERVER_URL,
-            onSnapshot: (snapshot) => this.applyNetworkSnapshot(snapshot),
-            onCombatEvent: (event) => this.handleNetworkCombatEvent(event),
-            onLootGrant: (grant) => this.openNetworkLoot(grant),
-            onAutoLootGrant: (grant) => this.handleNetworkAutoLootGrant(grant),
-            onInventoryConsumed: (message) => this.handleNetworkInventoryConsumed(message),
-            onRaidResult: (result) => this.handleNetworkRaidResult(result),
-            onActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
-            onErrorMessage: (error) => this.addCombatLog(formatWorldServerErrorLog(error)),
-            onStatusChange: (status) => this.handleNetworkStatusChange(status),
-            onGraceExpired: () => this.handleNetworkGraceExpired(),
-        });
-    }
-
-    private handleNetworkStatusChange(status: NetworkRaidStatus): void {
-        const log = this.getNetworkRaidState().consumeStatusLog(status);
-        if (log) this.addCombatLog(log);
-    }
-
-    private createPartyCompositionSnapshot(town: TownInfo): ActorSnapshot[] {
-        const exit = this.worldMap.getTownExitTile(town);
-        return this.party.getCharacters().slice(0, this.party.MAX_ACTIVE_PARTY_SIZE).map((character, index) => {
-            this.syncCharacterMovementToClass(character);
-            return {
-                id: character.id,
-                localActorId: character.id,
-                name: character.name,
-                classLineId: character.classLineId,
-                currentTier: character.currentTier,
-                level: character.level,
-                tile: {
-                    x: exit.x + (index === 2 ? 1 : 0),
-                    y: exit.y + (index === 1 ? 1 : 0),
-                },
-                stats: { ...character.stats },
-                statuses: character.statuses.map((status) => ({ ...status })),
-                actionGauge: 0,
-                remainingAp: 0,
-                majorActionUsed: false,
-                facing: 'down',
-                isDead: character.isDead,
-                magicLoadout: normalizeLoadout(character.magicLoadout, character),
-                skillUpgradeLevels: { ...character.skillUpgradeLevels },
-            };
-        });
-    }
-
-    private createCarriedItemCounts(): InventoryItemCountSnapshot[] {
-        const counts = new Map<string, number>();
-        for (const placed of this.gameManager.inventory.items) {
-            const quantity = Math.max(1, Math.floor(placed.quantity));
-            counts.set(placed.item.id, (counts.get(placed.item.id) ?? 0) + quantity);
-        }
-        return [...counts.entries()].map(([itemId, quantity]) => ({ itemId, quantity }));
-    }
-
-    private applyServerCompletedQuestIds(completedQuestIds: readonly string[] | undefined): void {
-        if (!completedQuestIds) return;
-        this.playerData.clearedStages = new Set(completedQuestIds);
-    }
-
     private updateNetworkRaid(dt: number, input: InputManager, camera: Camera): void {
+        this.refreshOpenActionMenuState();
         this.inputController.process(input, camera);
         for (const actor of this.partyActors) actor.entity.update(dt);
         for (const entry of this.fieldEnemies) entry.enemy.update(dt);
-        this.refreshNetworkMovePathPreview();
+        this.networkSyncController.refreshMovePathPreview();
         this.effectManager.update(dt);
         this.floatingText.update(dt);
         this.updateAttackCues(dt);
         this.refreshLootState();
-        this.checkDungeonArrival();
+        this.storyScenarioController.checkDungeonArrival();
+        this.refreshOpenActionMenuState();
 
         const controlled = this.getControlledActor();
         if (controlled) this.player = controlled.entity;
@@ -1482,513 +954,44 @@ export class WorldEngine {
 
     private applyNetworkSnapshot(snapshot: WorldSnapshot): void {
         this.raidSession.elapsedSeconds = snapshot.raidTimer.elapsedSeconds;
-        const previousActors = this.partyActors;
-        const localCharacters = this.party.getCharacters();
-        const localCharacterIds = new Set(localCharacters.map((character) => character.id));
-        const { ownSnapshots, remoteSnapshots } = classifyNetworkActorSnapshots({
-            snapshot,
-            playerId: this.getNetworkRaidState().playerId(),
-            localCharacterIds,
-        });
-        const nextLocalActors = reconcileNetworkLocalActors(previousActors, localCharacters, ownSnapshots);
-        const nextRemoteActors = reconcileNetworkRemoteActors(this.remotePartyActors, remoteSnapshots);
+        this.networkSyncController.applySnapshot(snapshot);
+    }
 
-        this.partyActors = [...nextLocalActors, ...nextRemoteActors];
-        this.fieldEnemies = reconcileNetworkEnemies(this.fieldEnemies, snapshot.enemies);
-        this.worldMap.loot = snapshot.loot.map((lootSnapshot) => createNetworkLootFromSnapshot(lootSnapshot));
-
-        const controlled = this.getControlledActor();
-        const ownReady = snapshot.readyActors.filter((actorId) => ownSnapshots.some((actor) => actor.id === actorId));
-        this.activeTurnActorId = controlled && ownReady.includes(controlled.id)
-            ? controlled.id
-            : ownReady[0] ?? null;
-        const activeTurnSnapshot = this.activeTurnActorId
-            ? ownSnapshots.find((actor) => actor.id === this.activeTurnActorId)
-            : undefined;
-        this.remainingActionPoints = this.activeTurnActorId
-            ? this.resolveSnapshotRemainingGauge(
-                activeTurnSnapshot?.remainingAp ?? snapshot.remainingApByActor[this.activeTurnActorId] ?? 0,
-                activeTurnSnapshot?.actionGauge ?? 0
-            )
-            : 0;
-        this.majorActionUsedThisTurn = this.activeTurnActorId
-            ? Boolean(ownSnapshots.find((actor) => actor.id === this.activeTurnActorId)?.majorActionUsed)
-            : false;
-        if (controlled) {
-            this.player = controlled.entity;
-            if (!this.selectionController.hasSelection()) this.selectionController.selectActor(controlled.id);
+    private applyMonsterSprite(enemy: Enemy, monsterId: string): void {
+        try {
+            const definition = getMonsterDefinition(monsterId as MonsterId);
+            enemy.setWalkSprite(
+                `${MONSTER_SPRITE_PATH}/${definition.sprite}`,
+                definition.frameSize,
+                definition.frameSize,
+                definition.frameCount,
+                definition.framesPerSecond,
+                MONSTER_ROW_BY_FACING,
+                definition.renderScale
+            );
+        } catch {
+            // Snapshot can still render with the fallback colored glyph.
         }
-        this.reopenPendingNetworkMoveMenu(ownSnapshots);
-        this.applyNetworkScenarioSnapshot(snapshot.scenario);
     }
 
     private openNetworkLoot(grant: LootGrantMessage): void {
-        const grid = gridFromSnapshot(grant.gridSnapshot);
-        this.gameManager.inventoryUI.setExternalGrid(grid, formatT('field.log.lootSource', { source: grant.lootId }), { isRaidLoot: true });
-        if (!this.gameManager.inventoryUI.isVisible()) this.gameManager.inventoryUI.toggle();
-        this.selectionController.selectLoot(grant.lootId);
+        this.networkSyncController.openLoot(grant);
     }
 
     private handleNetworkAutoLootGrant(grant: AutoLootGrantMessage): void {
-        const grid = gridFromSnapshot(grant.gridSnapshot);
-        const bag = this.gameManager.inventoryUI.getBag();
-        const acceptedCells: AutoLootCell[] = [];
-        const acquiredNames: string[] = [];
-        let blocked = false;
-
-        for (const placed of [...grid.items]) {
-            const source = { gridX: placed.gridX, gridY: placed.gridY };
-            grid.remove(placed);
-            if (bag.autoPlaceExisting(placed)) {
-                placed.acquiredInRaid = true;
-                acceptedCells.push(source);
-                acquiredNames.push(placed.item.nameKr);
-            } else {
-                grid.placeExisting(placed, source.gridX, source.gridY);
-                blocked = true;
-            }
-        }
-
-        this.getNetworkRaidState().getClient()?.sendAutoLootResolve(grant.lootId, acceptedCells);
-        if (acquiredNames.length > 0) {
-            this.addCombatLog(`${grant.sourceName} ${t('raid.autoLoot')}: ${acquiredNames.join(', ')}`);
-        }
-        if (blocked) this.addCombatLog(`${grant.sourceName}: ${t('raid.autoLootFull')}`);
+        this.networkSyncController.handleAutoLootGrant(grant);
     }
 
     private handleNetworkInventoryConsumed(message: InventoryConsumedMessage): void {
-        let remaining = Math.max(0, Math.floor(message.quantity));
-        if (remaining <= 0) return;
-        for (const placed of [...this.gameManager.inventory.items]) {
-            if (placed.item.id !== message.itemId || placed.quantity <= 0) continue;
-            const consumed = Math.min(remaining, placed.quantity);
-            placed.quantity -= consumed;
-            remaining -= consumed;
-            if (placed.quantity <= 0) this.gameManager.inventory.remove(placed);
-            if (remaining <= 0) break;
-        }
+        this.networkSyncController.handleInventoryConsumed(message);
     }
 
     private handleNetworkActionRejected(rejection: ActionRejectedMessage): void {
-        const rejectedMoveActorId = this.getNetworkRaidState().consumeRejectedMoveActorId(rejection.intentId);
-        if (this.pendingNetworkScenarioEnter?.intentId === rejection.intentId) {
-            const visitKey = this.pendingNetworkScenarioEnter.visitKey;
-            this.pendingNetworkScenarioEnter = null;
-            this.dismissedDungeonVisitKey = visitKey;
-            this.addCombatLog(formatT('mp.scenarioRejected', { reason: rejection.reason }));
-            return;
-        }
-        const pending = this.pendingLootPicks.get(rejection.intentId);
-        if (pending) {
-            this.pendingLootPicks.delete(rejection.intentId);
-            this.gameManager.inventoryUI.revertRaidLoot(pending.placed, pending.source);
-            this.addCombatLog(formatT('mp.lootRejected', { reason: rejection.reason }));
-            return;
-        }
-        this.addCombatLog(formatT('mp.actionRejected', { reason: rejection.reason }));
-        if (!rejectedMoveActorId) return;
-        const actor = this.partyActors.find((entry) => entry.id === rejectedMoveActorId);
-        if (!actor || actor.id !== this.activeTurnActorId) return;
-        if (this.remainingActionPoints < MIN_FIELD_ACTION_GAUGE_COST) return;
-        if (this.actionMenuUI.getIsOpen()) return;
-        if (this.playerActionController.getMode() !== null) return;
-        if (this.playerActionController.hasExecutableAction(actor)) this.reopenActionMenu(actor);
-    }
-
-    private purgeStaleLootPicks(): void {
-        const now = Date.now();
-        for (const pick of this.pendingLootPicks.values()) {
-            if (now - pick.at > 10_000 && !pick.timedOut) {
-                pick.timedOut = true;
-                this.addCombatLog(t('mp.lootPending'));
-            }
-        }
+        this.networkSyncController.handleActionRejected(rejection);
     }
 
     private handleNetworkCombatEvent(event: CombatEventMessage): void {
-        const targetEnemy = this.getEnemyById(event.targetId);
-        const targetActor = this.partyActors.find((actor) => actor.id === event.targetId);
-        const sourceActor = this.partyActors.find((actor) => actor.id === event.sourceId);
-        const sourceEnemy = this.getEnemyById(event.sourceId);
-        const feedbackGroupId = this.beginCombatFeedbackGroup();
-
-        if (targetEnemy) {
-            if (event.kind === 'kill') {
-                this.effectManager.spawnKillEffect(targetEnemy.gridX, targetEnemy.gridY, targetEnemy.color, targetEnemy.expReward, targetEnemy);
-                this.registerCombatFeedback('kill', feedbackGroupId);
-            } else if (event.kind === 'status') {
-                this.floatingText.spawnStatus(targetEnemy.gridX, targetEnemy.gridY, 'WEAK');
-                this.effectManager.spawnDebuffEffect(targetEnemy.gridX, targetEnemy.gridY);
-                this.registerCombatFeedback('status', feedbackGroupId);
-            } else {
-                this.floatingText.spawnDamage(targetEnemy.gridX, targetEnemy.gridY, event.value ?? 0, false, event.kind === 'miss');
-                if (event.kind !== 'miss' && (event.value ?? 0) > 0) {
-                    this.effectManager.spawnHitEffect(targetEnemy.gridX, targetEnemy.gridY);
-                    this.registerCombatFeedback('normal', feedbackGroupId);
-                }
-            }
-        }
-        if (targetActor) {
-            if (event.kind === 'heal') {
-                this.floatingText.spawnHeal(targetActor.entity.gridX, targetActor.entity.gridY, event.value ?? 0);
-                this.effectManager.spawnHealEffect(targetActor.entity.gridX, targetActor.entity.gridY);
-                this.registerCombatFeedback('normal', feedbackGroupId);
-            } else if (event.kind === 'status') {
-                this.floatingText.spawnStatus(targetActor.entity.gridX, targetActor.entity.gridY, 'BUFF');
-            } else {
-                this.floatingText.spawnDamage(targetActor.entity.gridX, targetActor.entity.gridY, event.value ?? 0, false, event.kind === 'miss');
-            }
-            if (event.kind !== 'miss' && event.kind !== 'heal' && (event.value ?? 0) > 0) {
-                this.effectManager.spawnHitEffect(targetActor.entity.gridX, targetActor.entity.gridY);
-                this.registerCombatFeedback(event.kind === 'down' ? 'kill' : 'normal', feedbackGroupId);
-            }
-            if (event.kind === 'down') this.floatingText.spawnStatus(targetActor.entity.gridX, targetActor.entity.gridY, 'DOWN');
-        }
-        if (sourceActor && targetEnemy) this.spawnAttackCue(this.actorTile(sourceActor), this.enemyTile(targetEnemy), '#72e8ff');
-        if (sourceEnemy && targetActor) this.spawnAttackCue(this.enemyTile(sourceEnemy), this.actorTile(targetActor), '#ff8a55');
-        this.flushCombatFeedbackGroup(feedbackGroupId);
-        this.addCombatLog(this.formatNetworkCombatEvent(event));
-    }
-
-    private applyNetworkScenarioSnapshot(scenario: WorldSnapshot['scenario'] | undefined): void {
-        if (!scenario) return;
-
-        const enteredDungeonIds = scenario.enteredDungeonIds ?? [];
-        const completedDungeonIds = scenario.completedDungeonIds ?? [];
-        const completedSet = new Set(completedDungeonIds);
-
-        for (const dungeonId of enteredDungeonIds) {
-            if (!this.getNetworkRaidState().markScenarioEntered(dungeonId)) continue;
-            const storyQuest = getStoryQuestByDungeonId(dungeonId);
-            if (storyQuest) this.addCombatLog(t(storyQuest.enterLogKey));
-            const scenario = getStoryScenarioByDungeonId(dungeonId);
-            if (scenario && isStoryInteriorDungeon(dungeonId)) {
-                this.addCombatLog(formatT('story.interior.enterLog', { dungeon: scenario.dungeonNameKr }));
-            }
-        }
-
-        if (scenario.activeDungeonId) {
-            if (this.raidSession.activeDungeonId !== scenario.activeDungeonId) {
-                this.raidSession.startDungeonEncounter(scenario.activeDungeonId);
-                this.selectionController.clear();
-                this.clearFieldTurnState();
-            }
-            const controlled = this.getControlledActor();
-            if (controlled) this.enterStoryInteriorMap(scenario.activeDungeonId, this.actorTile(controlled));
-        } else if (!scenario.activeDungeonId && this.raidSession.activeDungeonId && !completedSet.has(this.raidSession.activeDungeonId)) {
-            this.exitActiveStoryInterior();
-            this.raidSession.activeDungeonId = null;
-            this.selectionController.clear();
-            this.clearFieldTurnState();
-        }
-
-        for (const dungeonId of completedDungeonIds) {
-            if (this.raidSession.isDungeonCleared(dungeonId)) continue;
-            const storyQuest = getStoryQuestByDungeonId(dungeonId);
-            if (storyQuest) this.completeStoryDungeonObjective(dungeonId, storyQuest, { clearEnemies: false });
-            else this.raidSession.completeDungeonEncounter(dungeonId);
-        }
-
-        if (
-            this.pendingNetworkScenarioEnter
-            && (
-                enteredDungeonIds.includes(this.pendingNetworkScenarioEnter.dungeonId)
-                || completedSet.has(this.pendingNetworkScenarioEnter.dungeonId)
-                || scenario.activeDungeonId === this.pendingNetworkScenarioEnter.dungeonId
-            )
-        ) {
-            this.pendingNetworkScenarioEnter = null;
-        }
-    }
-
-    private formatNetworkCombatEvent(event: CombatEventMessage): string {
-        const sourceName = event.sourceName ?? this.getNetworkEntityName(event.sourceId);
-        const targetName = event.targetName ?? this.getNetworkEntityName(event.targetId);
-        const params = { source: sourceName, target: targetName, value: event.value ?? 0 };
-        if (event.kind === 'miss') return formatT('field.log.combat.miss', params);
-        if (event.kind === 'kill') return formatT('field.log.combat.kill', params);
-        if (event.kind === 'heal') return formatT('field.log.combat.heal', params);
-        if (event.kind === 'down') return formatT('field.log.combat.down', params);
-        if (event.kind === 'status') return formatT('field.log.combat.status', params);
-        return formatT('field.log.combat.damage', params);
-    }
-
-    private getNetworkEntityName(entityId: string): string {
-        const actor = this.partyActors.find((candidate) => candidate.id === entityId);
-        if (actor) return actor.character.name || actor.entity.label || entityId;
-        const enemy = this.getEnemyById(entityId);
-        if (enemy) return enemy.name || enemy.label || entityId;
-        return entityId;
-    }
-
-    private handleNetworkRaidResult(result: RaidResultMessage): void {
-        if (result.playerId !== this.getNetworkRaidState().playerId()) return;
-        this.closeNetworkRaidClient(false);
-        this.getNetworkRaidState().deactivate();
-        this.raidSession.elapsedSeconds = result.elapsedSeconds;
-        this.raidSession.kills = result.kills;
-        this.applyNetworkScenarioResult(result.completedDungeonIds);
-        if (result.result === 'SURVIVED') {
-            const town = this.getTownById(result.extractionTownId) ?? this.getCurrentHubTown();
-            this.raidOutcomeController.completeSuccess(town);
-        } else if (result.result === 'DEAD' || result.result === 'MIA') {
-            this.raidOutcomeController.completeFailure(result.result);
-        } else {
-            this.raidSession.failBackToTown(this.raidSession.currentHubTownId);
-            this.openTown(this.getCurrentHubTown());
-        }
-    }
-
-    private handleNetworkGraceExpired(): void {
-        if (!this.isNetworkRaidActive() || !this.raidSession.active) return;
-        this.addCombatLog(t('mp.graceExpired'));
-        this.closeNetworkRaidClient(false);
-        this.getNetworkRaidState().deactivate();
-        this.raidOutcomeController.completeFailure('MIA');
-    }
-
-    private applyNetworkScenarioResult(completedDungeonIds: readonly string[] | undefined): void {
-        for (const dungeonId of completedDungeonIds ?? []) {
-            if (this.raidSession.isDungeonCleared(dungeonId)) continue;
-            const storyQuest = getStoryQuestByDungeonId(dungeonId);
-            if (storyQuest) this.completeStoryDungeonObjective(dungeonId, storyQuest, { clearEnemies: false });
-            else this.raidSession.completeDungeonEncounter(dungeonId);
-        }
-    }
-
-    private closeNetworkRaidClient(sendLeave: boolean, reason: NetworkRaidCloseReason = 'manual'): void {
-        this.pendingLootPicks.clear();
-        this.pendingNetworkScenarioEnter = null;
-        this.remotePartyActors.clear();
-        this.getNetworkRaidState().closeClient(sendLeave, reason);
-    }
-
-    private checkTempleArrival(): void {
-        const actor = this.getControlledActor();
-        if (!actor) return;
-
-        const temple = this.worldMap.getTempleAtTile(actor.entity.gridX, actor.entity.gridY);
-        if (!temple) {
-            this.dismissedTempleVisitKey = null;
-            return;
-        }
-
-        const key = this.getCurrentTempleVisitKey();
-        if (!key || this.dismissedTempleVisitKey === key || this.fusionTempleUI.isVisible()) return;
-
-        const hostileActive = this.fieldEnemies.some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro);
-        if (hostileActive) {
-            this.addCombatLog(t('field.log.templeBlocked'));
-            this.dismissedTempleVisitKey = key;
-            return;
-        }
-
-        this.openFusionTemple();
-    }
-
-    private checkDungeonArrival(): void {
-        if (!this.raidSession.active || this.raidOutcomeController.isVisible() || this.townSession.isVisible() || this.fusionTempleUI.isVisible()) {
-            return;
-        }
-
-        const actor = this.getControlledActor();
-        if (!actor) return;
-
-        const dungeon = this.worldMap.getDungeonAtTile(actor.entity.gridX, actor.entity.gridY);
-        if (!dungeon) {
-            this.dismissedDungeonVisitKey = null;
-            return;
-        }
-        const storyQuest = getStoryQuestByDungeonId(dungeon.id);
-        if (!storyQuest) return;
-
-        const key = this.getCurrentDungeonVisitKey(dungeon);
-        if (!key || this.dismissedDungeonVisitKey === key) return;
-        if (!isStoryQuestAvailable(storyQuest, this.playerData)) {
-            const lockedLogKey = dungeon.id === 'sicilio_island'
-                ? 'story.sicilioRouteLockedLog'
-                : 'story.dungeonLockedLog';
-            this.addCombatLog(t(lockedLogKey));
-            this.dismissedDungeonVisitKey = key;
-            return;
-        }
-        if (this.raidSession.activeDungeonId) {
-            this.dismissedDungeonVisitKey = key;
-            return;
-        }
-        if (this.raidSession.isDungeonCleared(dungeon.id)) {
-            this.dismissedDungeonVisitKey = key;
-            return;
-        }
-        if (this.isEntityMoving(actor.entity)) return;
-
-        const hostileActive = this.fieldEnemies.some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro);
-        if (hostileActive) {
-            this.addCombatLog(formatT('field.log.dungeonBlocked', { dungeon: dungeon.nameKr }));
-            this.dismissedDungeonVisitKey = key;
-            return;
-        }
-
-        if (this.isNetworkRaidActive()) {
-            this.enterNetworkStoryDungeon(dungeon);
-            return;
-        }
-
-        this.enterStoryDungeon(dungeon);
-    }
-
-    private enterNetworkStoryDungeon(dungeon: WorldDungeonInfo): void {
-        const actor = this.getControlledActor();
-        const client = this.getNetworkRaidState().getClient();
-        if (!actor || !client) return;
-
-        const visitKey = this.getCurrentDungeonVisitKey(dungeon);
-        this.dismissedDungeonVisitKey = visitKey;
-        const intentId = client.sendScenarioEnter(actor.id, dungeon.id);
-        this.pendingNetworkScenarioEnter = { intentId, dungeonId: dungeon.id, visitKey };
-        this.addCombatLog(formatT('field.log.scenarioRequest', { dungeon: dungeon.nameKr }));
-    }
-
-    private enterStoryDungeon(dungeon: WorldDungeonInfo): void {
-        const storyQuest = getStoryQuestByDungeonId(dungeon.id);
-        if (!storyQuest) return;
-
-        this.dismissedDungeonVisitKey = this.getCurrentDungeonVisitKey(dungeon);
-        if (isStoryInteriorDungeon(dungeon.id)) {
-            this.startLocalStoryInteriorDungeon(dungeon, storyQuest);
-            return;
-        }
-
-        this.addCombatLog(formatT('field.log.scenarioServerOnly', { dungeon: dungeon.nameKr }));
-    }
-
-    private startLocalStoryInteriorDungeon(dungeon: WorldDungeonInfo, storyQuest: StoryQuestDefinition): void {
-        const actor = this.getControlledActor();
-        if (!actor) return;
-
-        const scenario = getStoryScenarioByDungeonId(dungeon.id);
-        const layout = this.enterStoryInteriorMap(dungeon.id, this.actorTile(actor));
-        if (!scenario || !layout) return;
-
-        this.raidSession.startDungeonEncounter(dungeon.id);
-        this.closeFieldOverlays();
-        this.fieldEnemies = [];
-        this.worldMap.loot = [];
-        this.placePartyNear(layout.playerStart);
-        this.player = this.getControlledActor()?.entity ?? this.player;
-        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-        this.clearFieldTurnState();
-
-        const guardDefinition = getMonsterDefinition('303R' as MonsterId);
-        this.fieldEnemies = [];
-        for (let index = 0; index < scenario.guardCount; index++) {
-            const tile = layout.guardTiles[index] ?? layout.guardTiles[layout.guardTiles.length - 1] ?? layout.playerStart;
-            const enemy = new Enemy(
-                `story_${dungeon.id}_guard_${index}`,
-                tile.x,
-                tile.y,
-                guardDefinition.name,
-                Math.max(scenario.guardLevel, guardDefinition.level),
-                guardDefinition.color,
-                guardDefinition.role
-            );
-            enemy.aggroRange = Math.max(guardDefinition.aggroRange, 8);
-            enemy.isAggro = true;
-            applyMonsterSprite(enemy, guardDefinition.id);
-            this.fieldEnemies.push({ enemy, home: { ...tile }, path: [] });
-        }
-
-        if (scenario.bossName) {
-            const boss = new Enemy(
-                `story_${dungeon.id}_boss`,
-                layout.bossTile.x,
-                layout.bossTile.y,
-                scenario.bossName,
-                scenario.bossLevel,
-                scenario.bossColor,
-                'boss'
-            );
-            boss.aggroRange = 10;
-            boss.isAggro = true;
-            boss.isBoss = true;
-            applyMonsterSprite(boss, 'burgos_wolf_boss');
-            this.fieldEnemies.push({ enemy: boss, home: { ...layout.bossTile }, path: [] });
-        }
-
-        this.camera.followTile(this.player.gridX, this.player.gridY);
-        this.camera.snapToTarget();
-        this.addCombatLog(formatT('story.interior.enterLog', { dungeon: dungeon.nameKr }));
-        this.addCombatLog(t(storyQuest.enterLogKey));
-    }
-
-    private openFusionTemple(): void {
-        this.closeFieldOverlays();
-        this.clearFieldTurnState();
-        this.fusionTempleUI.show({
-            realm: this.worldMap.getRealm(),
-            candidates: getFusionCandidates(this.party),
-            canEnterMasterWorld: hasActiveMasterCharacter(this.party),
-        });
-        this.addCombatLog(t(this.worldMap.getRealm() === 'master' ? 'field.log.templeMasterGate' : 'field.log.templeFusion'));
-    }
-
-    private performTempleFusion(branch: MasterBranch): void {
-        const result = fuseActivePartyBranch(this.party, branch);
-        this.addCombatLog(result.message);
-        if (!result.success) {
-            this.fusionTempleUI.show({
-                realm: this.worldMap.getRealm(),
-                candidates: getFusionCandidates(this.party),
-                canEnterMasterWorld: hasActiveMasterCharacter(this.party),
-            });
-            return;
-        }
-
-        this.fusionTempleUI.hide();
-        this.enterMasterWorld();
-    }
-
-    private enterMasterWorld(): void {
-        if (!hasActiveMasterCharacter(this.party)) {
-            this.addCombatLog(t('field.log.masterClassRequired'));
-            return;
-        }
-
-        this.fusionTempleUI.hide();
-        void this.beginRaidFromCurrentHub('master');
-    }
-
-    private returnToMortalWorld(): void {
-        this.fusionTempleUI.hide();
-        if (this.isNetworkRaidActive() || this.currentPhase === 'raid') {
-            void this.beginRaidFromCurrentHub('mortal');
-            return;
-        }
-        this.raidSession.failBackToTown(this.raidSession.currentHubTownId);
-        this.currentPhase = 'lobby';
-        this.worldMap.setRealm('mortal');
-        this.placePartyNear(this.worldMap.getPrimaryTempleTile());
-        this.player = this.getControlledActor()?.entity ?? this.player;
-        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-        this.fieldEnemies = [];
-        this.worldMap.loot = [];
-        this.clearFieldTurnState();
-        this.dismissedTempleVisitKey = this.getCurrentTempleVisitKey();
-        this.addCombatLog(t('field.log.returnedToMortalTemple'));
-    }
-
-    private getCurrentTempleVisitKey(): string | null {
-        const actor = this.getControlledActor();
-        if (!actor) return null;
-        const temple = this.worldMap.getTempleAtTile(actor.entity.gridX, actor.entity.gridY);
-        if (!temple) return null;
-        return `${this.worldMap.getRealm()}:${temple.id}:${actor.entity.gridX},${actor.entity.gridY}`;
-    }
-
-    private getCurrentDungeonVisitKey(dungeon: WorldDungeonInfo): string | null {
-        const actor = this.getControlledActor();
-        if (!actor) return null;
-        return `${this.worldMap.getRealm()}:${dungeon.id}:${actor.entity.gridX},${actor.entity.gridY}`;
+        this.networkSyncController.handleCombatEvent(event);
     }
 
     private resolveFieldHitAt(tile: TilePoint) {
@@ -2009,131 +1012,30 @@ export class WorldEngine {
         this.tacticalController.close();
     }
 
-    private markMajorActionUsed(): void {
-        if (this.activeTurnActorId) this.majorActionUsedThisTurn = true;
-    }
-
     private updateRestingActors(dt: number): void {
-        for (const actor of this.partyActors) {
-            if (actor.character.isDead || actor.character.stats.hp <= 0) {
-                this.restingRecoveryTimers.delete(actor.id);
-                continue;
-            }
-            const resting = getStatus(actor.character.statuses, 'resting');
-            if (!resting) {
-                this.restingRecoveryTimers.delete(actor.id);
-                continue;
-            }
-
-            const effective = getEffectiveStatsForCharacter(actor.character);
-            if (resting.sourceType !== 'action' && actor.character.stats.hp >= effective.maxHp && actor.character.stats.mp >= effective.maxMp) {
-                this.stopResting(actor, formatT('field.log.restComplete', { name: actor.character.name }));
-                continue;
-            }
-
-            let timer = (this.restingRecoveryTimers.get(actor.id) ?? 0) + dt;
-            const ticks = Math.floor(timer);
-            if (ticks <= 0) {
-                this.restingRecoveryTimers.set(actor.id, timer);
-                continue;
-            }
-            timer -= ticks;
-            this.restingRecoveryTimers.set(actor.id, timer);
-
-            const hpPerTick = Math.max(2, Math.floor(effective.maxHp * 0.03));
-            const mpPerTick = effective.maxMp > 0 ? Math.max(1, Math.floor(effective.maxMp * 0.03)) : 0;
-            const beforeHp = actor.character.stats.hp;
-            const beforeMp = actor.character.stats.mp;
-            actor.character.stats.hp = Math.min(effective.maxHp, actor.character.stats.hp + hpPerTick * ticks);
-            actor.character.stats.mp = Math.min(effective.maxMp, actor.character.stats.mp + mpPerTick * ticks);
-            const hpGain = actor.character.stats.hp - beforeHp;
-            const mpGain = actor.character.stats.mp - beforeMp;
-
-            if (hpGain > 0) this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, hpGain);
-            if (mpGain > 0) this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, `MP+${mpGain}`);
-            if (hpGain > 0 || mpGain > 0) this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
-
-            if (resting.sourceType !== 'action' && actor.character.stats.hp >= effective.maxHp && actor.character.stats.mp >= effective.maxMp) {
-                this.stopResting(actor, formatT('field.log.restComplete', { name: actor.character.name }));
-            }
-        }
+        this.restingController.update(dt);
     }
 
     private stopResting(actor: FieldActor, logMessage?: string): void {
-        const removed = removeStatusesFromCarrier(actor.character, (status) => status.kind === 'resting');
-        this.restingRecoveryTimers.delete(actor.id);
-        if (removed.length === 0) return;
-        this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'REST END');
-        if (logMessage) this.addCombatLog(logMessage);
+        this.restingController.stop(actor, logMessage);
     }
 
     private snapshotPartyHp(): Map<string, number> {
-        return new Map(this.partyActors.map((actor) => [actor.id, actor.character.stats.hp]));
+        return this.restingController.snapshotPartyHp();
     }
 
     private interruptRestingForDamage(beforeHpByActorId: Map<string, number>): void {
-        for (const actor of this.partyActors) {
-            const beforeHp = beforeHpByActorId.get(actor.id);
-            if (beforeHp === undefined) continue;
-            if (actor.character.stats.hp < beforeHp) {
-                this.stopResting(actor, formatT('field.log.restInterruptedDamage', { name: actor.character.name }));
-                removeActionStanceStatusesFromCarrier(actor.character);
-            }
-        }
-    }
-
-    private updateRaidTimer(dt: number): void {
-        const result = this.raidSession.advanceTimer(dt, {
-            townVisible: this.townSession.isVisible(),
-            resultVisible: this.raidOutcomeController.isVisible(),
-            turnCombatActive: this.isTurnCombatActive(),
-        });
-        if (result.advanced) this.townSession.advancePartyTimedRestStatuses(dt);
-        if (result.expired) {
-            this.raidOutcomeController.completeFailure('MIA');
-        }
+        this.restingController.interruptForDamage(beforeHpByActorId);
     }
 
     private isTurnCombatActive(): boolean {
         if (this.fieldEnemies.some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro)) return true;
-        if (this.activeTurnActorId) return true;
-        if (this.readyQueue.length > 0) return true;
-        if (this.reservedAction) return true;
+        if (this.turnStateController.hasTurnActivity()) return true;
         if (this.actionMenuUI.getIsOpen() || this.playerActionController.getMode()) return true;
         if (this.tacticalController.isOpen()) return true;
         if (this.magicController.isActive()) return true;
         if (this.toolController?.isActive()) return true;
         return this.partyActors.some((actor) => actor.queuedIntent || actor.path.length > 0);
-    }
-
-    private checkRaidEndConditions(): void {
-        if (!this.raidSession.active || this.raidOutcomeController.isVisible()) return;
-        if (this.party.isSquadWiped()) {
-            this.raidOutcomeController.completeFailure('DEAD');
-            return;
-        }
-        this.checkTownArrival();
-    }
-
-    private checkTownArrival(): void {
-        const actor = this.getControlledActor();
-        if (!actor || !this.worldMap.isWalkable(actor.entity.gridX, actor.entity.gridY)) return;
-
-        const town = this.worldMap.getTownAtTile(actor.entity.gridX, actor.entity.gridY);
-        const arrival = resolveTownArrival(town?.id, this.raidSession.departureTownId, this.raidSession.active);
-        if (arrival.kind === 'none') {
-            this.raidSession.clearDepartureBlock();
-            return;
-        }
-        if (arrival.kind === 'departureBlocked') {
-            if (this.raidSession.shouldReportDepartureBlock(arrival.townId)) {
-                this.addCombatLog(t('field.log.departureTownBlocked'));
-            }
-            return;
-        }
-
-        const destination = town ?? this.getTownById(arrival.townId ?? '') ?? this.getCurrentHubTown();
-        this.raidOutcomeController.completeSuccess(destination);
     }
 
     private applyCombatResult(result: CombatResult): void {
@@ -2149,85 +1051,31 @@ export class WorldEngine {
     }
 
     private spawnEnemyLoot(enemy: Enemy): void {
-        const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
-        const bossRune = enemy.isBoss ? rollBossRune(enemy.level) : null;
-        const items = [bossRune, herb].filter((item): item is NonNullable<typeof item> => Boolean(item));
-        if (items.length === 0) return;
-        const storyInteriorBossReturn = enemy.isBoss ? this.activeStoryInterior : null;
-        const lootMap = storyInteriorBossReturn?.previousWorldMap ?? this.worldMap;
-        const lootTile = storyInteriorBossReturn?.returnTile ?? { x: enemy.gridX, y: enemy.gridY };
-
-        if (!enemy.isBoss) {
-            const failedItems: typeof items = [];
-            const acquiredNames: string[] = [];
-            const bag = this.gameManager.inventoryUI.getBag();
-            for (const item of items) {
-                const placed = bag.autoPlace(item);
-                if (placed) {
-                    placed.acquiredInRaid = true;
-                    acquiredNames.push(item.nameKr);
-                } else {
-                    failedItems.push(item);
-                }
-            }
-            if (acquiredNames.length > 0) {
-                this.addCombatLog(`${enemy.name} ${t('raid.autoLoot')}: ${acquiredNames.join(', ')}`);
-            }
-            if (failedItems.length === 0) return;
-
-            this.addCombatLog(`${enemy.name}: ${t('raid.autoLootFull')}`);
-            const loot = new LootObject(`corpse_${enemy.id}`, enemy.gridX, enemy.gridY, failedItems, {
-                sourceLabel: formatT('field.log.lootSource', { source: enemy.name }),
-                kind: 'corpse',
-            });
-            this.worldMap.loot.push(loot);
-            return;
-        }
-
-        const loot = new LootObject(`corpse_${enemy.id}`, lootTile.x, lootTile.y, items, {
-            sourceLabel: formatT('field.log.lootSource', { source: enemy.name }),
-            kind: 'corpse',
-        });
-        lootMap.loot.push(loot);
-        if (storyInteriorBossReturn) {
-            this.addCombatLog(formatT('story.interior.rewardAtEntrance', { source: enemy.name }));
-        }
+        this.lootController.spawnEnemyLoot(enemy);
     }
 
     private submitNetworkMoveIntent(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean {
-        const intentId = this.sendNetworkIntent(actor.id, 'move', { tile, path, apCost, pathCost }, { requireOpen: false });
-        if (!intentId) return false;
-        this.getNetworkRaidState().registerPendingMove(intentId, actor.id, tile, path);
-        return true;
+        return this.networkIntentController.submitMove(actor, tile, path, apCost, pathCost);
     }
 
     private submitNetworkActionIntent(actor: FieldActor, action: 'defend' | 'rest'): boolean {
-        return Boolean(this.sendNetworkIntent(actor.id, action, {}));
+        return this.networkIntentController.submitAction(actor, action);
     }
 
     private submitNetworkUseItemIntent(actor: FieldActor, itemId: string): boolean {
-        return Boolean(this.sendNetworkIntent(actor.id, 'useItem', { itemId }));
+        return this.networkIntentController.submitUseItem(actor, itemId);
     }
 
     private submitNetworkSkillIntent(actor: FieldActor, skillId: string, targetId?: string): boolean {
-        return Boolean(this.sendNetworkIntent(actor.id, 'castSkill', { skillId, targetId }));
-    }
-
-    private sendNetworkIntent(
-        actorId: string,
-        kind: PlayerIntentKind,
-        payload: unknown,
-        options: { requireOpen?: boolean } = {}
-    ): string | null {
-        return this.getNetworkRaidState().sendIntent(actorId, kind, payload, options);
+        return this.networkIntentController.submitSkill(actor, skillId, targetId);
     }
 
     private tryActorAttack(actor: FieldActor, enemy: Enemy): boolean {
-        if (this.isNetworkRaidActive()) {
-            return Boolean(this.sendNetworkIntent(actor.id, 'attack', { targetId: enemy.id }, { requireOpen: false }));
+        if (this.isNetworkRaid) {
+            return this.networkIntentController.submitAttack(actor, enemy);
         }
-        if (!this.introTutorialActive) {
-            this.addCombatLog(t('field.log.serverCombatOnly'));
+        if (!this.tutorialController.isActive()) {
+            this.addCombatLog('서버 세션 밖에서는 전투 행동을 실행할 수 없습니다.');
             return false;
         }
         if (!this.canActorAttackTarget(actor, enemy)) return false;
@@ -2265,7 +1113,7 @@ export class WorldEngine {
     }
 
     private handleEnemyDefeated(actor: FieldActor, enemy: Enemy, feedbackGroupId?: string): void {
-        if (this.introTutorialActive && enemy.id === this.introTutorialEnemyId) {
+        if (this.isIntroTutorialEnemy(enemy)) {
             this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy);
             this.registerCombatFeedback('kill', feedbackGroupId);
             this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
@@ -2284,51 +1132,23 @@ export class WorldEngine {
         this.selectionController.clearEnemyIfSelected(enemy.id);
 
         this.spawnEnemyLoot(enemy);
-        this.completeDungeonIfBossDefeated(enemy);
-    }
-
-    private completeDungeonIfBossDefeated(enemy: Enemy): void {
-        const dungeonId = this.raidSession.activeDungeonId;
-        const storyQuest = dungeonId ? getStoryQuestByDungeonId(dungeonId) : null;
-        if (!enemy.isBoss || !dungeonId || !storyQuest) return;
-        this.completeStoryDungeonObjective(dungeonId, storyQuest);
-    }
-
-    private completeStoryDungeonObjective(
-        dungeonId: string,
-        storyQuest: StoryQuestDefinition,
-        options: { clearEnemies?: boolean } = {}
-    ): void {
-        this.raidSession.completeDungeonEncounter(dungeonId);
-        if (options.clearEnemies ?? true) this.fieldEnemies = [];
-        const completedInterior = this.activeStoryInterior?.dungeonId === dungeonId ? this.activeStoryInterior : null;
-        if (this.activeStoryInterior?.dungeonId === dungeonId) {
-            this.exitActiveStoryInterior({ placePartyAtReturn: !this.isNetworkRaidActive() });
-        }
-        this.selectionController.clear();
-        this.clearFieldTurnState();
-        const scenario = getStoryScenarioByDungeonId(dungeonId);
-        if (completedInterior && scenario) {
-            this.addCombatLog(formatT('story.interior.returnLog', { dungeon: scenario.dungeonNameKr }));
-        }
-        this.addCombatLog(t(storyQuest.objectiveCompleteLogKey));
+        this.storyScenarioController.playEnemyDefeatEvent(enemy);
+        this.storyScenarioController.completeDungeonIfBossDefeated(enemy);
     }
 
     private awardDefeatExp(actor: FieldActor, enemy: Enemy): void {
         const canGainExp = this.canCharacterGainExpInCurrentRealm(actor.character);
-        this.addCombatLog(canGainExp
-            ? formatT('field.log.enemyDefeatedExp', { enemy: enemy.name, exp: enemy.expReward })
-            : formatT('field.log.enemyDefeated', { enemy: enemy.name }));
+        this.addCombatLog(canGainExp ? `${enemy.name} 처치! +${enemy.expReward} EXP` : `${enemy.name} 처치!`);
         if (canGainExp) {
             const expResult = actor.character.gainExp(enemy.expReward);
             if (expResult.promoted && expResult.newTierName) {
-                this.addCombatLog(formatT('field.log.actorPromoted', { name: actor.character.name, tier: expResult.newTierName }));
+                this.addCombatLog(`${actor.character.name} 승급: ${expResult.newTierName}`);
             }
             if (expResult.emblemUnlocked) {
-                this.addCombatLog(formatT('field.log.emblemUnlocked', { name: actor.character.name }));
+                this.addCombatLog(`${actor.character.name}: 융합 문장 각성`);
             }
         } else {
-            this.addCombatLog(t('field.log.noGrowthRealm'));
+            this.addCombatLog('이 월드에서는 해당 티어가 성장하지 않습니다.');
         }
     }
 
@@ -2342,46 +1162,30 @@ export class WorldEngine {
         const index = this.partyActors.indexOf(actor);
         if (index === this.party.getActiveIndex()) {
             const next = this.party.markActiveDead();
-            this.addCombatLog(formatT('field.log.actorDown', { name: actor.character.name }));
+            this.addCombatLog(`${actor.character.name} 쓰러짐`);
             this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'DOWN');
             if (next) {
                 const nextIndex = this.partyActors.findIndex((candidate) => candidate.character === next);
                 if (nextIndex >= 0) this.switchToPartyMember(nextIndex);
             } else {
-                this.addCombatLog(t('field.log.partyAllDown'));
+                this.addCombatLog('출격조 전원 행동 불능');
             }
             return;
         }
 
         actor.character.isDead = true;
         actor.character.exp = 0;
-        this.addCombatLog(formatT('field.log.actorDown', { name: actor.character.name }));
+        this.addCombatLog(`${actor.character.name} 쓰러짐`);
         this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'DOWN');
     }
 
     private openLoot(loot: LootObject): void {
-        if (this.isNetworkRaidActive()) {
-            this.selectionController.selectLoot(loot.id);
-            this.addCombatLog(formatT('field.log.lootLockRequest', { source: loot.sourceLabel }));
-            this.sendNetworkIntent(this.requireControlledActor().id, 'interact', { lootId: loot.id });
-            return;
-        }
-        if (!this.areServerStyleFieldActionsEnabled()) {
-            this.addCombatLog(t('field.log.serverLootOnly'));
-            return;
-        }
-        this.selectionController.selectLoot(loot.id);
-        this.addCombatLog(formatT('field.log.lootSearch', { source: loot.sourceLabel }));
-        this.clearControlledPath();
-        this.requireControlledActor().queuedIntent = null;
-
-        this.gameManager.inventoryUI.setExternalGrid(loot.inventory, loot.sourceLabel, { isRaidLoot: true });
-        if (!this.gameManager.inventoryUI.isVisible()) this.gameManager.inventoryUI.toggle();
+        this.lootController.openLoot(loot);
     }
 
     private openFieldMagic(actor: FieldActor): void {
-        if (!this.areServerStyleFieldActionsEnabled()) {
-            this.addCombatLog(t('field.log.serverMagicOnly'));
+        if (!this.isNetworkRaid && !this.tutorialController.isActive()) {
+            this.addCombatLog('서버 세션 밖에서는 마법을 사용할 수 없습니다.');
             this.reopenActionMenu(actor);
             return;
         }
@@ -2389,8 +1193,8 @@ export class WorldEngine {
     }
 
     private openFieldTool(actor: FieldActor): void {
-        if (!this.areServerStyleFieldActionsEnabled()) {
-            this.addCombatLog(t('field.log.serverToolOnly'));
+        if (!this.isNetworkRaid && !this.tutorialController.isActive()) {
+            this.addCombatLog('서버 세션 밖에서는 도구를 사용할 수 없습니다.');
             this.reopenActionMenu(actor);
             return;
         }
@@ -2398,9 +1202,7 @@ export class WorldEngine {
     }
 
     private refreshLootState(): void {
-        for (const loot of this.worldMap.loot) {
-            loot.opened = loot.inventory.items.length === 0;
-        }
+        this.lootController.refreshLootState();
     }
 
     private getLocalPartyActors(): FieldActor[] {
@@ -2421,26 +1223,21 @@ export class WorldEngine {
     }
 
     private getFanfareFollowerCount(actor: FieldActor): number {
-        if (!this.areSoloFollowersEnabled()) return 0;
+        if (this.isNetworkRaid) return 0;
         return this.getLocalPartyActors().filter((candidate) => candidate !== actor && !candidate.character.isDead).length;
     }
 
     private getFanfareLeaderActor(): FieldActor | null {
-        if (!this.fanfareLeaderActorId || !this.areSoloFollowersEnabled()) return null;
+        if (!this.fanfareLeaderActorId || this.isNetworkRaid) return null;
         const leader = this.getLocalPartyActors().find((actor) => actor.id === this.fanfareLeaderActorId && !actor.character.isDead) ?? null;
         if (!leader) this.fanfareLeaderActorId = null;
         return leader;
     }
 
     private getActivePartyTurnActor(): FieldActor | null {
-        if (!this.activeTurnActorId) return null;
-        return this.partyActors.find((actor) => actor.id === this.activeTurnActorId && !actor.character.isDead) ?? null;
-    }
-
-    private requireControlledActor(): FieldActor {
-        const actor = this.getControlledActor();
-        if (!actor) throw new Error('No active field actor');
-        return actor;
+        const activeTurnActorId = this.turnStateController.getActiveTurnActorId();
+        if (!activeTurnActorId) return null;
+        return this.partyActors.find((actor) => actor.id === activeTurnActorId && !actor.character.isDead) ?? null;
     }
 
     private switchToNextAliveActor(): void {
@@ -2454,13 +1251,13 @@ export class WorldEngine {
     private switchToPartyMember(index: number): boolean {
         const actor = this.partyActors[index];
         if (!actor || actor.character.isDead) return false;
-        if (this.introTutorialActive && actor.id !== this.activeTurnActorId) {
+        if (this.tutorialController.isActive() && actor.id !== this.turnStateController.getActiveTurnActorId()) {
             this.addIntroTutorialBlockedLog();
             return false;
         }
         if (!this.party.getCharacters().includes(actor.character)) {
             this.selectionController.selectActor(actor.id);
-            this.addCombatLog(formatT('field.log.remoteDisplayOnly', { name: actor.character.name }));
+            this.addCombatLog(`${actor.character.name}: 원격 플레이어는 표시 전용입니다.`);
             return false;
         }
         if (!this.party.switchTo(index)) return false;
@@ -2469,7 +1266,7 @@ export class WorldEngine {
         this.playerActionController.clearTargeting();
         this.closeActionMenu();
         this.closeTacticalMenu();
-        this.addCombatLog(formatT('field.log.actorControl', { name: actor.character.name }));
+        this.addCombatLog(`${actor.character.name} 조작`);
         return true;
     }
 
@@ -2478,12 +1275,12 @@ export class WorldEngine {
         if (!actor) return;
         this.selectionController.selectActor(actor.id);
 
-        if (!this.activeTurnActorId && actor.entity.actionGauge >= FIELD_MAX_ACTION_GAUGE) {
+        if (!this.turnStateController.getActiveTurnActorId() && actor.entity.actionGauge >= FIELD_MAX_ACTION_GAUGE) {
             this.beginActorTurn(actor);
         }
 
-        if (actor.id !== this.activeTurnActorId) {
-            this.addCombatLog(t('field.log.notTurn'));
+        if (actor.id !== this.turnStateController.getActiveTurnActorId()) {
+            this.addCombatLog('아직 행동 순서가 아닙니다.');
             return;
         }
 
@@ -2500,8 +1297,18 @@ export class WorldEngine {
         this.actionMenuUI.close();
     }
 
+    private refreshOpenActionMenuState(): void {
+        if (!this.actionMenuUI.getIsOpen()) return;
+        const actor = this.getActivePartyTurnActor();
+        if (!actor) {
+            this.closeActionMenu();
+            return;
+        }
+        this.actionMenuUI.updateStates(this.getActionMenuStates(actor));
+    }
+
     private dismissActionMenuTurn(): void {
-        if (this.introTutorialActive) {
+        if (this.tutorialController.isActive()) {
             const actor = this.getActivePartyTurnActor();
             if (actor) this.reopenActionMenu(actor);
             this.addIntroTutorialBlockedLog();
@@ -2512,76 +1319,66 @@ export class WorldEngine {
             this.closeActionMenu();
             return;
         }
-        const carryover = this.remainingActionPoints >= FIELD_MAX_ACTION_GAUGE
-            ? 0
-            : this.remainingActionPoints;
-        this.endActorTurn(actor, 'field.log.reason.wait', carryover);
+        const carryover = this.turnStateController.getDismissCarryover();
+        this.endActorTurn(actor, '대기', carryover);
     }
 
     private spendAp(cost: number): boolean {
-        if (this.remainingActionPoints <= 0) this.remainingActionPoints = this.getSpendableActionGauge();
-        if (cost < 0 || this.remainingActionPoints < cost) return false;
-        this.remainingActionPoints -= cost;
+        if (!this.turnStateController.spendAp(cost, this.getSpendableActionGauge())) return false;
         const actor = this.getActivePartyTurnActor();
-        if (actor) actor.entity.actionGauge = this.remainingActionPoints;
+        if (actor) actor.entity.actionGauge = this.turnStateController.getRemainingActionPoints();
         return true;
     }
 
     private resumeOrEndActiveTurn(actor: FieldActor): void {
-        if (actor.id !== this.activeTurnActorId) return;
+        if (actor.id !== this.turnStateController.getActiveTurnActorId()) return;
         if (actor.character.isDead || actor.character.stats.hp <= 0) {
-            this.endActorTurn(actor, 'field.log.reason.incapacitated', 0);
+            this.endActorTurn(actor, '행동 불능', 0);
             return;
         }
         if (this.playerActionController.hasExecutableAction(actor)) {
             this.reopenActionMenu(actor);
             return;
         }
-        this.endActorTurn(actor, 'field.log.reason.gaugeLow', this.remainingActionPoints);
+        this.endActorTurn(actor, '행동 게이지 부족', this.turnStateController.getRemainingActionPoints());
     }
 
     private reopenActionMenu(actor: FieldActor): void {
-        if (actor.id !== this.activeTurnActorId) return;
+        if (actor.id !== this.turnStateController.getActiveTurnActorId()) return;
         if (actor.character.isDead || actor.character.stats.hp <= 0) return;
-        if (this.remainingActionPoints <= 0 && actor.entity.actionGauge >= MIN_FIELD_ACTION_GAUGE_COST) {
-            this.remainingActionPoints = Math.floor(actor.entity.actionGauge);
+        if (this.turnStateController.getRemainingActionPoints() <= 0 && actor.entity.actionGauge >= MIN_FIELD_ACTION_GAUGE_COST) {
+            this.turnStateController.setRemainingActionPoints(Math.floor(actor.entity.actionGauge));
         }
         this.selectionController.selectActor(actor.id);
         this.closeTacticalMenu();
         this.actionMenuUI.open(this.getActionMenuStates(actor));
     }
 
-    private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = this.remainingActionPoints): void {
-        const reasonLabel = reason.startsWith('field.log.reason.') ? t(reason) : reason;
-        if (actor.id === this.activeTurnActorId) this.sendNetworkIntent(actor.id, 'endTurn', { reason }, { requireOpen: false });
+    private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = this.turnStateController.getRemainingActionPoints()): void {
+        if (actor.id === this.turnStateController.getActiveTurnActorId()) this.networkIntentController.submitEndTurn(actor, reason);
         actor.entity.actionGauge = Math.max(0, Math.min(FIELD_MAX_ACTION_GAUGE, atbCarryover));
-        this.activeTurnActorId = null;
-        this.remainingActionPoints = 0;
-        this.majorActionUsedThisTurn = false;
-        this.reservedAction = null;
+        this.turnStateController.endActiveTurn();
         this.clearActorIntent(actor);
         this.closeActionMenu();
         this.closeTacticalMenu();
         this.playerActionController.clearTargeting();
         this.magicController.reset();
         this.toolController?.reset();
-        this.addCombatLog(formatT('field.log.turnEnd', { name: actor.character.name, reason: reasonLabel }));
+        this.addCombatLog(`${actor.character.name} 턴 종료: ${reason}`);
     }
 
     private endEnemyTurn(enemy: Enemy): void {
         enemy.actionGauge = 0;
-        this.activeTurnActorId = null;
-        this.remainingActionPoints = 0;
-        this.majorActionUsedThisTurn = false;
-        this.reservedAction = null;
+        this.turnStateController.endActiveTurn();
     }
 
     private startNextReadyTurn(): void {
         this.clearInvalidActiveTurn();
-        if (this.activeTurnActorId || this.reservedAction) return;
+        if (this.turnStateController.isReadyTurnBlocked()) return;
 
-        while (this.readyQueue.length > 0) {
-            const actorId = this.readyQueue.shift()!;
+        while (this.turnStateController.hasReadyActors()) {
+            const actorId = this.turnStateController.shiftReadyActorId();
+            if (!actorId) return;
             const actor = this.partyActors.find((candidate) => candidate.id === actorId);
             if (actor) {
                 if (actor.character.isDead) continue;
@@ -2592,23 +1389,20 @@ export class WorldEngine {
             const enemyEntry = this.fieldEnemies.find((entry) => entry.enemy.id === actorId);
             if (!enemyEntry || enemyEntry.enemy.stats.hp <= 0) continue;
             this.beginEnemyTurn(enemyEntry);
-            if (this.activeTurnActorId) return;
+            if (this.turnStateController.getActiveTurnActorId()) return;
         }
     }
 
     private clearInvalidActiveTurn(): void {
-        if (!this.activeTurnActorId) return;
+        const cleared = this.turnStateController.clearInvalidActiveTurn((actorId) => {
+            const activePartyActor = this.partyActors.find((actor) => actor.id === actorId);
+            if (activePartyActor && !activePartyActor.character.isDead && activePartyActor.character.stats.hp > 0) return true;
 
-        const activePartyActor = this.partyActors.find((actor) => actor.id === this.activeTurnActorId);
-        if (activePartyActor && !activePartyActor.character.isDead && activePartyActor.character.stats.hp > 0) return;
+            const activeEnemy = this.fieldEnemies.find((entry) => entry.enemy.id === actorId)?.enemy;
+            return activeEnemy !== undefined && activeEnemy.stats.hp > 0;
+        });
+        if (!cleared) return;
 
-        const activeEnemy = this.fieldEnemies.find((entry) => entry.enemy.id === this.activeTurnActorId)?.enemy;
-        if (activeEnemy && activeEnemy.stats.hp > 0) return;
-
-        this.activeTurnActorId = null;
-        this.remainingActionPoints = 0;
-        this.majorActionUsedThisTurn = false;
-        this.reservedAction = null;
         this.closeActionMenu();
         this.closeTacticalMenu();
         this.playerActionController.clearTargeting();
@@ -2619,17 +1413,17 @@ export class WorldEngine {
     private processActorTurnStartStatuses(actor: FieldActor): boolean {
         const result = resolveTurnStartStatuses(getEffectiveStatsForCharacter(actor.character), actor.character.statuses);
         actor.character.statuses = result.statuses;
-        if (result.expiredReaction) this.addCombatLog(formatT('field.log.statusReactionExpired', { name: actor.character.name }));
+        if (result.expiredReaction) this.addCombatLog(`${actor.character.name}: 방어/반격 태세 해제`);
         if (result.poisonDamage > 0) {
             this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, result.poisonDamage, false, false);
             this.effectManager.spawnDebuffEffect(actor.entity.gridX, actor.entity.gridY);
-            this.addCombatLog(formatT('field.log.statusPoisonDamage', { name: actor.character.name, value: result.poisonDamage }));
-            this.stopResting(actor, formatT('field.log.restInterruptedDamage', { name: actor.character.name }));
+            this.addCombatLog(`${actor.character.name}: 독 ${result.poisonDamage} 피해`);
+            this.stopResting(actor, `${actor.character.name}: 피해로 휴식 중단`);
         }
         if (result.regenHealing > 0) {
             this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, result.regenHealing);
             this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
-            this.addCombatLog(formatT('field.log.statusRegenHealing', { name: actor.character.name, value: result.regenHealing }));
+            this.addCombatLog(`${actor.character.name}: 재생 ${result.regenHealing} 회복`);
         }
         const effective = getEffectiveStatsForCharacter(actor.character);
         actor.character.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.character.stats.hp + result.hpDelta));
@@ -2645,16 +1439,16 @@ export class WorldEngine {
         const enemy = entry.enemy;
         const result = resolveTurnStartStatuses(getEffectiveStatsForEnemy(enemy), enemy.statuses);
         enemy.statuses = result.statuses;
-        if (result.expiredReaction) this.addCombatLog(formatT('field.log.statusReactionExpired', { name: enemy.name }));
+        if (result.expiredReaction) this.addCombatLog(`${enemy.name}: 방어/반격 태세 해제`);
         if (result.poisonDamage > 0) {
             this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, result.poisonDamage, false, false);
             this.effectManager.spawnDebuffEffect(enemy.gridX, enemy.gridY);
-            this.addCombatLog(formatT('field.log.statusPoisonDamage', { name: enemy.name, value: result.poisonDamage }));
+            this.addCombatLog(`${enemy.name}: 독 ${result.poisonDamage} 피해`);
         }
         if (result.regenHealing > 0) {
             this.floatingText.spawnHeal(enemy.gridX, enemy.gridY, result.regenHealing);
             this.effectManager.spawnHealEffect(enemy.gridX, enemy.gridY);
-            this.addCombatLog(formatT('field.log.statusRegenHealing', { name: enemy.name, value: result.regenHealing }));
+            this.addCombatLog(`${enemy.name}: 재생 ${result.regenHealing} 회복`);
         }
         enemy.stats.hp = Math.max(0, Math.min(enemy.stats.maxHp, enemy.stats.hp + result.hpDelta));
 
@@ -2670,22 +1464,19 @@ export class WorldEngine {
     private beginActorTurn(actor: FieldActor): void {
         const index = this.partyActors.indexOf(actor);
         if (index >= 0) this.switchToPartyMember(index);
-        this.activeTurnActorId = actor.id;
-        this.remainingActionPoints = FIELD_MAX_ACTION_GAUGE;
-        this.majorActionUsedThisTurn = false;
-        actor.entity.actionGauge = FIELD_MAX_ACTION_GAUGE;
+        actor.entity.actionGauge = this.turnStateController.beginActorTurn(actor.id);
         this.selectionController.selectActor(actor.id);
         if (!this.processActorTurnStartStatuses(actor)) {
-            this.endActorTurn(actor, 'field.log.reason.statusBlocked');
+            this.endActorTurn(actor, '상태이상');
             return;
         }
         this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'READY');
         this.addCombatLog(formatT('field.log.turnStart', {
             name: actor.character.name,
             gauge: t('ui.actionGauge'),
-            value: this.remainingActionPoints,
+            value: this.turnStateController.getRemainingActionPoints(),
         }));
-        if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, 'field.log.reason.noExecutableAction');
+        if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
         else {
             this.closeTacticalMenu();
             this.actionMenuUI.open(this.getActionMenuStates(actor));
@@ -2694,7 +1485,7 @@ export class WorldEngine {
 
     private beginEnemyTurn(entry: FieldEnemy): void {
         const enemy = entry.enemy;
-        this.activeTurnActorId = enemy.id;
+        this.turnStateController.beginEnemyTurn(enemy.id);
         this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'READY');
 
         if (!this.processEnemyTurnStartStatuses(entry)) {
@@ -2706,6 +1497,12 @@ export class WorldEngine {
         this.applyCombatResult(this.enemyTurnController.beginEnemyTurn(entry));
         this.interruptRestingForDamage(beforeHpByActorId);
         this.endEnemyTurn(enemy);
+    }
+
+    private refreshEnemyIntentPreviews(): void {
+        for (const entry of this.fieldEnemies) {
+            entry.previewIntent = this.enemyTurnController.previewEnemyIntent(entry);
+        }
     }
 
     private getActorById(actorId: string): FieldActor | null {
@@ -2781,51 +1578,25 @@ export class WorldEngine {
 
     private getPathPreviewTiles(actor: FieldActor | null): TilePoint[] {
         if (!actor) return [];
-        return this.getNetworkRaidState().getPathPreviewTiles(actor.id, actor.path);
-    }
-
-    private refreshNetworkMovePathPreview(): void {
-        this.getNetworkRaidState().refreshMovePathPreview((actorId) => {
-            const actor = this.partyActors.find((candidate) => candidate.id === actorId);
-            if (!actor) return null;
-            return {
-                id: actor.id,
-                tile: { x: actor.entity.gridX, y: actor.entity.gridY },
-                isMoving: this.isEntityMoving(actor.entity),
-                hasReachedTile: (tile) => this.hasEntityReachedPreviewTile(actor, tile),
-            };
-        });
-    }
-
-    private hasEntityReachedPreviewTile(actor: FieldActor, tile: TilePoint): boolean {
-        return Math.abs(actor.entity.pixelX - tile.x) < 0.03 && Math.abs(actor.entity.pixelY - tile.y) < 0.03;
+        const networkPreview = this.networkSyncController.getPathPreviewTiles(actor);
+        if (networkPreview) return networkPreview;
+        if (this.isEntityMoving(actor.entity)) {
+            const currentTarget = this.actorTile(actor);
+            const [nextStep] = actor.path;
+            if (!nextStep || nextStep.x !== currentTarget.x || nextStep.y !== currentTarget.y) {
+                return [currentTarget, ...actor.path];
+            }
+        }
+        return actor.path;
     }
 
     private getSpendableActionGauge(): number {
-        if (this.activeTurnActorId && this.isNetworkRaidActive()) {
-            return Math.max(0, Math.floor(this.remainingActionPoints));
+        if (this.turnStateController.getActiveTurnActorId() && this.isNetworkRaid) {
+            return Math.max(0, Math.floor(this.turnStateController.getRemainingActionPoints()));
         }
         const actor = this.getActivePartyTurnActor();
-        if (!actor) return this.remainingActionPoints;
-        return Math.max(this.remainingActionPoints, Math.floor(actor.entity.actionGauge));
-    }
-
-    private resolveSnapshotRemainingGauge(remainingGauge: number, actionGauge: number): number {
-        if (remainingGauge > 0) return remainingGauge;
-        return actionGauge >= MIN_FIELD_ACTION_GAUGE_COST ? Math.floor(actionGauge) : 0;
-    }
-
-    private reopenPendingNetworkMoveMenu(ownSnapshots: ActorSnapshot[]): void {
-        const snapshotKeys = new Set(ownSnapshots.map((actor) => `${actor.id}:${actor.tile.x},${actor.tile.y}`));
-        const pending = this.getNetworkRaidState().consumePendingMoveReopen(snapshotKeys);
-        if (!pending) return;
-
-        const actor = this.partyActors.find((entry) => entry.id === pending.actorId);
-        if (!actor || actor.id !== this.activeTurnActorId) return;
-        if (this.remainingActionPoints < MIN_FIELD_ACTION_GAUGE_COST) return;
-        if (this.actionMenuUI.getIsOpen()) return;
-        if (this.playerActionController.getMode() !== null) return;
-        if (this.playerActionController.hasExecutableAction(actor)) this.reopenActionMenu(actor);
+        if (!actor) return this.turnStateController.getRemainingActionPoints();
+        return Math.max(this.turnStateController.getRemainingActionPoints(), Math.floor(actor.entity.actionGauge));
     }
 
     private hasFieldLineOfSight(from: TilePoint, to: TilePoint): boolean {
@@ -2877,7 +1648,7 @@ export class WorldEngine {
     }
 
     private clearIntent(): void {
-        if (this.reservedAction) return;
+        if (this.turnStateController.getReservedAction()) return;
         const actor = this.getControlledActor();
         if (actor) this.clearActorIntent(actor);
         this.selectionController.selectActor(actor?.id ?? null);
@@ -2905,31 +1676,15 @@ export class WorldEngine {
     }
 
     private beginCombatFeedbackGroup(): string {
-        const id = `world:${this.worldTime}:${this.feedbackGroups.size + 1}:${Math.random().toString(36).slice(2, 8)}`;
-        this.feedbackGroups.set(id, 'status');
-        return id;
+        return this.combatFeedbackController.beginGroup();
     }
 
     private registerCombatFeedback(kind: CombatFeedbackKind, feedbackGroupId?: string): void {
-        if (!feedbackGroupId) {
-            this.applyCombatFeedback(kind);
-            return;
-        }
-        const current = this.feedbackGroups.get(feedbackGroupId);
-        this.feedbackGroups.set(feedbackGroupId, strongerCombatFeedback(current, kind));
+        this.combatFeedbackController.register(kind, feedbackGroupId);
     }
 
     private flushCombatFeedbackGroup(feedbackGroupId: string): void {
-        const kind = this.feedbackGroups.get(feedbackGroupId);
-        if (!kind) return;
-        this.feedbackGroups.delete(feedbackGroupId);
-        this.applyCombatFeedback(kind);
-    }
-
-    private applyCombatFeedback(kind: CombatFeedbackKind): void {
-        const feedback = HIT_FEEDBACK[kind];
-        if (feedback.shake > 0) this.camera.shake(feedback.shake, feedback.shakeMs);
-        if (feedback.hitstopMs > 0) HitStop.freeze(feedback.hitstopMs);
+        this.combatFeedbackController.flush(feedbackGroupId);
     }
 
     private spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void {

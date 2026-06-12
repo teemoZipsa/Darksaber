@@ -5,7 +5,7 @@ services:
     buildCommand: npm ci
     startCommand: npm run server
     healthCheckPath: /healthz
-    autoDeployTrigger: 'off'
+    autoDeployTrigger: 'commit'
     envVars:
       - key: NODE_ENV
         value: production

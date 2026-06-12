@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Character } from '../../src/character/Character';
 import { PartyManager } from '../../src/character/PartyManager';
 import type { GameManager } from '../../src/engine/GameManager';
 import { WorldRaidOutcomeController, type WorldRaidOutcomeContext } from '../../src/engine/world/WorldRaidOutcomeController';
@@ -13,11 +14,12 @@ import { BURGOS_CASTLE_DUNGEON_ID, ZAMORA_FORTRESS_DUNGEON_ID } from '../../src/
 import {
     MAIN_QUEST_EPISODE_01_ID,
     MAIN_QUEST_EPISODE_02_ID,
+    BURGOS_KEY_ITEM_ID,
+    CAIN_NECKLACE_ITEM_ID,
     QUEST_BOMB_ITEM_ID,
     STORY_CLERIC_EP02_ID,
     getStoryQuestViews,
 } from '../../src/data/StoryQuestData';
-import { i18n, type Language } from '../../src/i18n/LanguageManager';
 
 class ImageStub {
     public src = '';
@@ -49,7 +51,6 @@ function markZamoraObjectiveComplete(raidSession: WorldRaidSession): void {
 }
 
 function createController() {
-    const logs: string[] = [];
     const playerData = new PlayerData();
     playerData.markCleared('quest:first_survival');
     const raidSession = new WorldRaidSession('central_castle');
@@ -74,13 +75,13 @@ function createController() {
         placePartyAtTown: (_town: TownInfo) => undefined,
         openTown: (_town: TownInfo) => undefined,
         setPhase: () => undefined,
-        log: (message) => logs.push(message),
+        log: () => undefined,
     };
     const controller = new WorldRaidOutcomeController(context);
     const getOutcome = (): RaidOutcome | null =>
         (controller as unknown as { raidResultUI: { outcome: RaidOutcome | null } }).raidResultUI.outcome;
 
-    return { controller, playerData, raidSession, party, logs, getOutcome };
+    return { controller, playerData, raidSession, party, gameManager, getOutcome };
 }
 
 test('Burgos objective grants episode 1 completion and bomb only after survival', () => {
@@ -110,23 +111,60 @@ test('completed episode 1 does not grant duplicate story rewards', () => {
 });
 
 test('Burgos objective does not grant episode 1 reward on raid failure', () => {
-    const previousLang: Language = i18n.lang;
-    try {
-        i18n.lang = 'en';
-        const { controller, playerData, raidSession, logs, getOutcome } = createController();
-        raidSession.beginRaidFromTown('central_castle');
-        markBurgosObjectiveComplete(raidSession);
+    const { controller, playerData, raidSession, getOutcome } = createController();
+    raidSession.beginRaidFromTown('central_castle');
+    markBurgosObjectiveComplete(raidSession);
 
-        controller.completeFailure('DEAD');
+    controller.completeFailure('DEAD');
 
-        assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_01_ID), false);
-        assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), false);
-        assert.equal(getOutcome()?.questRewards, undefined);
-        assert.deepEqual(getOutcome()?.notes, ['The deployed party was wiped out.']);
-        assert.ok(logs.includes('Party wiped. Losses have been applied.'));
-    } finally {
-        i18n.lang = previousLang;
-    }
+    assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_01_ID), false);
+    assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), false);
+    assert.equal(getOutcome()?.questRewards, undefined);
+});
+
+test('raid failure grants a basic recovery set instead of leaving the party empty', () => {
+    const { controller, raidSession, party, gameManager, getOutcome } = createController();
+    const hero = new Character('hero', 'Hero', 'infantry');
+    party.addToRoster(hero);
+    party.deployCharacter(hero);
+    raidSession.beginRaidFromTown('central_castle');
+
+    controller.completeFailure('DEAD');
+
+    assert.equal(hero.equipment.get('weapon')?.item.id, 'short_sword');
+    assert.equal(hero.equipment.has('shield'), false);
+    assert.equal(hero.equipment.get('body')?.item.id, 'battle_t1_body');
+    assert.deepEqual(gameManager.inventory.items.map((placed) => placed.item.id), ['herb_cheap', 'herb_cheap', 'mp_potion']);
+    assert.ok(getOutcome()?.notes?.some((note) => note.includes('기본 보급품 지급')));
+});
+
+test('Burgos field event items are preserved as quest items only after survival', () => {
+    const { controller, playerData, raidSession, getOutcome } = createController();
+    raidSession.beginRaidFromTown('central_castle');
+    raidSession.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key');
+    raidSession.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'cain_necklace');
+
+    controller.completeSuccess(DESTINATION_TOWN);
+
+    assert.equal(playerData.hasQuestItem(BURGOS_KEY_ITEM_ID), true);
+    assert.equal(playerData.hasQuestItem(CAIN_NECKLACE_ITEM_ID), true);
+    assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_01_ID), false);
+    assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), false);
+    assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('부르고스성 열쇠')));
+    assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('케인의 목걸이')));
+});
+
+test('Burgos field event items are not preserved on raid failure', () => {
+    const { controller, playerData, raidSession, getOutcome } = createController();
+    raidSession.beginRaidFromTown('central_castle');
+    raidSession.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key');
+    raidSession.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'cain_necklace');
+
+    controller.completeFailure('DEAD');
+
+    assert.equal(playerData.hasQuestItem(BURGOS_KEY_ITEM_ID), false);
+    assert.equal(playerData.hasQuestItem(CAIN_NECKLACE_ITEM_ID), false);
+    assert.equal(getOutcome()?.questRewards, undefined);
 });
 
 test('episode 2 quest is hidden until episode 1 is completed', () => {
@@ -138,6 +176,27 @@ test('episode 2 quest is hidden until episode 1 is completed', () => {
         getStoryQuestViews(playerData, null).map((view) => view.quest.id),
         [MAIN_QUEST_EPISODE_01_ID, MAIN_QUEST_EPISODE_02_ID]
     );
+});
+
+test('Burgos Cain necklace appears as an optional quest objective', () => {
+    const playerData = new PlayerData();
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+
+    const initial = getStoryQuestViews(playerData, raidSession).find((view) => view.quest.id === MAIN_QUEST_EPISODE_01_ID);
+    assert.deepEqual(initial?.sideObjectives, [{
+        labelKey: 'story.ep01.sideObjective.cainNecklace',
+        completed: false,
+    }]);
+
+    raidSession.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'cain_necklace');
+    const inRaid = getStoryQuestViews(playerData, raidSession).find((view) => view.quest.id === MAIN_QUEST_EPISODE_01_ID);
+    assert.equal(inRaid?.sideObjectives[0]?.completed, true);
+
+    const survived = new PlayerData();
+    survived.addQuestItem(CAIN_NECKLACE_ITEM_ID);
+    const persisted = getStoryQuestViews(survived, null).find((view) => view.quest.id === MAIN_QUEST_EPISODE_01_ID);
+    assert.equal(persisted?.sideObjectives[0]?.completed, true);
 });
 
 test('Zamora objective grants episode 2 completion and cleric companion only after survival', () => {

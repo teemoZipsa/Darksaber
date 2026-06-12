@@ -33,7 +33,7 @@ export function QuestList() {
 
     return (
         <div className="ds-quest__body">
-            {quests.map(({ quest, status, rewardView }) => {
+            {quests.map(({ quest, status, rewardView, sideObjectives }) => {
                 return (
                     <div key={quest.id} className={`ds-quest__row is-${status}`}>
                         <span className="ds-quest__status" aria-hidden>{STATUS_ICON[status]}</span>
@@ -47,6 +47,14 @@ export function QuestList() {
                             {quest.recommendedLevelKey && (
                                 <span className="ds-quest__objective">{t('quest.recommendedLevel')}: {t(quest.recommendedLevelKey)}</span>
                             )}
+                            {sideObjectives.map((objective) => (
+                                <span
+                                    key={objective.labelKey}
+                                    className={`ds-quest__objective ds-quest__side-objective ${objective.completed ? 'is-complete' : 'is-active'}`}
+                                >
+                                    {objective.completed ? '✓' : '□'} {t(objective.labelKey)}
+                                </span>
+                            ))}
                         </div>
                         <span className="ds-quest__reward">
                             {t('quest.reward')}: {getRewardLabel(rewardView.reward)}

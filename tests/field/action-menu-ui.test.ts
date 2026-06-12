@@ -34,6 +34,25 @@ test('disabled inspect slot remains visible and clickable as a disabled action',
     assert.equal(result?.disabledReason, '조사 대상 없음');
 });
 
+test('open action menu can refresh a disabled attack slot after targets change', () => {
+    const menu = new ActionMenuUI();
+    menu.open([
+        { type: 'attack', enabled: false, disabledReason: '공격 대상 없음' },
+    ]);
+
+    assert.equal(clickSlot(menu, 'attack')?.enabled, false);
+
+    menu.updateStates([
+        { type: 'attack', enabled: true },
+    ]);
+
+    const result = clickSlot(menu, 'attack');
+
+    assert.equal(result?.type, 'attack');
+    assert.equal(result?.enabled, true);
+    assert.equal(result?.disabledReason, undefined);
+});
+
 test('fanfare slot remains visible and disabled when no state enables it', () => {
     const menu = new ActionMenuUI();
     menu.open();
@@ -99,4 +118,27 @@ test('magic menu slots use the same adjacent square layout as the action menu', 
     assert.deepEqual(runtime.slotPosition(5), { x: 100 - TILE_SIZE, y: 200 + TILE_SIZE });
     assert.deepEqual(runtime.slotPosition(6), { x: 100, y: 200 + TILE_SIZE });
     assert.deepEqual(runtime.slotPosition(7), { x: 100 + TILE_SIZE, y: 200 + TILE_SIZE });
+});
+
+test('magic menu slot refresh preserves hover state while updating affordability', () => {
+    const menu = new FieldMagicMenu();
+    const skill = getSkill('inf_t1');
+    assert.ok(skill);
+    menu.show([{ skill, level: 1, enabled: true }]);
+    const runtime = menu as unknown as {
+        centerX: number;
+        centerY: number;
+        hoveredIndex: number | null;
+        slotPosition(index: number): { x: number; y: number };
+    };
+    runtime.centerX = 100;
+    runtime.centerY = 200;
+    const pos = runtime.slotPosition(0);
+
+    menu.onMouseMove(pos.x, pos.y);
+    menu.updateSlots([{ skill, level: 1, enabled: false, disabledReason: 'MP 부족' }]);
+
+    assert.equal(runtime.hoveredIndex, 0);
+    assert.equal(menu.getSlot(0)?.enabled, false);
+    assert.equal(menu.getSlot(0)?.disabledReason, 'MP 부족');
 });

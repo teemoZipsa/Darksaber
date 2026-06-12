@@ -9,9 +9,6 @@ import { getStoryHmapTileAt } from './StoryHmaps';
 import { HMAP_BLEND_BAND, type HmapSample } from './HmapBlend';
 import { STORY_SCENARIOS } from '../data/StoryScenarioData';
 import { isStoryInteriorDungeon } from '../data/StoryInteriorData';
-import { t } from '../i18n/LanguageManager';
-import WORLD_LOCATIONS from '../data/content/world-locations.json';
-import WORLD_MAP_ROUTES_JSON from '../data/content/world-map-routes.json';
 
 export interface TileBounds {
     width: number;
@@ -75,12 +72,6 @@ export interface WorldDungeonInfo {
     tileRadius: number;
 }
 
-interface WorldLocationContent {
-    beginnerDungeons: WorldDungeonInfo[];
-}
-
-const WORLD_LOCATION_CONTENT = WORLD_LOCATIONS as WorldLocationContent;
-
 interface WorldMapOptions {
     validateTownSpawns?: boolean;
 }
@@ -108,17 +99,182 @@ interface TileRoute {
     noiseSalt: number;
 }
 
-interface WorldMapRoutesContent {
-    roads: TileRoute[];
-    rivers: TileRoute[];
+interface ScenarioWaterBasin {
+    center: RoutePoint;
+    radiusX: number;
+    radiusY: number;
+    innerRadius: number;
+    outerRadius: number;
+    noiseSalt: number;
 }
 
-const WORLD_MAP_ROUTES = WORLD_MAP_ROUTES_JSON as WorldMapRoutesContent;
-const ROAD_ROUTES: TileRoute[] = WORLD_MAP_ROUTES.roads;
-const RIVER_ROUTES: TileRoute[] = WORLD_MAP_ROUTES.rivers;
+const ROAD_ROUTES: TileRoute[] = [
+    {
+        points: [
+            { chunkX: 16, chunkY: 11 },
+            { chunkX: 23, chunkY: 23 },
+            { chunkX: 30, chunkY: 35 },
+            { chunkX: 37, chunkY: 44 },
+        ],
+        width: 2.2,
+        noiseSalt: 101,
+    },
+    {
+        points: [
+            { chunkX: 10, chunkY: 52 },
+            { chunkX: 20, chunkY: 48 },
+            { chunkX: 28, chunkY: 45 },
+            { chunkX: 37, chunkY: 44 },
+        ],
+        width: 2.2,
+        noiseSalt: 102,
+    },
+    {
+        points: [
+            { chunkX: 37, chunkY: 44 },
+            { chunkX: 39, chunkY: 62 },
+            { chunkX: 41, chunkY: 80 },
+        ],
+        width: 2.3,
+        noiseSalt: 103,
+    },
+    {
+        points: [
+            { chunkX: 12, chunkY: 79 },
+            { chunkX: 24, chunkY: 82 },
+            { chunkX: 41, chunkY: 80 },
+        ],
+        width: 2.1,
+        noiseSalt: 104,
+    },
+    {
+        points: [
+            { chunkX: 64, chunkY: 23 },
+            { chunkX: 64, chunkY: 35 },
+            { chunkX: 63, chunkY: 49 },
+            { chunkX: 63, chunkY: 60 },
+            { chunkX: 63, chunkY: 72 },
+        ],
+        width: 2.1,
+        noiseSalt: 105,
+    },
+    // Main story spine: threads the central inland scenarios in episode order
+    // (Ep4 -> Ep3 -> Ep2 -> Ep1 -> Ep7 -> Ep6 -> Ep16 -> Ep5 -> Ep8 -> Ep10),
+    // tying into the central castle so the campaign reads as a single trail.
+    {
+        points: [
+            { chunkX: 43, chunkY: 17 },
+            { chunkX: 43, chunkY: 24 },
+            { chunkX: 37, chunkY: 44 },
+            { chunkX: 43, chunkY: 40 },
+            { chunkX: 47, chunkY: 40 },
+            { chunkX: 45, chunkY: 45 },
+            { chunkX: 47, chunkY: 48 },
+            { chunkX: 47, chunkY: 53 },
+            { chunkX: 47, chunkY: 59 },
+            { chunkX: 51, chunkY: 64 },
+        ],
+        width: 2.3,
+        noiseSalt: 106,
+    },
+    // Eastern Ament branch, kept on the east continent between its two towns.
+    {
+        points: [
+            { chunkX: 64, chunkY: 23 },
+            { chunkX: 67, chunkY: 34 },
+            { chunkX: 64, chunkY: 37 },
+            { chunkX: 61, chunkY: 40 },
+            { chunkX: 63, chunkY: 49 },
+        ],
+        width: 2.1,
+        noiseSalt: 107,
+    },
+    // North-west desert branch: desert city -> Oasis -> Pyramid cluster.
+    {
+        points: [
+            { chunkX: 16, chunkY: 11 },
+            { chunkX: 18, chunkY: 20 },
+            { chunkX: 21, chunkY: 16 },
+            { chunkX: 24, chunkY: 16 },
+        ],
+        width: 2.1,
+        noiseSalt: 108,
+    },
+];
+
+const RIVER_ROUTES: TileRoute[] = [
+    {
+        points: [
+            { chunkX: 32, chunkY: 25 },
+            { chunkX: 36, chunkY: 34 },
+            { chunkX: 34, chunkY: 48 },
+            { chunkX: 29, chunkY: 59 },
+            { chunkX: 21, chunkY: 72 },
+        ],
+        width: 2.4,
+        noiseSalt: 201,
+    },
+    {
+        points: [
+            { chunkX: 68, chunkY: 16 },
+            { chunkX: 66, chunkY: 31 },
+            { chunkX: 61, chunkY: 44 },
+            { chunkX: 65, chunkY: 58 },
+            { chunkX: 61, chunkY: 75 },
+        ],
+        width: 2.1,
+        noiseSalt: 202,
+    },
+];
+
+const SCENARIO_WATER_ROUTES: TileRoute[] = [
+    {
+        points: [
+            { chunkX: 32, chunkY: 25 },
+            { chunkX: 33, chunkY: 28 },
+            { chunkX: 33, chunkY: 32 },
+            { chunkX: 34, chunkY: 36 },
+            { chunkX: 34, chunkY: 48 },
+        ],
+        width: 3.8,
+        noiseSalt: 303,
+    },
+    {
+        points: [
+            { chunkX: 47, chunkY: 59 },
+            { chunkX: 48, chunkY: 63 },
+            { chunkX: 50, chunkY: 69 },
+            { chunkX: 52, chunkY: 75 },
+        ],
+        width: 4.7,
+        noiseSalt: 301,
+    },
+    {
+        points: [
+            { chunkX: 43, chunkY: 72 },
+            { chunkX: 47, chunkY: 73 },
+            { chunkX: 52, chunkY: 75 },
+        ],
+        width: 5.1,
+        noiseSalt: 302,
+    },
+];
+
+const SCENARIO_WATER_BASINS: ScenarioWaterBasin[] = [
+    {
+        center: { chunkX: 41, chunkY: 72 },
+        radiusX: CHUNK_SIZE * 6.3,
+        radiusY: CHUNK_SIZE * 5.1,
+        innerRadius: 0.43,
+        outerRadius: 1.02,
+        noiseSalt: 321,
+    },
+];
 
 const DUNGEON_LANDMARKS: WorldDungeonInfo[] = [
-    ...WORLD_LOCATION_CONTENT.beginnerDungeons,
+    { id: 'beginner_mine', nameKr: '초심자의 폐광', chunkX: 38, chunkY: 35, sprite: 'beginnerMine', tileSpan: 3, tileRadius: 4 },
+    { id: 'beginner_ruins', nameKr: '초보자 유적', chunkX: 62, chunkY: 28, sprite: 'beginnerRuins', tileSpan: 3, tileRadius: 4 },
+    { id: 'dark_cave', nameKr: '암흑 동굴', chunkX: 62, chunkY: 48, sprite: 'caveEntrance', tileSpan: 3, tileRadius: 4 },
     ...STORY_SCENARIOS.map((scenario) => ({
         id: scenario.dungeonId,
         nameKr: scenario.dungeonNameKr,
@@ -137,6 +293,8 @@ const TOWN_EXIT_FORMATION_OFFSETS: TilePoint[] = [
     { x: 0, y: 1 },
     { x: 1, y: 0 },
 ];
+const MIN_TOWN_INTERACTION_RADIUS_TILES = 14;
+const TOWN_INTERACTION_RADIUS_PER_CHUNK = 5;
 
 interface TreeDecorationConfig {
     widthTiles: number;
@@ -256,7 +414,7 @@ export class WorldMap {
     }
 
     public getDisplayName(): string {
-        return t(this.getRealm() === 'master' ? 'world.realm.master' : 'world.realm.mortal');
+        return this.getRealm() === 'master' ? '마스터 월드' : '현세 월드';
     }
 
     public setRealm(realm: WorldRealm): void {
@@ -383,6 +541,26 @@ export class WorldMap {
         return RIVER_ROUTES.some((route) => this.isRouteTile(tx, ty, route, 1.65));
     }
 
+    private isScenarioWaterRouteTile(tx: number, ty: number): boolean {
+        return SCENARIO_WATER_ROUTES.some((route) => this.isRouteTile(tx, ty, route, route.width * 0.55));
+    }
+
+    private isScenarioWaterBasinTile(tx: number, ty: number): boolean {
+        return SCENARIO_WATER_BASINS.some((basin) => {
+            const center = this.routePointToTile(basin.center);
+            const dx = (tx - center.x) / basin.radiusX;
+            const dy = (ty - center.y) / basin.radiusY;
+            const dist = Math.hypot(dx, dy);
+            const raggedEdge = (this.fbm(tx, ty, 0.032, basin.noiseSalt) - 0.5) * 0.12;
+            const coast = dist + raggedEdge;
+            return coast >= basin.innerRadius && coast <= basin.outerRadius;
+        });
+    }
+
+    private isScenarioWaterTile(tx: number, ty: number): boolean {
+        return this.isScenarioWaterRouteTile(tx, ty) || this.isScenarioWaterBasinTile(tx, ty);
+    }
+
     private computeTownTile(tx: number, ty: number, town: TownInfo): TileType {
         const centerX = town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
         const centerY = town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
@@ -490,8 +668,12 @@ export class WorldMap {
             return this.isCoastOceanChunk(chunkX, chunkY) ? TileType.WATER : TileType.DEEP_WATER;
         }
         if (biome === 'town') {
-            const town = this.getTownAtTile(tx, ty);
+            const town = this.getTownTerrainAtTile(tx, ty);
             return town ? this.computeTownTile(tx, ty, town) : TileType.GRASS;
+        }
+
+        if (this.isScenarioWaterTile(tx, ty)) {
+            return this.isRoadTile(tx, ty) ? TileType.ROAD : TileType.WATER;
         }
 
         if (biome === 'special') {
@@ -535,7 +717,10 @@ export class WorldMap {
         // Roads/rivers stay on top of the feathered edge so the travel network
         // and its bridges remain connected; only the scenario interior wins, so
         // connecting roads tuck under a dungeon core instead of carving through it.
-        if (sample.weight < HMAP_BLEND_BAND && (this.isRoadTile(tx, ty) || this.isRiverTile(tx, ty))) {
+        if (this.isScenarioWaterTile(tx, ty) && sample.tile !== TileType.DUNGEON_ENTRANCE && sample.tile !== TileType.ROAD) {
+            return null;
+        }
+        if (sample.weight < HMAP_BLEND_BAND && (this.isRoadTile(tx, ty) || this.isRiverTile(tx, ty) || this.isScenarioWaterTile(tx, ty))) {
             return null;
         }
         return sample.tile;
@@ -977,6 +1162,16 @@ export class WorldMap {
     }
 
     public getTownAtTile(tx: number, ty: number): TownInfo | null {
+        for (const town of this.getTowns()) {
+            const center = this.getTownCenterTile(town);
+            const dx = tx - center.x;
+            const dy = ty - center.y;
+            if (Math.sqrt(dx * dx + dy * dy) <= this.getTownInteractionRadiusTiles(town)) return town;
+        }
+        return null;
+    }
+
+    private getTownTerrainAtTile(tx: number, ty: number): TownInfo | null {
         const { chunkX, chunkY } = this.tileToChunk(tx, ty);
         for (const town of this.getTowns()) {
             const dx = chunkX - town.chunkX;
@@ -986,17 +1181,27 @@ export class WorldMap {
         return null;
     }
 
+    private getTownCenterTile(town: TownInfo): TilePoint {
+        return {
+            x: town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+            y: town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+        };
+    }
+
+    private getTownInteractionRadiusTiles(town: TownInfo): number {
+        return Math.max(MIN_TOWN_INTERACTION_RADIUS_TILES, town.radius * TOWN_INTERACTION_RADIUS_PER_CHUNK);
+    }
+
     public getTownSpawnTile(town: TownInfo): TilePoint {
-        const centerX = town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
-        const centerY = town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
-        const maxRadius = Math.max(4, town.radius * CHUNK_SIZE);
+        const center = this.getTownCenterTile(town);
+        const maxRadius = this.getTownInteractionRadiusTiles(town);
 
         for (let radius = 0; radius <= maxRadius; radius++) {
             for (let dy = -radius; dy <= radius; dy++) {
                 for (let dx = -radius; dx <= radius; dx++) {
                     if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
-                    const tx = centerX + dx;
-                    const ty = centerY + dy;
+                    const tx = center.x + dx;
+                    const ty = center.y + dy;
                     if (this.isWalkable(tx, ty) && this.getTownAtTile(tx, ty)?.id === town.id) {
                         return { x: tx, y: ty };
                     }
@@ -1004,7 +1209,7 @@ export class WorldMap {
             }
         }
 
-        return { x: centerX, y: centerY };
+        return center;
     }
 
     public getTownExitTile(town: TownInfo): TilePoint {
@@ -1018,9 +1223,8 @@ export class WorldMap {
     }
 
     private computeTownExitTile(town: TownInfo): TilePoint {
-        const centerX = town.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
-        const centerY = town.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
-        const searchRadius = Math.max(8, town.radius * CHUNK_SIZE + CHUNK_SIZE);
+        const center = this.getTownCenterTile(town);
+        const searchRadius = this.getTownInteractionRadiusTiles(town) + 12;
         let bestSafeRoadExit: { tile: TilePoint; score: number } | null = null;
         let bestSafeExit: { tile: TilePoint; score: number } | null = null;
         let bestRoadExit: { tile: TilePoint; score: number } | null = null;
@@ -1028,8 +1232,8 @@ export class WorldMap {
 
         for (let dy = -searchRadius; dy <= searchRadius; dy++) {
             for (let dx = -searchRadius; dx <= searchRadius; dx++) {
-                const tx = centerX + dx;
-                const ty = centerY + dy;
+                const tx = center.x + dx;
+                const ty = center.y + dy;
                 if (!this.isWalkable(tx, ty) || this.getTownAtTile(tx, ty)?.id === town.id) continue;
                 const score = dx * dx + dy * dy;
                 const candidate = { tile: { x: tx, y: ty }, score };

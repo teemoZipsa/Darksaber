@@ -16,3 +16,5 @@
 ## 3. Engagement & Combat
 - **Field Encounters**: Monsters roam the grid. Walking into their aggro range triggers combat seamlessly on the exact same field (no separate battle screen).
 - **Line of Sight (LoS)**: Ranged attacks and spells are blocked by walls and obstacles on the grid.
+- **Monster Balance**: Original Dark Saver monster rows are kept as a reference ledger, but their raw numbers are not used directly. Monster combat stats are normalized to this project's damage formula so early monsters preserve original relative ordering without overpowering level-1 characters.
+- **Scenario Monsters**: Main-story guards and bosses use shared monster-id layouts for both server sessions and local story interiors, then receive normalized stats through the common `Enemy` creation path.

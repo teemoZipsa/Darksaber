@@ -20,6 +20,7 @@ export interface WorldStoryInteriorRenderModel {
     active: boolean;
     dungeonId: string | null;
     title: string;
+    objectiveKey: string;
     enemiesLeft: number;
 }
 
