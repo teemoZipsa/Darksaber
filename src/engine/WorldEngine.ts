@@ -93,8 +93,6 @@ import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from '.
 import { NetworkRaidClient, WorldServerError, type NetworkRaidStatus } from '../net/NetworkRaidClient';
 import {
     formatNetworkDeployFailure,
-    formatNetworkStatusLog,
-    formatReconnectRestoredLog,
     formatWorldServerErrorLog,
     getWorldServerErrorMessage,
 } from '../net/NetworkRaidMessages';
@@ -1413,26 +1411,8 @@ export class WorldEngine {
     }
 
     private handleNetworkStatusChange(status: NetworkRaidStatus): void {
-        switch (status) {
-            case 'connecting':
-                this.addCombatLog(formatNetworkStatusLog(status));
-                break;
-            case 'connected':
-                this.addCombatLog(this.getNetworkRaidState().statusWasReconnecting(status)
-                    ? formatReconnectRestoredLog()
-                    : formatNetworkStatusLog(status));
-                break;
-            case 'reconnecting':
-                this.getNetworkRaidState().statusWasReconnecting(status);
-                this.addCombatLog(formatNetworkStatusLog(status));
-                break;
-            case 'disconnected':
-                this.addCombatLog(formatNetworkStatusLog(status));
-                this.getNetworkRaidState().statusWasReconnecting(status);
-                break;
-            case 'idle':
-                break;
-        }
+        const log = this.getNetworkRaidState().consumeStatusLog(status);
+        if (log) this.addCombatLog(log);
     }
 
     private createPartyCompositionSnapshot(town: TownInfo): ActorSnapshot[] {

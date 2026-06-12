@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { i18n, type Language } from '../../src/i18n/LanguageManager';
+import { NetworkRaidState } from '../../src/engine/world/NetworkRaidState';
 import {
     formatNetworkDeployFailure,
     formatNetworkStatusLog,
@@ -21,6 +22,21 @@ test('network status logs use localized labels', () => {
         i18n.lang = 'en';
         assert.equal(formatNetworkStatusLog('connected'), 'Network status: Connected');
         assert.equal(formatReconnectRestoredLog(), 'World server connection restored.');
+    } finally {
+        i18n.lang = previousLang;
+    }
+});
+
+test('network raid state consumes reconnect status logs', () => {
+    const previousLang: Language = i18n.lang;
+    try {
+        i18n.lang = 'en';
+        const state = new NetworkRaidState();
+
+        assert.equal(state.consumeStatusLog('idle'), null);
+        assert.equal(state.consumeStatusLog('reconnecting'), 'Network status: Reconnecting...');
+        assert.equal(state.consumeStatusLog('connected'), 'World server connection restored.');
+        assert.equal(state.consumeStatusLog('connected'), 'Network status: Connected');
     } finally {
         i18n.lang = previousLang;
     }

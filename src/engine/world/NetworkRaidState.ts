@@ -1,4 +1,5 @@
 import { NetworkRaidClient, type NetworkRaidStatus } from '../../net/NetworkRaidClient';
+import { formatNetworkStatusLog, formatReconnectRestoredLog } from '../../net/NetworkRaidMessages';
 import type { TilePoint } from '../../field/FieldPathing';
 import type { PlayerIntentKind } from '../../net/WorldProtocol';
 
@@ -160,7 +161,7 @@ export class NetworkRaidState {
         this.client = null;
     }
 
-    public statusWasReconnecting(status: NetworkRaidStatus): boolean {
+    private statusWasReconnecting(status: NetworkRaidStatus): boolean {
         if (status === 'connected') {
             const restored = this.wasReconnecting;
             this.wasReconnecting = false;
@@ -169,6 +170,25 @@ export class NetworkRaidState {
         if (status === 'reconnecting') this.wasReconnecting = true;
         if (status === 'disconnected') this.wasReconnecting = false;
         return false;
+    }
+
+    public consumeStatusLog(status: NetworkRaidStatus): string | null {
+        switch (status) {
+            case 'connecting':
+                return formatNetworkStatusLog(status);
+            case 'connected':
+                return this.statusWasReconnecting(status)
+                    ? formatReconnectRestoredLog()
+                    : formatNetworkStatusLog(status);
+            case 'reconnecting':
+                this.statusWasReconnecting(status);
+                return formatNetworkStatusLog(status);
+            case 'disconnected':
+                this.statusWasReconnecting(status);
+                return formatNetworkStatusLog(status);
+            case 'idle':
+                return null;
+        }
     }
 
     private intentClient(requireOpen: boolean): NetworkRaidClient | null {
