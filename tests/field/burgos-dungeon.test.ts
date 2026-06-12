@@ -33,6 +33,7 @@ import { WorldStoryScenarioController } from '../../src/engine/world/WorldStoryS
 import { GridInventory } from '../../src/inventory/GridInventory';
 import { generateWorldLootNear } from '../../src/loot/WorldLootGenerator';
 import { BURGOS_CASTLE_HMAP_ROWS, BURGOS_CASTLE_HMAP_SIZE } from '../../src/map/BurgosCastleHmap';
+import { getStoryHmapTileAt, STORY_HMAP_SIZE } from '../../src/map/StoryHmaps';
 import { getStoryInteriorLayout, isStoryInteriorDungeon } from '../../src/data/StoryInteriorData';
 import { StoryInteriorMap } from '../../src/map/StoryInteriorMap';
 import { NEUTRAL_BIRD_SPRITE_SRC, WorldMap } from '../../src/map/WorldMap';
@@ -248,6 +249,26 @@ test('Burgos Castle uses the original 01hmap footprint around its entrance', () 
     // feathered into the surrounding biome (see HmapBlend), so sample interior tiles.
     assert.equal(world.getTileAt(entrance.x - 40, entrance.y - 40), TileType.STONE);
     assert.equal(world.getTileAt(entrance.x + 34, entrance.y + 34), TileType.ROAD);
+});
+
+test('late story scenarios expose original hmap footprints through episode 31', () => {
+    const world = new WorldMap();
+    for (const episode of [23, 24, 25, 26, 27, 28, 29, 30, 31]) {
+        const scenario = STORY_SCENARIOS.find((candidate) => candidate.episode === episode);
+        assert.ok(scenario, `missing story scenario ${episode}`);
+        const dungeon = world.getDungeons().find((candidate) => candidate.id === scenario.dungeonId);
+        assert.ok(dungeon, `missing dungeon ${scenario.dungeonId}`);
+
+        const entrance = world.getDungeonEntranceTile(dungeon);
+        assert.equal(getStoryHmapTileAt(episode, entrance.x, entrance.y, entrance)?.tile, TileType.DUNGEON_ENTRANCE);
+
+        const samples = [
+            getStoryHmapTileAt(episode, entrance.x - 12, entrance.y - 12, entrance),
+            getStoryHmapTileAt(episode, entrance.x + 12, entrance.y + 12, entrance),
+            getStoryHmapTileAt(episode, entrance.x, entrance.y + Math.floor(STORY_HMAP_SIZE / 4), entrance),
+        ];
+        assert.ok(samples.some((sample) => sample !== null && sample.tile !== TileType.DUNGEON_ENTRANCE), `missing hmap terrain sample for episode ${episode}`);
+    }
 });
 
 test('world map neutral bird sprite asset is available', () => {

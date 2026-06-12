@@ -3,7 +3,8 @@ import type { TilePoint } from './WorldMap';
 import { sampleHmapEdge, type HmapSample } from './HmapBlend';
 import STORY_HMAP_CONTENT_JSON from '../data/content/story-hmaps.json';
 
-// Generated from original client MAP/02hmap.BMP through MAP/20hmap.BMP.
+// Generated from original client MAP/02hmap.BMP through MAP/20hmap.BMP,
+// plus late-story MAP/23hmap.BMP through MAP/31hmap.BMP.
 interface StoryHmapContent {
     size: number;
     rle: Record<string, readonly string[]>;
