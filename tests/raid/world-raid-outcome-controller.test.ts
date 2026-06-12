@@ -17,6 +17,7 @@ import {
     STORY_CLERIC_EP02_ID,
     getStoryQuestViews,
 } from '../../src/data/StoryQuestData';
+import { i18n, type Language } from '../../src/i18n/LanguageManager';
 
 class ImageStub {
     public src = '';
@@ -48,6 +49,7 @@ function markZamoraObjectiveComplete(raidSession: WorldRaidSession): void {
 }
 
 function createController() {
+    const logs: string[] = [];
     const playerData = new PlayerData();
     playerData.markCleared('quest:first_survival');
     const raidSession = new WorldRaidSession('central_castle');
@@ -72,13 +74,13 @@ function createController() {
         placePartyAtTown: (_town: TownInfo) => undefined,
         openTown: (_town: TownInfo) => undefined,
         setPhase: () => undefined,
-        log: () => undefined,
+        log: (message) => logs.push(message),
     };
     const controller = new WorldRaidOutcomeController(context);
     const getOutcome = (): RaidOutcome | null =>
         (controller as unknown as { raidResultUI: { outcome: RaidOutcome | null } }).raidResultUI.outcome;
 
-    return { controller, playerData, raidSession, party, getOutcome };
+    return { controller, playerData, raidSession, party, logs, getOutcome };
 }
 
 test('Burgos objective grants episode 1 completion and bomb only after survival', () => {
@@ -108,15 +110,23 @@ test('completed episode 1 does not grant duplicate story rewards', () => {
 });
 
 test('Burgos objective does not grant episode 1 reward on raid failure', () => {
-    const { controller, playerData, raidSession, getOutcome } = createController();
-    raidSession.beginRaidFromTown('central_castle');
-    markBurgosObjectiveComplete(raidSession);
+    const previousLang: Language = i18n.lang;
+    try {
+        i18n.lang = 'en';
+        const { controller, playerData, raidSession, logs, getOutcome } = createController();
+        raidSession.beginRaidFromTown('central_castle');
+        markBurgosObjectiveComplete(raidSession);
 
-    controller.completeFailure('DEAD');
+        controller.completeFailure('DEAD');
 
-    assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_01_ID), false);
-    assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), false);
-    assert.equal(getOutcome()?.questRewards, undefined);
+        assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_01_ID), false);
+        assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), false);
+        assert.equal(getOutcome()?.questRewards, undefined);
+        assert.deepEqual(getOutcome()?.notes, ['The deployed party was wiped out.']);
+        assert.ok(logs.includes('Party wiped. Losses have been applied.'));
+    } finally {
+        i18n.lang = previousLang;
+    }
 });
 
 test('episode 2 quest is hidden until episode 1 is completed', () => {

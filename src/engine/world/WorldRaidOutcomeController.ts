@@ -3,7 +3,7 @@ import { Character } from '../../character/Character';
 import { getItemDef } from '../../data/ItemDB';
 import type { PlayerData } from '../../data/PlayerData';
 import { STORY_QUESTS, type StoryQuestReward } from '../../data/StoryQuestData';
-import { t } from '../../i18n/LanguageManager';
+import { formatT, t } from '../../i18n/LanguageManager';
 import type { TownInfo } from '../../map/BiomeMask';
 import {
     computeRaidFailureLoss,
@@ -71,7 +71,7 @@ export class WorldRaidOutcomeController {
             this.context.playerData.markCleared('quest:first_survival');
             this.context.playerData.addGold(200);
             goldReward = 200;
-            questRewards.push('퀘스트 완료: 첫 생환');
+            questRewards.push(formatT('raid.outcome.firstSurvivalQuest', { completed: t('quest.completed') }));
         }
         questRewards.push(...this.completeStoryQuestRewards());
 
@@ -97,10 +97,10 @@ export class WorldRaidOutcomeController {
             equipmentLost: [],
             goldReward,
             questRewards,
-            notes: ['전리품과 창고는 현재 세션에서만 유지됩니다.'],
+            notes: [t('raid.outcome.sessionOnlyNote')],
         };
         this.showRaidResult(outcome, destination);
-        this.context.log(`${destination.nameKr} 생환 성공.`);
+        this.context.log(formatT('raid.outcome.survivedLog', { town: destination.nameKr }));
     }
 
     public completeFailure(result: Exclude<RaidResultType, 'SURVIVED'>): void {
@@ -136,10 +136,10 @@ export class WorldRaidOutcomeController {
             secured: [],
             lost: mergeSnapshots(loss.backpackLost),
             equipmentLost: loss.equipmentLost,
-            notes: [result === 'MIA' ? '시간 초과로 실종 처리되었습니다.' : '출격조가 전멸했습니다.'],
+            notes: [t(result === 'MIA' ? 'raid.outcome.miaNote' : 'raid.outcome.deadNote')],
         };
         this.showRaidResult(outcome, returnTown);
-        this.context.log(result === 'MIA' ? '시간 초과. 손실이 적용되었습니다.' : '전멸. 손실이 적용되었습니다.');
+        this.context.log(t(result === 'MIA' ? 'raid.outcome.miaLog' : 'raid.outcome.deadLog'));
     }
 
     private completeStoryQuestRewards(): string[] {
