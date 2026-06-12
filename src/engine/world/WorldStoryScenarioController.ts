@@ -330,6 +330,7 @@ export class WorldStoryScenarioController {
         for (let index = 0; index < scenario.guardCount; index++) {
             const monsterId = monsterLayout.guardMonsterIds[index % monsterLayout.guardMonsterIds.length];
             const guardDefinition = getMonsterDefinition(monsterId);
+            const guardRole = guardDefinition.role === 'boss' ? 'bruiser' : guardDefinition.role;
             const tile = layout.guardTiles[index] ?? layout.guardTiles[layout.guardTiles.length - 1] ?? layout.playerStart;
             const enemy = new Enemy(
                 `story_${dungeon.id}_guard_${index}`,
@@ -338,7 +339,7 @@ export class WorldStoryScenarioController {
                 guardDefinition.name,
                 Math.max(scenario.guardLevel, guardDefinition.level),
                 guardDefinition.color,
-                guardDefinition.role,
+                guardRole,
                 monsterId
             );
             enemy.aggroRange = Math.max(guardDefinition.aggroRange, 8);

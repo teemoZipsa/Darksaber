@@ -23,8 +23,13 @@ import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import {
     getStoryScenarioEventSequence,
     getStoryScenarioPresentationDurationMs,
+    type StoryScenarioFieldEvent,
 } from '../../src/data/StoryScenarioEventData';
 import { getStoryScenarioFieldEventTiles } from '../../src/data/StoryScenarioFieldEventPlacement';
+import {
+    getOriginalLateStoryBossTile,
+    getOriginalLateStoryCacheEvents,
+} from '../../src/data/OriginalLateStoryFacts';
 import { Enemy } from '../../src/entity/Enemy';
 import { LootObject } from '../../src/entity/LootObject';
 import { Player } from '../../src/entity/Player';
@@ -1179,6 +1184,56 @@ test('late story presentation steps focus the camera on original event tiles', (
     drainStoryPresentation(harness.controller);
     assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 22, y: 11 });
     assert.ok(harness.cameraFollowed);
+});
+
+test('episodes 23 through 31 launch late story interiors through the runtime controller', () => {
+    for (let episode = 23; episode <= 31; episode++) {
+        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+        assert.ok(scenario, `missing episode ${episode}`);
+        const layout = getStoryInteriorLayout(scenario.dungeonId);
+        const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+        assert.ok(layout, `missing layout for episode ${episode}`);
+        assert.ok(sequence, `missing sequence for episode ${episode}`);
+
+        const player = new Player(0, 0);
+        const raidSession = new WorldRaidSession('central_castle');
+        raidSession.beginRaidFromTown('central_castle');
+        const harness = createStoryScenarioHarness({ player, raidSession });
+        const dungeon = harness.worldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+        const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+        assert.ok(dungeon, `missing dungeon for episode ${episode}`);
+        assert.ok(quest, `missing quest for episode ${episode}`);
+
+        harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+
+        assert.equal(raidSession.activeDungeonId, scenario.dungeonId, `episode ${episode} active dungeon`);
+        assert.ok(harness.worldMap instanceof StoryInteriorMap, `episode ${episode} did not enter an interior map`);
+        assert.deepEqual(harness.controller.getActiveInterior()?.layout.bossTile, getOriginalLateStoryBossTile(episode));
+        assert.deepEqual({ x: player.gridX, y: player.gridY }, layout.playerStart, `episode ${episode} player start`);
+        assert.deepEqual(harness.cameraFocusTiles[0], getOriginalLateStoryBossTile(episode), `episode ${episode} first focus`);
+        assert.equal(harness.controller.getLastPresentationDurationMs(), getStoryScenarioPresentationDurationMs(sequence.entry));
+        assert.equal(harness.fieldEnemies.length, scenario.guardCount + 1, `episode ${episode} enemy count`);
+        assert.equal(harness.fieldEnemies.filter((entry) => entry.enemy.isBoss).length, 1, `episode ${episode} boss count`);
+        assert.ok(harness.fieldEnemies.every((entry) => harness.worldMap.isWalkable(entry.enemy.gridX, entry.enemy.gridY)), `episode ${episode} enemy tile`);
+
+        harness.controller.updatePresentation(0.65);
+        assert.deepEqual(
+            { x: player.gridX, y: player.gridY },
+            { x: layout.playerStart.x, y: layout.playerStart.y - 1 },
+            `episode ${episode} entry move`
+        );
+        drainStoryPresentation(harness.controller);
+
+        const expectedCaches = getOriginalLateStoryCacheEvents(episode);
+        for (const cache of expectedCaches) {
+            const event: StoryScenarioFieldEvent | undefined = sequence.fieldEvents.find((candidate) => candidate.originalEventId === `EVENT ${cache.eventNumber}`);
+            assert.ok(event, `episode ${episode} missing EVENT ${cache.eventNumber}`);
+            assert.equal(harness.controller.playFieldEvent(scenario.dungeonId, event.id), true, `episode ${episode} EVENT ${cache.eventNumber}`);
+            assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], cache.tile, `episode ${episode} EVENT ${cache.eventNumber} focus`);
+            drainStoryPresentation(harness.controller);
+        }
+        assert.deepEqual(harness.rewardItemIds, expectedCaches.map((cache) => cache.itemId), `episode ${episode} cache rewards`);
+    }
 });
 
 test('Airship objective completion keeps variant monsters as optional encounters', () => {
