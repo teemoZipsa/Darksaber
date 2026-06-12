@@ -8,6 +8,7 @@ import {
     ORIGINAL_LATE_STORY_ITEMS,
     getOriginalLateStoryItem,
     getOriginalLateStoryItemIds,
+    getOriginalLateStoryItemsForSourceEvent,
 } from '../../src/data/OriginalLateStoryItems';
 import {
     GENERAL_MONSTER_IDS,
@@ -128,7 +129,6 @@ test('shop and original item data expose guarded equipment fields', () => {
 
 test('late original story reward item ledger covers every GETITEM cache event', () => {
     const seenOriginalItemIds = new Set<number>();
-    const sourceKeys = new Set<string>();
 
     for (let episode = 23; episode <= 31; episode++) {
         for (const cacheEvent of getOriginalLateStoryCacheEvents(episode)) {
@@ -138,18 +138,25 @@ test('late original story reward item ledger covers every GETITEM cache event', 
             assert.ok(getItemDef(item.currentItemId), `missing mapped current item ${item.currentItemId}`);
             assert.equal(item.sourceEvents.some((source) => source.episode === episode && source.eventNumber === cacheEvent.eventNumber), true);
             seenOriginalItemIds.add(cacheEvent.originalItemId);
-
-            for (const source of item.sourceEvents) {
-                assert.match(source.setArc, /^MAP\/\d{2}set\.arc$/);
-                assert.match(source.eventMember, /^\d{2}\.evt$/);
-                sourceKeys.add(`${source.episode}:${source.eventNumber}:${item.originalItemId}`);
-            }
         }
     }
 
-    assert.deepEqual(getOriginalLateStoryItemIds().sort((a, b) => a - b), [...seenOriginalItemIds].sort((a, b) => a - b));
-    assert.equal(ORIGINAL_LATE_STORY_ITEMS.length, seenOriginalItemIds.size);
-    assert.equal(sourceKeys.size, 29);
+    const ledgerIds = getOriginalLateStoryItemIds();
+    const sourceKeys = new Set<string>();
+    for (const item of ORIGINAL_LATE_STORY_ITEMS) {
+        assert.ok(getItemDef(item.currentItemId), `missing mapped current item ${item.currentItemId}`);
+        for (const source of item.sourceEvents) {
+            assert.match(source.setArc, /^MAP\/\d{2}set\.arc$/);
+            assert.match(source.eventMember, /^\d{2}\.evt$/);
+            sourceKeys.add(`${source.episode}:${source.eventNumber}:${item.originalItemId}`);
+        }
+    }
+    for (const originalItemId of seenOriginalItemIds) assert.equal(ledgerIds.includes(originalItemId), true);
+    assert.equal(getOriginalLateStoryItemsForSourceEvent(23, 99).map((item) => item.originalItemId).join(','), '984');
+    assert.equal(getOriginalLateStoryItemsForSourceEvent(24, 99).map((item) => item.originalItemId).join(','), '976');
+    assert.equal(getOriginalLateStoryItemsForSourceEvent(25, 99).length, 0);
+    assert.equal(ORIGINAL_LATE_STORY_ITEMS.length, 30);
+    assert.equal(sourceKeys.size, 31);
 });
 
 test('rest, monster, and starting class data reject unknown ids', () => {

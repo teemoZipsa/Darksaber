@@ -1,5 +1,6 @@
 import type { TilePoint } from '../field/FieldPathing';
 import { getOriginalLateStoryBossTile, getOriginalLateStoryCacheEvents } from './OriginalLateStoryFacts';
+import { getOriginalLateStoryItemsForSourceEvent } from './OriginalLateStoryItems';
 
 export type StoryScenarioEventStep =
     | { kind: 'focus'; target: TilePoint; labelKey: string }
@@ -19,6 +20,7 @@ export interface StoryScenarioEventSequence {
     entry: StoryScenarioEventStep[];
     fieldEvents: StoryScenarioFieldEvent[];
     enemyDefeatEvents?: StoryScenarioEnemyDefeatEvent[];
+    bossDefeatEvent?: StoryScenarioBossDefeatEvent;
     bossDefeat: StoryScenarioEventStep[];
 }
 
@@ -56,6 +58,15 @@ export interface StoryScenarioEnemyDefeatEvent {
     trigger: string;
     enemyId: string;
     steps: StoryScenarioEventStep[];
+}
+
+export interface StoryScenarioBossDefeatEvent {
+    id: string;
+    originalSource: string;
+    originalEventId: string;
+    trigger: string;
+    runtimeFlag: string;
+    rewards?: StoryScenarioFieldEventReward[];
 }
 
 function skeria2FlowerEvent(eventNumber: number, tile: TilePoint, randomChance: number): StoryScenarioFieldEvent {
@@ -161,6 +172,15 @@ function lateScenarioSequence(input: {
         ...dialogueSteps,
         { kind: 'combatStart', labelKey: `story.event.ep${ep}.combatStart`, focus: input.bossTile },
     ];
+    const bossClearItems = getOriginalLateStoryItemsForSourceEvent(input.episode, 99);
+    const bossDefeatEvent: StoryScenarioBossDefeatEvent | undefined = bossClearItems.length > 0 ? {
+        id: `${input.dungeonId}_boss_clear_99`,
+        originalSource: `MAP/${ep}set.arc:${ep}.evt`,
+        originalEventId: 'EVENT 99',
+        trigger: `ALL CHARDEAD 700 ${bossClearItems.map((item) => `GETITEM ${item.originalItemId}`).join(' ')} SCENECLEAR`,
+        runtimeFlag: objectiveRuntimeFlag,
+        rewards: bossClearItems.map((item) => ({ type: 'item' as const, itemId: item.currentItemId, originalItemId: item.originalItemId })),
+    } : undefined;
 
     return {
         dungeonId: input.dungeonId,
@@ -179,6 +199,7 @@ function lateScenarioSequence(input: {
             cache.originalItemId,
             cache.itemId
         )),
+        bossDefeatEvent,
         bossDefeat: [
             ...(input.bossDefeatDialogues?.map((dialogue) => ({
                 kind: 'dialogue' as const,

@@ -1,10 +1,22 @@
 {
   "items": [
     {
+      "originalItemId": 976,
+      "currentItemId": "shadow_cloak",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 24, "dungeonId": "astaroth_gate", "setArc": "MAP/24set.arc", "eventMember": "24.evt", "eventNumber": 99 }]
+    },
+    {
       "originalItemId": 980,
       "currentItemId": "web_66_51",
       "rewardKind": "relic",
       "sourceEvents": [{ "episode": 24, "dungeonId": "astaroth_gate", "setArc": "MAP/24set.arc", "eventMember": "24.evt", "eventNumber": 91 }]
+    },
+    {
+      "originalItemId": 984,
+      "currentItemId": "corrupted_blade",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 23, "dungeonId": "beelzebuth_hall", "setArc": "MAP/23set.arc", "eventMember": "23.evt", "eventNumber": 99 }]
     },
     {
       "originalItemId": 986,

@@ -41,6 +41,12 @@ export function requireOriginalLateStoryItem(originalItemId: number): OriginalLa
     return item;
 }
 
+export function getOriginalLateStoryItemsForSourceEvent(episode: number, eventNumber: number): OriginalLateStoryItemRecord[] {
+    return ORIGINAL_LATE_STORY_ITEMS.filter((item) =>
+        item.sourceEvents.some((source) => source.episode === episode && source.eventNumber === eventNumber)
+    );
+}
+
 export function getOriginalLateStoryItemIds(): number[] {
     return ORIGINAL_LATE_STORY_ITEMS.map((item) => item.originalItemId);
 }

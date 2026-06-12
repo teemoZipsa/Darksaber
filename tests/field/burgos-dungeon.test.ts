@@ -51,6 +51,7 @@ class ImageStub {
 
 const MONSTER_PUBLIC_PATH = ['public', ...MONSTER_SPRITE_PATH.split('/').filter(Boolean)];
 const ETNA_VOLCANO_DUNGEON_ID = 'etna_volcano';
+const BEELZEBUTH_HALL_DUNGEON_ID = 'beelzebuth_hall';
 const ARCADIA_PLAIN_DUNGEON_ID = 'arcadia_plain';
 const CACAORA_HIGHLAND_DUNGEON_ID = 'cacaora_highland';
 const REMOTE_VILLAGE_DUNGEON_ID = 'remote_village';
@@ -1080,6 +1081,22 @@ test('Etna Ganomas defeat plays original sword event and clears only the dungeon
     assert.ok(harness.logs.includes("%S님이 전설의 보검'을 얻었습니다."));
     assert.ok(harness.logs.includes('시나리오 클리어'));
     assert.ok(harness.logs.includes('에트나 화산 목표 달성. 다른 마을로 생환하면 3화가 완료됩니다.'));
+});
+
+test('late story boss clear GETITEM rewards are granted on boss defeat', () => {
+    const boss = new Enemy('story_beelzebuth_hall_boss', 19, 28, '벨제뷔트', 9, '#7a3150', 'boss');
+    boss.isBoss = true;
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    raidSession.startDungeonEncounter(BEELZEBUTH_HALL_DUNGEON_ID);
+    const harness = createStoryScenarioHarness({ raidSession });
+
+    harness.controller.completeDungeonIfBossDefeated(boss);
+
+    assert.equal(raidSession.isDungeonCleared(BEELZEBUTH_HALL_DUNGEON_ID), true);
+    assert.deepEqual(harness.rewardItemIds, ['corrupted_blade']);
+    assert.ok(harness.logs.some((entry) => entry.includes('타락한 검')));
+    assert.ok(harness.logs.includes('시나리오 클리어'));
 });
 
 test('Airship objective completion keeps variant monsters as optional encounters', () => {

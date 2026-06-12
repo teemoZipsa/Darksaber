@@ -9,6 +9,7 @@ import {
 } from '../../data/StoryScenarioFieldEventPlacement';
 import {
     getStoryScenarioEventSequence,
+    type StoryScenarioEventSequence,
     type StoryScenarioEventStep,
     type StoryScenarioFieldEvent,
 } from '../../data/StoryScenarioEventData';
@@ -382,6 +383,7 @@ export class WorldStoryScenarioController {
         if (eventSequence?.objectiveRuntimeFlag) {
             this.context.raidSession.setScenarioFlag(dungeonId, eventSequence.objectiveRuntimeFlag);
         }
+        if (eventSequence?.bossDefeatEvent) this.applyBossDefeatEventRewards(dungeonId, eventSequence.bossDefeatEvent);
         if (options.clearEnemies ?? true) this.context.setFieldEnemies([]);
         const completedInterior = this.activeInterior?.dungeonId === dungeonId ? this.activeInterior : null;
         if (this.activeInterior?.dungeonId === dungeonId) {
@@ -578,8 +580,20 @@ export class WorldStoryScenarioController {
         worldMap.setInspectMarkers([...fieldEventMarkers, ...scenarioMarkers]);
     }
 
+    private applyBossDefeatEventRewards(dungeonId: string, event: NonNullable<StoryScenarioEventSequence['bossDefeatEvent']>): void {
+        const key = this.fieldEventKey(dungeonId, event.id);
+        if (this.completedFieldEventKeys.has(key)) return;
+        this.completedFieldEventKeys.add(key);
+        this.context.raidSession.setScenarioFlag(dungeonId, event.runtimeFlag);
+        this.applyScenarioRewards(event.rewards);
+    }
+
     private applyFieldEventRewards(event: StoryScenarioFieldEvent): void {
-        for (const reward of event.rewards ?? []) {
+        this.applyScenarioRewards(event.rewards);
+    }
+
+    private applyScenarioRewards(rewards: StoryScenarioFieldEvent['rewards']): void {
+        for (const reward of rewards ?? []) {
             if (reward.type === 'gold') {
                 this.context.playerData.addGold(reward.amount);
                 this.context.log(formatT('story.event.reward.gold', { amount: reward.amount }));
