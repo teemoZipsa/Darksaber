@@ -1,4 +1,5 @@
 import type { SkillTerrainContext } from '../combat/SkillEffectResolver';
+import { t } from '../i18n/LanguageManager';
 import type { TileType } from '../map/Tile';
 import type { TilePoint } from './FieldPathing';
 import { tileKey } from './FieldPathing';
@@ -48,9 +49,9 @@ export function getActorAttackTargetFailure(input: ActorAttackTargetFailureInput
 
 export function getAttackFailureMessage(failure: AttackTargetFailure): string {
     switch (failure) {
-        case 'tooClose': return '너무 가까운 대상입니다.';
-        case 'blocked': return '공격 경로가 막혔습니다.';
-        case 'outOfRange': return '공격 사거리 밖입니다.';
+        case 'tooClose': return t('field.attackFailure.tooClose');
+        case 'blocked': return t('field.attackFailure.blocked');
+        case 'outOfRange': return t('field.attackFailure.outOfRange');
     }
 }
 

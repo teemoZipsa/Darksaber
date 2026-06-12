@@ -8,6 +8,7 @@ import { Character } from '../../src/character/Character';
 import { Player } from '../../src/entity/Player';
 import { getSkill } from '../../src/data/SkillDB';
 import type { FieldActor } from '../../src/field/FieldTypes';
+import { i18n } from '../../src/i18n/LanguageManager';
 
 class ImageStub {
     public src = '';
@@ -50,7 +51,11 @@ test('field targeting distinguishes too close, blocked, and out of range attacks
         target: { x: 5, y: 0 },
     }), 'outOfRange');
 
+    i18n.setLanguage('ko');
     assert.equal(getAttackFailureMessage('blocked'), '공격 경로가 막혔습니다.');
+    i18n.setLanguage('en');
+    assert.equal(getAttackFailureMessage('blocked'), 'Attack path is blocked.');
+    i18n.setLanguage('ko');
 });
 
 test('field targeting resolves pattern skill candidates and terrain context by callbacks', () => {
