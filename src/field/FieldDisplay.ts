@@ -1,5 +1,6 @@
 import type { EnemyRole } from './EnemyAI';
 import type { TacticalMarker } from './TacticalMarkers';
+import { t } from '../i18n/LanguageManager';
 
 export function formatRaidTime(seconds: number): string {
     const total = Math.max(0, Math.floor(seconds));
@@ -8,15 +9,15 @@ export function formatRaidTime(seconds: number): string {
 
 export function getEnemyRoleLabel(role: EnemyRole): string {
     switch (role) {
-        case 'tank': return '탱커형 몬스터';
-        case 'archer': return '궁수형 몬스터';
-        case 'healer': return '힐러형 몬스터';
-        case 'coward': return '도망형 몬스터';
-        case 'support': return '지원형 몬스터';
-        case 'boss': return '보스 몬스터';
+        case 'tank': return t('field.enemyRole.tank');
+        case 'archer': return t('field.enemyRole.archer');
+        case 'healer': return t('field.enemyRole.healer');
+        case 'coward': return t('field.enemyRole.coward');
+        case 'support': return t('field.enemyRole.support');
+        case 'boss': return t('field.enemyRole.boss');
         case 'bruiser':
         default:
-            return '근접형 몬스터';
+            return t('field.enemyRole.bruiser');
     }
 }
 
