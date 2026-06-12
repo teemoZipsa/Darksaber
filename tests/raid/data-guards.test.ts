@@ -172,7 +172,7 @@ test('story episodes 1 through 31 are chained and fully localized', () => {
     assert.equal(STORY_QUESTS.length, 31);
     assert.deepEqual(
         STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'soloInterior').map((scenario) => scenario.episode),
-        [1, 2, 3, 7, 13, 18, 19, 20, 21, 22]
+        [1, 2, 3, 7, 13, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
     );
     assert.deepEqual(
         STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'vehicle').map((scenario) => scenario.episode),

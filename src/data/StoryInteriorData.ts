@@ -553,6 +553,138 @@ const FLAME_CASTLE_TILE_OVERRIDES: StoryInteriorTileOverride[] = [
     ...horizontalOverrides(27, 15, 24, TileType.ROAD),
 ];
 
+const BEELZEBUTH_HALL_GUARDS: TilePoint[] = [
+    { x: 13, y: 6 }, { x: 11, y: 10 }, { x: 26, y: 6 }, { x: 28, y: 10 },
+    { x: 13, y: 34 }, { x: 26, y: 34 }, { x: 11, y: 31 }, { x: 28, y: 31 },
+    { x: 5, y: 14 }, { x: 15, y: 10 }, { x: 24, y: 10 }, { x: 19, y: 11 },
+    { x: 5, y: 27 }, { x: 15, y: 30 }, { x: 24, y: 30 }, { x: 11, y: 25 },
+    { x: 10, y: 15 }, { x: 28, y: 14 }, { x: 14, y: 18 }, { x: 24, y: 18 },
+    { x: 19, y: 17 }, { x: 29, y: 25 }, { x: 19, y: 24 },
+];
+
+const ASTAROTH_GATE_GUARDS: TilePoint[] = [
+    { x: 8, y: 31 }, { x: 15, y: 33 }, { x: 19, y: 33 }, { x: 23, y: 33 },
+    { x: 31, y: 31 }, { x: 13, y: 29 }, { x: 26, y: 29 }, { x: 20, y: 26 },
+    { x: 20, y: 22 }, { x: 24, y: 19 }, { x: 15, y: 19 }, { x: 8, y: 14 },
+    { x: 31, y: 14 }, { x: 13, y: 15 }, { x: 26, y: 15 }, { x: 19, y: 9 },
+];
+
+const NERGAL_DEPTHS_GUARDS: TilePoint[] = [
+    { x: 14, y: 32 }, { x: 25, y: 32 }, { x: 20, y: 32 }, { x: 14, y: 28 },
+    { x: 25, y: 28 }, { x: 20, y: 28 }, { x: 6, y: 23 }, { x: 32, y: 23 },
+    { x: 37, y: 28 }, { x: 37, y: 33 }, { x: 37, y: 37 }, { x: 2, y: 28 },
+    { x: 2, y: 33 }, { x: 2, y: 37 }, { x: 19, y: 22 }, { x: 6, y: 17 },
+    { x: 2, y: 20 }, { x: 2, y: 9 }, { x: 2, y: 14 }, { x: 37, y: 9 },
+    { x: 37, y: 14 }, { x: 37, y: 20 }, { x: 33, y: 17 }, { x: 16, y: 15 },
+    { x: 23, y: 15 }, { x: 19, y: 18 }, { x: 19, y: 11 }, { x: 15, y: 6 },
+    { x: 24, y: 6 },
+];
+
+const BEAST_MARK_SHRINE_GUARDS: TilePoint[] = [
+    { x: 5, y: 17 }, { x: 17, y: 16 }, { x: 28, y: 16 }, { x: 11, y: 23 },
+    { x: 36, y: 26 }, { x: 10, y: 30 }, { x: 25, y: 30 }, { x: 23, y: 21 },
+    { x: 4, y: 3 }, { x: 10, y: 7 }, { x: 18, y: 2 }, { x: 28, y: 5 },
+];
+
+const CHOSEN_MARK_SHRINE_GUARDS: TilePoint[] = [
+    { x: 17, y: 22 }, { x: 4, y: 19 }, { x: 10, y: 16 }, { x: 26, y: 23 },
+    { x: 30, y: 17 }, { x: 24, y: 9 }, { x: 16, y: 3 }, { x: 5, y: 6 },
+    { x: 34, y: 4 }, { x: 36, y: 26 }, { x: 36, y: 14 }, { x: 22, y: 2 },
+];
+
+const ERGION_KEEP_GUARDS: TilePoint[] = [
+    { x: 12, y: 28 }, { x: 12, y: 23 }, { x: 12, y: 18 }, { x: 12, y: 12 },
+    { x: 4, y: 11 }, { x: 6, y: 31 }, { x: 33, y: 31 }, { x: 27, y: 28 },
+    { x: 27, y: 23 }, { x: 27, y: 18 }, { x: 29, y: 12 }, { x: 35, y: 11 },
+    { x: 13, y: 5 }, { x: 26, y: 5 }, { x: 19, y: 15 }, { x: 19, y: 24 },
+    { x: 19, y: 31 },
+];
+
+const MARTANI_BASTION_GUARDS: TilePoint[] = [
+    { x: 19, y: 8 }, { x: 12, y: 12 }, { x: 11, y: 26 }, { x: 20, y: 30 },
+    { x: 20, y: 20 }, { x: 31, y: 20 }, { x: 40, y: 11 }, { x: 41, y: 28 },
+    { x: 48, y: 20 }, { x: 22, y: 14 }, { x: 26, y: 35 }, { x: 39, y: 16 },
+    { x: 39, y: 23 },
+];
+
+const BLIN_WATCH_GUARDS: TilePoint[] = [
+    { x: 7, y: 32 }, { x: 12, y: 35 }, { x: 32, y: 32 }, { x: 28, y: 36 },
+    { x: 7, y: 8 }, { x: 11, y: 5 }, { x: 29, y: 7 }, { x: 33, y: 4 },
+    { x: 7, y: 17 }, { x: 33, y: 17 }, { x: 19, y: 12 }, { x: 20, y: 29 },
+    { x: 12, y: 19 }, { x: 28, y: 19 }, { x: 20, y: 22 },
+];
+
+const DEMON_FIXERS_DEN_GUARDS: TilePoint[] = [
+    { x: 11, y: 44 }, { x: 16, y: 39 }, { x: 26, y: 34 }, { x: 9, y: 34 },
+    { x: 36, y: 26 }, { x: 14, y: 23 }, { x: 30, y: 21 }, { x: 4, y: 19 },
+    { x: 22, y: 17 }, { x: 30, y: 13 }, { x: 3, y: 9 }, { x: 37, y: 8 },
+    { x: 15, y: 4 }, { x: 29, y: 2 },
+];
+
+interface LateOriginalInteriorConfig {
+    dungeonId: string;
+    displayNameKey: string;
+    objectiveKey: string;
+    width: number;
+    height: number;
+    theme: StoryInteriorTheme;
+    entryTile: TilePoint;
+    playerStart: TilePoint;
+    bossTile: TilePoint;
+    guardTiles: TilePoint[];
+    rooms: StoryInteriorRoom[];
+    cacheTiles: TilePoint[];
+    characterMarkers?: Array<{ tile: TilePoint; labelKey: string }>;
+    blockedPaths?: StoryInteriorBlockedPath[];
+}
+
+function cloneTile(tile: TilePoint): TilePoint {
+    return { x: tile.x, y: tile.y };
+}
+
+function buildLateOriginalInterior(config: LateOriginalInteriorConfig): StoryInteriorLayout {
+    const episode = config.objectiveKey.match(/ep(\d+)/)?.[1] ?? '23';
+    const blockedPaths = config.blockedPaths ?? [];
+    return {
+        dungeonId: config.dungeonId,
+        displayNameKey: config.displayNameKey,
+        width: config.width,
+        height: config.height,
+        theme: config.theme,
+        entryTile: cloneTile(config.entryTile),
+        playerStart: cloneTile(config.playerStart),
+        guardTiles: config.guardTiles.map(cloneTile),
+        bossTile: cloneTile(config.bossTile),
+        objectiveKey: config.objectiveKey,
+        rooms: [
+            { id: 'entry', nameKey: 'story.interior.room.entryHall', x: Math.max(1, config.entryTile.x - 3), y: Math.max(1, config.entryTile.y - 4), width: 7, height: 5 },
+            ...config.rooms.map((room) => ({ ...room })),
+            { id: 'bossRoom', nameKey: 'story.interior.room.bossRoom', x: Math.max(1, config.bossTile.x - 4), y: Math.max(1, config.bossTile.y - 3), width: 9, height: 7 },
+        ],
+        props: [
+            { kind: 'torch', tile: { x: Math.max(1, config.entryTile.x - 2), y: Math.max(1, config.entryTile.y - 3) } },
+            { kind: 'torch', tile: { x: Math.min(config.width - 2, config.entryTile.x + 2), y: Math.max(1, config.entryTile.y - 3) } },
+            ...config.cacheTiles.map((tile) => ({ kind: 'crate' as const, tile: cloneTile(tile), labelKey: `story.event.ep${episode}.cache.marker` })),
+            ...(config.characterMarkers ?? []).map((marker) => ({ kind: 'banner' as const, tile: cloneTile(marker.tile), labelKey: marker.labelKey })),
+            { kind: 'sealedDoor', tile: { x: config.bossTile.x, y: Math.min(config.height - 2, config.bossTile.y + 2) }, labelKey: 'story.interior.prop.sealedDoor' },
+            { kind: 'bossSeal', tile: cloneTile(config.bossTile), labelKey: 'story.interior.prop.bossSeal' },
+            { kind: 'throne', tile: { x: config.bossTile.x, y: Math.max(1, config.bossTile.y - 1) } },
+        ],
+        doors: [
+            { id: `${config.dungeonId}_front`, tile: cloneTile(config.entryTile), connects: ['entry'], originalTile: cloneTile(config.entryTile) },
+            { id: `${config.dungeonId}_boss_seal`, tile: { x: config.bossTile.x, y: Math.min(config.height - 2, config.bossTile.y + 2) }, connects: ['route', 'bossRoom'], originalTile: cloneTile(config.bossTile), sealed: true },
+        ],
+        blockedPaths: blockedPaths.map((path) => ({ ...path, tile: cloneTile(path.tile), originalTile: path.originalTile ? cloneTile(path.originalTile) : undefined })),
+        walkableAreas: config.rooms.map((room) => ({ ...room })),
+        tileOverrides: [
+            { tile: cloneTile(config.entryTile), type: TileType.DUNGEON_ENTRANCE },
+            ...blockedPaths.map((path) => ({ tile: cloneTile(path.tile), type: TileType.WALL })),
+            ...verticalOverrides(config.playerStart.x, Math.min(config.playerStart.y, config.bossTile.y), Math.max(config.playerStart.y, config.bossTile.y), TileType.ROAD),
+            ...horizontalOverrides(config.bossTile.y, Math.min(config.playerStart.x, config.bossTile.x), Math.max(config.playerStart.x, config.bossTile.x), TileType.ROAD),
+        ],
+    };
+}
+
 const BURGOS_CASTLE_LAYOUT: StoryInteriorLayout = {
     dungeonId: 'burgos_castle',
     displayNameKey: 'story.interior.burgos_castle.name',
@@ -1015,6 +1147,208 @@ const FLAME_CASTLE_LAYOUT: StoryInteriorLayout = {
     tileOverrides: FLAME_CASTLE_TILE_OVERRIDES.map((override) => ({ ...override, tile: { ...override.tile } })),
 };
 
+const BEELZEBUTH_HALL_LAYOUT = buildLateOriginalInterior({
+    dungeonId: 'beelzebuth_hall',
+    displayNameKey: 'story.interior.beelzebuth_hall.name',
+    objectiveKey: 'story.interior.beelzebuth_hall.objective',
+    width: 40,
+    height: 40,
+    theme: 'ament',
+    entryTile: { x: 19, y: 38 },
+    playerStart: { x: 19, y: 31 },
+    bossTile: { x: 21, y: 15 },
+    guardTiles: BEELZEBUTH_HALL_GUARDS,
+    rooms: [
+        { id: 'beelzebuthNorthVault', nameKey: 'story.interior.room.beelzebuthNorthVault', x: 10, y: 5, width: 20, height: 10 },
+        { id: 'beelzebuthThroneHall', nameKey: 'story.interior.room.beelzebuthThroneHall', x: 5, y: 14, width: 29, height: 12 },
+        { id: 'beelzebuthRelicHall', nameKey: 'story.interior.room.beelzebuthRelicHall', x: 5, y: 24, width: 25, height: 8 },
+        { id: 'beelzebuthEntry', nameKey: 'story.interior.room.entryHall', x: 10, y: 31, width: 20, height: 8 },
+    ],
+    cacheTiles: [{ x: 19, y: 19 }, { x: 15, y: 27 }],
+    characterMarkers: [
+        { tile: { x: 18, y: 15 }, labelKey: 'story.event.speaker.nergal' },
+        { tile: { x: 21, y: 15 }, labelKey: 'story.event.speaker.beelzebuth' },
+    ],
+});
+
+const ASTAROTH_GATE_LAYOUT = buildLateOriginalInterior({
+    dungeonId: 'astaroth_gate',
+    displayNameKey: 'story.interior.astaroth_gate.name',
+    objectiveKey: 'story.interior.astaroth_gate.objective',
+    width: 40,
+    height: 38,
+    theme: 'ament',
+    entryTile: { x: 19, y: 36 },
+    playerStart: { x: 19, y: 33 },
+    bossTile: { x: 19, y: 7 },
+    guardTiles: ASTAROTH_GATE_GUARDS,
+    rooms: [
+        { id: 'astarothOuterGate', nameKey: 'story.interior.room.astarothOuterGate', x: 7, y: 29, width: 26, height: 7 },
+        { id: 'astarothProcessional', nameKey: 'story.interior.room.astarothProcessional', x: 12, y: 18, width: 16, height: 12 },
+        { id: 'astarothTwinReliquary', nameKey: 'story.interior.room.astarothTwinReliquary', x: 7, y: 10, width: 26, height: 9 },
+        { id: 'astarothFinalGate', nameKey: 'story.interior.room.astarothFinalGate', x: 15, y: 5, width: 9, height: 7 },
+    ],
+    cacheTiles: [{ x: 16, y: 26 }, { x: 27, y: 11 }],
+    characterMarkers: [{ tile: { x: 19, y: 7 }, labelKey: 'story.event.speaker.astaroth' }],
+});
+
+const NERGAL_DEPTHS_LAYOUT = buildLateOriginalInterior({
+    dungeonId: 'nergal_depths',
+    displayNameKey: 'story.interior.nergal_depths.name',
+    objectiveKey: 'story.interior.nergal_depths.objective',
+    width: 40,
+    height: 40,
+    theme: 'ament',
+    entryTile: { x: 19, y: 38 },
+    playerStart: { x: 19, y: 23 },
+    bossTile: { x: 19, y: 7 },
+    guardTiles: NERGAL_DEPTHS_GUARDS,
+    rooms: [
+        { id: 'nergalDepthsSouth', nameKey: 'story.interior.room.nergalDepthsSouth', x: 1, y: 27, width: 38, height: 12 },
+        { id: 'nergalDepthsCrossing', nameKey: 'story.interior.room.nergalDepthsCrossing', x: 1, y: 15, width: 38, height: 13 },
+        { id: 'nergalDepthsWestCells', nameKey: 'story.interior.room.nergalDepthsCells', x: 1, y: 8, width: 8, height: 13 },
+        { id: 'nergalDepthsEastCells', nameKey: 'story.interior.room.nergalDepthsCells', x: 31, y: 8, width: 8, height: 13 },
+        { id: 'nergalDepthsTrialHall', nameKey: 'story.interior.room.nergalDepthsTrialHall', x: 14, y: 5, width: 12, height: 11 },
+    ],
+    cacheTiles: [{ x: 12, y: 18 }, { x: 12, y: 32 }],
+    characterMarkers: [{ tile: { x: 19, y: 7 }, labelKey: 'story.event.speaker.nergal' }],
+});
+
+const BEAST_MARK_SHRINE_LAYOUT = buildLateOriginalInterior({
+    dungeonId: 'beast_mark_shrine',
+    displayNameKey: 'story.interior.beast_mark_shrine.name',
+    objectiveKey: 'story.interior.beast_mark_shrine.objective',
+    width: 40,
+    height: 40,
+    theme: 'temple',
+    entryTile: { x: 15, y: 38 },
+    playerStart: { x: 15, y: 37 },
+    bossTile: { x: 36, y: 3 },
+    guardTiles: BEAST_MARK_SHRINE_GUARDS,
+    rooms: [
+        { id: 'beastMarkSouthSeal', nameKey: 'story.interior.room.beastMarkSouthSeal', x: 2, y: 28, width: 34, height: 10 },
+        { id: 'beastMarkCentralShrine', nameKey: 'story.interior.room.beastMarkCentralShrine', x: 4, y: 15, width: 34, height: 12 },
+        { id: 'beastMarkNorthShrine', nameKey: 'story.interior.room.beastMarkNorthShrine', x: 3, y: 1, width: 35, height: 9 },
+    ],
+    cacheTiles: [{ x: 15, y: 21 }],
+    characterMarkers: [{ tile: { x: 36, y: 3 }, labelKey: 'story.event.speaker.markGuardian' }],
+});
+
+const CHOSEN_MARK_SHRINE_LAYOUT = buildLateOriginalInterior({
+    dungeonId: 'chosen_mark_shrine',
+    displayNameKey: 'story.interior.chosen_mark_shrine.name',
+    objectiveKey: 'story.interior.chosen_mark_shrine.objective',
+    width: 40,
+    height: 30,
+    theme: 'temple',
+    entryTile: { x: 20, y: 28 },
+    playerStart: { x: 20, y: 25 },
+    bossTile: { x: 20, y: 16 },
+    guardTiles: CHOSEN_MARK_SHRINE_GUARDS,
+    rooms: [
+        { id: 'chosenMarkSouthSeal', nameKey: 'story.interior.room.chosenMarkSouthSeal', x: 3, y: 18, width: 34, height: 9 },
+        { id: 'chosenMarkCentralShrine', nameKey: 'story.interior.room.chosenMarkCentralShrine', x: 4, y: 12, width: 33, height: 8 },
+        { id: 'chosenMarkSealBridge', nameKey: 'story.interior.room.chosenMarkCentralShrine', x: 16, y: 8, width: 9, height: 6 },
+        { id: 'chosenMarkNorthShrine', nameKey: 'story.interior.room.chosenMarkNorthShrine', x: 4, y: 1, width: 33, height: 9 },
+    ],
+    cacheTiles: [{ x: 16, y: 6 }, { x: 31, y: 17 }],
+    characterMarkers: [{ tile: { x: 20, y: 16 }, labelKey: 'story.event.speaker.markGuardian' }],
+});
+
+const ERGION_KEEP_LAYOUT = buildLateOriginalInterior({
+    dungeonId: 'ergion_keep',
+    displayNameKey: 'story.interior.ergion_keep.name',
+    objectiveKey: 'story.interior.ergion_keep.objective',
+    width: 40,
+    height: 36,
+    theme: 'castle',
+    entryTile: { x: 14, y: 34 },
+    playerStart: { x: 14, y: 32 },
+    bossTile: { x: 19, y: 7 },
+    guardTiles: ERGION_KEEP_GUARDS,
+    rooms: [
+        { id: 'ergionSouthernKeep', nameKey: 'story.interior.room.ergionSouthernKeep', x: 5, y: 27, width: 30, height: 7 },
+        { id: 'ergionProcessional', nameKey: 'story.interior.room.ergionProcessional', x: 10, y: 4, width: 20, height: 29 },
+        { id: 'ergionWestReliquary', nameKey: 'story.interior.room.ergionCrossHall', x: 2, y: 5, width: 12, height: 7 },
+        { id: 'ergionCrossHall', nameKey: 'story.interior.room.ergionCrossHall', x: 2, y: 10, width: 35, height: 9 },
+    ],
+    cacheTiles: [{ x: 6, y: 16 }, { x: 35, y: 17 }, { x: 14, y: 31 }, { x: 2, y: 7 }],
+    characterMarkers: [
+        { tile: { x: 19, y: 7 }, labelKey: 'story.event.speaker.ergion' },
+        { tile: { x: 19, y: 13 }, labelKey: 'story.event.speaker.blin' },
+    ],
+});
+
+const MARTANI_BASTION_LAYOUT = buildLateOriginalInterior({
+    dungeonId: 'martani_bastion',
+    displayNameKey: 'story.interior.martani_bastion.name',
+    objectiveKey: 'story.interior.martani_bastion.objective',
+    width: 60,
+    height: 38,
+    theme: 'castle',
+    entryTile: { x: 14, y: 36 },
+    playerStart: { x: 14, y: 32 },
+    bossTile: { x: 19, y: 7 },
+    guardTiles: MARTANI_BASTION_GUARDS,
+    rooms: [
+        { id: 'martaniSouthBastion', nameKey: 'story.interior.room.martaniSouthBastion', x: 10, y: 26, width: 20, height: 10 },
+        { id: 'martaniCentralBastion', nameKey: 'story.interior.room.martaniCentralBastion', x: 10, y: 6, width: 40, height: 28 },
+        { id: 'martaniEastReliquary', nameKey: 'story.interior.room.martaniEastReliquary', x: 35, y: 10, width: 22, height: 18 },
+    ],
+    cacheTiles: [{ x: 35, y: 13 }, { x: 40, y: 20 }, { x: 55, y: 24 }],
+    characterMarkers: [
+        { tile: { x: 19, y: 7 }, labelKey: 'story.event.speaker.martani' },
+        { tile: { x: 19, y: 13 }, labelKey: 'story.event.speaker.blin' },
+    ],
+});
+
+const BLIN_WATCH_LAYOUT = buildLateOriginalInterior({
+    dungeonId: 'blin_watch',
+    displayNameKey: 'story.interior.blin_watch.name',
+    objectiveKey: 'story.interior.blin_watch.objective',
+    width: 40,
+    height: 38,
+    theme: 'castle',
+    entryTile: { x: 14, y: 36 },
+    playerStart: { x: 14, y: 32 },
+    bossTile: { x: 19, y: 7 },
+    guardTiles: BLIN_WATCH_GUARDS,
+    rooms: [
+        { id: 'blinLowerWatch', nameKey: 'story.interior.room.blinLowerWatch', x: 6, y: 28, width: 28, height: 9 },
+        { id: 'blinMiddleWatch', nameKey: 'story.interior.room.blinMiddleWatch', x: 6, y: 14, width: 28, height: 15 },
+        { id: 'blinUpperWatch', nameKey: 'story.interior.room.blinUpperWatch', x: 6, y: 3, width: 28, height: 12 },
+    ],
+    cacheTiles: [{ x: 15, y: 21 }, { x: 33, y: 25 }, { x: 6, y: 25 }, { x: 23, y: 12 }],
+    characterMarkers: [
+        { tile: { x: 19, y: 7 }, labelKey: 'story.event.speaker.blin' },
+        { tile: { x: 19, y: 13 }, labelKey: 'story.event.speaker.jade' },
+    ],
+});
+
+const DEMON_FIXERS_DEN_LAYOUT = buildLateOriginalInterior({
+    dungeonId: 'demon_fixers_den',
+    displayNameKey: 'story.interior.demon_fixers_den.name',
+    objectiveKey: 'story.interior.demon_fixers_den.objective',
+    width: 40,
+    height: 47,
+    theme: 'ament',
+    entryTile: { x: 14, y: 45 },
+    playerStart: { x: 14, y: 32 },
+    bossTile: { x: 19, y: 7 },
+    guardTiles: DEMON_FIXERS_DEN_GUARDS,
+    rooms: [
+        { id: 'demonFixerLowerDen', nameKey: 'story.interior.room.demonFixerLowerDen', x: 2, y: 32, width: 36, height: 14 },
+        { id: 'demonFixerMiddleDen', nameKey: 'story.interior.room.demonFixerMiddleDen', x: 2, y: 16, width: 36, height: 18 },
+        { id: 'demonFixerUpperDen', nameKey: 'story.interior.room.demonFixerUpperDen', x: 2, y: 8, width: 36, height: 10 },
+        { id: 'demonFixerSummoningDen', nameKey: 'story.interior.room.demonFixerSummoningDen', x: 14, y: 1, width: 16, height: 9 },
+    ],
+    cacheTiles: [{ x: 33, y: 17 }, { x: 8, y: 21 }, { x: 21, y: 17 }],
+    characterMarkers: [
+        { tile: { x: 19, y: 7 }, labelKey: 'story.event.speaker.demonFixer' },
+        { tile: { x: 19, y: 13 }, labelKey: 'story.event.speaker.jade' },
+    ],
+});
+
 export const STORY_INTERIOR_LAYOUTS: StoryInteriorLayout[] = [
     BURGOS_CASTLE_LAYOUT,
     ZAMORA_FORTRESS_LAYOUT,
@@ -1026,6 +1360,15 @@ export const STORY_INTERIOR_LAYOUTS: StoryInteriorLayout[] = [
     AMENT_2F_LAYOUT,
     NERGAL_CASTLE_LAYOUT,
     FLAME_CASTLE_LAYOUT,
+    BEELZEBUTH_HALL_LAYOUT,
+    ASTAROTH_GATE_LAYOUT,
+    NERGAL_DEPTHS_LAYOUT,
+    BEAST_MARK_SHRINE_LAYOUT,
+    CHOSEN_MARK_SHRINE_LAYOUT,
+    ERGION_KEEP_LAYOUT,
+    MARTANI_BASTION_LAYOUT,
+    BLIN_WATCH_LAYOUT,
+    DEMON_FIXERS_DEN_LAYOUT,
 ];
 
 export function getStoryInteriorLayout(dungeonId: string): StoryInteriorLayout | null {

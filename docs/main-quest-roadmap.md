@@ -40,15 +40,15 @@
 | 20 | `main:episode_20_ament_2f` | `ament_2f` | 실내 | 메피스토펠레스 처치 |
 | 21 | `main:episode_21_nergal_castle` | `nergal_castle` | 실내 | 네르갈 처치 |
 | 22 | `main:episode_22_flame_castle` | `flame_castle` | 실내 | 베라모드 처치 |
-| 23 | `main:episode_23_beelzebuth` | `beelzebuth_hall` | 필드 | 벨제뷔트 처치 |
-| 24 | `main:episode_24_astaroth` | `astaroth_gate` | 필드 | 아스타로스 처치 |
-| 25 | `main:episode_25_nergal_depths` | `nergal_depths` | 필드 | 네르갈 처치 |
-| 26 | `main:episode_26_beast_mark` | `beast_mark_shrine` | 필드 | 배마의 징표 수호자 처치 |
-| 27 | `main:episode_27_chosen_mark` | `chosen_mark_shrine` | 필드 | 택마의 징표 수호자 처치 |
-| 28 | `main:episode_28_ergion` | `ergion_keep` | 필드 | 에르기온 처치 |
-| 29 | `main:episode_29_martani` | `martani_bastion` | 필드 | 마르타니 처치 |
-| 30 | `main:episode_30_blin` | `blin_watch` | 필드 | 블린 처치 |
-| 31 | `main:episode_31_demon_fixers` | `demon_fixers_den` | 필드 | 마계 해결사 처치 |
+| 23 | `main:episode_23_beelzebuth` | `beelzebuth_hall` | 실내 | 벨제뷔트 처치 |
+| 24 | `main:episode_24_astaroth` | `astaroth_gate` | 실내 | 아스타로스 처치 |
+| 25 | `main:episode_25_nergal_depths` | `nergal_depths` | 실내 | 네르갈 처치 |
+| 26 | `main:episode_26_beast_mark` | `beast_mark_shrine` | 실내 | 배마의 징표 수호자 처치 |
+| 27 | `main:episode_27_chosen_mark` | `chosen_mark_shrine` | 실내 | 택마의 징표 수호자 처치 |
+| 28 | `main:episode_28_ergion` | `ergion_keep` | 실내 | 에르기온 처치 |
+| 29 | `main:episode_29_martani` | `martani_bastion` | 실내 | 마르타니 처치 |
+| 30 | `main:episode_30_blin` | `blin_watch` | 실내 | 블린 처치 |
+| 31 | `main:episode_31_demon_fixers` | `demon_fixers_den` | 실내 | 마계 해결사 처치 |
 
 ## 원작 후반 구간 기준
 

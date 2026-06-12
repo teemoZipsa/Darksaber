@@ -1023,20 +1023,31 @@ test('Flame Castle exposes original episode 22 Beramode, relic, and clear flow',
     assert.equal(flame.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
 });
 
-test('episodes 23 through 31 expose late original field scenario shells', () => {
+test('episodes 23 through 31 use original late interior routes and events', () => {
     const expected = [
-        { dungeonId: 'beelzebuth_hall', episode: 23, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [1005, 1052, 986, 1010] },
-        { dungeonId: 'astaroth_gate', episode: 24, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [980, 992, 997, 1002] },
-        { dungeonId: 'nergal_depths', episode: 25, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [1030, 1007, 1027, 1010] },
-        { dungeonId: 'beast_mark_shrine', episode: 26, events: ['EVENT 92'], items: [1168] },
-        { dungeonId: 'chosen_mark_shrine', episode: 27, events: ['EVENT 92', 'EVENT 93'], items: [1169, 1170] },
-        { dungeonId: 'ergion_keep', episode: 28, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [1104, 1108, 1111, 1113] },
-        { dungeonId: 'martani_bastion', episode: 29, events: ['EVENT 91', 'EVENT 92', 'EVENT 93'], items: [1116, 1125, 1134] },
-        { dungeonId: 'blin_watch', episode: 30, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [1119, 1128, 1137, 1143] },
-        { dungeonId: 'demon_fixers_den', episode: 31, events: ['EVENT 91', 'EVENT 92', 'EVENT 93'], items: [1122, 1131, 1140] },
+        { dungeonId: 'beelzebuth_hall', episode: 23, size: { width: 40, height: 40 }, boss: { x: 21, y: 15 }, guards: 23, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [1005, 1052, 986, 1010] },
+        { dungeonId: 'astaroth_gate', episode: 24, size: { width: 40, height: 38 }, boss: { x: 19, y: 7 }, guards: 16, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [980, 992, 997, 1002] },
+        { dungeonId: 'nergal_depths', episode: 25, size: { width: 40, height: 40 }, boss: { x: 19, y: 7 }, guards: 29, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [1030, 1007, 1027, 1010] },
+        { dungeonId: 'beast_mark_shrine', episode: 26, size: { width: 40, height: 40 }, boss: { x: 36, y: 3 }, guards: 12, events: ['EVENT 92'], items: [1168] },
+        { dungeonId: 'chosen_mark_shrine', episode: 27, size: { width: 40, height: 30 }, boss: { x: 20, y: 16 }, guards: 12, events: ['EVENT 92', 'EVENT 93'], items: [1169, 1170] },
+        { dungeonId: 'ergion_keep', episode: 28, size: { width: 40, height: 36 }, boss: { x: 19, y: 7 }, guards: 17, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [1104, 1108, 1111, 1113] },
+        { dungeonId: 'martani_bastion', episode: 29, size: { width: 60, height: 38 }, boss: { x: 19, y: 7 }, guards: 13, events: ['EVENT 91', 'EVENT 92', 'EVENT 93'], items: [1116, 1125, 1134] },
+        { dungeonId: 'blin_watch', episode: 30, size: { width: 40, height: 38 }, boss: { x: 19, y: 7 }, guards: 15, events: ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94'], items: [1119, 1128, 1137, 1143] },
+        { dungeonId: 'demon_fixers_den', episode: 31, size: { width: 40, height: 47 }, boss: { x: 19, y: 7 }, guards: 14, events: ['EVENT 91', 'EVENT 92', 'EVENT 93'], items: [1122, 1131, 1140] },
     ];
 
     for (const row of expected) {
+        const layout = getStoryInteriorLayout(row.dungeonId);
+        assert.ok(layout, `missing interior layout for ${row.dungeonId}`);
+        const map = new StoryInteriorMap(layout);
+        assert.deepEqual(map.getBoundsTiles(), row.size);
+        assert.deepEqual(layout.bossTile, row.boss);
+        assert.equal(layout.guardTiles.length, row.guards);
+        assert.equal(hasWalkablePath(map, layout.playerStart, layout.bossTile), true, row.dungeonId);
+        for (const tile of [...layout.guardTiles, layout.entryTile, layout.playerStart, layout.bossTile]) {
+            assert.equal(map.isWalkable(tile.x, tile.y), true, `${row.dungeonId}:${tile.x},${tile.y}`);
+        }
+
         const sequence = getStoryScenarioEventSequence(row.dungeonId);
         assert.ok(sequence, `missing event sequence for ${row.dungeonId}`);
         assert.equal(sequence.originalSources.sceneScript, `Wlib/scene${row.episode}.lsc`);
@@ -1046,6 +1057,12 @@ test('episodes 23 through 31 expose late original field scenario shells', () => 
         assert.deepEqual(sequence.fieldEvents.map((event) => event.originalEventId), row.events);
         assert.deepEqual(sequence.fieldEvents.map((event) => event.rewards?.[0]?.originalItemId), row.items);
         assert.ok(sequence.fieldEvents.every((event) => event.originalSource === `MAP/${String(row.episode).padStart(2, '0')}set.arc:${String(row.episode).padStart(2, '0')}.evt`));
+        for (const event of sequence.fieldEvents) {
+            for (const tile of event.triggerTiles) {
+                assert.equal(map.isWalkable(tile.x, tile.y), true, `${row.dungeonId}:${event.id}:${tile.x},${tile.y}`);
+                assert.equal(hasWalkablePath(map, layout.playerStart, tile), true, `${row.dungeonId}:${event.id}:${tile.x},${tile.y}`);
+            }
+        }
     }
 });
 
