@@ -1,4 +1,4 @@
-import { t } from '../../i18n/LanguageManager';
+import { formatT, t } from '../../i18n/LanguageManager';
 import type { PartyManager } from '../../character/PartyManager';
 import type { PlayerData } from '../../data/PlayerData';
 import { HybridMarketService } from '../../data/HybridMarketService';
@@ -95,7 +95,7 @@ export class WorldTownSession {
         }
         this.playerData.pendingRestMenuId = menu.id;
         this.playerData.save();
-        this.log(`${t(menu.nameKey)} 예약`);
+        this.log(formatT('town.log.restReserved', { menu: t(menu.nameKey) }));
         return true;
     }
 
@@ -136,7 +136,7 @@ export class WorldTownSession {
             if (menu) applyStatusesToCarrier(character, this.createRestStatuses(menu));
         }
         if (menu) {
-            this.log(`${t(menu.nameKey)} 효과 적용`);
+            this.log(formatT('town.log.restApplied', { menu: t(menu.nameKey) }));
             this.playerData.pendingRestMenuId = null;
             this.playerData.save();
         }
@@ -188,18 +188,18 @@ export class WorldTownSession {
         };
         this.ui.getShopUI().onBuy = (item, price) => {
             if (!this.playerData.spendGold(price)) {
-                this.log('골드가 부족합니다.');
+                this.log(t('town.log.noGold'));
                 return false;
             }
             const placed = this.gameManager.inventory.autoPlace(item);
             if (!placed) {
                 this.playerData.addGold(price);
-                this.log('배낭 공간이 부족합니다.');
+                this.log(t('town.log.inventoryFull'));
                 return false;
             }
             this.marketService.recordBuy(this.ui.getCurrentTown()?.id, item.id);
             this.playerData.save();
-            this.log(`${item.nameKr} 구매`);
+            this.log(formatT('town.log.itemBought', { item: item.nameKr }));
             return true;
         };
         this.ui.getShopUI().onSell = (placed, sourceGrid, price) => {
@@ -209,7 +209,7 @@ export class WorldTownSession {
             this.playerData.addGold(price);
             this.marketService.recordSell(this.ui.getCurrentTown()?.id, placed.item.id, quantity);
             this.playerData.save();
-            this.log(`${placed.item.nameKr} 판매 +${price}G`);
+            this.log(formatT('town.log.itemSold', { item: placed.item.nameKr, price }));
             return true;
         };
         this.ui.getPendingRestMenuId = () => this.playerData.pendingRestMenuId;

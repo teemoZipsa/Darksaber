@@ -8,6 +8,7 @@ import { GridInventory } from '../../src/inventory/GridInventory';
 import { WorldTownSession } from '../../src/engine/world/WorldTownSession';
 import { TownUI, TOWN_DEPLOY_CLICK_GUARD_MS } from '../../src/ui/TownUI';
 import type { TownInfo } from '../../src/map/BiomeMask';
+import { i18n, type Language } from '../../src/i18n/LanguageManager';
 
 class ImageStub {
     public src = '';
@@ -27,6 +28,7 @@ const KAOSIA: TownInfo = {
 };
 
 test('world town session purchases pending rest and treats active party injuries', () => {
+    const previousLang: Language = i18n.lang;
     const party = new PartyManager();
     const character = new Character('hero-1', 'Hero', 'infantry');
     party.addToRoster(character);
@@ -46,16 +48,26 @@ test('world town session purchases pending rest and treats active party injuries
         log: (message) => logs.push(message),
     });
 
-    assert.equal(session.purchaseRestMenu('hearty_breakfast'), true);
-    assert.equal(playerData.pendingRestMenuId, 'hearty_breakfast');
-    assert.ok(character.statuses.some((status) => status.sourceType === 'rest'));
+    try {
+        i18n.lang = 'ko';
+        assert.equal(session.purchaseRestMenu('hearty_breakfast'), true);
+        assert.equal(playerData.pendingRestMenuId, 'hearty_breakfast');
+        assert.ok(character.statuses.some((status) => status.sourceType === 'rest'));
+        assert.ok(logs.some((message) => message.includes('예약')));
 
-    character.statuses = [createStatus('injury')];
-    const goldBeforeTreatment = playerData.gold;
-    assert.equal(session.treatActivePartyInjuries(), true);
-    assert.equal(hasStatus(character.statuses, 'injury'), false);
-    assert.equal(playerData.gold < goldBeforeTreatment, true);
-    assert.ok(logs.length > 0);
+        i18n.lang = 'en';
+        session.applyPendingRestForRaidStart();
+        assert.ok(logs.some((message) => message.includes('applied')));
+
+        character.statuses = [createStatus('injury')];
+        const goldBeforeTreatment = playerData.gold;
+        assert.equal(session.treatActivePartyInjuries(), true);
+        assert.equal(hasStatus(character.statuses, 'injury'), false);
+        assert.equal(playerData.gold < goldBeforeTreatment, true);
+        assert.ok(logs.length > 0);
+    } finally {
+        i18n.lang = previousLang;
+    }
 });
 
 test('town deploy ignores click-through immediately after opening', () => {
