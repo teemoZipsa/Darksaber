@@ -1,4 +1,5 @@
 import type { TilePoint } from '../field/FieldPathing';
+import { requireOriginalLateStoryItem, type OriginalLateStoryItemRecord } from './OriginalLateStoryItems';
 import ORIGINAL_LATE_STORY_FACTS_JSON from './content/original-late-story-facts.json';
 
 export interface OriginalLateStoryArea {
@@ -71,11 +72,24 @@ export function getOriginalLateStoryGuardTiles(episode: number): TilePoint[] {
     return requireOriginalLateStoryFact(episode).guardAreas.map(cloneTileFromArea);
 }
 
-export function getOriginalLateStoryCacheEvents(episode: number): Array<{ eventNumber: number; tile: TilePoint; originalItemId: number; itemId: string }> {
-    return requireOriginalLateStoryFact(episode).cacheEvents.map((event) => ({
-        eventNumber: event.eventNumber,
-        tile: { x: event.x, y: event.y },
-        originalItemId: event.originalItemId,
-        itemId: event.currentItemId,
-    }));
+export function getOriginalLateStoryCacheEvents(episode: number): Array<{
+    eventNumber: number;
+    tile: TilePoint;
+    originalItemId: number;
+    itemId: string;
+    originalItem: OriginalLateStoryItemRecord;
+}> {
+    return requireOriginalLateStoryFact(episode).cacheEvents.map((event) => {
+        const originalItem = requireOriginalLateStoryItem(event.originalItemId);
+        if (originalItem.currentItemId !== event.currentItemId) {
+            throw new Error(`Original item ${event.originalItemId} maps to ${originalItem.currentItemId}, not ${event.currentItemId}`);
+        }
+        return {
+            eventNumber: event.eventNumber,
+            tile: { x: event.x, y: event.y },
+            originalItemId: event.originalItemId,
+            itemId: event.currentItemId,
+            originalItem,
+        };
+    });
 }

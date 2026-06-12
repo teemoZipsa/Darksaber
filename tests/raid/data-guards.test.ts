@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
 import { getMasterClass, isMasterClassLineId } from '../../src/data/ClassTree';
 import { getItemDef, ITEMS } from '../../src/data/ItemDB';
+import { getOriginalLateStoryCacheEvents } from '../../src/data/OriginalLateStoryFacts';
+import {
+    ORIGINAL_LATE_STORY_ITEMS,
+    getOriginalLateStoryItem,
+    getOriginalLateStoryItemIds,
+} from '../../src/data/OriginalLateStoryItems';
 import {
     GENERAL_MONSTER_IDS,
     FINAL_STORY_MONSTER_IDS,
@@ -118,6 +124,32 @@ test('shop and original item data expose guarded equipment fields', () => {
 
     assert.equal(getShopItems('master_sanctum', 'shrine').some(({ item }) => item.slot === 'gem'), true);
     assert.equal(getShopItems('master_sanctum', 'specialty_trader').some(({ item }) => item.slot === 'gem'), false);
+});
+
+test('late original story reward item ledger covers every GETITEM cache event', () => {
+    const seenOriginalItemIds = new Set<number>();
+    const sourceKeys = new Set<string>();
+
+    for (let episode = 23; episode <= 31; episode++) {
+        for (const cacheEvent of getOriginalLateStoryCacheEvents(episode)) {
+            const item = getOriginalLateStoryItem(cacheEvent.originalItemId);
+            assert.ok(item, `missing late original item ${cacheEvent.originalItemId}`);
+            assert.equal(item.currentItemId, cacheEvent.itemId);
+            assert.ok(getItemDef(item.currentItemId), `missing mapped current item ${item.currentItemId}`);
+            assert.equal(item.sourceEvents.some((source) => source.episode === episode && source.eventNumber === cacheEvent.eventNumber), true);
+            seenOriginalItemIds.add(cacheEvent.originalItemId);
+
+            for (const source of item.sourceEvents) {
+                assert.match(source.setArc, /^MAP\/\d{2}set\.arc$/);
+                assert.match(source.eventMember, /^\d{2}\.evt$/);
+                sourceKeys.add(`${source.episode}:${source.eventNumber}:${item.originalItemId}`);
+            }
+        }
+    }
+
+    assert.deepEqual(getOriginalLateStoryItemIds().sort((a, b) => a - b), [...seenOriginalItemIds].sort((a, b) => a - b));
+    assert.equal(ORIGINAL_LATE_STORY_ITEMS.length, seenOriginalItemIds.size);
+    assert.equal(sourceKeys.size, 29);
 });
 
 test('rest, monster, and starting class data reject unknown ids', () => {

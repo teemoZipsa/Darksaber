@@ -1,0 +1,175 @@
+{
+  "items": [
+    {
+      "originalItemId": 980,
+      "currentItemId": "web_66_51",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 24, "dungeonId": "astaroth_gate", "setArc": "MAP/24set.arc", "eventMember": "24.evt", "eventNumber": 91 }]
+    },
+    {
+      "originalItemId": 986,
+      "currentItemId": "magic_t6_body",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 23, "dungeonId": "beelzebuth_hall", "setArc": "MAP/23set.arc", "eventMember": "23.evt", "eventNumber": 93 }]
+    },
+    {
+      "originalItemId": 992,
+      "currentItemId": "void_crystal",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 24, "dungeonId": "astaroth_gate", "setArc": "MAP/24set.arc", "eventMember": "24.evt", "eventNumber": 92 }]
+    },
+    {
+      "originalItemId": 997,
+      "currentItemId": "magic_t6_body",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 24, "dungeonId": "astaroth_gate", "setArc": "MAP/24set.arc", "eventMember": "24.evt", "eventNumber": 93 }]
+    },
+    {
+      "originalItemId": 1002,
+      "currentItemId": "shadow_cloak",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 24, "dungeonId": "astaroth_gate", "setArc": "MAP/24set.arc", "eventMember": "24.evt", "eventNumber": 94 }]
+    },
+    {
+      "originalItemId": 1005,
+      "currentItemId": "web_66_51",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 23, "dungeonId": "beelzebuth_hall", "setArc": "MAP/23set.arc", "eventMember": "23.evt", "eventNumber": 91 }]
+    },
+    {
+      "originalItemId": 1007,
+      "currentItemId": "void_crystal",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 25, "dungeonId": "nergal_depths", "setArc": "MAP/25set.arc", "eventMember": "25.evt", "eventNumber": 92 }]
+    },
+    {
+      "originalItemId": 1010,
+      "currentItemId": "shadow_cloak",
+      "rewardKind": "relic",
+      "sourceEvents": [
+        { "episode": 23, "dungeonId": "beelzebuth_hall", "setArc": "MAP/23set.arc", "eventMember": "23.evt", "eventNumber": 94 },
+        { "episode": 25, "dungeonId": "nergal_depths", "setArc": "MAP/25set.arc", "eventMember": "25.evt", "eventNumber": 94 }
+      ]
+    },
+    {
+      "originalItemId": 1027,
+      "currentItemId": "magic_t6_body",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 25, "dungeonId": "nergal_depths", "setArc": "MAP/25set.arc", "eventMember": "25.evt", "eventNumber": 93 }]
+    },
+    {
+      "originalItemId": 1030,
+      "currentItemId": "web_66_51",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 25, "dungeonId": "nergal_depths", "setArc": "MAP/25set.arc", "eventMember": "25.evt", "eventNumber": 91 }]
+    },
+    {
+      "originalItemId": 1052,
+      "currentItemId": "void_crystal",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 23, "dungeonId": "beelzebuth_hall", "setArc": "MAP/23set.arc", "eventMember": "23.evt", "eventNumber": 92 }]
+    },
+    {
+      "originalItemId": 1104,
+      "currentItemId": "web_66_51",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 28, "dungeonId": "ergion_keep", "setArc": "MAP/28set.arc", "eventMember": "28.evt", "eventNumber": 91 }]
+    },
+    {
+      "originalItemId": 1108,
+      "currentItemId": "lance",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 28, "dungeonId": "ergion_keep", "setArc": "MAP/28set.arc", "eventMember": "28.evt", "eventNumber": 92 }]
+    },
+    {
+      "originalItemId": 1111,
+      "currentItemId": "magic_t6_body",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 28, "dungeonId": "ergion_keep", "setArc": "MAP/28set.arc", "eventMember": "28.evt", "eventNumber": 93 }]
+    },
+    {
+      "originalItemId": 1113,
+      "currentItemId": "corrupted_blade",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 28, "dungeonId": "ergion_keep", "setArc": "MAP/28set.arc", "eventMember": "28.evt", "eventNumber": 94 }]
+    },
+    {
+      "originalItemId": 1116,
+      "currentItemId": "web_66_51",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 29, "dungeonId": "martani_bastion", "setArc": "MAP/29set.arc", "eventMember": "29.evt", "eventNumber": 91 }]
+    },
+    {
+      "originalItemId": 1119,
+      "currentItemId": "web_66_51",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 30, "dungeonId": "blin_watch", "setArc": "MAP/30set.arc", "eventMember": "30.evt", "eventNumber": 91 }]
+    },
+    {
+      "originalItemId": 1122,
+      "currentItemId": "web_66_51",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 31, "dungeonId": "demon_fixers_den", "setArc": "MAP/31set.arc", "eventMember": "31.evt", "eventNumber": 91 }]
+    },
+    {
+      "originalItemId": 1125,
+      "currentItemId": "void_crystal",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 29, "dungeonId": "martani_bastion", "setArc": "MAP/29set.arc", "eventMember": "29.evt", "eventNumber": 92 }]
+    },
+    {
+      "originalItemId": 1128,
+      "currentItemId": "void_crystal",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 30, "dungeonId": "blin_watch", "setArc": "MAP/30set.arc", "eventMember": "30.evt", "eventNumber": 92 }]
+    },
+    {
+      "originalItemId": 1131,
+      "currentItemId": "void_crystal",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 31, "dungeonId": "demon_fixers_den", "setArc": "MAP/31set.arc", "eventMember": "31.evt", "eventNumber": 92 }]
+    },
+    {
+      "originalItemId": 1134,
+      "currentItemId": "magic_t6_body",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 29, "dungeonId": "martani_bastion", "setArc": "MAP/29set.arc", "eventMember": "29.evt", "eventNumber": 93 }]
+    },
+    {
+      "originalItemId": 1137,
+      "currentItemId": "magic_t6_body",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 30, "dungeonId": "blin_watch", "setArc": "MAP/30set.arc", "eventMember": "30.evt", "eventNumber": 93 }]
+    },
+    {
+      "originalItemId": 1140,
+      "currentItemId": "magic_t6_body",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 31, "dungeonId": "demon_fixers_den", "setArc": "MAP/31set.arc", "eventMember": "31.evt", "eventNumber": 93 }]
+    },
+    {
+      "originalItemId": 1143,
+      "currentItemId": "shadow_cloak",
+      "rewardKind": "relic",
+      "sourceEvents": [{ "episode": 30, "dungeonId": "blin_watch", "setArc": "MAP/30set.arc", "eventMember": "30.evt", "eventNumber": 94 }]
+    },
+    {
+      "originalItemId": 1168,
+      "currentItemId": "void_crystal",
+      "rewardKind": "mark",
+      "sourceEvents": [{ "episode": 26, "dungeonId": "beast_mark_shrine", "setArc": "MAP/26set.arc", "eventMember": "26.evt", "eventNumber": 92 }]
+    },
+    {
+      "originalItemId": 1169,
+      "currentItemId": "void_crystal",
+      "rewardKind": "mark",
+      "sourceEvents": [{ "episode": 27, "dungeonId": "chosen_mark_shrine", "setArc": "MAP/27set.arc", "eventMember": "27.evt", "eventNumber": 92 }]
+    },
+    {
+      "originalItemId": 1170,
+      "currentItemId": "magic_t6_body",
+      "rewardKind": "mark",
+      "sourceEvents": [{ "episode": 27, "dungeonId": "chosen_mark_shrine", "setArc": "MAP/27set.arc", "eventMember": "27.evt", "eventNumber": 93 }]
+    }
+  ]
+}

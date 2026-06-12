@@ -1069,7 +1069,14 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
         assert.deepEqual(sequence.fieldEvents.map((event) => event.originalEventId), expectedCaches.map((event) => `EVENT ${event.eventNumber}`));
         assert.deepEqual(sequence.fieldEvents.map((event) => event.triggerTiles[0]), expectedCaches.map((event) => event.tile));
-        assert.deepEqual(sequence.fieldEvents.map((event) => event.rewards?.[0]?.originalItemId), expectedCaches.map((event) => event.originalItemId));
+        const actualOriginalItemIds = sequence.fieldEvents.map((event) => {
+            const reward = event.rewards?.[0];
+            if (!reward || reward.type !== 'item') {
+                throw new Error(`Expected item reward for ${fact.dungeonId}:${event.id}`);
+            }
+            return reward.originalItemId;
+        });
+        assert.deepEqual(actualOriginalItemIds, expectedCaches.map((event) => event.originalItemId));
         assert.ok(sequence.fieldEvents.every((event) => event.originalSource === `${fact.setArc}:${fact.eventMember}`));
         for (const event of sequence.fieldEvents) {
             for (const tile of event.triggerTiles) {
