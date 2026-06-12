@@ -87,6 +87,7 @@ import { WorldFieldSpawnController } from './world/WorldFieldSpawnController';
 import { WorldRenderController } from './world/WorldRenderController';
 import { WorldInputController } from './world/WorldInputController';
 import { NetworkRaidState, type NetworkRaidCloseReason } from './world/NetworkRaidState';
+import { classifyNetworkActorSnapshots } from './world/NetworkSnapshotOwnership';
 import { HitStop } from './world/HitStop';
 import { HIT_FEEDBACK, strongerCombatFeedback, type CombatFeedbackKind } from './world/CombatFeedback';
 import { NetworkRaidClient, WorldServerError, type NetworkRaidStatus } from '../net/NetworkRaidClient';
@@ -1494,16 +1495,11 @@ export class WorldEngine {
         const previousActors = this.partyActors;
         const localCharacters = this.party.getCharacters();
         const localCharacterIds = new Set(localCharacters.map((character) => character.id));
-        const localPlayerActorIds = new Set(
-            snapshot.players.find((player) => player.playerId === this.getNetworkRaidState().playerId())?.actorIds ?? []
-        );
-        const isOwnActorSnapshot = (actor: ActorSnapshot): boolean =>
-            actor.ownerPlayerId === this.getNetworkRaidState().playerId()
-            || localPlayerActorIds.has(actor.id)
-            || (actor.localActorId ? localCharacterIds.has(actor.localActorId) : false);
-        const liveActorSnapshots = snapshot.partyActors.filter((actor) => !actor.isGhost);
-        const ownSnapshots = liveActorSnapshots.filter(isOwnActorSnapshot);
-        const remoteSnapshots = liveActorSnapshots.filter((actor) => !isOwnActorSnapshot(actor));
+        const { ownSnapshots, remoteSnapshots } = classifyNetworkActorSnapshots({
+            snapshot,
+            playerId: this.getNetworkRaidState().playerId(),
+            localCharacterIds,
+        });
         const ownByLocalId = new Map(ownSnapshots.map((actor) => [actor.localActorId ?? actor.id, actor]));
         const nextLocalActors: FieldActor[] = [];
 
