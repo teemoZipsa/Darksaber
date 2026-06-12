@@ -26,17 +26,17 @@ export interface InventoryItem {
 }
 
 export interface SaveData {
-    gold: number;
-    clearedStages: string[];
+    gold?: number;
+    clearedStages?: string[];
     questItems?: string[];
     storyCompanions?: string[];
     marketState?: MarketState;
     marketCycle?: number;
     marketContracts?: MarketContract[];
-    currentHubTownId: string;
-    pendingRestMenuId: string | null;
-    inventory: InventoryItem[];
-    equipped: { [slot: string]: InventoryItem | null };
+    currentHubTownId?: string;
+    pendingRestMenuId?: string | null;
+    inventory?: InventoryItem[];
+    equipped?: { [slot: string]: InventoryItem | null };
     characterSave?: CharacterSave;
     /** ISO date string of last save */
     lastSaved: string;
@@ -131,21 +131,7 @@ export class PlayerData {
             revision: characterSave.revision,
             updatedAt: characterSave.updatedAt,
         };
-        const data: SaveData = {
-            gold: this.gold,
-            clearedStages: Array.from(this.clearedStages),
-            questItems: Array.from(this.questItems),
-            storyCompanions: Array.from(this.storyCompanions),
-            marketState: this.marketState,
-            marketCycle: this.marketCycle,
-            marketContracts: this.marketContracts,
-            currentHubTownId: this.currentHubTownId,
-            pendingRestMenuId: this.pendingRestMenuId,
-            inventory: this.inventory,
-            equipped: this.equipped,
-            characterSave: patchedCharacterSave,
-            lastSaved,
-        };
+        const data: SaveData = { characterSave: patchedCharacterSave, lastSaved };
         try {
             localStorage.setItem(SAVE_KEY, JSON.stringify(data));
             this.localSaveRevision = patchedCharacterSave.revision;

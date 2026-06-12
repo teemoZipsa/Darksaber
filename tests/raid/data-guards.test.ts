@@ -235,6 +235,9 @@ test('player data writes and loads a canonical character save snapshot', () => {
         player.save();
 
         const raw = JSON.parse(store.get('sin_eater_save') ?? '{}') as Record<string, unknown>;
+        assert.equal(Object.prototype.hasOwnProperty.call(raw, 'inventory'), false);
+        assert.equal(Object.prototype.hasOwnProperty.call(raw, 'equipped'), false);
+        assert.equal(Object.prototype.hasOwnProperty.call(raw, 'marketState'), false);
         const save = asRecord(raw.characterSave);
         assert.equal(asRecord(save.questState).gold, 777);
         assert.equal(asRecord(save.hubLocation).townId, 's_coast_town');
