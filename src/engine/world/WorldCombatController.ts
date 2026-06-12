@@ -16,6 +16,7 @@ import type { CombatFeedbackKind } from './CombatFeedback';
 import { damageDefensiveEquipment, damageEquippedWeapon } from '../../inventory/Socketing';
 import type { PlacedItem } from '../../inventory/GridInventory';
 import { AudioManager } from '../AudioManager';
+import { formatT, t } from '../../i18n/LanguageManager';
 
 let nextFeedbackGroupId = 1;
 
@@ -118,7 +119,11 @@ export class WorldCombatController {
             if (damageResult.isMiss) {
                 this.sink.spawnDamage(target.gridX, target.gridY, 0, false, true);
                 AudioManager.playSfx('sfx.miss', { volume: 0.7, rate: 0.03 });
-                this.sink.log(`${input.actor.character.name} 명중 실패: ${target.name} (${Math.floor(damageResult.hitChance ?? 0)}%)`);
+                this.sink.log(formatT('field.combat.missChance', {
+                    source: input.actor.character.name,
+                    target: target.name,
+                    chance: Math.floor(damageResult.hitChance ?? 0),
+                }));
                 continue;
             }
 
@@ -129,10 +134,16 @@ export class WorldCombatController {
             this.sink.spawnDamage(target.gridX, target.gridY, dealtDamage, damageResult.isCrit, false);
             this.sink.spawnHitEffect(target.gridX, target.gridY, damageResult.isCrit, feedbackGroupId);
             AudioManager.playSfx(damageResult.isCrit ? 'sfx.crit' : 'sfx.hit_flesh', { volume: damageResult.isCrit ? 0.72 : 0.62, rate: 0.04 });
-            const critText = damageResult.isCrit ? ' 치명' : '';
+            const critText = damageResult.isCrit ? t('field.combat.critSuffix') : '';
             const dirText = dirBonus.label ? ` ${dirBonus.label}` : '';
-            this.sink.log(`${input.actor.character.name} → ${target.name} ${dealtDamage} 피해${critText}${dirText}`);
-            if (guarded.guarded) this.sink.log(`${target.name} 방어: 피해 감소`);
+            this.sink.log(formatT('field.combat.physicalDamage', {
+                source: input.actor.character.name,
+                target: target.name,
+                damage: dealtDamage,
+                crit: critText,
+                direction: dirText,
+            }));
+            if (guarded.guarded) this.sink.log(formatT('field.combat.guardReduced', { target: target.name }));
             this.logPhysicalTerrainEffect(damageResult);
 
             if (dead) {
@@ -166,7 +177,11 @@ export class WorldCombatController {
         if (damageResult.isMiss) {
             this.sink.spawnDamage(actor.entity.gridX, actor.entity.gridY, 0, false, true);
             AudioManager.playSfx('sfx.miss', { volume: 0.7, rate: 0.03 });
-            this.sink.log(`${enemy.name} 명중 실패: ${actor.character.name} (${Math.floor(damageResult.hitChance ?? 0)}%)`);
+            this.sink.log(formatT('field.combat.missChance', {
+                source: enemy.name,
+                target: actor.character.name,
+                chance: Math.floor(damageResult.hitChance ?? 0),
+            }));
             return result;
         }
 
@@ -176,8 +191,14 @@ export class WorldCombatController {
         this.sink.spawnDamage(actor.entity.gridX, actor.entity.gridY, guarded.damage, damageResult.isCrit, false);
         this.sink.spawnHitEffect(actor.entity.gridX, actor.entity.gridY, damageResult.isCrit, input.feedbackGroupId);
         AudioManager.playSfx(damageResult.isCrit ? 'sfx.crit' : 'sfx.hit_flesh', { volume: damageResult.isCrit ? 0.72 : 0.62, rate: 0.04 });
-        this.sink.log(`${enemy.name} → ${actor.character.name} ${guarded.damage} 피해${damageResult.isCrit ? ' 치명' : ''}`);
-        if (guarded.guarded) this.sink.log(`${actor.character.name} 방어: 피해 감소`);
+        this.sink.log(formatT('field.combat.physicalDamage', {
+            source: enemy.name,
+            target: actor.character.name,
+            damage: guarded.damage,
+            crit: damageResult.isCrit ? t('field.combat.critSuffix') : '',
+            direction: '',
+        }));
+        if (guarded.guarded) this.sink.log(formatT('field.combat.guardReduced', { target: actor.character.name }));
         this.logPhysicalTerrainEffect(damageResult);
         if (guarded.damage > 0) this.logBrokenEquipment(actor.character.name, damageDefensiveEquipment(actor.character));
 
@@ -195,7 +216,7 @@ export class WorldCombatController {
         if (!ready) return result;
         if (input.actor.character.isDead || input.actor.character.stats.hp <= 0 || input.enemy.stats.hp <= 0) return result;
         if (!input.canActorAttackTarget(input.actor, input.enemy)) {
-            this.sink.log(`${input.actor.character.name} 반격 실패: 사거리 밖`);
+            this.sink.log(formatT('field.combat.counterOutOfRange', { source: input.actor.character.name }));
             return result;
         }
 
@@ -214,7 +235,10 @@ export class WorldCombatController {
         if (damageResult.isMiss) {
             this.sink.spawnDamage(input.enemy.gridX, input.enemy.gridY, 0, false, true);
             AudioManager.playSfx('sfx.miss', { volume: 0.65, rate: 0.03 });
-            this.sink.log(`${input.actor.character.name} 반격 빗나감: ${input.enemy.name}`);
+            this.sink.log(formatT('field.combat.counterMissTarget', {
+                source: input.actor.character.name,
+                target: input.enemy.name,
+            }));
             return result;
         }
 
@@ -226,7 +250,11 @@ export class WorldCombatController {
         this.sink.spawnDamage(input.enemy.gridX, input.enemy.gridY, damage, damageResult.isCrit, false);
         this.sink.spawnHitEffect(input.enemy.gridX, input.enemy.gridY, damageResult.isCrit, feedbackGroupId, damageResult.isCrit ? 'critical' : 'counter');
         AudioManager.playSfx(damageResult.isCrit ? 'sfx.crit' : 'sfx.hit_flesh', { volume: damageResult.isCrit ? 0.68 : 0.58, rate: 0.04 });
-        this.sink.log(`${input.actor.character.name} 반격 → ${input.enemy.name} ${damage} 피해`);
+        this.sink.log(formatT('field.combat.counterDamage', {
+            source: input.actor.character.name,
+            target: input.enemy.name,
+            damage,
+        }));
         if (dead) this.handleEnemyDefeated(input.actor, input.enemy, result, feedbackGroupId);
         this.sink.flushFeedbackGroup?.(feedbackGroupId);
         return result;
@@ -238,7 +266,7 @@ export class WorldCombatController {
         if (!ready) return result;
         if (input.enemy.stats.hp <= 0 || input.actor.character.isDead || input.actor.character.stats.hp <= 0) return result;
         if (manhattan(enemyTile(input.enemy), actorTile(input.actor)) > 1) {
-            this.sink.log(`${input.enemy.name} 반격 실패: 사거리 밖`);
+            this.sink.log(formatT('field.combat.counterOutOfRange', { source: input.enemy.name }));
             return result;
         }
 
@@ -256,7 +284,7 @@ export class WorldCombatController {
         if (damageResult.isMiss) {
             this.sink.spawnDamage(input.actor.entity.gridX, input.actor.entity.gridY, 0, false, true);
             AudioManager.playSfx('sfx.miss', { volume: 0.65, rate: 0.03 });
-            this.sink.log(`${input.enemy.name} 반격 빗나감`);
+            this.sink.log(formatT('field.combat.counterMiss', { source: input.enemy.name }));
             return result;
         }
 
@@ -271,7 +299,11 @@ export class WorldCombatController {
         this.sink.spawnDamage(input.actor.entity.gridX, input.actor.entity.gridY, damage, damageResult.isCrit, false);
         this.sink.spawnHitEffect(input.actor.entity.gridX, input.actor.entity.gridY, damageResult.isCrit, feedbackGroupId, damageResult.isCrit ? 'critical' : 'counter');
         AudioManager.playSfx(damageResult.isCrit ? 'sfx.crit' : 'sfx.hit_flesh', { volume: damageResult.isCrit ? 0.68 : 0.58, rate: 0.04 });
-        this.sink.log(`${input.enemy.name} 반격 → ${input.actor.character.name} ${damage} 피해`);
+        this.sink.log(formatT('field.combat.counterDamage', {
+            source: input.enemy.name,
+            target: input.actor.character.name,
+            damage,
+        }));
         if (damage > 0) this.logBrokenEquipment(input.actor.character.name, damageDefensiveEquipment(input.actor.character));
         if (input.actor.character.stats.hp <= 0 && !input.actor.character.isDead) result.downedCharacterIds.push(input.actor.character.id);
         this.sink.flushFeedbackGroup?.(feedbackGroupId);
@@ -282,7 +314,7 @@ export class WorldCombatController {
         result.killedEnemyIds.push(enemy.id);
         if (this.sink.awardExp) this.sink.awardExp(actor, enemy);
         else {
-            this.sink.log(`${enemy.name} 처치! +${enemy.expReward} EXP`);
+            this.sink.log(formatT('field.log.enemyDefeatedExp', { enemy: enemy.name, exp: enemy.expReward }));
             actor.character.gainExp(enemy.expReward);
         }
         this.sink.spawnKillEffect(enemy, feedbackGroupId);
@@ -295,14 +327,16 @@ export class WorldCombatController {
     private logPhysicalTerrainEffect(result: { terrainMultiplier?: number; hitChance?: number }): void {
         const notes: string[] = [];
         if (result.terrainMultiplier !== undefined && result.terrainMultiplier < 0.999) {
-            notes.push(`피해 -${Math.round((1 - result.terrainMultiplier) * 100)}%`);
+            notes.push(formatT('field.combat.terrainDamageReduction', {
+                percent: Math.round((1 - result.terrainMultiplier) * 100),
+            }));
         }
-        if (notes.length > 0) this.sink.log(`지형 효과: ${notes.join(', ')}`);
+        if (notes.length > 0) this.sink.log(formatT('field.combat.terrainEffect', { notes: notes.join(', ') }));
     }
 
     private logBrokenEquipment(characterName: string, placed: PlacedItem | null): void {
         if (placed?.durability === 0) {
-            this.sink.log(`${characterName}: ${placed.item.nameKr} 내구도 0 - 장비 효과 비활성`);
+            this.sink.log(formatT('field.combat.equipmentBroken', { name: characterName, item: placed.item.nameKr }));
         }
     }
 }
