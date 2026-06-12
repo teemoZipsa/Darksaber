@@ -154,6 +154,8 @@ export const i18n = {
             'town.name.master_sanctum': '마스터 성역',
             'town.name.astral_keep': '성좌 요새',
             'town.name.ember_citadel': '홍염 성채',
+            'world.realm.mortal': '현세 월드',
+            'world.realm.master': '마스터 월드',
             
             // Inventory
             'inv.title': '⚔️ 장비 및 소지품',
@@ -1148,6 +1150,8 @@ export const i18n = {
             'town.name.master_sanctum': 'Master Sanctum',
             'town.name.astral_keep': 'Astral Keep',
             'town.name.ember_citadel': 'Ember Citadel',
+            'world.realm.mortal': 'Mortal World',
+            'world.realm.master': 'Master World',
             
             // Inventory
             'inv.title': '⚔️ Equipment & Inventory',

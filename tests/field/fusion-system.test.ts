@@ -121,13 +121,21 @@ test('master class line promotes through T8 to T10', () => {
 });
 
 test('world map exposes mortal and master temple entrances', () => {
+    const previousLang = i18n.lang;
     const world = new WorldMap('mortal');
-    const mortalTemple = world.getPrimaryTempleTile();
-    assert.equal(world.getTileAt(mortalTemple.x, mortalTemple.y), TileType.DUNGEON_ENTRANCE);
+    try {
+        const mortalTemple = world.getPrimaryTempleTile();
+        assert.equal(world.getTileAt(mortalTemple.x, mortalTemple.y), TileType.DUNGEON_ENTRANCE);
 
-    world.setRealm('master');
-    const masterTemple = world.getPrimaryTempleTile();
-    assert.equal(world.getRealm(), 'master');
-    assert.equal(world.getTileAt(masterTemple.x, masterTemple.y), TileType.DUNGEON_ENTRANCE);
-    assert.equal(world.getDisplayName(), '마스터 월드');
+        world.setRealm('master');
+        const masterTemple = world.getPrimaryTempleTile();
+        assert.equal(world.getRealm(), 'master');
+        assert.equal(world.getTileAt(masterTemple.x, masterTemple.y), TileType.DUNGEON_ENTRANCE);
+        i18n.lang = 'ko';
+        assert.equal(world.getDisplayName(), '마스터 월드');
+        i18n.lang = 'en';
+        assert.equal(world.getDisplayName(), 'Master World');
+    } finally {
+        i18n.lang = previousLang;
+    }
 });

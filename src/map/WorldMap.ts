@@ -9,6 +9,7 @@ import { getStoryHmapTileAt } from './StoryHmaps';
 import { HMAP_BLEND_BAND, type HmapSample } from './HmapBlend';
 import { STORY_SCENARIOS } from '../data/StoryScenarioData';
 import { isStoryInteriorDungeon } from '../data/StoryInteriorData';
+import { t } from '../i18n/LanguageManager';
 
 export interface TileBounds {
     width: number;
@@ -359,7 +360,7 @@ export class WorldMap {
     }
 
     public getDisplayName(): string {
-        return this.getRealm() === 'master' ? '마스터 월드' : '현세 월드';
+        return t(this.getRealm() === 'master' ? 'world.realm.master' : 'world.realm.mortal');
     }
 
     public setRealm(realm: WorldRealm): void {
