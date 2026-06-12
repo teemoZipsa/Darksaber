@@ -1,5 +1,6 @@
 import { InputManager } from '../engine/InputManager';
 import { RaidOutcome } from '../raid/RaidOutcome';
+import { formatT, i18n, t } from '../i18n/LanguageManager';
 import { UI, Parchment, drawParchmentPanel, drawParchmentButton, renderGameTitle } from './UITheme';
 
 function formatTime(totalSeconds: number): string {
@@ -10,9 +11,13 @@ function formatTime(totalSeconds: number): string {
 }
 
 function resultTitle(result: RaidOutcome['result']): string {
-    if (result === 'SURVIVED') return '생환 성공';
-    if (result === 'MIA') return '시간 초과';
-    return '출격 실패';
+    if (result === 'SURVIVED') return t('raid.result.survived');
+    if (result === 'MIA') return t('raid.result.mia');
+    return t('raid.result.failed');
+}
+
+function outcomeItemName(item: { name: string; nameKr: string }): string {
+    return i18n.lang === 'en' ? item.name : item.nameKr;
 }
 
 export class RaidResultUI {
@@ -89,7 +94,12 @@ export class RaidResultUI {
         ctx.fillStyle = Parchment.textDark;
         const destination = this.outcome.extractionTownId ?? '-';
         ctx.fillText(
-            `출발 ${this.outcome.departureTownId}  ->  도착 ${destination}  |  ${formatTime(this.outcome.elapsedSeconds)}  |  처치 ${this.outcome.kills}`,
+            formatT('raid.result.summary', {
+                from: this.outcome.departureTownId,
+                to: destination,
+                time: formatTime(this.outcome.elapsedSeconds),
+                kills: this.outcome.kills,
+            }),
             px + panelW / 2,
             py + 64
         );
@@ -118,14 +128,14 @@ export class RaidResultUI {
 
     private renderHeroes(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
         drawParchmentPanel(ctx, x, y, w, h, { radius: 6, shadow: false, compact: true });
-        this.renderSectionTitle(ctx, '출격 영웅', x + 16, y + 16);
+        this.renderSectionTitle(ctx, t('raid.result.heroes'), x + 16, y + 16);
 
         const heroes = this.outcome?.heroStatuses ?? [];
         ctx.font = `bold 14px ${UI.fontPrimary}`;
         ctx.textAlign = 'left';
         if (heroes.length === 0) {
             ctx.fillStyle = Parchment.textMuted;
-            ctx.fillText('기록된 영웅 상태가 없습니다.', x + 16, y + 52);
+            ctx.fillText(t('raid.result.noHeroes'), x + 16, y + 52);
             return;
         }
 
@@ -144,34 +154,34 @@ export class RaidResultUI {
 
     private renderRewardsAndLosses(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
         drawParchmentPanel(ctx, x, y, w, h, { radius: 6, shadow: false, compact: true });
-        this.renderSectionTitle(ctx, '보상 / 손실', x + 16, y + 16);
+        this.renderSectionTitle(ctx, t('raid.result.rewardsAndLosses'), x + 16, y + 16);
 
         const lines: Array<{ text: string; color: string }> = [];
         const outcome = this.outcome!;
 
         if (outcome.secured.length > 0) {
-            lines.push({ text: '[확보 전리품]', color: '#2d6a3d' });
+            lines.push({ text: t('raid.result.securedLoot'), color: '#2d6a3d' });
             for (const item of outcome.secured) {
-                lines.push({ text: `${item.nameKr} x${item.quantity}`, color: Parchment.textDark });
+                lines.push({ text: `${outcomeItemName(item)} x${item.quantity}`, color: Parchment.textDark });
             }
         }
-        if ((outcome.goldReward ?? 0) > 0) lines.push({ text: `보상 골드 +${outcome.goldReward}G`, color: '#7a5410' });
+        if ((outcome.goldReward ?? 0) > 0) lines.push({ text: formatT('raid.result.goldReward', { gold: outcome.goldReward ?? 0 }), color: '#7a5410' });
         for (const quest of outcome.questRewards ?? []) lines.push({ text: quest, color: Parchment.textLabel });
 
         if (outcome.lost.length > 0) {
-            lines.push({ text: '[잃은 배낭]', color: '#8a1818' });
+            lines.push({ text: t('raid.result.lostBackpack'), color: '#8a1818' });
             for (const item of outcome.lost) {
-                lines.push({ text: `${item.nameKr} x${item.quantity}`, color: Parchment.textDark });
+                lines.push({ text: `${outcomeItemName(item)} x${item.quantity}`, color: Parchment.textDark });
             }
         }
         if (outcome.equipmentLost.length > 0) {
-            lines.push({ text: '[잃은 장비]', color: '#8a1818' });
+            lines.push({ text: t('raid.result.lostEquipment'), color: '#8a1818' });
             for (const loss of outcome.equipmentLost) {
-                lines.push({ text: `${loss.characterName}: ${loss.item.nameKr}`, color: Parchment.textDark });
+                lines.push({ text: `${loss.characterName}: ${outcomeItemName(loss.item)}`, color: Parchment.textDark });
             }
         }
         for (const note of outcome.notes ?? []) lines.push({ text: note, color: Parchment.textMid });
-        if (lines.length === 0) lines.push({ text: '변동된 보상이나 손실이 없습니다.', color: Parchment.textMuted });
+        if (lines.length === 0) lines.push({ text: t('raid.result.noChanges'), color: Parchment.textMuted });
 
         ctx.font = `13px ${UI.fontPrimary}`;
         ctx.textAlign = 'left';
@@ -186,6 +196,6 @@ export class RaidResultUI {
 
     private renderConfirm(ctx: CanvasRenderingContext2D, x: number, y: number): void {
         this.confirmRect = { x, y, w: 180, h: 42 };
-        drawParchmentButton(ctx, x, y, 180, 42, '확인', 'default');
+        drawParchmentButton(ctx, x, y, 180, 42, t('raid.result.confirm'), 'default');
     }
 }
