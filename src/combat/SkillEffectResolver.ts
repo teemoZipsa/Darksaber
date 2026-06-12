@@ -5,6 +5,7 @@ import { getMagicTerrainMultiplier, getTerrainProfile } from '../field/TerrainRu
 import type { TileType } from '../map/Tile';
 import { clampHitChance, type RandomSource } from './CombatFormulas';
 import { StatusEffect, getStatusEffectsForSkill } from './StatusEffects';
+import { formatT, t } from '../i18n/LanguageManager';
 
 export interface SkillEffectEnemyInput {
     id: string;
@@ -77,11 +78,11 @@ export function resolveSkillEffect(input: ResolveSkillEffectInput): SkillEffectR
         case 'buff':
             result.casterStatusEffects = getStatusEffectsForSkill(skill);
             result.appliesBuff = skill;
-            result.logs.push(`${skill.icon} ${skill.nameKr}: 버프/보호 발동!`);
+            result.logs.push(formatSkillLog('field.skill.buffActivated', skill));
             break;
         case 'damage':
             if (!targetEnemy) {
-                result.logs.push('대상 없음!');
+                result.logs.push(t('field.magic.noTarget'));
                 break;
             }
             result.enemyResults = getResolvedTargets(input, targetEnemy).map((enemy) =>
@@ -89,16 +90,20 @@ export function resolveSkillEffect(input: ResolveSkillEffectInput): SkillEffectR
             );
             if (result.enemyResults.length === 1) {
                 if (!result.enemyResults[0].isMiss) {
-                    result.logs.push(`${skill.icon} ${skill.nameKr}: ${targetEnemy.name}에게 ${result.enemyResults[0].damage} 피해!${formatTerrainNote(result.enemyResults[0])}`);
+                    result.logs.push(formatSkillLog('field.skill.damageSingle', skill, {
+                        target: targetEnemy.name,
+                        damage: result.enemyResults[0].damage,
+                        terrain: formatTerrainNote(result.enemyResults[0]),
+                    }));
                 }
             } else {
-                result.logs.push(`${skill.icon} ${skill.nameKr}: ${result.enemyResults.length}체 대상!`);
+                result.logs.push(formatSkillLog('field.skill.targetCount', skill, { count: result.enemyResults.length }));
             }
             appendResourceDrainLogs(skill, result);
             break;
         case 'debuff':
             if (!targetEnemy) {
-                result.logs.push('대상 없음!');
+                result.logs.push(t('field.magic.noTarget'));
                 break;
             }
             result.enemyResults = getResolvedTargets(input, targetEnemy).map((enemy) =>
@@ -106,15 +111,18 @@ export function resolveSkillEffect(input: ResolveSkillEffectInput): SkillEffectR
             );
             if (result.enemyResults.length === 1) {
                 if (!result.enemyResults[0].isMiss) {
-                    result.logs.push(`${skill.icon} ${skill.nameKr}: ${targetEnemy.name} 약화${formatTerrainNote(result.enemyResults[0])}`);
+                    result.logs.push(formatSkillLog('field.skill.debuffSingle', skill, {
+                        target: targetEnemy.name,
+                        terrain: formatTerrainNote(result.enemyResults[0]),
+                    }));
                 }
             } else {
-                result.logs.push(`${skill.icon} ${skill.nameKr}: ${result.enemyResults.length}체 약화`);
+                result.logs.push(formatSkillLog('field.skill.debuffCount', skill, { count: result.enemyResults.length }));
             }
             break;
         case 'aoe': {
             if (!targetEnemy) {
-                result.logs.push('대상 없음!');
+                result.logs.push(t('field.magic.noTarget'));
                 break;
             }
             const targets = input.targetsResolvedByPattern
@@ -124,10 +132,10 @@ export function resolveSkillEffect(input: ResolveSkillEffectInput): SkillEffectR
                     Math.abs(enemy.gridX - targetEnemy.gridX) <= skill.aoeRadius &&
                     Math.abs(enemy.gridY - targetEnemy.gridY) <= skill.aoeRadius
                 );
-            result.logs.push(`${skill.icon} ${skill.nameKr}: ${targets.length}체 대상!`);
+            result.logs.push(formatSkillLog('field.skill.targetCount', skill, { count: targets.length }));
             result.enemyResults = targets.map((enemy) => resolveDamageToEnemy(skill, casterCombatStats, enemy, input.terrainContext, random));
             if (result.enemyResults.some((enemyResult) => hasTerrainMultiplier(enemyResult))) {
-                result.logs.push('지형 마법 상성 적용');
+                result.logs.push(t('field.skill.terrainAffinity'));
             }
             appendResourceDrainLogs(skill, result);
             break;
@@ -172,7 +180,7 @@ function resolveHeal(
         const mpGain = Math.max(0, casterStats.maxMp - (casterStats.mp - skill.mpCost));
         result.casterHpDelta = hpGain;
         result.casterMpDelta = -skill.mpCost + mpGain;
-        result.logs.push(`${skill.icon} ${skill.nameKr}: HP/MP 전회복!`);
+        result.logs.push(formatSkillLog('field.skill.fullRecover', skill));
         return;
     }
 
@@ -186,7 +194,7 @@ function resolveHeal(
         return;
     }
 
-    result.logs.push(`${skill.icon} ${skill.nameKr}: HP +${healAmt} 회복`);
+    result.logs.push(formatSkillLog('field.skill.heal', skill, { amount: healAmt }));
 }
 
 function resolveDamageToEnemy(
@@ -284,8 +292,8 @@ function getSpecialDamageRule(skillId: string): SpecialDamageRule {
 function appendResourceDrainLogs(skill: Skill, result: SkillEffectResult): void {
     const hpRestore = result.enemyResults.reduce((sum, enemy) => sum + (enemy.casterHpRestore ?? 0), 0);
     const mpRestore = result.enemyResults.reduce((sum, enemy) => sum + (enemy.casterMpRestore ?? 0), 0);
-    if (hpRestore > 0) result.logs.push(`${skill.icon} ${skill.nameKr}: HP ${hpRestore} 흡수`);
-    if (mpRestore > 0) result.logs.push(`${skill.icon} ${skill.nameKr}: MP ${mpRestore} 흡수`);
+    if (hpRestore > 0) result.logs.push(formatSkillLog('field.skill.hpAbsorb', skill, { amount: hpRestore }));
+    if (mpRestore > 0) result.logs.push(formatSkillLog('field.skill.mpAbsorb', skill, { amount: mpRestore }));
 }
 
 function rollSkillHit(
@@ -351,5 +359,13 @@ function hasTerrainMultiplier(result: SkillEffectEnemyResult): boolean {
 
 function formatTerrainNote(result: SkillEffectEnemyResult): string {
     if (!hasTerrainMultiplier(result)) return '';
-    return ` (지형 x${result.terrainMultiplier!.toFixed(2)})`;
+    return formatT('field.skill.terrainNote', { multiplier: result.terrainMultiplier!.toFixed(2) });
+}
+
+function formatSkillLog(key: string, skill: Skill, params: Record<string, string | number> = {}): string {
+    return formatT(key, {
+        icon: skill.icon,
+        skill: skill.nameKr,
+        ...params,
+    });
 }
