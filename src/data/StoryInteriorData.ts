@@ -1156,7 +1156,7 @@ const BEELZEBUTH_HALL_LAYOUT = buildLateOriginalInterior({
     theme: 'ament',
     entryTile: { x: 19, y: 38 },
     playerStart: { x: 19, y: 31 },
-    bossTile: { x: 21, y: 15 },
+    bossTile: { x: 19, y: 28 },
     guardTiles: BEELZEBUTH_HALL_GUARDS,
     rooms: [
         { id: 'beelzebuthNorthVault', nameKey: 'story.interior.room.beelzebuthNorthVault', x: 10, y: 5, width: 20, height: 10 },
@@ -1180,7 +1180,7 @@ const ASTAROTH_GATE_LAYOUT = buildLateOriginalInterior({
     theme: 'ament',
     entryTile: { x: 19, y: 36 },
     playerStart: { x: 19, y: 33 },
-    bossTile: { x: 19, y: 7 },
+    bossTile: { x: 19, y: 14 },
     guardTiles: ASTAROTH_GATE_GUARDS,
     rooms: [
         { id: 'astarothOuterGate', nameKey: 'story.interior.room.astarothOuterGate', x: 7, y: 29, width: 26, height: 7 },
@@ -1201,7 +1201,7 @@ const NERGAL_DEPTHS_LAYOUT = buildLateOriginalInterior({
     theme: 'ament',
     entryTile: { x: 19, y: 38 },
     playerStart: { x: 19, y: 23 },
-    bossTile: { x: 19, y: 7 },
+    bossTile: { x: 19, y: 6 },
     guardTiles: NERGAL_DEPTHS_GUARDS,
     rooms: [
         { id: 'nergalDepthsSouth', nameKey: 'story.interior.room.nergalDepthsSouth', x: 1, y: 27, width: 38, height: 12 },
@@ -1264,7 +1264,7 @@ const ERGION_KEEP_LAYOUT = buildLateOriginalInterior({
     theme: 'castle',
     entryTile: { x: 14, y: 34 },
     playerStart: { x: 14, y: 32 },
-    bossTile: { x: 19, y: 7 },
+    bossTile: { x: 19, y: 10 },
     guardTiles: ERGION_KEEP_GUARDS,
     rooms: [
         { id: 'ergionSouthernKeep', nameKey: 'story.interior.room.ergionSouthernKeep', x: 5, y: 27, width: 30, height: 7 },
@@ -1288,7 +1288,7 @@ const MARTANI_BASTION_LAYOUT = buildLateOriginalInterior({
     theme: 'castle',
     entryTile: { x: 14, y: 36 },
     playerStart: { x: 14, y: 32 },
-    bossTile: { x: 19, y: 7 },
+    bossTile: { x: 43, y: 19 },
     guardTiles: MARTANI_BASTION_GUARDS,
     rooms: [
         { id: 'martaniSouthBastion', nameKey: 'story.interior.room.martaniSouthBastion', x: 10, y: 26, width: 20, height: 10 },
@@ -1311,7 +1311,7 @@ const BLIN_WATCH_LAYOUT = buildLateOriginalInterior({
     theme: 'castle',
     entryTile: { x: 14, y: 36 },
     playerStart: { x: 14, y: 32 },
-    bossTile: { x: 19, y: 7 },
+    bossTile: { x: 20, y: 19 },
     guardTiles: BLIN_WATCH_GUARDS,
     rooms: [
         { id: 'blinLowerWatch', nameKey: 'story.interior.room.blinLowerWatch', x: 6, y: 28, width: 28, height: 9 },
@@ -1334,7 +1334,7 @@ const DEMON_FIXERS_DEN_LAYOUT = buildLateOriginalInterior({
     theme: 'ament',
     entryTile: { x: 14, y: 45 },
     playerStart: { x: 14, y: 32 },
-    bossTile: { x: 19, y: 7 },
+    bossTile: { x: 22, y: 11 },
     guardTiles: DEMON_FIXERS_DEN_GUARDS,
     rooms: [
         { id: 'demonFixerLowerDen', nameKey: 'story.interior.room.demonFixerLowerDen', x: 2, y: 32, width: 36, height: 14 },
