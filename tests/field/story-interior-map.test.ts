@@ -1073,6 +1073,11 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         assert.equal(sequence.entry.filter((step) => step.kind === 'combatStart').length, 1);
         assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
         assert.equal(sequence.entry[0].durationMs, 650);
+        const entryMove = sequence.entry.find((step) => step.kind === 'moveActor');
+        assert.ok(entryMove, fact.dungeonId);
+        assert.equal(entryMove.actorId, 'hero');
+        assert.deepEqual(entryMove.target, { x: layout.playerStart.x, y: layout.playerStart.y - 1 });
+        assert.equal(map.isWalkable(entryMove.target.x, entryMove.target.y), true, fact.dungeonId);
         assert.ok(sequence.entry.every((step) => getStoryScenarioEventStepDurationMs(step) > 0), fact.dungeonId);
         assert.ok(sequence.bossDefeat.every((step) => getStoryScenarioEventStepDurationMs(step) > 0), fact.dungeonId);
         assert.ok(getStoryScenarioPresentationDurationMs(sequence.entry) >= 3150, fact.dungeonId);

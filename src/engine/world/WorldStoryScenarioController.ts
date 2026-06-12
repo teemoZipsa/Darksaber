@@ -111,6 +111,7 @@ export class WorldStoryScenarioController {
 
     public updatePresentation(dt: number): void {
         if (!this.presentationActive) return;
+        this.updatePresentationActors(dt);
         this.presentationRemainingMs -= Math.max(0, dt) * 1000;
         this.advanceStoryScenarioPresentation();
     }
@@ -667,6 +668,12 @@ export class WorldStoryScenarioController {
                 this.context.focusCameraOnTile(step.target);
                 this.context.log(formatT('story.event.focusLog', { target: t(step.labelKey) }));
                 break;
+            case 'moveActor': {
+                const entity = this.resolvePresentationActorEntity(step.actorId);
+                if (entity) entity.setGridPosition(step.target.x, step.target.y);
+                this.context.focusCameraOnTile(step.focus ?? step.target);
+                break;
+            }
             case 'dialogue':
                 if (step.focus) this.context.focusCameraOnTile(step.focus);
                 this.context.log(formatT('story.event.dialogueLog', {
@@ -680,6 +687,32 @@ export class WorldStoryScenarioController {
                 this.context.log(t(step.labelKey));
                 break;
         }
+    }
+
+    private updatePresentationActors(dt: number): void {
+        const controlled = this.context.getControlledActor();
+        controlled?.entity.update(dt);
+        for (const entry of this.context.getFieldEnemies()) entry.enemy.update(dt);
+    }
+
+    private resolvePresentationActorEntity(actorId: string): Player | Enemy | null {
+        const controlled = this.context.getControlledActor();
+        if (
+            actorId === 'hero'
+            || actorId === 'player'
+            || actorId === 'controlled'
+            || actorId === controlled?.id
+            || actorId === controlled?.character.id
+            || actorId === controlled?.entity.id
+        ) {
+            return controlled?.entity ?? this.context.getPlayer();
+        }
+
+        const enemyEntry = this.context.getFieldEnemies().find((entry) =>
+            entry.enemy.id === actorId
+            || (actorId === 'boss' && entry.enemy.isBoss)
+        );
+        return enemyEntry?.enemy ?? null;
     }
 
     private enqueueStoryScenarioPresentation(steps: readonly StoryScenarioEventStep[]): void {

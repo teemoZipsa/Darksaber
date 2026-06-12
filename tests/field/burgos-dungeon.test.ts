@@ -93,7 +93,10 @@ function createStoryScenarioHarness(options: {
         setFieldEnemies: (nextFieldEnemies) => { fieldEnemies = nextFieldEnemies; },
         getControlledActor: () => ({ id: 'hero', entity: player } as any),
         actorTile: () => ({ x: player.gridX, y: player.gridY }),
-        placePartyNear: (tile) => { placedNear = { ...tile }; },
+        placePartyNear: (tile) => {
+            placedNear = { ...tile };
+            player.setGridPosition(tile.x, tile.y, true);
+        },
         clearFieldTurnState: () => { turnStateCleared = true; },
         closeFieldOverlays: () => undefined,
         selectActor: (actorId) => { selectedActorId = actorId; },
@@ -586,6 +589,8 @@ test('Zamora chest events grant raid rewards once per chest', () => {
     const harness = createStoryScenarioHarness({ player, playerData, raidSession });
 
     harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+    drainStoryPresentation(harness.controller);
+    player.setGridPosition(10, 5, true);
     assert.ok(harness.worldMap instanceof StoryInteriorMap);
     assert.ok(harness.worldMap.getInspectMarkers().some((marker) => marker.id === 'zamora_gold_chest_01:11,5' && marker.kind === 'chest'));
 
@@ -617,6 +622,8 @@ test('Etna chest events grant original episode 3 raid rewards once per chest', (
     const harness = createStoryScenarioHarness({ player, playerData, raidSession });
 
     harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+    drainStoryPresentation(harness.controller);
+    player.setGridPosition(12, 33, true);
     assert.ok(harness.worldMap instanceof StoryInteriorMap);
     assert.ok(harness.worldMap.getInspectMarkers().some((marker) => marker.id === 'etna_gold_chest_01:13,33' && marker.kind === 'chest'));
 
@@ -647,6 +654,7 @@ test('Burgos field events can be inspected once inside the local interior', () =
 
     harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
     drainStoryPresentation(harness.controller);
+    player.setGridPosition(24, 9, true);
 
     assert.ok(harness.worldMap instanceof StoryInteriorMap);
     assert.deepEqual(harness.worldMap.getInspectMarkers().map((marker) => marker.id).sort(), [
@@ -701,6 +709,8 @@ test('Burgos throne room seal unlocks after the survivor key event', () => {
     const harness = createStoryScenarioHarness({ player, raidSession });
 
     harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+    drainStoryPresentation(harness.controller);
+    player.setGridPosition(24, 9, true);
 
     assert.equal(harness.worldMap.isWalkable(27, 9), false);
     assert.equal(harness.controller.getLockedDoorMessage({ x: 27, y: 9 }), '문이 잠겨 있습니다. 부르고스성 열쇠가 필요합니다.');
@@ -741,6 +751,7 @@ test('Burgos Cain field event records a raid-scoped relic flag before survival r
 
     harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
     drainStoryPresentation(harness.controller);
+    player.setGridPosition(8, 12, true);
 
     assert.equal(harness.controller.playFieldEventAt({ x: 9, y: 12 }, { id: 'hero', entity: player } as any), true);
     drainStoryPresentation(harness.controller);
@@ -1146,6 +1157,9 @@ test('late story presentation steps focus the camera on original event tiles', (
     assert.equal(harness.controller.getLastPresentationDurationMs(), getStoryScenarioPresentationDurationMs(sequence.entry));
     assert.equal(harness.controller.isPresentationActive(), true);
     harness.controller.updatePresentation(0.65);
+    assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 14, y: 31 });
+    assert.deepEqual({ x: player.gridX, y: player.gridY }, { x: 14, y: 31 });
+    harness.controller.updatePresentation(0.7);
     assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 19, y: 7 });
     drainStoryPresentation(harness.controller);
 

@@ -1,15 +1,18 @@
 import type { TilePoint } from '../field/FieldPathing';
+import { getStoryInteriorLayout } from './StoryInteriorData';
 import { getOriginalLateStoryBossTile, getOriginalLateStoryCacheEvents } from './OriginalLateStoryFacts';
 import { getOriginalLateStoryItemsForSourceEvent } from './OriginalLateStoryItems';
 
 export type StoryScenarioEventStep =
     | { kind: 'focus'; target: TilePoint; labelKey: string; durationMs?: number }
+    | { kind: 'moveActor'; actorId: string; target: TilePoint; focus?: TilePoint; durationMs?: number }
     | { kind: 'dialogue'; speakerId: string; speakerNameKey: string; textKey: string; focus?: TilePoint; durationMs?: number }
     | { kind: 'combatStart'; labelKey: string; focus?: TilePoint; durationMs?: number }
     | { kind: 'objective'; labelKey: string; focus?: TilePoint; durationMs?: number };
 
 const DEFAULT_STORY_STEP_DURATION_MS: Record<StoryScenarioEventStep['kind'], number> = {
     focus: 450,
+    moveActor: 700,
     dialogue: 1400,
     combatStart: 900,
     objective: 800,
@@ -17,6 +20,7 @@ const DEFAULT_STORY_STEP_DURATION_MS: Record<StoryScenarioEventStep['kind'], num
 
 const LATE_STORY_STEP_DURATION_MS = {
     focus: 650,
+    moveActor: 700,
     dialogue: 1600,
     combatStart: 900,
     objective: 900,
@@ -178,6 +182,8 @@ function lateScenarioSequence(input: {
 }): StoryScenarioEventSequence {
     const ep = String(input.episode).padStart(2, '0');
     const objectiveRuntimeFlag = `${input.dungeonId}_objective_complete`;
+    const layout = getStoryInteriorLayout(input.dungeonId);
+    const entryAdvanceTile = layout ? { x: layout.playerStart.x, y: layout.playerStart.y - 1 } : null;
     const dialogueSteps = input.dialogues?.map((dialogue) => ({
         kind: 'dialogue' as const,
         speakerId: dialogue.speakerId,
@@ -195,6 +201,13 @@ function lateScenarioSequence(input: {
     }));
     const entry: StoryScenarioEventStep[] = [
         { kind: 'focus', target: input.bossTile, labelKey: `story.event.ep${ep}.focus.boss`, durationMs: LATE_STORY_STEP_DURATION_MS.focus },
+        ...(entryAdvanceTile ? [{
+            kind: 'moveActor' as const,
+            actorId: 'hero',
+            target: entryAdvanceTile,
+            focus: entryAdvanceTile,
+            durationMs: LATE_STORY_STEP_DURATION_MS.moveActor,
+        }] : []),
         ...dialogueSteps,
         { kind: 'combatStart', labelKey: `story.event.ep${ep}.combatStart`, focus: input.bossTile, durationMs: LATE_STORY_STEP_DURATION_MS.combatStart },
     ];
