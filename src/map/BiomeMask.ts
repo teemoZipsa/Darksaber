@@ -4,6 +4,8 @@
  * bends borders so the result reads like a designed map instead of a grid.
  */
 
+import WORLD_LOCATIONS from '../data/content/world-locations.json';
+
 export type BiomeType =
     | 'ocean'
     | 'sand'
@@ -61,32 +63,21 @@ interface SpecialZone {
     r: number;
 }
 
+interface WorldLocationContent {
+    mortalTowns: TownInfo[];
+    masterTowns: TownInfo[];
+    mortalTemples: TempleInfo[];
+    masterTemples: TempleInfo[];
+}
+
+const WORLD_LOCATION_CONTENT = WORLD_LOCATIONS as WorldLocationContent;
+
 // Towns double as the strongest biome anchors, so local geography always
 // agrees with the town's identity.
-const MORTAL_TOWNS: TownInfo[] = [
-    { id: 'nw_desert_city',   name: 'Desert Outpost',     nameKr: '사막의 전초기지', chunkX: 16, chunkY: 11, radius: 2 },
-    { id: 'w_forest_village', name: 'Belfuers',           nameKr: '벨퓌어스',        chunkX: 10, chunkY: 52, radius: 2 },
-    { id: 'central_castle',   name: 'Kaosia',             nameKr: '카오시아',        chunkX: 37, chunkY: 44, radius: 3 },
-    { id: 'sw_hideout',       name: 'Southern Refuge',    nameKr: '남부 은신처',     chunkX: 12, chunkY: 79, radius: 2 },
-    { id: 's_coast_town',     name: 'Sicilio',            nameKr: '시시리오',        chunkX: 41, chunkY: 80, radius: 2 },
-    { id: 'e_outpost',        name: 'Eastern Outpost',    nameKr: '동부 전초기지',   chunkX: 64, chunkY: 23, radius: 2 },
-    { id: 'e_stronghold',     name: 'Entria',             nameKr: '엔트리아',        chunkX: 63, chunkY: 49, radius: 2 },
-    { id: 'se_port',          name: 'Arikna',             nameKr: '아리크나',        chunkX: 63, chunkY: 72, radius: 2 },
-];
-
-const MASTER_TOWNS: TownInfo[] = [
-    { id: 'master_sanctum',    name: 'Master Sanctum',     nameKr: '마스터 성역',     chunkX: 40, chunkY: 50, radius: 2 },
-    { id: 'astral_keep',       name: 'Astral Keep',        nameKr: '성좌 요새',       chunkX: 23, chunkY: 28, radius: 2 },
-    { id: 'ember_citadel',     name: 'Ember Citadel',      nameKr: '홍염 성채',       chunkX: 60, chunkY: 67, radius: 2 },
-];
-
-const MORTAL_TEMPLES: TempleInfo[] = [
-    { id: 'fusion_temple', name: 'Fusion Temple', nameKr: '융합의 신전', chunkX: 38, chunkY: 35, tileRadius: 4 },
-];
-
-const MASTER_TEMPLES: TempleInfo[] = [
-    { id: 'mortal_gate', name: 'Mortal Gate', nameKr: '현세의 문', chunkX: 40, chunkY: 50, tileRadius: 4 },
-];
+const MORTAL_TOWNS = WORLD_LOCATION_CONTENT.mortalTowns;
+const MASTER_TOWNS = WORLD_LOCATION_CONTENT.masterTowns;
+const MORTAL_TEMPLES = WORLD_LOCATION_CONTENT.mortalTemples;
+const MASTER_TEMPLES = WORLD_LOCATION_CONTENT.masterTemples;
 
 const LAND_ANCHORS: InfluenceAnchor[] = [
     // West continent spine.

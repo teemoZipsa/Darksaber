@@ -10,6 +10,7 @@ import { HMAP_BLEND_BAND, type HmapSample } from './HmapBlend';
 import { STORY_SCENARIOS } from '../data/StoryScenarioData';
 import { isStoryInteriorDungeon } from '../data/StoryInteriorData';
 import { t } from '../i18n/LanguageManager';
+import WORLD_LOCATIONS from '../data/content/world-locations.json';
 
 export interface TileBounds {
     width: number;
@@ -72,6 +73,12 @@ export interface WorldDungeonInfo {
     tileSpan: number;
     tileRadius: number;
 }
+
+interface WorldLocationContent {
+    beginnerDungeons: WorldDungeonInfo[];
+}
+
+const WORLD_LOCATION_CONTENT = WORLD_LOCATIONS as WorldLocationContent;
 
 interface WorldMapOptions {
     validateTownSpawns?: boolean;
@@ -220,9 +227,7 @@ const RIVER_ROUTES: TileRoute[] = [
 ];
 
 const DUNGEON_LANDMARKS: WorldDungeonInfo[] = [
-    { id: 'beginner_mine', nameKr: '초심자의 폐광', chunkX: 38, chunkY: 35, sprite: 'beginnerMine', tileSpan: 3, tileRadius: 4 },
-    { id: 'beginner_ruins', nameKr: '초보자 유적', chunkX: 62, chunkY: 28, sprite: 'beginnerRuins', tileSpan: 3, tileRadius: 4 },
-    { id: 'dark_cave', nameKr: '암흑 동굴', chunkX: 62, chunkY: 48, sprite: 'caveEntrance', tileSpan: 3, tileRadius: 4 },
+    ...WORLD_LOCATION_CONTENT.beginnerDungeons,
     ...STORY_SCENARIOS.map((scenario) => ({
         id: scenario.dungeonId,
         nameKr: scenario.dungeonNameKr,
