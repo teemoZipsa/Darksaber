@@ -16,6 +16,7 @@ import {
     getStatusEffectsForSkill,
     resolveTurnStartStatuses,
 } from '../combat/StatusEffects';
+import { i18n, t } from '../i18n/LanguageManager';
 
 export interface ActiveBuff {
     id: string;
@@ -429,9 +430,10 @@ export class Character {
 
     /** Get current tier display name */
     public getTierName(): string {
-        if (!this.classLine) return '미상';
+        if (!this.classLine) return t('character.tier.unknown');
         const tier = this.classLine.tiers[this.tierIndex];
-        return tier ? tier.nameKr : '미상';
+        if (!tier) return t('character.tier.unknown');
+        return i18n.lang === 'en' ? tier.nameEn : tier.nameKr;
     }
 
     public getTierNameEn(): string {

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Character } from '../../src/character/Character';
 import { getLevelCap, getExpToNext, getOriginalStats } from '../../src/data/original/originalProgression';
+import { i18n } from '../../src/i18n/LanguageManager';
 
 class ImageStub {
     public src = '';
@@ -39,6 +40,22 @@ test('classes without original data keep the formula fallback', () => {
     const c = new Character('a', 'Alchy', 'alchemist');
     assert.equal(c.levelCap(), 10);
     assert.ok(c.expToNext > 0);
+});
+
+test('character tier display name follows the active language', () => {
+    const previousLang = i18n.lang;
+    try {
+        const c = new Character('h', 'Hero', 'infantry');
+        i18n.lang = 'ko';
+        assert.equal(c.getTierName(), '파이터');
+        i18n.lang = 'en';
+        assert.equal(c.getTierName(), 'Fighter');
+
+        const unknown = new Character('u', 'Unknown', 'missing_class');
+        assert.equal(unknown.getTierName(), 'Unknown');
+    } finally {
+        i18n.lang = previousLang;
+    }
 });
 
 test('original base stats: paired stats interpolate 수→한 across the tier', () => {

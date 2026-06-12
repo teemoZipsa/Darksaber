@@ -1,6 +1,7 @@
 import { UI, Parchment, drawParchmentPanel } from './UITheme';
 import type { ItemIconSprite } from '../data/ItemDB';
 import { drawItemIcon } from './ItemIconRenderer';
+import { t } from '../i18n/LanguageManager';
 
 export interface ToolOptionView {
     itemId: string;
@@ -149,7 +150,7 @@ export class ToolUI {
         ctx.fillStyle = Parchment.textDark;
         ctx.font = `bold 15px ${UI.fontPrimary}`;
         ctx.textAlign = 'left';
-        ctx.fillText('도구', px + 16, py + 22);
+        ctx.fillText(t('tool.title'), px + 16, py + 22);
 
         ctx.fillStyle = '#a01818';
         ctx.font = `bold 14px ${UI.fontPrimary}`;

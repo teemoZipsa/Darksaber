@@ -37,6 +37,8 @@ export const i18n = {
             'action.label.rest': '휴식',
             'action.label.fanfare': '빵빠레',
             'action.label.open': '조사',
+            'character.tier.unknown': '미상',
+            'tool.title': '도구',
 
             // General
             'btn.deploy': '출격',
@@ -1014,6 +1016,8 @@ export const i18n = {
             'action.label.rest': 'Rest',
             'action.label.fanfare': 'Fanfare',
             'action.label.open': 'Inspect',
+            'character.tier.unknown': 'Unknown',
+            'tool.title': 'Tools',
 
             // General
             'btn.deploy': 'DEPLOY',
