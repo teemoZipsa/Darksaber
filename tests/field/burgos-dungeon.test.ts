@@ -1094,8 +1094,8 @@ test('late story boss clear GETITEM rewards are granted on boss defeat', () => {
     harness.controller.completeDungeonIfBossDefeated(boss);
 
     assert.equal(raidSession.isDungeonCleared(BEELZEBUTH_HALL_DUNGEON_ID), true);
-    assert.deepEqual(harness.rewardItemIds, ['corrupted_blade']);
-    assert.ok(harness.logs.some((entry) => entry.includes('타락한 검')));
+    assert.deepEqual(harness.rewardItemIds, ['orig_late_0984']);
+    assert.ok(harness.logs.some((entry) => entry.includes('실버애로우')));
     assert.ok(harness.logs.includes('시나리오 클리어'));
 });
 

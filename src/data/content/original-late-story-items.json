@@ -2,186 +2,1023 @@
   "items": [
     {
       "originalItemId": 976,
-      "currentItemId": "shadow_cloak",
+      "currentItemId": "orig_late_0976",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 24, "dungeonId": "astaroth_gate", "setArc": "MAP/24set.arc", "eventMember": "24.evt", "eventNumber": 99 }]
+      "originalNameKr": "문라이트",
+      "originalDescriptionKr": "달을 밸 수 있는 빠르기를 지닌 창",
+      "slot": "weapon",
+      "gridW": 1,
+      "gridH": 3,
+      "color": "#b8a48c",
+      "icon": "🔱",
+      "iconSprite": {
+        "col": 51,
+        "row": 3
+      },
+      "maxDurability": 9000,
+      "requiredLevel": 500,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "보병, 비병, 기병",
+      "stats": {
+        "atk": 235
+      },
+      "attackRange": 2,
+      "sourceEvents": [
+        {
+          "episode": 24,
+          "dungeonId": "astaroth_gate",
+          "setArc": "MAP/24set.arc",
+          "eventMember": "24.evt",
+          "eventNumber": 99
+        }
+      ]
     },
     {
       "originalItemId": 980,
-      "currentItemId": "web_66_51",
+      "currentItemId": "orig_late_0980",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 24, "dungeonId": "astaroth_gate", "setArc": "MAP/24set.arc", "eventMember": "24.evt", "eventNumber": 91 }]
+      "originalNameKr": "큐피트",
+      "originalDescriptionKr": "사랑의힘을 주는 활",
+      "slot": "weapon",
+      "gridW": 1,
+      "gridH": 3,
+      "color": "#b8a48c",
+      "icon": "🏹",
+      "iconSprite": {
+        "col": 55,
+        "row": 3
+      },
+      "maxDurability": 6000,
+      "requiredLevel": 500,
+      "originalMagicId": 2506,
+      "originalPrice": 0,
+      "usableClasses": "수병, 창병, 궁병",
+      "stats": {
+        "atk": 160
+      },
+      "attackRange": 7,
+      "sourceEvents": [
+        {
+          "episode": 24,
+          "dungeonId": "astaroth_gate",
+          "setArc": "MAP/24set.arc",
+          "eventMember": "24.evt",
+          "eventNumber": 91
+        }
+      ]
     },
     {
       "originalItemId": 984,
-      "currentItemId": "corrupted_blade",
+      "currentItemId": "orig_late_0984",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 23, "dungeonId": "beelzebuth_hall", "setArc": "MAP/23set.arc", "eventMember": "23.evt", "eventNumber": 99 }]
+      "originalNameKr": "실버애로우",
+      "originalDescriptionKr": "강력한 명중률를 보이는 화살",
+      "slot": "weapon",
+      "gridW": 1,
+      "gridH": 3,
+      "color": "#b8a48c",
+      "icon": "🏹",
+      "iconSprite": {
+        "col": 59,
+        "row": 3
+      },
+      "maxDurability": 4000,
+      "requiredLevel": 500,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "수병, 창병, 궁병",
+      "stats": {
+        "atk": 160,
+        "hitRate": 10
+      },
+      "attackRange": 7,
+      "sourceEvents": [
+        {
+          "episode": 23,
+          "dungeonId": "beelzebuth_hall",
+          "setArc": "MAP/23set.arc",
+          "eventMember": "23.evt",
+          "eventNumber": 99
+        }
+      ]
     },
     {
       "originalItemId": 986,
-      "currentItemId": "magic_t6_body",
+      "currentItemId": "orig_late_0986",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 23, "dungeonId": "beelzebuth_hall", "setArc": "MAP/23set.arc", "eventMember": "23.evt", "eventNumber": 93 }]
+      "originalNameKr": "포세이큰",
+      "originalDescriptionKr": "물의 정령의 힘을 지닌 강력한활",
+      "slot": "weapon",
+      "gridW": 1,
+      "gridH": 3,
+      "color": "#b8a48c",
+      "icon": "🏹",
+      "iconSprite": {
+        "col": 61,
+        "row": 3
+      },
+      "maxDurability": 5000,
+      "requiredLevel": 500,
+      "originalMagicId": 306,
+      "originalPrice": 0,
+      "usableClasses": "수병, 창병, 궁병",
+      "stats": {
+        "atk": 160
+      },
+      "attackRange": 7,
+      "sourceEvents": [
+        {
+          "episode": 23,
+          "dungeonId": "beelzebuth_hall",
+          "setArc": "MAP/23set.arc",
+          "eventMember": "23.evt",
+          "eventNumber": 93
+        }
+      ]
     },
     {
       "originalItemId": 992,
-      "currentItemId": "void_crystal",
+      "currentItemId": "orig_late_0992",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 24, "dungeonId": "astaroth_gate", "setArc": "MAP/24set.arc", "eventMember": "24.evt", "eventNumber": 92 }]
+      "originalNameKr": "피리플레케톤",
+      "originalDescriptionKr": "성스러운 수호천사의 정령이 깃든 갑옷",
+      "slot": "body",
+      "gridW": 2,
+      "gridH": 3,
+      "color": "#7f8c8d",
+      "icon": "🦺",
+      "iconSprite": {
+        "col": 67,
+        "row": 3
+      },
+      "maxDurability": 2000,
+      "requiredLevel": 500,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "보병, 비병, 기병",
+      "stats": {
+        "def": 70,
+        "evasion": 5
+      },
+      "sourceEvents": [
+        {
+          "episode": 24,
+          "dungeonId": "astaroth_gate",
+          "setArc": "MAP/24set.arc",
+          "eventMember": "24.evt",
+          "eventNumber": 92
+        }
+      ]
     },
     {
       "originalItemId": 997,
-      "currentItemId": "magic_t6_body",
+      "currentItemId": "orig_late_0997",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 24, "dungeonId": "astaroth_gate", "setArc": "MAP/24set.arc", "eventMember": "24.evt", "eventNumber": 93 }]
+      "originalNameKr": "이제네르",
+      "originalDescriptionKr": "전설의마법사게이시론의 마법력이 숨어있는 자켓",
+      "slot": "body",
+      "gridW": 2,
+      "gridH": 3,
+      "color": "#7f8c8d",
+      "icon": "🦺",
+      "iconSprite": {
+        "col": 72,
+        "row": 3
+      },
+      "maxDurability": 2000,
+      "requiredLevel": 500,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "수병, 창병, 궁병",
+      "stats": {
+        "def": 65,
+        "magAtk": 20
+      },
+      "magicRange": 30,
+      "sourceEvents": [
+        {
+          "episode": 24,
+          "dungeonId": "astaroth_gate",
+          "setArc": "MAP/24set.arc",
+          "eventMember": "24.evt",
+          "eventNumber": 93
+        }
+      ]
     },
     {
       "originalItemId": 1002,
-      "currentItemId": "shadow_cloak",
+      "currentItemId": "orig_late_1002",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 24, "dungeonId": "astaroth_gate", "setArc": "MAP/24set.arc", "eventMember": "24.evt", "eventNumber": 94 }]
+      "originalNameKr": "가리우스",
+      "originalDescriptionKr": "불멸의 신인 가리디아스의 염력을 지닌 로브",
+      "slot": "body",
+      "gridW": 2,
+      "gridH": 3,
+      "color": "#7f8c8d",
+      "icon": "🦺",
+      "iconSprite": {
+        "col": 77,
+        "row": 3
+      },
+      "maxDurability": 1800,
+      "requiredLevel": 500,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "승려, 신관, 마교, 사교",
+      "stats": {
+        "def": 75,
+        "magDef": 10,
+        "evasion": 5
+      },
+      "sourceEvents": [
+        {
+          "episode": 24,
+          "dungeonId": "astaroth_gate",
+          "setArc": "MAP/24set.arc",
+          "eventMember": "24.evt",
+          "eventNumber": 94
+        }
+      ]
     },
     {
       "originalItemId": 1005,
-      "currentItemId": "web_66_51",
+      "currentItemId": "orig_late_1005",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 23, "dungeonId": "beelzebuth_hall", "setArc": "MAP/23set.arc", "eventMember": "23.evt", "eventNumber": 91 }]
+      "originalNameKr": "라르시안",
+      "originalDescriptionKr": "강한 내구성과 방어력을 지닌 부츠",
+      "slot": "boots",
+      "gridW": 2,
+      "gridH": 2,
+      "color": "#7f8c8d",
+      "icon": "🥾",
+      "iconSprite": {
+        "col": 80,
+        "row": 3
+      },
+      "maxDurability": 1200,
+      "requiredLevel": 500,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "보병, 비병, 기병",
+      "stats": {
+        "def": 28,
+        "magDef": 10
+      },
+      "sourceEvents": [
+        {
+          "episode": 23,
+          "dungeonId": "beelzebuth_hall",
+          "setArc": "MAP/23set.arc",
+          "eventMember": "23.evt",
+          "eventNumber": 91
+        }
+      ]
     },
     {
       "originalItemId": 1007,
-      "currentItemId": "void_crystal",
+      "currentItemId": "orig_late_1007",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 25, "dungeonId": "nergal_depths", "setArc": "MAP/25set.arc", "eventMember": "25.evt", "eventNumber": 92 }]
+      "originalNameKr": "천공제신",
+      "originalDescriptionKr": "하늘을 날아다닐 수 있을정도의 스피드 가진 부츠",
+      "slot": "boots",
+      "gridW": 2,
+      "gridH": 2,
+      "color": "#7f8c8d",
+      "icon": "🥾",
+      "iconSprite": {
+        "col": 82,
+        "row": 3
+      },
+      "maxDurability": 1500,
+      "requiredLevel": 500,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "보병, 비병, 기병",
+      "stats": {
+        "def": 35
+      },
+      "sourceEvents": [
+        {
+          "episode": 25,
+          "dungeonId": "nergal_depths",
+          "setArc": "MAP/25set.arc",
+          "eventMember": "25.evt",
+          "eventNumber": 92
+        }
+      ]
     },
     {
       "originalItemId": 1010,
-      "currentItemId": "shadow_cloak",
+      "currentItemId": "orig_late_1010",
       "rewardKind": "relic",
+      "originalNameKr": "가드니스슈즈",
+      "originalDescriptionKr": "여신의 보호막을 지닌 슈즈",
+      "slot": "boots",
+      "gridW": 2,
+      "gridH": 2,
+      "color": "#7f8c8d",
+      "icon": "🥾",
+      "iconSprite": {
+        "col": 85,
+        "row": 3
+      },
+      "maxDurability": 1200,
+      "requiredLevel": 500,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "승려, 신관, 마교, 사교",
+      "stats": {
+        "def": 40,
+        "magAtk": -20
+      },
       "sourceEvents": [
-        { "episode": 23, "dungeonId": "beelzebuth_hall", "setArc": "MAP/23set.arc", "eventMember": "23.evt", "eventNumber": 94 },
-        { "episode": 25, "dungeonId": "nergal_depths", "setArc": "MAP/25set.arc", "eventMember": "25.evt", "eventNumber": 94 }
+        {
+          "episode": 23,
+          "dungeonId": "beelzebuth_hall",
+          "setArc": "MAP/23set.arc",
+          "eventMember": "23.evt",
+          "eventNumber": 94
+        },
+        {
+          "episode": 25,
+          "dungeonId": "nergal_depths",
+          "setArc": "MAP/25set.arc",
+          "eventMember": "25.evt",
+          "eventNumber": 94
+        }
       ]
     },
     {
       "originalItemId": 1027,
-      "currentItemId": "magic_t6_body",
+      "currentItemId": "orig_late_1027",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 25, "dungeonId": "nergal_depths", "setArc": "MAP/25set.arc", "eventMember": "25.evt", "eventNumber": 93 }]
+      "originalNameKr": "세류니어스",
+      "originalDescriptionKr": "땅마법의 데미지를 극소화 시켜주는 모자",
+      "slot": "head",
+      "gridW": 2,
+      "gridH": 2,
+      "color": "#7f8c8d",
+      "icon": "⛑️",
+      "iconSprite": {
+        "col": 2,
+        "row": 4
+      },
+      "maxDurability": 1200,
+      "requiredLevel": 500,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "수병, 창병, 궁병",
+      "stats": {
+        "def": 45
+      },
+      "sourceEvents": [
+        {
+          "episode": 25,
+          "dungeonId": "nergal_depths",
+          "setArc": "MAP/25set.arc",
+          "eventMember": "25.evt",
+          "eventNumber": 93
+        }
+      ]
     },
     {
       "originalItemId": 1030,
-      "currentItemId": "web_66_51",
+      "currentItemId": "orig_late_1030",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 25, "dungeonId": "nergal_depths", "setArc": "MAP/25set.arc", "eventMember": "25.evt", "eventNumber": 91 }]
+      "originalNameKr": "마르시어스",
+      "originalDescriptionKr": "전쟁의화신인 마르시의 마력이 깃든 햇",
+      "slot": "head",
+      "gridW": 2,
+      "gridH": 2,
+      "color": "#7f8c8d",
+      "icon": "⛑️",
+      "iconSprite": {
+        "col": 5,
+        "row": 4
+      },
+      "maxDurability": 1500,
+      "requiredLevel": 500,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "승려, 신관, 마교, 사교",
+      "stats": {
+        "def": 40,
+        "magAtk": 30,
+        "magDef": 15
+      },
+      "sourceEvents": [
+        {
+          "episode": 25,
+          "dungeonId": "nergal_depths",
+          "setArc": "MAP/25set.arc",
+          "eventMember": "25.evt",
+          "eventNumber": 91
+        }
+      ]
     },
     {
       "originalItemId": 1052,
-      "currentItemId": "void_crystal",
+      "currentItemId": "orig_late_1052",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 23, "dungeonId": "beelzebuth_hall", "setArc": "MAP/23set.arc", "eventMember": "23.evt", "eventNumber": 92 }]
+      "originalNameKr": "다이커스",
+      "originalDescriptionKr": "마력방패막을 지닌 성스러운 실드",
+      "slot": "shield",
+      "gridW": 2,
+      "gridH": 2,
+      "color": "#8fa8b8",
+      "icon": "🛡️",
+      "iconSprite": {
+        "col": 27,
+        "row": 4
+      },
+      "maxDurability": 1500,
+      "requiredLevel": 500,
+      "originalMagicId": 2006,
+      "originalPrice": 0,
+      "usableClasses": "보병, 비병, 기병",
+      "stats": {
+        "def": 60,
+        "evasion": 10
+      },
+      "magicRange": 5,
+      "sourceEvents": [
+        {
+          "episode": 23,
+          "dungeonId": "beelzebuth_hall",
+          "setArc": "MAP/23set.arc",
+          "eventMember": "23.evt",
+          "eventNumber": 92
+        }
+      ]
     },
     {
       "originalItemId": 1104,
-      "currentItemId": "web_66_51",
+      "currentItemId": "orig_late_1104",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 28, "dungeonId": "ergion_keep", "setArc": "MAP/28set.arc", "eventMember": "28.evt", "eventNumber": 91 }]
+      "originalNameKr": "엘디카이져",
+      "originalDescriptionKr": "9단계 검",
+      "slot": "weapon",
+      "gridW": 1,
+      "gridH": 3,
+      "color": "#b8a48c",
+      "icon": "🗡️",
+      "iconSprite": {
+        "col": 53,
+        "row": 4
+      },
+      "maxDurability": 1000,
+      "requiredLevel": 570,
+      "originalMagicId": 10803,
+      "originalPrice": 0,
+      "usableClasses": "보병, 비병, 기병",
+      "stats": {
+        "atk": 300
+      },
+      "attackRange": 1,
+      "sourceEvents": [
+        {
+          "episode": 28,
+          "dungeonId": "ergion_keep",
+          "setArc": "MAP/28set.arc",
+          "eventMember": "28.evt",
+          "eventNumber": 91
+        }
+      ]
     },
     {
       "originalItemId": 1108,
-      "currentItemId": "lance",
+      "currentItemId": "orig_late_1108",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 28, "dungeonId": "ergion_keep", "setArc": "MAP/28set.arc", "eventMember": "28.evt", "eventNumber": 92 }]
+      "originalNameKr": "Material Bow",
+      "originalDescriptionKr": "9단계 활",
+      "slot": "weapon",
+      "gridW": 1,
+      "gridH": 3,
+      "color": "#b8a48c",
+      "icon": "🏹",
+      "iconSprite": {
+        "col": 57,
+        "row": 4
+      },
+      "maxDurability": 1000,
+      "requiredLevel": 570,
+      "originalMagicId": 1006,
+      "originalPrice": 0,
+      "usableClasses": "수병, 창병, 궁병",
+      "stats": {
+        "atk": 250
+      },
+      "attackRange": 8,
+      "sourceEvents": [
+        {
+          "episode": 28,
+          "dungeonId": "ergion_keep",
+          "setArc": "MAP/28set.arc",
+          "eventMember": "28.evt",
+          "eventNumber": 92
+        }
+      ]
     },
     {
       "originalItemId": 1111,
-      "currentItemId": "magic_t6_body",
+      "currentItemId": "orig_late_1111",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 28, "dungeonId": "ergion_keep", "setArc": "MAP/28set.arc", "eventMember": "28.evt", "eventNumber": 93 }]
+      "originalNameKr": "헬화이언스",
+      "originalDescriptionKr": "9단계 창",
+      "slot": "weapon",
+      "gridW": 1,
+      "gridH": 3,
+      "color": "#b8a48c",
+      "icon": "🔱",
+      "iconSprite": {
+        "col": 60,
+        "row": 4
+      },
+      "maxDurability": 2500,
+      "requiredLevel": 570,
+      "originalMagicId": 6603,
+      "originalPrice": 0,
+      "usableClasses": "보병, 비병, 기병, 수병, 창병, 궁병",
+      "stats": {
+        "atk": 320
+      },
+      "attackRange": 2,
+      "sourceEvents": [
+        {
+          "episode": 28,
+          "dungeonId": "ergion_keep",
+          "setArc": "MAP/28set.arc",
+          "eventMember": "28.evt",
+          "eventNumber": 93
+        }
+      ]
     },
     {
       "originalItemId": 1113,
-      "currentItemId": "corrupted_blade",
+      "currentItemId": "orig_late_1113",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 28, "dungeonId": "ergion_keep", "setArc": "MAP/28set.arc", "eventMember": "28.evt", "eventNumber": 94 }]
+      "originalNameKr": "크림스크래쉬",
+      "originalDescriptionKr": "9단계 지팡이",
+      "slot": "weapon",
+      "gridW": 1,
+      "gridH": 3,
+      "color": "#b8a48c",
+      "icon": "🏹",
+      "iconSprite": {
+        "col": 62,
+        "row": 4
+      },
+      "maxDurability": 1000,
+      "requiredLevel": 570,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "승려, 신관, 마교, 사교",
+      "stats": {
+        "atk": 280,
+        "magAtk": 50,
+        "magDef": 180
+      },
+      "attackRange": 1,
+      "sourceEvents": [
+        {
+          "episode": 28,
+          "dungeonId": "ergion_keep",
+          "setArc": "MAP/28set.arc",
+          "eventMember": "28.evt",
+          "eventNumber": 94
+        }
+      ]
     },
     {
       "originalItemId": 1116,
-      "currentItemId": "web_66_51",
+      "currentItemId": "orig_late_1116",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 29, "dungeonId": "martani_bastion", "setArc": "MAP/29set.arc", "eventMember": "29.evt", "eventNumber": 91 }]
+      "originalNameKr": "엘리나",
+      "originalDescriptionKr": "9단계 투구",
+      "slot": "head",
+      "gridW": 2,
+      "gridH": 2,
+      "color": "#7f8c8d",
+      "icon": "⛑️",
+      "iconSprite": {
+        "col": 65,
+        "row": 4
+      },
+      "maxDurability": 500,
+      "requiredLevel": 570,
+      "originalMagicId": 1703,
+      "originalPrice": 0,
+      "usableClasses": "보병, 비병, 기병",
+      "stats": {
+        "def": 38
+      },
+      "sourceEvents": [
+        {
+          "episode": 29,
+          "dungeonId": "martani_bastion",
+          "setArc": "MAP/29set.arc",
+          "eventMember": "29.evt",
+          "eventNumber": 91
+        }
+      ]
     },
     {
       "originalItemId": 1119,
-      "currentItemId": "web_66_51",
+      "currentItemId": "orig_late_1119",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 30, "dungeonId": "blin_watch", "setArc": "MAP/30set.arc", "eventMember": "30.evt", "eventNumber": 91 }]
+      "originalNameKr": "세실리온",
+      "originalDescriptionKr": "9단계 아머",
+      "slot": "body",
+      "gridW": 2,
+      "gridH": 3,
+      "color": "#7f8c8d",
+      "icon": "🦺",
+      "iconSprite": {
+        "col": 68,
+        "row": 4
+      },
+      "maxDurability": 500,
+      "requiredLevel": 570,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "보병, 비병, 기병",
+      "stats": {
+        "def": 75
+      },
+      "magicRange": 10,
+      "sourceEvents": [
+        {
+          "episode": 30,
+          "dungeonId": "blin_watch",
+          "setArc": "MAP/30set.arc",
+          "eventMember": "30.evt",
+          "eventNumber": 91
+        }
+      ]
     },
     {
       "originalItemId": 1122,
-      "currentItemId": "web_66_51",
+      "currentItemId": "orig_late_1122",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 31, "dungeonId": "demon_fixers_den", "setArc": "MAP/31set.arc", "eventMember": "31.evt", "eventNumber": 91 }]
+      "originalNameKr": "레지넨",
+      "originalDescriptionKr": "9단계 부츠",
+      "slot": "boots",
+      "gridW": 2,
+      "gridH": 2,
+      "color": "#7f8c8d",
+      "icon": "🥾",
+      "iconSprite": {
+        "col": 71,
+        "row": 4
+      },
+      "maxDurability": 500,
+      "requiredLevel": 570,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "보병, 비병, 기병",
+      "stats": {
+        "def": 45,
+        "evasion": 5
+      },
+      "sourceEvents": [
+        {
+          "episode": 31,
+          "dungeonId": "demon_fixers_den",
+          "setArc": "MAP/31set.arc",
+          "eventMember": "31.evt",
+          "eventNumber": 91
+        }
+      ]
     },
     {
       "originalItemId": 1125,
-      "currentItemId": "void_crystal",
+      "currentItemId": "orig_late_1125",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 29, "dungeonId": "martani_bastion", "setArc": "MAP/29set.arc", "eventMember": "29.evt", "eventNumber": 92 }]
+      "originalNameKr": "켈미리온",
+      "originalDescriptionKr": "9단계모자",
+      "slot": "head",
+      "gridW": 2,
+      "gridH": 2,
+      "color": "#7f8c8d",
+      "icon": "⛑️",
+      "iconSprite": {
+        "col": 74,
+        "row": 4
+      },
+      "maxDurability": 400,
+      "requiredLevel": 570,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "수병, 창병, 궁병",
+      "stats": {
+        "def": 50
+      },
+      "magicRange": 15,
+      "sourceEvents": [
+        {
+          "episode": 29,
+          "dungeonId": "martani_bastion",
+          "setArc": "MAP/29set.arc",
+          "eventMember": "29.evt",
+          "eventNumber": 92
+        }
+      ]
     },
     {
       "originalItemId": 1128,
-      "currentItemId": "void_crystal",
+      "currentItemId": "orig_late_1128",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 30, "dungeonId": "blin_watch", "setArc": "MAP/30set.arc", "eventMember": "30.evt", "eventNumber": 92 }]
+      "originalNameKr": "크라케스",
+      "originalDescriptionKr": "9단계재킷",
+      "slot": "body",
+      "gridW": 2,
+      "gridH": 3,
+      "color": "#7f8c8d",
+      "icon": "🦺",
+      "iconSprite": {
+        "col": 77,
+        "row": 4
+      },
+      "maxDurability": 500,
+      "requiredLevel": 570,
+      "originalMagicId": 2303,
+      "originalPrice": 0,
+      "usableClasses": "수병, 창병, 궁병",
+      "stats": {
+        "def": 70
+      },
+      "sourceEvents": [
+        {
+          "episode": 30,
+          "dungeonId": "blin_watch",
+          "setArc": "MAP/30set.arc",
+          "eventMember": "30.evt",
+          "eventNumber": 92
+        }
+      ]
     },
     {
       "originalItemId": 1131,
-      "currentItemId": "void_crystal",
+      "currentItemId": "orig_late_1131",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 31, "dungeonId": "demon_fixers_den", "setArc": "MAP/31set.arc", "eventMember": "31.evt", "eventNumber": 92 }]
+      "originalNameKr": "아르바겐",
+      "originalDescriptionKr": "9단계신발",
+      "slot": "boots",
+      "gridW": 2,
+      "gridH": 2,
+      "color": "#7f8c8d",
+      "icon": "🥾",
+      "iconSprite": {
+        "col": 80,
+        "row": 4
+      },
+      "maxDurability": 400,
+      "requiredLevel": 570,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "수병, 창병, 궁병",
+      "stats": {
+        "def": 50
+      },
+      "magicRange": 5,
+      "sourceEvents": [
+        {
+          "episode": 31,
+          "dungeonId": "demon_fixers_den",
+          "setArc": "MAP/31set.arc",
+          "eventMember": "31.evt",
+          "eventNumber": 92
+        }
+      ]
     },
     {
       "originalItemId": 1134,
-      "currentItemId": "magic_t6_body",
+      "currentItemId": "orig_late_1134",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 29, "dungeonId": "martani_bastion", "setArc": "MAP/29set.arc", "eventMember": "29.evt", "eventNumber": 93 }]
+      "originalNameKr": "디키뮈스",
+      "originalDescriptionKr": "9단계햇",
+      "slot": "head",
+      "gridW": 2,
+      "gridH": 2,
+      "color": "#7f8c8d",
+      "icon": "⛑️",
+      "iconSprite": {
+        "col": 83,
+        "row": 4
+      },
+      "maxDurability": 400,
+      "requiredLevel": 570,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "승려, 신관, 마교, 사교",
+      "stats": {
+        "def": 50,
+        "magAtk": 60
+      },
+      "sourceEvents": [
+        {
+          "episode": 29,
+          "dungeonId": "martani_bastion",
+          "setArc": "MAP/29set.arc",
+          "eventMember": "29.evt",
+          "eventNumber": 93
+        }
+      ]
     },
     {
       "originalItemId": 1137,
-      "currentItemId": "magic_t6_body",
+      "currentItemId": "orig_late_1137",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 30, "dungeonId": "blin_watch", "setArc": "MAP/30set.arc", "eventMember": "30.evt", "eventNumber": 93 }]
+      "originalNameKr": "아리노아 로브",
+      "originalDescriptionKr": "9단계로브",
+      "slot": "body",
+      "gridW": 2,
+      "gridH": 3,
+      "color": "#7f8c8d",
+      "icon": "🦺",
+      "iconSprite": {
+        "col": 86,
+        "row": 4
+      },
+      "maxDurability": 600,
+      "requiredLevel": 570,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "승려, 신관, 마교, 사교",
+      "stats": {
+        "def": 75,
+        "magDef": 10
+      },
+      "sourceEvents": [
+        {
+          "episode": 30,
+          "dungeonId": "blin_watch",
+          "setArc": "MAP/30set.arc",
+          "eventMember": "30.evt",
+          "eventNumber": 93
+        }
+      ]
     },
     {
       "originalItemId": 1140,
-      "currentItemId": "magic_t6_body",
+      "currentItemId": "orig_late_1140",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 31, "dungeonId": "demon_fixers_den", "setArc": "MAP/31set.arc", "eventMember": "31.evt", "eventNumber": 93 }]
+      "originalNameKr": "슈티니언",
+      "originalDescriptionKr": "9단계슈즈",
+      "slot": "boots",
+      "gridW": 2,
+      "gridH": 2,
+      "color": "#7f8c8d",
+      "icon": "🥾",
+      "iconSprite": {
+        "col": 89,
+        "row": 4
+      },
+      "maxDurability": 400,
+      "requiredLevel": 570,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "승려, 신관, 마교, 사교",
+      "stats": {
+        "def": 50
+      },
+      "magicRange": 10,
+      "sourceEvents": [
+        {
+          "episode": 31,
+          "dungeonId": "demon_fixers_den",
+          "setArc": "MAP/31set.arc",
+          "eventMember": "31.evt",
+          "eventNumber": 93
+        }
+      ]
     },
     {
       "originalItemId": 1143,
-      "currentItemId": "shadow_cloak",
+      "currentItemId": "orig_late_1143",
       "rewardKind": "relic",
-      "sourceEvents": [{ "episode": 30, "dungeonId": "blin_watch", "setArc": "MAP/30set.arc", "eventMember": "30.evt", "eventNumber": 94 }]
+      "originalNameKr": "헬레디언",
+      "originalDescriptionKr": "9단계실드",
+      "slot": "shield",
+      "gridW": 2,
+      "gridH": 2,
+      "color": "#8fa8b8",
+      "icon": "🛡️",
+      "iconSprite": {
+        "col": 92,
+        "row": 4
+      },
+      "maxDurability": 600,
+      "requiredLevel": 570,
+      "originalMagicId": 2006,
+      "originalPrice": 0,
+      "usableClasses": "보병, 비병, 기병",
+      "stats": {
+        "def": 70
+      },
+      "sourceEvents": [
+        {
+          "episode": 30,
+          "dungeonId": "blin_watch",
+          "setArc": "MAP/30set.arc",
+          "eventMember": "30.evt",
+          "eventNumber": 94
+        }
+      ]
     },
     {
       "originalItemId": 1168,
-      "currentItemId": "void_crystal",
+      "currentItemId": "orig_late_1168",
       "rewardKind": "mark",
-      "sourceEvents": [{ "episode": 26, "dungeonId": "beast_mark_shrine", "setArc": "MAP/26set.arc", "eventMember": "26.evt", "eventNumber": 92 }]
+      "originalNameKr": "배마의징표",
+      "originalDescriptionKr": "진정한 택자가 되기위해서 궁병이 지녀야 할 징표",
+      "slot": "material",
+      "gridW": 1,
+      "gridH": 1,
+      "color": "#f0c050",
+      "icon": "*",
+      "iconSprite": {
+        "col": 26,
+        "row": 5
+      },
+      "maxDurability": 1,
+      "requiredLevel": 0,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "비병",
+      "stats": {},
+      "sourceEvents": [
+        {
+          "episode": 26,
+          "dungeonId": "beast_mark_shrine",
+          "setArc": "MAP/26set.arc",
+          "eventMember": "26.evt",
+          "eventNumber": 92
+        }
+      ]
     },
     {
       "originalItemId": 1169,
-      "currentItemId": "void_crystal",
+      "currentItemId": "orig_late_1169",
       "rewardKind": "mark",
-      "sourceEvents": [{ "episode": 27, "dungeonId": "chosen_mark_shrine", "setArc": "MAP/27set.arc", "eventMember": "27.evt", "eventNumber": 92 }]
+      "originalNameKr": "택마의징표",
+      "originalDescriptionKr": "진정한 택자가 되기위해서 궁병이 지녀야 할 징표",
+      "slot": "material",
+      "gridW": 1,
+      "gridH": 1,
+      "color": "#f0c050",
+      "icon": "*",
+      "iconSprite": {
+        "col": 25,
+        "row": 5
+      },
+      "maxDurability": 1,
+      "requiredLevel": 0,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "궁병",
+      "stats": {},
+      "sourceEvents": [
+        {
+          "episode": 27,
+          "dungeonId": "chosen_mark_shrine",
+          "setArc": "MAP/27set.arc",
+          "eventMember": "27.evt",
+          "eventNumber": 92
+        }
+      ]
     },
     {
       "originalItemId": 1170,
-      "currentItemId": "magic_t6_body",
+      "currentItemId": "orig_late_1170",
       "rewardKind": "mark",
-      "sourceEvents": [{ "episode": 27, "dungeonId": "chosen_mark_shrine", "setArc": "MAP/27set.arc", "eventMember": "27.evt", "eventNumber": 93 }]
+      "originalNameKr": "매마의징표",
+      "originalDescriptionKr": "진정한 택자가 되기위해서 궁병이 지녀야 할 징표",
+      "slot": "material",
+      "gridW": 1,
+      "gridH": 1,
+      "color": "#f0c050",
+      "icon": "*",
+      "iconSprite": {
+        "col": 27,
+        "row": 5
+      },
+      "maxDurability": 1,
+      "requiredLevel": 0,
+      "originalMagicId": -1,
+      "originalPrice": 0,
+      "usableClasses": "승려, 신관, 마교, 사교",
+      "stats": {},
+      "sourceEvents": [
+        {
+          "episode": 27,
+          "dungeonId": "chosen_mark_shrine",
+          "setArc": "MAP/27set.arc",
+          "eventMember": "27.evt",
+          "eventNumber": 93
+        }
+      ]
     }
   ]
 }

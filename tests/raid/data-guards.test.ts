@@ -6,6 +6,7 @@ import { getItemDef, ITEMS } from '../../src/data/ItemDB';
 import { getOriginalLateStoryCacheEvents } from '../../src/data/OriginalLateStoryFacts';
 import {
     ORIGINAL_LATE_STORY_ITEMS,
+    ORIGINAL_LATE_STORY_REWARD_ITEMS,
     getOriginalLateStoryItem,
     getOriginalLateStoryItemIds,
     getOriginalLateStoryItemsForSourceEvent,
@@ -144,7 +145,12 @@ test('late original story reward item ledger covers every GETITEM cache event', 
     const ledgerIds = getOriginalLateStoryItemIds();
     const sourceKeys = new Set<string>();
     for (const item of ORIGINAL_LATE_STORY_ITEMS) {
-        assert.ok(getItemDef(item.currentItemId), `missing mapped current item ${item.currentItemId}`);
+        assert.match(item.currentItemId, /^orig_late_\d{4}$/);
+        const itemDef = getItemDef(item.currentItemId);
+        assert.ok(itemDef, `missing mapped current item ${item.currentItemId}`);
+        assert.equal(itemDef.nameKr, item.originalNameKr);
+        assert.deepEqual(itemDef.stats, item.stats);
+        assert.equal(itemDef.requiredLevel, item.requiredLevel);
         for (const source of item.sourceEvents) {
             assert.match(source.setArc, /^MAP\/\d{2}set\.arc$/);
             assert.match(source.eventMember, /^\d{2}\.evt$/);
@@ -156,6 +162,11 @@ test('late original story reward item ledger covers every GETITEM cache event', 
     assert.equal(getOriginalLateStoryItemsForSourceEvent(24, 99).map((item) => item.originalItemId).join(','), '976');
     assert.equal(getOriginalLateStoryItemsForSourceEvent(25, 99).length, 0);
     assert.equal(ORIGINAL_LATE_STORY_ITEMS.length, 30);
+    assert.equal(ORIGINAL_LATE_STORY_REWARD_ITEMS.length, ORIGINAL_LATE_STORY_ITEMS.length);
+    assert.equal(getItemDef('orig_late_1122')?.nameKr, '레지넨');
+    assert.deepEqual(getItemDef('orig_late_1122')?.stats, { def: 45, evasion: 5 });
+    assert.equal(getItemDef('orig_late_1122')?.slot, 'boots');
+    assert.equal(getItemDef('orig_late_1168')?.sellable, false);
     assert.equal(sourceKeys.size, 31);
 });
 

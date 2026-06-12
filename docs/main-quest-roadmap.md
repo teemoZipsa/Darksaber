@@ -78,7 +78,7 @@
 
 1. 각 실내맵의 목표 HUD와 입장/복귀/전리품 로그가 자연스럽게 보이는지 실제 플레이로 확인한다.
    - 31화 마계 해결사의 소굴은 `npm run dev:raid:story31` 또는 `/?devStart=raid&devScenario=story31`로 바로 진입해 실내맵/대사/보상 동선을 점검할 수 있다.
-2. 23~31화 GETITEM 보상은 `src/data/content/original-late-story-items.json`에 원작 아이템 ID와 출처 이벤트를 원장화했다. 다음 단계는 원작 아이템명/스탯 테이블까지 확정해 현재 임시 `currentItemId` 보상을 원본 아이템 정의로 교체하는 것이다.
+2. 23~31화 GETITEM 보상은 `src/data/content/original-late-story-items.json`에 원작 아이템 ID, 출처 이벤트, 원작 이름/스탯을 원장화했고 `orig_late_####` 아이템 정의로 지급한다. 원장은 `scripts/generate-late-story-item-defs.mjs`로 원작 `itemtbl.atr`에서 재생성할 수 있다.
 3. 컷신 카메라 타이밍/캐릭터 이동 연출은 별도 연출 패스로 분리한다.
 
 ## 필드 미션 후속 작업

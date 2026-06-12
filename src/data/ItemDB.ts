@@ -4,6 +4,7 @@
  */
 
 import type { MasterBranch } from './ClassTree';
+import { ORIGINAL_LATE_STORY_REWARD_ITEMS } from './OriginalLateStoryItems';
 import { ORIGINAL_SHOP_ITEMS } from './OriginalShopItems';
 import type { CharacterStats } from './Stats';
 
@@ -860,6 +861,9 @@ const RAW_ITEMS: RawItemDef[] = [
 
     // ─── Original Darksaber town weapon shops ──────
     ...ORIGINAL_SHOP_ITEMS,
+
+    // ─── Original Darksaber late-story GETITEM rewards ──────
+    ...ORIGINAL_LATE_STORY_REWARD_ITEMS,
 
     // ─── Accessories (다크세이버 장신구) ─────
     {

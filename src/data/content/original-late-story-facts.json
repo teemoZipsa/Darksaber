@@ -37,10 +37,10 @@
       { "char": 620, "x": 19, "y": 24, "radius": 10 }
     ],
     "cacheEvents": [
-      { "eventNumber": 91, "x": 19, "y": 19, "originalItemId": 1005, "currentItemId": "web_66_51" },
-      { "eventNumber": 92, "x": 15, "y": 27, "originalItemId": 1052, "currentItemId": "void_crystal" },
-      { "eventNumber": 93, "x": 15, "y": 27, "originalItemId": 986, "currentItemId": "magic_t6_body" },
-      { "eventNumber": 94, "x": 15, "y": 27, "originalItemId": 1010, "currentItemId": "shadow_cloak" }
+      { "eventNumber": 91, "x": 19, "y": 19, "originalItemId": 1005, "currentItemId": "orig_late_1005" },
+      { "eventNumber": 92, "x": 15, "y": 27, "originalItemId": 1052, "currentItemId": "orig_late_1052" },
+      { "eventNumber": 93, "x": 15, "y": 27, "originalItemId": 986, "currentItemId": "orig_late_0986" },
+      { "eventNumber": 94, "x": 15, "y": 27, "originalItemId": 1010, "currentItemId": "orig_late_1010" }
     ]
   },
   "24": {
@@ -73,10 +73,10 @@
       { "char": 550, "x": 19, "y": 9, "radius": 10 }
     ],
     "cacheEvents": [
-      { "eventNumber": 91, "x": 16, "y": 26, "originalItemId": 980, "currentItemId": "web_66_51" },
-      { "eventNumber": 92, "x": 27, "y": 11, "originalItemId": 992, "currentItemId": "void_crystal" },
-      { "eventNumber": 93, "x": 27, "y": 11, "originalItemId": 997, "currentItemId": "magic_t6_body" },
-      { "eventNumber": 94, "x": 27, "y": 11, "originalItemId": 1002, "currentItemId": "shadow_cloak" }
+      { "eventNumber": 91, "x": 16, "y": 26, "originalItemId": 980, "currentItemId": "orig_late_0980" },
+      { "eventNumber": 92, "x": 27, "y": 11, "originalItemId": 992, "currentItemId": "orig_late_0992" },
+      { "eventNumber": 93, "x": 27, "y": 11, "originalItemId": 997, "currentItemId": "orig_late_0997" },
+      { "eventNumber": 94, "x": 27, "y": 11, "originalItemId": 1002, "currentItemId": "orig_late_1002" }
     ]
   },
   "25": {
@@ -123,10 +123,10 @@
       { "char": 680, "x": 24, "y": 6, "radius": 8 }
     ],
     "cacheEvents": [
-      { "eventNumber": 91, "x": 12, "y": 18, "originalItemId": 1030, "currentItemId": "web_66_51" },
-      { "eventNumber": 92, "x": 12, "y": 32, "originalItemId": 1007, "currentItemId": "void_crystal" },
-      { "eventNumber": 93, "x": 12, "y": 32, "originalItemId": 1027, "currentItemId": "magic_t6_body" },
-      { "eventNumber": 94, "x": 12, "y": 32, "originalItemId": 1010, "currentItemId": "shadow_cloak" }
+      { "eventNumber": 91, "x": 12, "y": 18, "originalItemId": 1030, "currentItemId": "orig_late_1030" },
+      { "eventNumber": 92, "x": 12, "y": 32, "originalItemId": 1007, "currentItemId": "orig_late_1007" },
+      { "eventNumber": 93, "x": 12, "y": 32, "originalItemId": 1027, "currentItemId": "orig_late_1027" },
+      { "eventNumber": 94, "x": 12, "y": 32, "originalItemId": 1010, "currentItemId": "orig_late_1010" }
     ]
   },
   "26": {
@@ -153,7 +153,7 @@
       { "char": 510, "x": 28, "y": 5, "radius": 8 }
     ],
     "cacheEvents": [
-      { "eventNumber": 92, "x": 15, "y": 21, "originalItemId": 1168, "currentItemId": "void_crystal" }
+      { "eventNumber": 92, "x": 15, "y": 21, "originalItemId": 1168, "currentItemId": "orig_late_1168" }
     ]
   },
   "27": {
@@ -180,8 +180,8 @@
       { "char": 510, "x": 22, "y": 2, "radius": 8 }
     ],
     "cacheEvents": [
-      { "eventNumber": 92, "x": 16, "y": 6, "originalItemId": 1169, "currentItemId": "void_crystal" },
-      { "eventNumber": 93, "x": 31, "y": 17, "originalItemId": 1170, "currentItemId": "magic_t6_body" }
+      { "eventNumber": 92, "x": 16, "y": 6, "originalItemId": 1169, "currentItemId": "orig_late_1169" },
+      { "eventNumber": 93, "x": 31, "y": 17, "originalItemId": 1170, "currentItemId": "orig_late_1170" }
     ]
   },
   "28": {
@@ -216,10 +216,10 @@
       { "char": 560, "x": 19, "y": 31, "radius": 8 }
     ],
     "cacheEvents": [
-      { "eventNumber": 91, "x": 6, "y": 16, "originalItemId": 1104, "currentItemId": "web_66_51" },
-      { "eventNumber": 92, "x": 35, "y": 17, "originalItemId": 1108, "currentItemId": "lance" },
-      { "eventNumber": 93, "x": 14, "y": 31, "originalItemId": 1111, "currentItemId": "magic_t6_body" },
-      { "eventNumber": 94, "x": 2, "y": 7, "originalItemId": 1113, "currentItemId": "corrupted_blade" }
+      { "eventNumber": 91, "x": 6, "y": 16, "originalItemId": 1104, "currentItemId": "orig_late_1104" },
+      { "eventNumber": 92, "x": 35, "y": 17, "originalItemId": 1108, "currentItemId": "orig_late_1108" },
+      { "eventNumber": 93, "x": 14, "y": 31, "originalItemId": 1111, "currentItemId": "orig_late_1111" },
+      { "eventNumber": 94, "x": 2, "y": 7, "originalItemId": 1113, "currentItemId": "orig_late_1113" }
     ]
   },
   "29": {
@@ -250,9 +250,9 @@
       { "char": 520, "x": 39, "y": 23, "radius": 8 }
     ],
     "cacheEvents": [
-      { "eventNumber": 91, "x": 35, "y": 13, "originalItemId": 1116, "currentItemId": "web_66_51" },
-      { "eventNumber": 92, "x": 40, "y": 20, "originalItemId": 1125, "currentItemId": "void_crystal" },
-      { "eventNumber": 93, "x": 55, "y": 24, "originalItemId": 1134, "currentItemId": "magic_t6_body" }
+      { "eventNumber": 91, "x": 35, "y": 13, "originalItemId": 1116, "currentItemId": "orig_late_1116" },
+      { "eventNumber": 92, "x": 40, "y": 20, "originalItemId": 1125, "currentItemId": "orig_late_1125" },
+      { "eventNumber": 93, "x": 55, "y": 24, "originalItemId": 1134, "currentItemId": "orig_late_1134" }
     ]
   },
   "30": {
@@ -285,10 +285,10 @@
       { "char": 540, "x": 20, "y": 22, "radius": 8 }
     ],
     "cacheEvents": [
-      { "eventNumber": 91, "x": 15, "y": 21, "originalItemId": 1119, "currentItemId": "web_66_51" },
-      { "eventNumber": 92, "x": 33, "y": 25, "originalItemId": 1128, "currentItemId": "void_crystal" },
-      { "eventNumber": 93, "x": 6, "y": 25, "originalItemId": 1137, "currentItemId": "magic_t6_body" },
-      { "eventNumber": 94, "x": 23, "y": 12, "originalItemId": 1143, "currentItemId": "shadow_cloak" }
+      { "eventNumber": 91, "x": 15, "y": 21, "originalItemId": 1119, "currentItemId": "orig_late_1119" },
+      { "eventNumber": 92, "x": 33, "y": 25, "originalItemId": 1128, "currentItemId": "orig_late_1128" },
+      { "eventNumber": 93, "x": 6, "y": 25, "originalItemId": 1137, "currentItemId": "orig_late_1137" },
+      { "eventNumber": 94, "x": 23, "y": 12, "originalItemId": 1143, "currentItemId": "orig_late_1143" }
     ]
   },
   "31": {
@@ -320,9 +320,9 @@
       { "char": 530, "x": 29, "y": 2, "radius": 8 }
     ],
     "cacheEvents": [
-      { "eventNumber": 91, "x": 33, "y": 17, "originalItemId": 1122, "currentItemId": "web_66_51" },
-      { "eventNumber": 92, "x": 8, "y": 21, "originalItemId": 1131, "currentItemId": "void_crystal" },
-      { "eventNumber": 93, "x": 21, "y": 17, "originalItemId": 1140, "currentItemId": "magic_t6_body" }
+      { "eventNumber": 91, "x": 33, "y": 17, "originalItemId": 1122, "currentItemId": "orig_late_1122" },
+      { "eventNumber": 92, "x": 8, "y": 21, "originalItemId": 1131, "currentItemId": "orig_late_1131" },
+      { "eventNumber": 93, "x": 21, "y": 17, "originalItemId": 1140, "currentItemId": "orig_late_1140" }
     ]
   }
 }
