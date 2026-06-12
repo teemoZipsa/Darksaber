@@ -12,6 +12,7 @@ import {
     getOriginalLateStoryFact,
     getOriginalLateStoryGuardTiles,
 } from '../../src/data/OriginalLateStoryFacts';
+import { getOriginalLateStoryMrcFact } from '../../src/data/OriginalLateStoryMapFacts';
 import { i18n } from '../../src/i18n/LanguageManager';
 import { TileType } from '../../src/map/Tile';
 import { StoryInteriorMap } from '../../src/map/StoryInteriorMap';
@@ -1030,24 +1031,15 @@ test('Flame Castle exposes original episode 22 Beramode, relic, and clear flow',
 });
 
 test('episodes 23 through 31 use original late interior routes and events', () => {
-    const expectedSizes = new Map([
-        [23, { width: 40, height: 40 }],
-        [24, { width: 40, height: 38 }],
-        [25, { width: 40, height: 40 }],
-        [26, { width: 40, height: 40 }],
-        [27, { width: 40, height: 30 }],
-        [28, { width: 40, height: 36 }],
-        [29, { width: 60, height: 38 }],
-        [30, { width: 40, height: 38 }],
-        [31, { width: 40, height: 47 }],
-    ]);
-
     for (const episode of [23, 24, 25, 26, 27, 28, 29, 30, 31]) {
         const fact = getOriginalLateStoryFact(episode);
+        const mrcFact = getOriginalLateStoryMrcFact(episode);
         const layout = getStoryInteriorLayout(fact.dungeonId);
         assert.ok(layout, `missing interior layout for ${fact.dungeonId}`);
         const map = new StoryInteriorMap(layout);
-        assert.deepEqual(map.getBoundsTiles(), expectedSizes.get(episode));
+        assert.deepEqual(map.getBoundsTiles(), { width: mrcFact.width, height: mrcFact.height });
+        assert.equal(layout.originalMrc?.source, `MAP/${String(episode).padStart(2, '0')}.mrc`);
+        assert.equal(layout.originalMrc?.layerCount, mrcFact.layerCount);
         assert.deepEqual(layout.bossTile, getOriginalLateStoryBossTile(episode));
         assert.deepEqual(layout.guardTiles, getOriginalLateStoryGuardTiles(episode));
         assert.equal(hasWalkablePath(map, layout.playerStart, layout.bossTile), true, fact.dungeonId);
