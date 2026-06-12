@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { GameManager } from '../../src/engine/GameManager';
+import { WorldEngine } from '../../src/engine/WorldEngine';
 import { applyDevRaidScenario } from '../../src/dev/DevRaidScenarios';
 
 function createActor() {
@@ -93,6 +94,10 @@ function createManagerHarness() {
     const manager = { worldEngine: world, inventoryUI: inventory };
     return { actor, inventory, logs, manager: manager as unknown as GameManager, selected, world };
 }
+
+test('WorldEngine exposes network raid close hook for dev scenario handoff', () => {
+    assert.equal(typeof WorldEngine.prototype.closeNetworkRaidClient, 'function');
+});
 
 test('dev story31 scenario launches local Demon Fixer Den without network raid state', () => {
     const { actor, inventory, logs, manager, world } = createManagerHarness();
