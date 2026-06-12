@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { i18n } from '../../src/i18n/LanguageManager';
 import { getEntityInfoHeaderLines, type EntityDisplayInfo } from '../../src/ui/EntityInfoUI';
 
 test('entity info header uses monster name instead of role label', () => {
@@ -19,8 +20,20 @@ test('entity info header uses monster name instead of role label', () => {
         spriteColor: '#d4c4cc',
     };
 
-    assert.deepEqual(getEntityInfoHeaderLines(info), {
-        title: '스켈레톤 궁수',
-        subtitle: '원거리형 몬스터 · 레벨 2',
-    });
+    const previousLang = i18n.lang;
+    try {
+        i18n.lang = 'ko';
+        assert.deepEqual(getEntityInfoHeaderLines(info), {
+            title: '스켈레톤 궁수',
+            subtitle: '원거리형 몬스터 · 레벨 2',
+        });
+
+        i18n.lang = 'en';
+        assert.deepEqual(getEntityInfoHeaderLines({ ...info, className: 'Ranged monster' }), {
+            title: '스켈레톤 궁수',
+            subtitle: 'Ranged monster · Level 2',
+        });
+    } finally {
+        i18n.lang = previousLang;
+    }
 });

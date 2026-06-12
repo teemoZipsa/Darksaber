@@ -42,9 +42,10 @@ export interface EntityDisplayInfo {
 }
 
 export function getEntityInfoHeaderLines(info: EntityDisplayInfo): { title: string; subtitle: string } {
+    const level = t('info.level');
     return {
         title: info.name,
-        subtitle: info.className ? `${info.className} · 레벨 ${info.level}` : `[ 레벨 ${info.level} ]`,
+        subtitle: info.className ? `${info.className} · ${level} ${info.level}` : `[ ${level} ${info.level} ]`,
     };
 }
 
@@ -250,7 +251,7 @@ export class EntityInfoUI {
         const barH = 14;
         let by = sepY + 8;
 
-        // ATB / 행동
+        // ATB
         const isFullATB = info.actionGauge >= 100;
         let atbColor = '#e67e22';
         let atbGlow = false;
@@ -260,26 +261,26 @@ export class EntityInfoUI {
             atbGlow = true;
         }
         const atbPct = Math.min(1, this.displayAtb / 100);
-        this.drawRetroBar(ctx, '행동', barLabelX, barX, by, barW, barH, atbPct, atbColor, 'rgba(0,0,0,0.5)',
-            isFullATB ? '준비!' : undefined, atbGlow);
+        this.drawRetroBar(ctx, t('ui.actionGauge'), barLabelX, barX, by, barW, barH, atbPct, atbColor, 'rgba(0,0,0,0.5)',
+            isFullATB ? t('entityInfo.ready') : undefined, atbGlow);
         by += barH + 6;
 
-        // HP / 체력
+        // HP
         const hpPct = info.maxHp > 0 ? this.displayHp / info.maxHp : 0;
-        this.drawRetroBar(ctx, '체력', barLabelX, barX, by, barW, barH, hpPct, '#e53935', 'rgba(0,0,0,0.3)',
+        this.drawRetroBar(ctx, t('stat.hp'), barLabelX, barX, by, barW, barH, hpPct, '#e53935', 'rgba(0,0,0,0.3)',
             `${Math.ceil(this.displayHp)}/${info.maxHp}`);
         by += barH + 6;
 
-        // MP / 마법
+        // MP
         const mpPct = info.maxMp > 0 ? this.displayMp / info.maxMp : 0;
-        this.drawRetroBar(ctx, '마법', barLabelX, barX, by, barW, barH, mpPct, '#f0c040', 'rgba(0,0,0,0.3)',
+        this.drawRetroBar(ctx, t('stat.mp'), barLabelX, barX, by, barW, barH, mpPct, '#f0c040', 'rgba(0,0,0,0.3)',
             info.maxMp > 0 ? `${Math.ceil(this.displayMp)}/${info.maxMp}` : '—');
         by += barH + 6;
 
-        // EXP / 경험
+        // EXP
         if (info.maxExp !== undefined && info.exp !== undefined) {
             const expPct = info.maxExp > 0 ? info.exp / info.maxExp : 0;
-            this.drawRetroBar(ctx, '경험', barLabelX, barX, by, barW, barH, expPct, '#88ee44', 'rgba(0,0,0,0.3)',
+            this.drawRetroBar(ctx, t('info.exp'), barLabelX, barX, by, barW, barH, expPct, '#88ee44', 'rgba(0,0,0,0.3)',
                 `${info.exp}/${info.maxExp}`);
             by += barH + 6;
         }
@@ -305,7 +306,7 @@ export class EntityInfoUI {
         ctx.strokeRect(this.x + statPad, by, boxW, 22);
         ctx.fillStyle = Parchment.textDark;
         ctx.font = `bold 12px ${UI.fontPrimary}`;
-        ctx.fillText('공격', this.x + statPad + 4, by + 16);
+        ctx.fillText(t('create.atk'), this.x + statPad + 4, by + 16);
         ctx.font = `bold 13px ${UI.fontMono}`;
         ctx.textAlign = 'right';
         ctx.fillText(`${Math.floor(info.atk)}`, this.x + statPad + boxW - 6, by + 16);
@@ -318,7 +319,7 @@ export class EntityInfoUI {
         ctx.strokeRect(this.x + statPad + boxW + 8, by, boxW, 22);
         ctx.fillStyle = Parchment.textDark;
         ctx.font = `bold 12px ${UI.fontPrimary}`;
-        ctx.fillText('방어', this.x + statPad + boxW + 12, by + 16);
+        ctx.fillText(t('create.def'), this.x + statPad + boxW + 12, by + 16);
         ctx.font = `bold 13px ${UI.fontMono}`;
         ctx.textAlign = 'right';
         ctx.fillText(`${Math.floor(info.def)}`, this.x + statPad + boxW * 2 + 2, by + 16);
@@ -333,7 +334,7 @@ export class EntityInfoUI {
         ctx.strokeRect(this.x + statPad, by, boxW, 22);
         ctx.fillStyle = Parchment.textDark;
         ctx.font = `bold 12px ${UI.fontPrimary}`;
-        ctx.fillText('마공', this.x + statPad + 4, by + 16);
+        ctx.fillText(t('entityInfo.stat.magAtkShort'), this.x + statPad + 4, by + 16);
         ctx.font = `bold 13px ${UI.fontMono}`;
         ctx.textAlign = 'right';
         ctx.fillText(`${Math.floor(info.magAtk)}`, this.x + statPad + boxW - 6, by + 16);
@@ -346,7 +347,7 @@ export class EntityInfoUI {
         ctx.strokeRect(this.x + statPad + boxW + 8, by, boxW, 22);
         ctx.fillStyle = Parchment.textDark;
         ctx.font = `bold 12px ${UI.fontPrimary}`;
-        ctx.fillText('마방', this.x + statPad + boxW + 12, by + 16);
+        ctx.fillText(t('entityInfo.stat.magDefShort'), this.x + statPad + boxW + 12, by + 16);
         ctx.font = `bold 13px ${UI.fontMono}`;
         ctx.textAlign = 'right';
         ctx.fillText(`${Math.floor(info.magDef)}`, this.x + statPad + boxW * 2 + 2, by + 16);
