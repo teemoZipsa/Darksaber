@@ -4,7 +4,7 @@ import type { ActionMenuUI } from '../../ui/ActionMenuUI';
 import type { EntityInfoUI } from '../../ui/EntityInfoUI';
 import type { Camera } from '../Camera';
 import type { InputManager } from '../InputManager';
-import { t } from '../../i18n/LanguageManager';
+import { formatT, t } from '../../i18n/LanguageManager';
 import type { TilePoint } from '../../field/FieldPathing';
 import type { FieldActor, FieldHitParty, FieldIntent } from '../../field/FieldTypes';
 import type { FieldHit } from '../../field/FieldInteraction';
@@ -161,7 +161,7 @@ export class WorldInputController {
         switch (hit.kind) {
             case 'enemy':
                 this.context.selectionController.selectEnemy(hit.enemy.id);
-                this.context.log(`${hit.enemy.name} 선택`);
+                this.context.log(formatT('field.input.enemySelected', { name: hit.enemy.name }));
                 break;
             case 'party': {
                 const index = this.context.getPartyActors().findIndex((actor) => actor.id === hit.party.id);
@@ -172,14 +172,14 @@ export class WorldInputController {
             }
             case 'loot':
                 this.context.selectionController.selectLoot(hit.loot.id);
-                this.context.log(`${hit.loot.sourceLabel} 선택`);
+                this.context.log(formatT('field.input.lootSelected', { name: hit.loot.sourceLabel }));
                 break;
             case 'ground':
                 this.context.closeActionMenu();
                 break;
             case 'blocked':
                 this.context.clearIntent();
-                this.context.log('갈 수 없는 위치입니다.');
+                this.context.log(t('field.input.blockedTile'));
                 break;
         }
     }
@@ -210,7 +210,7 @@ export class WorldInputController {
         if (result.enabled) {
             this.context.playerActionController.execute(result.type);
         } else {
-            this.context.log(result.disabledReason ?? '지금 사용할 수 없는 행동입니다.');
+            this.context.log(result.disabledReason ?? t('field.input.actionUnavailable'));
         }
         return true;
     }

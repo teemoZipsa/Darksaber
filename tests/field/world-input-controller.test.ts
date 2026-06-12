@@ -4,6 +4,7 @@ import { Character } from '../../src/character/Character';
 import { Player } from '../../src/entity/Player';
 import type { FieldActor, FieldHitParty } from '../../src/field/FieldTypes';
 import { WorldInputController, type WorldInputContext } from '../../src/engine/world/WorldInputController';
+import { i18n } from '../../src/i18n/LanguageManager';
 
 class ImageStub {
     public src = '';
@@ -126,4 +127,23 @@ test('clicking the active actor body while action menu is open does not dismiss 
     assert.ok(calls.includes(`selectActor:${actor.id}`));
     assert.ok(!calls.includes('dismissActionMenuTurn'));
     assert.ok(!calls.includes('switchParty'));
+});
+
+test('blocked field clicks use localized input logs', () => {
+    i18n.setLanguage('en');
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.actionMenuUI = {
+        ...context.actionMenuUI,
+        getIsOpen: () => false,
+    } as any;
+    context.resolveFieldHitAt = () => ({ kind: 'blocked' }) as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput(), makeCamera());
+
+    assert.ok(calls.includes('clearIntent'));
+    assert.ok(calls.includes('log:That position cannot be reached.'));
+    i18n.setLanguage('ko');
 });
