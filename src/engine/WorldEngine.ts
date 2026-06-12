@@ -567,11 +567,11 @@ export class WorldEngine {
         if (options.startIntroTutorial) {
             this.startIntroTutorial();
         } else if (NetworkRaidClient.hasStoredResumeToken()) {
-            this.addCombatLog('월드 세션 재접속 중...');
+            this.addCombatLog(t('mp.resumeAttempt'));
             void this.beginRaidFromCurrentHub();
         } else {
             this.openTown(this.getCurrentHubTown());
-            this.addCombatLog('마을에 도착했습니다. 출격 준비를 마치세요.');
+            this.addCombatLog(t('field.log.townReady'));
         }
 
         camera.followTile(this.player.gridX, this.player.gridY);
@@ -1269,8 +1269,8 @@ export class WorldEngine {
             this.worldMap.loot = [];
             this.clearFieldTurnState();
             this.addCombatLog(isResumeJoin
-                ? `${this.worldMap.getDisplayName()} 서버 원정에 재접속했습니다.`
-                : `${town.nameKr}에서 ${this.worldMap.getDisplayName()} 서버로 출격.`);
+                ? formatT('mp.deployResumed', { world: this.worldMap.getDisplayName() })
+                : formatT('mp.deployStarted', { town: town.nameKr, world: this.worldMap.getDisplayName() }));
         } catch (error) {
             if (this.shouldReloadDevAutoStartAuth(error)) {
                 console.warn('[Darksaber] Dev auth expired after server restart; reloading to issue a fresh dev session.');
@@ -1337,7 +1337,7 @@ export class WorldEngine {
                 credentials: 'include',
             });
             if (!response.ok) {
-                if (logFailure) this.addCombatLog(`인증 토큰 갱신 실패: HTTP ${response.status}`);
+                if (logFailure) this.addCombatLog(formatT('mp.authRefreshFailedHttp', { status: response.status }));
                 return null;
             }
             const parsed = await response.json() as unknown;
@@ -1349,7 +1349,7 @@ export class WorldEngine {
             this.gameManager.updateNetworkAccessToken(accessToken);
             return { ...authContext, accessToken };
         } catch (error) {
-            if (logFailure) this.addCombatLog(`인증 토큰 갱신 실패: ${error instanceof Error ? error.message : 'unknown error'}`);
+            if (logFailure) this.addCombatLog(formatT('mp.authRefreshFailed', { message: error instanceof Error ? error.message : 'unknown error' }));
             return null;
         }
     }
@@ -1674,7 +1674,7 @@ export class WorldEngine {
 
     private openNetworkLoot(grant: LootGrantMessage): void {
         const grid = this.gridFromSnapshot(grant.gridSnapshot);
-        this.gameManager.inventoryUI.setExternalGrid(grid, `전리품 ${grant.lootId}`, { isRaidLoot: true });
+        this.gameManager.inventoryUI.setExternalGrid(grid, formatT('field.log.lootSource', { source: grant.lootId }), { isRaidLoot: true });
         if (!this.gameManager.inventoryUI.isVisible()) this.gameManager.inventoryUI.toggle();
         this.selectionController.selectLoot(grant.lootId);
     }
@@ -1725,17 +1725,17 @@ export class WorldEngine {
             const visitKey = this.pendingNetworkScenarioEnter.visitKey;
             this.pendingNetworkScenarioEnter = null;
             this.dismissedDungeonVisitKey = visitKey;
-            this.addCombatLog(`시나리오 진입 실패: ${rejection.reason}`);
+            this.addCombatLog(formatT('mp.scenarioRejected', { reason: rejection.reason }));
             return;
         }
         const pending = this.pendingLootPicks.get(rejection.intentId);
         if (pending) {
             this.pendingLootPicks.delete(rejection.intentId);
             this.gameManager.inventoryUI.revertRaidLoot(pending.placed, pending.source);
-            this.addCombatLog(`전리품 획득 실패: ${rejection.reason}`);
+            this.addCombatLog(formatT('mp.lootRejected', { reason: rejection.reason }));
             return;
         }
-        this.addCombatLog(`서버 거부: ${rejection.reason}`);
+        this.addCombatLog(formatT('mp.actionRejected', { reason: rejection.reason }));
         if (!rejectedMoveActorId) return;
         const actor = this.partyActors.find((entry) => entry.id === rejectedMoveActorId);
         if (!actor || actor.id !== this.activeTurnActorId) return;
@@ -1750,7 +1750,7 @@ export class WorldEngine {
         for (const pick of this.pendingLootPicks.values()) {
             if (now - pick.at > 10_000 && !pick.timedOut) {
                 pick.timedOut = true;
-                this.addCombatLog('전리품 획득 응답 지연: 서버 응답을 기다리는 중입니다.');
+                this.addCombatLog(t('mp.lootPending'));
             }
         }
     }
@@ -1854,12 +1854,13 @@ export class WorldEngine {
     private formatNetworkCombatEvent(event: CombatEventMessage): string {
         const sourceName = event.sourceName ?? this.getNetworkEntityName(event.sourceId);
         const targetName = event.targetName ?? this.getNetworkEntityName(event.targetId);
-        if (event.kind === 'miss') return `${sourceName} → ${targetName} 빗나감`;
-        if (event.kind === 'kill') return `${sourceName} → ${targetName} 처치`;
-        if (event.kind === 'heal') return `${sourceName} → ${targetName} HP +${event.value ?? 0}`;
-        if (event.kind === 'down') return `${sourceName} → ${targetName} 행동 불능`;
-        if (event.kind === 'status') return `${sourceName} → ${targetName} 상태 변화`;
-        return `${sourceName} → ${targetName} ${event.value ?? 0} 피해`;
+        const params = { source: sourceName, target: targetName, value: event.value ?? 0 };
+        if (event.kind === 'miss') return formatT('field.log.combat.miss', params);
+        if (event.kind === 'kill') return formatT('field.log.combat.kill', params);
+        if (event.kind === 'heal') return formatT('field.log.combat.heal', params);
+        if (event.kind === 'down') return formatT('field.log.combat.down', params);
+        if (event.kind === 'status') return formatT('field.log.combat.status', params);
+        return formatT('field.log.combat.damage', params);
     }
 
     private getNetworkEntityName(entityId: string): string {
@@ -1927,7 +1928,7 @@ export class WorldEngine {
 
         const hostileActive = this.fieldEnemies.some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro);
         if (hostileActive) {
-            this.addCombatLog('주변의 적을 정리해야 신전에 들어갈 수 있습니다.');
+            this.addCombatLog(t('field.log.templeBlocked'));
             this.dismissedTempleVisitKey = key;
             return;
         }
@@ -1973,7 +1974,7 @@ export class WorldEngine {
 
         const hostileActive = this.fieldEnemies.some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro);
         if (hostileActive) {
-            this.addCombatLog(`${dungeon.nameKr}에 들어가려면 주변 전투를 정리해야 합니다.`);
+            this.addCombatLog(formatT('field.log.dungeonBlocked', { dungeon: dungeon.nameKr }));
             this.dismissedDungeonVisitKey = key;
             return;
         }
@@ -1995,7 +1996,7 @@ export class WorldEngine {
         this.dismissedDungeonVisitKey = visitKey;
         const intentId = client.sendScenarioEnter(actor.id, dungeon.id);
         this.pendingNetworkScenarioEnter = { intentId, dungeonId: dungeon.id, visitKey };
-        this.addCombatLog(`${dungeon.nameKr} 서버 시나리오 진입 요청.`);
+        this.addCombatLog(formatT('field.log.scenarioRequest', { dungeon: dungeon.nameKr }));
     }
 
     private enterStoryDungeon(dungeon: WorldDungeonInfo): void {
@@ -2008,7 +2009,7 @@ export class WorldEngine {
             return;
         }
 
-        this.addCombatLog(`${dungeon.nameKr} 시나리오는 서버 세션 이관 후 진입할 수 있습니다.`);
+        this.addCombatLog(formatT('field.log.scenarioServerOnly', { dungeon: dungeon.nameKr }));
     }
 
     private startLocalStoryInteriorDungeon(dungeon: WorldDungeonInfo, storyQuest: StoryQuestDefinition): void {
@@ -2326,7 +2327,7 @@ export class WorldEngine {
 
             this.addCombatLog(`${enemy.name}: ${t('raid.autoLootFull')}`);
             const loot = new LootObject(`corpse_${enemy.id}`, enemy.gridX, enemy.gridY, failedItems, {
-                sourceLabel: `${enemy.name} 전리품`,
+                sourceLabel: formatT('field.log.lootSource', { source: enemy.name }),
                 kind: 'corpse',
             });
             this.worldMap.loot.push(loot);
@@ -2334,7 +2335,7 @@ export class WorldEngine {
         }
 
         const loot = new LootObject(`corpse_${enemy.id}`, lootTile.x, lootTile.y, items, {
-            sourceLabel: `${enemy.name} 전리품`,
+            sourceLabel: formatT('field.log.lootSource', { source: enemy.name }),
             kind: 'corpse',
         });
         lootMap.loot.push(loot);
@@ -2376,7 +2377,7 @@ export class WorldEngine {
             return Boolean(this.sendNetworkIntent(actor.id, 'attack', { targetId: enemy.id }, { requireOpen: false }));
         }
         if (!this.introTutorialActive) {
-            this.addCombatLog('서버 세션 밖에서는 전투 행동을 실행할 수 없습니다.');
+            this.addCombatLog(t('field.log.serverCombatOnly'));
             return false;
         }
         if (!this.canActorAttackTarget(actor, enemy)) return false;
@@ -2514,7 +2515,7 @@ export class WorldEngine {
             return;
         }
         if (!this.introTutorialActive) {
-            this.addCombatLog('서버 세션 밖에서는 전리품을 열 수 없습니다.');
+            this.addCombatLog(t('field.log.serverLootOnly'));
             return;
         }
         this.selectionController.selectLoot(loot.id);
@@ -2528,7 +2529,7 @@ export class WorldEngine {
 
     private openFieldMagic(actor: FieldActor): void {
         if (!this.getNetworkRaidState().isActive() && !this.introTutorialActive) {
-            this.addCombatLog('서버 세션 밖에서는 마법을 사용할 수 없습니다.');
+            this.addCombatLog(t('field.log.serverMagicOnly'));
             this.reopenActionMenu(actor);
             return;
         }
@@ -2537,7 +2538,7 @@ export class WorldEngine {
 
     private openFieldTool(actor: FieldActor): void {
         if (!this.getNetworkRaidState().isActive() && !this.introTutorialActive) {
-            this.addCombatLog('서버 세션 밖에서는 도구를 사용할 수 없습니다.');
+            this.addCombatLog(t('field.log.serverToolOnly'));
             this.reopenActionMenu(actor);
             return;
         }
