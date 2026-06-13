@@ -298,6 +298,36 @@ test('episode 3 sacred sword falls back to stash when backpack is full', () => {
     assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('보검')));
 });
 
+test('episode 3 sacred sword blocks quest completion when all reward storage is full', () => {
+    const { controller, playerData, raidSession, gameManager, getOutcome } = createController();
+    const episode3 = STORY_QUESTS.find((quest) => quest.episode === 3);
+    const filler = getItemDef('herb_cheap');
+    assert.ok(episode3);
+    assert.ok(filler);
+    playerData.markCleared(MAIN_QUEST_EPISODE_01_ID);
+    playerData.markCleared(MAIN_QUEST_EPISODE_02_ID);
+    for (const grid of [gameManager.inventory, gameManager.stash]) {
+        for (let y = 0; y < grid.height; y++) {
+            for (let x = 0; x < grid.width; x++) {
+                assert.ok(grid.place(filler, x, y));
+            }
+        }
+    }
+    raidSession.beginRaidFromTown('central_castle');
+    markStoryObjectiveComplete(raidSession, episode3.dungeonId);
+
+    controller.completeSuccess(DESTINATION_TOWN);
+
+    assert.equal(playerData.isCleared(episode3.id), false);
+    assert.equal(playerData.hasQuestItem('quest_sacred_sword'), false);
+    assert.equal(isStoryRewardOwned(episode3.reward, playerData), false);
+    assert.equal(
+        getStoryQuestViews(playerData, raidSession).find((view) => view.quest.id === episode3.id)?.status,
+        'active'
+    );
+    assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('보상 보관 공간 부족')));
+});
+
 test('episode 31 objective grants final implemented quest completion only after survival', () => {
     const { controller, playerData, raidSession, getOutcome } = createController();
     const episode31 = STORY_QUESTS.find((quest) => quest.episode === 31);

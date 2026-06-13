@@ -5,7 +5,7 @@ import type { PlayerData } from '../../data/PlayerData';
 import type { PlacedItem } from '../../inventory/GridInventory';
 import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../../data/StarterKitData';
 import { STORY_SCENARIO_EVENT_SEQUENCES } from '../../data/StoryScenarioEventData';
-import { STORY_QUESTS, type StoryQuestReward } from '../../data/StoryQuestData';
+import { isStoryRewardOwned, STORY_QUESTS, type StoryQuestReward } from '../../data/StoryQuestData';
 import { t } from '../../i18n/LanguageManager';
 import type { TownInfo } from '../../map/BiomeMask';
 import {
@@ -197,9 +197,14 @@ export class WorldRaidOutcomeController {
             if (!this.context.raidSession.isDungeonCleared(quest.dungeonId)) continue;
             if (this.context.playerData.isCleared(quest.id)) continue;
 
+            const rewardLine = this.grantStoryQuestReward(quest.reward);
+            if (!isStoryRewardOwned(quest.reward, this.context.playerData)) {
+                rewards.push(`${t('quest.rewardStorageFull')}: ${t(quest.titleKey)}`);
+                continue;
+            }
             this.context.playerData.markCleared(quest.id);
             rewards.push(`${t('quest.completed')}: ${t(quest.titleKey)}`);
-            rewards.push(this.grantStoryQuestReward(quest.reward));
+            rewards.push(rewardLine);
         }
         return rewards;
     }
@@ -241,8 +246,7 @@ export class WorldRaidOutcomeController {
             if (!this.context.playerData.hasQuestItem(reward.itemId)) {
                 const rewardItem = getItemDef(reward.itemId);
                 if (rewardItem) {
-                    const placed = this.context.gameManager.inventory.autoPlace(rewardItem)
-                        ?? this.context.gameManager.stash.autoPlace(rewardItem);
+                    const placed = this.placeStoryInventoryReward(rewardItem);
                     if (placed) this.context.playerData.addQuestItem(reward.itemId);
                 }
             }
@@ -257,6 +261,19 @@ export class WorldRaidOutcomeController {
             this.context.party.addToRoster(new Character(reward.companionId, t(reward.nameKey), reward.classId));
         }
         return `${t('quest.rewardCompanion')}: ${t(reward.nameKey)}`;
+    }
+
+    private placeStoryInventoryReward(item: ItemDef): PlacedItem | null {
+        const backpackPlaced = this.context.gameManager.inventory.autoPlace(item);
+        if (backpackPlaced) return backpackPlaced;
+        const stashPlaced = this.context.gameManager.stash.autoPlace(item);
+        if (stashPlaced) return stashPlaced;
+
+        this.context.gameManager.inventory.sort();
+        const sortedBackpackPlaced = this.context.gameManager.inventory.autoPlace(item);
+        if (sortedBackpackPlaced) return sortedBackpackPlaced;
+        this.context.gameManager.stash.sort();
+        return this.context.gameManager.stash.autoPlace(item);
     }
 
     private showRaidResult(outcome: RaidOutcome, nextTown: TownInfo): void {
