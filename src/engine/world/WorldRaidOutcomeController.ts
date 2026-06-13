@@ -2,7 +2,7 @@ import type { PartyManager } from '../../character/PartyManager';
 import { Character } from '../../character/Character';
 import { getItemDef, type ItemDef } from '../../data/ItemDB';
 import type { PlayerData } from '../../data/PlayerData';
-import type { PlacedItem } from '../../inventory/GridInventory';
+import { GridInventory, type PlacedItem } from '../../inventory/GridInventory';
 import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../../data/StarterKitData';
 import { STORY_SCENARIO_EVENT_SEQUENCES } from '../../data/StoryScenarioEventData';
 import { isStoryRewardOwned, STORY_QUESTS, type StoryQuestReward } from '../../data/StoryQuestData';
@@ -197,6 +197,10 @@ export class WorldRaidOutcomeController {
             if (!this.context.raidSession.isDungeonCleared(quest.dungeonId)) continue;
             if (this.context.playerData.isCleared(quest.id)) continue;
 
+            if (!this.canStoreStoryQuestReward(quest.reward)) {
+                rewards.push(`${t('quest.rewardStorageFull')}: ${t(quest.titleKey)}`);
+                continue;
+            }
             const rewardLine = this.grantStoryQuestReward(quest.reward);
             if (!isStoryRewardOwned(quest.reward, this.context.playerData)) {
                 rewards.push(`${t('quest.rewardStorageFull')}: ${t(quest.titleKey)}`);
@@ -263,6 +267,19 @@ export class WorldRaidOutcomeController {
         return `${t('quest.rewardCompanion')}: ${t(reward.nameKey)}`;
     }
 
+    private canStoreStoryQuestReward(reward: StoryQuestReward): boolean {
+        if (reward.type === 'none' || reward.type === 'questItem' || reward.type === 'companion') return true;
+        if (reward.type === 'bundle') return reward.rewards.every((entry) => this.canStoreStoryQuestReward(entry));
+        if (this.context.playerData.hasQuestItem(reward.itemId)) return true;
+        const rewardItem = getItemDef(reward.itemId);
+        return rewardItem ? this.canPlaceStoryInventoryReward(rewardItem) : false;
+    }
+
+    private canPlaceStoryInventoryReward(item: ItemDef): boolean {
+        return canAutoPlaceItem(this.context.gameManager.inventory, item)
+            || canAutoPlaceItem(this.context.gameManager.stash, item);
+    }
+
     private placeStoryInventoryReward(item: ItemDef): PlacedItem | null {
         const backpackPlaced = this.context.gameManager.inventory.autoPlace(item);
         if (backpackPlaced) return backpackPlaced;
@@ -324,4 +341,28 @@ export class WorldRaidOutcomeController {
 
         return secured;
     }
+}
+
+function canAutoPlaceItem(grid: GridInventory, item: ItemDef): boolean {
+    if (hasFreeSlotForItem(grid, item)) return true;
+    const sorted = cloneGridInventory(grid);
+    sorted.sort();
+    return hasFreeSlotForItem(sorted, item);
+}
+
+function hasFreeSlotForItem(grid: GridInventory, item: ItemDef): boolean {
+    for (let y = 0; y <= grid.height - item.gridH; y++) {
+        for (let x = 0; x <= grid.width - item.gridW; x++) {
+            if (grid.canPlace(item, x, y)) return true;
+        }
+    }
+    return false;
+}
+
+function cloneGridInventory(grid: GridInventory): GridInventory {
+    const clone = new GridInventory(grid.width, grid.height);
+    for (const placed of grid.items) {
+        clone.place(placed.item, placed.gridX, placed.gridY);
+    }
+    return clone;
 }

@@ -69,7 +69,9 @@ test('auth store raid survival with full inventory does not persist incomplete s
     assert.equal(updatedSave.hubLocation.townId, 'w_forest_village');
     assert.notEqual((updatedSave.questState.completedQuestIds as string[] | undefined)?.includes(scenario.questId), true);
     assert.notEqual((updatedSave.questState.questItemIds as string[] | undefined)?.includes('quest_sacred_sword'), true);
+    assert.notEqual((updatedSave.questState.storyCompanionIds as string[] | undefined)?.includes('story_fighter_ep03'), true);
     assert.equal(updatedSave.inventory.items.some((item) => item.itemId === 'quest_sacred_sword'), false);
+    assert.equal((updatedSave.rosterSnapshot.characters as unknown[]).some((entry) => asRecord(entry).id === 'story_fighter_ep03'), false);
     assert.equal(progress.completedQuests.includes(scenario.questId), false);
 });
 

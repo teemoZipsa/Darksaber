@@ -299,7 +299,7 @@ test('episode 3 sacred sword falls back to stash when backpack is full', () => {
 });
 
 test('episode 3 sacred sword blocks quest completion when all reward storage is full', () => {
-    const { controller, playerData, raidSession, gameManager, getOutcome } = createController();
+    const { controller, playerData, raidSession, party, gameManager, getOutcome } = createController();
     const episode3 = STORY_QUESTS.find((quest) => quest.episode === 3);
     const filler = getItemDef('herb_cheap');
     assert.ok(episode3);
@@ -320,6 +320,8 @@ test('episode 3 sacred sword blocks quest completion when all reward storage is 
 
     assert.equal(playerData.isCleared(episode3.id), false);
     assert.equal(playerData.hasQuestItem('quest_sacred_sword'), false);
+    assert.equal(playerData.hasStoryCompanion('story_fighter_ep03'), false);
+    assert.equal(party.getRoster().some((character) => character.id === 'story_fighter_ep03'), false);
     assert.equal(isStoryRewardOwned(episode3.reward, playerData), false);
     assert.equal(
         getStoryQuestViews(playerData, raidSession).find((view) => view.quest.id === episode3.id)?.status,

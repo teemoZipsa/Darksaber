@@ -15,10 +15,17 @@ export function applyStoryQuestRewardsToSaveState(
     const blockedQuestIds = new Set<string>();
     for (const scenario of STORY_SCENARIOS) {
         if (!completedQuestIds.has(scenario.questId)) continue;
-        applyStoryQuestReward(scenario.reward, questState, inventory, rosterSnapshot);
-        if (blockableQuestIds.has(scenario.questId) && !isStoryRewardOwned(scenario.reward, questState)) {
+        const draftQuestState = cloneRecord(questState);
+        const draftInventory = cloneInventorySnapshot(inventory);
+        const draftRosterSnapshot = cloneRecord(rosterSnapshot);
+        applyStoryQuestReward(scenario.reward, draftQuestState, draftInventory, draftRosterSnapshot);
+        if (blockableQuestIds.has(scenario.questId) && !isStoryRewardOwned(scenario.reward, draftQuestState)) {
             blockedQuestIds.add(scenario.questId);
+            continue;
         }
+        replaceRecord(questState, draftQuestState);
+        replaceInventorySnapshot(inventory, draftInventory);
+        replaceRecord(rosterSnapshot, draftRosterSnapshot);
     }
     if (blockedQuestIds.size > 0) {
         questState.completedQuestIds = normalizeStringArray(questState.completedQuestIds)
@@ -105,6 +112,31 @@ function addStringSetValue(record: Record<string, unknown>, key: string, value: 
 
 function normalizeStringArray(value: unknown): string[] {
     return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
+}
+
+function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
+    return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+}
+
+function cloneInventorySnapshot(inventory: InventorySaveSnapshot): InventorySaveSnapshot {
+    return {
+        width: inventory.width,
+        height: inventory.height,
+        items: inventory.items.map((item) => ({ ...item })),
+    };
+}
+
+function replaceRecord(target: Record<string, unknown>, source: Record<string, unknown>): void {
+    for (const key of Object.keys(target)) {
+        delete target[key];
+    }
+    Object.assign(target, source);
+}
+
+function replaceInventorySnapshot(target: InventorySaveSnapshot, source: InventorySaveSnapshot): void {
+    target.width = source.width;
+    target.height = source.height;
+    target.items = source.items.map((item) => ({ ...item }));
 }
 
 function isStoryRewardOwned(reward: StoryQuestRewardData, questState: Record<string, unknown>): boolean {

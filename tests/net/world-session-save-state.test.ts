@@ -73,7 +73,9 @@ test('final world save patch with full inventory does not persist incomplete sto
     assert.ok(finalPatch);
     assert.notEqual((finalPatch.questState?.completedQuestIds as string[] | undefined)?.includes(scenario.questId), true);
     assert.notEqual((finalPatch.questState?.questItemIds as string[] | undefined)?.includes('quest_sacred_sword'), true);
+    assert.notEqual((finalPatch.questState?.storyCompanionIds as string[] | undefined)?.includes('story_fighter_ep03'), true);
     assert.equal(finalPatch.inventory?.items.some((item) => item.itemId === 'quest_sacred_sword'), false);
+    assert.equal((finalPatch.rosterSnapshot?.characters as unknown[]).some((entry) => asRecord(entry).id === 'story_fighter_ep03'), false);
 });
 
 function fullInventory(width: number, height: number) {
@@ -92,4 +94,10 @@ function fullInventory(width: number, height: number) {
         }
     }
     return { width, height, items };
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+    assert.equal(typeof value, 'object');
+    assert.notEqual(value, null);
+    return value as Record<string, unknown>;
 }
