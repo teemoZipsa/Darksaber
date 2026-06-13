@@ -1565,13 +1565,16 @@ test('cleared field nests respawn after five minutes away from active actors', (
     assert.equal(state.monsterIds.length, 0);
     const respawnAt = state.respawnAt;
     assert.ok(respawnAt >= 310_000);
-
-    serverActor.tile = { ...state.centerTile };
-    session.tick(respawnAt + 1);
-    assert.equal(state.monsterIds.length, 0, 'nest should not respawn inside the 18-tile safety radius');
-
     const stateChunkX = Math.floor(state.centerTile.x / CHUNK_SIZE);
     const stateChunkY = Math.floor(state.centerTile.y / CHUNK_SIZE);
+    const realm = internals.worldMap.getRealm();
+    const biome = internals.worldMap.getBiomeAtChunk(stateChunkX, stateChunkY);
+    const seed = `server:${internals.sessionEpoch}`;
+
+    serverActor.tile = { ...state.centerTile };
+    internals.spawnNest(stateChunkX, stateChunkY, biome, realm, seed, false, respawnAt + 1);
+    assert.equal(state.monsterIds.length, 0, 'nest should not respawn inside the 18-tile safety radius');
+
     let outsideSafeTile: { x: number; y: number } | null = null;
     const chunkMinX = stateChunkX * CHUNK_SIZE;
     const chunkMinY = stateChunkY * CHUNK_SIZE;
@@ -1586,6 +1589,6 @@ test('cleared field nests respawn after five minutes away from active actors', (
     }
     assert.ok(outsideSafeTile, 'test fixture should find a same-chunk tile outside the nest spawn safety radius');
     serverActor.tile = outsideSafeTile;
-    session.tick(respawnAt + 1_001);
+    internals.spawnNest(stateChunkX, stateChunkY, biome, realm, seed, false, respawnAt + 1_001);
     assert.ok(state.monsterIds.length > 0, 'nest should respawn once the timer passed and actors are outside the spawn safety radius');
 });

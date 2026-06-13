@@ -1,9 +1,6 @@
 import { getItemDef } from '../src/data/ItemDB';
-import { getClassLine } from '../src/data/ClassTree';
-import { createBaseStats, getBaseStatsForClass } from '../src/data/Stats';
-import { STORY_SCENARIOS, type StoryQuestRewardData } from '../src/data/StoryScenarioData';
-import { t } from '../src/i18n/LanguageManager';
 import type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from './AuthStore';
+import { applyStoryQuestRewardsToSaveState } from './StoryRewardSave';
 
 export type WorldCharacterSavePatch = CharacterSavePatch;
 
@@ -104,7 +101,7 @@ export class WorldSessionSaveState {
         const inventory = cloneInventorySnapshot(save.inventory, options);
         const rosterSnapshot = cloneRecord(save.rosterSnapshot);
         if (options.includeRaidRewards) {
-            applyStoryQuestRewards(player.completedQuestIds, questState, inventory, rosterSnapshot);
+            applyStoryQuestRewardsToSaveState(player.completedQuestIds, questState, inventory, rosterSnapshot);
         }
         const hubLocation = {
             ...cloneRecord(save.hubLocation),
@@ -162,98 +159,6 @@ function normalizeStringArray(value: unknown): string[] {
 
 function normalizeGoldValue(value: unknown): number {
     return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
-}
-
-function applyStoryQuestRewards(
-    completedQuestIds: ReadonlySet<string>,
-    questState: Record<string, unknown>,
-    inventory: InventorySaveSnapshot,
-    rosterSnapshot: Record<string, unknown>
-): void {
-    for (const scenario of STORY_SCENARIOS) {
-        if (!completedQuestIds.has(scenario.questId)) continue;
-        applyStoryQuestReward(scenario.reward, questState, inventory, rosterSnapshot);
-    }
-}
-
-function applyStoryQuestReward(
-    reward: StoryQuestRewardData,
-    questState: Record<string, unknown>,
-    inventory: InventorySaveSnapshot,
-    rosterSnapshot: Record<string, unknown>
-): void {
-    if (reward.type === 'none') return;
-    if (reward.type === 'bundle') {
-        for (const entry of reward.rewards) {
-            applyStoryQuestReward(entry, questState, inventory, rosterSnapshot);
-        }
-        return;
-    }
-    if (reward.type === 'questItem') {
-        addStringSetValue(questState, 'questItemIds', reward.itemId);
-        return;
-    }
-    if (reward.type === 'inventoryItem') {
-        if (inventory.items.some((item) => item.itemId === reward.itemId) || addInventoryItemReward(inventory, reward.itemId)) {
-            addStringSetValue(questState, 'questItemIds', reward.itemId);
-        }
-        return;
-    }
-
-    addStringSetValue(questState, 'storyCompanionIds', reward.companionId);
-    addRosterCompanion(rosterSnapshot, reward);
-}
-
-function addInventoryItemReward(inventory: InventorySaveSnapshot, itemId: string): boolean {
-    const itemDef = getItemDef(itemId);
-    if (!itemDef) return false;
-    const slot = findFreeInventorySlot(inventory, itemId);
-    if (!slot) return false;
-    inventory.items.push({
-        itemId,
-        gridX: slot.x,
-        gridY: slot.y,
-        durability: itemDef.maxDurability,
-        quantity: 1,
-    });
-    return true;
-}
-
-function addRosterCompanion(
-    rosterSnapshot: Record<string, unknown>,
-    reward: Extract<StoryQuestRewardData, { type: 'companion' }>
-): void {
-    const rawCharacters = Array.isArray(rosterSnapshot.characters) ? rosterSnapshot.characters : [];
-    const characters = rawCharacters.filter(isRecord);
-    if (characters.some((entry) => entry.id === reward.companionId)) {
-        rosterSnapshot.characters = rawCharacters;
-        return;
-    }
-    const classLine = getClassLine(reward.classId);
-    const baseMov = classLine?.baseMovRange ?? 4;
-    rosterSnapshot.characters = [
-        ...rawCharacters,
-        {
-            id: reward.companionId,
-            name: t(reward.nameKey),
-            classKey: reward.classId,
-            gender: 'M',
-            tier: classLine?.tiers[0]?.tier ?? 1,
-            level: 1,
-            exp: 0,
-            baseStats: createBaseStats(getBaseStatsForClass(reward.classId, baseMov)),
-        },
-    ];
-}
-
-function addStringSetValue(record: Record<string, unknown>, key: string, value: string): void {
-    const values = new Set(normalizeStringArray(record[key]));
-    values.add(value);
-    record[key] = [...values];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function findFreeInventorySlot(inventory: InventorySaveSnapshot, itemId: string): { x: number; y: number } | null {

@@ -6,6 +6,7 @@ import { ITEMS } from '../src/data/ItemDB';
 import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../src/data/StarterKitData';
 import { createBaseStats, getBaseStatsForClass, type CharacterStats } from '../src/data/Stats';
 import type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
+import { applyStoryQuestRewardsToSaveState } from './StoryRewardSave';
 export type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
 
 export const CURRENT_SAVE_VERSION = 1;
@@ -355,13 +356,7 @@ export class InMemoryAuthStore implements AuthStore {
             completedQuests: mergedQuestIds,
             updatedAt: now,
         });
-        this.saves.set(characterId, {
-            ...save,
-            hubLocation: { ...save.hubLocation, townId: currentHubTownId },
-            questState: { ...save.questState, completedQuestIds: mergedQuestIds },
-            revision: save.revision + 1,
-            updatedAt: now,
-        });
+        this.saves.set(characterId, buildRaidSurvivalSave(save, mergedQuestIds, currentHubTownId, now));
     }
 }
 
@@ -777,16 +772,47 @@ export class PostgresAuthStore implements AuthStore {
                     now,
                 ]
             );
-            await client.query(
-                `UPDATE character_saves s
-                 SET hub_location = jsonb_set(s.hub_location, '{townId}', to_jsonb($1::text), true),
-                     quest_state = jsonb_set(s.quest_state, '{completedQuestIds}', $2::jsonb, true),
-                     revision = s.revision + 1,
-                     updated_at = $3
-                 FROM characters c
-                 WHERE s.character_id = c.id AND c.id = $4 AND c.account_id = $5 AND c.deleted_at IS NULL`,
-                [currentHubTownId, JSON.stringify(mergedQuestIds), now, characterId, accountId]
+            const saveResult = await client.query(
+                `SELECT s.*
+                 FROM character_saves s
+                 JOIN characters c ON c.id = s.character_id
+                 WHERE s.character_id = $1 AND c.account_id = $2 AND c.deleted_at IS NULL
+                 FOR UPDATE OF s`,
+                [characterId, accountId]
             );
+            if (saveResult.rows[0]) {
+                const updatedSave = buildRaidSurvivalSave(
+                    saveFromRow(saveResult.rows[0]),
+                    mergedQuestIds,
+                    currentHubTownId,
+                    now
+                );
+                await client.query(
+                    `UPDATE character_saves
+                     SET save_version = $1,
+                         revision = $2,
+                         hub_location = $3::jsonb,
+                         quest_state = $4::jsonb,
+                         inventory = $5::jsonb,
+                         equipment = $6::jsonb,
+                         party_snapshot = $7::jsonb,
+                         roster_snapshot = $8::jsonb,
+                         updated_at = $9
+                     WHERE character_id = $10`,
+                    [
+                        updatedSave.saveVersion,
+                        updatedSave.revision,
+                        JSON.stringify(updatedSave.hubLocation),
+                        JSON.stringify(updatedSave.questState),
+                        JSON.stringify(updatedSave.inventory),
+                        JSON.stringify(updatedSave.equipment),
+                        JSON.stringify(updatedSave.partySnapshot),
+                        JSON.stringify(updatedSave.rosterSnapshot),
+                        updatedSave.updatedAt,
+                        characterId,
+                    ]
+                );
+            }
             await client.query('COMMIT');
         } catch (error) {
             await safeRollback(client);
@@ -916,6 +942,30 @@ function firstOpenSlot(characters: Array<{ slotNo: number }>): number | null {
 
 function normalizeCharacterName(name: string): string {
     return name.trim().toLocaleLowerCase('en-US');
+}
+
+function buildRaidSurvivalSave(
+    save: CharacterSave,
+    mergedQuestIds: readonly string[],
+    currentHubTownId: string,
+    updatedAt: string
+): CharacterSave {
+    const questState = {
+        ...clone(save.questState),
+        completedQuestIds: uniqueStrings(mergedQuestIds),
+    };
+    const inventory = normalizeInventorySnapshot(save.inventory);
+    const rosterSnapshot = clone(save.rosterSnapshot);
+    applyStoryQuestRewardsToSaveState(new Set(questState.completedQuestIds), questState, inventory, rosterSnapshot);
+    return {
+        ...save,
+        hubLocation: { ...clone(save.hubLocation), townId: currentHubTownId },
+        questState,
+        inventory,
+        rosterSnapshot,
+        revision: save.revision + 1,
+        updatedAt,
+    };
 }
 
 function normalizeInventorySnapshot(snapshot: InventorySaveSnapshot): InventorySaveSnapshot {
