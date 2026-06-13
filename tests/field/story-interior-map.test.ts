@@ -1041,10 +1041,10 @@ test('Ament 1F exposes original episode 19 Uraeus, ice trap, cache, and shard fl
     assert.ok(ament.fieldEvents.slice(0, 4).every((event) => event.trigger.includes('MAGIC 0404')));
     assert.deepEqual(ament.fieldEvents.slice(4, 8).map((event) => event.originalEventId), ['EVENT 80', 'EVENT 81', 'EVENT 82', 'EVENT 82']);
     assert.deepEqual(ament.fieldEvents.slice(4, 8).map((event) => event.rewards?.[0]), [
-        { type: 'item', itemId: 'short_bow', originalItemId: 15 },
-        { type: 'item', itemId: 'wooden_shield', originalItemId: 110 },
-        { type: 'item', itemId: 'magic_t5_body', originalItemId: 854 },
-        { type: 'item', itemId: 'web_66_01', originalItemId: 578 },
+        { type: 'item', itemId: 'orig_story_0015_short_bow', originalItemId: 15 },
+        { type: 'item', itemId: 'orig_story_0110_ice_shield', originalItemId: 110 },
+        { type: 'item', itemId: 'orig_story_0854_crystal_mail6', originalItemId: 854 },
+        { type: 'item', itemId: 'orig_story_0578_zambia7', originalItemId: 578 },
     ]);
     assert.deepEqual(ament.fieldEvents.slice(8).map((event) => event.originalEventId), ['EVENT 99', 'EVENT 95', 'EVENT 97', 'EVENT 96']);
     assert.deepEqual(ament.fieldEvents.slice(8).map((event) => event.rewards?.[0]), [

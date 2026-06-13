@@ -234,6 +234,47 @@ test('shop and original item data expose guarded equipment fields', () => {
     assert.equal(zambia6.requiredLevel, 76);
     assert.match(zambia6.description ?? '', /GETITEM 577/);
     assert.equal(getSellPrice(zambia6), 175000);
+    const shortBow = getItemDef('orig_story_0015_short_bow');
+    assert.ok(shortBow);
+    assert.equal(shortBow.nameKr, '쇼트보우');
+    assert.equal(shortBow.itemCategory, 'normal_weapon');
+    assert.deepEqual(shortBow.iconSprite, { col: 15, row: 0 });
+    assert.deepEqual(shortBow.stats, { atk: 35 });
+    assert.equal(shortBow.attackRange, 5);
+    assert.equal(shortBow.maxDurability, 300);
+    assert.match(shortBow.description ?? '', /GETITEM 015/);
+    assert.equal(getSellPrice(shortBow), 6000);
+    const iceShield = getItemDef('orig_story_0110_ice_shield');
+    assert.ok(iceShield);
+    assert.equal(iceShield.nameKr, '아이스 실드');
+    assert.equal(iceShield.itemCategory, 'armor');
+    assert.equal(iceShield.slot, 'shield');
+    assert.deepEqual(iceShield.iconSprite, { col: 37, row: 0 });
+    assert.deepEqual(iceShield.stats, { def: 20 });
+    assert.equal(iceShield.magicRange, 2);
+    assert.match(iceShield.description ?? '', /GETITEM 110/);
+    assert.equal(getSellPrice(iceShield), 25000);
+    const crystalMail6 = getItemDef('orig_story_0854_crystal_mail6');
+    assert.ok(crystalMail6);
+    assert.equal(crystalMail6.nameKr, '크리스탈 메일6');
+    assert.equal(crystalMail6.itemCategory, 'armor');
+    assert.equal(crystalMail6.slot, 'body');
+    assert.deepEqual(crystalMail6.iconSprite, { col: 63, row: 2 });
+    assert.deepEqual(crystalMail6.stats, { def: 30, evasion: 10 });
+    assert.equal(crystalMail6.maxDurability, 900);
+    assert.equal(crystalMail6.requiredLevel, 76);
+    assert.match(crystalMail6.description ?? '', /GETITEM 854/);
+    assert.equal(getSellPrice(crystalMail6), 50000);
+    const zambia7 = getItemDef('orig_story_0578_zambia7');
+    assert.ok(zambia7);
+    assert.equal(zambia7.nameKr, '잠비아7');
+    assert.equal(zambia7.itemCategory, 'normal_weapon');
+    assert.deepEqual(zambia7.iconSprite, { col: 71, row: 1 });
+    assert.deepEqual(zambia7.stats, { atk: 155 });
+    assert.equal(zambia7.maxDurability, 4000);
+    assert.equal(zambia7.requiredLevel, 106);
+    assert.match(zambia7.description ?? '', /GETITEM 578/);
+    assert.equal(getSellPrice(zambia7), 250000);
     for (const [itemId, originalItemId] of [
         ['orig_story_0315_stone_snake', 315],
         ['orig_story_0397_yellow_flower', 397],
