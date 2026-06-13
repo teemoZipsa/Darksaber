@@ -923,7 +923,21 @@ test('Valhalla Plain exposes original episode 16 Barbatu, trap, and cache flow',
         itemId: 'orig_story_0204_resist_thunder_ring',
         originalItemId: 204,
     });
-    assert.ok(valhalla.fieldEvents.some((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 619)));
+    assert.deepEqual(valhalla.fieldEvents.find((event) => event.originalEventId === 'EVENT 80')?.rewards?.[0], {
+        type: 'item',
+        itemId: 'orig_story_0261_hermes_shoes',
+        originalItemId: 261,
+    });
+    assert.deepEqual(valhalla.fieldEvents.find((event) => event.originalEventId === 'EVENT 90')?.rewards?.[0], {
+        type: 'item',
+        itemId: 'orig_story_0005_assassin_knife',
+        originalItemId: 5,
+    });
+    assert.deepEqual(valhalla.fieldEvents.find((event) => event.originalEventId === 'EVENT 92')?.rewards?.[0], {
+        type: 'item',
+        itemId: 'orig_story_0619_dragon_killer6',
+        originalItemId: 619,
+    });
     assert.equal(valhalla.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
     assert.equal(valhalla.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
 });

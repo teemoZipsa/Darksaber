@@ -160,6 +160,37 @@ test('shop and original item data expose guarded equipment fields', () => {
         assert.match(originalAccessory.descriptionKr ?? '', new RegExp(`GETITEM ${originalItemId}`));
         assert.equal(getSellPrice(originalAccessory), expectedSellPrice);
     }
+    const assassinKnife = getItemDef('orig_story_0005_assassin_knife');
+    assert.ok(assassinKnife);
+    assert.equal(assassinKnife.nameKr, '어새신 나이프');
+    assert.equal(assassinKnife.itemCategory, 'normal_weapon');
+    assert.deepEqual(assassinKnife.iconSprite, { col: 5, row: 0 });
+    assert.deepEqual(assassinKnife.stats, { atk: 45 });
+    assert.equal(assassinKnife.maxDurability, 300);
+    assert.equal(assassinKnife.attackRange, 1);
+    assert.match(assassinKnife.description ?? '', /GETITEM 005/);
+    assert.equal(getSellPrice(assassinKnife), 5750);
+    const hermesShoes = getItemDef('orig_story_0261_hermes_shoes');
+    assert.ok(hermesShoes);
+    assert.equal(hermesShoes.nameKr, '엘메스의 구두');
+    assert.equal(hermesShoes.itemCategory, 'armor');
+    assert.equal(hermesShoes.slot, 'boots');
+    assert.deepEqual(hermesShoes.iconSprite, { col: 80, row: 0 });
+    assert.deepEqual(hermesShoes.stats, { def: -4 });
+    assert.equal(hermesShoes.magicRange, -4);
+    assert.equal(hermesShoes.maxDurability, 300);
+    assert.match(hermesShoes.description ?? '', /GETITEM 261/);
+    assert.equal(getSellPrice(hermesShoes), 13000);
+    const dragonKiller6 = getItemDef('orig_story_0619_dragon_killer6');
+    assert.ok(dragonKiller6);
+    assert.equal(dragonKiller6.nameKr, '드래곤 킬러6');
+    assert.equal(dragonKiller6.itemCategory, 'normal_weapon');
+    assert.deepEqual(dragonKiller6.iconSprite, { col: 78, row: 1 });
+    assert.deepEqual(dragonKiller6.stats, { atk: 100, hitRate: 10 });
+    assert.equal(dragonKiller6.maxDurability, 3200);
+    assert.equal(dragonKiller6.requiredLevel, 76);
+    assert.match(dragonKiller6.description ?? '', /GETITEM 619/);
+    assert.equal(getSellPrice(dragonKiller6), 400000);
     for (const [itemId, originalItemId] of [
         ['orig_story_0315_stone_snake', 315],
         ['orig_story_0397_yellow_flower', 397],
