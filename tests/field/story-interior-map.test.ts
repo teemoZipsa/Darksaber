@@ -965,10 +965,10 @@ test('Airship exposes original episode 17 purity seal and boarding flow', () => 
     ]);
     assert.equal(airship.fieldEvents.filter((event) => event.originalEventId === 'EVENT 91').length, 2);
     assert.deepEqual(airship.fieldEvents.filter((event) => event.rewards?.length).map((event) => event.rewards?.[0]), [
-        { type: 'item', itemId: 'magic_t4_body', originalItemId: 180 },
+        { type: 'item', itemId: 'orig_story_0180_light_robe', originalItemId: 180 },
         { type: 'gold', amount: 500 },
         { type: 'item', itemId: 'fire_herb', originalItemId: 0 },
-        { type: 'item', itemId: 'web_66_51', originalItemId: 620 },
+        { type: 'item', itemId: 'orig_story_0620_dragon_killer7', originalItemId: 620 },
         { type: 'item', itemId: 'orig_story_0204_resist_thunder_ring', originalItemId: 204 },
         { type: 'item', itemId: 'orig_story_0208_necklace', originalItemId: 208 },
     ]);

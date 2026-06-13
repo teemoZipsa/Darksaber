@@ -191,6 +191,27 @@ test('shop and original item data expose guarded equipment fields', () => {
     assert.equal(dragonKiller6.requiredLevel, 76);
     assert.match(dragonKiller6.description ?? '', /GETITEM 619/);
     assert.equal(getSellPrice(dragonKiller6), 400000);
+    const lightRobe = getItemDef('orig_story_0180_light_robe');
+    assert.ok(lightRobe);
+    assert.equal(lightRobe.nameKr, '빛의 로브');
+    assert.equal(lightRobe.itemCategory, 'armor');
+    assert.equal(lightRobe.slot, 'body');
+    assert.deepEqual(lightRobe.iconSprite, { col: 57, row: 0 });
+    assert.deepEqual(lightRobe.stats, { def: 1 });
+    assert.equal(lightRobe.magicRange, 1);
+    assert.equal(lightRobe.maxDurability, 300);
+    assert.match(lightRobe.description ?? '', /GETITEM 180/);
+    assert.equal(getSellPrice(lightRobe), 45000);
+    const dragonKiller7 = getItemDef('orig_story_0620_dragon_killer7');
+    assert.ok(dragonKiller7);
+    assert.equal(dragonKiller7.nameKr, '드래곤 킬러7');
+    assert.equal(dragonKiller7.itemCategory, 'normal_weapon');
+    assert.deepEqual(dragonKiller7.iconSprite, { col: 78, row: 1 });
+    assert.deepEqual(dragonKiller7.stats, { atk: 125, hitRate: 10 });
+    assert.equal(dragonKiller7.maxDurability, 4000);
+    assert.equal(dragonKiller7.requiredLevel, 106);
+    assert.match(dragonKiller7.description ?? '', /GETITEM 620/);
+    assert.equal(getSellPrice(dragonKiller7), 500000);
     for (const [itemId, originalItemId] of [
         ['orig_story_0315_stone_snake', 315],
         ['orig_story_0397_yellow_flower', 397],

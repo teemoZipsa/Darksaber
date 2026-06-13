@@ -1072,6 +1072,40 @@ const RAW_ITEMS: RawItemDef[] = [
         maxSockets: 3,
         socketTypes: ['rune', 'gem']
     },
+    {
+        id: 'orig_story_0180_light_robe', name: 'Light Robe', nameKr: '빛의 로브',
+        slot: 'body', gridW: 2, gridH: 3, color: '#7f8c8d', icon: '🦺',
+        iconSprite: { col: 57, row: 0 },
+        maxDurability: 300,
+        stats: { def: 1 },
+        magicRange: 1,
+        description: 'Original Darksaber body armor reward. Preserves GETITEM 180 and original price 90000.',
+        descriptionKr: '원작 다크세이버 갑옷 보상. GETITEM 180과 원작 가격 90000을 보존합니다. 어둠 속에서 빛을 내뿜는 옷, 회복 마법을 강화시키는 능력이 있음.',
+        rarity: 'unique',
+        weight: 5.4,
+        baseValue: 90000,
+        requiredLevel: 0,
+        itemCategory: 'armor',
+        maxSockets: 3,
+        socketTypes: ['rune', 'gem']
+    },
+    {
+        id: 'orig_story_0620_dragon_killer7', name: 'Dragon Killer 7', nameKr: '드래곤 킬러7',
+        slot: 'weapon', gridW: 1, gridH: 3, color: '#b8a48c', icon: '🗡️',
+        iconSprite: { col: 78, row: 1 },
+        maxDurability: 4000,
+        stats: { atk: 125, hitRate: 10 },
+        attackRange: 1,
+        description: 'Original Darksaber weapon reward. Preserves GETITEM 620 and original price 1000000.',
+        descriptionKr: '원작 다크세이버 무기 보상. GETITEM 620과 원작 가격 1000000을 보존합니다. 드래곤의 뼈로 만들어진 검, 두꺼운 드래곤의 피부를 뚫을 수 있는 검이다.',
+        rarity: 'unique',
+        weight: 2.3,
+        baseValue: 1000000,
+        requiredLevel: 106,
+        itemCategory: 'normal_weapon',
+        maxSockets: 3,
+        socketTypes: ['rune', 'gem']
+    },
 
     // ─── Socket Inserts (Diablo II-style runes and gems) ──────
     ...SOCKET_INSERTS,
