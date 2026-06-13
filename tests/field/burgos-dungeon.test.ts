@@ -1182,7 +1182,13 @@ test('late story presentation steps focus the camera on original event tiles', (
     assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 19, y: 7 });
     assert.equal(harness.controller.getLastPresentationDurationMs(), getStoryScenarioPresentationDurationMs(sequence.bossDefeat));
     drainStoryPresentation(harness.controller);
+    assert.equal(raidSession.isDungeonCleared('demon_fixers_den'), true);
+    assert.equal(raidSession.activeDungeonId, null);
+    assert.equal(harness.controller.getActiveInterior(), null);
+    assert.deepEqual(harness.placedNear, { x: 0, y: 0 });
     assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 22, y: 11 });
+    assert.ok(harness.logs.includes('마계 해결사의 소굴 입구로 복귀했습니다.'));
+    assert.ok(harness.logs.includes('마계 해결사의 소굴 목표 달성. 다른 마을로 생환하면 31화가 완료됩니다.'));
     assert.ok(harness.cameraFollowed);
 });
 
