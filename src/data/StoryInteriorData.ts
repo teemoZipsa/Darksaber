@@ -651,6 +651,7 @@ const BURGOS_CASTLE_LAYOUT: StoryInteriorLayout = {
         { x: 23, y: 11 },
     ],
     bossTile: { x: 30, y: 9 },
+    objectiveKey: 'story.interior.burgos_castle.objective',
     rooms: [
         { id: 'entry', nameKey: 'story.interior.room.entryHall', x: 2, y: 7, width: 6, height: 5 },
         ...BURGOS_WALKABLE_AREAS.map((room) => ({ ...room })),

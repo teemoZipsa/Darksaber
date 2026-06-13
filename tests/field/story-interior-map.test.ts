@@ -54,6 +54,11 @@ test('solo interior layouts expose walkable entry, player, guard, and boss tiles
         assert.equal(getStoryInteriorTileAt(layout, layout.entryTile.x, layout.entryTile.y), TileType.DUNGEON_ENTRANCE);
         assert.notEqual(getStoryInteriorTileAt(layout, layout.playerStart.x, layout.playerStart.y), TileType.WALL);
         assert.notEqual(getStoryInteriorTileAt(layout, layout.bossTile.x, layout.bossTile.y), TileType.WALL);
+        assert.notEqual(i18n.strings.ko[layout.displayNameKey as keyof typeof i18n.strings.ko], undefined, `missing ko key ${layout.displayNameKey}`);
+        assert.notEqual(i18n.strings.en[layout.displayNameKey as keyof typeof i18n.strings.en], undefined, `missing en key ${layout.displayNameKey}`);
+        assert.ok(layout.objectiveKey, `${layout.dungeonId} needs a dedicated objective HUD key`);
+        assert.notEqual(i18n.strings.ko[layout.objectiveKey as keyof typeof i18n.strings.ko], undefined, `missing ko key ${layout.objectiveKey}`);
+        assert.notEqual(i18n.strings.en[layout.objectiveKey as keyof typeof i18n.strings.en], undefined, `missing en key ${layout.objectiveKey}`);
         assert.ok(layout.rooms.some((room) => room.id === 'entry'));
         assert.ok(layout.rooms.some((room) => room.id === 'bossRoom'));
         assert.ok(layout.props.some((prop) => prop.kind === 'sealedDoor'));
