@@ -820,7 +820,7 @@ test('Skeria exposes original episode 14 Yadua, quake trap, and cache flow', () 
         'EVENT 62',
     ]);
     assert.deepEqual(skeria.fieldEvents.slice(4).map((event) => event.rewards?.[0]), [
-        { type: 'item', itemId: 'shell_ring', originalItemId: 203 },
+        { type: 'item', itemId: 'orig_story_0203_resist_fire_ring', originalItemId: 203 },
         { type: 'gold', amount: 200 },
         { type: 'item', itemId: 'web_66_01', originalItemId: 18 },
     ]);
@@ -918,6 +918,11 @@ test('Valhalla Plain exposes original episode 16 Barbatu, trap, and cache flow',
         itemId: 'orig_story_0305_magic_potion',
         originalItemId: 305,
     });
+    assert.deepEqual(valhalla.fieldEvents.find((event) => event.originalEventId === 'EVENT 70')?.rewards?.[0], {
+        type: 'item',
+        itemId: 'orig_story_0204_resist_thunder_ring',
+        originalItemId: 204,
+    });
     assert.ok(valhalla.fieldEvents.some((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 619)));
     assert.equal(valhalla.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
     assert.equal(valhalla.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
@@ -950,8 +955,8 @@ test('Airship exposes original episode 17 purity seal and boarding flow', () => 
         { type: 'gold', amount: 500 },
         { type: 'item', itemId: 'fire_herb', originalItemId: 0 },
         { type: 'item', itemId: 'web_66_51', originalItemId: 620 },
-        { type: 'item', itemId: 'shell_ring', originalItemId: 204 },
-        { type: 'item', itemId: 'ice_herb', originalItemId: 208 },
+        { type: 'item', itemId: 'orig_story_0204_resist_thunder_ring', originalItemId: 204 },
+        { type: 'item', itemId: 'orig_story_0208_necklace', originalItemId: 208 },
     ]);
     assert.equal(airship.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
 });
@@ -1058,7 +1063,7 @@ test('Ament 2F exposes original episode 20 Mephistopheles, lightning trap, cache
         'EVENT 84',
     ]);
     assert.deepEqual(ament.fieldEvents.filter((event) => event.rewards?.length).map((event) => event.rewards?.[0]), [
-        { type: 'item', itemId: 'power_ring', originalItemId: 207 },
+        { type: 'item', itemId: 'orig_story_0207_illusion_ring', originalItemId: 207 },
         { type: 'item', itemId: 'magic_t5_head', originalItemId: 148 },
         { type: 'item', itemId: 'magic_t5_boots', originalItemId: 262 },
         { type: 'item', itemId: 'web_66_51', originalItemId: 632 },

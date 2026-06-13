@@ -971,6 +971,56 @@ const RAW_ITEMS: RawItemDef[] = [
         sellable: false,
         itemCategory: 'material'
     },
+    {
+        id: 'orig_story_0203_resist_fire_ring', name: 'Resist Fire Ring', nameKr: '레지스트파이어링',
+        slot: 'accessory', gridW: 1, gridH: 1, color: '#d95f3f', icon: '◇',
+        iconSprite: { col: 61, row: 0 },
+        maxDurability: 250,
+        description: 'Original Darksaber accessory reward. Preserves GETITEM 203 and original price 60000.',
+        descriptionKr: '원작 다크세이버 장신구 보상. GETITEM 203과 원작 가격 60000을 보존합니다. 착용시 불에 대한 내성이 생긴다.',
+        rarity: 'unique',
+        weight: 0.1,
+        baseValue: 60000,
+        itemCategory: 'accessory'
+    },
+    {
+        id: 'orig_story_0204_resist_thunder_ring', name: 'Resist Thunder Ring', nameKr: '레지스트썬더링',
+        slot: 'accessory', gridW: 1, gridH: 1, color: '#d8c24a', icon: '◇',
+        iconSprite: { col: 62, row: 0 },
+        maxDurability: 250,
+        description: 'Original Darksaber accessory reward. Preserves GETITEM 204 and original price 60000.',
+        descriptionKr: '원작 다크세이버 장신구 보상. GETITEM 204와 원작 가격 60000을 보존합니다. 착용시 전격에 대한 내성이 생긴다.',
+        rarity: 'unique',
+        weight: 0.1,
+        baseValue: 60000,
+        itemCategory: 'accessory'
+    },
+    {
+        id: 'orig_story_0207_illusion_ring', name: 'Illusion Ring', nameKr: '일루젼 링',
+        slot: 'accessory', gridW: 1, gridH: 1, color: '#b7c8ff', icon: '◇',
+        iconSprite: { col: 65, row: 0 },
+        maxDurability: 250,
+        stats: { evasion: 5 },
+        description: 'Original Darksaber accessory reward. Preserves GETITEM 207 and original price 5000.',
+        descriptionKr: '원작 다크세이버 장신구 보상. GETITEM 207과 원작 가격 5000을 보존합니다. 적에게 환상을 보여 적의 공격을 피하는 확률을 높이는 효과를 가진다.',
+        rarity: 'unique',
+        weight: 0.1,
+        baseValue: 5000,
+        itemCategory: 'accessory'
+    },
+    {
+        id: 'orig_story_0208_necklace', name: 'Necklace', nameKr: '네크리스',
+        slot: 'accessory', gridW: 1, gridH: 1, color: '#9bc4ff', icon: '◇',
+        iconSprite: { col: 66, row: 0 },
+        maxDurability: 250,
+        stats: { magDef: 5 },
+        description: 'Original Darksaber accessory reward. Preserves GETITEM 208 and original price 5000.',
+        descriptionKr: '원작 다크세이버 장신구 보상. GETITEM 208과 원작 가격 5000을 보존합니다. 착용시 마법공격력을 약간 높여주는 목걸이.',
+        rarity: 'unique',
+        weight: 0.1,
+        baseValue: 5000,
+        itemCategory: 'accessory'
+    },
 
     // ─── Socket Inserts (Diablo II-style runes and gems) ──────
     ...SOCKET_INSERTS,

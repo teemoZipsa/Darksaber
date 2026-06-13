@@ -142,6 +142,24 @@ test('shop and original item data expose guarded equipment fields', () => {
     assert.match(starKnife.description ?? '', /GETITEM 008/);
     assert.match(starKnife.descriptionKr ?? '', /GETITEM 008/);
     assert.equal(getSellPrice(starKnife), 0);
+    for (const [itemId, originalItemId, nameKr, iconCol, expectedStats, expectedSellPrice] of [
+        ['orig_story_0203_resist_fire_ring', 203, '레지스트파이어링', 61, undefined, 30000],
+        ['orig_story_0204_resist_thunder_ring', 204, '레지스트썬더링', 62, undefined, 30000],
+        ['orig_story_0207_illusion_ring', 207, '일루젼 링', 65, { evasion: 5 }, 2500],
+        ['orig_story_0208_necklace', 208, '네크리스', 66, { magDef: 5 }, 2500],
+    ] as const) {
+        const originalAccessory = getItemDef(itemId);
+        assert.ok(originalAccessory, `missing original accessory ${itemId}`);
+        assert.equal(originalAccessory.nameKr, nameKr);
+        assert.equal(originalAccessory.itemCategory, 'accessory');
+        assert.equal(originalAccessory.slot, 'accessory');
+        assert.deepEqual(originalAccessory.iconSprite, { col: iconCol, row: 0 });
+        assert.equal(originalAccessory.maxDurability, 250);
+        assert.deepEqual(originalAccessory.stats, expectedStats);
+        assert.match(originalAccessory.description ?? '', new RegExp(`GETITEM ${originalItemId}`));
+        assert.match(originalAccessory.descriptionKr ?? '', new RegExp(`GETITEM ${originalItemId}`));
+        assert.equal(getSellPrice(originalAccessory), expectedSellPrice);
+    }
     for (const [itemId, originalItemId] of [
         ['orig_story_0315_stone_snake', 315],
         ['orig_story_0397_yellow_flower', 397],
