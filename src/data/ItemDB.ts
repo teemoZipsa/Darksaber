@@ -669,6 +669,20 @@ const RAW_ITEMS: RawItemDef[] = [
         buyPrice: 25
     },
     {
+        id: 'orig_story_0305_magic_potion', name: 'Magic Potion', nameKr: '매직포션',
+        slot: 'consumable', gridW: 1, gridH: 1, color: '#4488ff', icon: 'M',
+        iconSprite: { col: 87, row: 0 },
+        maxDurability: 1,
+        stats: { mp: 30 },
+        useEffect: { type: 'recover', mp: 30 },
+        description: 'Original Darksaber Magic Potion reward. Preserves GETITEM 305, magic 3201, and original price 10000.',
+        descriptionKr: '원작 다크세이버 매직포션 보상. GETITEM 305, 발동마법 3201, 원작 가격 10000을 보존합니다.',
+        rarity: 'uncommon',
+        weight: 0.2,
+        baseValue: 100,
+        itemCategory: 'consumable'
+    },
+    {
         id: 'repair_kit', name: 'Repair Kit', nameKr: '수리 키트',
         slot: 'consumable', gridW: 1, gridH: 2, color: '#ffaa00', icon: '🔧',
         maxDurability: 5,

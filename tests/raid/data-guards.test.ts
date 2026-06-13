@@ -91,6 +91,7 @@ test('item normalization keeps consumable rarity and generated armor metadata st
     assert.equal(getItemDef('herb_cheap')?.rarity, 'common');
     assert.equal(getItemDef('orig_story_0300_heal_potion')?.rarity, 'uncommon');
     assert.equal(getItemDef('herb_common')?.rarity, 'uncommon');
+    assert.equal(getItemDef('orig_story_0305_magic_potion')?.rarity, 'uncommon');
     assert.equal(getItemDef('mp_potion')?.rarity, 'common');
     assert.equal(getItemDef('battle_t1_head')?.itemCategory, 'armor');
     assert.equal(Object.prototype.hasOwnProperty.call(getItemDef('gem_flawed_ruby') ?? {}, 'buyPrice'), false);
@@ -125,6 +126,14 @@ test('shop and original item data expose guarded equipment fields', () => {
     assert.deepEqual(getCombatRecovery(originalHealPotion), { hp: 50, mp: 0 });
     assert.match(originalHealPotion.description ?? '', /GETITEM 300/);
     assert.match(originalHealPotion.descriptionKr ?? '', /발동마법 3001/);
+    const originalMagicPotion = getItemDef('orig_story_0305_magic_potion');
+    assert.ok(originalMagicPotion);
+    assert.equal(originalMagicPotion.nameKr, '매직포션');
+    assert.equal(originalMagicPotion.itemCategory, 'consumable');
+    assert.deepEqual(originalMagicPotion.iconSprite, { col: 87, row: 0 });
+    assert.deepEqual(getCombatRecovery(originalMagicPotion), { hp: 0, mp: 30 });
+    assert.match(originalMagicPotion.description ?? '', /GETITEM 305/);
+    assert.match(originalMagicPotion.descriptionKr ?? '', /발동마법 3201/);
     const starKnife = getItemDef('orig_story_0008_star_knife');
     assert.ok(starKnife);
     assert.equal(starKnife.itemCategory, 'normal_weapon');

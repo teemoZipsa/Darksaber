@@ -591,6 +591,7 @@ test('episodes 4 through 6 expose original field scenario event flows', () => {
     assert.equal(cacaora.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'gold' && reward.amount === 100)).length, 2);
     assert.ok(cacaora.fieldEvents.some((event) => event.id === 'cacaora_rusted_sword'));
     assert.ok(cacaora.fieldEvents.some((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 305)));
+    assert.equal(cacaora.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.itemId === 'orig_story_0305_magic_potion')).length, 1);
 
     assert.equal(village.originalSources.sceneScript, 'Wlib/scene6.lsc');
     assert.ok(village.originalSources.mapFiles.includes('MAP/06set.arc'));
@@ -784,7 +785,7 @@ test('Pyramid Interior exposes original episode 13 Myant, trap, and chest flow',
         { type: 'item', itemId: 'web_65_08', originalItemId: 10 },
         { type: 'item', itemId: 'orig_story_0008_star_knife', originalItemId: 8 },
         { type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 },
-        { type: 'item', itemId: 'mp_potion', originalItemId: 305 },
+        { type: 'item', itemId: 'orig_story_0305_magic_potion', originalItemId: 305 },
     ]);
     assert.ok(pyramid.fieldEvents.slice(8).every((event) => event.markerKind === 'chest'));
     assert.equal(pyramid.bossDefeat.filter((step) => step.kind === 'dialogue').length, 0);
@@ -912,6 +913,11 @@ test('Valhalla Plain exposes original episode 16 Barbatu, trap, and cache flow',
         itemId: 'orig_story_0315_stone_snake',
         originalItemId: 315,
     });
+    assert.deepEqual(valhalla.fieldEvents.find((event) => event.originalEventId === 'EVENT 63')?.rewards?.[0], {
+        type: 'item',
+        itemId: 'orig_story_0305_magic_potion',
+        originalItemId: 305,
+    });
     assert.ok(valhalla.fieldEvents.some((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 619)));
     assert.equal(valhalla.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
     assert.equal(valhalla.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
@@ -976,6 +982,11 @@ test('Ament Gate exposes original episode 18 Amphit, trap, cache, and true-door 
         'EVENT 86',
         'EVENT 87',
     ]);
+    assert.deepEqual(ament.fieldEvents.find((event) => event.originalEventId === 'EVENT 30')?.rewards?.[0], {
+        type: 'item',
+        itemId: 'orig_story_0305_magic_potion',
+        originalItemId: 305,
+    });
     assert.ok(ament.fieldEvents.some((event) => event.originalEventId === 'EVENT 99' && event.runtimeFlag === 'ament_gate_route_opened'));
     assert.ok(ament.fieldEvents.every((event) => event.originalSource === 'MAP/18set.arc:18.evt'));
     assert.ok(ament.fieldEvents.every((event) => event.triggerTiles.every((tile) => map.isWalkable(tile.x, tile.y))));
