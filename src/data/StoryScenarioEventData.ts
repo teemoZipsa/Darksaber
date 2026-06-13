@@ -1,6 +1,6 @@
 import type { TilePoint } from '../field/FieldPathing';
 import { getStoryInteriorLayout } from './StoryInteriorData';
-import { getOriginalLateStoryBossTile, getOriginalLateStoryCacheEvents } from './OriginalLateStoryFacts';
+import { getOriginalLateStoryBossTile, getOriginalLateStoryCacheEvents, getOriginalLateStoryFact } from './OriginalLateStoryFacts';
 import { getOriginalLateStoryItemsForSourceEvent } from './OriginalLateStoryItems';
 
 export type StoryScenarioEventStep =
@@ -42,6 +42,7 @@ export interface StoryScenarioEventSequence {
         sceneScript: string;
         globalScript: string;
         mapFiles: string[];
+        setArcMembers?: string[];
     };
     objectiveRuntimeFlag?: string;
     markers?: StoryScenarioMarker[];
@@ -183,6 +184,7 @@ function lateScenarioSequence(input: {
     caches: Array<{ eventNumber: number; tile: TilePoint; originalItemId: number; itemId: string }>;
 }): StoryScenarioEventSequence {
     const ep = String(input.episode).padStart(2, '0');
+    const originalFact = getOriginalLateStoryFact(input.episode);
     const objectiveRuntimeFlag = `${input.dungeonId}_objective_complete`;
     const layout = getStoryInteriorLayout(input.dungeonId);
     const entryAdvanceTile = layout ? { x: layout.playerStart.x, y: layout.playerStart.y - 1 } : null;
@@ -236,6 +238,12 @@ function lateScenarioSequence(input: {
             sceneScript: `Wlib/scene${input.episode}.lsc`,
             globalScript: input.globalScript,
             mapFiles: input.mapFiles,
+            setArcMembers: [
+                originalFact.aiMember,
+                originalFact.eventMember,
+                ...(originalFact.deoMember ? [originalFact.deoMember] : []),
+                ...(originalFact.deeMember ? [originalFact.deeMember] : []),
+            ],
         },
         objectiveRuntimeFlag,
         entry,
@@ -2854,7 +2862,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
         bossTile: getOriginalLateStoryBossTile(26),
         globalScript: 'Glib/gscene26.lsc',
         mapFiles: ['MAP/26.mrc', 'MAP/26t.mrc', 'MAP/26hmap.bmp', 'MAP/26bg.bmp', 'MAP/26set.arc', 'MAP/2600.mrc', 'MAP/2600t.mrc', 'MAP/2600hmap.bmp'],
-        dialogueCount: 1,
+        dialogueCount: 0,
         caches: getOriginalLateStoryCacheEvents(26),
     }),
     lateScenarioSequence({
@@ -2865,7 +2873,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
         bossTile: getOriginalLateStoryBossTile(27),
         globalScript: 'Glib/gscene27.lsc',
         mapFiles: ['MAP/27.mrc', 'MAP/27t.mrc', 'MAP/27hmap.bmp', 'MAP/27set.arc', 'MAP/2700.mrc', 'MAP/2700t.mrc', 'MAP/2700hmap.bmp'],
-        dialogueCount: 1,
+        dialogueCount: 0,
         caches: getOriginalLateStoryCacheEvents(27),
     }),
     lateScenarioSequence({

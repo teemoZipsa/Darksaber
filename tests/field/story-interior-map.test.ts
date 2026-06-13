@@ -1268,7 +1268,29 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         assert.ok(sequence, `missing event sequence for ${fact.dungeonId}`);
         assert.equal(sequence.originalSources.sceneScript, `Wlib/scene${episode}.lsc`);
         assert.ok(sequence.originalSources.mapFiles.includes(fact.setArc));
+        assert.deepEqual(
+            sequence.originalSources.setArcMembers,
+            [
+                fact.aiMember,
+                fact.eventMember,
+                ...(fact.deoMember ? [fact.deoMember] : []),
+                ...(fact.deeMember ? [fact.deeMember] : []),
+            ],
+            `${fact.dungeonId}:set arc members`
+        );
         assert.equal(sequence.entry.filter((step) => step.kind === 'combatStart').length, 1);
+        const entryDialogueCount = sequence.entry.filter((step) => step.kind === 'dialogue').length;
+        if (fact.deoMember) {
+            assert.ok(entryDialogueCount > 0, `${fact.dungeonId}:entry dialogue from ${fact.deoMember}`);
+        } else {
+            assert.equal(entryDialogueCount, 0, `${fact.dungeonId}:no DEO-backed entry dialogue`);
+        }
+        const bossDefeatDialogueCount = sequence.bossDefeat.filter((step) => step.kind === 'dialogue').length;
+        if (fact.deeMember) {
+            assert.ok(bossDefeatDialogueCount > 0, `${fact.dungeonId}:boss defeat dialogue from ${fact.deeMember}`);
+        } else {
+            assert.equal(bossDefeatDialogueCount, 0, `${fact.dungeonId}:no DEE-backed boss defeat dialogue`);
+        }
         assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
         assert.equal(sequence.entry[0].durationMs, 650);
         const entryMove = sequence.entry.find((step) => step.kind === 'moveActor');
@@ -1285,7 +1307,7 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         }
         assert.ok(sequence.entry.every((step) => getStoryScenarioEventStepDurationMs(step) > 0), fact.dungeonId);
         assert.ok(sequence.bossDefeat.every((step) => getStoryScenarioEventStepDurationMs(step) > 0), fact.dungeonId);
-        assert.ok(getStoryScenarioPresentationDurationMs(sequence.entry) >= 3150, fact.dungeonId);
+        assert.ok(getStoryScenarioPresentationDurationMs(sequence.entry) >= (fact.deoMember ? 3150 : 2250), fact.dungeonId);
         assert.deepEqual(sequence.fieldEvents.map((event) => event.originalEventId), expectedCaches.map((event) => `EVENT ${event.eventNumber}`));
         assert.deepEqual(sequence.fieldEvents.map((event) => event.triggerTiles[0]), expectedCaches.map((event) => event.tile));
         assert.ok(sequence.fieldEvents.every((event) => event.steps.every((step) => getStoryScenarioEventStepDurationMs(step) === 700)), fact.dungeonId);
