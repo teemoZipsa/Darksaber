@@ -1028,7 +1028,6 @@ export class WorldSession {
         const dungeonId = typeof message.dungeonId === 'string' ? message.dungeonId.trim() : '';
         const eventId = typeof message.eventId === 'string' ? message.eventId.trim() : '';
         if (!dungeonId || !eventId) return reject(message.intentId, 'Scenario field event request is malformed.');
-        if (getStoryInteriorLayout(dungeonId)) return reject(message.intentId, 'Interior scenario events are not network-interactable.');
         if (player!.activeDungeonId !== dungeonId) return reject(message.intentId, 'Scenario is not active for this player.');
 
         const sequence = getStoryScenarioEventSequence(dungeonId);
@@ -1041,7 +1040,9 @@ export class WorldSession {
             return reject(message.intentId, 'Scenario field event is already complete.');
         }
 
-        const triggerTiles = getStoryScenarioFieldEventTiles(dungeonId, event, this.worldMap);
+        const triggerTiles = getStoryInteriorLayout(dungeonId)
+            ? event.triggerTiles
+            : getStoryScenarioFieldEventTiles(dungeonId, event, this.worldMap);
         if (!triggerTiles.some((tile) => manhattan(actor!.tile, tile) <= 1)) {
             return reject(message.intentId, 'Scenario field event is too far away.');
         }

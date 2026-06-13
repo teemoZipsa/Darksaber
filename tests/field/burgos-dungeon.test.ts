@@ -770,7 +770,7 @@ test('Burgos Cain field event records a raid-scoped relic flag before survival r
     assert.equal(harness.controller.playFieldEventAt({ x: 9, y: 12 }, { id: 'hero', entity: player } as any), false);
 });
 
-test('Burgos local field events are disabled during network scenario play', () => {
+test('Burgos interior field events use server intents during network scenario play', () => {
     const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === BURGOS_CASTLE_DUNGEON_ID);
     const quest = getStoryQuestByDungeonId(BURGOS_CASTLE_DUNGEON_ID);
     assert.ok(dungeon);
@@ -779,12 +779,31 @@ test('Burgos local field events are disabled during network scenario play', () =
     const player = new Player(24, 9);
     const raidSession = new WorldRaidSession('central_castle');
     raidSession.beginRaidFromTown('central_castle');
-    const harness = createStoryScenarioHarness({ player, raidSession, isNetworkRaid: true });
+    const sentIntents: Array<{ actorId: string; dungeonId: string; eventId: string }> = [];
+    const harness = createStoryScenarioHarness({
+        player,
+        raidSession,
+        isNetworkRaid: true,
+        networkClient: {
+            sendScenarioEnter: () => 'unused-enter',
+            sendScenarioFieldEventInteract: (actorId, dungeonId, eventId) => {
+                sentIntents.push({ actorId, dungeonId, eventId });
+                return 'burgos-interior-event-intent';
+            },
+        },
+    });
 
     harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+    drainStoryPresentation(harness.controller);
+    player.setGridPosition(24, 9, true);
 
-    assert.equal(harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any).size, 0);
-    assert.equal(harness.controller.playFieldEventAt({ x: 25, y: 9 }, { id: 'hero', entity: player } as any), false);
+    assert.ok(harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any).has('25,9'));
+    assert.equal(harness.controller.playFieldEventAt({ x: 25, y: 9 }, { id: 'hero', entity: player } as any), true);
+    assert.deepEqual(sentIntents, [{
+        actorId: 'hero',
+        dungeonId: BURGOS_CASTLE_DUNGEON_ID,
+        eventId: 'burgos_key_handoff',
+    }]);
 });
 
 test('network field scenario entry plays original episode 4 event flow once', () => {

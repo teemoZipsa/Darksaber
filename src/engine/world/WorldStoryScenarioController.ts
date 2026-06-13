@@ -555,7 +555,7 @@ export class WorldStoryScenarioController {
     }
 
     private getFieldEventDungeonId(): string | null {
-        if (this.activeInterior) return this.context.isNetworkRaid() ? null : this.activeInterior.dungeonId;
+        if (this.activeInterior) return this.activeInterior.dungeonId;
         const dungeonId = this.context.raidSession.activeDungeonId;
         if (!dungeonId || isStoryInteriorDungeon(dungeonId)) return null;
         return dungeonId;
