@@ -46,7 +46,7 @@ import { generateWorldLootNear } from '../../src/loot/WorldLootGenerator';
 import { BURGOS_CASTLE_HMAP_ROWS, BURGOS_CASTLE_HMAP_SIZE } from '../../src/map/BurgosCastleHmap';
 import { getStoryHmapTileAt, STORY_HMAP_SIZE } from '../../src/map/StoryHmaps';
 import { getStoryInteriorLayout, isStoryInteriorDungeon } from '../../src/data/StoryInteriorData';
-import { StoryInteriorMap } from '../../src/map/StoryInteriorMap';
+import { StoryInteriorMap, type StoryInteriorInspectMarker } from '../../src/map/StoryInteriorMap';
 import { NEUTRAL_BIRD_SPRITE_SRC, WorldMap } from '../../src/map/WorldMap';
 import { TileType } from '../../src/map/Tile';
 
@@ -1234,12 +1234,26 @@ test('episodes 23 through 31 launch late story interiors through the runtime con
         drainStoryPresentation(harness.controller);
 
         const expectedCaches = getOriginalLateStoryCacheEvents(episode);
+        const interiorMap = harness.worldMap;
+        assert.ok(interiorMap instanceof StoryInteriorMap, `episode ${episode} active map`);
+        assert.deepEqual(
+            interiorMap.getInspectMarkers().map((marker) => marker.id).sort(),
+            sequence.fieldEvents.map((event) => `${event.id}:${event.triggerTiles[0].x},${event.triggerTiles[0].y}`).sort(),
+            `episode ${episode} initial inspect markers`
+        );
         for (const cache of expectedCaches) {
             const event: StoryScenarioFieldEvent | undefined = sequence.fieldEvents.find((candidate) => candidate.originalEventId === `EVENT ${cache.eventNumber}`);
             assert.ok(event, `episode ${episode} missing EVENT ${cache.eventNumber}`);
+            const markerId: string = `${event.id}:${cache.tile.x},${cache.tile.y}`;
+            const marker: StoryInteriorInspectMarker | undefined = interiorMap.getInspectMarkers().find((candidate) => candidate.id === markerId);
+            assert.ok(marker, `episode ${episode} EVENT ${cache.eventNumber} marker`);
+            assert.deepEqual(marker.tile, cache.tile, `episode ${episode} EVENT ${cache.eventNumber} marker tile`);
+            assert.equal(marker.kind, 'chest', `episode ${episode} EVENT ${cache.eventNumber} marker kind`);
+            assert.equal(marker.labelKey, `story.event.ep${String(episode).padStart(2, '0')}.cache.marker`, `episode ${episode} EVENT ${cache.eventNumber} marker label`);
             assert.equal(harness.controller.playFieldEvent(scenario.dungeonId, event.id), true, `episode ${episode} EVENT ${cache.eventNumber}`);
             assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], cache.tile, `episode ${episode} EVENT ${cache.eventNumber} focus`);
             drainStoryPresentation(harness.controller);
+            assert.equal(interiorMap.getInspectMarkers().some((candidate) => candidate.id === markerId), false, `episode ${episode} EVENT ${cache.eventNumber} marker removed`);
             assert.equal(raidSession.hasScenarioFlag(scenario.dungeonId, getStoryScenarioFieldEventFlag(event)), true, `episode ${episode} EVENT ${cache.eventNumber} flag`);
             const rewardCountAfterFirstPlay: number = harness.rewardItemIds.length;
             const flagCountAfterFirstPlay: number = raidSession.getScenarioFlags(scenario.dungeonId).length;
