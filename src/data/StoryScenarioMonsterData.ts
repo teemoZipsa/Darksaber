@@ -34,7 +34,21 @@ export const STORY_SCENARIO_MONSTER_LAYOUTS = {
     sicilio_island: { bossMonsterId: '634R', guardMonsterIds: ['634R', '635R', '463R'] },
     dalai_lake: { bossMonsterId: '216R', guardMonsterIds: ['214R', '216R', '462R'] },
     oasis: { bossMonsterId: '467R', guardMonsterIds: ['458R', '462R', '467R'] },
-    pyramid_front: { bossMonsterId: '454R', guardMonsterIds: ['354R', '458R', '462R'] },
+    pyramid_front: {
+        bossMonsterId: '454R',
+        guardMonsterIds: [
+            '354R', '354R', '354R', '354R',
+            '458R', '458R', '458R', '458R',
+            '462R', '462R', '462R', '462R', '462R', '462R',
+            '454R', '454R', '454R',
+        ],
+        guardOffsets: [
+            { x: -5, y: 5 }, { x: -10, y: 5 }, { x: 10, y: 5 }, { x: 5, y: 5 },
+            { x: -5, y: -2 }, { x: -10, y: -2 }, { x: 16, y: -2 }, { x: 10, y: -2 },
+            { x: -5, y: -9 }, { x: -10, y: -9 }, { x: -16, y: -9 }, { x: 16, y: -9 }, { x: 10, y: -9 }, { x: 5, y: -9 },
+            { x: 0, y: 4 }, { x: 0, y: -3 }, { x: 0, y: -10 },
+        ],
+    },
     pyramid_inside: { bossMonsterId: '466R', guardMonsterIds: ['354R', '466R', '467R'] },
     skeria: { bossMonsterId: '634R', guardMonsterIds: ['634R', '635R', '637R'] },
     skeria_2: { bossMonsterId: '467R', guardMonsterIds: ['467R', '638R', '639R'] },

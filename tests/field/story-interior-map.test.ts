@@ -762,6 +762,14 @@ test('Pyramid Front exposes original episode 12 Mantagoras and trap flow', () =>
             { eventId: 'EVENT 8', charId: 510, index: 5, textKey: 'story.event.ep12.enemyDefeat.510' },
             { eventId: 'EVENT 10', charId: 530, index: 6, textKey: 'story.event.ep12.enemyDefeat.530' },
             { eventId: 'EVENT 11', charId: 540, index: 7, textKey: 'story.event.ep12.enemyDefeat.540' },
+            { eventId: 'EVENT 13', charId: 600, index: 8, textKey: 'story.event.ep12.enemyDefeat.600' },
+            { eventId: 'EVENT 14', charId: 610, index: 9, textKey: 'story.event.ep12.enemyDefeat.610' },
+            { eventId: 'EVENT 16', charId: 630, index: 11, textKey: 'story.event.ep12.enemyDefeat.630' },
+            { eventId: 'EVENT 17', charId: 640, index: 12, textKey: 'story.event.ep12.enemyDefeat.640' },
+            { eventId: 'EVENT 18', charId: 650, index: 13, textKey: 'story.event.ep12.enemyDefeat.650' },
+            { eventId: 'EVENT 60', charId: 710, index: 14, textKey: 'story.event.ep12.enemyDefeat.710' },
+            { eventId: 'EVENT 61', charId: 720, index: 15, textKey: 'story.event.ep12.enemyDefeat.720' },
+            { eventId: 'EVENT 62', charId: 730, index: 16, textKey: 'story.event.ep12.enemyDefeat.730' },
         ]
     );
     assert.equal(pyramid.bossDefeat.filter((step) => step.kind === 'dialogue').length, 7);

@@ -236,7 +236,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 11,
         bossColor: '#c09052',
         guardLevel: 6,
-        guardCount: 8,
+        guardCount: 17,
         missionKind: 'field',
         reward: { type: 'companion', companionId: 'story_hawk_knight_ep12', classId: 'flying', nameKey: 'story.companion.ep12HawkKnight.name' },
     },

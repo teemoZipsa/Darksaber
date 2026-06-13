@@ -942,7 +942,8 @@ test('server field scenario enemy deaths return original CHARDEAD presentation s
 
     const state = internals.scenarioStates.get(joined.playerId);
     assert.ok(state);
-    const guard = internals.enemies.get(state.enemyIds[0]);
+    assert.equal(state.enemyIds.length, 18);
+    const guard = internals.enemies.get(state.enemyIds[16]);
     assert.ok(guard);
     guard.enemy.stats.hp = 1;
     guard.enemy.stats.def = 0;
@@ -953,7 +954,7 @@ test('server field scenario enemy deaths return original CHARDEAD presentation s
 
     const result = withFixedRandom(0, () => session.handleMessage(joined.playerId, {
         type: 'PLAYER_INTENT',
-        intentId: 'kill-pyramid-front-guard',
+        intentId: 'kill-pyramid-front-late-guard',
         actorId: serverActor.id,
         kind: 'attack',
         payload: { targetId: guard.enemy.id },
@@ -963,9 +964,9 @@ test('server field scenario enemy deaths return original CHARDEAD presentation s
     assert.equal(deathEvent?.type, 'SCENARIO_ENEMY_DEFEAT_EVENT');
     assert.equal(deathEvent.dungeonId, 'pyramid_front');
     assert.equal(deathEvent.enemyId, guard.enemy.id);
-    assert.equal(deathEvent.eventId, 'pyramid_front_enemy_defeat_400');
+    assert.equal(deathEvent.eventId, 'pyramid_front_enemy_defeat_730');
     assert.deepEqual(deathEvent.presentationSteps.map((step) => step.kind === 'dialogue' ? step.textKey : ''), [
-        'story.event.ep12.enemyDefeat.400',
+        'story.event.ep12.enemyDefeat.730',
     ]);
     assert.deepEqual(deathEvent.presentationSteps[0]?.kind === 'dialogue' ? deathEvent.presentationSteps[0].focus : null, {
         x: guard.enemy.gridX,
