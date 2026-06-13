@@ -868,6 +868,21 @@ const RAW_ITEMS: RawItemDef[] = [
         itemCategory: 'material'
     },
     {
+        id: 'orig_story_0008_star_knife', name: 'Star Knife', nameKr: '스타 나이프',
+        slot: 'weapon', gridW: 1, gridH: 3, color: '#b7c8ff', icon: '*',
+        maxDurability: 100,
+        stats: { atk: 8, hitRate: 5 },
+        description: 'Original Darksaber episode 13 chest reward. Preserves GETITEM 008.',
+        descriptionKr: '원작 다크세이버 13화 상자 보상. GETITEM 008을 보존합니다.',
+        rarity: 'unique',
+        weight: 0.8,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'normal_weapon',
+        maxSockets: 1,
+        socketTypes: ['rune', 'gem']
+    },
+    {
         id: 'orig_story_0397_yellow_flower', name: 'Yellow Flower', nameKr: '노란 꽃',
         slot: 'material', gridW: 1, gridH: 1, color: '#e0c34a', icon: '*',
         maxDurability: 1,

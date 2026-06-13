@@ -116,6 +116,14 @@ test('shop and original item data expose guarded equipment fields', () => {
     const cainNecklace = getItemDef('quest_cain_necklace');
     assert.ok(cainNecklace);
     assert.equal(getSellPrice(cainNecklace), 0);
+    const starKnife = getItemDef('orig_story_0008_star_knife');
+    assert.ok(starKnife);
+    assert.equal(starKnife.itemCategory, 'normal_weapon');
+    assert.equal(starKnife.slot, 'weapon');
+    assert.equal(starKnife.sellable, false);
+    assert.match(starKnife.description ?? '', /GETITEM 008/);
+    assert.match(starKnife.descriptionKr ?? '', /GETITEM 008/);
+    assert.equal(getSellPrice(starKnife), 0);
     for (const [itemId, originalItemId] of [
         ['orig_story_0315_stone_snake', 315],
         ['orig_story_0397_yellow_flower', 397],

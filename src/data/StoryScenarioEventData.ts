@@ -1920,7 +1920,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 runtimeFlag: 'pyramid_inside_star_knife_chest',
                 markerLabelKey: 'story.event.ep13.chest.marker',
                 markerKind: 'chest',
-                rewards: [{ type: 'item', itemId: 'short_sword', originalItemId: 8 }],
+                rewards: [{ type: 'item', itemId: 'orig_story_0008_star_knife', originalItemId: 8 }],
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep13.chest.starKnife', focus: { x: 20, y: 32 } }],
             },
             {

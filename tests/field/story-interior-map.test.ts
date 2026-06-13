@@ -779,7 +779,7 @@ test('Pyramid Interior exposes original episode 13 Myant, trap, and chest flow',
     ]);
     assert.deepEqual(pyramid.fieldEvents.slice(8).map((event) => event.rewards?.[0]), [
         { type: 'item', itemId: 'web_65_08', originalItemId: 10 },
-        { type: 'item', itemId: 'short_sword', originalItemId: 8 },
+        { type: 'item', itemId: 'orig_story_0008_star_knife', originalItemId: 8 },
         { type: 'item', itemId: 'herb_common', originalItemId: 300 },
         { type: 'item', itemId: 'mp_potion', originalItemId: 305 },
     ]);
