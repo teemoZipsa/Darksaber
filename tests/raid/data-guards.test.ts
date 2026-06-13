@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
 import { getMasterClass, isMasterClassLineId } from '../../src/data/ClassTree';
 import { getCombatRecovery, getItemDef, ITEMS } from '../../src/data/ItemDB';
-import { getOriginalLateStoryCacheEvents, getOriginalLateStoryFact } from '../../src/data/OriginalLateStoryFacts';
+import { ORIGINAL_LATE_STORY_FACTS, getOriginalLateStoryCacheEvents, getOriginalLateStoryFact } from '../../src/data/OriginalLateStoryFacts';
+import { ORIGINAL_LATE_STORY_MRC_FACTS } from '../../src/data/OriginalLateStoryMapFacts';
 import {
     ORIGINAL_LATE_STORY_ITEMS,
     ORIGINAL_LATE_STORY_REWARD_ITEMS,
@@ -539,6 +540,38 @@ test('late original story reward item ledger covers every GETITEM cache event', 
     assert.equal(getItemDef('orig_late_1122')?.slot, 'boots');
     assert.equal(getItemDef('orig_late_1168')?.sellable, false);
     assert.equal(sourceKeys.size, 31);
+});
+
+test('late original story source ledgers cover exactly episodes 23 through 31', () => {
+    const expectedEpisodes = Array.from({ length: 9 }, (_, index) => index + 23);
+
+    assert.deepEqual(
+        Object.keys(ORIGINAL_LATE_STORY_FACTS).map(Number).sort((a, b) => a - b),
+        expectedEpisodes
+    );
+    assert.deepEqual(
+        Object.keys(ORIGINAL_LATE_STORY_MRC_FACTS).map(Number).sort((a, b) => a - b),
+        expectedEpisodes
+    );
+
+    for (const episode of expectedEpisodes) {
+        const episodeKey = String(episode);
+        const paddedEpisode = episodeKey.padStart(2, '0');
+        const fact = getOriginalLateStoryFact(episode);
+        const mrcFact = ORIGINAL_LATE_STORY_MRC_FACTS[episodeKey];
+        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+        const sequence = STORY_SCENARIO_EVENT_SEQUENCES.find((entry) => entry.dungeonId === fact.dungeonId);
+
+        assert.ok(scenario, `missing story scenario ${episode}`);
+        assert.ok(sequence, `missing story sequence ${episode}`);
+        assert.equal(scenario.dungeonId, fact.dungeonId, `episode ${episode} dungeon id`);
+        assert.equal(scenario.missionKind, 'soloInterior', `episode ${episode} mission kind`);
+        assert.equal(scenario.guardCount, fact.guardAreas.length, `episode ${episode} guard count`);
+        assert.equal(mrcFact.source, `MAP/${paddedEpisode}.mrc`, `episode ${episode} source mrc`);
+        assert.equal(mrcFact.translatedSource, `MAP/${paddedEpisode}t.mrc`, `episode ${episode} translated mrc`);
+        assert.equal(sequence.originalSources.mapFiles.includes(mrcFact.source), true, `episode ${episode} sequence mrc`);
+        assert.equal(sequence.originalSources.mapFiles.includes(fact.setArc), true, `episode ${episode} sequence set arc`);
+    }
 });
 
 test('rest, monster, and starting class data reject unknown ids', () => {
