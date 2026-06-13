@@ -68,6 +68,7 @@ const BEELZEBUTH_HALL_DUNGEON_ID = 'beelzebuth_hall';
 const ARCADIA_PLAIN_DUNGEON_ID = 'arcadia_plain';
 const CACAORA_HIGHLAND_DUNGEON_ID = 'cacaora_highland';
 const REMOTE_VILLAGE_DUNGEON_ID = 'remote_village';
+const SAGUNTO_PORT_DUNGEON_ID = 'sagunto_port';
 
 function createStoryScenarioHarness(options: {
     player?: Player;
@@ -889,6 +890,45 @@ test('network field scenario events expose world inspect tiles and one-shot rewa
     assert.ok(harness.logs.includes('%s가(이) 상자를 열었습니다.'));
     assert.ok(harness.logs.includes('100 GOLD를 얻었습니다.'));
     assert.equal(harness.controller.playFieldEventAt(eventTile, { id: 'hero', entity: player } as any), false);
+});
+
+test('network shared field event snapshot hides already completed inspect tiles', () => {
+    const worldMap = new WorldMap();
+    const sequence = getStoryScenarioEventSequence(SAGUNTO_PORT_DUNGEON_ID);
+    const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'sagunto_west_south_blockade');
+    assert.ok(event);
+    assert.equal(event.scope, 'shared');
+    const [eventTile] = getStoryScenarioFieldEventTiles(SAGUNTO_PORT_DUNGEON_ID, event, worldMap);
+    const player = new Player(eventTile.x, eventTile.y + 1);
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    raidSession.startDungeonEncounter(SAGUNTO_PORT_DUNGEON_ID);
+    const harness = createStoryScenarioHarness({
+        player,
+        raidSession,
+        worldMap,
+        isNetworkRaid: true,
+        networkClient: {
+            sendScenarioEnter: () => 'unused',
+            sendScenarioFieldEventInteract: () => 'unused-shared-field-event',
+        },
+    });
+
+    const actor = { id: 'hero', entity: player } as any;
+    assert.equal(harness.controller.getInspectableFieldEventTiles(actor).has(`${eventTile.x},${eventTile.y}`), true);
+
+    harness.controller.applyNetworkScenarioSnapshot({
+        enteredDungeonIds: [SAGUNTO_PORT_DUNGEON_ID],
+        activeDungeonId: SAGUNTO_PORT_DUNGEON_ID,
+        completedDungeonIds: [],
+        sharedFieldEventFlagsByDungeonId: {
+            [SAGUNTO_PORT_DUNGEON_ID]: ['sagunto_west_south_blockade'],
+        },
+    });
+
+    assert.equal(raidSession.hasScenarioFlag(SAGUNTO_PORT_DUNGEON_ID, 'sagunto_west_south_blockade'), true);
+    assert.equal(harness.controller.getInspectableFieldEventTiles(actor).has(`${eventTile.x},${eventTile.y}`), false);
+    assert.equal(harness.controller.playFieldEventAt(eventTile, actor), false);
 });
 
 test('local field scenario event presentation focuses the placed world event tile', () => {
