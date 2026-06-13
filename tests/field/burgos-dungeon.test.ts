@@ -25,7 +25,10 @@ import {
     getStoryScenarioPresentationDurationMs,
     type StoryScenarioFieldEvent,
 } from '../../src/data/StoryScenarioEventData';
-import { getStoryScenarioFieldEventTiles } from '../../src/data/StoryScenarioFieldEventPlacement';
+import {
+    getStoryScenarioFieldEventFlag,
+    getStoryScenarioFieldEventTiles,
+} from '../../src/data/StoryScenarioFieldEventPlacement';
 import {
     getOriginalLateStoryBossTile,
     getOriginalLateStoryCacheEvents,
@@ -1237,6 +1240,14 @@ test('episodes 23 through 31 launch late story interiors through the runtime con
             assert.equal(harness.controller.playFieldEvent(scenario.dungeonId, event.id), true, `episode ${episode} EVENT ${cache.eventNumber}`);
             assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], cache.tile, `episode ${episode} EVENT ${cache.eventNumber} focus`);
             drainStoryPresentation(harness.controller);
+            assert.equal(raidSession.hasScenarioFlag(scenario.dungeonId, getStoryScenarioFieldEventFlag(event)), true, `episode ${episode} EVENT ${cache.eventNumber} flag`);
+            const rewardCountAfterFirstPlay: number = harness.rewardItemIds.length;
+            const flagCountAfterFirstPlay: number = raidSession.getScenarioFlags(scenario.dungeonId).length;
+            const durationAfterFirstPlay: number = harness.controller.getLastPresentationDurationMs();
+            assert.equal(harness.controller.playFieldEvent(scenario.dungeonId, event.id), false, `episode ${episode} EVENT ${cache.eventNumber} duplicate`);
+            assert.equal(harness.rewardItemIds.length, rewardCountAfterFirstPlay, `episode ${episode} EVENT ${cache.eventNumber} duplicate reward`);
+            assert.equal(raidSession.getScenarioFlags(scenario.dungeonId).length, flagCountAfterFirstPlay, `episode ${episode} EVENT ${cache.eventNumber} duplicate flag`);
+            assert.equal(harness.controller.getLastPresentationDurationMs(), durationAfterFirstPlay, `episode ${episode} EVENT ${cache.eventNumber} duplicate presentation`);
         }
         assert.deepEqual(harness.rewardItemIds, expectedCaches.map((cache) => cache.itemId), `episode ${episode} cache rewards`);
     }
