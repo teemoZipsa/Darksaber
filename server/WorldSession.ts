@@ -1356,7 +1356,8 @@ export class WorldSession {
         };
         this.log(`raid result player=${playerId} result=${result} kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
         if (player) {
-            this.captureFinalSavePatch(player, extractionTownId);
+            const survived = result === 'SURVIVED';
+            this.captureFinalSavePatch(player, survived ? extractionTownId : undefined, survived);
             this.markSaveDirty(playerId);
         }
         this.removePlayer(playerId);
@@ -2074,8 +2075,8 @@ export class WorldSession {
         this.saveState.markDirty(playerId);
     }
 
-    private captureFinalSavePatch(player: ServerPlayer, hubTownId?: string): void {
-        this.saveState.captureFinalPatch(player, hubTownId);
+    private captureFinalSavePatch(player: ServerPlayer, hubTownId?: string, includeRaidRewards: boolean = false): void {
+        this.saveState.captureFinalPatch(player, hubTownId, includeRaidRewards);
     }
 
     private removeSaveItemQuantity(player: ServerPlayer, itemId: string, quantity: number): void {

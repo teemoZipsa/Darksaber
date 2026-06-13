@@ -31,11 +31,11 @@ export class WorldSessionSaveState {
     }
 
     public createPatch(player: WorldSessionSavePlayer | undefined, playerId: string, hubTownId?: string): WorldCharacterSavePatch | null {
-        return player ? this.buildPatch(player, hubTownId) : this.finalPatches.get(playerId) ?? null;
+        return player ? this.buildPatch(player, { hubTownId, includeRaidRewards: false }) : this.finalPatches.get(playerId) ?? null;
     }
 
-    public captureFinalPatch(player: WorldSessionSavePlayer, hubTownId?: string): void {
-        const patch = this.buildPatch(player, hubTownId);
+    public captureFinalPatch(player: WorldSessionSavePlayer, hubTownId?: string, includeRaidRewards: boolean = false): void {
+        const patch = this.buildPatch(player, { hubTownId, includeRaidRewards });
         if (patch) this.finalPatches.set(player.id, patch);
     }
 
@@ -81,24 +81,27 @@ export class WorldSessionSaveState {
         inventory.items.push(item);
     }
 
-    private buildPatch(player: WorldSessionSavePlayer, hubTownId?: string): WorldCharacterSavePatch | null {
+    private buildPatch(
+        player: WorldSessionSavePlayer,
+        options: { hubTownId?: string; includeRaidRewards: boolean }
+    ): WorldCharacterSavePatch | null {
         const save = player.saveSnapshot;
         if (!save) return null;
-        save.questState = {
-            ...save.questState,
-            completedQuestIds: [...player.completedQuestIds],
+        const questState = {
+            ...cloneRecord(save.questState),
+            completedQuestIds: options.includeRaidRewards
+                ? [...player.completedQuestIds]
+                : normalizeStringArray(save.questState.completedQuestIds),
         };
-        if (hubTownId) {
-            save.hubLocation = {
-                ...save.hubLocation,
-                townId: hubTownId,
-            };
-        }
+        const hubLocation = {
+            ...cloneRecord(save.hubLocation),
+            ...(options.hubTownId ? { townId: options.hubTownId } : {}),
+        };
         return {
             saveVersion: save.saveVersion,
-            hubLocation: cloneRecord(save.hubLocation),
-            questState: cloneRecord(save.questState),
-            inventory: cloneInventorySnapshot(save.inventory),
+            hubLocation,
+            questState,
+            inventory: cloneInventorySnapshot(save.inventory, options),
             equipment: cloneRecord(save.equipment),
             partySnapshot: cloneRecord(save.partySnapshot),
             rosterSnapshot: cloneRecord(save.rosterSnapshot),
@@ -112,23 +115,36 @@ export function cloneCharacterSave(save: CharacterSave | undefined): CharacterSa
         ...save,
         hubLocation: cloneRecord(save.hubLocation),
         questState: cloneRecord(save.questState),
-        inventory: cloneInventorySnapshot(save.inventory),
+        inventory: cloneInventorySnapshot(save.inventory, { includeRaidRewards: true }),
         equipment: cloneRecord(save.equipment),
         partySnapshot: cloneRecord(save.partySnapshot),
         rosterSnapshot: cloneRecord(save.rosterSnapshot),
     };
 }
 
-function cloneInventorySnapshot(inventory: InventorySaveSnapshot): InventorySaveSnapshot {
+function cloneInventorySnapshot(
+    inventory: InventorySaveSnapshot,
+    options: { includeRaidRewards: boolean }
+): InventorySaveSnapshot {
     return {
         width: inventory.width,
         height: inventory.height,
-        items: inventory.items.map((item) => ({ ...item })),
+        items: inventory.items
+            .filter((item) => options.includeRaidRewards || item.acquiredInRaid !== true)
+            .map((item) => {
+                const clone = { ...item };
+                if (options.includeRaidRewards) delete clone.acquiredInRaid;
+                return clone;
+            }),
     };
 }
 
 function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
     return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+    return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 }
 
 function findFreeInventorySlot(inventory: InventorySaveSnapshot, itemId: string): { x: number; y: number } | null {
