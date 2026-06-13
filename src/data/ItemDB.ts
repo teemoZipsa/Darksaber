@@ -1106,6 +1106,40 @@ const RAW_ITEMS: RawItemDef[] = [
         maxSockets: 3,
         socketTypes: ['rune', 'gem']
     },
+    {
+        id: 'orig_story_0258_wind_boots', name: 'Wind Boots', nameKr: '바람의 부츠',
+        slot: 'boots', gridW: 2, gridH: 2, color: '#7f8c8d', icon: '🥾',
+        iconSprite: { col: 77, row: 0 },
+        maxDurability: 300,
+        stats: { def: 20 },
+        magicRange: 1,
+        description: 'Original Darksaber boots reward. Preserves GETITEM 258, magic 701, and original price 70000.',
+        descriptionKr: '원작 다크세이버 장화 보상. GETITEM 258, 발동마법 701, 원작 가격 70000을 보존합니다. 바람의 속성을 가진 천으로 만들어진 신발(윈드커터마법LV1UP).',
+        rarity: 'unique',
+        weight: 1.8,
+        baseValue: 70000,
+        requiredLevel: 106,
+        itemCategory: 'armor',
+        maxSockets: 3,
+        socketTypes: ['rune', 'gem']
+    },
+    {
+        id: 'orig_story_0577_zambia6', name: 'Zambia 6', nameKr: '잠비아6',
+        slot: 'weapon', gridW: 1, gridH: 3, color: '#b8a48c', icon: '🗡️',
+        iconSprite: { col: 71, row: 1 },
+        maxDurability: 3200,
+        stats: { atk: 120 },
+        attackRange: 1,
+        description: 'Original Darksaber weapon reward. Preserves GETITEM 577 and original price 350000.',
+        descriptionKr: '원작 다크세이버 무기 보상. GETITEM 577과 원작 가격 350000을 보존합니다. 칼날의 끝이 휘어 있는 단검, 칼날이 매우 두껍다.',
+        rarity: 'unique',
+        weight: 2.3,
+        baseValue: 350000,
+        requiredLevel: 76,
+        itemCategory: 'normal_weapon',
+        maxSockets: 3,
+        socketTypes: ['rune', 'gem']
+    },
 
     // ─── Socket Inserts (Diablo II-style runes and gems) ──────
     ...SOCKET_INSERTS,

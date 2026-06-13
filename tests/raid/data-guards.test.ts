@@ -212,6 +212,28 @@ test('shop and original item data expose guarded equipment fields', () => {
     assert.equal(dragonKiller7.requiredLevel, 106);
     assert.match(dragonKiller7.description ?? '', /GETITEM 620/);
     assert.equal(getSellPrice(dragonKiller7), 500000);
+    const windBoots = getItemDef('orig_story_0258_wind_boots');
+    assert.ok(windBoots);
+    assert.equal(windBoots.nameKr, '바람의 부츠');
+    assert.equal(windBoots.itemCategory, 'armor');
+    assert.equal(windBoots.slot, 'boots');
+    assert.deepEqual(windBoots.iconSprite, { col: 77, row: 0 });
+    assert.deepEqual(windBoots.stats, { def: 20 });
+    assert.equal(windBoots.magicRange, 1);
+    assert.equal(windBoots.requiredLevel, 106);
+    assert.match(windBoots.description ?? '', /GETITEM 258/);
+    assert.match(windBoots.descriptionKr ?? '', /발동마법 701/);
+    assert.equal(getSellPrice(windBoots), 35000);
+    const zambia6 = getItemDef('orig_story_0577_zambia6');
+    assert.ok(zambia6);
+    assert.equal(zambia6.nameKr, '잠비아6');
+    assert.equal(zambia6.itemCategory, 'normal_weapon');
+    assert.deepEqual(zambia6.iconSprite, { col: 71, row: 1 });
+    assert.deepEqual(zambia6.stats, { atk: 120 });
+    assert.equal(zambia6.maxDurability, 3200);
+    assert.equal(zambia6.requiredLevel, 76);
+    assert.match(zambia6.description ?? '', /GETITEM 577/);
+    assert.equal(getSellPrice(zambia6), 175000);
     for (const [itemId, originalItemId] of [
         ['orig_story_0315_stone_snake', 315],
         ['orig_story_0397_yellow_flower', 397],

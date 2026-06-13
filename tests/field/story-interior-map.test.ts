@@ -1006,6 +1006,16 @@ test('Ament Gate exposes original episode 18 Amphit, trap, cache, and true-door 
         itemId: 'orig_story_0305_magic_potion',
         originalItemId: 305,
     });
+    assert.deepEqual(ament.fieldEvents.find((event) => event.originalEventId === 'EVENT 85')?.rewards?.[0], {
+        type: 'item',
+        itemId: 'orig_story_0258_wind_boots',
+        originalItemId: 258,
+    });
+    assert.deepEqual(ament.fieldEvents.find((event) => event.originalEventId === 'EVENT 87')?.rewards?.[0], {
+        type: 'item',
+        itemId: 'orig_story_0577_zambia6',
+        originalItemId: 577,
+    });
     assert.ok(ament.fieldEvents.some((event) => event.originalEventId === 'EVENT 99' && event.runtimeFlag === 'ament_gate_route_opened'));
     assert.ok(ament.fieldEvents.every((event) => event.originalSource === 'MAP/18set.arc:18.evt'));
     assert.ok(ament.fieldEvents.every((event) => event.triggerTiles.every((tile) => map.isWalkable(tile.x, tile.y))));
