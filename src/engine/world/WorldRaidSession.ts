@@ -20,6 +20,7 @@ export class WorldRaidSession {
     public readonly limitSeconds: number;
     public active = false;
     public kills = 0;
+    public raidGoldReward = 0;
     public activeDungeonId: string | null = null;
     public readonly downedCharacterIds: Set<string> = new Set();
     public readonly clearedDungeonIds: Set<string> = new Set();
@@ -38,6 +39,7 @@ export class WorldRaidSession {
         this.activeDungeonId = null;
         this.clearedDungeonIds.clear();
         this.clearScenarioFlags();
+        this.raidGoldReward = 0;
         this.currentHubTownId = townId;
     }
 
@@ -46,6 +48,7 @@ export class WorldRaidSession {
         this.elapsedSeconds = 0;
         this.active = true;
         this.kills = 0;
+        this.raidGoldReward = 0;
         this.activeDungeonId = null;
         this.downedCharacterIds.clear();
         this.clearedDungeonIds.clear();
@@ -78,6 +81,7 @@ export class WorldRaidSession {
         this.activeDungeonId = null;
         this.clearedDungeonIds.clear();
         this.clearScenarioFlags();
+        this.raidGoldReward = 0;
         this.currentHubTownId = townId;
     }
 
@@ -86,7 +90,20 @@ export class WorldRaidSession {
         this.activeDungeonId = null;
         this.clearedDungeonIds.clear();
         this.clearScenarioFlags();
+        this.raidGoldReward = 0;
         this.currentHubTownId = townId;
+    }
+
+    public addRaidGoldReward(amount: number): void {
+        if (!this.active) return;
+        if (!Number.isFinite(amount) || amount <= 0) return;
+        this.raidGoldReward += Math.floor(amount);
+    }
+
+    public consumeRaidGoldReward(): number {
+        const amount = this.raidGoldReward;
+        this.raidGoldReward = 0;
+        return amount;
     }
 
     public recordKill(): void {

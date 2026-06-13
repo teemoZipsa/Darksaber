@@ -68,12 +68,14 @@ export class WorldRaidOutcomeController {
         const heroStatuses = this.createHeroStatuses();
         const secured = this.secureRaidLoot();
         const questRewards: string[] = [];
-        let goldReward = 0;
+        const raidGoldReward = raidSession.consumeRaidGoldReward();
+        if (raidGoldReward > 0) this.context.playerData.addGold(raidGoldReward);
+        let goldReward = raidGoldReward;
 
         if (!this.context.playerData.isCleared('quest:first_survival')) {
             this.context.playerData.markCleared('quest:first_survival');
             this.context.playerData.addGold(200);
-            goldReward = 200;
+            goldReward += 200;
             questRewards.push('퀘스트 완료: 첫 생환');
         }
         questRewards.push(...this.completeScenarioRuntimeQuestItems());

@@ -656,7 +656,7 @@ export class WorldStoryScenarioController {
     private applyScenarioRewards(rewards: StoryScenarioFieldEvent['rewards']): void {
         for (const reward of rewards ?? []) {
             if (reward.type === 'gold') {
-                this.context.playerData.addGold(reward.amount);
+                this.context.raidSession.addRaidGoldReward(reward.amount);
                 this.context.log(formatT('story.event.reward.gold', { amount: reward.amount }));
                 continue;
             }
@@ -812,7 +812,7 @@ export class WorldStoryScenarioController {
 
     private applyNetworkFieldEventReward(reward: ScenarioFieldEventRewardResult): void {
         if (reward.type === 'gold') {
-            this.context.playerData.addGold(reward.amount);
+            this.context.raidSession.addRaidGoldReward(reward.amount);
             this.context.log(formatT('story.event.reward.gold', { amount: reward.amount }));
             return;
         }

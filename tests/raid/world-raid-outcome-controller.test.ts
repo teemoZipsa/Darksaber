@@ -117,6 +117,28 @@ test('completed episode 1 does not grant duplicate story rewards', () => {
     assert.deepEqual(getOutcome()?.questRewards ?? [], []);
 });
 
+test('raid gold rewards are secured only after survival', () => {
+    const survived = createController();
+    survived.raidSession.beginRaidFromTown('central_castle');
+    survived.raidSession.addRaidGoldReward(300);
+
+    survived.controller.completeSuccess(DESTINATION_TOWN);
+
+    assert.equal(survived.playerData.gold, 800);
+    assert.equal(survived.raidSession.raidGoldReward, 0);
+    assert.equal(survived.getOutcome()?.goldReward, 300);
+
+    const failed = createController();
+    failed.raidSession.beginRaidFromTown('central_castle');
+    failed.raidSession.addRaidGoldReward(300);
+
+    failed.controller.completeFailure('DEAD');
+
+    assert.equal(failed.playerData.gold, 500);
+    assert.equal(failed.raidSession.raidGoldReward, 0);
+    assert.equal(failed.getOutcome()?.goldReward, undefined);
+});
+
 test('Burgos objective does not grant episode 1 reward on raid failure', () => {
     const { controller, playerData, raidSession, getOutcome } = createController();
     raidSession.beginRaidFromTown('central_castle');

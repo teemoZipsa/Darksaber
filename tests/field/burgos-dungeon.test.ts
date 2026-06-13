@@ -610,7 +610,8 @@ test('Zamora chest events grant raid rewards once per chest', () => {
     assert.ok(harness.worldMap.getInspectMarkers().some((marker) => marker.id === 'zamora_gold_chest_01:11,5' && marker.kind === 'chest'));
 
     assert.equal(harness.controller.playFieldEventAt({ x: 11, y: 5 }, { id: 'hero', entity: player } as any), true);
-    assert.equal(playerData.gold, 600);
+    assert.equal(playerData.gold, 500);
+    assert.equal(raidSession.raidGoldReward, 100);
     assert.equal(raidSession.hasScenarioFlag(ZAMORA_FORTRESS_DUNGEON_ID, 'zamora_gold_chest_01'), true);
     assert.ok(harness.logs.includes('상자를 열었습니다.'));
     assert.ok(harness.logs.includes('100 GOLD를 얻었습니다.'));
@@ -643,7 +644,8 @@ test('Etna chest events grant original episode 3 raid rewards once per chest', (
     assert.ok(harness.worldMap.getInspectMarkers().some((marker) => marker.id === 'etna_gold_chest_01:13,33' && marker.kind === 'chest'));
 
     assert.equal(harness.controller.playFieldEventAt({ x: 13, y: 33 }, { id: 'hero', entity: player } as any), true);
-    assert.equal(playerData.gold, 600);
+    assert.equal(playerData.gold, 500);
+    assert.equal(raidSession.raidGoldReward, 100);
     assert.equal(raidSession.hasScenarioFlag(ETNA_VOLCANO_DUNGEON_ID, 'etna_gold_chest_01'), true);
     assert.ok(harness.logs.includes('%s가(이) 상자를 열었습니다.'));
     assert.ok(harness.logs.includes('100 GOLD를 얻었습니다.'));
@@ -885,7 +887,8 @@ test('network field scenario events expose world inspect tiles and one-shot rewa
         rewards: [{ type: 'gold', amount: 100 }],
     });
     assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], eventTile);
-    assert.equal(playerData.gold, 600);
+    assert.equal(playerData.gold, 500);
+    assert.equal(raidSession.raidGoldReward, 100);
     assert.equal(raidSession.hasScenarioFlag(ARCADIA_PLAIN_DUNGEON_ID, 'arcadia_gold_chest_01'), true);
     assert.ok(harness.logs.includes('%s가(이) 상자를 열었습니다.'));
     assert.ok(harness.logs.includes('100 GOLD를 얻었습니다.'));
@@ -946,7 +949,8 @@ test('local field scenario event presentation focuses the placed world event til
 
     assert.equal(harness.controller.playFieldEventAt(eventTile, { id: 'hero', entity: player } as any), true);
     assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], eventTile);
-    assert.equal(playerData.gold, 600);
+    assert.equal(playerData.gold, 500);
+    assert.equal(raidSession.raidGoldReward, 100);
     assert.equal(raidSession.hasScenarioFlag(ARCADIA_PLAIN_DUNGEON_ID, 'arcadia_gold_chest_01'), true);
 });
 
