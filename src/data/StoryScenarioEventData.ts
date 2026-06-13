@@ -107,7 +107,7 @@ function skeria2FlowerEvent(eventNumber: number, tile: TilePoint, randomChance: 
         triggerTiles: [{ ...tile }],
         runtimeFlag: `skeria_2_yellow_flower_${eventNumber}`,
         markerLabelKey: 'story.event.ep15.flower.marker',
-        rewards: [{ type: 'item', itemId: 'fire_herb', originalItemId: 397 }],
+        rewards: [{ type: 'item', itemId: 'orig_story_0397_yellow_flower', originalItemId: 397 }],
         steps: [
             { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep15.flower.inspect', focus: { ...tile } },
             { kind: 'objective', labelKey: 'story.event.ep15.flower.result', focus: { ...tile } },
@@ -2264,7 +2264,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 runtimeFlag: 'skeria_2_shaman_exchange',
                 markerLabelKey: 'story.event.ep15.shaman.marker',
                 markerKind: 'person',
-                rewards: [{ type: 'item', itemId: 'herb_rare', originalItemId: 315 }],
+                rewards: [{ type: 'item', itemId: 'orig_story_0315_stone_snake', originalItemId: 315 }],
                 steps: [
                     { kind: 'dialogue', speakerId: 'villager', speakerNameKey: 'story.event.speaker.villager', textKey: 'story.event.ep15.shaman.01', focus: { x: 9, y: 1 } },
                     { kind: 'objective', labelKey: 'story.event.ep15.shaman.result', focus: { x: 9, y: 1 } },
@@ -2310,7 +2310,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { kind: 'combatStart', labelKey: 'story.event.ep16.combatStart', focus: { x: 21, y: 6 } },
         ],
         fieldEvents: [
-            { id: 'valhalla_stone_snake_chest', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 20', trigger: 'COMMANDER ONCE CHARPOS 1 17 / 1 19 / 0 18 / 2 18 RANDOM 50 GETITEM 315', triggerTiles: [{ x: 1, y: 17 }, { x: 1, y: 19 }, { x: 0, y: 18 }, { x: 2, y: 18 }], runtimeFlag: 'valhalla_stone_snake_chest', markerLabelKey: 'story.event.ep16.cache.marker', markerKind: 'chest', rewards: [{ type: 'item', itemId: 'herb_rare', originalItemId: 315 }], steps: [{ kind: 'objective', labelKey: 'story.event.ep16.cache.stoneSnake', focus: { x: 1, y: 18 } }] },
+            { id: 'valhalla_stone_snake_chest', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 20', trigger: 'COMMANDER ONCE CHARPOS 1 17 / 1 19 / 0 18 / 2 18 RANDOM 50 GETITEM 315', triggerTiles: [{ x: 1, y: 17 }, { x: 1, y: 19 }, { x: 0, y: 18 }, { x: 2, y: 18 }], runtimeFlag: 'valhalla_stone_snake_chest', markerLabelKey: 'story.event.ep16.cache.marker', markerKind: 'chest', rewards: [{ type: 'item', itemId: 'orig_story_0315_stone_snake', originalItemId: 315 }], steps: [{ kind: 'objective', labelKey: 'story.event.ep16.cache.stoneSnake', focus: { x: 1, y: 18 } }] },
             { id: 'valhalla_trap_50', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 50', trigger: 'COMMANDER CHARPOS 28 30 / 29 30 RANDOM 50 MAGIC 0803 -1 30 30', triggerTiles: [{ x: 28, y: 30 }, { x: 29, y: 30 }], runtimeFlag: 'valhalla_trap_50', markerLabelKey: 'story.event.ep16.trap.marker', steps: [{ kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep16.trap.50', focus: { x: 28, y: 30 } }] },
             { id: 'valhalla_trap_51', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 51', trigger: 'COMMANDER CHARPOS 10 29 / 11 29 RANDOM 50 MAGIC 0803 -1 10 29', triggerTiles: [{ x: 10, y: 29 }, { x: 11, y: 29 }], runtimeFlag: 'valhalla_trap_51', markerLabelKey: 'story.event.ep16.trap.marker', steps: [{ kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep16.trap.51', focus: { x: 10, y: 29 } }] },
             { id: 'valhalla_trap_52', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 52', trigger: 'COMMANDER CHARPOS 35 27 / 36 27 RANDOM 50 MAGIC 0803 -1 35 27', triggerTiles: [{ x: 35, y: 27 }, { x: 36, y: 27 }], runtimeFlag: 'valhalla_trap_52', markerLabelKey: 'story.event.ep16.trap.marker', steps: [{ kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep16.trap.52', focus: { x: 35, y: 27 } }] },

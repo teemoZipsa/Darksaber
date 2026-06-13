@@ -850,6 +850,13 @@ test('Skeria 2 exposes original episode 15 nameless village and yellow flower fl
     assert.equal(skeria.fieldEvents.filter((event) => event.originalEventId === 'EVENT 04' && event.rewards?.some((reward) => reward.type === 'gold' && reward.amount === 3000)).length, 1);
     assert.equal(skeria.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 397)).length, 15);
     assert.equal(skeria.fieldEvents.filter((event) => event.originalEventId === 'EVENT 08' && event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 315)).length, 1);
+    assert.ok(skeria.fieldEvents.slice(8).every((event) =>
+        event.rewards?.some((reward) => reward.type === 'item' && reward.itemId === 'orig_story_0397_yellow_flower')
+    ));
+    assert.ok(skeria.fieldEvents.some((event) =>
+        event.originalEventId === 'EVENT 08'
+        && event.rewards?.some((reward) => reward.type === 'item' && reward.itemId === 'orig_story_0315_stone_snake')
+    ));
     assert.deepEqual(skeria.fieldEvents.slice(8).map((event) => event.originalEventId), [
         'EVENT 10',
         'EVENT 11',
@@ -897,6 +904,11 @@ test('Valhalla Plain exposes original episode 16 Barbatu, trap, and cache flow',
         'EVENT 91',
         'EVENT 92',
     ]);
+    assert.deepEqual(valhalla.fieldEvents.find((event) => event.originalEventId === 'EVENT 20')?.rewards?.[0], {
+        type: 'item',
+        itemId: 'orig_story_0315_stone_snake',
+        originalItemId: 315,
+    });
     assert.ok(valhalla.fieldEvents.some((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 619)));
     assert.equal(valhalla.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
     assert.equal(valhalla.bossDefeat.filter((step) => step.kind === 'objective').length, 1);

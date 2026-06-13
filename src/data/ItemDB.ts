@@ -856,6 +856,30 @@ const RAW_ITEMS: RawItemDef[] = [
         itemCategory: 'divine_weapon'
     },
     {
+        id: 'orig_story_0315_stone_snake', name: 'Stone Snake', nameKr: '스톤 스네이크',
+        slot: 'material', gridW: 1, gridH: 1, color: '#8a8f98', icon: '◇',
+        maxDurability: 1,
+        description: 'Original Darksaber scenario reward. Preserves GETITEM 315.',
+        descriptionKr: '원작 다크세이버 시나리오 보상. GETITEM 315를 보존합니다.',
+        rarity: 'unique',
+        weight: 0.2,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'material'
+    },
+    {
+        id: 'orig_story_0397_yellow_flower', name: 'Yellow Flower', nameKr: '노란 꽃',
+        slot: 'material', gridW: 1, gridH: 1, color: '#e0c34a', icon: '*',
+        maxDurability: 1,
+        description: 'Original Darksaber scenario reward. Preserves GETITEM 397.',
+        descriptionKr: '원작 다크세이버 시나리오 보상. GETITEM 397을 보존합니다.',
+        rarity: 'unique',
+        weight: 0.1,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'material'
+    },
+    {
         id: 'orig_ep19_shard_0386', name: 'North Mystic Shard', nameKr: '북쪽 신비 조각',
         slot: 'material', gridW: 1, gridH: 1, color: '#8fc8ff', icon: '◇',
         maxDurability: 1,
