@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
 import { getMasterClass, isMasterClassLineId } from '../../src/data/ClassTree';
 import { getCombatRecovery, getItemDef, ITEMS } from '../../src/data/ItemDB';
@@ -45,6 +47,14 @@ import {
     isTownFacilityId,
     isTownId,
 } from '../../src/data/TownFacilityData';
+
+type StoryScenarioContentRecord = {
+    episode: number;
+    questId: string;
+    dungeonId: string;
+    guardCount: number;
+    missionKind: string;
+};
 
 test('town facility guards reject prototype keys and return copies', () => {
     assert.equal(isTownId('toString'), false);
@@ -624,6 +634,27 @@ test('story episodes 1 through 31 are chained and fully localized', () => {
     }
     assert.ok(ko['story.ep01.sideObjective.cainNecklace']);
     assert.ok(en['story.ep01.sideObjective.cainNecklace']);
+});
+
+test('story scenario content ledger matches runtime scenario definitions', () => {
+    const contentPath = fileURLToPath(new URL('../../src/data/content/story-scenarios.json', import.meta.url));
+    const contentScenarios = JSON.parse(readFileSync(contentPath, 'utf8')) as StoryScenarioContentRecord[];
+    assert.deepEqual(
+        contentScenarios.map((scenario) => ({
+            episode: scenario.episode,
+            questId: scenario.questId,
+            dungeonId: scenario.dungeonId,
+            guardCount: scenario.guardCount,
+            missionKind: scenario.missionKind,
+        })),
+        STORY_SCENARIOS.map((scenario) => ({
+            episode: scenario.episode,
+            questId: scenario.questId,
+            dungeonId: scenario.dungeonId,
+            guardCount: scenario.guardCount,
+            missionKind: scenario.missionKind,
+        }))
+    );
 });
 
 test('player data guards gold and normalizes old save shapes', () => {
