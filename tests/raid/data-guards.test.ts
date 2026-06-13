@@ -29,6 +29,7 @@ import { getSkillVisualProfile } from '../../src/data/SkillVisualProfiles';
 import { createBaseStats, getBaseStatsForClass } from '../../src/data/Stats';
 import { STORY_QUESTS, getStoryCompanionRewards } from '../../src/data/StoryQuestData';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { STORY_SCENARIO_EVENT_SEQUENCES } from '../../src/data/StoryScenarioEventData';
 import { STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
 import { i18n } from '../../src/i18n/LanguageManager';
 import {
@@ -255,6 +256,23 @@ test('story episodes 1 through 31 are chained and fully localized', () => {
         STORY_INTERIOR_LAYOUTS.map((layout) => layout.dungeonId).sort(),
         STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'soloInterior').map((scenario) => scenario.dungeonId).sort()
     );
+    assert.equal(STORY_SCENARIO_EVENT_SEQUENCES.length, STORY_SCENARIOS.length);
+    assert.deepEqual(
+        STORY_SCENARIO_EVENT_SEQUENCES.map((sequence) => sequence.dungeonId).sort(),
+        STORY_SCENARIOS.map((scenario) => scenario.dungeonId).sort()
+    );
+    assert.equal(new Set(STORY_SCENARIO_EVENT_SEQUENCES.map((sequence) => sequence.dungeonId)).size, STORY_SCENARIO_EVENT_SEQUENCES.length);
+    for (const scenario of STORY_SCENARIOS) {
+        const sequence = STORY_SCENARIO_EVENT_SEQUENCES.find((entry) => entry.dungeonId === scenario.dungeonId);
+        assert.ok(sequence, `missing event sequence for episode ${scenario.episode}`);
+        const episode = String(scenario.episode).padStart(2, '0');
+        assert.equal(sequence.originalSources.sceneScript, `Wlib/scene${scenario.episode}.lsc`);
+        assert.equal(sequence.originalSources.mapFiles.includes(`MAP/${episode}.mrc`), true, `missing MAP/${episode}.mrc`);
+        assert.equal(sequence.originalSources.mapFiles.includes(`MAP/${episode}set.arc`), true, `missing MAP/${episode}set.arc`);
+        if (sequence.originalSources.globalScript !== 'missing') {
+            assert.equal(sequence.originalSources.globalScript, `Glib/gscene${scenario.episode}.lsc`);
+        }
+    }
 
     const ko = i18n.strings.ko as Record<string, string>;
     const en = i18n.strings.en as Record<string, string>;
