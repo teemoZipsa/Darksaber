@@ -784,6 +784,11 @@ test('server late story interiors spawn original objective and guard layouts thr
         assert.ok(boss, `episode ${episode} objective boss`);
         assert.equal(boss.monsterId, monsterLayout.bossMonsterId, `episode ${episode} boss monster id`);
         assert.deepEqual({ x: boss.enemy.gridX, y: boss.enemy.gridY }, getOriginalLateStoryBossTile(episode), `episode ${episode} boss tile`);
+        const bossBalance = getNormalizedMonsterBalance(boss.monsterId, boss.enemy.level);
+        assert.equal(bossBalance.source, 'original', `episode ${episode} boss balance source`);
+        const expectedBoss = new Enemy('expected_boss', 0, 0, boss.enemy.name, boss.enemy.level, boss.enemy.color, boss.enemy.role, boss.monsterId);
+        assert.equal(boss.enemy.stats.maxHp, expectedBoss.stats.maxHp, `episode ${episode} boss hp`);
+        assert.equal(boss.enemy.stats.atk, expectedBoss.stats.atk, `episode ${episode} boss atk`);
 
         const expectedGuardTiles = getOriginalLateStoryGuardTiles(episode);
         guards.forEach((entry: any, index: number) => {
