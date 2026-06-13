@@ -1088,10 +1088,10 @@ test('Ament 2F exposes original episode 20 Mephistopheles, lightning trap, cache
     ]);
     assert.deepEqual(ament.fieldEvents.filter((event) => event.rewards?.length).map((event) => event.rewards?.[0]), [
         { type: 'item', itemId: 'orig_story_0207_illusion_ring', originalItemId: 207 },
-        { type: 'item', itemId: 'magic_t5_head', originalItemId: 148 },
-        { type: 'item', itemId: 'magic_t5_boots', originalItemId: 262 },
-        { type: 'item', itemId: 'web_66_51', originalItemId: 632 },
-        { type: 'item', itemId: 'magic_t6_body', originalItemId: 855 },
+        { type: 'item', itemId: 'orig_story_0148_crown', originalItemId: 148 },
+        { type: 'item', itemId: 'orig_story_0262_levitation_boots', originalItemId: 262 },
+        { type: 'item', itemId: 'orig_story_0632_flail_saber7', originalItemId: 632 },
+        { type: 'item', itemId: 'orig_story_0855_crystal_mail7', originalItemId: 855 },
     ]);
     assert.ok(ament.fieldEvents.some((event) => event.originalEventId === 'EVENT 90' && event.runtimeFlag === 'ament_2f_dark_sword_recovered'));
     assert.ok(ament.fieldEvents.every((event) => event.originalSource === 'MAP/20set.arc:20.evt'));

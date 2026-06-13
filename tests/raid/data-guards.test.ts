@@ -275,6 +275,47 @@ test('shop and original item data expose guarded equipment fields', () => {
     assert.equal(zambia7.requiredLevel, 106);
     assert.match(zambia7.description ?? '', /GETITEM 578/);
     assert.equal(getSellPrice(zambia7), 250000);
+    const crown = getItemDef('orig_story_0148_crown');
+    assert.ok(crown);
+    assert.equal(crown.nameKr, '크라운');
+    assert.equal(crown.itemCategory, 'armor');
+    assert.equal(crown.slot, 'head');
+    assert.deepEqual(crown.iconSprite, { col: 45, row: 0 });
+    assert.deepEqual(crown.stats, { def: 3, magDef: 3 });
+    assert.equal(crown.magicRange, 3);
+    assert.match(crown.description ?? '', /GETITEM 148/);
+    assert.equal(getSellPrice(crown), 45000);
+    const levitationBoots = getItemDef('orig_story_0262_levitation_boots');
+    assert.ok(levitationBoots);
+    assert.equal(levitationBoots.nameKr, '레비테이션 부츠');
+    assert.equal(levitationBoots.itemCategory, 'armor');
+    assert.equal(levitationBoots.slot, 'boots');
+    assert.deepEqual(levitationBoots.iconSprite, { col: 81, row: 0 });
+    assert.deepEqual(levitationBoots.stats, { def: 1 });
+    assert.equal(levitationBoots.magicRange, 1);
+    assert.match(levitationBoots.description ?? '', /GETITEM 262/);
+    assert.equal(getSellPrice(levitationBoots), 30000);
+    const flailSaber7 = getItemDef('orig_story_0632_flail_saber7');
+    assert.ok(flailSaber7);
+    assert.equal(flailSaber7.nameKr, '플레일 세이버7');
+    assert.equal(flailSaber7.itemCategory, 'normal_weapon');
+    assert.deepEqual(flailSaber7.iconSprite, { col: 13, row: 0 });
+    assert.deepEqual(flailSaber7.stats, { atk: 140, hitRate: 20 });
+    assert.equal(flailSaber7.maxDurability, 4000);
+    assert.equal(flailSaber7.requiredLevel, 106);
+    assert.match(flailSaber7.description ?? '', /GETITEM 632/);
+    assert.equal(getSellPrice(flailSaber7), 300000);
+    const crystalMail7 = getItemDef('orig_story_0855_crystal_mail7');
+    assert.ok(crystalMail7);
+    assert.equal(crystalMail7.nameKr, '크리스탈 메일7');
+    assert.equal(crystalMail7.itemCategory, 'armor');
+    assert.equal(crystalMail7.slot, 'body');
+    assert.deepEqual(crystalMail7.iconSprite, { col: 63, row: 2 });
+    assert.deepEqual(crystalMail7.stats, { def: 37, evasion: 10 });
+    assert.equal(crystalMail7.maxDurability, 1000);
+    assert.equal(crystalMail7.requiredLevel, 106);
+    assert.match(crystalMail7.description ?? '', /GETITEM 855/);
+    assert.equal(getSellPrice(crystalMail7), 75000);
     for (const [itemId, originalItemId] of [
         ['orig_story_0315_stone_snake', 315],
         ['orig_story_0397_yellow_flower', 397],
