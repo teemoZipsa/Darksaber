@@ -20,6 +20,7 @@ import {
     STORY_CLERIC_EP02_ID,
     STORY_QUESTS,
     getStoryQuestViews,
+    isStoryRewardOwned,
 } from '../../src/data/StoryQuestData';
 
 class ImageStub {
@@ -278,4 +279,35 @@ test('episode 31 objective grants final implemented quest completion only after 
 
     assert.equal(failed.playerData.isCleared(episode31.id), false);
     assert.equal(failed.getOutcome()?.questRewards, undefined);
+});
+
+test('story objectives 1 through 31 grant quest completion once after survival', () => {
+    for (const quest of STORY_QUESTS) {
+        const { controller, playerData, raidSession, getOutcome } = createController();
+        for (const previousQuest of STORY_QUESTS.filter((candidate) => candidate.episode < quest.episode)) {
+            playerData.markCleared(previousQuest.id);
+        }
+
+        raidSession.beginRaidFromTown('central_castle');
+        markStoryObjectiveComplete(raidSession, quest.dungeonId);
+        controller.completeSuccess(DESTINATION_TOWN);
+
+        assert.equal(playerData.isCleared(quest.id), true, `episode ${quest.episode} completion`);
+        assert.equal(isStoryRewardOwned(quest.reward, playerData), true, `episode ${quest.episode} reward ownership`);
+        assert.equal(
+            getStoryQuestViews(playerData, null).find((view) => view.quest.id === quest.id)?.status,
+            'completed',
+            `episode ${quest.episode} quest view`
+        );
+        assert.ok(getOutcome()?.questRewards?.some((line) => line.includes(`${quest.episode}화`)), `episode ${quest.episode} reward line`);
+
+        const rewardLineCount = getOutcome()?.questRewards?.length ?? 0;
+        raidSession.beginRaidFromTown('central_castle');
+        markStoryObjectiveComplete(raidSession, quest.dungeonId);
+        controller.completeSuccess(DESTINATION_TOWN);
+
+        assert.equal(playerData.isCleared(quest.id), true, `episode ${quest.episode} duplicate completion`);
+        assert.equal(getOutcome()?.questRewards?.length ?? 0, 0, `episode ${quest.episode} duplicate rewards`);
+        assert.ok(rewardLineCount > 0, `episode ${quest.episode} first reward lines`);
+    }
 });
