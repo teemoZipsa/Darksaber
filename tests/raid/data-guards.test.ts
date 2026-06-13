@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
 import { getMasterClass, isMasterClassLineId } from '../../src/data/ClassTree';
 import { getCombatRecovery, getItemDef, ITEMS } from '../../src/data/ItemDB';
-import { getOriginalLateStoryCacheEvents } from '../../src/data/OriginalLateStoryFacts';
+import { getOriginalLateStoryCacheEvents, getOriginalLateStoryFact } from '../../src/data/OriginalLateStoryFacts';
 import {
     ORIGINAL_LATE_STORY_ITEMS,
     ORIGINAL_LATE_STORY_REWARD_ITEMS,
@@ -517,6 +517,12 @@ test('late original story reward item ledger covers every GETITEM cache event', 
         assert.match(itemDef.description, new RegExp(`원작 GETITEM ${item.originalItemId}`));
         if (item.rewardKind === 'mark') assert.equal(itemDef.sellable, false);
         for (const source of item.sourceEvents) {
+            const fact = getOriginalLateStoryFact(source.episode);
+            assert.equal(source.dungeonId, fact.dungeonId, `late item ${item.originalItemId} source dungeon`);
+            assert.equal(source.setArc, fact.setArc, `late item ${item.originalItemId} source set arc`);
+            assert.equal(source.eventMember, fact.eventMember, `late item ${item.originalItemId} source event member`);
+            assert.match(itemDef.descriptionKr ?? '', new RegExp(`${source.eventMember} EVENT ${source.eventNumber}`));
+            assert.match(itemDef.description ?? '', new RegExp(`${source.eventMember} EVENT ${source.eventNumber}`));
             assert.match(source.setArc, /^MAP\/\d{2}set\.arc$/);
             assert.match(source.eventMember, /^\d{2}\.evt$/);
             sourceKeys.add(`${source.episode}:${source.eventNumber}:${item.originalItemId}`);

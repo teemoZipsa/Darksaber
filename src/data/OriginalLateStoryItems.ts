@@ -43,6 +43,9 @@ const content = ORIGINAL_LATE_STORY_ITEMS_JSON as OriginalLateStoryItemContent;
 export const ORIGINAL_LATE_STORY_ITEMS: readonly OriginalLateStoryItemRecord[] = content.items;
 
 function buildOriginalLateStoryDescription(item: OriginalLateStoryItemRecord): string {
+    const sourceSummary = item.sourceEvents
+        .map((source) => `${source.eventMember} EVENT ${source.eventNumber}`)
+        .join(', ');
     const details = [
         item.originalDescriptionKr,
         item.requiredLevel > 0 ? `장착레벨 ${item.requiredLevel}` : null,
@@ -50,6 +53,7 @@ function buildOriginalLateStoryDescription(item: OriginalLateStoryItemRecord): s
         item.magicRange ? `마법범위 ${item.magicRange}` : null,
         item.originalMagicId > 0 ? `원작 발동마법 ${item.originalMagicId}` : null,
         item.usableClasses ? `사용가능: ${item.usableClasses}` : null,
+        sourceSummary ? `원작 출처 ${sourceSummary}` : null,
         `원작 GETITEM ${item.originalItemId}`,
     ].filter(Boolean);
     return details.join(' / ');
