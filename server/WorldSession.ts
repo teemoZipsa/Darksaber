@@ -1715,6 +1715,7 @@ export class WorldSession {
         player.completedDungeonIds.add(dungeonId);
         const quest = getStoryQuestByDungeonId(dungeonId);
         if (quest) player.completedQuestIds.add(quest.id);
+        this.applyScenarioBossDefeatRewards(player, dungeonId);
         if (state?.returnTile) this.returnPlayerActorsFromScenarioInterior(player, state.returnTile);
         this.markSaveDirty(player.id);
 
@@ -1762,8 +1763,23 @@ export class WorldSession {
         player: ServerPlayer,
         event: StoryScenarioFieldEvent
     ): ScenarioFieldEventRewardResult[] {
+        return this.applyScenarioRewards(player, event.rewards);
+    }
+
+    private applyScenarioBossDefeatRewards(
+        player: ServerPlayer,
+        dungeonId: string
+    ): ScenarioFieldEventRewardResult[] {
+        const event = getStoryScenarioEventSequence(dungeonId)?.bossDefeatEvent;
+        return this.applyScenarioRewards(player, event?.rewards);
+    }
+
+    private applyScenarioRewards(
+        player: ServerPlayer,
+        rewards: StoryScenarioFieldEvent['rewards']
+    ): ScenarioFieldEventRewardResult[] {
         const results: ScenarioFieldEventRewardResult[] = [];
-        for (const reward of event.rewards ?? []) {
+        for (const reward of rewards ?? []) {
             if (reward.type === 'gold') {
                 results.push({ type: 'gold', amount: reward.amount });
                 continue;
