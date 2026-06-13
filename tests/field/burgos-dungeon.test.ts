@@ -33,6 +33,7 @@ import {
     getOriginalLateStoryBossTile,
     getOriginalLateStoryCacheEvents,
 } from '../../src/data/OriginalLateStoryFacts';
+import { getOriginalLateStoryItemsForSourceEvent } from '../../src/data/OriginalLateStoryItems';
 import { Enemy } from '../../src/entity/Enemy';
 import { LootObject } from '../../src/entity/LootObject';
 import { Player } from '../../src/entity/Player';
@@ -42,6 +43,7 @@ import { WorldLootController } from '../../src/engine/world/WorldLootController'
 import { WorldSelectionController } from '../../src/engine/world/WorldSelectionController';
 import { WorldStoryScenarioController } from '../../src/engine/world/WorldStoryScenarioController';
 import { GridInventory } from '../../src/inventory/GridInventory';
+import { t } from '../../src/i18n/LanguageManager';
 import { generateWorldLootNear } from '../../src/loot/WorldLootGenerator';
 import { BURGOS_CASTLE_HMAP_ROWS, BURGOS_CASTLE_HMAP_SIZE } from '../../src/map/BurgosCastleHmap';
 import { getStoryHmapTileAt, STORY_HMAP_SIZE } from '../../src/map/StoryHmaps';
@@ -1163,6 +1165,47 @@ test('late story boss clear GETITEM rewards are granted on boss defeat', () => {
     assert.deepEqual(harness.rewardItemIds, ['orig_late_0984']);
     assert.ok(harness.logs.some((entry) => entry.includes('실버애로우')));
     assert.ok(harness.logs.includes('시나리오 클리어'));
+});
+
+test('late story boss clear rewards match original EVENT 99 item sources through episode 31', () => {
+    for (let episode = 23; episode <= 31; episode++) {
+        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+        assert.ok(scenario, `missing episode ${episode}`);
+        const bossTile = getOriginalLateStoryBossTile(episode);
+        const boss = new Enemy(
+            `story_${scenario.dungeonId}_boss`,
+            bossTile.x,
+            bossTile.y,
+            scenario.bossName ?? `episode ${episode} boss`,
+            scenario.bossLevel,
+            scenario.bossColor,
+            'boss'
+        );
+        boss.isBoss = true;
+        const raidSession = new WorldRaidSession('central_castle');
+        raidSession.beginRaidFromTown('central_castle');
+        raidSession.startDungeonEncounter(scenario.dungeonId);
+        const harness = createStoryScenarioHarness({ raidSession });
+        const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+        assert.ok(quest, `missing episode ${episode} quest`);
+
+        harness.controller.completeDungeonIfBossDefeated(boss);
+        drainStoryPresentation(harness.controller);
+
+        assert.equal(raidSession.isDungeonCleared(scenario.dungeonId), true, `episode ${episode} cleared`);
+        assert.equal(
+            raidSession.hasScenarioFlag(scenario.dungeonId, `${scenario.dungeonId}_objective_complete`),
+            true,
+            `episode ${episode} objective flag`
+        );
+        assert.deepEqual(
+            harness.rewardItemIds,
+            getOriginalLateStoryItemsForSourceEvent(episode, 99).map((item) => item.currentItemId),
+            `episode ${episode} EVENT 99 rewards`
+        );
+        assert.ok(harness.logs.includes('시나리오 클리어'), `episode ${episode} clear log`);
+        assert.ok(harness.logs.includes(t(quest.objectiveCompleteLogKey)), `episode ${episode} objective log`);
+    }
 });
 
 test('late story presentation steps focus the camera on original event tiles', () => {
