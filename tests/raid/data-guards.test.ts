@@ -144,6 +144,15 @@ test('late original story reward item ledger covers every GETITEM cache event', 
 
     const ledgerIds = getOriginalLateStoryItemIds();
     const sourceKeys = new Set<string>();
+    const expectedItemCategoryBySlot = new Map([
+        ['weapon', 'normal_weapon'],
+        ['accessory', 'accessory'],
+        ['accessory2', 'accessory'],
+        ['material', 'material'],
+        ['rune', 'rune'],
+        ['gem', 'gem'],
+        ['consumable', 'consumable'],
+    ]);
     for (const item of ORIGINAL_LATE_STORY_ITEMS) {
         assert.match(item.currentItemId, /^orig_late_\d{4}$/);
         const itemDef = getItemDef(item.currentItemId);
@@ -151,6 +160,20 @@ test('late original story reward item ledger covers every GETITEM cache event', 
         assert.equal(itemDef.nameKr, item.originalNameKr);
         assert.deepEqual(itemDef.stats, item.stats);
         assert.equal(itemDef.requiredLevel, item.requiredLevel);
+        assert.equal(itemDef.slot, item.slot);
+        assert.equal(itemDef.gridW, item.gridW);
+        assert.equal(itemDef.gridH, item.gridH);
+        assert.equal(itemDef.color, item.color);
+        assert.equal(itemDef.icon, item.icon);
+        assert.deepEqual(itemDef.iconSprite, item.iconSprite);
+        assert.equal(itemDef.maxDurability, item.maxDurability);
+        assert.equal(itemDef.attackRange, item.attackRange);
+        assert.equal(itemDef.magicRange, item.magicRange);
+        assert.equal(itemDef.rarity, 'unique');
+        assert.equal(itemDef.itemCategory, expectedItemCategoryBySlot.get(item.slot) ?? 'armor');
+        assert.match(itemDef.descriptionKr ?? '', new RegExp(`원작 GETITEM ${item.originalItemId}`));
+        assert.match(itemDef.description, new RegExp(`원작 GETITEM ${item.originalItemId}`));
+        if (item.rewardKind === 'mark') assert.equal(itemDef.sellable, false);
         for (const source of item.sourceEvents) {
             assert.match(source.setArc, /^MAP\/\d{2}set\.arc$/);
             assert.match(source.eventMember, /^\d{2}\.evt$/);
