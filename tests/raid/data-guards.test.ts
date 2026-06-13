@@ -473,6 +473,7 @@ test('shop and original item data expose guarded equipment fields', () => {
 
 test('late original story reward item ledger covers every GETITEM cache event', () => {
     const seenOriginalItemIds = new Set<number>();
+    const factCacheSourceKeys = new Set<string>();
 
     for (let episode = 23; episode <= 31; episode++) {
         for (const cacheEvent of getOriginalLateStoryCacheEvents(episode)) {
@@ -482,10 +483,17 @@ test('late original story reward item ledger covers every GETITEM cache event', 
             assert.ok(getItemDef(item.currentItemId), `missing mapped current item ${item.currentItemId}`);
             assert.equal(item.sourceEvents.some((source) => source.episode === episode && source.eventNumber === cacheEvent.eventNumber), true);
             seenOriginalItemIds.add(cacheEvent.originalItemId);
+            factCacheSourceKeys.add(`${episode}:${cacheEvent.eventNumber}:${cacheEvent.originalItemId}`);
         }
     }
 
     const ledgerIds = getOriginalLateStoryItemIds();
+    assert.equal(new Set(ledgerIds).size, ledgerIds.length, 'late original item ids must be unique');
+    assert.equal(
+        new Set(ORIGINAL_LATE_STORY_ITEMS.map((item) => item.currentItemId)).size,
+        ORIGINAL_LATE_STORY_ITEMS.length,
+        'late current item ids must be unique'
+    );
     const sourceKeys = new Set<string>();
     const expectedItemCategoryBySlot = new Map([
         ['weapon', 'normal_weapon'],
@@ -526,9 +534,23 @@ test('late original story reward item ledger covers every GETITEM cache event', 
             assert.match(itemDef.description ?? '', new RegExp(`${source.eventMember} EVENT ${source.eventNumber}`));
             assert.match(source.setArc, /^MAP\/\d{2}set\.arc$/);
             assert.match(source.eventMember, /^\d{2}\.evt$/);
-            sourceKeys.add(`${source.episode}:${source.eventNumber}:${item.originalItemId}`);
+            const sourceKey = `${source.episode}:${source.eventNumber}:${item.originalItemId}`;
+            sourceKeys.add(sourceKey);
+            if (source.eventNumber === 99) {
+                assert.equal(
+                    getOriginalLateStoryItemsForSourceEvent(source.episode, 99).some((candidate) => candidate.originalItemId === item.originalItemId),
+                    true,
+                    `late boss EVENT 99 source must resolve ${sourceKey}`
+                );
+            } else {
+                assert.equal(factCacheSourceKeys.has(sourceKey), true, `late item source must match a source fact cache event ${sourceKey}`);
+            }
         }
     }
+    assert.deepEqual(
+        [...factCacheSourceKeys].sort((left, right) => left.localeCompare(right)),
+        [...sourceKeys].filter((key) => !key.includes(':99:')).sort((left, right) => left.localeCompare(right))
+    );
     for (const originalItemId of seenOriginalItemIds) assert.equal(ledgerIds.includes(originalItemId), true);
     assert.equal(getOriginalLateStoryItemsForSourceEvent(23, 99).map((item) => item.originalItemId).join(','), '984');
     assert.equal(getOriginalLateStoryItemsForSourceEvent(24, 99).map((item) => item.originalItemId).join(','), '976');
