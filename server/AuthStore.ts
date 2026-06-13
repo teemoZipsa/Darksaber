@@ -351,12 +351,17 @@ export class InMemoryAuthStore implements AuthStore {
         const now = new Date().toISOString();
         const progress = await this.getAccountProgress(accountId);
         const mergedQuestIds = uniqueStrings([...progress.completedQuests, ...completedQuestIds]);
+        const result = buildRaidSurvivalSave(save, mergedQuestIds, currentHubTownId, now, new Set(completedQuestIds));
+        const blockedQuestIds = new Set(result.blockedQuestIds);
         this.progress.set(accountId, {
             ...progress,
-            completedQuests: mergedQuestIds,
+            completedQuests: uniqueStrings([
+                ...progress.completedQuests,
+                ...completedQuestIds.filter((questId) => !blockedQuestIds.has(questId)),
+            ]),
             updatedAt: now,
         });
-        this.saves.set(characterId, buildRaidSurvivalSave(save, mergedQuestIds, currentHubTownId, now));
+        this.saves.set(characterId, result.save);
     }
 }
 
@@ -750,12 +755,36 @@ export class PostgresAuthStore implements AuthStore {
         const client = await this.pool.connect();
         try {
             await client.query('BEGIN');
+            const now = new Date().toISOString();
+            const saveResult = await client.query(
+                `SELECT s.*
+                 FROM character_saves s
+                 JOIN characters c ON c.id = s.character_id
+                 WHERE s.character_id = $1 AND c.account_id = $2 AND c.deleted_at IS NULL
+                 FOR UPDATE OF s`,
+                [characterId, accountId]
+            );
+            if (!saveResult.rows[0]) {
+                await client.query('COMMIT');
+                return;
+            }
             const progressResult = await client.query('SELECT * FROM account_progress WHERE account_id = $1 FOR UPDATE', [accountId]);
             const currentProgress = progressResult.rows[0]
                 ? progressFromRow(progressResult.rows[0])
                 : createDefaultAccountProgress(accountId);
             const mergedQuestIds = uniqueStrings([...currentProgress.completedQuests, ...completedQuestIds]);
-            const now = new Date().toISOString();
+            const result = buildRaidSurvivalSave(
+                saveFromRow(saveResult.rows[0]),
+                mergedQuestIds,
+                currentHubTownId,
+                now,
+                new Set(completedQuestIds)
+            );
+            const blockedQuestIds = new Set(result.blockedQuestIds);
+            const progressQuestIds = uniqueStrings([
+                ...currentProgress.completedQuests,
+                ...completedQuestIds.filter((questId) => !blockedQuestIds.has(questId)),
+            ]);
             await client.query(
                 `INSERT INTO account_progress (account_id, completed_quests, unlocks, flags, updated_at)
                  VALUES ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5)
@@ -766,53 +795,37 @@ export class PostgresAuthStore implements AuthStore {
                      updated_at = EXCLUDED.updated_at`,
                 [
                     accountId,
-                    JSON.stringify(mergedQuestIds),
+                    JSON.stringify(progressQuestIds),
                     JSON.stringify(currentProgress.unlocks),
                     JSON.stringify(currentProgress.flags),
                     now,
                 ]
             );
-            const saveResult = await client.query(
-                `SELECT s.*
-                 FROM character_saves s
-                 JOIN characters c ON c.id = s.character_id
-                 WHERE s.character_id = $1 AND c.account_id = $2 AND c.deleted_at IS NULL
-                 FOR UPDATE OF s`,
-                [characterId, accountId]
+            await client.query(
+                `UPDATE character_saves
+                 SET save_version = $1,
+                     revision = $2,
+                     hub_location = $3::jsonb,
+                     quest_state = $4::jsonb,
+                     inventory = $5::jsonb,
+                     equipment = $6::jsonb,
+                     party_snapshot = $7::jsonb,
+                     roster_snapshot = $8::jsonb,
+                     updated_at = $9
+                 WHERE character_id = $10`,
+                [
+                    result.save.saveVersion,
+                    result.save.revision,
+                    JSON.stringify(result.save.hubLocation),
+                    JSON.stringify(result.save.questState),
+                    JSON.stringify(result.save.inventory),
+                    JSON.stringify(result.save.equipment),
+                    JSON.stringify(result.save.partySnapshot),
+                    JSON.stringify(result.save.rosterSnapshot),
+                    result.save.updatedAt,
+                    characterId,
+                ]
             );
-            if (saveResult.rows[0]) {
-                const updatedSave = buildRaidSurvivalSave(
-                    saveFromRow(saveResult.rows[0]),
-                    mergedQuestIds,
-                    currentHubTownId,
-                    now
-                );
-                await client.query(
-                    `UPDATE character_saves
-                     SET save_version = $1,
-                         revision = $2,
-                         hub_location = $3::jsonb,
-                         quest_state = $4::jsonb,
-                         inventory = $5::jsonb,
-                         equipment = $6::jsonb,
-                         party_snapshot = $7::jsonb,
-                         roster_snapshot = $8::jsonb,
-                         updated_at = $9
-                     WHERE character_id = $10`,
-                    [
-                        updatedSave.saveVersion,
-                        updatedSave.revision,
-                        JSON.stringify(updatedSave.hubLocation),
-                        JSON.stringify(updatedSave.questState),
-                        JSON.stringify(updatedSave.inventory),
-                        JSON.stringify(updatedSave.equipment),
-                        JSON.stringify(updatedSave.partySnapshot),
-                        JSON.stringify(updatedSave.rosterSnapshot),
-                        updatedSave.updatedAt,
-                        characterId,
-                    ]
-                );
-            }
             await client.query('COMMIT');
         } catch (error) {
             await safeRollback(client);
@@ -948,23 +961,33 @@ function buildRaidSurvivalSave(
     save: CharacterSave,
     mergedQuestIds: readonly string[],
     currentHubTownId: string,
-    updatedAt: string
-): CharacterSave {
+    updatedAt: string,
+    blockableQuestIds: ReadonlySet<string>
+): { save: CharacterSave; blockedQuestIds: string[] } {
     const questState = {
         ...clone(save.questState),
         completedQuestIds: uniqueStrings(mergedQuestIds),
     };
     const inventory = normalizeInventorySnapshot(save.inventory);
     const rosterSnapshot = clone(save.rosterSnapshot);
-    applyStoryQuestRewardsToSaveState(new Set(questState.completedQuestIds), questState, inventory, rosterSnapshot);
-    return {
-        ...save,
-        hubLocation: { ...clone(save.hubLocation), townId: currentHubTownId },
+    const blockedQuestIds = applyStoryQuestRewardsToSaveState(
+        new Set(questState.completedQuestIds),
         questState,
         inventory,
         rosterSnapshot,
-        revision: save.revision + 1,
-        updatedAt,
+        blockableQuestIds
+    );
+    return {
+        save: {
+            ...save,
+            hubLocation: { ...clone(save.hubLocation), townId: currentHubTownId },
+            questState,
+            inventory,
+            rosterSnapshot,
+            revision: save.revision + 1,
+            updatedAt,
+        },
+        blockedQuestIds,
     };
 }
 

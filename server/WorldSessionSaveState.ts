@@ -101,7 +101,9 @@ export class WorldSessionSaveState {
         const inventory = cloneInventorySnapshot(save.inventory, options);
         const rosterSnapshot = cloneRecord(save.rosterSnapshot);
         if (options.includeRaidRewards) {
-            applyStoryQuestRewardsToSaveState(player.completedQuestIds, questState, inventory, rosterSnapshot);
+            const previousQuestIds = new Set(normalizeStringArray(save.questState.completedQuestIds));
+            const blockableQuestIds = new Set([...player.completedQuestIds].filter((questId) => !previousQuestIds.has(questId)));
+            applyStoryQuestRewardsToSaveState(player.completedQuestIds, questState, inventory, rosterSnapshot, blockableQuestIds);
         }
         const hubLocation = {
             ...cloneRecord(save.hubLocation),

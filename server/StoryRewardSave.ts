@@ -9,12 +9,22 @@ export function applyStoryQuestRewardsToSaveState(
     completedQuestIds: ReadonlySet<string>,
     questState: Record<string, unknown>,
     inventory: InventorySaveSnapshot,
-    rosterSnapshot: Record<string, unknown>
-): void {
+    rosterSnapshot: Record<string, unknown>,
+    blockableQuestIds: ReadonlySet<string> = completedQuestIds
+): string[] {
+    const blockedQuestIds = new Set<string>();
     for (const scenario of STORY_SCENARIOS) {
         if (!completedQuestIds.has(scenario.questId)) continue;
         applyStoryQuestReward(scenario.reward, questState, inventory, rosterSnapshot);
+        if (blockableQuestIds.has(scenario.questId) && !isStoryRewardOwned(scenario.reward, questState)) {
+            blockedQuestIds.add(scenario.questId);
+        }
     }
+    if (blockedQuestIds.size > 0) {
+        questState.completedQuestIds = normalizeStringArray(questState.completedQuestIds)
+            .filter((questId) => !blockedQuestIds.has(questId));
+    }
+    return [...blockedQuestIds];
 }
 
 function applyStoryQuestReward(
@@ -95,6 +105,13 @@ function addStringSetValue(record: Record<string, unknown>, key: string, value: 
 
 function normalizeStringArray(value: unknown): string[] {
     return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
+}
+
+function isStoryRewardOwned(reward: StoryQuestRewardData, questState: Record<string, unknown>): boolean {
+    if (reward.type === 'none') return true;
+    if (reward.type === 'bundle') return reward.rewards.every((entry) => isStoryRewardOwned(entry, questState));
+    if (reward.type === 'companion') return normalizeStringArray(questState.storyCompanionIds).includes(reward.companionId);
+    return normalizeStringArray(questState.questItemIds).includes(reward.itemId);
 }
 
 function findFreeInventorySlot(inventory: InventorySaveSnapshot, itemId: string): { x: number; y: number } | null {

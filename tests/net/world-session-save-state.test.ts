@@ -4,6 +4,7 @@ import { WorldSessionSaveState, type WorldSessionSavePlayer } from '../../server
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
 import { createBaseStats } from '../../src/data/Stats';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { getItemDef } from '../../src/data/ItemDB';
 
 function authCharacter(id: string): AuthCharacter {
     return {
@@ -53,3 +54,42 @@ test('final world save patch persists story quest inventory and companion reward
     assert.equal(companion?.classKey, 'infantry');
     assert.equal(companion?.level, 1);
 });
+
+test('final world save patch with full inventory does not persist incomplete story completion', () => {
+    const scenario = STORY_SCENARIOS.find((entry) => entry.episode === 3);
+    assert.ok(scenario);
+    const save = createDefaultCharacterSave(authCharacter('hero-a'));
+    save.inventory = fullInventory(save.inventory.width, save.inventory.height);
+    const player: WorldSessionSavePlayer = {
+        id: 'hero-a',
+        completedQuestIds: new Set([scenario.questId]),
+        raidGoldReward: 0,
+        saveSnapshot: save,
+    };
+    const saveState = new WorldSessionSaveState();
+
+    saveState.captureFinalPatch(player, 'w_forest_village', true);
+    const finalPatch = saveState.consumeFinalPatch(player.id);
+    assert.ok(finalPatch);
+    assert.notEqual((finalPatch.questState?.completedQuestIds as string[] | undefined)?.includes(scenario.questId), true);
+    assert.notEqual((finalPatch.questState?.questItemIds as string[] | undefined)?.includes('quest_sacred_sword'), true);
+    assert.equal(finalPatch.inventory?.items.some((item) => item.itemId === 'quest_sacred_sword'), false);
+});
+
+function fullInventory(width: number, height: number) {
+    const filler = getItemDef('herb_cheap');
+    assert.ok(filler);
+    const items = [];
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            items.push({
+                itemId: filler.id,
+                gridX: x,
+                gridY: y,
+                quantity: 1,
+                durability: filler.maxDurability,
+            });
+        }
+    }
+    return { width, height, items };
+}
