@@ -1229,6 +1229,10 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         assert.deepEqual(map.getBoundsTiles(), { width: mrcFact.width, height: mrcFact.height });
         assert.equal(layout.originalMrc?.source, `MAP/${String(episode).padStart(2, '0')}.mrc`);
         assert.equal(layout.originalMrc?.layerCount, mrcFact.layerCount);
+        assert.equal(layout.originalAi?.source, `${fact.setArc}:${fact.aiMember}`);
+        assert.deepEqual(layout.originalAi?.bossArea, fact.bossArea);
+        assert.deepEqual(layout.originalAi?.guardAreas, fact.guardAreas);
+        assert.deepEqual(layout.originalAi?.staging, fact.staging);
         assert.equal(mrcFact.visualRows.length, mrcFact.height);
         assert.ok(mrcFact.visualRows.every((row) => row.length > 0));
         assert.notEqual(getOriginalLateStoryMrcVisualSymbol(mrcFact, layout.bossTile.x, layout.bossTile.y), null);

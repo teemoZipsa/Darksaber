@@ -1,8 +1,9 @@
 import type { TilePoint } from '../field/FieldPathing';
 import { TILE_PROPERTIES, TileType } from '../map/Tile';
+import type { OriginalLateStoryArea, OriginalLateStoryPosition } from './OriginalLateStoryFacts';
 import type { OriginalLateStoryMrcFact } from './OriginalLateStoryMapFacts';
 import { getOriginalLateStoryMrcFact, getOriginalLateStoryMrcVisualSymbol } from './OriginalLateStoryMapFacts';
-import { getOriginalLateStoryBossTile, getOriginalLateStoryGuardTiles } from './OriginalLateStoryFacts';
+import { getOriginalLateStoryBossTile, getOriginalLateStoryFact, getOriginalLateStoryGuardTiles } from './OriginalLateStoryFacts';
 
 export type StoryInteriorTheme = 'castle' | 'volcano' | 'temple' | 'pyramid' | 'ament';
 export type StoryInteriorPropKind = 'torch' | 'crate' | 'banner' | 'door' | 'sealedDoor' | 'throne' | 'bossSeal' | 'rubble';
@@ -44,6 +45,13 @@ export interface StoryInteriorBlockedPath {
     originalTile?: TilePoint;
 }
 
+export interface StoryInteriorOriginalAi {
+    source: string;
+    bossArea: OriginalLateStoryArea;
+    guardAreas: OriginalLateStoryArea[];
+    staging: OriginalLateStoryPosition[];
+}
+
 export interface StoryInteriorLayout {
     dungeonId: string;
     displayNameKey: string;
@@ -62,6 +70,7 @@ export interface StoryInteriorLayout {
     walkableAreas?: StoryInteriorRoom[];
     tileOverrides?: StoryInteriorTileOverride[];
     originalMrc?: OriginalLateStoryMrcFact;
+    originalAi?: StoryInteriorOriginalAi;
 }
 
 const BURGOS_WALKABLE_AREAS: StoryInteriorRoom[] = [
@@ -587,7 +596,16 @@ function cloneTile(tile: TilePoint): TilePoint {
     return { x: tile.x, y: tile.y };
 }
 
+function cloneOriginalArea(area: OriginalLateStoryArea): OriginalLateStoryArea {
+    return { char: area.char, x: area.x, y: area.y, radius: area.radius };
+}
+
+function cloneOriginalPosition(position: OriginalLateStoryPosition): OriginalLateStoryPosition {
+    return { char: position.char, x: position.x, y: position.y };
+}
+
 function buildLateOriginalInterior(config: LateOriginalInteriorConfig): StoryInteriorLayout {
+    const originalFact = getOriginalLateStoryFact(config.episode);
     const originalMrc = getOriginalLateStoryMrcFact(config.episode);
     const episode = String(config.episode).padStart(2, '0');
     const blockedPaths = config.blockedPaths ?? [];
@@ -598,6 +616,12 @@ function buildLateOriginalInterior(config: LateOriginalInteriorConfig): StoryInt
         height: originalMrc.height,
         theme: config.theme,
         originalMrc,
+        originalAi: {
+            source: `${originalFact.setArc}:${originalFact.aiMember}`,
+            bossArea: cloneOriginalArea(originalFact.bossArea),
+            guardAreas: originalFact.guardAreas.map(cloneOriginalArea),
+            staging: originalFact.staging.map(cloneOriginalPosition),
+        },
         entryTile: cloneTile(config.entryTile),
         playerStart: cloneTile(config.playerStart),
         guardTiles: config.guardTiles.map(cloneTile),
