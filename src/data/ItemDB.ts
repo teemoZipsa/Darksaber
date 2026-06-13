@@ -848,6 +848,30 @@ const RAW_ITEMS: RawItemDef[] = [
         itemCategory: 'material'
     },
     {
+        id: 'orig_story_ep16_oil_can', name: 'Oil Can', nameKr: '기름통',
+        slot: 'material', gridW: 1, gridH: 1, color: '#b8794f', icon: '●',
+        maxDurability: 1,
+        description: 'Original Darksaber objective item. Preserves MAP/16set.arc EVENT 91 SET_DUTY_STEP 16 4.',
+        descriptionKr: '원작 다크세이버 목표 아이템. MAP/16set.arc EVENT 91 SET_DUTY_STEP 16 4를 보존합니다.',
+        rarity: 'unique',
+        weight: 0.4,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'material'
+    },
+    {
+        id: 'orig_story_ep17_lamp', name: 'Lamp', nameKr: '등잔',
+        slot: 'material', gridW: 1, gridH: 1, color: '#d0aa55', icon: '✧',
+        maxDurability: 1,
+        description: 'Original Darksaber objective item. Preserves MAP/17set.arc EVENT 83 SET_DUTY_STEP 16 2.',
+        descriptionKr: '원작 다크세이버 목표 아이템. MAP/17set.arc EVENT 83 SET_DUTY_STEP 16 2를 보존합니다.',
+        rarity: 'unique',
+        weight: 0.3,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'material'
+    },
+    {
         id: 'quest_burgos_key', name: 'Burgos Key', nameKr: '부르고스성 열쇠',
         slot: 'material', gridW: 1, gridH: 1, color: '#d0aa55', icon: '⚿',
         maxDurability: 1,

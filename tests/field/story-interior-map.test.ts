@@ -933,6 +933,11 @@ test('Valhalla Plain exposes original episode 16 Barbatu, trap, and cache flow',
         itemId: 'orig_story_0005_assassin_knife',
         originalItemId: 5,
     });
+    assert.deepEqual(valhalla.fieldEvents.find((event) => event.originalEventId === 'EVENT 91')?.rewards?.[0], {
+        type: 'item',
+        itemId: 'orig_story_ep16_oil_can',
+        originalItemId: 0,
+    });
     assert.deepEqual(valhalla.fieldEvents.find((event) => event.originalEventId === 'EVENT 92')?.rewards?.[0], {
         type: 'item',
         itemId: 'orig_story_0619_dragon_killer6',
@@ -967,7 +972,7 @@ test('Airship exposes original episode 17 purity seal and boarding flow', () => 
     assert.deepEqual(airship.fieldEvents.filter((event) => event.rewards?.length).map((event) => event.rewards?.[0]), [
         { type: 'item', itemId: 'orig_story_0180_light_robe', originalItemId: 180 },
         { type: 'gold', amount: 500 },
-        { type: 'item', itemId: 'fire_herb', originalItemId: 0 },
+        { type: 'item', itemId: 'orig_story_ep17_lamp', originalItemId: 0 },
         { type: 'item', itemId: 'orig_story_0620_dragon_killer7', originalItemId: 620 },
         { type: 'item', itemId: 'orig_story_0204_resist_thunder_ring', originalItemId: 204 },
         { type: 'item', itemId: 'orig_story_0208_necklace', originalItemId: 208 },
