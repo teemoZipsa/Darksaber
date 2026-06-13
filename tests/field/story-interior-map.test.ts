@@ -6,6 +6,7 @@ import {
     getStoryScenarioPresentationDurationMs,
     STORY_SCENARIO_EVENT_SEQUENCES,
 } from '../../src/data/StoryScenarioEventData';
+import type { StoryScenarioEventStep } from '../../src/data/StoryScenarioEventData';
 import {
     getStoryScenarioFieldEventPlacements,
     getStoryScenarioFieldEventTiles,
@@ -47,6 +48,17 @@ function hasWalkablePath(map: StoryInteriorMap, from: { x: number; y: number }, 
     return false;
 }
 
+function getPresentationStepTiles(step: StoryScenarioEventStep): Array<{ label: string; tile: { x: number; y: number } }> {
+    if (step.kind === 'focus') return [{ label: 'target', tile: step.target }];
+    if (step.kind === 'moveActor') {
+        return [
+            { label: 'target', tile: step.target },
+            ...(step.focus ? [{ label: 'focus', tile: step.focus }] : []),
+        ];
+    }
+    return step.focus ? [{ label: 'focus', tile: step.focus }] : [];
+}
+
 test('solo interior layouts expose walkable entry, player, guard, and boss tiles', () => {
     assert.ok(STORY_INTERIOR_LAYOUTS.length > 0);
     for (const layout of STORY_INTERIOR_LAYOUTS) {
@@ -65,6 +77,53 @@ test('solo interior layouts expose walkable entry, player, guard, and boss tiles
         assert.ok(layout.props.some((prop) => prop.kind === 'bossSeal'));
         for (const tile of layout.guardTiles) {
             assert.notEqual(getStoryInteriorTileAt(layout, tile.x, tile.y), TileType.WALL);
+        }
+    }
+});
+
+test('story interior event presentation and trigger tiles stay walkable', () => {
+    for (const sequence of STORY_SCENARIO_EVENT_SEQUENCES) {
+        const layout = getStoryInteriorLayout(sequence.dungeonId);
+        if (!layout) continue;
+
+        const map = new StoryInteriorMap(layout);
+        const bounds = map.getBoundsTiles();
+        const assertWalkable = (label: string, tile: { x: number; y: number }) => {
+            const context = `${sequence.dungeonId}:${label}:${tile.x},${tile.y}`;
+            assert.equal(tile.x >= 0 && tile.y >= 0 && tile.x < bounds.width && tile.y < bounds.height, true, context);
+            assert.equal(map.isWalkable(tile.x, tile.y), true, context);
+        };
+
+        for (const [group, steps] of [
+            ['entry', sequence.entry],
+            ['bossDefeat', sequence.bossDefeat],
+        ] as const) {
+            steps.forEach((step, index) => {
+                for (const point of getPresentationStepTiles(step)) {
+                    assertWalkable(`${group}:${index}:${step.kind}:${point.label}`, point.tile);
+                }
+            });
+        }
+
+        for (const event of sequence.fieldEvents) {
+            event.triggerTiles.forEach((tile, index) => assertWalkable(`field:${event.id}:trigger:${index}`, tile));
+            event.steps.forEach((step, index) => {
+                for (const point of getPresentationStepTiles(step)) {
+                    assertWalkable(`field:${event.id}:${index}:${step.kind}:${point.label}`, point.tile);
+                }
+            });
+        }
+
+        for (const event of sequence.enemyDefeatEvents ?? []) {
+            event.steps.forEach((step, index) => {
+                for (const point of getPresentationStepTiles(step)) {
+                    assertWalkable(`enemy:${event.id}:${index}:${step.kind}:${point.label}`, point.tile);
+                }
+            });
+        }
+
+        for (const marker of sequence.markers ?? []) {
+            assertWalkable(`marker:${marker.id}`, marker.tile);
         }
     }
 });
