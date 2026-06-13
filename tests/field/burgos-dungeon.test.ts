@@ -46,7 +46,7 @@ import { GridInventory } from '../../src/inventory/GridInventory';
 import { t } from '../../src/i18n/LanguageManager';
 import { generateWorldLootNear } from '../../src/loot/WorldLootGenerator';
 import { BURGOS_CASTLE_HMAP_ROWS, BURGOS_CASTLE_HMAP_SIZE } from '../../src/map/BurgosCastleHmap';
-import { getStoryHmapTileAt, STORY_HMAP_SIZE } from '../../src/map/StoryHmaps';
+import { getStoryHmapTileAt, STORY_HMAP_EPISODES, STORY_HMAP_SIZE } from '../../src/map/StoryHmaps';
 import { getStoryInteriorLayout, isStoryInteriorDungeon } from '../../src/data/StoryInteriorData';
 import { StoryInteriorMap, type StoryInteriorInspectMarker } from '../../src/map/StoryInteriorMap';
 import { NEUTRAL_BIRD_SPRITE_SRC, WorldMap } from '../../src/map/WorldMap';
@@ -280,6 +280,10 @@ test('Burgos Castle uses the original 01hmap footprint around its entrance', () 
 
 test('late story scenarios expose original hmap footprints through episode 31', () => {
     const world = new WorldMap();
+    assert.deepEqual(
+        STORY_HMAP_EPISODES,
+        [...Array.from({ length: 19 }, (_, index) => index + 2), ...Array.from({ length: 9 }, (_, index) => index + 23)]
+    );
     for (const episode of [23, 24, 25, 26, 27, 28, 29, 30, 31]) {
         const scenario = STORY_SCENARIOS.find((candidate) => candidate.episode === episode);
         assert.ok(scenario, `missing story scenario ${episode}`);

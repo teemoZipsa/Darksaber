@@ -35,6 +35,9 @@ function decodeRow(row: string): string {
             countText += char;
             continue;
         }
+        if (!(char in TILE_BY_SYMBOL)) {
+            throw new Error(`Invalid story hmap symbol: ${char}`);
+        }
         const count = countText ? Number(countText) : 1;
         decoded += char.repeat(count);
         countText = '';
@@ -45,7 +48,13 @@ function decodeRow(row: string): string {
     return decoded;
 }
 
-const STORY_HMAP_ROWS = new Map<number, readonly string[]>(Object.entries(STORY_HMAP_CONTENT.rle).map(([episode, rows]) => [Number(episode), rows.map(decodeRow)]));
+const STORY_HMAP_ROWS = new Map<number, readonly string[]>(Object.entries(STORY_HMAP_CONTENT.rle).map(([episode, rows]) => {
+    if (rows.length !== STORY_HMAP_SIZE) {
+        throw new Error(`Invalid story hmap row count for episode ${episode}: ${rows.length}`);
+    }
+    return [Number(episode), rows.map(decodeRow)] as const;
+}));
+export const STORY_HMAP_EPISODES = [...STORY_HMAP_ROWS.keys()].sort((left, right) => left - right);
 
 export function getStoryHmapTileAt(episode: number, tx: number, ty: number, center: TilePoint): HmapSample | null {
     const rows = STORY_HMAP_ROWS.get(episode);
