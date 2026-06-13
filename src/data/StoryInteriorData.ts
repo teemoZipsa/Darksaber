@@ -1124,7 +1124,7 @@ const ASTAROTH_GATE_LAYOUT = buildLateOriginalInterior({
     objectiveKey: 'story.interior.astaroth_gate.objective',
     theme: 'ament',
     entryTile: { x: 19, y: 36 },
-    playerStart: { x: 19, y: 33 },
+    playerStart: { x: 19, y: 35 },
     bossTile: getOriginalLateStoryBossTile(24),
     guardTiles: ASTAROTH_GATE_GUARDS,
     rooms: [

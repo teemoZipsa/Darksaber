@@ -9,9 +9,14 @@ import { CHUNK_SIZE } from '../../src/map/Chunk';
 import { WorldResumeFailedError, WorldSession } from '../../server/WorldSession';
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { getStoryScenarioMonsterLayout } from '../../src/data/StoryScenarioMonsterData';
 import { getStoryScenarioEventSequence } from '../../src/data/StoryScenarioEventData';
 import { getStoryScenarioFieldEventTiles } from '../../src/data/StoryScenarioFieldEventPlacement';
 import { getStoryInteriorLayout } from '../../src/data/StoryInteriorData';
+import {
+    getOriginalLateStoryBossTile,
+    getOriginalLateStoryGuardTiles,
+} from '../../src/data/OriginalLateStoryFacts';
 import { ENEMY_AGGRO_RANGE, ENEMY_SIMULATION_ACTIVE_RANGE } from '../../src/field/FieldConfig';
 
 function actor(id: string, overrides: Partial<ActorSnapshot> = {}): ActorSnapshot {
@@ -662,6 +667,78 @@ test('solo interior scenario enemies stay private to the entering player', () =>
 
     assert.equal(attack.replies[0]?.type, 'ACTION_REJECTED');
     assert.match(attack.replies[0]?.type === 'ACTION_REJECTED' ? attack.replies[0].reason : '', /not visible/);
+});
+
+test('server late story interiors spawn original objective and guard layouts through episode 31', () => {
+    const world = new WorldMap();
+
+    for (let episode = 23; episode <= 31; episode++) {
+        const session = new WorldSession();
+        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+        assert.ok(scenario, `episode ${episode} scenario`);
+        const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+        const interior = getStoryInteriorLayout(scenario.dungeonId);
+        const monsterLayout = getStoryScenarioMonsterLayout(scenario);
+        assert.ok(dungeon, `episode ${episode} dungeon`);
+        assert.ok(interior, `episode ${episode} interior`);
+        assert.ok(monsterLayout.bossMonsterId, `episode ${episode} boss monster`);
+
+        const completedQuestIds = STORY_SCENARIOS
+            .filter((entry) => entry.episode < episode)
+            .map((entry) => entry.questId);
+        const joined = session.join({
+            ...joinMessage('central_castle', `hero-ep${episode}`),
+            completedQuestIds,
+        }, episode);
+        const internals = session as any;
+        const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+        assert.ok(serverActor, `episode ${episode} actor`);
+        serverActor.tile = world.getDungeonEntranceTile(dungeon);
+        const returnTile = { ...serverActor.tile };
+
+        const result = session.handleMessage(joined.playerId, {
+            type: 'SCENARIO_ENTER',
+            intentId: `enter-ep${episode}`,
+            actorId: serverActor.id,
+            dungeonId: scenario.dungeonId,
+        }, 1_000 + episode);
+
+        assert.equal(result.replies.length, 0, `episode ${episode} enter`);
+        const state = internals.scenarioStates.get(joined.playerId);
+        assert.ok(state, `episode ${episode} scenario state`);
+        assert.equal(state.dungeonId, scenario.dungeonId, `episode ${episode} dungeon id`);
+        assert.equal(state.missionKind, 'soloInterior', `episode ${episode} mission kind`);
+        assert.deepEqual(state.returnTile, returnTile, `episode ${episode} return tile`);
+        assert.equal(state.enemyIds.length, scenario.guardCount + 1, `episode ${episode} enemy count`);
+
+        const serverEnemies = state.enemyIds.map((id: string) => internals.enemies.get(id));
+        assert.equal(serverEnemies.every(Boolean), true, `episode ${episode} server enemies`);
+        const guards = serverEnemies.filter((entry: any) => !entry.scenarioObjective);
+        const boss = serverEnemies.find((entry: any) => entry.scenarioObjective);
+        assert.equal(guards.length, scenario.guardCount, `episode ${episode} guard count`);
+        assert.ok(boss, `episode ${episode} objective boss`);
+        assert.equal(boss.monsterId, monsterLayout.bossMonsterId, `episode ${episode} boss monster id`);
+        assert.deepEqual({ x: boss.enemy.gridX, y: boss.enemy.gridY }, getOriginalLateStoryBossTile(episode), `episode ${episode} boss tile`);
+
+        const expectedGuardTiles = getOriginalLateStoryGuardTiles(episode);
+        guards.forEach((entry: any, index: number) => {
+            assert.equal(entry.monsterId, monsterLayout.guardMonsterIds[index % monsterLayout.guardMonsterIds.length], `episode ${episode} guard ${index} monster`);
+            assert.deepEqual({ x: entry.enemy.gridX, y: entry.enemy.gridY }, expectedGuardTiles[index], `episode ${episode} guard ${index} tile`);
+            const guardBalance = getNormalizedMonsterBalance(entry.monsterId, entry.enemy.level);
+            assert.equal(guardBalance.source, 'original', `episode ${episode} guard ${index} balance source`);
+            const expectedGuard = new Enemy('expected', 0, 0, entry.enemy.name, entry.enemy.level, entry.enemy.color, entry.enemy.role, entry.monsterId);
+            assert.equal(entry.enemy.stats.maxHp, expectedGuard.stats.maxHp, `episode ${episode} guard ${index} hp`);
+            assert.equal(entry.enemy.stats.atk, expectedGuard.stats.atk, `episode ${episode} guard ${index} atk`);
+        });
+
+        const snapshot = session.createSnapshot(joined.playerId, 2_000 + episode);
+        assert.equal(snapshot.scenario.activeDungeonId, scenario.dungeonId, `episode ${episode} active dungeon`);
+        assert.ok(snapshot.scenario.enteredDungeonIds.includes(scenario.dungeonId), `episode ${episode} entered`);
+        assert.deepEqual(snapshot.partyActors.find((entry) => entry.id === serverActor.id)?.tile, interior.playerStart, `episode ${episode} player start`);
+        for (const enemyId of state.enemyIds) {
+            assert.ok(snapshot.enemies.some((enemy) => enemy.id === enemyId), `episode ${episode} visible enemy ${enemyId}`);
+        }
+    }
 });
 
 test('scenario entry validates quest prerequisites on the server', () => {

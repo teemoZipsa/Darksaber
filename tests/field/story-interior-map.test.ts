@@ -1060,6 +1060,12 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         assert.ok(originalMrcOpenCells > 0, fact.dungeonId);
         assert.deepEqual(layout.bossTile, getOriginalLateStoryBossTile(episode));
         assert.deepEqual(layout.guardTiles, getOriginalLateStoryGuardTiles(episode));
+        const occupiedCombatTiles = [layout.playerStart, layout.bossTile, ...layout.guardTiles];
+        assert.equal(
+            new Set(occupiedCombatTiles.map((tile) => `${tile.x},${tile.y}`)).size,
+            occupiedCombatTiles.length,
+            `${fact.dungeonId}:combat spawn tiles must not overlap`
+        );
         assert.equal(hasWalkablePath(map, layout.playerStart, layout.bossTile), true, fact.dungeonId);
         const stagingTiles = fact.staging.map((position) => ({ x: position.x, y: position.y }));
         for (const tile of [...layout.guardTiles, ...stagingTiles, layout.entryTile, layout.playerStart, layout.bossTile]) {
