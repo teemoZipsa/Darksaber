@@ -10,6 +10,7 @@ import { GridInventory } from '../../src/inventory/GridInventory';
 import type { TownInfo } from '../../src/map/BiomeMask';
 import type { RaidOutcome } from '../../src/raid/RaidOutcome';
 import { PlayerData } from '../../src/data/PlayerData';
+import { getItemDef } from '../../src/data/ItemDB';
 import { BURGOS_CASTLE_DUNGEON_ID, ZAMORA_FORTRESS_DUNGEON_ID } from '../../src/data/MonsterCatalog';
 import {
     MAIN_QUEST_EPISODE_01_ID,
@@ -271,6 +272,30 @@ test('Zamora objective does not grant episode 2 reward on raid failure', () => {
     assert.equal(playerData.hasStoryCompanion(STORY_CLERIC_EP02_ID), false);
     assert.equal(party.getRoster().some((character) => character.id === STORY_CLERIC_EP02_ID), false);
     assert.equal(getOutcome()?.questRewards, undefined);
+});
+
+test('episode 3 sacred sword falls back to stash when backpack is full', () => {
+    const { controller, playerData, raidSession, gameManager, getOutcome } = createController();
+    const episode3 = STORY_QUESTS.find((quest) => quest.episode === 3);
+    const filler = getItemDef('herb_cheap');
+    assert.ok(episode3);
+    assert.ok(filler);
+    playerData.markCleared(MAIN_QUEST_EPISODE_01_ID);
+    playerData.markCleared(MAIN_QUEST_EPISODE_02_ID);
+    for (let y = 0; y < gameManager.inventory.height; y++) {
+        for (let x = 0; x < gameManager.inventory.width; x++) {
+            assert.ok(gameManager.inventory.place(filler, x, y));
+        }
+    }
+    raidSession.beginRaidFromTown('central_castle');
+    markStoryObjectiveComplete(raidSession, episode3.dungeonId);
+
+    controller.completeSuccess(DESTINATION_TOWN);
+
+    assert.equal(playerData.hasQuestItem('quest_sacred_sword'), true);
+    assert.equal(gameManager.inventory.items.some((placed) => placed.item.id === 'quest_sacred_sword'), false);
+    assert.equal(gameManager.stash.items.some((placed) => placed.item.id === 'quest_sacred_sword'), true);
+    assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('보검')));
 });
 
 test('episode 31 objective grants final implemented quest completion only after survival', () => {

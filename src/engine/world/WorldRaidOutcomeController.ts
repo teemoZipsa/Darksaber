@@ -239,9 +239,12 @@ export class WorldRaidOutcomeController {
 
         if (reward.type === 'inventoryItem') {
             if (!this.context.playerData.hasQuestItem(reward.itemId)) {
-                this.context.playerData.addQuestItem(reward.itemId);
                 const rewardItem = getItemDef(reward.itemId);
-                if (rewardItem) this.context.gameManager.inventory.autoPlace(rewardItem);
+                if (rewardItem) {
+                    const placed = this.context.gameManager.inventory.autoPlace(rewardItem)
+                        ?? this.context.gameManager.stash.autoPlace(rewardItem);
+                    if (placed) this.context.playerData.addQuestItem(reward.itemId);
+                }
             }
             const rewardItem = getItemDef(reward.itemId);
             return `${t('quest.rewardItem')}: ${rewardItem?.nameKr ?? reward.itemId}`;
