@@ -8,6 +8,7 @@ import { WorldMap } from '../../src/map/WorldMap';
 import { CHUNK_SIZE } from '../../src/map/Chunk';
 import { WorldResumeFailedError, WorldSession } from '../../server/WorldSession';
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
+import { getItemDef } from '../../src/data/ItemDB';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import { getStoryScenarioMonsterLayout } from '../../src/data/StoryScenarioMonsterData';
 import { getStoryScenarioEventSequence } from '../../src/data/StoryScenarioEventData';
@@ -19,6 +20,7 @@ import {
 } from '../../src/data/OriginalLateStoryFacts';
 import { getOriginalLateStoryItemsForSourceEvent } from '../../src/data/OriginalLateStoryItems';
 import { ENEMY_AGGRO_RANGE, ENEMY_SIMULATION_ACTIVE_RANGE } from '../../src/field/FieldConfig';
+import type { InventorySaveSnapshot } from '../../src/shared/CharacterSave';
 
 function actor(id: string, overrides: Partial<ActorSnapshot> = {}): ActorSnapshot {
     return {
@@ -74,6 +76,24 @@ function authCharacter(id: string): AuthCharacter {
         updatedAt: '2026-01-01T00:00:00.000Z',
         deletedAt: null,
     };
+}
+
+function fullInventory(width: number, height: number): InventorySaveSnapshot {
+    const filler = getItemDef('herb_cheap');
+    assert.ok(filler);
+    const items: InventorySaveSnapshot['items'] = [];
+    for (let y = 0; y < height; y += filler.gridH) {
+        for (let x = 0; x < width; x += filler.gridW) {
+            items.push({
+                itemId: filler.id,
+                gridX: x,
+                gridY: y,
+                quantity: 1,
+                durability: filler.maxDurability,
+            });
+        }
+    }
+    return { width, height, items };
 }
 
 test('join spawns each player at their origin hub external exit tile', () => {
@@ -1299,6 +1319,77 @@ test('server-authoritative field scenario gold rewards are lost on failed raids'
     const finalPatch = session.createCharacterSavePatch(joined.playerId);
     assert.ok(finalPatch?.questState);
     assert.equal(finalPatch.questState.gold, 500);
+});
+
+test('server-authoritative field scenario item rewards reject full save storage without completing the event', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const completedQuestIds = STORY_SCENARIOS
+        .filter((scenario) => scenario.episode < 4)
+        .map((scenario) => scenario.questId);
+    const character = authCharacter('full-item-reward');
+    const save = createDefaultCharacterSave(character);
+    save.inventory = fullInventory(save.inventory.width, save.inventory.height);
+    save.questState = { ...save.questState, completedQuestIds };
+    const joined = session.join({
+        ...joinMessage('central_castle', character.id),
+        completedQuestIds,
+    }, 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        completedQuestIds,
+        saveSnapshot: save,
+    });
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const player = internals.players.get(joined.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === 'arcadia_plain');
+    const sequence = getStoryScenarioEventSequence('arcadia_plain');
+    const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'arcadia_item_chest_05');
+    assert.ok(serverActor);
+    assert.ok(player);
+    assert.ok(dungeon);
+    assert.ok(event);
+    serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+    session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-arcadia-full-item',
+        actorId: serverActor.id,
+        dungeonId: 'arcadia_plain',
+    }, 1_000);
+
+    const [eventTile] = getStoryScenarioFieldEventTiles('arcadia_plain', event, world);
+    serverActor.tile = { x: eventTile.x, y: eventTile.y + 1 };
+    const fullStorage = session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'open-arcadia-item-full',
+        actorId: serverActor.id,
+        dungeonId: 'arcadia_plain',
+        eventId: 'arcadia_item_chest_05',
+    }, 1_100);
+
+    assert.equal(fullStorage.replies[0]?.type, 'ACTION_REJECTED');
+    assert.match(fullStorage.replies[0]?.type === 'ACTION_REJECTED' ? fullStorage.replies[0].reason : '', /reward storage is full/);
+    const rejectedSnapshot = session.createSnapshot(joined.playerId, 1_100);
+    assert.equal(rejectedSnapshot.scenario.playerFieldEventFlagsByDungeonId?.arcadia_plain, undefined);
+    assert.equal(player.saveSnapshot.inventory.items.some((item: any) => item.itemId === 'orig_story_0300_heal_potion'), false);
+
+    player.saveSnapshot.inventory.items.pop();
+    const retried = session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'open-arcadia-item-retry',
+        actorId: serverActor.id,
+        dungeonId: 'arcadia_plain',
+        eventId: 'arcadia_item_chest_05',
+    }, 1_200);
+
+    const fieldResult = retried.replies.find((message) => message.type === 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.equal(fieldResult?.type, 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.deepEqual(fieldResult.rewards, [{ type: 'item', itemId: 'orig_story_0300_heal_potion' }]);
+    const completedSnapshot = session.createSnapshot(joined.playerId, 1_200);
+    assert.deepEqual(completedSnapshot.scenario.playerFieldEventFlagsByDungeonId?.arcadia_plain, ['arcadia_item_chest_05']);
+    assert.equal(player.saveSnapshot.inventory.items.some((item: any) => item.itemId === 'orig_story_0300_heal_potion'), true);
 });
 
 test('server-authoritative field scenario events reject invalid actors and distant requests', () => {

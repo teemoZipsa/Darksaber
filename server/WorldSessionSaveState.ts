@@ -66,21 +66,20 @@ export class WorldSessionSaveState {
         }
     }
 
-    public addPlacedItem(player: WorldSessionSavePlayer, placed: WorldSessionPlacedSaveItem): void {
+    public canAddPlacedItems(player: WorldSessionSavePlayer, placedItems: readonly WorldSessionPlacedSaveItem[]): boolean {
         const inventory = player.saveSnapshot?.inventory;
-        if (!inventory || placed.quantity <= 0) return;
-        const slot = findFreeInventorySlot(inventory, placed.item.id);
-        if (!slot) return;
-        const item: InventorySaveItem = {
-            itemId: placed.item.id,
-            gridX: slot.x,
-            gridY: slot.y,
-            durability: Number.isFinite(placed.durability) ? placed.durability : placed.item.maxDurability,
-            quantity: Math.max(1, Math.floor(placed.quantity)),
-            acquiredInRaid: true,
-        };
-        if (placed.sockets) item.sockets = placed.sockets.map((socket) => socket.id);
-        inventory.items.push(item);
+        if (!inventory) return true;
+        const draft = cloneInventorySnapshot(inventory, { includeRaidRewards: true });
+        for (const placed of placedItems) {
+            if (!tryAddPlacedItemToInventory(draft, placed, false)) return false;
+        }
+        return true;
+    }
+
+    public addPlacedItem(player: WorldSessionSavePlayer, placed: WorldSessionPlacedSaveItem): boolean {
+        const inventory = player.saveSnapshot?.inventory;
+        if (!inventory) return true;
+        return tryAddPlacedItemToInventory(inventory, placed, true);
     }
 
     private buildPatch(
@@ -119,6 +118,27 @@ export class WorldSessionSaveState {
             rosterSnapshot,
         };
     }
+}
+
+function tryAddPlacedItemToInventory(
+    inventory: InventorySaveSnapshot,
+    placed: WorldSessionPlacedSaveItem,
+    acquiredInRaid: boolean
+): boolean {
+    if (placed.quantity <= 0) return false;
+    const slot = findFreeInventorySlot(inventory, placed.item.id);
+    if (!slot) return false;
+    const item: InventorySaveItem = {
+        itemId: placed.item.id,
+        gridX: slot.x,
+        gridY: slot.y,
+        durability: Number.isFinite(placed.durability) ? placed.durability : placed.item.maxDurability,
+        quantity: Math.max(1, Math.floor(placed.quantity)),
+    };
+    if (acquiredInRaid) item.acquiredInRaid = true;
+    if (placed.sockets) item.sockets = placed.sockets.map((socket) => socket.id);
+    inventory.items.push(item);
+    return true;
 }
 
 export function cloneCharacterSave(save: CharacterSave | undefined): CharacterSave | undefined {

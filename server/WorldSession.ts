@@ -1048,6 +1048,9 @@ export class WorldSession {
         if (!triggerTiles.some((tile) => manhattan(actor!.tile, tile) <= 1)) {
             return reject(message.intentId, 'Scenario field event is too far away.');
         }
+        if (!this.canApplyScenarioRewards(player!, event.rewards)) {
+            return reject(message.intentId, 'Scenario field event reward storage is full.');
+        }
 
         this.markScenarioFieldEventFlagComplete(player!, dungeonId, flag, scope);
         const rewards = this.applyScenarioFieldEventRewards(player!, event);
@@ -1811,17 +1814,27 @@ export class WorldSession {
 
             const item = getItemDef(reward.itemId);
             if (!item) continue;
-            this.addCarriedItemQuantity(player.id, item.id, 1);
-            this.addCarriedWeight(player.id, getPlacedItemWeight({ item, quantity: 1 }));
-            this.addSavePlacedItem(player, {
+            const saved = this.addSavePlacedItem(player, {
                 item,
                 durability: item.maxDurability,
                 quantity: 1,
             });
+            if (!saved) continue;
+            this.addCarriedItemQuantity(player.id, item.id, 1);
+            this.addCarriedWeight(player.id, getPlacedItemWeight({ item, quantity: 1 }));
             this.markSaveDirty(player.id);
             results.push({ type: 'item', itemId: item.id });
         }
         return results;
+    }
+
+    private canApplyScenarioRewards(player: ServerPlayer, rewards: StoryScenarioFieldEvent['rewards']): boolean {
+        const placedItems = (rewards ?? []).flatMap((reward) => {
+            if (reward.type !== 'item') return [];
+            const item = getItemDef(reward.itemId);
+            return item ? [{ item, durability: item.maxDurability, quantity: 1 }] : [];
+        });
+        return this.saveState.canAddPlacedItems(player, placedItems);
     }
 
     private ensureContentNear(spawnTile: TilePoint, departureTownId: string | null | undefined, now: number): void {
@@ -2106,8 +2119,8 @@ export class WorldSession {
         this.saveState.removeItemQuantity(player, itemId, quantity);
     }
 
-    private addSavePlacedItem(player: ServerPlayer, placed: { item: { id: string; maxDurability: number }; durability: number; quantity: number; sockets?: Array<{ id: string }> }): void {
-        this.saveState.addPlacedItem(player, placed);
+    private addSavePlacedItem(player: ServerPlayer, placed: { item: { id: string; maxDurability: number }; durability: number; quantity: number; sockets?: Array<{ id: string }> }): boolean {
+        return this.saveState.addPlacedItem(player, placed);
     }
 
     private getLearnedSkillIds(actor: ServerActor): Set<string> {
