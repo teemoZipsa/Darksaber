@@ -618,6 +618,9 @@ test('Sagunto Port exposes original episode 8 ship and blockade event flow', () 
     assert.ok(sagunto.fieldEvents.every((event) => event.originalSource === 'MAP/08set.arc:08.evt'));
     assert.ok(sagunto.fieldEvents.every((event) => event.scope === 'shared'));
     assert.ok(sagunto.fieldEvents.every((event) => event.triggerTiles.length === 2));
+    assert.equal(sagunto.bossDefeatEvent?.originalSource, 'MAP/08set.arc:08.evt');
+    assert.equal(sagunto.bossDefeatEvent?.originalEventId, 'EVENT 54/55/56/99');
+    assert.equal(sagunto.bossDefeatEvent?.runtimeFlag, 'sagunto_sicilio_route_opened');
     assert.equal(sagunto.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
     assert.equal(sagunto.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
 });
@@ -645,6 +648,9 @@ test('Sicilio Island exposes original episode 9 coast ambush and rescue flow', (
         markerLabelKey: 'story.event.ep09.kamoraSon.marker',
         hideWhenRuntimeFlag: 'kamora_son_rescued',
     }]);
+    assert.equal(sicilio.bossDefeatEvent?.originalSource, 'MAP/09set.arc:09.EVT');
+    assert.equal(sicilio.bossDefeatEvent?.originalEventId, 'EVENT 50/99');
+    assert.equal(sicilio.bossDefeatEvent?.runtimeFlag, 'kamora_son_rescued');
     assert.equal(sicilio.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
     assert.equal(sicilio.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
 });
@@ -672,6 +678,9 @@ test('Dalai Lake exposes original episode 10 lake temptation and rescue flow', (
         markerLabelKey: 'story.event.ep10.fiancee.marker',
         hideWhenRuntimeFlag: 'tripani_fiancee_rescued',
     }]);
+    assert.equal(dalai.bossDefeatEvent?.originalSource, 'MAP/10set.arc:10.EVT');
+    assert.equal(dalai.bossDefeatEvent?.originalEventId, 'EVENT 99');
+    assert.equal(dalai.bossDefeatEvent?.runtimeFlag, 'tripani_fiancee_rescued');
     assert.equal(dalai.bossDefeat.filter((step) => step.kind === 'dialogue').length, 0);
     assert.equal(dalai.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
 });
@@ -708,6 +717,9 @@ test('Oasis exposes original episode 11 Charon and treasure chest flow', () => {
     assert.ok(oasis.fieldEvents.every((event) => event.trigger === 'treasure chest RANDOM 50 GOLD 500'));
     assert.ok(oasis.fieldEvents.every((event) => event.markerKind === 'chest'));
     assert.ok(oasis.fieldEvents.every((event) => event.rewards?.some((reward) => reward.type === 'gold' && reward.amount === 500)));
+    assert.equal(oasis.bossDefeatEvent?.originalSource, 'MAP/11set.arc:11.EVT');
+    assert.equal(oasis.bossDefeatEvent?.originalEventId, 'EVENT 50/99');
+    assert.equal(oasis.bossDefeatEvent?.runtimeFlag, 'acheron_truth_seal_opened');
     assert.equal(oasis.bossDefeat.filter((step) => step.kind === 'dialogue').length, 0);
     assert.equal(oasis.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
 });
@@ -772,6 +784,9 @@ test('Pyramid Front exposes original episode 12 Mantagoras and trap flow', () =>
             { eventId: 'EVENT 62', charId: 730, index: 16, textKey: 'story.event.ep12.enemyDefeat.730' },
         ]
     );
+    assert.equal(pyramid.bossDefeatEvent?.originalSource, 'MAP/12set.arc:12.evt');
+    assert.equal(pyramid.bossDefeatEvent?.originalEventId, 'EVENT 70/99');
+    assert.equal(pyramid.bossDefeatEvent?.runtimeFlag, 'pyramid_front_mantagoras_defeated');
     assert.equal(pyramid.bossDefeat.filter((step) => step.kind === 'dialogue').length, 7);
     assert.deepEqual(
         pyramid.bossDefeat.filter((step) => step.kind === 'dialogue').map((step) => step.kind === 'dialogue' ? step.textKey : ''),

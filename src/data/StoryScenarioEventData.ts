@@ -1364,6 +1364,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 ],
             },
         ],
+        bossDefeatEvent: {
+            id: 'sagunto_shut_route_opened',
+            originalSource: 'MAP/08set.arc:08.evt',
+            originalEventId: 'EVENT 54/55/56/99',
+            trigger: 'CHARDEAD Shut / Sicilio route opening / SCENECLEAR',
+            runtimeFlag: 'sagunto_sicilio_route_opened',
+        },
         bossDefeat: [
             { kind: 'dialogue', speakerId: 'shut', speakerNameKey: 'story.event.speaker.shut', textKey: 'story.event.ep08.bossDefeat.01', focus: { x: 20, y: 18 } },
             { kind: 'objective', labelKey: 'story.event.ep08.route.result', focus: { x: 20, y: 18 } },
@@ -1435,6 +1442,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { kind: 'combatStart', labelKey: 'story.event.ep09.combatStart', focus: { x: 45, y: 26 } },
         ],
         fieldEvents: [],
+        bossDefeatEvent: {
+            id: 'sicilio_dangu_clear',
+            originalSource: 'MAP/09set.arc:09.EVT',
+            originalEventId: 'EVENT 50/99',
+            trigger: 'CHARDEAD Dangu / SCENECLEAR',
+            runtimeFlag: 'kamora_son_rescued',
+        },
         bossDefeat: [
             { kind: 'dialogue', speakerId: 'dangu', speakerNameKey: 'story.event.speaker.dangu', textKey: 'story.event.ep09.bossDefeat.01', focus: { x: 45, y: 26 } },
             { kind: 'objective', labelKey: 'story.event.ep09.kamoraSon.result', focus: { x: 45, y: 26 } },
@@ -1499,6 +1513,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { kind: 'combatStart', labelKey: 'story.event.ep10.combatStart', focus: { x: 23, y: 4 } },
         ],
         fieldEvents: [],
+        bossDefeatEvent: {
+            id: 'dalai_naiad_clear',
+            originalSource: 'MAP/10set.arc:10.EVT',
+            originalEventId: 'EVENT 99',
+            trigger: 'CHARDEAD Naiad / SCENECLEAR',
+            runtimeFlag: 'tripani_fiancee_rescued',
+        },
         bossDefeat: [
             { kind: 'objective', labelKey: 'story.event.ep10.fiancee.result', focus: { x: 23, y: 4 } },
             { kind: 'objective', labelKey: 'story.event.ep10.objective', focus: { x: 17, y: 45 } },
@@ -1633,6 +1654,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep11.chest.opened', focus: { x: 25, y: 37 } }],
             },
         ],
+        bossDefeatEvent: {
+            id: 'oasis_charon_clear',
+            originalSource: 'MAP/11set.arc:11.EVT',
+            originalEventId: 'EVENT 50/99',
+            trigger: 'CHARDEAD Charon / truth seal / SCENECLEAR',
+            runtimeFlag: 'acheron_truth_seal_opened',
+        },
         bossDefeat: [
             { kind: 'objective', labelKey: 'story.event.ep11.truthSeal.result', focus: { x: 29, y: 32 } },
             { kind: 'objective', labelKey: 'story.event.ep11.objective', focus: { x: 6, y: 3 } },
@@ -1930,6 +1958,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 steps: [{ kind: 'dialogue', speakerId: 'pyramidFrontGuard', speakerNameKey: 'story.event.speaker.pyramidFrontGuard', textKey: 'story.event.ep12.enemyDefeat.730', focus: { x: 20, y: 11 } }],
             },
         ],
+        bossDefeatEvent: {
+            id: 'pyramid_front_mantagoras_clear',
+            originalSource: 'MAP/12set.arc:12.evt',
+            originalEventId: 'EVENT 70/99',
+            trigger: 'CHARDEAD Mantagoras / 12b.dee aftermath / SCENECLEAR',
+            runtimeFlag: 'pyramid_front_mantagoras_defeated',
+        },
         bossDefeat: [
             { kind: 'dialogue', speakerId: 'mantagoras', speakerNameKey: 'story.event.speaker.mantagoras', textKey: 'story.event.ep12.bossDefeat.01', focus: { x: 20, y: 5 } },
             { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep12.bossDefeat.02', focus: { x: 20, y: 8 } },
