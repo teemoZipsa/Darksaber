@@ -165,6 +165,7 @@ interface ServerPlayer {
     kills: number;
     carriedWeight: number;
     carriedItems: Map<string, number>;
+    raidGoldReward: number;
     completedQuestIds: Set<string>;
     enteredDungeonIds: Set<string>;
     completedDungeonIds: Set<string>;
@@ -321,6 +322,7 @@ export class WorldSession {
             kills: 0,
             carriedWeight: sanitizeCarriedWeight(message.carriedWeight),
             carriedItems: sanitizeCarriedItems(message.carriedItems),
+            raidGoldReward: 0,
             completedQuestIds: new Set(sanitizeStringArray(context.completedQuestIds ?? message.completedQuestIds)),
             enteredDungeonIds: new Set(),
             completedDungeonIds: new Set(),
@@ -1802,6 +1804,7 @@ export class WorldSession {
         const results: ScenarioFieldEventRewardResult[] = [];
         for (const reward of rewards ?? []) {
             if (reward.type === 'gold') {
+                player.raidGoldReward += Math.max(0, Math.floor(reward.amount));
                 results.push({ type: 'gold', amount: reward.amount });
                 continue;
             }

@@ -1156,10 +1156,18 @@ test('server-authoritative field scenario events complete per player without tru
     const completedQuestIds = STORY_SCENARIOS
         .filter((scenario) => scenario.episode < 4)
         .map((scenario) => scenario.questId);
+    const characterA = authCharacter('hero-a');
+    const saveA = createDefaultCharacterSave(characterA);
+    saveA.questState = { ...saveA.questState, completedQuestIds, gold: 500 };
     const joinedA = session.join({
         ...joinMessage('central_castle', 'hero-a'),
         completedQuestIds,
-    }, 0);
+    }, 0, {
+        accountId: characterA.accountId,
+        characterId: characterA.id,
+        completedQuestIds,
+        saveSnapshot: saveA,
+    });
     const joinedB = session.join({
         ...joinMessage('central_castle', 'hero-b'),
         completedQuestIds,
@@ -1211,6 +1219,9 @@ test('server-authoritative field scenario events complete per player without tru
     const snapshotB = session.createSnapshot(joinedB.playerId, 1_100);
     assert.deepEqual(snapshotA.scenario.playerFieldEventFlagsByDungeonId?.arcadia_plain, ['arcadia_gold_chest_01']);
     assert.equal(snapshotB.scenario.playerFieldEventFlagsByDungeonId?.arcadia_plain, undefined);
+    const dirtyPatch = session.createCharacterSavePatch(joinedA.playerId);
+    assert.ok(dirtyPatch?.questState);
+    assert.equal(dirtyPatch.questState.gold, 500);
 
     const duplicate = session.handleMessage(joinedA.playerId, {
         type: 'SCENARIO_FIELD_EVENT_INTERACT',
@@ -1221,6 +1232,73 @@ test('server-authoritative field scenario events complete per player without tru
     }, 1_200);
     assert.equal(duplicate.replies[0]?.type, 'ACTION_REJECTED');
     assert.match(duplicate.replies[0]?.type === 'ACTION_REJECTED' ? duplicate.replies[0].reason : '', /already complete/);
+
+    const extractionTown = world.getTowns().find((town) => town.id === 'w_forest_village');
+    assert.ok(extractionTown);
+    actorA.tile = world.getTownSpawnTile(extractionTown);
+    const leave = session.handleMessage(joinedA.playerId, { type: 'WORLD_LEAVE', reason: 'town' }, 1_300);
+    assert.equal(leave.replies[0]?.type, 'RAID_RESULT');
+    assert.equal(leave.replies[0]?.type === 'RAID_RESULT' ? leave.replies[0].result : '', 'SURVIVED');
+    const finalPatch = session.createCharacterSavePatch(joinedA.playerId);
+    assert.ok(finalPatch?.questState);
+    assert.equal(finalPatch.questState.gold, 600);
+});
+
+test('server-authoritative field scenario gold rewards are lost on failed raids', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const completedQuestIds = STORY_SCENARIOS
+        .filter((scenario) => scenario.episode < 4)
+        .map((scenario) => scenario.questId);
+    const character = authCharacter('failed-gold');
+    const save = createDefaultCharacterSave(character);
+    save.questState = { ...save.questState, completedQuestIds, gold: 500 };
+    const joined = session.join({
+        ...joinMessage('central_castle', character.id),
+        completedQuestIds,
+    }, 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        completedQuestIds,
+        saveSnapshot: save,
+    });
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === 'arcadia_plain');
+    const sequence = getStoryScenarioEventSequence('arcadia_plain');
+    const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'arcadia_gold_chest_01');
+    assert.ok(serverActor);
+    assert.ok(dungeon);
+    assert.ok(event);
+    serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+    session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-arcadia-failed-gold',
+        actorId: serverActor.id,
+        dungeonId: 'arcadia_plain',
+    }, 1_000);
+
+    const [eventTile] = getStoryScenarioFieldEventTiles('arcadia_plain', event, world);
+    serverActor.tile = { x: eventTile.x, y: eventTile.y + 1 };
+    const result = session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'open-arcadia-gold-failed',
+        actorId: serverActor.id,
+        dungeonId: 'arcadia_plain',
+        eventId: 'arcadia_gold_chest_01',
+    }, 1_100);
+    assert.equal(result.replies[0]?.type, 'SCENARIO_FIELD_EVENT_RESULT');
+    const dirtyPatch = session.createCharacterSavePatch(joined.playerId);
+    assert.ok(dirtyPatch?.questState);
+    assert.equal(dirtyPatch.questState.gold, 500);
+
+    const leave = session.handleMessage(joined.playerId, { type: 'WORLD_LEAVE', reason: 'wipe' }, 1_200);
+    assert.equal(leave.replies[0]?.type, 'RAID_RESULT');
+    assert.equal(leave.replies[0]?.type === 'RAID_RESULT' ? leave.replies[0].result : '', 'DEAD');
+    const finalPatch = session.createCharacterSavePatch(joined.playerId);
+    assert.ok(finalPatch?.questState);
+    assert.equal(finalPatch.questState.gold, 500);
 });
 
 test('server-authoritative field scenario events reject invalid actors and distant requests', () => {

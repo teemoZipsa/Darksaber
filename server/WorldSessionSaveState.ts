@@ -6,6 +6,7 @@ export type WorldCharacterSavePatch = CharacterSavePatch;
 export interface WorldSessionSavePlayer {
     id: string;
     completedQuestIds: Set<string>;
+    raidGoldReward: number;
     saveSnapshot?: CharacterSave;
 }
 
@@ -87,12 +88,15 @@ export class WorldSessionSaveState {
     ): WorldCharacterSavePatch | null {
         const save = player.saveSnapshot;
         if (!save) return null;
-        const questState = {
+        const questState: Record<string, unknown> = {
             ...cloneRecord(save.questState),
             completedQuestIds: options.includeRaidRewards
                 ? [...player.completedQuestIds]
                 : normalizeStringArray(save.questState.completedQuestIds),
         };
+        if (options.includeRaidRewards && player.raidGoldReward > 0) {
+            questState.gold = normalizeGoldValue(questState.gold) + Math.floor(player.raidGoldReward);
+        }
         const hubLocation = {
             ...cloneRecord(save.hubLocation),
             ...(options.hubTownId ? { townId: options.hubTownId } : {}),
@@ -145,6 +149,10 @@ function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
 
 function normalizeStringArray(value: unknown): string[] {
     return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
+}
+
+function normalizeGoldValue(value: unknown): number {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 }
 
 function findFreeInventorySlot(inventory: InventorySaveSnapshot, itemId: string): { x: number; y: number } | null {
