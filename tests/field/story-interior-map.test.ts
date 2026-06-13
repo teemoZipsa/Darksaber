@@ -782,7 +782,7 @@ test('Pyramid Interior exposes original episode 13 Myant, trap, and chest flow',
         'EVENT 63',
     ]);
     assert.deepEqual(pyramid.fieldEvents.slice(8).map((event) => event.rewards?.[0]), [
-        { type: 'item', itemId: 'web_65_08', originalItemId: 10 },
+        { type: 'item', itemId: 'orig_story_0010_jack_knife', originalItemId: 10 },
         { type: 'item', itemId: 'orig_story_0008_star_knife', originalItemId: 8 },
         { type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 },
         { type: 'item', itemId: 'orig_story_0305_magic_potion', originalItemId: 305 },
@@ -822,7 +822,7 @@ test('Skeria exposes original episode 14 Yadua, quake trap, and cache flow', () 
     assert.deepEqual(skeria.fieldEvents.slice(4).map((event) => event.rewards?.[0]), [
         { type: 'item', itemId: 'orig_story_0203_resist_fire_ring', originalItemId: 203 },
         { type: 'gold', amount: 200 },
-        { type: 'item', itemId: 'web_66_01', originalItemId: 18 },
+        { type: 'item', itemId: 'orig_story_0018_power_staff', originalItemId: 18 },
     ]);
     assert.equal(skeria.bossDefeat.filter((step) => step.kind === 'dialogue').length, 2);
     assert.equal(skeria.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
@@ -1123,11 +1123,11 @@ test('Nergal Castle exposes original episode 21 summoning, relic, and clear flow
     assert.equal(nergal.fieldEvents.length, 5);
     assert.deepEqual(nergal.fieldEvents.map((event) => event.originalEventId), ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94', 'EVENT 99']);
     assert.deepEqual(nergal.fieldEvents.map((event) => event.rewards?.[0]), [
-        { type: 'item', itemId: 'lance', originalItemId: 974 },
-        { type: 'item', itemId: 'void_crystal', originalItemId: 1037 },
-        { type: 'item', itemId: 'magic_t6_body', originalItemId: 995 },
-        { type: 'item', itemId: 'trade_ember_core', originalItemId: 990 },
-        { type: 'item', itemId: 'corrupted_blade', originalItemId: 970 },
+        { type: 'item', itemId: 'orig_story_0974_longinus', originalItemId: 974 },
+        { type: 'item', itemId: 'orig_story_1037_earth_armageddon', originalItemId: 1037 },
+        { type: 'item', itemId: 'orig_story_0995_valkyrie', originalItemId: 995 },
+        { type: 'item', itemId: 'orig_story_0990_bernium', originalItemId: 990 },
+        { type: 'item', itemId: 'orig_story_0970_enigma_blade', originalItemId: 970 },
     ]);
     assert.ok(nergal.fieldEvents.every((event) => event.originalSource === 'MAP/21set.arc:21.evt'));
     assert.ok(nergal.fieldEvents.every((event) => event.triggerTiles.every((tile) => map.isWalkable(tile.x, tile.y))));
@@ -1153,11 +1153,11 @@ test('Flame Castle exposes original episode 22 Beramode, relic, and clear flow',
     assert.equal(flame.fieldEvents.length, 5);
     assert.deepEqual(flame.fieldEvents.map((event) => event.originalEventId), ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94', 'EVENT 99']);
     assert.deepEqual(flame.fieldEvents.map((event) => event.rewards?.[0]), [
-        { type: 'item', itemId: 'void_crystal', originalItemId: 1035 },
-        { type: 'item', itemId: 'corrupted_blade', originalItemId: 969 },
-        { type: 'item', itemId: 'magic_t6_body', originalItemId: 1015 },
-        { type: 'item', itemId: 'web_66_51', originalItemId: 1000 },
-        { type: 'item', itemId: 'shadow_cloak', originalItemId: 975 },
+        { type: 'item', itemId: 'orig_story_1035_discovery', originalItemId: 1035 },
+        { type: 'item', itemId: 'orig_story_0969_excalibur', originalItemId: 969 },
+        { type: 'item', itemId: 'orig_story_1015_gr_carium', originalItemId: 1015 },
+        { type: 'item', itemId: 'orig_story_1000_arondight', originalItemId: 1000 },
+        { type: 'item', itemId: 'orig_story_0975_chaos_linger', originalItemId: 975 },
     ]);
     assert.ok(flame.fieldEvents.every((event) => event.originalSource === 'MAP/22set.arc:22.evt'));
     assert.ok(flame.fieldEvents.every((event) => event.triggerTiles.every((tile) => map.isWalkable(tile.x, tile.y))));
