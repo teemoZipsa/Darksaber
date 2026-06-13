@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
 import { MASTER_CLASSES } from '../../src/data/ClassTree';
 import { REST_FACILITIES } from '../../src/data/RestFacilityData';
+import { STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
 import { STORY_QUESTS, getStoryCompanionRewards } from '../../src/data/StoryQuestData';
 import { TOWN_FACILITY_META } from '../../src/data/TownFacilityData';
 import { EQUIP_SLOT_LIST } from '../../src/inventory/InventoryUI';
@@ -76,6 +77,13 @@ function collectDataDrivenUiKeys(): Set<string> {
         add(quest.recommendedLevelKey);
         add(quest.enterLogKey);
         add(quest.objectiveCompleteLogKey);
+    }
+    for (const layout of STORY_INTERIOR_LAYOUTS) {
+        add(layout.displayNameKey);
+        add(layout.objectiveKey);
+        for (const room of layout.rooms) add(room.nameKey);
+        for (const prop of layout.props) add(prop.labelKey);
+        for (const door of layout.doors ?? []) add(door.lockedLogKey);
     }
     for (const reward of getStoryCompanionRewards()) add(reward.nameKey);
 
