@@ -7,6 +7,7 @@ import { MASTER_CLASSES } from '../../src/data/ClassTree';
 import { REST_FACILITIES } from '../../src/data/RestFacilityData';
 import { STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
 import { STORY_QUESTS, getStoryCompanionRewards } from '../../src/data/StoryQuestData';
+import { STORY_SCENARIO_EVENT_SEQUENCES, type StoryScenarioEventStep } from '../../src/data/StoryScenarioEventData';
 import { TOWN_FACILITY_META } from '../../src/data/TownFacilityData';
 import { EQUIP_SLOT_LIST } from '../../src/inventory/InventoryUI';
 import { SHOP_KIND_TABS } from '../../src/ui/ShopUI';
@@ -56,6 +57,14 @@ function collectDataDrivenUiKeys(): Set<string> {
     const add = (key: string | undefined | null) => {
         if (key) keys.add(key);
     };
+    const addScenarioStep = (step: StoryScenarioEventStep) => {
+        if (step.kind === 'dialogue') {
+            add(step.speakerNameKey);
+            add(step.textKey);
+        } else if (step.kind === 'focus' || step.kind === 'combatStart' || step.kind === 'objective') {
+            add(step.labelKey);
+        }
+    };
 
     for (const cfg of CHAR_CLASSES) add(cfg.labelKey);
     for (const entry of EQUIP_SLOT_LIST) add(entry.labelKey);
@@ -86,6 +95,18 @@ function collectDataDrivenUiKeys(): Set<string> {
         for (const door of layout.doors ?? []) add(door.lockedLogKey);
     }
     for (const reward of getStoryCompanionRewards()) add(reward.nameKey);
+    for (const sequence of STORY_SCENARIO_EVENT_SEQUENCES) {
+        for (const marker of sequence.markers ?? []) add(marker.markerLabelKey);
+        for (const step of sequence.entry) addScenarioStep(step);
+        for (const step of sequence.bossDefeat) addScenarioStep(step);
+        for (const event of sequence.fieldEvents) {
+            add(event.markerLabelKey);
+            for (const step of event.steps) addScenarioStep(step);
+        }
+        for (const event of sequence.enemyDefeatEvents ?? []) {
+            for (const step of event.steps) addScenarioStep(step);
+        }
+    }
 
     for (const type of ['damage', 'heal', 'buff', 'debuff', 'aoe']) add(`magic.type.${type}`);
     for (const element of ['fire', 'ice', 'lightning', 'holy', 'dark', 'earth', 'wind', 'physical', 'none']) add(`magic.element.${element}`);
