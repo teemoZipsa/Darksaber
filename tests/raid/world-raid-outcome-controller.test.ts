@@ -18,6 +18,7 @@ import {
     CAIN_NECKLACE_ITEM_ID,
     QUEST_BOMB_ITEM_ID,
     STORY_CLERIC_EP02_ID,
+    STORY_QUESTS,
     getStoryQuestViews,
 } from '../../src/data/StoryQuestData';
 
@@ -48,6 +49,11 @@ function markBurgosObjectiveComplete(raidSession: WorldRaidSession): void {
 function markZamoraObjectiveComplete(raidSession: WorldRaidSession): void {
     raidSession.startDungeonEncounter(ZAMORA_FORTRESS_DUNGEON_ID);
     raidSession.completeDungeonEncounter(ZAMORA_FORTRESS_DUNGEON_ID);
+}
+
+function markStoryObjectiveComplete(raidSession: WorldRaidSession, dungeonId: string): void {
+    raidSession.startDungeonEncounter(dungeonId);
+    raidSession.completeDungeonEncounter(dungeonId);
 }
 
 function createController() {
@@ -242,4 +248,34 @@ test('Zamora objective does not grant episode 2 reward on raid failure', () => {
     assert.equal(playerData.hasStoryCompanion(STORY_CLERIC_EP02_ID), false);
     assert.equal(party.getRoster().some((character) => character.id === STORY_CLERIC_EP02_ID), false);
     assert.equal(getOutcome()?.questRewards, undefined);
+});
+
+test('episode 31 objective grants final implemented quest completion only after survival', () => {
+    const { controller, playerData, raidSession, getOutcome } = createController();
+    const episode31 = STORY_QUESTS.find((quest) => quest.episode === 31);
+    assert.ok(episode31);
+    for (const quest of STORY_QUESTS.filter((candidate) => candidate.episode < 31)) {
+        playerData.markCleared(quest.id);
+    }
+    raidSession.beginRaidFromTown('central_castle');
+    markStoryObjectiveComplete(raidSession, episode31.dungeonId);
+
+    controller.completeSuccess(DESTINATION_TOWN);
+
+    assert.equal(playerData.isCleared(episode31.id), true);
+    assert.equal(getStoryQuestViews(playerData, null).find((view) => view.quest.id === episode31.id)?.status, 'completed');
+    assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('31화')));
+    assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('없음')));
+
+    const failed = createController();
+    for (const quest of STORY_QUESTS.filter((candidate) => candidate.episode < 31)) {
+        failed.playerData.markCleared(quest.id);
+    }
+    failed.raidSession.beginRaidFromTown('central_castle');
+    markStoryObjectiveComplete(failed.raidSession, episode31.dungeonId);
+
+    failed.controller.completeFailure('DEAD');
+
+    assert.equal(failed.playerData.isCleared(episode31.id), false);
+    assert.equal(failed.getOutcome()?.questRewards, undefined);
 });
