@@ -858,11 +858,31 @@ test('network field scenario events expose world inspect tiles and one-shot rewa
         presentationSteps: event.steps,
         rewards: [{ type: 'gold', amount: 100 }],
     });
+    assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], eventTile);
     assert.equal(playerData.gold, 600);
     assert.equal(raidSession.hasScenarioFlag(ARCADIA_PLAIN_DUNGEON_ID, 'arcadia_gold_chest_01'), true);
     assert.ok(harness.logs.includes('%s가(이) 상자를 열었습니다.'));
     assert.ok(harness.logs.includes('100 GOLD를 얻었습니다.'));
     assert.equal(harness.controller.playFieldEventAt(eventTile, { id: 'hero', entity: player } as any), false);
+});
+
+test('local field scenario event presentation focuses the placed world event tile', () => {
+    const worldMap = new WorldMap();
+    const sequence = getStoryScenarioEventSequence(ARCADIA_PLAIN_DUNGEON_ID);
+    const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'arcadia_gold_chest_01');
+    assert.ok(event);
+    const [eventTile] = getStoryScenarioFieldEventTiles(ARCADIA_PLAIN_DUNGEON_ID, event, worldMap);
+    const player = new Player(eventTile.x, eventTile.y + 1);
+    const playerData = new PlayerData();
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    raidSession.startDungeonEncounter(ARCADIA_PLAIN_DUNGEON_ID);
+    const harness = createStoryScenarioHarness({ player, playerData, raidSession, worldMap });
+
+    assert.equal(harness.controller.playFieldEventAt(eventTile, { id: 'hero', entity: player } as any), true);
+    assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], eventTile);
+    assert.equal(playerData.gold, 600);
+    assert.equal(raidSession.hasScenarioFlag(ARCADIA_PLAIN_DUNGEON_ID, 'arcadia_gold_chest_01'), true);
 });
 
 test('episodes 5 and 6 field scenario inspect events map to current world scenario entrances', () => {

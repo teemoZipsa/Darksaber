@@ -179,7 +179,7 @@ export class WorldStoryScenarioController {
         this.context.raidSession.setScenarioFlag(dungeonId, getStoryScenarioFieldEventFlag(event));
         this.syncActiveInteriorDoorLocks();
         this.syncActiveInteriorInspectMarkers();
-        this.enqueueStoryScenarioPresentation(event.steps);
+        this.enqueueStoryScenarioPresentation(this.getFieldEventPresentationSteps(dungeonId, event, event.steps));
         this.applyFieldEventRewards(event);
         return true;
     }
@@ -502,7 +502,11 @@ export class WorldStoryScenarioController {
     public applyNetworkScenarioFieldEventResult(result: ScenarioFieldEventResultMessage): void {
         this.pendingNetworkFieldEventIntentIds.delete(result.intentId);
         this.markNetworkFieldEventComplete(result.dungeonId, result.eventId, result.flag);
-        this.enqueueStoryScenarioPresentation(result.presentationSteps);
+        const event = getStoryScenarioEventSequence(result.dungeonId)?.fieldEvents
+            .find((candidate) => candidate.id === result.eventId);
+        this.enqueueStoryScenarioPresentation(event
+            ? this.getFieldEventPresentationSteps(result.dungeonId, event, result.presentationSteps)
+            : result.presentationSteps);
         for (const reward of result.rewards) this.applyNetworkFieldEventReward(reward);
     }
 
@@ -512,7 +516,7 @@ export class WorldStoryScenarioController {
         if (!event || getStoryScenarioFieldEventScope(event) !== 'shared') return;
         if (this.isFieldEventCompleted(message.dungeonId, event)) return;
         this.markNetworkFieldEventComplete(message.dungeonId, message.eventId, message.flag);
-        this.enqueueStoryScenarioPresentation(message.presentationSteps);
+        this.enqueueStoryScenarioPresentation(this.getFieldEventPresentationSteps(message.dungeonId, event, message.presentationSteps));
     }
 
     public handleNetworkActionRejected(intentId: string, reason: string): boolean {
@@ -555,6 +559,34 @@ export class WorldStoryScenarioController {
     private getScenarioFieldEventTiles(dungeonId: string, event: StoryScenarioFieldEvent): TilePoint[] {
         if (this.activeInterior?.dungeonId === dungeonId) return event.triggerTiles;
         return getStoryScenarioFieldEventTiles(dungeonId, event, this.context.getWorldMap());
+    }
+
+    private getFieldEventPresentationSteps(
+        dungeonId: string,
+        event: StoryScenarioFieldEvent,
+        steps: readonly StoryScenarioEventStep[]
+    ): StoryScenarioEventStep[] {
+        if (this.activeInterior?.dungeonId === dungeonId) return steps.map((step) => ({ ...step }));
+        const [focusTile] = this.getScenarioFieldEventTiles(dungeonId, event);
+        if (!focusTile) return steps.map((step) => ({ ...step }));
+        return steps.map((step) => this.withPresentationStepFocus(step, focusTile));
+    }
+
+    private withPresentationStepFocus(step: StoryScenarioEventStep, focusTile: TilePoint): StoryScenarioEventStep {
+        switch (step.kind) {
+            case 'focus':
+                return { ...step, target: { ...focusTile } };
+            case 'moveActor':
+                return {
+                    ...step,
+                    target: { ...focusTile },
+                    focus: { ...focusTile },
+                };
+            case 'dialogue':
+            case 'combatStart':
+            case 'objective':
+                return { ...step, focus: { ...focusTile } };
+        }
     }
 
     private syncActiveInteriorDoorLocks(): void {
