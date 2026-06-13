@@ -432,7 +432,7 @@ export class WorldSession {
             case 'WORLD_LEAVE':
                 this.log(`leave player=${playerId} reason=${message.reason}`);
                 return {
-                    replies: [this.finishPlayer(playerId, message.reason === 'wipe' ? 'DEAD' : message.reason === 'town' ? 'SURVIVED' : 'LEFT')],
+                    replies: [this.finishPlayer(playerId, this.resolveRequestedRaidResult(playerId, message.reason))],
                     broadcasts: [],
                 };
             default:
@@ -1344,19 +1344,20 @@ export class WorldSession {
     private finishPlayer(playerId: string, result: RaidResultMessage['result']): RaidResultMessage {
         const player = this.players.get(playerId);
         const extractionTownId = this.resolveExtractionTownId(player);
+        const finalResult = result === 'SURVIVED' && !this.isValidExtractionTown(player, extractionTownId) ? 'LEFT' : result;
         const message: RaidResultMessage = {
             type: 'RAID_RESULT',
             playerId,
-            result,
+            result: finalResult,
             elapsedSeconds: player?.elapsedSeconds ?? 0,
             kills: player?.kills ?? 0,
             departureTownId: player?.departureTownId ?? 'central_castle',
             extractionTownId,
             completedDungeonIds: player ? [...player.completedDungeonIds] : [],
         };
-        this.log(`raid result player=${playerId} result=${result} kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
+        this.log(`raid result player=${playerId} result=${finalResult} kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
         if (player) {
-            const survived = result === 'SURVIVED';
+            const survived = finalResult === 'SURVIVED';
             this.captureFinalSavePatch(player, survived ? extractionTownId : undefined, survived);
             this.markSaveDirty(playerId);
         }
@@ -1379,6 +1380,24 @@ export class WorldSession {
         if (!actor) return player.departureTownId;
         const town = this.worldMap.getTownAtTile(actor.tile.x, actor.tile.y);
         return town?.id ?? player.departureTownId;
+    }
+
+    private resolveRequestedRaidResult(
+        playerId: string,
+        reason: Extract<WorldClientMessage, { type: 'WORLD_LEAVE' }>['reason']
+    ): RaidResultMessage['result'] {
+        if (reason === 'wipe') return 'DEAD';
+        if (reason !== 'town') return 'LEFT';
+        const player = this.players.get(playerId);
+        return this.isValidExtractionTown(player, this.resolveExtractionTownId(player)) ? 'SURVIVED' : 'LEFT';
+    }
+
+    private isValidExtractionTown(player: ServerPlayer | undefined, extractionTownId: string): boolean {
+        if (!player) return false;
+        if (extractionTownId === player.departureTownId) return false;
+        const actor = player.actorIds.map((id) => this.actors.get(id)).find(Boolean);
+        if (!actor) return false;
+        return this.worldMap.getTownAtTile(actor.tile.x, actor.tile.y)?.id === extractionTownId;
     }
 
     private getTargetableActors(entry?: ServerEnemy): ServerActor[] {

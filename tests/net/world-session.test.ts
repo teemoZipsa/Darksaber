@@ -92,6 +92,50 @@ test('join spawns each player at their origin hub external exit tile', () => {
     assert.deepEqual(forestActor?.tile, forestExit);
 });
 
+test('server town leave only survives at a non-departure town', () => {
+    const world = new WorldMap();
+    const central = world.getTowns().find((town) => town.id === 'central_castle');
+    const forest = world.getTowns().find((town) => town.id === 'w_forest_village');
+    assert.ok(central);
+    assert.ok(forest);
+    const cases = [
+        {
+            id: 'same-town',
+            tile: world.getTownSpawnTile(central),
+            expectedResult: 'LEFT',
+            expectedExtraction: 'central_castle',
+        },
+        {
+            id: 'outside-town',
+            tile: world.getTownExitTile(central),
+            expectedResult: 'LEFT',
+            expectedExtraction: 'central_castle',
+        },
+        {
+            id: 'other-town',
+            tile: world.getTownSpawnTile(forest),
+            expectedResult: 'SURVIVED',
+            expectedExtraction: 'w_forest_village',
+        },
+    ] as const;
+
+    for (const entry of cases) {
+        const session = new WorldSession();
+        const joined = session.join(joinMessage('central_castle', `hero-${entry.id}`), 0);
+        const internals = session as any;
+        const serverActor = [...internals.actors.values()].find((actorEntry: any) => actorEntry.ownerPlayerId === joined.playerId);
+        assert.ok(serverActor, `${entry.id} actor`);
+        serverActor.tile = { ...entry.tile };
+
+        const leave = session.handleMessage(joined.playerId, { type: 'WORLD_LEAVE', reason: 'town' }, 1_000);
+        const result = leave.replies[0];
+        assert.equal(result?.type, 'RAID_RESULT', `${entry.id} result type`);
+        if (result?.type !== 'RAID_RESULT') continue;
+        assert.equal(result.result, entry.expectedResult, `${entry.id} result`);
+        assert.equal(result.extractionTownId, entry.expectedExtraction, `${entry.id} extraction`);
+    }
+});
+
 test('default character saves start with the shared no-shield basic kit', () => {
     const save = createDefaultCharacterSave(authCharacter('starter'));
     const equipment = save.equipment as Record<string, { itemId?: string }>;
@@ -833,8 +877,12 @@ test('server late story boss clears secure original EVENT 99 rewards only after 
             `episode ${episode} dirty patch excludes raid quest completion`
         );
 
+        const extractionTown = world.getTowns().find((town) => town.id === 'w_forest_village');
+        assert.ok(extractionTown, `episode ${episode} extraction town`);
+        serverActor.tile = world.getTownSpawnTile(extractionTown);
         const leave = session.handleMessage(joined.playerId, { type: 'WORLD_LEAVE', reason: 'town' }, 3_000 + episode);
         assert.equal(leave.replies[0]?.type, 'RAID_RESULT', `episode ${episode} raid result`);
+        assert.equal(leave.replies[0]?.type === 'RAID_RESULT' ? leave.replies[0].result : '', 'SURVIVED', `episode ${episode} survived result`);
         const finalPatch = session.createCharacterSavePatch(joined.playerId);
         assert.ok(finalPatch?.inventory, `episode ${episode} final patch`);
         const finalQuestState = finalPatch.questState;
