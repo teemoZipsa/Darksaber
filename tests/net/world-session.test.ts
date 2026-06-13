@@ -1140,20 +1140,18 @@ test('cleared field nests respawn after five minutes away from active actors', (
     const stateChunkX = Math.floor(state.centerTile.x / CHUNK_SIZE);
     const stateChunkY = Math.floor(state.centerTile.y / CHUNK_SIZE);
     let outsideSafeTile: { x: number; y: number } | null = null;
-    for (let distance = ENEMY_AGGRO_RANGE + 1; distance < CHUNK_SIZE * 2 && !outsideSafeTile; distance++) {
-        for (let dy = -distance; dy <= distance && !outsideSafeTile; dy++) {
-            const dxAbs = distance - Math.abs(dy);
-            for (const dx of dxAbs === 0 ? [0] : [-dxAbs, dxAbs]) {
-                const tile = { x: state.centerTile.x + dx, y: state.centerTile.y + dy };
-                if (Math.abs(Math.floor(tile.x / CHUNK_SIZE) - stateChunkX) > 2) continue;
-                if (Math.abs(Math.floor(tile.y / CHUNK_SIZE) - stateChunkY) > 2) continue;
-                if (!internals.worldMap.isWalkable(tile.x, tile.y)) continue;
-                outsideSafeTile = tile;
-                break;
-            }
+    const chunkMinX = stateChunkX * CHUNK_SIZE;
+    const chunkMinY = stateChunkY * CHUNK_SIZE;
+    for (let y = chunkMinY; y < chunkMinY + CHUNK_SIZE && !outsideSafeTile; y++) {
+        for (let x = chunkMinX; x < chunkMinX + CHUNK_SIZE; x++) {
+            const distance = Math.abs(x - state.centerTile.x) + Math.abs(y - state.centerTile.y);
+            if (distance <= ENEMY_AGGRO_RANGE) continue;
+            if (!internals.worldMap.isWalkable(x, y)) continue;
+            outsideSafeTile = { x, y };
+            break;
         }
     }
-    assert.ok(outsideSafeTile, 'test fixture should find a nearby tile outside the nest spawn safety radius');
+    assert.ok(outsideSafeTile, 'test fixture should find a same-chunk tile outside the nest spawn safety radius');
     serverActor.tile = outsideSafeTile;
     session.tick(respawnAt + 1_001);
     assert.ok(state.monsterIds.length > 0, 'nest should respawn once the timer passed and actors are outside the spawn safety radius');

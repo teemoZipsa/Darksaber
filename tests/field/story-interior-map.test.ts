@@ -18,6 +18,7 @@ import {
     getOriginalLateStoryFact,
     getOriginalLateStoryGuardTiles,
 } from '../../src/data/OriginalLateStoryFacts';
+import { getOriginalLateStoryItemsForSourceEvent } from '../../src/data/OriginalLateStoryItems';
 import { getOriginalLateStoryMrcFact, getOriginalLateStoryMrcVisualSymbol } from '../../src/data/OriginalLateStoryMapFacts';
 import { i18n } from '../../src/i18n/LanguageManager';
 import { TileType } from '../../src/map/Tile';
@@ -1292,12 +1293,19 @@ test('episodes 23 through 31 use original late interior routes and events', () =
             return reward.originalItemId;
         });
         assert.deepEqual(actualOriginalItemIds, expectedCaches.map((event) => event.originalItemId));
-        if (episode === 23 || episode === 24) {
-            assert.equal(sequence.bossDefeatEvent?.originalEventId, 'EVENT 99');
-            assert.equal(sequence.bossDefeatEvent?.rewards?.[0]?.type, 'item');
-            assert.equal(sequence.bossDefeatEvent?.rewards?.[0]?.originalItemId, episode === 23 ? 984 : 976);
+        assert.equal(sequence.bossDefeatEvent?.originalSource, `${fact.setArc}:${fact.eventMember}`);
+        assert.equal(sequence.bossDefeatEvent?.originalEventId, 'EVENT 99');
+        assert.equal(sequence.bossDefeatEvent?.runtimeFlag, `${fact.dungeonId}_objective_complete`);
+        assert.match(sequence.bossDefeatEvent?.trigger ?? '', /CHARDEAD 700/);
+        assert.match(sequence.bossDefeatEvent?.trigger ?? '', /SCENECLEAR/);
+        const expectedBossClearItems = getOriginalLateStoryItemsForSourceEvent(episode, 99);
+        if (expectedBossClearItems.length > 0) {
+            assert.deepEqual(
+                sequence.bossDefeatEvent?.rewards?.map((reward) => reward.type === 'item' ? reward.originalItemId : null),
+                expectedBossClearItems.map((item) => item.originalItemId)
+            );
         } else {
-            assert.equal(sequence.bossDefeatEvent, undefined);
+            assert.equal(sequence.bossDefeatEvent?.rewards, undefined);
         }
         assert.ok(sequence.fieldEvents.every((event) => event.originalSource === `${fact.setArc}:${fact.eventMember}`));
         for (const event of sequence.fieldEvents) {

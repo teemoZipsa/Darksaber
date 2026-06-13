@@ -214,14 +214,21 @@ function lateScenarioSequence(input: {
         { kind: 'combatStart', labelKey: `story.event.ep${ep}.combatStart`, focus: input.bossTile, durationMs: LATE_STORY_STEP_DURATION_MS.combatStart },
     ];
     const bossClearItems = getOriginalLateStoryItemsForSourceEvent(input.episode, 99);
-    const bossDefeatEvent: StoryScenarioBossDefeatEvent | undefined = bossClearItems.length > 0 ? {
+    const bossClearTriggerParts = [
+        'ALL CHARDEAD 700',
+        ...bossClearItems.map((item) => `GETITEM ${item.originalItemId}`),
+        'SCENECLEAR',
+    ];
+    const bossDefeatEvent: StoryScenarioBossDefeatEvent = {
         id: `${input.dungeonId}_boss_clear_99`,
         originalSource: `MAP/${ep}set.arc:${ep}.evt`,
         originalEventId: 'EVENT 99',
-        trigger: `ALL CHARDEAD 700 ${bossClearItems.map((item) => `GETITEM ${item.originalItemId}`).join(' ')} SCENECLEAR`,
+        trigger: bossClearTriggerParts.join(' '),
         runtimeFlag: objectiveRuntimeFlag,
-        rewards: bossClearItems.map((item) => ({ type: 'item' as const, itemId: item.currentItemId, originalItemId: item.originalItemId })),
-    } : undefined;
+        ...(bossClearItems.length > 0
+            ? { rewards: bossClearItems.map((item) => ({ type: 'item' as const, itemId: item.currentItemId, originalItemId: item.originalItemId })) }
+            : {}),
+    };
 
     return {
         dungeonId: input.dungeonId,
