@@ -32,7 +32,12 @@ import {
 import { getStoryQuestByDungeonId } from '../src/data/StoryQuestData';
 import { getStoryScenarioByDungeonId, type StoryScenarioDefinition, type StoryScenarioMissionKind } from '../src/data/StoryScenarioData';
 import { getStoryScenarioMonsterLayout } from '../src/data/StoryScenarioMonsterData';
-import { getStoryScenarioEventSequence, type StoryScenarioFieldEvent } from '../src/data/StoryScenarioEventData';
+import {
+    getStoryScenarioEventSequence,
+    type StoryScenarioEnemyDefeatEvent,
+    type StoryScenarioEventStep,
+    type StoryScenarioFieldEvent,
+} from '../src/data/StoryScenarioEventData';
 import {
     getStoryScenarioFieldEventFlag,
     getStoryScenarioFieldEventScope,
@@ -100,6 +105,7 @@ import {
     type LootSnapshot,
     type NetFacing,
     type RaidResultMessage,
+    type ScenarioEnemyDefeatEventMessage,
     type ScenarioFieldEventResultMessage,
     type ScenarioFieldEventRewardResult,
     type WorldClientMessage,
@@ -190,6 +196,11 @@ interface ServerScenarioState {
     enemyIds: string[];
     objectiveEnemyId: string | null;
     completed: boolean;
+}
+
+interface CompleteEnemyKillResult {
+    autoLootGrant?: AutoLootGrantMessage;
+    scenarioEnemyDefeatEvent?: ScenarioEnemyDefeatEventMessage;
 }
 
 export interface WorldSessionTickResult {
@@ -758,9 +769,12 @@ export class WorldSession {
 
         this.spendActorGauge(actor, ATTACK_AP_COST);
         actor.facing = directionFromTo(actor.tile, targetTile);
-        const { event, autoLootGrant } = this.resolveActorAttack(actor, target, now);
+        const { event, autoLootGrant, scenarioEnemyDefeatEvent } = this.resolveActorAttack(actor, target, now);
         this.finishActorIfSpent(actor);
-        return { replies: autoLootGrant ? [autoLootGrant] : [], broadcasts: [event] };
+        const replies: WorldServerMessage[] = [];
+        if (autoLootGrant) replies.push(autoLootGrant);
+        if (scenarioEnemyDefeatEvent) replies.push(scenarioEnemyDefeatEvent);
+        return { replies, broadcasts: [event] };
     }
 
     private handleUseItemIntent(player: ServerPlayer, actor: ServerActor, intentId: string, payload: unknown): WorldSessionMessageResult {
@@ -1133,8 +1147,9 @@ export class WorldSession {
             }
             if (dead) {
                 broadcasts.push(createEnemyEvent('kill', actor, enemy, guarded.damage));
-                const autoLootGrant = this.completeEnemyKill(actor, target, now);
-                if (autoLootGrant) replies.push(autoLootGrant);
+                const killResult = this.completeEnemyKill(actor, target, now);
+                if (killResult.autoLootGrant) replies.push(killResult.autoLootGrant);
+                if (killResult.scenarioEnemyDefeatEvent) replies.push(killResult.scenarioEnemyDefeatEvent);
             } else if (guarded.damage > 0 || (!enemyResult.statusEffects && enemyResult.mpDamage === undefined)) {
                 broadcasts.push(createEnemyEvent('damage', actor, enemy, guarded.damage));
             }
@@ -1144,7 +1159,11 @@ export class WorldSession {
         return { replies, broadcasts };
     }
 
-    private resolveActorAttack(actor: ServerActor, target: ServerEnemy, now: number): { event: CombatEventMessage; autoLootGrant?: AutoLootGrantMessage } {
+    private resolveActorAttack(
+        actor: ServerActor,
+        target: ServerEnemy,
+        now: number
+    ): { event: CombatEventMessage; autoLootGrant?: AutoLootGrantMessage; scenarioEnemyDefeatEvent?: ScenarioEnemyDefeatEventMessage } {
         const enemy = target.enemy;
         const result = CombatFormulas.calcPhysicalDamage(
             getEffectiveStats(actor.stats, actor.statuses),
@@ -1162,6 +1181,7 @@ export class WorldSession {
             value: result.damage,
         };
         let autoLootGrant: AutoLootGrantMessage | undefined;
+        let scenarioEnemyDefeatEvent: ScenarioEnemyDefeatEventMessage | undefined;
         if (!result.isMiss) {
             const guarded = applyGuardToDamage(enemy.statuses, result.damage);
             enemy.statuses = guarded.statuses;
@@ -1169,14 +1189,17 @@ export class WorldSession {
             event.value = guarded.damage;
             if (enemy.stats.hp <= 0) {
                 event.kind = 'kill';
-                autoLootGrant = this.completeEnemyKill(actor, target, now);
+                const killResult = this.completeEnemyKill(actor, target, now);
+                autoLootGrant = killResult.autoLootGrant;
+                scenarioEnemyDefeatEvent = killResult.scenarioEnemyDefeatEvent;
             }
         }
-        return { event, autoLootGrant };
+        return { event, autoLootGrant, scenarioEnemyDefeatEvent };
     }
 
-    private completeEnemyKill(actor: ServerActor, target: ServerEnemy, now: number): AutoLootGrantMessage | undefined {
+    private completeEnemyKill(actor: ServerActor, target: ServerEnemy, now: number): CompleteEnemyKillResult {
         const enemy = target.enemy;
+        const scenarioEnemyDefeatEvent = this.createScenarioEnemyDefeatEventMessage(target);
         const scenarioState = target.scenarioPlayerId ? this.scenarioStates.get(target.scenarioPlayerId) : undefined;
         const scenarioBossLootTile = target.scenarioObjective && scenarioState?.returnTile
             ? { ...scenarioState.returnTile }
@@ -1190,7 +1213,7 @@ export class WorldSession {
             ? undefined
             : this.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
         if (enemy.isBoss || !autoLootGrant) this.spawnEnemyLoot(enemy, scenarioBossLootTile ?? undefined);
-        return autoLootGrant;
+        return { autoLootGrant, scenarioEnemyDefeatEvent };
     }
 
     private resolveEnemyTurn(entry: ServerEnemy, now: number): CombatEventMessage[] {
@@ -1635,6 +1658,35 @@ export class WorldSession {
         });
         input.state.enemyIds.push(id);
         return id;
+    }
+
+    private createScenarioEnemyDefeatEventMessage(target: ServerEnemy): ScenarioEnemyDefeatEventMessage | undefined {
+        if (target.scenarioObjective || !target.scenarioPlayerId || !target.scenarioDungeonId) return undefined;
+        const event = this.getScenarioEnemyDefeatEvent(target);
+        if (!event) return undefined;
+        const focus = { x: target.enemy.gridX, y: target.enemy.gridY };
+        return {
+            type: 'SCENARIO_ENEMY_DEFEAT_EVENT',
+            dungeonId: target.scenarioDungeonId,
+            enemyId: target.enemy.id,
+            eventId: event.id,
+            presentationSteps: event.steps.map((step) => this.withScenarioEnemyDefeatFocus(step, focus)),
+        };
+    }
+
+    private getScenarioEnemyDefeatEvent(target: ServerEnemy): StoryScenarioEnemyDefeatEvent | undefined {
+        if (!target.scenarioPlayerId || !target.scenarioDungeonId) return undefined;
+        const state = this.scenarioStates.get(target.scenarioPlayerId);
+        if (!state || state.dungeonId !== target.scenarioDungeonId) return undefined;
+        const scenarioEnemyIndex = state.enemyIds.indexOf(target.enemy.id);
+        if (scenarioEnemyIndex < 0) return undefined;
+        return getStoryScenarioEventSequence(target.scenarioDungeonId)?.enemyDefeatEvents
+            ?.find((event) => event.scenarioEnemyIndex === scenarioEnemyIndex);
+    }
+
+    private withScenarioEnemyDefeatFocus(step: StoryScenarioEventStep, focus: TilePoint): StoryScenarioEventStep {
+        if (step.kind === 'focus') return { ...step, target: { ...focus } };
+        return { ...step, focus: { ...focus } };
     }
 
     private markScenarioEnemyKilled(target: ServerEnemy, enemyId: string): void {

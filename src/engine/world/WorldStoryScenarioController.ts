@@ -26,6 +26,7 @@ import { manhattan, type TilePoint } from '../../field/FieldPathing';
 import { StoryInteriorMap } from '../../map/StoryInteriorMap';
 import type { WorldDungeonInfo, WorldMap } from '../../map/WorldMap';
 import type {
+    ScenarioEnemyDefeatEventMessage,
     ScenarioFieldEventBroadcastMessage,
     ScenarioFieldEventResultMessage,
     ScenarioFieldEventRewardResult,
@@ -517,6 +518,10 @@ export class WorldStoryScenarioController {
         if (this.isFieldEventCompleted(message.dungeonId, event)) return;
         this.markNetworkFieldEventComplete(message.dungeonId, message.eventId, message.flag);
         this.enqueueStoryScenarioPresentation(this.getFieldEventPresentationSteps(message.dungeonId, event, message.presentationSteps));
+    }
+
+    public applyNetworkScenarioEnemyDefeatEvent(message: ScenarioEnemyDefeatEventMessage): void {
+        this.enqueueStoryScenarioPresentation(message.presentationSteps);
     }
 
     public handleNetworkActionRejected(intentId: string, reason: string): boolean {

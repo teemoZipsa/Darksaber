@@ -13,6 +13,7 @@ import {
     type MarketSnapshotMessage,
     type PlayerIntentKind,
     type RaidResultMessage,
+    type ScenarioEnemyDefeatEventMessage,
     type ScenarioFieldEventBroadcastMessage,
     type ScenarioFieldEventResultMessage,
     type WorldRealmId,
@@ -47,6 +48,7 @@ export interface NetworkRaidClientOptions {
     onInventoryConsumed?: (message: InventoryConsumedMessage) => void;
     onScenarioFieldEventResult?: (message: ScenarioFieldEventResultMessage) => void;
     onScenarioFieldEventBroadcast?: (message: ScenarioFieldEventBroadcastMessage) => void;
+    onScenarioEnemyDefeatEvent?: (message: ScenarioEnemyDefeatEventMessage) => void;
     onRaidResult?: (result: RaidResultMessage) => void;
     onMarketSnapshot?: (message: MarketSnapshotMessage) => void;
     onMarketRecordAck?: (message: MarketRecordAckMessage) => void;
@@ -355,6 +357,13 @@ export class NetworkRaidClient {
                 }
                 this.options.onScenarioFieldEventBroadcast?.(message);
                 break;
+            case 'SCENARIO_ENEMY_DEFEAT_EVENT':
+                if (!isScenarioEnemyDefeatEventMessage(message)) {
+                    this.reportBadMessage('Malformed SCENARIO_ENEMY_DEFEAT_EVENT message.');
+                    return;
+                }
+                this.options.onScenarioEnemyDefeatEvent?.(message);
+                break;
             case 'RAID_RESULT':
                 if (!isRaidResultMessage(message)) {
                     this.reportBadMessage('Malformed RAID_RESULT message.');
@@ -607,5 +616,14 @@ function isScenarioFieldEventBroadcastMessage(message: unknown): message is Scen
         && typeof message.eventId === 'string'
         && message.scope === 'shared'
         && typeof message.flag === 'string'
+        && Array.isArray(message.presentationSteps);
+}
+
+function isScenarioEnemyDefeatEventMessage(message: unknown): message is ScenarioEnemyDefeatEventMessage {
+    if (!isRecord(message)) return false;
+    return message.type === 'SCENARIO_ENEMY_DEFEAT_EVENT'
+        && typeof message.dungeonId === 'string'
+        && typeof message.enemyId === 'string'
+        && typeof message.eventId === 'string'
         && Array.isArray(message.presentationSteps);
 }

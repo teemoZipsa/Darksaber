@@ -913,6 +913,66 @@ test('server-authoritative field scenario events reject invalid actors and dista
     assert.match(distant.replies[0]?.type === 'ACTION_REJECTED' ? distant.replies[0].reason : '', /too far/);
 });
 
+test('server field scenario enemy deaths return original CHARDEAD presentation steps', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const completedQuestIds = STORY_SCENARIOS
+        .filter((scenario) => scenario.episode < 12)
+        .map((scenario) => scenario.questId);
+    const joined = session.join({
+        ...joinMessage('central_castle', 'hero-a'),
+        completedQuestIds,
+        partyComposition: [actor('hero-a', {
+            stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === 'pyramid_front');
+    assert.ok(serverActor);
+    assert.ok(dungeon);
+    serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+    session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-pyramid-front',
+        actorId: serverActor.id,
+        dungeonId: 'pyramid_front',
+    }, 1_000);
+
+    const state = internals.scenarioStates.get(joined.playerId);
+    assert.ok(state);
+    const guard = internals.enemies.get(state.enemyIds[0]);
+    assert.ok(guard);
+    guard.enemy.stats.hp = 1;
+    guard.enemy.stats.def = 0;
+    guard.enemy.stats.spd = 0;
+    serverActor.actionGauge = 100;
+    serverActor.remainingAp = 80;
+    serverActor.tile = { x: guard.enemy.gridX - 1, y: guard.enemy.gridY };
+
+    const result = withFixedRandom(0, () => session.handleMessage(joined.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'kill-pyramid-front-guard',
+        actorId: serverActor.id,
+        kind: 'attack',
+        payload: { targetId: guard.enemy.id },
+    }, 1_100));
+
+    const deathEvent = result.replies.find((message) => message.type === 'SCENARIO_ENEMY_DEFEAT_EVENT');
+    assert.equal(deathEvent?.type, 'SCENARIO_ENEMY_DEFEAT_EVENT');
+    assert.equal(deathEvent.dungeonId, 'pyramid_front');
+    assert.equal(deathEvent.enemyId, guard.enemy.id);
+    assert.equal(deathEvent.eventId, 'pyramid_front_enemy_defeat_400');
+    assert.deepEqual(deathEvent.presentationSteps.map((step) => step.kind === 'dialogue' ? step.textKey : ''), [
+        'story.event.ep12.enemyDefeat.400',
+    ]);
+    assert.deepEqual(deathEvent.presentationSteps[0]?.kind === 'dialogue' ? deathEvent.presentationSteps[0].focus : null, {
+        x: guard.enemy.gridX,
+        y: guard.enemy.gridY,
+    });
+});
+
 test('shared field scenario event flags are included for late join snapshots', () => {
     const session = new WorldSession();
     const world = new WorldMap();

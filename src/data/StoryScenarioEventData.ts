@@ -85,6 +85,8 @@ export interface StoryScenarioEnemyDefeatEvent {
     originalEventId: string;
     trigger: string;
     enemyId: string;
+    scenarioEnemyIndex?: number;
+    originalCharId?: number;
     steps: StoryScenarioEventStep[];
 }
 
@@ -1764,6 +1766,88 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 runtimeFlag: 'pyramid_front_trap_57',
                 markerLabelKey: 'story.event.ep12.trap.marker',
                 steps: [{ kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep12.trap.57', focus: { x: 24, y: 8 } }],
+            },
+        ],
+        enemyDefeatEvents: [
+            {
+                id: 'pyramid_front_enemy_defeat_400',
+                originalSource: 'MAP/12set.arc:12.evt',
+                originalEventId: 'EVENT 1',
+                trigger: 'CHARDEAD 400',
+                enemyId: 'scenario:pyramid_front:guard_0',
+                scenarioEnemyIndex: 0,
+                originalCharId: 400,
+                steps: [{ kind: 'dialogue', speakerId: 'pyramidFrontGuard', speakerNameKey: 'story.event.speaker.pyramidFrontGuard', textKey: 'story.event.ep12.enemyDefeat.400', focus: { x: 15, y: 26 } }],
+            },
+            {
+                id: 'pyramid_front_enemy_defeat_410',
+                originalSource: 'MAP/12set.arc:12.evt',
+                originalEventId: 'EVENT 2',
+                trigger: 'CHARDEAD 410',
+                enemyId: 'scenario:pyramid_front:guard_1',
+                scenarioEnemyIndex: 1,
+                originalCharId: 410,
+                steps: [{ kind: 'dialogue', speakerId: 'pyramidFrontGuard', speakerNameKey: 'story.event.speaker.pyramidFrontGuard', textKey: 'story.event.ep12.enemyDefeat.410', focus: { x: 10, y: 26 } }],
+            },
+            {
+                id: 'pyramid_front_enemy_defeat_440',
+                originalSource: 'MAP/12set.arc:12.evt',
+                originalEventId: 'EVENT 5',
+                trigger: 'CHARDEAD 440',
+                enemyId: 'scenario:pyramid_front:guard_2',
+                scenarioEnemyIndex: 2,
+                originalCharId: 440,
+                steps: [{ kind: 'dialogue', speakerId: 'pyramidFrontGuard', speakerNameKey: 'story.event.speaker.pyramidFrontGuard', textKey: 'story.event.ep12.enemyDefeat.440', focus: { x: 30, y: 26 } }],
+            },
+            {
+                id: 'pyramid_front_enemy_defeat_450',
+                originalSource: 'MAP/12set.arc:12.evt',
+                originalEventId: 'EVENT 6',
+                trigger: 'CHARDEAD 450',
+                enemyId: 'scenario:pyramid_front:guard_3',
+                scenarioEnemyIndex: 3,
+                originalCharId: 450,
+                steps: [{ kind: 'dialogue', speakerId: 'pyramidFrontGuard', speakerNameKey: 'story.event.speaker.pyramidFrontGuard', textKey: 'story.event.ep12.enemyDefeat.450', focus: { x: 25, y: 26 } }],
+            },
+            {
+                id: 'pyramid_front_enemy_defeat_500',
+                originalSource: 'MAP/12set.arc:12.evt',
+                originalEventId: 'EVENT 7',
+                trigger: 'CHARDEAD 500',
+                enemyId: 'scenario:pyramid_front:guard_4',
+                scenarioEnemyIndex: 4,
+                originalCharId: 500,
+                steps: [{ kind: 'dialogue', speakerId: 'pyramidFrontGuard', speakerNameKey: 'story.event.speaker.pyramidFrontGuard', textKey: 'story.event.ep12.enemyDefeat.500', focus: { x: 15, y: 19 } }],
+            },
+            {
+                id: 'pyramid_front_enemy_defeat_510',
+                originalSource: 'MAP/12set.arc:12.evt',
+                originalEventId: 'EVENT 8',
+                trigger: 'CHARDEAD 510',
+                enemyId: 'scenario:pyramid_front:guard_5',
+                scenarioEnemyIndex: 5,
+                originalCharId: 510,
+                steps: [{ kind: 'dialogue', speakerId: 'pyramidFrontGuard', speakerNameKey: 'story.event.speaker.pyramidFrontGuard', textKey: 'story.event.ep12.enemyDefeat.510', focus: { x: 10, y: 19 } }],
+            },
+            {
+                id: 'pyramid_front_enemy_defeat_530',
+                originalSource: 'MAP/12set.arc:12.evt',
+                originalEventId: 'EVENT 10',
+                trigger: 'CHARDEAD 530',
+                enemyId: 'scenario:pyramid_front:guard_6',
+                scenarioEnemyIndex: 6,
+                originalCharId: 530,
+                steps: [{ kind: 'dialogue', speakerId: 'pyramidFrontGuard', speakerNameKey: 'story.event.speaker.pyramidFrontGuard', textKey: 'story.event.ep12.enemyDefeat.530', focus: { x: 36, y: 19 } }],
+            },
+            {
+                id: 'pyramid_front_enemy_defeat_540',
+                originalSource: 'MAP/12set.arc:12.evt',
+                originalEventId: 'EVENT 11',
+                trigger: 'CHARDEAD 540',
+                enemyId: 'scenario:pyramid_front:guard_7',
+                scenarioEnemyIndex: 7,
+                originalCharId: 540,
+                steps: [{ kind: 'dialogue', speakerId: 'pyramidFrontGuard', speakerNameKey: 'story.event.speaker.pyramidFrontGuard', textKey: 'story.event.ep12.enemyDefeat.540', focus: { x: 30, y: 19 } }],
             },
         ],
         bossDefeat: [

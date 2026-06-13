@@ -361,6 +361,14 @@ export interface ScenarioFieldEventBroadcastMessage {
     presentationSteps: StoryScenarioEventStep[];
 }
 
+export interface ScenarioEnemyDefeatEventMessage {
+    type: 'SCENARIO_ENEMY_DEFEAT_EVENT';
+    dungeonId: string;
+    enemyId: string;
+    eventId: string;
+    presentationSteps: StoryScenarioEventStep[];
+}
+
 export interface WorldErrorMessage {
     type: 'ERROR';
     code: string;
@@ -401,6 +409,7 @@ export type WorldServerMessage =
     | CombatEventMessage
     | ScenarioFieldEventResultMessage
     | ScenarioFieldEventBroadcastMessage
+    | ScenarioEnemyDefeatEventMessage
     | RaidResultMessage
     | WorldErrorMessage
     | ServerHeartbeatAckMessage

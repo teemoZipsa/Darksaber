@@ -746,6 +746,24 @@ test('Pyramid Front exposes original episode 12 Mantagoras and trap flow', () =>
     assert.ok(pyramid.fieldEvents.every((event) => event.originalSource === 'MAP/12set.arc:12.evt'));
     assert.ok(pyramid.fieldEvents.every((event) => event.trigger.includes('RANDOM 50')));
     assert.ok(pyramid.fieldEvents.some((event) => event.trigger.includes('MAGIC 1002')));
+    assert.deepEqual(
+        pyramid.enemyDefeatEvents?.map((event) => ({
+            eventId: event.originalEventId,
+            charId: event.originalCharId,
+            index: event.scenarioEnemyIndex,
+            textKey: event.steps[0]?.kind === 'dialogue' ? event.steps[0].textKey : '',
+        })),
+        [
+            { eventId: 'EVENT 1', charId: 400, index: 0, textKey: 'story.event.ep12.enemyDefeat.400' },
+            { eventId: 'EVENT 2', charId: 410, index: 1, textKey: 'story.event.ep12.enemyDefeat.410' },
+            { eventId: 'EVENT 5', charId: 440, index: 2, textKey: 'story.event.ep12.enemyDefeat.440' },
+            { eventId: 'EVENT 6', charId: 450, index: 3, textKey: 'story.event.ep12.enemyDefeat.450' },
+            { eventId: 'EVENT 7', charId: 500, index: 4, textKey: 'story.event.ep12.enemyDefeat.500' },
+            { eventId: 'EVENT 8', charId: 510, index: 5, textKey: 'story.event.ep12.enemyDefeat.510' },
+            { eventId: 'EVENT 10', charId: 530, index: 6, textKey: 'story.event.ep12.enemyDefeat.530' },
+            { eventId: 'EVENT 11', charId: 540, index: 7, textKey: 'story.event.ep12.enemyDefeat.540' },
+        ]
+    );
     assert.equal(pyramid.bossDefeat.filter((step) => step.kind === 'dialogue').length, 7);
     assert.deepEqual(
         pyramid.bossDefeat.filter((step) => step.kind === 'dialogue').map((step) => step.kind === 'dialogue' ? step.textKey : ''),

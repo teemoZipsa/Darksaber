@@ -339,6 +339,7 @@ export class WorldRaidLifecycleController {
             onInventoryConsumed: (message) => this.context.handleNetworkInventoryConsumed(message),
             onScenarioFieldEventResult: (message) => this.context.storyScenarioController.applyNetworkScenarioFieldEventResult(message),
             onScenarioFieldEventBroadcast: (message) => this.context.storyScenarioController.applyNetworkScenarioFieldEventBroadcast(message),
+            onScenarioEnemyDefeatEvent: (message) => this.context.storyScenarioController.applyNetworkScenarioEnemyDefeatEvent(message),
             onRaidResult: (result) => this.handleNetworkRaidResult(result),
             onActionRejected: (rejection) => this.context.handleNetworkActionRejected(rejection),
             onErrorMessage: (error) => this.context.log(formatWorldServerErrorLog(error)),
