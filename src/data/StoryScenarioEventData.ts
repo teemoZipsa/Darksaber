@@ -1767,6 +1767,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             },
         ],
         bossDefeat: [
+            { kind: 'dialogue', speakerId: 'mantagoras', speakerNameKey: 'story.event.speaker.mantagoras', textKey: 'story.event.ep12.bossDefeat.01', focus: { x: 20, y: 5 } },
+            { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep12.bossDefeat.02', focus: { x: 20, y: 8 } },
+            { kind: 'dialogue', speakerId: 'mantagoras', speakerNameKey: 'story.event.speaker.mantagoras', textKey: 'story.event.ep12.bossDefeat.03', focus: { x: 20, y: 5 } },
+            { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep12.bossDefeat.04', focus: { x: 20, y: 8 } },
+            { kind: 'dialogue', speakerId: 'mantagoras', speakerNameKey: 'story.event.speaker.mantagoras', textKey: 'story.event.ep12.bossDefeat.05', focus: { x: 20, y: 5 } },
+            { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep12.bossDefeat.06', focus: { x: 20, y: 8 } },
+            { kind: 'dialogue', speakerId: 'mantagoras', speakerNameKey: 'story.event.speaker.mantagoras', textKey: 'story.event.ep12.bossDefeat.07', focus: { x: 20, y: 5 } },
             { kind: 'objective', labelKey: 'story.event.ep12.tomb.result', focus: { x: 20, y: 5 } },
             { kind: 'objective', labelKey: 'story.event.ep12.objective', focus: { x: 20, y: 25 } },
         ],

@@ -746,7 +746,19 @@ test('Pyramid Front exposes original episode 12 Mantagoras and trap flow', () =>
     assert.ok(pyramid.fieldEvents.every((event) => event.originalSource === 'MAP/12set.arc:12.evt'));
     assert.ok(pyramid.fieldEvents.every((event) => event.trigger.includes('RANDOM 50')));
     assert.ok(pyramid.fieldEvents.some((event) => event.trigger.includes('MAGIC 1002')));
-    assert.equal(pyramid.bossDefeat.filter((step) => step.kind === 'dialogue').length, 0);
+    assert.equal(pyramid.bossDefeat.filter((step) => step.kind === 'dialogue').length, 7);
+    assert.deepEqual(
+        pyramid.bossDefeat.filter((step) => step.kind === 'dialogue').map((step) => step.kind === 'dialogue' ? step.textKey : ''),
+        [
+            'story.event.ep12.bossDefeat.01',
+            'story.event.ep12.bossDefeat.02',
+            'story.event.ep12.bossDefeat.03',
+            'story.event.ep12.bossDefeat.04',
+            'story.event.ep12.bossDefeat.05',
+            'story.event.ep12.bossDefeat.06',
+            'story.event.ep12.bossDefeat.07',
+        ]
+    );
     assert.equal(pyramid.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
 });
 
