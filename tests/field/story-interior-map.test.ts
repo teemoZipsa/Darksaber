@@ -985,13 +985,19 @@ test('Ament 1F exposes original episode 19 Uraeus, ice trap, cache, and shard fl
     assert.deepEqual(ament.fieldEvents.slice(0, 4).map((event) => event.originalEventId), ['EVENT 50', 'EVENT 51', 'EVENT 52', 'EVENT 53']);
     assert.ok(ament.fieldEvents.slice(0, 4).every((event) => event.trigger.includes('MAGIC 0404')));
     assert.deepEqual(ament.fieldEvents.slice(4, 8).map((event) => event.originalEventId), ['EVENT 80', 'EVENT 81', 'EVENT 82', 'EVENT 82']);
-    assert.deepEqual(ament.fieldEvents.filter((event) => event.rewards?.length).map((event) => event.rewards?.[0]), [
+    assert.deepEqual(ament.fieldEvents.slice(4, 8).map((event) => event.rewards?.[0]), [
         { type: 'item', itemId: 'short_bow', originalItemId: 15 },
         { type: 'item', itemId: 'wooden_shield', originalItemId: 110 },
         { type: 'item', itemId: 'magic_t5_body', originalItemId: 854 },
         { type: 'item', itemId: 'web_66_01', originalItemId: 578 },
     ]);
     assert.deepEqual(ament.fieldEvents.slice(8).map((event) => event.originalEventId), ['EVENT 99', 'EVENT 95', 'EVENT 97', 'EVENT 96']);
+    assert.deepEqual(ament.fieldEvents.slice(8).map((event) => event.rewards?.[0]), [
+        { type: 'item', itemId: 'orig_ep19_shard_0386', originalItemId: 386 },
+        { type: 'item', itemId: 'orig_ep19_shard_0387', originalItemId: 387 },
+        { type: 'item', itemId: 'orig_ep19_shard_0388', originalItemId: 388 },
+        { type: 'item', itemId: 'orig_ep19_shard_0389', originalItemId: 389 },
+    ]);
     assert.ok(ament.fieldEvents.slice(8).every((event) => event.runtimeFlag === 'ament_1f_mystic_shard_found'));
     assert.ok(ament.fieldEvents.every((event) => event.originalSource === 'MAP/19set.arc:19.evt'));
     assert.ok(ament.fieldEvents.every((event) => event.triggerTiles.every((tile) => map.isWalkable(tile.x, tile.y))));

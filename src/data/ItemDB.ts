@@ -855,6 +855,54 @@ const RAW_ITEMS: RawItemDef[] = [
         sellable: false,
         itemCategory: 'divine_weapon'
     },
+    {
+        id: 'orig_ep19_shard_0386', name: 'North Mystic Shard', nameKr: '북쪽 신비 조각',
+        slot: 'material', gridW: 1, gridH: 1, color: '#8fc8ff', icon: '◇',
+        maxDurability: 1,
+        description: 'Original Darksaber episode 19 shard reward. Preserves GETITEM 386.',
+        descriptionKr: '원작 다크세이버 19화 조각 보상. GETITEM 386을 보존합니다.',
+        rarity: 'unique',
+        weight: 0.1,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'material'
+    },
+    {
+        id: 'orig_ep19_shard_0387', name: 'South Mystic Shard', nameKr: '남쪽 신비 조각',
+        slot: 'material', gridW: 1, gridH: 1, color: '#8fc8ff', icon: '◇',
+        maxDurability: 1,
+        description: 'Original Darksaber episode 19 shard reward. Preserves GETITEM 387.',
+        descriptionKr: '원작 다크세이버 19화 조각 보상. GETITEM 387을 보존합니다.',
+        rarity: 'unique',
+        weight: 0.1,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'material'
+    },
+    {
+        id: 'orig_ep19_shard_0388', name: 'West Mystic Shard', nameKr: '서쪽 신비 조각',
+        slot: 'material', gridW: 1, gridH: 1, color: '#8fc8ff', icon: '◇',
+        maxDurability: 1,
+        description: 'Original Darksaber episode 19 shard reward. Preserves GETITEM 388.',
+        descriptionKr: '원작 다크세이버 19화 조각 보상. GETITEM 388을 보존합니다.',
+        rarity: 'unique',
+        weight: 0.1,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'material'
+    },
+    {
+        id: 'orig_ep19_shard_0389', name: 'East Mystic Shard', nameKr: '동쪽 신비 조각',
+        slot: 'material', gridW: 1, gridH: 1, color: '#8fc8ff', icon: '◇',
+        maxDurability: 1,
+        description: 'Original Darksaber episode 19 shard reward. Preserves GETITEM 389.',
+        descriptionKr: '원작 다크세이버 19화 조각 보상. GETITEM 389을 보존합니다.',
+        rarity: 'unique',
+        weight: 0.1,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'material'
+    },
 
     // ─── Socket Inserts (Diablo II-style runes and gems) ──────
     ...SOCKET_INSERTS,

@@ -116,6 +116,15 @@ test('shop and original item data expose guarded equipment fields', () => {
     const cainNecklace = getItemDef('quest_cain_necklace');
     assert.ok(cainNecklace);
     assert.equal(getSellPrice(cainNecklace), 0);
+    for (const originalItemId of [386, 387, 388, 389]) {
+        const shard = getItemDef(`orig_ep19_shard_0${originalItemId}`);
+        assert.ok(shard, `missing episode 19 shard ${originalItemId}`);
+        assert.equal(shard.itemCategory, 'material');
+        assert.equal(shard.sellable, false);
+        assert.match(shard.description ?? '', new RegExp(`GETITEM ${originalItemId}`));
+        assert.match(shard.descriptionKr ?? '', new RegExp(`GETITEM ${originalItemId}`));
+        assert.equal(getSellPrice(shard), 0);
+    }
 
     for (const inventory of Object.values(SHOP_INVENTORY_BY_TOWN_FACILITY)) {
         for (const entries of Object.values(inventory)) {
