@@ -611,9 +611,9 @@ test('Zamora chest events grant raid rewards once per chest', () => {
     assert.equal(harness.controller.playFieldEventAt({ x: 11, y: 5 }, { id: 'hero', entity: player } as any), false);
 
     assert.equal(harness.controller.playFieldEvent(ZAMORA_FORTRESS_DUNGEON_ID, 'zamora_item_chest_05'), true);
-    assert.deepEqual(harness.rewardItemIds, ['herb_common']);
+    assert.deepEqual(harness.rewardItemIds, ['orig_story_0300_heal_potion']);
     assert.equal(raidSession.hasScenarioFlag(ZAMORA_FORTRESS_DUNGEON_ID, 'zamora_item_chest_05'), true);
-    assert.ok(harness.logs.includes('흔한 약초을(를) 얻었습니다.'));
+    assert.ok(harness.logs.includes('힐포션을(를) 얻었습니다.'));
     assert.equal(harness.controller.playFieldEvent(ZAMORA_FORTRESS_DUNGEON_ID, 'zamora_item_chest_05'), false);
 });
 
@@ -644,7 +644,7 @@ test('Etna chest events grant original episode 3 raid rewards once per chest', (
     assert.equal(harness.controller.playFieldEventAt({ x: 13, y: 33 }, { id: 'hero', entity: player } as any), false);
 
     assert.equal(harness.controller.playFieldEvent(ETNA_VOLCANO_DUNGEON_ID, 'etna_item_chest_05'), true);
-    assert.deepEqual(harness.rewardItemIds, ['herb_common']);
+    assert.deepEqual(harness.rewardItemIds, ['orig_story_0300_heal_potion']);
     assert.equal(raidSession.hasScenarioFlag(ETNA_VOLCANO_DUNGEON_ID, 'etna_item_chest_05'), true);
     assert.equal(harness.controller.playFieldEvent(ETNA_VOLCANO_DUNGEON_ID, 'etna_item_chest_05'), false);
 });

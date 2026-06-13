@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
 import { getMasterClass, isMasterClassLineId } from '../../src/data/ClassTree';
-import { getItemDef, ITEMS } from '../../src/data/ItemDB';
+import { getCombatRecovery, getItemDef, ITEMS } from '../../src/data/ItemDB';
 import { getOriginalLateStoryCacheEvents } from '../../src/data/OriginalLateStoryFacts';
 import {
     ORIGINAL_LATE_STORY_ITEMS,
@@ -89,6 +89,7 @@ test('class and stat guards reject loose ids and clamp resources', () => {
 
 test('item normalization keeps consumable rarity and generated armor metadata stable', () => {
     assert.equal(getItemDef('herb_cheap')?.rarity, 'common');
+    assert.equal(getItemDef('orig_story_0300_heal_potion')?.rarity, 'uncommon');
     assert.equal(getItemDef('herb_common')?.rarity, 'uncommon');
     assert.equal(getItemDef('mp_potion')?.rarity, 'common');
     assert.equal(getItemDef('battle_t1_head')?.itemCategory, 'armor');
@@ -116,6 +117,14 @@ test('shop and original item data expose guarded equipment fields', () => {
     const cainNecklace = getItemDef('quest_cain_necklace');
     assert.ok(cainNecklace);
     assert.equal(getSellPrice(cainNecklace), 0);
+    const originalHealPotion = getItemDef('orig_story_0300_heal_potion');
+    assert.ok(originalHealPotion);
+    assert.equal(originalHealPotion.nameKr, '힐포션');
+    assert.equal(originalHealPotion.itemCategory, 'consumable');
+    assert.deepEqual(originalHealPotion.iconSprite, { col: 82, row: 0 });
+    assert.deepEqual(getCombatRecovery(originalHealPotion), { hp: 50, mp: 0 });
+    assert.match(originalHealPotion.description ?? '', /GETITEM 300/);
+    assert.match(originalHealPotion.descriptionKr ?? '', /발동마법 3001/);
     const starKnife = getItemDef('orig_story_0008_star_knife');
     assert.ok(starKnife);
     assert.equal(starKnife.itemCategory, 'normal_weapon');

@@ -610,6 +610,21 @@ const RAW_ITEMS: RawItemDef[] = [
         buyPrice: 10
     },
     {
+        id: 'orig_story_0300_heal_potion', name: 'Heal Potion', nameKr: '힐포션',
+        slot: 'consumable', gridW: 1, gridH: 1, color: '#dc5f5f', icon: '+',
+        iconSprite: { col: 82, row: 0 },
+        maxDurability: 1,
+        stats: { hp: 50 },
+        useEffect: { type: 'recover', hp: 50 },
+        description: 'Original Darksaber Heal Potion reward. Preserves GETITEM 300, magic 3001, and original price 500.',
+        descriptionKr: '원작 다크세이버 힐포션 보상. GETITEM 300, 발동마법 3001, 원작 가격 500을 보존합니다.',
+        rarity: 'uncommon',
+        weight: 0.2,
+        baseValue: 50,
+        buyPrice: 50,
+        itemCategory: 'consumable'
+    },
+    {
         id: 'herb_common', name: 'Common Herb', nameKr: '흔한 약초',
         slot: 'consumable', gridW: 1, gridH: 1, color: '#3cb371', icon: '🌿',
         iconSprite: { col: 84, row: 0 },

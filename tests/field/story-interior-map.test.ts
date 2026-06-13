@@ -490,6 +490,7 @@ test('Zamora Fortress exposes original episode 2 entry event flow', () => {
     assert.equal(sequence.fieldEvents.length, 8);
     assert.equal(sequence.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'gold' && reward.amount === 100)).length, 4);
     assert.equal(sequence.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 300)).length, 4);
+    assert.equal(sequence.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.itemId === 'orig_story_0300_heal_potion')).length, 4);
     assert.ok(sequence.fieldEvents.every((event) => event.originalSource === 'MAP/02set.arc:02.evt'));
     assert.ok(sequence.fieldEvents.every((event) => event.markerKind === 'chest'));
     assert.equal(sequence.objectiveRuntimeFlag, 'princess_rescued');
@@ -523,6 +524,7 @@ test('Etna Volcano exposes original episode 3 entry, chest, and Ganomas event fl
     assert.equal(sequence.fieldEvents.length, 8);
     assert.equal(sequence.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'gold' && reward.amount === 100)).length, 4);
     assert.equal(sequence.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 300)).length, 4);
+    assert.equal(sequence.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.itemId === 'orig_story_0300_heal_potion')).length, 4);
     assert.ok(sequence.fieldEvents.every((event) => event.originalSource === 'MAP/03set.arc:03.evt'));
     assert.ok(sequence.fieldEvents.every((event) => event.markerKind === 'chest'));
     assert.ok(sequence.fieldEvents.every((event) => event.triggerTiles.every((tile) => map.isWalkable(tile.x, tile.y))));
@@ -578,6 +580,7 @@ test('episodes 4 through 6 expose original field scenario event flows', () => {
     assert.equal(arcadia.fieldEvents.length, 7);
     assert.equal(arcadia.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'gold' && reward.amount === 100)).length, 4);
     assert.equal(arcadia.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 300)).length, 2);
+    assert.equal(arcadia.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.itemId === 'orig_story_0300_heal_potion')).length, 2);
     assert.ok(arcadia.fieldEvents.some((event) => event.id === 'arcadia_child_rescue'));
     assert.equal(arcadia.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
 
@@ -780,7 +783,7 @@ test('Pyramid Interior exposes original episode 13 Myant, trap, and chest flow',
     assert.deepEqual(pyramid.fieldEvents.slice(8).map((event) => event.rewards?.[0]), [
         { type: 'item', itemId: 'web_65_08', originalItemId: 10 },
         { type: 'item', itemId: 'orig_story_0008_star_knife', originalItemId: 8 },
-        { type: 'item', itemId: 'herb_common', originalItemId: 300 },
+        { type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 },
         { type: 'item', itemId: 'mp_potion', originalItemId: 305 },
     ]);
     assert.ok(pyramid.fieldEvents.slice(8).every((event) => event.markerKind === 'chest'));

@@ -591,7 +591,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 runtimeFlag: 'zamora_item_chest_05',
                 markerLabelKey: 'story.event.ep02.chest.marker',
                 markerKind: 'chest',
-                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                rewards: [{ type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 }],
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep02.chest.opened', focus: { x: 9, y: 7 } }],
             },
             {
@@ -603,7 +603,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 runtimeFlag: 'zamora_item_chest_06',
                 markerLabelKey: 'story.event.ep02.chest.marker',
                 markerKind: 'chest',
-                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                rewards: [{ type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 }],
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep02.chest.opened', focus: { x: 9, y: 13 } }],
             },
             {
@@ -615,7 +615,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 runtimeFlag: 'zamora_item_chest_07',
                 markerLabelKey: 'story.event.ep02.chest.marker',
                 markerKind: 'chest',
-                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                rewards: [{ type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 }],
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep02.chest.opened', focus: { x: 24, y: 8 } }],
             },
             {
@@ -627,7 +627,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 runtimeFlag: 'zamora_item_chest_08',
                 markerLabelKey: 'story.event.ep02.chest.marker',
                 markerKind: 'chest',
-                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                rewards: [{ type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 }],
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep02.chest.opened', focus: { x: 24, y: 12 } }],
             },
         ],
@@ -777,7 +777,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 runtimeFlag: 'etna_item_chest_05',
                 markerLabelKey: 'story.event.ep03.chest.marker',
                 markerKind: 'chest',
-                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                rewards: [{ type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 }],
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep03.chest.opened', focus: { x: 14, y: 29 } }],
             },
             {
@@ -789,7 +789,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 runtimeFlag: 'etna_item_chest_06',
                 markerLabelKey: 'story.event.ep03.chest.marker',
                 markerKind: 'chest',
-                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                rewards: [{ type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 }],
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep03.chest.opened', focus: { x: 16, y: 29 } }],
             },
             {
@@ -801,7 +801,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 runtimeFlag: 'etna_item_chest_07',
                 markerLabelKey: 'story.event.ep03.chest.marker',
                 markerKind: 'chest',
-                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                rewards: [{ type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 }],
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep03.chest.opened', focus: { x: 14, y: 16 } }],
             },
             {
@@ -813,7 +813,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 runtimeFlag: 'etna_item_chest_08',
                 markerLabelKey: 'story.event.ep03.chest.marker',
                 markerKind: 'chest',
-                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                rewards: [{ type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 }],
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep03.chest.opened', focus: { x: 16, y: 16 } }],
             },
         ],
@@ -1014,7 +1014,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 runtimeFlag: 'arcadia_item_chest_05',
                 markerLabelKey: 'story.event.ep04.chest.marker',
                 markerKind: 'chest',
-                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                rewards: [{ type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 }],
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep04.chest.opened', focus: { x: 14, y: 18 } }],
             },
             {
@@ -1026,7 +1026,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 runtimeFlag: 'arcadia_item_chest_06',
                 markerLabelKey: 'story.event.ep04.chest.marker',
                 markerKind: 'chest',
-                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                rewards: [{ type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 }],
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep04.chest.opened', focus: { x: 18, y: 18 } }],
             },
             {
@@ -1932,7 +1932,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 runtimeFlag: 'pyramid_inside_heal_potion_chest',
                 markerLabelKey: 'story.event.ep13.chest.marker',
                 markerKind: 'chest',
-                rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }],
+                rewards: [{ type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 }],
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep13.chest.healPotion', focus: { x: 11, y: 2 } }],
             },
             {
@@ -2319,7 +2319,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { id: 'valhalla_trap_55', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 55', trigger: 'COMMANDER CHARPOS 31 21 / 30 21 RANDOM 50 MAGIC 0803 -1 31 21', triggerTiles: [{ x: 31, y: 21 }, { x: 30, y: 21 }], runtimeFlag: 'valhalla_trap_55', markerLabelKey: 'story.event.ep16.trap.marker', steps: [{ kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep16.trap.55', focus: { x: 31, y: 21 } }] },
             { id: 'valhalla_trap_56', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 56', trigger: 'COMMANDER CHARPOS 23 14 / 24 14 RANDOM 50 MAGIC 1003 -1 23 14', triggerTiles: [{ x: 23, y: 14 }, { x: 24, y: 14 }], runtimeFlag: 'valhalla_trap_56', markerLabelKey: 'story.event.ep16.trap.marker', steps: [{ kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep16.trap.56', focus: { x: 23, y: 14 } }] },
             { id: 'valhalla_trap_57', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 57', trigger: 'COMMANDER CHARPOS 24 8 / 25 8 RANDOM 50 MAGIC 0803 -1 24 8', triggerTiles: [{ x: 24, y: 8 }, { x: 25, y: 8 }], runtimeFlag: 'valhalla_trap_57', markerLabelKey: 'story.event.ep16.trap.marker', steps: [{ kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep16.trap.57', focus: { x: 24, y: 8 } }] },
-            { id: 'valhalla_heal_potion_cache', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 60', trigger: 'COMMANDER CHARPOS 8 28 RANDOM 80 GETITEM 300', triggerTiles: [{ x: 8, y: 28 }], runtimeFlag: 'valhalla_heal_potion_cache', markerLabelKey: 'story.event.ep16.cache.marker', rewards: [{ type: 'item', itemId: 'herb_common', originalItemId: 300 }], steps: [{ kind: 'objective', labelKey: 'story.event.ep16.cache.healPotion', focus: { x: 8, y: 28 } }] },
+            { id: 'valhalla_heal_potion_cache', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 60', trigger: 'COMMANDER CHARPOS 8 28 RANDOM 80 GETITEM 300', triggerTiles: [{ x: 8, y: 28 }], runtimeFlag: 'valhalla_heal_potion_cache', markerLabelKey: 'story.event.ep16.cache.marker', rewards: [{ type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 }], steps: [{ kind: 'objective', labelKey: 'story.event.ep16.cache.healPotion', focus: { x: 8, y: 28 } }] },
             { id: 'valhalla_poison_flower_west', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 61', trigger: 'COMMANDER CHARPOS 5 15 / 6 15 / 5 16 / 6 16 RANDOM 70 MAGIC 1603 -1 6 15', triggerTiles: [{ x: 5, y: 15 }, { x: 6, y: 15 }, { x: 5, y: 16 }, { x: 6, y: 16 }], runtimeFlag: 'valhalla_poison_flower_west', markerLabelKey: 'story.event.ep16.poison.marker', steps: [{ kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep16.poison.61', focus: { x: 6, y: 15 } }] },
             { id: 'valhalla_poison_flower_east', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 62', trigger: 'COMMANDER CHARPOS 32 19 / 33 19 / 32 20 / 33 20 RANDOM 70 MAGIC 1603 -1 33 19', triggerTiles: [{ x: 32, y: 19 }, { x: 33, y: 19 }, { x: 32, y: 20 }, { x: 33, y: 20 }], runtimeFlag: 'valhalla_poison_flower_east', markerLabelKey: 'story.event.ep16.poison.marker', steps: [{ kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep16.poison.62', focus: { x: 33, y: 19 } }] },
             { id: 'valhalla_magic_potion_cache', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 63', trigger: 'COMMANDER CHARPOS 19 35 / 20 35 RANDOM 90 GETITEM 305', triggerTiles: [{ x: 19, y: 35 }, { x: 20, y: 35 }], runtimeFlag: 'valhalla_magic_potion_cache', markerLabelKey: 'story.event.ep16.cache.marker', rewards: [{ type: 'item', itemId: 'mp_potion', originalItemId: 305 }], steps: [{ kind: 'objective', labelKey: 'story.event.ep16.cache.magicPotion', focus: { x: 19, y: 35 } }] },
