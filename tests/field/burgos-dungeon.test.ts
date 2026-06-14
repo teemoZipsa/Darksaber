@@ -1494,6 +1494,50 @@ test('episode 31 network story snapshot starts story bgm once on entry', () => {
     }
 });
 
+test('network late story completion snapshots exit interiors through episode 31', () => {
+    for (let episode = 23; episode <= 31; episode++) {
+        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+        assert.ok(scenario, `missing episode ${episode}`);
+        const player = new Player(0, 0);
+        const raidSession = new WorldRaidSession('central_castle');
+        raidSession.beginRaidFromTown('central_castle');
+        const previousWorldMap = new WorldMap();
+        const harness = createStoryScenarioHarness({
+            player,
+            raidSession,
+            worldMap: previousWorldMap,
+            isNetworkRaid: true,
+        });
+        const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+        assert.ok(quest, `missing episode ${episode} quest`);
+
+        harness.controller.applyNetworkScenarioSnapshot({
+            enteredDungeonIds: [scenario.dungeonId],
+            activeDungeonId: scenario.dungeonId,
+            completedDungeonIds: [],
+        });
+
+        assert.ok(harness.worldMap instanceof StoryInteriorMap, `episode ${episode} entered interior`);
+        assert.equal(raidSession.activeDungeonId, scenario.dungeonId, `episode ${episode} active dungeon`);
+        assert.deepEqual(harness.controller.getActiveInterior()?.layout.bossTile, getOriginalLateStoryBossTile(episode));
+
+        harness.controller.applyNetworkScenarioSnapshot({
+            enteredDungeonIds: [scenario.dungeonId],
+            activeDungeonId: null,
+            completedDungeonIds: [scenario.dungeonId],
+        });
+        drainStoryPresentation(harness.controller);
+
+        assert.equal(harness.worldMap, previousWorldMap, `episode ${episode} restored previous world`);
+        assert.equal(harness.controller.getActiveInterior(), null, `episode ${episode} cleared active interior`);
+        assert.equal(raidSession.activeDungeonId, null, `episode ${episode} cleared active dungeon`);
+        assert.equal(raidSession.isDungeonCleared(scenario.dungeonId), true, `episode ${episode} marked clear`);
+        assert.equal(harness.selectionCleared, true, `episode ${episode} selection cleared`);
+        assert.equal(harness.turnStateCleared, true, `episode ${episode} turn state cleared`);
+        assert.ok(harness.logs.includes(t(quest.objectiveCompleteLogKey)), `episode ${episode} objective log`);
+    }
+});
+
 test('late story presentation steps focus the camera on original event tiles', () => {
     const player = new Player(0, 0);
     const raidSession = new WorldRaidSession('central_castle');
