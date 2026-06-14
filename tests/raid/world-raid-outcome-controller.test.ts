@@ -428,6 +428,45 @@ test('story quest views show objective complete before extraction through episod
     }
 });
 
+test('story objectives 1 through 31 do not grant completion or rewards on raid failure', () => {
+    for (const quest of STORY_QUESTS) {
+        const { controller, playerData, raidSession, getOutcome } = createController();
+        for (const previousQuest of STORY_QUESTS.filter((candidate) => candidate.episode < quest.episode)) {
+            playerData.markCleared(previousQuest.id);
+        }
+
+        raidSession.beginRaidFromTown('central_castle');
+        markStoryObjectiveComplete(raidSession, quest.dungeonId);
+        assert.equal(
+            getStoryQuestViews(playerData, raidSession).find((view) => view.quest.id === quest.id)?.status,
+            'objectiveComplete',
+            `episode ${quest.episode} objective complete before failure`
+        );
+
+        controller.completeFailure('DEAD');
+
+        assert.equal(playerData.isCleared(quest.id), false, `episode ${quest.episode} failed completion`);
+        if (quest.reward.type !== 'none') {
+            assert.equal(isStoryRewardOwned(quest.reward, playerData), false, `episode ${quest.episode} failed reward ownership`);
+        }
+        assert.equal(getOutcome()?.questRewards, undefined, `episode ${quest.episode} failed reward lines`);
+        assert.equal(
+            getStoryQuestViews(playerData, null).find((view) => view.quest.id === quest.id)?.status,
+            'active',
+            `episode ${quest.episode} remains active after failure`
+        );
+
+        const nextQuest = STORY_QUESTS.find((candidate) => candidate.episode === quest.episode + 1);
+        if (nextQuest) {
+            assert.equal(
+                getStoryQuestViews(playerData, null).some((view) => view.quest.id === nextQuest.id),
+                false,
+                `episode ${quest.episode} failure does not unlock episode ${nextQuest.episode}`
+            );
+        }
+    }
+});
+
 test('story objectives 1 through 31 grant quest completion once after survival', () => {
     for (const quest of STORY_QUESTS) {
         const { controller, playerData, raidSession, getOutcome } = createController();
