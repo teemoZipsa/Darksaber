@@ -24,6 +24,7 @@ import {
     getStoryScenarioEventSequence,
     getStoryScenarioPresentationDurationMs,
     type StoryScenarioFieldEvent,
+    type StoryScenarioEventStep,
 } from '../../src/data/StoryScenarioEventData';
 import {
     getStoryScenarioFieldEventFlag,
@@ -154,6 +155,11 @@ function drainStoryPresentation(controller: WorldStoryScenarioController): void 
         controller.updatePresentation(10);
     }
     assert.equal(controller.isPresentationActive(), false);
+}
+
+function getPresentationStepFocus(step: StoryScenarioEventStep): { x: number; y: number } | null {
+    if (step.kind === 'focus') return step.target;
+    return step.focus ?? null;
 }
 
 function installLootController(engine: any, options: {
@@ -1519,7 +1525,9 @@ test('network late story completion snapshots exit interiors through episode 31'
             isNetworkRaid: true,
         });
         const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+        const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
         assert.ok(quest, `missing episode ${episode} quest`);
+        assert.ok(sequence, `missing episode ${episode} sequence`);
 
         harness.controller.applyNetworkScenarioSnapshot({
             enteredDungeonIds: [scenario.dungeonId],
@@ -1531,11 +1539,28 @@ test('network late story completion snapshots exit interiors through episode 31'
         assert.equal(raidSession.activeDungeonId, scenario.dungeonId, `episode ${episode} active dungeon`);
         assert.deepEqual(harness.controller.getActiveInterior()?.layout.bossTile, getOriginalLateStoryBossTile(episode));
 
+        const focusCountBeforeCompletion = harness.cameraFocusTiles.length;
         harness.controller.applyNetworkScenarioSnapshot({
             enteredDungeonIds: [scenario.dungeonId],
             activeDungeonId: null,
             completedDungeonIds: [scenario.dungeonId],
         });
+
+        const expectedCompletionFocus = getPresentationStepFocus(sequence.bossDefeat[0]);
+        assert.equal(
+            harness.controller.getLastPresentationDurationMs(),
+            getStoryScenarioPresentationDurationMs(sequence.bossDefeat),
+            `episode ${episode} boss defeat presentation duration`
+        );
+        assert.equal(harness.controller.isPresentationActive(), true, `episode ${episode} boss defeat presentation active`);
+        assert.ok(harness.cameraFocusTiles.length > focusCountBeforeCompletion, `episode ${episode} completion focus`);
+        if (expectedCompletionFocus) {
+            assert.deepEqual(
+                harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1],
+                expectedCompletionFocus,
+                `episode ${episode} boss defeat first focus`
+            );
+        }
         drainStoryPresentation(harness.controller);
 
         assert.equal(harness.worldMap, previousWorldMap, `episode ${episode} restored previous world`);
