@@ -1027,6 +1027,16 @@ test('server late story interior cache rewards persist only after survival throu
             `episode ${episode} carried cache rewards`
         );
 
+        const completedFlags = sequence.fieldEvents
+            .map((event) => getStoryScenarioFieldEventFlag(event))
+            .sort((left, right) => left.localeCompare(right));
+        const cacheSnapshot = session.createSnapshot(joined.playerId, 2_500 + episode);
+        assert.deepEqual(
+            cacheSnapshot.scenario.playerFieldEventFlagsByDungeonId?.[scenario.dungeonId],
+            completedFlags,
+            `episode ${episode} snapshot cache flags`
+        );
+
         const dirtyPatch = session.createCharacterSavePatch(joined.playerId);
         assert.ok(dirtyPatch?.inventory, `episode ${episode} dirty patch`);
         assert.deepEqual(
