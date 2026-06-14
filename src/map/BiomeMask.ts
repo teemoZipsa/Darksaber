@@ -105,7 +105,9 @@ const LAND_ANCHORS: InfluenceAnchor[] = [
     { cx: 63, cy: 72, radius: 15, weight: 1.0 },
     { cx: 68, cy: 14, radius: 8, weight: 0.68 },
     { cx: 73, cy: 18, radius: 9, weight: 0.72 },
+    { cx: 75, cy: 24, radius: 8, weight: 0.78 },
     { cx: 73, cy: 64, radius: 12, weight: 0.78 },
+    { cx: 76, cy: 72, radius: 9, weight: 0.86 },
 
     // Small islands.
     { cx: 56, cy: 35, radius: 4, weight: 0.8 },
@@ -189,6 +191,8 @@ const SPECIAL_ZONES: SpecialZone[] = [
     { cx: 38, cy: 35, r: 3 },
     { cx: 62, cy: 28, r: 2 },
     { cx: 62, cy: 48, r: 2 },
+    { cx: 74, cy: 66, r: 2 },
+    { cx: 76, cy: 72, r: 3 },
 ];
 
 const MASTER_LAND_ANCHORS: InfluenceAnchor[] = [

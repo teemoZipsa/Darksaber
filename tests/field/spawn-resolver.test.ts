@@ -8,6 +8,7 @@ import {
     pickNestForChunk,
     type SpawnContext,
 } from '../../src/field/SpawnResolver';
+import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import {
     GENERAL_MONSTER_IDS,
     MONSTER_DEFINITIONS,
@@ -15,6 +16,7 @@ import {
     RESERVED_RENDERABLE_MONSTER_IDS,
     type MonsterId,
 } from '../../src/data/MonsterCatalog';
+import { WorldMap } from '../../src/map/WorldMap';
 
 test('catalog level bands are well-formed and contain the base level', () => {
     const fieldPool: MonsterId[] = [...GENERAL_MONSTER_IDS, ...NEW_MONSTER_IDS];
@@ -83,6 +85,32 @@ test('the eastern stone zone yields only the 600-series human elites', () => {
     for (const id of pool) {
         assert.ok(NEW_MONSTER_IDS.includes(id as never) && MONSTER_DEFINITIONS[id].family === 'human',
             `${id} should be a 600-series human elite`);
+    }
+});
+
+test('late story sealed continent keeps episodes 23 through 31 on hostile land', () => {
+    const world = new WorldMap('mortal', { validateTownSpawns: false });
+    const expectedBiomes = new Map<number, string>([
+        [23, 'stone'],
+        [24, 'stone'],
+        [25, 'snow'],
+        [26, 'snow'],
+        [27, 'snow'],
+        [28, 'lava'],
+        [29, 'lava'],
+        [30, 'special'],
+        [31, 'special'],
+    ]);
+
+    for (let episode = 23; episode <= 31; episode++) {
+        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+        assert.ok(scenario, `missing episode ${episode}`);
+        assert.equal(
+            world.getBiomeAtChunk(scenario.chunkX, scenario.chunkY),
+            expectedBiomes.get(episode),
+            `episode ${episode} sealed-continent biome`
+        );
+        assert.equal(getFieldDanger(scenario.chunkX, scenario.chunkY), 20, `episode ${episode} late-story danger`);
     }
 });
 

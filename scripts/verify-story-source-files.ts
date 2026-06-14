@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { AUDIO_CATALOG } from '../src/engine/AudioManager';
+import { getFieldDanger } from '../src/field/SpawnResolver';
 import { getClassLine } from '../src/data/ClassTree';
 import { getItemDef } from '../src/data/ItemDB';
 import { parseOriginalArcArchive } from '../src/data/original/originalArcArchive';
@@ -40,6 +41,17 @@ const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Save
 const DEFAULT_START = 1;
 const DEFAULT_END = 31;
 const RESOLVABLE_PRESENTATION_ACTOR_IDS = new Set(['hero', 'player', 'controlled', 'boss']);
+const LATE_STORY_WORLD_BIOMES = new Map<number, string>([
+    [23, 'stone'],
+    [24, 'stone'],
+    [25, 'snow'],
+    [26, 'snow'],
+    [27, 'snow'],
+    [28, 'lava'],
+    [29, 'lava'],
+    [30, 'special'],
+    [31, 'special'],
+]);
 
 interface Options {
     sourceRoot: string;
@@ -630,6 +642,21 @@ function verifyStoryHmapContract(episode: number, scenario: StoryScenarioDefinit
     }
 }
 
+function verifyLateStoryWorldBiomeContract(episode: number, scenario: StoryScenarioDefinition, worldMap: WorldMap): void {
+    const expectedBiome = LATE_STORY_WORLD_BIOMES.get(episode);
+    if (!expectedBiome) return;
+
+    const biome = worldMap.getBiomeAtChunk(scenario.chunkX, scenario.chunkY);
+    if (biome !== expectedBiome) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} biome mismatch: ${biome} !== ${expectedBiome}`);
+    }
+
+    const danger = getFieldDanger(scenario.chunkX, scenario.chunkY);
+    if (danger !== 20) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} late story danger mismatch: ${danger} !== 20`);
+    }
+}
+
 function getPresentationStepTiles(step: StoryScenarioEventStep): Array<{ label: string; tile: { x: number; y: number } }> {
     if (step.kind === 'focus') return [{ label: 'target', tile: step.target }];
     if (step.kind === 'moveActor') {
@@ -1059,6 +1086,7 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verifyStoryScenarioContentLedger(episode, scenario, contentRows);
     verifyStoryWorldEntrance(episode, scenario, worldMap);
     verifyStoryHmapContract(episode, scenario, worldMap);
+    verifyLateStoryWorldBiomeContract(episode, scenario, worldMap);
     verifyStoryInteriorAccessibilityContract(episode, scenario, sequence);
     verifyLateStoryOriginalMapContract(episode, scenario, sequence);
     verifyFieldScenarioWorldProjection(episode, scenario, sequence, worldMap);
@@ -1096,4 +1124,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, collection chains, quests, quest display text, rewards, event references, scenario ledgers, world entrances, hmaps, interior accessibility, late-story original AI/MRC, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, collection chains, quests, quest display text, rewards, event references, scenario ledgers, world entrances, hmaps, late-story biomes, interior accessibility, late-story original AI/MRC, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
