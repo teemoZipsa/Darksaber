@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { AUDIO_CATALOG } from '../src/engine/AudioManager';
+import { getClassLine } from '../src/data/ClassTree';
+import { getItemDef } from '../src/data/ItemDB';
 import { parseOriginalArcArchive } from '../src/data/original/originalArcArchive';
 import { i18n } from '../src/i18n/LanguageManager';
 import { getBurgosCastleHmapTileAt, BURGOS_CASTLE_HMAP_SIZE } from '../src/map/BurgosCastleHmap';
@@ -23,7 +25,12 @@ import {
     type StoryScenarioEventSequence,
     type StoryScenarioEventStep,
 } from '../src/data/StoryScenarioEventData';
-import { STORY_SCENARIOS, type StoryScenarioDefinition, type StoryScenarioMissionKind } from '../src/data/StoryScenarioData';
+import {
+    STORY_SCENARIOS,
+    type StoryQuestRewardData,
+    type StoryScenarioDefinition,
+    type StoryScenarioMissionKind,
+} from '../src/data/StoryScenarioData';
 
 const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Saver_Files\\Saver';
 const DEFAULT_START = 1;
@@ -49,6 +56,10 @@ interface RoadmapDocRow {
     dungeonId: string;
     treatment: string;
     objective: string;
+}
+
+interface RewardContractState {
+    companionIds: Map<string, string>;
 }
 
 const ROADMAP_TREATMENT_BY_MISSION_KIND: Record<StoryScenarioMissionKind, string> = {
@@ -328,6 +339,48 @@ function verifyStoryQuestDefinition(episode: number, scenario: StoryScenarioDefi
             throw new Error(`Episode ${episode} quest ${key} mismatch: ${quest[key as keyof typeof expectedKeys]} !== ${expectedValue}`);
         }
     }
+}
+
+function verifyStoryRewardContract(
+    episode: number,
+    reward: StoryQuestRewardData,
+    context: string,
+    state: RewardContractState
+): void {
+    if (reward.type === 'none') return;
+
+    if (reward.type === 'bundle') {
+        if (reward.rewards.length === 0) {
+            throw new Error(`Episode ${episode} ${context} reward bundle is empty`);
+        }
+        for (const [index, entry] of reward.rewards.entries()) {
+            verifyStoryRewardContract(episode, entry, `${context} bundle ${index}`, state);
+        }
+        return;
+    }
+
+    if (reward.type === 'questItem' || reward.type === 'inventoryItem') {
+        const itemDef = getItemDef(reward.itemId);
+        if (!itemDef) throw new Error(`Episode ${episode} ${context} missing reward item ${reward.itemId}`);
+        if (!itemDef.name || !itemDef.nameKr) {
+            throw new Error(`Episode ${episode} ${context} reward item ${reward.itemId} has missing display name`);
+        }
+        return;
+    }
+
+    const existingCompanionContext = state.companionIds.get(reward.companionId);
+    if (existingCompanionContext) {
+        throw new Error(`Duplicate story companion reward ${reward.companionId}: ${existingCompanionContext} and ${context}`);
+    }
+    state.companionIds.set(reward.companionId, context);
+
+    if (!getClassLine(reward.classId)) {
+        throw new Error(`Episode ${episode} ${context} missing reward companion class ${reward.classId}`);
+    }
+    const ko = i18n.strings.ko as Record<string, string>;
+    const en = i18n.strings.en as Record<string, string>;
+    if (!ko[reward.nameKey]) throw new Error(`Episode ${episode} ${context} missing ko companion reward key ${reward.nameKey}`);
+    if (!en[reward.nameKey]) throw new Error(`Episode ${episode} ${context} missing en companion reward key ${reward.nameKey}`);
 }
 
 function verifyStoryScenarioContentLedger(episode: number, scenario: StoryScenarioDefinition, contentRows: Map<number, StoryScenarioDefinition>): void {
@@ -636,6 +689,7 @@ const docRows = readScenarioImportDocRows();
 const roadmapRows = readRoadmapDocRows();
 const contentRows = readStoryScenarioContentRows();
 const completionFlags = new Map<string, string>();
+const rewardContractState: RewardContractState = { companionIds: new Map() };
 const worldMap = new WorldMap();
 const verified: string[] = [];
 
@@ -652,6 +706,7 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verifyScenarioImportDocRow(episode, sequence, docRows);
     verifyRoadmapDocRow(episode, scenario, roadmapRows);
     verifyStoryQuestDefinition(episode, scenario);
+    verifyStoryRewardContract(episode, scenario.reward, `episode ${episode} reward`, rewardContractState);
     verifyStoryScenarioContentLedger(episode, scenario, contentRows);
     verifyStoryWorldEntrance(episode, scenario, worldMap);
     verifyStoryHmapContract(episode, scenario, worldMap);
@@ -690,4 +745,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, collection chains, quests, scenario ledgers, world entrances, hmaps, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, collection chains, quests, rewards, scenario ledgers, world entrances, hmaps, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
