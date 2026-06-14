@@ -1056,6 +1056,96 @@ test('server late story interior cache rewards persist only after survival throu
     }
 });
 
+test('server late story interior cache rewards are not persisted on failed raid results', () => {
+    const world = new WorldMap();
+
+    for (let episode = 23; episode <= 31; episode++) {
+        const session = new WorldSession();
+        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+        assert.ok(scenario, `episode ${episode} scenario`);
+        const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+        assert.ok(sequence, `episode ${episode} sequence`);
+        const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+        assert.ok(dungeon, `episode ${episode} dungeon`);
+        const completedQuestIds = STORY_SCENARIOS
+            .filter((entry) => entry.episode < episode)
+            .map((entry) => entry.questId);
+        const character = authCharacter(`failed-cache-ep${episode}`);
+        const save = createDefaultCharacterSave(character);
+        save.questState = { ...save.questState, completedQuestIds };
+        const joined = session.join({
+            ...joinMessage('central_castle', character.id),
+            completedQuestIds,
+            partyComposition: [actor(character.id, {
+                stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+            })],
+        }, episode, {
+            accountId: character.accountId,
+            characterId: character.id,
+            completedQuestIds,
+            saveSnapshot: save,
+        });
+        const internals = session as any;
+        const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+        assert.ok(serverActor, `episode ${episode} actor`);
+        serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+        session.handleMessage(joined.playerId, {
+            type: 'SCENARIO_ENTER',
+            intentId: `enter-failed-cache-ep${episode}`,
+            actorId: serverActor.id,
+            dungeonId: scenario.dungeonId,
+        }, 1_000 + episode);
+
+        const expectedRewardIds: string[] = [];
+        for (const event of sequence.fieldEvents) {
+            const [tile] = event.triggerTiles;
+            assert.ok(tile, `episode ${episode} ${event.id} trigger tile`);
+            serverActor.tile = { x: tile.x, y: tile.y + 1 };
+
+            const result = session.handleMessage(joined.playerId, {
+                type: 'SCENARIO_FIELD_EVENT_INTERACT',
+                intentId: `failed-cache-${episode}-${event.id}`,
+                actorId: serverActor.id,
+                dungeonId: scenario.dungeonId,
+                eventId: event.id,
+            }, 2_000 + episode);
+            assert.equal(result.replies[0]?.type, 'SCENARIO_FIELD_EVENT_RESULT', `episode ${episode} ${event.id} result`);
+            expectedRewardIds.push(
+                ...(event.rewards ?? [])
+                    .filter((reward) => reward.type === 'item')
+                    .map((reward) => reward.itemId)
+            );
+        }
+        assert.ok(expectedRewardIds.length > 0, `episode ${episode} cache item rewards`);
+
+        const serverPlayer = internals.players.get(joined.playerId);
+        assert.ok(serverPlayer, `episode ${episode} server player`);
+        for (const itemId of expectedRewardIds) {
+            assert.equal(serverPlayer.carriedItems.has(itemId), true, `episode ${episode} carried cache reward ${itemId}`);
+        }
+
+        const leave = session.handleMessage(joined.playerId, { type: 'WORLD_LEAVE', reason: 'wipe' }, 3_000 + episode);
+        assert.equal(leave.replies[0]?.type, 'RAID_RESULT', `episode ${episode} raid result`);
+        const finalPatch = session.createCharacterSavePatch(joined.playerId);
+        assert.ok(finalPatch?.inventory, `episode ${episode} final patch`);
+        const finalQuestState = finalPatch.questState;
+        assert.ok(finalQuestState, `episode ${episode} final quest state`);
+        assert.deepEqual(
+            finalPatch.inventory.items
+                .filter((item) => expectedRewardIds.includes(item.itemId))
+                .map((item) => item.itemId),
+            [],
+            `episode ${episode} failed final patch excludes cache rewards`
+        );
+        assert.deepEqual(
+            finalQuestState.completedQuestIds,
+            completedQuestIds,
+            `episode ${episode} failed final patch excludes raid quest completion`
+        );
+    }
+});
+
 test('server late story boss rewards are not persisted on failed raid results', () => {
     const world = new WorldMap();
 
