@@ -599,8 +599,15 @@ test('late original story source ledgers cover exactly episodes 23 through 31', 
         assert.deepEqual(layout.originalAi?.staging, fact.staging, `episode ${episode} original staging positions`);
         assert.equal(mrcFact.source, `MAP/${paddedEpisode}.mrc`, `episode ${episode} source mrc`);
         assert.equal(mrcFact.translatedSource, `MAP/${paddedEpisode}t.mrc`, `episode ${episode} translated mrc`);
-        assert.equal(sequence.originalSources.mapFiles.includes(mrcFact.source), true, `episode ${episode} sequence mrc`);
-        assert.equal(sequence.originalSources.mapFiles.includes(fact.setArc), true, `episode ${episode} sequence set arc`);
+        assert.equal(sequence.originalSources.sceneScript, `Wlib/scene${episode}.lsc`, `episode ${episode} sequence script`);
+        for (const sourceFile of [
+            mrcFact.source,
+            mrcFact.translatedSource,
+            `MAP/${paddedEpisode}hmap.bmp`,
+            fact.setArc,
+        ]) {
+            assert.equal(sequence.originalSources.mapFiles.includes(sourceFile), true, `episode ${episode} sequence source ${sourceFile}`);
+        }
     }
 });
 
