@@ -25,7 +25,7 @@ import type { Player } from '../../entity/Player';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
 import { manhattan, type TilePoint } from '../../field/FieldPathing';
 import { StoryInteriorMap } from '../../map/StoryInteriorMap';
-import type { WorldDungeonInfo, WorldMap } from '../../map/WorldMap';
+import type { WorldDungeonInfo, WorldInspectMarker, WorldMap } from '../../map/WorldMap';
 import type {
     ScenarioEnemyDefeatEventMessage,
     ScenarioFieldEventBroadcastMessage,
@@ -181,6 +181,7 @@ export class WorldStoryScenarioController {
         this.context.raidSession.setScenarioFlag(dungeonId, getStoryScenarioFieldEventFlag(event));
         this.syncActiveInteriorDoorLocks();
         this.syncActiveInteriorInspectMarkers();
+        this.syncActiveWorldScenarioMarkers();
         this.enqueueStoryScenarioPresentation(this.getFieldEventPresentationSteps(dungeonId, event, event.steps));
         this.applyFieldEventRewards(event);
         return true;
@@ -409,6 +410,7 @@ export class WorldStoryScenarioController {
             this.context.raidSession.setScenarioFlag(dungeonId, eventSequence.objectiveRuntimeFlag);
         }
         if (eventSequence?.bossDefeatEvent) this.applyBossDefeatEventRewards(dungeonId, eventSequence.bossDefeatEvent);
+        this.syncActiveWorldScenarioMarkers();
         if (options.clearEnemies ?? true) this.context.setFieldEnemies([]);
         const completedInterior = this.activeInterior?.dungeonId === dungeonId ? this.activeInterior : null;
         this.playStoryScenarioSequence(dungeonId, 'bossDefeat', () => {
@@ -462,6 +464,7 @@ export class WorldStoryScenarioController {
             }
             const controlled = this.context.getControlledActor();
             if (controlled) this.enterInteriorMap(scenarioSnapshot.activeDungeonId, this.context.actorTile(controlled));
+            this.syncActiveWorldScenarioMarkers();
         } else if (
             !scenarioSnapshot.activeDungeonId
             && this.context.raidSession.activeDungeonId
@@ -469,6 +472,7 @@ export class WorldStoryScenarioController {
         ) {
             this.exitActiveInterior();
             this.context.raidSession.activeDungeonId = null;
+            this.syncActiveWorldScenarioMarkers();
             this.context.clearSelection();
             this.context.clearFieldTurnState();
         }
@@ -510,6 +514,7 @@ export class WorldStoryScenarioController {
             ? this.getFieldEventPresentationSteps(result.dungeonId, event, result.presentationSteps)
             : result.presentationSteps);
         for (const reward of result.rewards) this.applyNetworkFieldEventReward(reward);
+        this.syncActiveWorldScenarioMarkers();
     }
 
     public applyNetworkScenarioFieldEventBroadcast(message: ScenarioFieldEventBroadcastMessage): void {
@@ -519,6 +524,7 @@ export class WorldStoryScenarioController {
         if (this.isFieldEventCompleted(message.dungeonId, event)) return;
         this.markNetworkFieldEventComplete(message.dungeonId, message.eventId, message.flag);
         this.enqueueStoryScenarioPresentation(this.getFieldEventPresentationSteps(message.dungeonId, event, message.presentationSteps));
+        this.syncActiveWorldScenarioMarkers();
     }
 
     public applyNetworkScenarioEnemyDefeatEvent(message: ScenarioEnemyDefeatEventMessage): void {
@@ -668,6 +674,43 @@ export class WorldStoryScenarioController {
                 labelKey: marker.markerLabelKey,
                 kind: marker.markerKind,
             }));
+        worldMap.setInspectMarkers([...fieldEventMarkers, ...scenarioMarkers]);
+    }
+
+    private syncActiveWorldScenarioMarkers(): void {
+        const worldMap = this.context.getWorldMap();
+        const dungeonId = this.context.raidSession.activeDungeonId;
+        if (worldMap instanceof StoryInteriorMap || !dungeonId || isStoryInteriorDungeon(dungeonId)) {
+            if (!(worldMap instanceof StoryInteriorMap)) worldMap.setInspectMarkers([]);
+            return;
+        }
+
+        const sequence = getStoryScenarioEventSequence(dungeonId);
+        if (!sequence) {
+            worldMap.setInspectMarkers([]);
+            return;
+        }
+
+        const fieldEventMarkers: WorldInspectMarker[] = sequence.fieldEvents
+            .filter((event) => !this.isFieldEventCompleted(dungeonId, event))
+            .flatMap((event) => this.getScenarioFieldEventTiles(dungeonId, event).map((tile) => ({
+                id: `${event.id}:${tile.x},${tile.y}`,
+                tile,
+                labelKey: event.markerLabelKey,
+                kind: event.markerKind,
+            })));
+        const scenarioMarkers: WorldInspectMarker[] = (sequence.markers ?? [])
+            .filter((marker) => !marker.hideWhenRuntimeFlag || !this.context.raidSession.hasScenarioFlag(dungeonId, marker.hideWhenRuntimeFlag))
+            .map((marker) => {
+                const tile = projectStoryScenarioFieldTileToWorld(dungeonId, worldMap, marker.tile);
+                return {
+                    id: `${marker.id}:${tile.x},${tile.y}`,
+                    tile,
+                    labelKey: marker.markerLabelKey,
+                    kind: marker.markerKind,
+                };
+            });
+
         worldMap.setInspectMarkers([...fieldEventMarkers, ...scenarioMarkers]);
     }
 

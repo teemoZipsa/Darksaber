@@ -70,6 +70,7 @@ const ARCADIA_PLAIN_DUNGEON_ID = 'arcadia_plain';
 const CACAORA_HIGHLAND_DUNGEON_ID = 'cacaora_highland';
 const REMOTE_VILLAGE_DUNGEON_ID = 'remote_village';
 const SAGUNTO_PORT_DUNGEON_ID = 'sagunto_port';
+const SICILIO_ISLAND_DUNGEON_ID = 'sicilio_island';
 
 function createStoryScenarioHarness(options: {
     player?: Player;
@@ -937,6 +938,45 @@ test('network field scenario entry plays original episode 4 event flow once', ()
     });
 
     assert.equal(harness.logs.length, logCount);
+});
+
+test('network outdoor story scenarios expose projected world inspect markers', () => {
+    const arcadiaRaid = new WorldRaidSession('central_castle');
+    arcadiaRaid.beginRaidFromTown('central_castle');
+    const arcadiaHarness = createStoryScenarioHarness({ raidSession: arcadiaRaid, isNetworkRaid: true });
+
+    arcadiaHarness.controller.applyNetworkScenarioSnapshot({
+        enteredDungeonIds: [ARCADIA_PLAIN_DUNGEON_ID],
+        activeDungeonId: ARCADIA_PLAIN_DUNGEON_ID,
+        completedDungeonIds: [],
+    });
+    const arcadiaMarker = arcadiaHarness.worldMap.getInspectMarkers()
+        .find((marker) => marker.id.startsWith('arcadia_gold_chest_01:'));
+    assert.ok(arcadiaMarker);
+    assert.equal(arcadiaMarker.kind, 'chest');
+    assert.equal(arcadiaHarness.worldMap.isWalkable(arcadiaMarker.tile.x, arcadiaMarker.tile.y), true);
+
+    const sicilioRaid = new WorldRaidSession('central_castle');
+    sicilioRaid.beginRaidFromTown('central_castle');
+    const sicilioHarness = createStoryScenarioHarness({ raidSession: sicilioRaid, isNetworkRaid: true });
+
+    sicilioHarness.controller.applyNetworkScenarioSnapshot({
+        enteredDungeonIds: [SICILIO_ISLAND_DUNGEON_ID],
+        activeDungeonId: SICILIO_ISLAND_DUNGEON_ID,
+        completedDungeonIds: [],
+    });
+    const rescueMarker = sicilioHarness.worldMap.getInspectMarkers()
+        .find((marker) => marker.id.startsWith('sicilio_kamora_son:'));
+    assert.ok(rescueMarker);
+    assert.equal(rescueMarker.kind, 'person');
+    assert.equal(sicilioHarness.worldMap.isWalkable(rescueMarker.tile.x, rescueMarker.tile.y), true);
+
+    sicilioHarness.controller.applyNetworkScenarioSnapshot({
+        enteredDungeonIds: [SICILIO_ISLAND_DUNGEON_ID],
+        activeDungeonId: null,
+        completedDungeonIds: [SICILIO_ISLAND_DUNGEON_ID],
+    });
+    assert.equal(sicilioHarness.worldMap.getInspectMarkers().some((marker) => marker.id.startsWith('sicilio_kamora_son:')), false);
 });
 
 test('network field scenario events expose world inspect tiles and one-shot rewards', () => {

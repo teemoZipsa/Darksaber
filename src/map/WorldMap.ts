@@ -9,6 +9,7 @@ import { getStoryHmapTileAt } from './StoryHmaps';
 import { HMAP_BLEND_BAND, type HmapSample } from './HmapBlend';
 import { STORY_SCENARIOS } from '../data/StoryScenarioData';
 import { isStoryInteriorDungeon } from '../data/StoryInteriorData';
+import { t } from '../i18n/LanguageManager';
 
 export interface TileBounds {
     width: number;
@@ -61,6 +62,13 @@ export interface WorldMapBridgeDecoration {
 }
 
 export type WorldMapDecoration = WorldMapTreeDecoration | WorldMapBridgeDecoration;
+
+export interface WorldInspectMarker {
+    id: string;
+    tile: TilePoint;
+    labelKey?: string;
+    kind?: 'person' | 'chest';
+}
 
 export interface WorldDungeonInfo {
     id: string;
@@ -410,6 +418,7 @@ export class WorldMap {
     private biomeMask: BiomeMask;
     private neutralBirdImage: HTMLImageElement | null = null;
     private neutralBirdImageLoaded = false;
+    private worldInspectMarkers: WorldInspectMarker[] = [];
 
     public loot: LootObject[] = [];
     public extractionZones: ExtractionZone[] = [];
@@ -1005,6 +1014,20 @@ export class WorldMap {
         for (const c of this.chunks.values()) c.markDirty();
     }
 
+    public setInspectMarkers(markers: readonly WorldInspectMarker[]): void {
+        this.worldInspectMarkers = markers.map((marker) => ({
+            ...marker,
+            tile: { ...marker.tile },
+        }));
+    }
+
+    public getInspectMarkers(): WorldInspectMarker[] {
+        return this.worldInspectMarkers.map((marker) => ({
+            ...marker,
+            tile: { ...marker.tile },
+        }));
+    }
+
     public render(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number, vw: number, vh: number, renderScale: number = 1): void {
         for (const chunk of this.chunks.values()) {
             const sx = chunk.chunkX * CHUNK_SIZE * TILE_SIZE - cameraX;
@@ -1019,6 +1042,7 @@ export class WorldMap {
         this.renderTempleLandmarks(ctx, cameraX, cameraY, vw, vh);
         this.renderStoryInteriorEntrances(ctx, cameraX, cameraY, vw, vh);
         this.renderNeutralBirds(ctx, cameraX, cameraY, vw, vh);
+        this.renderWorldInspectMarkers(ctx, cameraX, cameraY, vw, vh);
 
         for (const zone of this.extractionZones) {
             zone.render(ctx, (gx, gy) => ({
@@ -1579,6 +1603,73 @@ export class WorldMap {
         ctx.fillStyle = '#f0d78a';
         ctx.strokeText(label, labelX, labelY);
         ctx.fillText(label, labelX, labelY);
+        ctx.restore();
+    }
+
+    private renderWorldInspectMarkers(
+        ctx: CanvasRenderingContext2D,
+        cameraX: number,
+        cameraY: number,
+        vw: number,
+        vh: number
+    ): void {
+        for (const marker of this.worldInspectMarkers) {
+            const sx = marker.tile.x * TILE_SIZE - cameraX;
+            const sy = marker.tile.y * TILE_SIZE - cameraY;
+            if (sx + TILE_SIZE < 0 || sx > vw || sy + TILE_SIZE < 0 || sy > vh) continue;
+            this.renderWorldInspectMarker(ctx, marker, sx, sy);
+        }
+    }
+
+    private renderWorldInspectMarker(ctx: CanvasRenderingContext2D, marker: WorldInspectMarker, sx: number, sy: number): void {
+        ctx.save();
+        const cx = sx + TILE_SIZE / 2;
+
+        ctx.fillStyle = 'rgba(6, 7, 10, 0.62)';
+        ctx.beginPath();
+        ctx.ellipse(cx, sy + TILE_SIZE - 8, 15, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (marker.kind === 'chest') {
+            ctx.fillStyle = '#5b3922';
+            ctx.fillRect(sx + 8, sy + 15, TILE_SIZE - 16, 12);
+            ctx.fillStyle = '#8a5b2f';
+            ctx.fillRect(sx + 7, sy + 12, TILE_SIZE - 14, 7);
+            ctx.strokeStyle = '#d6a85f';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(sx + 8, sy + 13, TILE_SIZE - 16, 13);
+            ctx.fillStyle = '#f1d58b';
+            ctx.fillRect(cx - 2, sy + 17, 4, 5);
+        } else {
+            ctx.fillStyle = '#3d4c5a';
+            ctx.fillRect(sx + 10, sy + 18, TILE_SIZE - 20, 8);
+            ctx.fillStyle = '#b8c7d4';
+            ctx.beginPath();
+            ctx.arc(cx, sy + 15, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.strokeStyle = '#72dfff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, sy + 7, 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx, sy + 14);
+        ctx.lineTo(cx, sy + 18);
+        ctx.stroke();
+
+        if (marker.labelKey) {
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillStyle = '#dcf7ff';
+            const label = t(marker.labelKey);
+            ctx.strokeText(label, cx, sy - 2);
+            ctx.fillText(label, cx, sy - 2);
+        }
         ctx.restore();
     }
 
