@@ -2,10 +2,17 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseOriginalArcArchive } from '../src/data/original/originalArcArchive';
 import { i18n } from '../src/i18n/LanguageManager';
+import { getBurgosCastleHmapTileAt, BURGOS_CASTLE_HMAP_SIZE } from '../src/map/BurgosCastleHmap';
+import { getStoryHmapTileAt, STORY_HMAP_EPISODES, STORY_HMAP_SIZE } from '../src/map/StoryHmaps';
 import { TileType } from '../src/map/Tile';
 import { WorldMap } from '../src/map/WorldMap';
 import { getStoryInteriorLayout, STORY_INTERIOR_LAYOUTS } from '../src/data/StoryInteriorData';
 import { getMonsterDefinitionSafe } from '../src/data/MonsterCatalog';
+import {
+    getStoryScenarioFieldEventPlacements,
+    getStoryScenarioFieldEventTiles,
+    projectStoryScenarioFieldTileToWorld,
+} from '../src/data/StoryScenarioFieldEventPlacement';
 import { STORY_QUESTS } from '../src/data/StoryQuestData';
 import { getStoryScenarioMonsterLayout } from '../src/data/StoryScenarioMonsterData';
 import {
@@ -279,6 +286,97 @@ function verifyStoryWorldEntrance(episode: number, scenario: StoryScenarioDefini
     }
 }
 
+function verifyStoryHmapContract(episode: number, scenario: StoryScenarioDefinition, worldMap: WorldMap): void {
+    const dungeon = worldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+    if (!dungeon) return;
+    const entrance = worldMap.getDungeonEntranceTile(dungeon);
+    const sampleOffsets = [
+        { x: -12, y: -12 },
+        { x: 12, y: 12 },
+        { x: 0, y: episode === 1 ? Math.floor(BURGOS_CASTLE_HMAP_SIZE / 4) : Math.floor(STORY_HMAP_SIZE / 4) },
+    ];
+
+    const samples = episode === 1
+        ? [
+            getBurgosCastleHmapTileAt(entrance.x, entrance.y, entrance),
+            ...sampleOffsets.map((offset) => getBurgosCastleHmapTileAt(entrance.x + offset.x, entrance.y + offset.y, entrance)),
+        ]
+        : STORY_HMAP_EPISODES.includes(episode)
+            ? [
+                getStoryHmapTileAt(episode, entrance.x, entrance.y, entrance),
+                ...sampleOffsets.map((offset) => getStoryHmapTileAt(episode, entrance.x + offset.x, entrance.y + offset.y, entrance)),
+            ]
+            : [];
+
+    if (samples.length === 0) return;
+    if (samples[0]?.tile !== TileType.DUNGEON_ENTRANCE) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} hmap center is not a dungeon entrance`);
+    }
+    if (!samples.slice(1).some((sample) => sample !== null && sample.tile !== TileType.DUNGEON_ENTRANCE)) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} hmap has no terrain sample around the entrance`);
+    }
+}
+
+function getPresentationStepTiles(step: StoryScenarioEventStep): Array<{ label: string; tile: { x: number; y: number } }> {
+    if (step.kind === 'focus') return [{ label: 'target', tile: step.target }];
+    if (step.kind === 'moveActor') {
+        return [
+            { label: 'target', tile: step.target },
+            ...(step.focus ? [{ label: 'focus', tile: step.focus }] : []),
+        ];
+    }
+    return step.focus ? [{ label: 'focus', tile: step.focus }] : [];
+}
+
+function verifyFieldScenarioWorldProjection(episode: number, scenario: StoryScenarioDefinition, sequence: StoryScenarioEventSequence, worldMap: WorldMap): void {
+    if (scenario.missionKind === 'soloInterior') return;
+    const dungeon = worldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+    if (!dungeon) throw new Error(`Episode ${episode} ${scenario.dungeonId} missing world dungeon for field projection`);
+    const entrance = worldMap.getDungeonEntranceTile(dungeon);
+
+    const placements = getStoryScenarioFieldEventPlacements(scenario.dungeonId, worldMap);
+    const expectedPlacementCount = sequence.fieldEvents.reduce((sum, event) => sum + event.triggerTiles.length, 0);
+    if (placements.length !== expectedPlacementCount) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} field placement count mismatch: ${placements.length} !== ${expectedPlacementCount}`);
+    }
+    const uniqueTiles = new Set(placements.map((placement) => `${placement.tile.x},${placement.tile.y}`));
+    if (uniqueTiles.size !== placements.length) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} field event placements overlap`);
+    }
+    for (const placement of placements) {
+        if (!worldMap.isWalkable(placement.tile.x, placement.tile.y)) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} field placement is not walkable: ${placement.eventId}@${placement.tile.x},${placement.tile.y}`);
+        }
+    }
+    for (const event of sequence.fieldEvents) {
+        const eventTiles = getStoryScenarioFieldEventTiles(scenario.dungeonId, event, worldMap);
+        const placementTiles = placements
+            .filter((placement) => placement.eventId === event.id)
+            .sort((left, right) => left.triggerIndex - right.triggerIndex)
+            .map((placement) => placement.tile);
+        if (JSON.stringify(eventTiles) !== JSON.stringify(placementTiles)) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} field event ${event.id} shared placement mismatch`);
+        }
+    }
+
+    for (const [group, steps] of [
+        ['entry', sequence.entry],
+        ['bossDefeat', sequence.bossDefeat],
+    ] as const) {
+        for (const [index, step] of steps.entries()) {
+            for (const point of getPresentationStepTiles(step)) {
+                const projected = projectStoryScenarioFieldTileToWorld(scenario.dungeonId, worldMap, point.tile);
+                if (!worldMap.isWalkable(projected.x, projected.y)) {
+                    throw new Error(`Episode ${episode} ${scenario.dungeonId} ${group} step ${index} ${point.label} projects to blocked tile`);
+                }
+                if (Math.abs(projected.x - entrance.x) > 12 || Math.abs(projected.y - entrance.y) > 12) {
+                    throw new Error(`Episode ${episode} ${scenario.dungeonId} ${group} step ${index} ${point.label} projects too far from entrance`);
+                }
+            }
+        }
+    }
+}
+
 function verifyStoryScenarioMonsterContract(episode: number, scenario: StoryScenarioDefinition): void {
     if (scenario.guardCount < 0 || !Number.isInteger(scenario.guardCount)) {
         throw new Error(`Episode ${episode} invalid guard count ${scenario.guardCount}`);
@@ -475,6 +573,8 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verifyStoryQuestDefinition(episode, scenario);
     verifyStoryScenarioContentLedger(episode, scenario, contentRows);
     verifyStoryWorldEntrance(episode, scenario, worldMap);
+    verifyStoryHmapContract(episode, scenario, worldMap);
+    verifyFieldScenarioWorldProjection(episode, scenario, sequence, worldMap);
     verifyStoryScenarioMonsterContract(episode, scenario);
     verifyStoryI18nKeys(episode, scenario, sequence);
     verifyStoryCompletionContract(episode, scenario, sequence, completionFlags);
@@ -509,4 +609,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, quests, scenario ledgers, world entrances, monsters, i18n, and completion contracts: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, quests, scenario ledgers, world entrances, hmaps, field placements, monsters, i18n, and completion contracts: ${verified.join(', ')}`);
