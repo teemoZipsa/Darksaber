@@ -22,6 +22,7 @@ import {
     getStoryScenarioEventStepDurationMs,
     getStoryScenarioPresentationDurationMs,
     STORY_SCENARIO_EVENT_SEQUENCES,
+    type StoryScenarioFieldEventReward,
     type StoryScenarioEventSequence,
     type StoryScenarioEventStep,
 } from '../src/data/StoryScenarioEventData';
@@ -35,6 +36,7 @@ import {
 const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Saver_Files\\Saver';
 const DEFAULT_START = 1;
 const DEFAULT_END = 31;
+const RESOLVABLE_PRESENTATION_ACTOR_IDS = new Set(['hero', 'player', 'controlled', 'boss']);
 
 interface Options {
     sourceRoot: string;
@@ -383,6 +385,139 @@ function verifyStoryRewardContract(
     if (!en[reward.nameKey]) throw new Error(`Episode ${episode} ${context} missing en companion reward key ${reward.nameKey}`);
 }
 
+function verifyStoryPresentationStepReference(
+    episode: number,
+    dungeonId: string,
+    context: string,
+    step: StoryScenarioEventStep
+): void {
+    if (step.kind === 'moveActor' && !RESOLVABLE_PRESENTATION_ACTOR_IDS.has(step.actorId)) {
+        throw new Error(`Episode ${episode} ${dungeonId} ${context} uses unresolved move actor ${step.actorId}`);
+    }
+    if (step.kind === 'dialogue') {
+        if (!step.speakerId.trim()) {
+            throw new Error(`Episode ${episode} ${dungeonId} ${context} has an empty speaker id`);
+        }
+        if (!step.speakerNameKey.startsWith('story.event.speaker.')) {
+            throw new Error(`Episode ${episode} ${dungeonId} ${context} speaker key is not a story speaker: ${step.speakerNameKey}`);
+        }
+    }
+}
+
+function verifyStoryEventRewardContract(
+    episode: number,
+    dungeonId: string,
+    eventId: string,
+    trigger: string,
+    reward: StoryScenarioFieldEventReward
+): void {
+    if (reward.type === 'gold') {
+        if (!Number.isInteger(reward.amount) || reward.amount <= 0) {
+            throw new Error(`Episode ${episode} ${dungeonId} ${eventId} invalid gold reward ${reward.amount}`);
+        }
+        return;
+    }
+
+    const itemDef = getItemDef(reward.itemId);
+    if (!itemDef) throw new Error(`Episode ${episode} ${dungeonId} ${eventId} missing event reward item ${reward.itemId}`);
+    if (reward.originalItemId === undefined || reward.originalItemId <= 0) return;
+
+    const originalItemPattern = new RegExp(`GETITEM 0*${reward.originalItemId}\\b`);
+    if (!originalItemPattern.test(trigger)) {
+        throw new Error(`Episode ${episode} ${dungeonId} ${eventId} reward item ${reward.originalItemId} is not present in trigger`);
+    }
+    if (!originalItemPattern.test(itemDef.description ?? '') || !originalItemPattern.test(itemDef.descriptionKr ?? '')) {
+        throw new Error(`Episode ${episode} ${dungeonId} ${eventId} reward item ${reward.itemId} is missing original GETITEM description`);
+    }
+}
+
+function verifyStoryEventReferenceContract(episode: number, sequence: StoryScenarioEventSequence): void {
+    const runtimeFlags = new Set<string>();
+    if (sequence.objectiveRuntimeFlag) runtimeFlags.add(sequence.objectiveRuntimeFlag);
+    if (sequence.bossDefeatEvent?.runtimeFlag) runtimeFlags.add(sequence.bossDefeatEvent.runtimeFlag);
+
+    for (const [index, step] of sequence.entry.entries()) {
+        verifyStoryPresentationStepReference(episode, sequence.dungeonId, `entry step ${index}`, step);
+    }
+    for (const [index, step] of sequence.bossDefeat.entries()) {
+        verifyStoryPresentationStepReference(episode, sequence.dungeonId, `boss defeat step ${index}`, step);
+    }
+
+    const fieldEventIds = new Set<string>();
+    for (const event of sequence.fieldEvents) {
+        if (fieldEventIds.has(event.id)) {
+            throw new Error(`Episode ${episode} ${sequence.dungeonId} duplicate field event id ${event.id}`);
+        }
+        fieldEventIds.add(event.id);
+        if (event.runtimeFlag) runtimeFlags.add(event.runtimeFlag);
+        if (!/^EVENT \d+(?:\/\d+)*$/.test(event.originalEventId)) {
+            throw new Error(`Episode ${episode} ${sequence.dungeonId} ${event.id} invalid original event id ${event.originalEventId}`);
+        }
+        if (event.triggerTiles.length === 0) {
+            throw new Error(`Episode ${episode} ${sequence.dungeonId} ${event.id} has no trigger tiles`);
+        }
+        if (event.steps.length === 0) {
+            throw new Error(`Episode ${episode} ${sequence.dungeonId} ${event.id} has no presentation steps`);
+        }
+        for (const [index, step] of event.steps.entries()) {
+            verifyStoryPresentationStepReference(episode, sequence.dungeonId, `${event.id} step ${index}`, step);
+        }
+
+        const hasPersistentReward = Boolean(event.questItemId || event.rewards?.length);
+        if (hasPersistentReward) {
+            if (!event.runtimeFlag) throw new Error(`Episode ${episode} ${sequence.dungeonId} ${event.id} persistent reward has no runtime flag`);
+            if (!event.markerLabelKey) throw new Error(`Episode ${episode} ${sequence.dungeonId} ${event.id} persistent reward has no marker label`);
+        }
+        for (const reward of event.rewards ?? []) {
+            verifyStoryEventRewardContract(episode, sequence.dungeonId, event.id, event.trigger, reward);
+        }
+    }
+
+    const enemyEventIds = new Set<string>();
+    for (const event of sequence.enemyDefeatEvents ?? []) {
+        if (enemyEventIds.has(event.id)) {
+            throw new Error(`Episode ${episode} ${sequence.dungeonId} duplicate enemy defeat event id ${event.id}`);
+        }
+        enemyEventIds.add(event.id);
+        if (!/^EVENT \d+(?:\/\d+)*$/.test(event.originalEventId)) {
+            throw new Error(`Episode ${episode} ${sequence.dungeonId} ${event.id} invalid original event id ${event.originalEventId}`);
+        }
+        if (!event.enemyId.trim()) {
+            throw new Error(`Episode ${episode} ${sequence.dungeonId} ${event.id} has an empty enemy id`);
+        }
+        if (event.steps.length === 0) {
+            throw new Error(`Episode ${episode} ${sequence.dungeonId} ${event.id} has no presentation steps`);
+        }
+        for (const [index, step] of event.steps.entries()) {
+            verifyStoryPresentationStepReference(episode, sequence.dungeonId, `${event.id} step ${index}`, step);
+        }
+    }
+
+    if (sequence.bossDefeatEvent) {
+        if (!/^EVENT \d+(?:\/\d+)*$/.test(sequence.bossDefeatEvent.originalEventId)) {
+            throw new Error(`Episode ${episode} ${sequence.dungeonId} boss defeat invalid original event id ${sequence.bossDefeatEvent.originalEventId}`);
+        }
+        for (const reward of sequence.bossDefeatEvent.rewards ?? []) {
+            verifyStoryEventRewardContract(
+                episode,
+                sequence.dungeonId,
+                sequence.bossDefeatEvent.id,
+                sequence.bossDefeatEvent.trigger,
+                reward
+            );
+        }
+    }
+
+    const markerIds = new Set<string>();
+    for (const marker of sequence.markers ?? []) {
+        if (markerIds.has(marker.id)) throw new Error(`Episode ${episode} ${sequence.dungeonId} duplicate marker id ${marker.id}`);
+        markerIds.add(marker.id);
+        if (marker.hideWhenRuntimeFlag && !runtimeFlags.has(marker.hideWhenRuntimeFlag)) {
+            throw new Error(`Episode ${episode} ${sequence.dungeonId} marker ${marker.id} hides on unknown flag ${marker.hideWhenRuntimeFlag}`);
+        }
+    }
+}
+
 function verifyStoryScenarioContentLedger(episode: number, scenario: StoryScenarioDefinition, contentRows: Map<number, StoryScenarioDefinition>): void {
     const row = contentRows.get(episode);
     if (!row) throw new Error(`Missing src/data/content/story-scenarios.json row for episode ${episode}`);
@@ -707,6 +842,7 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verifyRoadmapDocRow(episode, scenario, roadmapRows);
     verifyStoryQuestDefinition(episode, scenario);
     verifyStoryRewardContract(episode, scenario.reward, `episode ${episode} reward`, rewardContractState);
+    verifyStoryEventReferenceContract(episode, sequence);
     verifyStoryScenarioContentLedger(episode, scenario, contentRows);
     verifyStoryWorldEntrance(episode, scenario, worldMap);
     verifyStoryHmapContract(episode, scenario, worldMap);
@@ -745,4 +881,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, collection chains, quests, rewards, scenario ledgers, world entrances, hmaps, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, collection chains, quests, rewards, event references, scenario ledgers, world entrances, hmaps, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
