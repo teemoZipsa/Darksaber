@@ -18,17 +18,23 @@ test('auth store raid survival persists story inventory and companion rewards', 
         gender: 'M',
     });
     const scenario = STORY_SCENARIOS.find((entry) => entry.episode === 3);
+    const priorQuestIds = STORY_SCENARIOS
+        .filter((entry) => entry.episode < 3)
+        .map((entry) => entry.questId);
     assert.ok(scenario);
 
+    for (const questId of priorQuestIds) {
+        await store.recordRaidSurvival(account.id, character.id, [questId], 'w_forest_village');
+    }
     await store.recordRaidSurvival(account.id, character.id, [scenario.questId], 'w_forest_village');
     await store.recordRaidSurvival(account.id, character.id, [scenario.questId], 'w_forest_village');
 
     const save = await store.getCharacterSave(account.id, character.id);
     assert.ok(save);
     assert.equal(save.hubLocation.townId, 'w_forest_village');
-    assert.deepEqual(save.questState.completedQuestIds, [scenario.questId]);
-    assert.deepEqual(save.questState.questItemIds, ['quest_sacred_sword']);
-    assert.deepEqual(save.questState.storyCompanionIds, ['story_fighter_ep03']);
+    assert.ok((save.questState.completedQuestIds as string[]).includes(scenario.questId));
+    assert.ok((save.questState.questItemIds as string[]).includes('quest_sacred_sword'));
+    assert.ok((save.questState.storyCompanionIds as string[]).includes('story_fighter_ep03'));
     assert.equal(save.inventory.items.filter((item) => item.itemId === 'quest_sacred_sword').length, 1);
 
     const roster = save.rosterSnapshot.characters;
@@ -72,6 +78,31 @@ test('auth store raid survival with full inventory does not persist incomplete s
     assert.notEqual((updatedSave.questState.storyCompanionIds as string[] | undefined)?.includes('story_fighter_ep03'), true);
     assert.equal(updatedSave.inventory.items.some((item) => item.itemId === 'quest_sacred_sword'), false);
     assert.equal((updatedSave.rosterSnapshot.characters as unknown[]).some((entry) => asRecord(entry).id === 'story_fighter_ep03'), false);
+    assert.equal(progress.completedQuests.includes(scenario.questId), false);
+});
+
+test('auth store raid survival cannot persist episode 31 without prior story clears', async () => {
+    const store = new InMemoryAuthStore();
+    await store.initialize();
+    const account = await store.createAccount({
+        loginName: 'Episode31SkipUser',
+        loginNameNormalized: normalizeLoginName('Episode31SkipUser'),
+        passwordHash: 'hash',
+    });
+    const { character } = await store.createCharacter(account.id, {
+        name: 'Hero',
+        classKey: 'infantry',
+        gender: 'M',
+    });
+    const scenario = STORY_SCENARIOS.find((entry) => entry.episode === 31);
+    assert.ok(scenario);
+
+    await store.recordRaidSurvival(account.id, character.id, [scenario.questId], 'w_forest_village');
+
+    const updatedSave = await store.getCharacterSave(account.id, character.id);
+    const progress = await store.getAccountProgress(account.id);
+    assert.ok(updatedSave);
+    assert.notEqual((updatedSave.questState.completedQuestIds as string[] | undefined)?.includes(scenario.questId), true);
     assert.equal(progress.completedQuests.includes(scenario.questId), false);
 });
 

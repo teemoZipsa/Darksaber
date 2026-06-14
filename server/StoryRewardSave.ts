@@ -13,8 +13,17 @@ export function applyStoryQuestRewardsToSaveState(
     blockableQuestIds: ReadonlySet<string> = completedQuestIds
 ): string[] {
     const blockedQuestIds = new Set<string>();
-    for (const scenario of STORY_SCENARIOS) {
+    const acceptedQuestIds = new Set(
+        normalizeStringArray(questState.completedQuestIds).filter((questId) => !blockableQuestIds.has(questId))
+    );
+    for (let index = 0; index < STORY_SCENARIOS.length; index++) {
+        const scenario = STORY_SCENARIOS[index];
         if (!completedQuestIds.has(scenario.questId)) continue;
+        const prerequisiteQuestId = index > 0 ? STORY_SCENARIOS[index - 1].questId : null;
+        if (prerequisiteQuestId && !acceptedQuestIds.has(prerequisiteQuestId)) {
+            if (blockableQuestIds.has(scenario.questId)) blockedQuestIds.add(scenario.questId);
+            continue;
+        }
         const draftQuestState = cloneRecord(questState);
         const draftInventory = cloneInventorySnapshot(inventory);
         const draftRosterSnapshot = cloneRecord(rosterSnapshot);
@@ -26,6 +35,7 @@ export function applyStoryQuestRewardsToSaveState(
         replaceRecord(questState, draftQuestState);
         replaceInventorySnapshot(inventory, draftInventory);
         replaceRecord(rosterSnapshot, draftRosterSnapshot);
+        acceptedQuestIds.add(scenario.questId);
     }
     if (blockedQuestIds.size > 0) {
         questState.completedQuestIds = normalizeStringArray(questState.completedQuestIds)

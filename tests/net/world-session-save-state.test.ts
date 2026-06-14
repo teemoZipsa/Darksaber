@@ -27,9 +27,13 @@ test('final world save patch persists story quest inventory and companion reward
     const scenario = STORY_SCENARIOS.find((entry) => entry.episode === 3);
     assert.ok(scenario);
     const save = createDefaultCharacterSave(authCharacter('hero-a'));
+    const priorQuestIds = STORY_SCENARIOS
+        .filter((entry) => entry.episode < 3)
+        .map((entry) => entry.questId);
+    save.questState = { ...save.questState, completedQuestIds: priorQuestIds };
     const player: WorldSessionSavePlayer = {
         id: 'hero-a',
-        completedQuestIds: new Set([scenario.questId]),
+        completedQuestIds: new Set([...priorQuestIds, scenario.questId]),
         raidGoldReward: 0,
         saveSnapshot: save,
     };
@@ -76,6 +80,24 @@ test('final world save patch with full inventory does not persist incomplete sto
     assert.notEqual((finalPatch.questState?.storyCompanionIds as string[] | undefined)?.includes('story_fighter_ep03'), true);
     assert.equal(finalPatch.inventory?.items.some((item) => item.itemId === 'quest_sacred_sword'), false);
     assert.equal((finalPatch.rosterSnapshot?.characters as unknown[]).some((entry) => asRecord(entry).id === 'story_fighter_ep03'), false);
+});
+
+test('final world save patch cannot persist episode 31 without prior story clears', () => {
+    const scenario = STORY_SCENARIOS.find((entry) => entry.episode === 31);
+    assert.ok(scenario);
+    const save = createDefaultCharacterSave(authCharacter('hero-a'));
+    const player: WorldSessionSavePlayer = {
+        id: 'hero-a',
+        completedQuestIds: new Set([scenario.questId]),
+        raidGoldReward: 0,
+        saveSnapshot: save,
+    };
+    const saveState = new WorldSessionSaveState();
+
+    saveState.captureFinalPatch(player, 'w_forest_village', true);
+    const finalPatch = saveState.consumeFinalPatch(player.id);
+    assert.ok(finalPatch);
+    assert.notEqual((finalPatch.questState?.completedQuestIds as string[] | undefined)?.includes(scenario.questId), true);
 });
 
 function fullInventory(width: number, height: number) {

@@ -86,9 +86,12 @@ export class ServerAccountStore {
     public recordRaidSurvival(accountId: string, completedQuestIds: readonly string[], currentHubTownId: string): ServerAccountRecord | null {
         const account = this.accounts.get(accountId);
         if (!account) return null;
-        const nextCompleted = new Set(account.completedQuestIds);
-        for (const questId of completedQuestIds) {
-            if (QUEST_IDS.has(questId)) nextCompleted.add(questId);
+        const requestedQuestIds = new Set(completedQuestIds.filter((questId) => QUEST_IDS.has(questId)));
+        const nextCompleted = new Set(account.completedQuestIds.filter((questId) => QUEST_IDS.has(questId)));
+        for (const quest of STORY_QUESTS) {
+            if (nextCompleted.has(quest.id) || !requestedQuestIds.has(quest.id)) continue;
+            if (quest.prerequisiteQuestId && !nextCompleted.has(quest.prerequisiteQuestId)) continue;
+            nextCompleted.add(quest.id);
         }
         account.completedQuestIds = [...nextCompleted];
         account.currentHubTownId = currentHubTownId;

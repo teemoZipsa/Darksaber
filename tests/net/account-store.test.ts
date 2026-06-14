@@ -43,6 +43,20 @@ test('server account store persists only recognized story quest progress', () =>
     }
 });
 
+test('server account store cannot skip directly to episode 31 progress', () => {
+    const store = new ServerAccountStore({ now: () => 350 });
+    const accountId = 'acct_test_ep31skip';
+    const accountSecret = 'secret_ep31skip_abcdefghij';
+    const episode31 = STORY_QUESTS.find((quest) => quest.episode === 31);
+    assert.ok(episode31);
+
+    assert.equal(store.authenticate(accountId, accountSecret).accepted, true);
+    const account = store.recordRaidSurvival(accountId, [episode31.id], 'w_forest_village');
+
+    assert.deepEqual(account?.completedQuestIds, []);
+    assert.equal(account?.currentHubTownId, 'w_forest_village');
+});
+
 test('server account store loads backup when primary file is corrupt', () => {
     const dir = mkdtempSync(join(tmpdir(), 'darksaber-account-'));
     const persistPath = join(dir, 'accounts.json');
