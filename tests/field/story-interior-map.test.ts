@@ -1244,6 +1244,28 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         30: 10,
         31: 8,
     };
+    const expectedEntryDialogueFocuses: Record<number, string[]> = {
+        23: ['18,15', '21,15', '18,15', '21,15'],
+        24: ['19,7'],
+        25: ['19,7', '19,23', '19,7', '19,23', '19,7', '19,23'],
+        26: [],
+        27: [],
+        28: ['19,7', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7'],
+        29: ['19,7', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7', '14,32', '19,7'],
+        30: ['19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7', '14,32', '19,7'],
+        31: ['19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7', '14,32', '19,7'],
+    };
+    const expectedBossDefeatDialogueFocuses: Record<number, string[]> = {
+        23: ['19,7'],
+        24: ['19,7'],
+        25: ['19,7', '19,9', '19,7', '19,9'],
+        26: [],
+        27: [],
+        28: ['19,7', '19,9'],
+        29: ['19,9', '19,7', '19,9'],
+        30: ['19,9', '19,7', '19,7', '19,7', '19,9', '19,7', '19,7', '19,9', '19,7', '19,9'],
+        31: ['19,7', '19,9', '19,7', '19,9', '19,7', '19,9', '19,7', '19,9'],
+    };
 
     for (const episode of [23, 24, 25, 26, 27, 28, 29, 30, 31]) {
         const fact = getOriginalLateStoryFact(episode);
@@ -1304,15 +1326,27 @@ test('episodes 23 through 31 use original late interior routes and events', () =
             `${fact.dungeonId}:set arc members`
         );
         assert.equal(sequence.entry.filter((step) => step.kind === 'combatStart').length, 1);
-        const entryDialogueCount = sequence.entry.filter((step) => step.kind === 'dialogue').length;
+        const entryDialogues = sequence.entry.filter((step) => step.kind === 'dialogue');
+        const entryDialogueCount = entryDialogues.length;
         assert.equal(entryDialogueCount, expectedEntryDialogueCounts[episode], `${fact.dungeonId}:entry dialogue count`);
+        assert.deepEqual(
+            entryDialogues.map((step) => step.focus ? `${step.focus.x},${step.focus.y}` : 'none'),
+            expectedEntryDialogueFocuses[episode],
+            `${fact.dungeonId}:entry dialogue focuses`
+        );
         if (fact.deoMember) {
             assert.ok(entryDialogueCount > 0, `${fact.dungeonId}:entry dialogue from ${fact.deoMember}`);
         } else {
             assert.equal(entryDialogueCount, 0, `${fact.dungeonId}:no DEO-backed entry dialogue`);
         }
-        const bossDefeatDialogueCount = sequence.bossDefeat.filter((step) => step.kind === 'dialogue').length;
+        const bossDefeatDialogues = sequence.bossDefeat.filter((step) => step.kind === 'dialogue');
+        const bossDefeatDialogueCount = bossDefeatDialogues.length;
         assert.equal(bossDefeatDialogueCount, expectedBossDefeatDialogueCounts[episode], `${fact.dungeonId}:boss defeat dialogue count`);
+        assert.deepEqual(
+            bossDefeatDialogues.map((step) => step.focus ? `${step.focus.x},${step.focus.y}` : 'none'),
+            expectedBossDefeatDialogueFocuses[episode],
+            `${fact.dungeonId}:boss defeat dialogue focuses`
+        );
         if (fact.deeMember) {
             assert.ok(bossDefeatDialogueCount > 0, `${fact.dungeonId}:boss defeat dialogue from ${fact.deeMember}`);
         } else {
