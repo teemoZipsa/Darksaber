@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
-import { getMasterClass, isMasterClassLineId } from '../../src/data/ClassTree';
+import { getClassLine, getMasterClass, isMasterClassLineId } from '../../src/data/ClassTree';
 import { getCombatRecovery, getItemDef, ITEMS } from '../../src/data/ItemDB';
 import { ORIGINAL_LATE_STORY_FACTS, getOriginalLateStoryCacheEvents, getOriginalLateStoryFact } from '../../src/data/OriginalLateStoryFacts';
 import { ORIGINAL_LATE_STORY_MRC_FACTS } from '../../src/data/OriginalLateStoryMapFacts';
@@ -31,7 +31,7 @@ import { rollBossRune, rollChestGem } from '../../src/data/SocketLoot';
 import { getSkill } from '../../src/data/SkillDB';
 import { getSkillVisualProfile } from '../../src/data/SkillVisualProfiles';
 import { createBaseStats, getBaseStatsForClass } from '../../src/data/Stats';
-import { STORY_QUESTS, getStoryCompanionRewards } from '../../src/data/StoryQuestData';
+import { STORY_QUESTS, getStoryCompanionRewards, type StoryQuestReward } from '../../src/data/StoryQuestData';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import { STORY_SCENARIO_EVENT_SEQUENCES } from '../../src/data/StoryScenarioEventData';
 import { STORY_INTERIOR_LAYOUTS, getStoryInteriorLayout } from '../../src/data/StoryInteriorData';
@@ -58,6 +58,26 @@ type StoryScenarioContentRecord = {
     guardCount: number;
     missionKind: string;
 };
+
+function assertStoryRewardData(reward: StoryQuestReward, context: string, ko: Record<string, string>, en: Record<string, string>): void {
+    if (reward.type === 'none') return;
+    if (reward.type === 'bundle') {
+        assert.ok(reward.rewards.length > 0, `${context} empty reward bundle`);
+        for (const [index, entry] of reward.rewards.entries()) {
+            assertStoryRewardData(entry, `${context} reward ${index}`, ko, en);
+        }
+        return;
+    }
+    if (reward.type === 'questItem' || reward.type === 'inventoryItem') {
+        assert.ok(getItemDef(reward.itemId), `${context} missing reward item ${reward.itemId}`);
+        return;
+    }
+
+    assert.ok(reward.companionId, `${context} missing companion id`);
+    assert.ok(getClassLine(reward.classId), `${context} missing companion class ${reward.classId}`);
+    assert.ok(ko[reward.nameKey], `${context} missing ko companion key ${reward.nameKey}`);
+    assert.ok(en[reward.nameKey], `${context} missing en companion key ${reward.nameKey}`);
+}
 
 test('town facility guards reject prototype keys and return copies', () => {
     assert.equal(isTownId('toString'), false);
@@ -715,6 +735,7 @@ test('story episodes 1 through 31 are chained and fully localized', () => {
             assert.ok(ko[key], `missing ko story key ${key}`);
             assert.ok(en[key], `missing en story key ${key}`);
         }
+        assertStoryRewardData(quest.reward, `episode ${quest.episode}`, ko, en);
     }
     assert.ok(ko['story.ep01.sideObjective.cainNecklace']);
     assert.ok(en['story.ep01.sideObjective.cainNecklace']);
