@@ -1686,6 +1686,50 @@ test('network late story cache results update interior markers and presentations
     }
 });
 
+test('network late story cache snapshots hide already completed interior markers through episode 31', () => {
+    for (let episode = 23; episode <= 31; episode++) {
+        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+        assert.ok(scenario, `missing episode ${episode}`);
+        const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+        assert.ok(sequence, `missing episode ${episode} sequence`);
+
+        const player = new Player(0, 0);
+        const raidSession = new WorldRaidSession('central_castle');
+        raidSession.beginRaidFromTown('central_castle');
+        const harness = createStoryScenarioHarness({
+            player,
+            raidSession,
+            worldMap: new WorldMap(),
+            isNetworkRaid: true,
+        });
+
+        harness.controller.applyNetworkScenarioSnapshot({
+            enteredDungeonIds: [scenario.dungeonId],
+            activeDungeonId: scenario.dungeonId,
+            completedDungeonIds: [],
+            playerFieldEventFlagsByDungeonId: {
+                [scenario.dungeonId]: sequence.fieldEvents.map((event) => getStoryScenarioFieldEventFlag(event)),
+            },
+        });
+        drainStoryPresentation(harness.controller);
+
+        const interiorMap = harness.worldMap;
+        assert.ok(interiorMap instanceof StoryInteriorMap, `episode ${episode} active map`);
+        for (const cache of getOriginalLateStoryCacheEvents(episode)) {
+            const event: StoryScenarioFieldEvent | undefined = sequence.fieldEvents.find((candidate) => candidate.originalEventId === `EVENT ${cache.eventNumber}`);
+            assert.ok(event, `episode ${episode} EVENT ${cache.eventNumber}`);
+            const markerId: string = `${event.id}:${cache.tile.x},${cache.tile.y}`;
+            assert.equal(interiorMap.getInspectMarkers().some((marker: StoryInteriorInspectMarker) => marker.id === markerId), false, `episode ${episode} ${event.id} marker hidden`);
+            player.setGridPosition(cache.tile.x, cache.tile.y + 1, true);
+            assert.equal(
+                harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any).has(`${cache.tile.x},${cache.tile.y}`),
+                false,
+                `episode ${episode} ${event.id} not inspectable`
+            );
+        }
+    }
+});
+
 test('late story presentation steps focus the camera on original event tiles', () => {
     const player = new Player(0, 0);
     const raidSession = new WorldRaidSession('central_castle');
