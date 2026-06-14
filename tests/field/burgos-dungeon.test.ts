@@ -1807,6 +1807,20 @@ test('episodes 23 through 31 launch late story interiors through the runtime con
         );
         boss.isBoss = true;
         harness.controller.completeDungeonIfBossDefeated(boss);
+
+        const expectedCompletionFocus = getPresentationStepFocus(sequence.bossDefeat[0]);
+        assert.equal(
+            harness.controller.getLastPresentationDurationMs(),
+            getStoryScenarioPresentationDurationMs(sequence.bossDefeat),
+            `episode ${episode} boss defeat presentation duration`
+        );
+        if (expectedCompletionFocus) {
+            assert.deepEqual(
+                harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1],
+                expectedCompletionFocus,
+                `episode ${episode} boss defeat focus`
+            );
+        }
         drainStoryPresentation(harness.controller);
 
         const expectedBossRewards = getOriginalLateStoryItemsForSourceEvent(episode, 99).map((item) => item.currentItemId);
@@ -1815,6 +1829,8 @@ test('episodes 23 through 31 launch late story interiors through the runtime con
         assert.equal(harness.controller.getActiveInterior(), null, `episode ${episode} interior cleared`);
         assert.equal(harness.worldMap, previousWorldMap, `episode ${episode} restored previous world`);
         assert.deepEqual(harness.placedNear, { x: 0, y: 0 }, `episode ${episode} return tile`);
+        assert.equal(harness.selectionCleared, true, `episode ${episode} selection cleared`);
+        assert.equal(harness.turnStateCleared, true, `episode ${episode} turn state cleared`);
         assert.ok(
             harness.logs.includes(formatT('story.interior.returnLog', { dungeon: scenario.dungeonNameKr })),
             `episode ${episode} return log`
