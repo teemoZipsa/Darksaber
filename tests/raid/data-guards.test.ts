@@ -753,6 +753,28 @@ test('story scenario event source references stay inside their declared original
     }
 });
 
+test('story scenario item rewards preserve their original GETITEM ids', () => {
+    for (const sequence of STORY_SCENARIO_EVENT_SEQUENCES) {
+        const rewardedEvents = [
+            ...sequence.fieldEvents,
+            ...(sequence.bossDefeatEvent ? [sequence.bossDefeatEvent] : []),
+        ];
+        for (const event of rewardedEvents) {
+            for (const reward of event.rewards ?? []) {
+                if (reward.type !== 'item') continue;
+                const itemDef = getItemDef(reward.itemId);
+                assert.ok(itemDef, `${sequence.dungeonId} ${event.id} missing reward item ${reward.itemId}`);
+                if (reward.originalItemId === undefined || reward.originalItemId <= 0) continue;
+
+                const originalItemPattern = new RegExp(`GETITEM 0*${reward.originalItemId}\\b`);
+                assert.match(event.trigger, originalItemPattern, `${sequence.dungeonId} ${event.id} reward trigger GETITEM`);
+                assert.match(itemDef.description ?? '', originalItemPattern, `${sequence.dungeonId} ${event.id} reward item description`);
+                assert.match(itemDef.descriptionKr ?? '', originalItemPattern, `${sequence.dungeonId} ${event.id} reward item Korean description`);
+            }
+        }
+    }
+});
+
 test('player data guards gold and normalizes old save shapes', () => {
     const previousStorage = globalThis.localStorage;
     const store = new Map<string, string>();
