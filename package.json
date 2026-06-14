@@ -21,6 +21,7 @@
     "render:deploy": "node scripts/render-deploy.mjs deploy",
     "render:wait": "node scripts/render-deploy.mjs wait",
     "deploy:prod": "node scripts/deploy-production.mjs",
+    "verify:late-story": "npm run verify:late-story-items && npm run verify:late-story-mrc",
     "verify:late-story-items": "node scripts/generate-late-story-item-defs.mjs --check",
     "verify:late-story-mrc": "node scripts/generate-late-story-mrc-facts.mjs --check",
     "typecheck:test": "tsc -p tsconfig.test.json",
