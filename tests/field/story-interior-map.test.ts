@@ -811,7 +811,7 @@ test('Pyramid Interior exposes original episode 13 Myant, trap, and chest flow',
     assert.ok(pyramid);
 
     assert.equal(pyramid.originalSources.sceneScript, 'Wlib/scene13.lsc');
-    assert.equal(pyramid.originalSources.globalScript, 'Glib/gscene13.lsc');
+    assert.equal(pyramid.originalSources.globalScript, 'missing');
     assert.ok(pyramid.originalSources.mapFiles.includes('MAP/13.mrc'));
     assert.ok(pyramid.originalSources.mapFiles.includes('MAP/13set.arc'));
     assert.equal(pyramid.entry.filter((step) => step.kind === 'dialogue').length, 5);
@@ -853,7 +853,7 @@ test('Skeria exposes original episode 14 Yadua, quake trap, and cache flow', () 
     assert.ok(skeria);
 
     assert.equal(skeria.originalSources.sceneScript, 'Wlib/scene14.lsc');
-    assert.equal(skeria.originalSources.globalScript, 'Glib/gscene14.lsc');
+    assert.equal(skeria.originalSources.globalScript, 'missing');
     assert.ok(skeria.originalSources.mapFiles.includes('MAP/14.mrc'));
     assert.ok(skeria.originalSources.mapFiles.includes('MAP/14set.arc'));
     assert.equal(skeria.objectiveRuntimeFlag, 'skeria_yadua_saved');
@@ -889,7 +889,7 @@ test('Skeria 2 exposes original episode 15 nameless village and yellow flower fl
     assert.ok(skeria);
 
     assert.equal(skeria.originalSources.sceneScript, 'Wlib/scene15.lsc');
-    assert.equal(skeria.originalSources.globalScript, 'Glib/gscene15.lsc');
+    assert.equal(skeria.originalSources.globalScript, 'missing');
     assert.ok(skeria.originalSources.mapFiles.includes('MAP/15.mrc'));
     assert.ok(skeria.originalSources.mapFiles.includes('MAP/15set.arc'));
     assert.ok(skeria.originalSources.mapFiles.includes('MAP/1500.mrc'));
@@ -943,7 +943,7 @@ test('Valhalla Plain exposes original episode 16 Barbatu, trap, and cache flow',
     assert.ok(valhalla);
 
     assert.equal(valhalla.originalSources.sceneScript, 'Wlib/scene16.lsc');
-    assert.equal(valhalla.originalSources.globalScript, 'Glib/gscene16.lsc');
+    assert.equal(valhalla.originalSources.globalScript, 'missing');
     assert.ok(valhalla.originalSources.mapFiles.includes('MAP/16.mrc'));
     assert.ok(valhalla.originalSources.mapFiles.includes('MAP/16set.arc'));
     assert.equal(valhalla.objectiveRuntimeFlag, 'valhalla_airship_route_opened');

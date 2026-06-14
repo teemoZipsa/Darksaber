@@ -1986,7 +1986,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
         dungeonId: 'pyramid_inside',
         originalSources: {
             sceneScript: 'Wlib/scene13.lsc',
-            globalScript: 'Glib/gscene13.lsc',
+            globalScript: 'missing',
             mapFiles: ['MAP/13.mrc', 'MAP/13t.mrc', 'MAP/13hmap.BMP', 'MAP/13set.arc'],
         },
         entry: [
@@ -2168,7 +2168,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
         dungeonId: 'skeria',
         originalSources: {
             sceneScript: 'Wlib/scene14.lsc',
-            globalScript: 'Glib/gscene14.lsc',
+            globalScript: 'missing',
             mapFiles: ['MAP/14.mrc', 'MAP/14t.mrc', 'MAP/14hmap.BMP', 'MAP/14set.arc'],
         },
         objectiveRuntimeFlag: 'skeria_yadua_saved',
@@ -2335,7 +2335,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
         dungeonId: 'skeria_2',
         originalSources: {
             sceneScript: 'Wlib/scene15.lsc',
-            globalScript: 'Glib/gscene15.lsc',
+            globalScript: 'missing',
             mapFiles: ['MAP/15.mrc', 'MAP/15t.mrc', 'MAP/15hmap.BMP', 'MAP/15set.arc', 'MAP/1500.mrc', 'MAP/1500t.mrc', 'MAP/1500hmap.bmp'],
         },
         objectiveRuntimeFlag: 'skeria_2_yellow_flower_delivered',
@@ -2505,7 +2505,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
         dungeonId: 'valhalla_plain',
         originalSources: {
             sceneScript: 'Wlib/scene16.lsc',
-            globalScript: 'Glib/gscene16.lsc',
+            globalScript: 'missing',
             mapFiles: ['MAP/16.mrc', 'MAP/16t.mrc', 'MAP/16hmap.BMP', 'MAP/16set.arc'],
         },
         objectiveRuntimeFlag: 'valhalla_airship_route_opened',
