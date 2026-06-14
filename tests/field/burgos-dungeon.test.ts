@@ -1601,6 +1601,7 @@ test('episodes 23 through 31 launch late story interiors through the runtime con
         const raidSession = new WorldRaidSession('central_castle');
         raidSession.beginRaidFromTown('central_castle');
         const harness = createStoryScenarioHarness({ player, raidSession });
+        const previousWorldMap = harness.worldMap;
         const dungeon = harness.worldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
         const quest = getStoryQuestByDungeonId(scenario.dungeonId);
         assert.ok(dungeon, `missing dungeon for episode ${episode}`);
@@ -1662,6 +1663,37 @@ test('episodes 23 through 31 launch late story interiors through the runtime con
             assert.equal(harness.controller.getLastPresentationDurationMs(), durationAfterFirstPlay, `episode ${episode} EVENT ${cache.eventNumber} duplicate presentation`);
         }
         assert.deepEqual(harness.rewardItemIds, expectedCaches.map((cache) => cache.itemId), `episode ${episode} cache rewards`);
+
+        const bossTile = getOriginalLateStoryBossTile(episode);
+        const boss = new Enemy(
+            `story_${scenario.dungeonId}_boss`,
+            bossTile.x,
+            bossTile.y,
+            scenario.bossName ?? `episode ${episode} boss`,
+            scenario.bossLevel,
+            scenario.bossColor,
+            'boss'
+        );
+        boss.isBoss = true;
+        harness.controller.completeDungeonIfBossDefeated(boss);
+        drainStoryPresentation(harness.controller);
+
+        const expectedBossRewards = getOriginalLateStoryItemsForSourceEvent(episode, 99).map((item) => item.currentItemId);
+        assert.equal(raidSession.isDungeonCleared(scenario.dungeonId), true, `episode ${episode} cleared`);
+        assert.equal(raidSession.activeDungeonId, null, `episode ${episode} active dungeon cleared`);
+        assert.equal(harness.controller.getActiveInterior(), null, `episode ${episode} interior cleared`);
+        assert.equal(harness.worldMap, previousWorldMap, `episode ${episode} restored previous world`);
+        assert.deepEqual(harness.placedNear, { x: 0, y: 0 }, `episode ${episode} return tile`);
+        assert.ok(
+            harness.logs.includes(formatT('story.interior.returnLog', { dungeon: scenario.dungeonNameKr })),
+            `episode ${episode} return log`
+        );
+        assert.ok(harness.logs.includes(t(quest.objectiveCompleteLogKey)), `episode ${episode} objective complete log`);
+        assert.deepEqual(
+            harness.rewardItemIds,
+            [...expectedCaches.map((cache) => cache.itemId), ...expectedBossRewards],
+            `episode ${episode} final rewards`
+        );
     }
 });
 
