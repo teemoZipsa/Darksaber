@@ -8,6 +8,7 @@ import { StoryInteriorMap } from '../../src/map/StoryInteriorMap';
 import { WorldRenderController } from '../../src/engine/world/WorldRenderController';
 import { WorldRaidSession } from '../../src/engine/world/WorldRaidSession';
 import type { WorldRenderModel } from '../../src/engine/world/WorldRenderModel';
+import { t } from '../../src/i18n/LanguageManager';
 
 function buildStoryInteriorRenderModel(dungeonId: string): WorldRenderModel {
     const layout = getStoryInteriorLayout(dungeonId);
@@ -77,6 +78,12 @@ test('late story interiors expose dedicated objective HUD models through episode
         assert.equal(model.storyInterior.active, true, `episode ${episode} active`);
         assert.equal(model.storyInterior.dungeonId, scenario.dungeonId, `episode ${episode} dungeon`);
         assert.equal(model.storyInterior.objectiveKey, layout.objectiveKey, `episode ${episode} objective key`);
+        assert.equal(
+            model.storyInterior.objectiveKey,
+            `story.interior.${scenario.dungeonId}.objective`,
+            `episode ${episode} dedicated objective key`
+        );
+        assert.notEqual(t(model.storyInterior.objectiveKey), model.storyInterior.objectiveKey, `episode ${episode} localized objective`);
         assert.equal(model.storyInterior.title, new StoryInteriorMap(layout).getDisplayName(), `episode ${episode} title`);
         assert.equal(model.storyInterior.enemiesLeft, 1, `episode ${episode} live enemy count`);
     }
