@@ -724,6 +724,35 @@ test('story scenario content ledger matches runtime scenario definitions', () =>
     );
 });
 
+test('story scenario event source references stay inside their declared original source files', () => {
+    for (const sequence of STORY_SCENARIO_EVENT_SEQUENCES) {
+        const declaredMapFiles = new Set(sequence.originalSources.mapFiles);
+        const declaredSetMembers = sequence.originalSources.setArcMembers
+            ? new Set(sequence.originalSources.setArcMembers.map((member) => member.toLowerCase()))
+            : null;
+        const sourcedEvents = [
+            ...sequence.fieldEvents,
+            ...(sequence.enemyDefeatEvents ?? []),
+            ...(sequence.bossDefeatEvent ? [sequence.bossDefeatEvent] : []),
+        ];
+
+        for (const event of sourcedEvents) {
+            const [sourceFile, sourceMember] = event.originalSource.split(':');
+            assert.ok(sourceFile, `${sequence.dungeonId} ${event.id} original source file`);
+            assert.ok(sourceMember, `${sequence.dungeonId} ${event.id} original source member`);
+            assert.equal(declaredMapFiles.has(sourceFile), true, `${sequence.dungeonId} ${event.id} undeclared source file ${sourceFile}`);
+            if (declaredSetMembers) {
+                assert.equal(
+                    declaredSetMembers.has(sourceMember.toLowerCase()),
+                    true,
+                    `${sequence.dungeonId} ${event.id} undeclared source member ${sourceMember}`
+                );
+            }
+            assert.match(event.originalEventId, /^EVENT \d+(?:\/\d+)*$/, `${sequence.dungeonId} ${event.id} original event id`);
+        }
+    }
+});
+
 test('player data guards gold and normalizes old save shapes', () => {
     const previousStorage = globalThis.localStorage;
     const store = new Map<string, string>();
