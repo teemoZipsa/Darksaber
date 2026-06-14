@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseOriginalArcArchive } from '../src/data/original/originalArcArchive';
 import { STORY_SCENARIO_EVENT_SEQUENCES, type StoryScenarioEventSequence } from '../src/data/StoryScenarioEventData';
-import { STORY_SCENARIOS } from '../src/data/StoryScenarioData';
+import { STORY_SCENARIOS, type StoryScenarioDefinition, type StoryScenarioMissionKind } from '../src/data/StoryScenarioData';
 
 const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Saver_Files\\Saver';
 const DEFAULT_START = 1;
@@ -21,6 +21,20 @@ interface ScenarioImportDocRow {
     globalScript: string;
     mapFiles: string[];
 }
+
+interface RoadmapDocRow {
+    episode: number;
+    questId: string;
+    dungeonId: string;
+    treatment: string;
+    objective: string;
+}
+
+const ROADMAP_TREATMENT_BY_MISSION_KIND: Record<StoryScenarioMissionKind, string> = {
+    field: '필드',
+    soloInterior: '실내',
+    vehicle: '비공정',
+};
 
 function parseArgs(argv: string[]): Options {
     const options: Options = { sourceRoot: DEFAULT_ROOT, start: DEFAULT_START, end: DEFAULT_END };
@@ -94,6 +108,25 @@ function readScenarioImportDocRows(): Map<number, ScenarioImportDocRow> {
     return rows;
 }
 
+function readRoadmapDocRows(): Map<number, RoadmapDocRow> {
+    const path = 'docs/main-quest-roadmap.md';
+    const rows = new Map<number, RoadmapDocRow>();
+    for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+        if (!line.startsWith('|')) continue;
+        const cells = line.slice(1, line.endsWith('|') ? -1 : undefined).split('|').map((cell) => cell.trim());
+        const episode = Number(cells[0]);
+        if (!Number.isInteger(episode)) continue;
+        rows.set(episode, {
+            episode,
+            questId: extractBacktickValues(cells[1] ?? '')[0],
+            dungeonId: extractBacktickValues(cells[2] ?? '')[0],
+            treatment: cells[3] ?? '',
+            objective: cells[4] ?? '',
+        });
+    }
+    return rows;
+}
+
 function requireArrayEqual(episode: number, label: string, actual: string[], expected: string[]): void {
     if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
         throw new Error(`Episode ${episode} ${label} mismatch.\n  docs: ${actual.join(', ')}\n  data: ${expected.join(', ')}`);
@@ -115,9 +148,29 @@ function verifyScenarioImportDocRow(episode: number, sequence: StoryScenarioEven
     requireArrayEqual(episode, 'docs map candidates', row.mapFiles, sequence.originalSources.mapFiles);
 }
 
+function verifyRoadmapDocRow(episode: number, scenario: StoryScenarioDefinition, docRows: Map<number, RoadmapDocRow>): void {
+    const row = docRows.get(episode);
+    if (!row) throw new Error(`Missing docs/main-quest-roadmap.md row for episode ${episode}`);
+    if (row.questId !== scenario.questId) {
+        throw new Error(`Episode ${episode} roadmap quest mismatch: ${row.questId} !== ${scenario.questId}`);
+    }
+    if (row.dungeonId !== scenario.dungeonId) {
+        throw new Error(`Episode ${episode} roadmap dungeon mismatch: ${row.dungeonId} !== ${scenario.dungeonId}`);
+    }
+    const expectedTreatment = ROADMAP_TREATMENT_BY_MISSION_KIND[scenario.missionKind];
+    if (row.treatment !== expectedTreatment) {
+        throw new Error(`Episode ${episode} roadmap treatment mismatch: ${row.treatment} !== ${expectedTreatment}`);
+    }
+    const expectedObjective = scenario.missionKind === 'vehicle' ? '탑승/진입형 특수 목표' : `${scenario.bossName} 처치`;
+    if (row.objective !== expectedObjective) {
+        throw new Error(`Episode ${episode} roadmap objective mismatch: ${row.objective} !== ${expectedObjective}`);
+    }
+}
+
 const options = parseArgs(process.argv.slice(2));
 const sourceRoot = resolve(options.sourceRoot);
 const docRows = readScenarioImportDocRows();
+const roadmapRows = readRoadmapDocRows();
 const verified: string[] = [];
 
 for (let episode = options.start; episode <= options.end; episode++) {
@@ -129,6 +182,7 @@ for (let episode = options.start; episode <= options.end; episode++) {
 
     const declaredMapFiles = new Set(sequence.originalSources.mapFiles);
     verifyScenarioImportDocRow(episode, sequence, docRows);
+    verifyRoadmapDocRow(episode, scenario, roadmapRows);
     requireSourceFile(sourceRoot, episode, sequence.originalSources.sceneScript);
     if (sequence.originalSources.globalScript !== 'missing') {
         requireSourceFile(sourceRoot, episode, sequence.originalSources.globalScript);
@@ -160,4 +214,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files and import docs: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, and roadmap docs: ${verified.join(', ')}`);
