@@ -548,6 +548,47 @@ test('local story interior uses the shared monster ids and normalized stats', ()
     assert.equal((boss as unknown as { spriteTestId: string }).spriteTestId, BURGOS_BOSS_MONSTER_ID);
 });
 
+test('local story interiors use shared scenario monster layouts through episode 31', () => {
+    const world = new WorldMap();
+    for (const scenario of STORY_SCENARIOS.filter((entry) => entry.missionKind === 'soloInterior')) {
+        const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+        const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+        const layout = getStoryInteriorLayout(scenario.dungeonId);
+        const monsterLayout = getStoryScenarioMonsterLayout(scenario);
+        assert.ok(dungeon, `episode ${scenario.episode} dungeon`);
+        assert.ok(quest, `episode ${scenario.episode} quest`);
+        assert.ok(layout, `episode ${scenario.episode} layout`);
+        assert.ok(monsterLayout.bossMonsterId, `episode ${scenario.episode} boss monster`);
+
+        const raidSession = new WorldRaidSession('central_castle');
+        raidSession.beginRaidFromTown('central_castle');
+        const harness = createStoryScenarioHarness({ raidSession });
+
+        harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+
+        assert.equal(raidSession.activeDungeonId, scenario.dungeonId, `episode ${scenario.episode} active dungeon`);
+        assert.deepEqual(harness.placedNear, layout.playerStart, `episode ${scenario.episode} player start`);
+        assert.equal(harness.fieldEnemies.length, scenario.guardCount + 1, `episode ${scenario.episode} enemy count`);
+
+        const guards = harness.fieldEnemies.filter((entry) => !entry.enemy.isBoss);
+        const boss = harness.fieldEnemies.find((entry) => entry.enemy.isBoss)?.enemy;
+        assert.equal(guards.length, scenario.guardCount, `episode ${scenario.episode} guard count`);
+        assert.ok(boss, `episode ${scenario.episode} boss`);
+        assert.equal((boss as unknown as { spriteTestId: string }).spriteTestId, monsterLayout.bossMonsterId, `episode ${scenario.episode} boss sprite`);
+        const expectedBoss = new Enemy('expected_boss', 0, 0, boss.name, boss.level, boss.color, boss.role, monsterLayout.bossMonsterId);
+        assert.equal(boss.stats.maxHp, expectedBoss.stats.maxHp, `episode ${scenario.episode} boss hp`);
+        assert.equal(boss.stats.atk, expectedBoss.stats.atk, `episode ${scenario.episode} boss atk`);
+
+        guards.forEach(({ enemy }, index) => {
+            const expectedMonsterId = monsterLayout.guardMonsterIds[index % monsterLayout.guardMonsterIds.length];
+            assert.equal((enemy as unknown as { spriteTestId: string }).spriteTestId, expectedMonsterId, `episode ${scenario.episode} guard ${index} sprite`);
+            const expectedGuard = new Enemy('expected_guard', 0, 0, enemy.name, enemy.level, enemy.color, enemy.role, expectedMonsterId);
+            assert.equal(enemy.stats.maxHp, expectedGuard.stats.maxHp, `episode ${scenario.episode} guard ${index} hp`);
+            assert.equal(enemy.stats.atk, expectedGuard.stats.atk, `episode ${scenario.episode} guard ${index} atk`);
+        });
+    }
+});
+
 test('story interior completion restores the previous world map at the return tile', () => {
     const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === BURGOS_CASTLE_DUNGEON_ID);
     const quest = getStoryQuestByDungeonId(BURGOS_CASTLE_DUNGEON_ID);
