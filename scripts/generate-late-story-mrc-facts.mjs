@@ -10,6 +10,7 @@ function parseArgs(argv) {
     sourceRoot: DEFAULT_ROOT,
     outPath: DEFAULT_OUT,
     episodes: DEFAULT_EPISODES,
+    check: false,
   };
 
   for (let index = 0; index < argv.length; index++) {
@@ -17,8 +18,9 @@ function parseArgs(argv) {
     if (arg === '--source-root') options.sourceRoot = argv[++index];
     else if (arg === '--out') options.outPath = argv[++index];
     else if (arg === '--episodes') options.episodes = argv[++index].split(',').map((value) => Number.parseInt(value, 10));
+    else if (arg === '--check') options.check = true;
     else if (arg === '--help' || arg === '-h') {
-      console.log('Usage: node scripts/generate-late-story-mrc-facts.mjs [--source-root <Saver>] [--out <json>] [--episodes 23,24]');
+      console.log('Usage: node scripts/generate-late-story-mrc-facts.mjs [--source-root <Saver>] [--out <json>] [--episodes 23,24] [--check]');
       process.exit(0);
     } else {
       throw new Error(`Unknown argument: ${arg}`);
@@ -157,5 +159,15 @@ for (const episode of options.episodes) {
   };
 }
 
-writeFileSync(outPath, `${JSON.stringify(output, null, 2)}\n`, 'utf8');
+const outputText = `${JSON.stringify(output, null, 2)}\n`;
+if (options.check) {
+  const existingText = readFileSync(outPath, 'utf8');
+  if (existingText !== outputText) {
+    console.error(`late story MRC facts are stale: ${outPath}`);
+    process.exit(1);
+  }
+  console.log(`verified late story MRC facts: ${outPath}`);
+} else {
+  writeFileSync(outPath, outputText, 'utf8');
+}
 console.log(JSON.stringify(Object.fromEntries(Object.entries(output).map(([episode, fact]) => [episode, { width: fact.width, height: fact.height, layerCount: fact.layerCount }]))));
