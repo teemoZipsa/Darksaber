@@ -1553,6 +1553,11 @@ test('network late story completion snapshots exit interiors through episode 31'
         assert.ok(harness.worldMap instanceof StoryInteriorMap, `episode ${episode} entered interior`);
         assert.equal(raidSession.activeDungeonId, scenario.dungeonId, `episode ${episode} active dungeon`);
         assert.deepEqual(harness.controller.getActiveInterior()?.layout.bossTile, getOriginalLateStoryBossTile(episode));
+        assert.ok(
+            harness.logs.includes(formatT('story.interior.enterLog', { dungeon: scenario.dungeonNameKr })),
+            `episode ${episode} network interior enter log`
+        );
+        assert.ok(harness.logs.includes(t(quest.enterLogKey)), `episode ${episode} network quest enter log`);
 
         const focusCountBeforeCompletion = harness.cameraFocusTiles.length;
         harness.controller.applyNetworkScenarioSnapshot({
@@ -1584,6 +1589,10 @@ test('network late story completion snapshots exit interiors through episode 31'
         assert.equal(raidSession.isDungeonCleared(scenario.dungeonId), true, `episode ${episode} marked clear`);
         assert.equal(harness.selectionCleared, true, `episode ${episode} selection cleared`);
         assert.equal(harness.turnStateCleared, true, `episode ${episode} turn state cleared`);
+        assert.ok(
+            harness.logs.includes(formatT('story.interior.returnLog', { dungeon: scenario.dungeonNameKr })),
+            `episode ${episode} network interior return log`
+        );
         assert.ok(harness.logs.includes(t(quest.objectiveCompleteLogKey)), `episode ${episode} objective log`);
     }
 });
