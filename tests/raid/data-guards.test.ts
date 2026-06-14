@@ -33,7 +33,11 @@ import { getSkillVisualProfile } from '../../src/data/SkillVisualProfiles';
 import { createBaseStats, getBaseStatsForClass } from '../../src/data/Stats';
 import { STORY_QUESTS, getStoryCompanionRewards, type StoryQuestReward } from '../../src/data/StoryQuestData';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
-import { STORY_SCENARIO_EVENT_SEQUENCES } from '../../src/data/StoryScenarioEventData';
+import {
+    STORY_SCENARIO_EVENT_SEQUENCES,
+    getStoryScenarioEventStepDurationMs,
+    type StoryScenarioEventStep,
+} from '../../src/data/StoryScenarioEventData';
 import { STORY_INTERIOR_LAYOUTS, getStoryInteriorLayout } from '../../src/data/StoryInteriorData';
 import { i18n } from '../../src/i18n/LanguageManager';
 import {
@@ -77,6 +81,23 @@ function assertStoryRewardData(reward: StoryQuestReward, context: string, ko: Re
     assert.ok(getClassLine(reward.classId), `${context} missing companion class ${reward.classId}`);
     assert.ok(ko[reward.nameKey], `${context} missing ko companion key ${reward.nameKey}`);
     assert.ok(en[reward.nameKey], `${context} missing en companion key ${reward.nameKey}`);
+}
+
+function assertStoryTile(tile: { x: number; y: number }, context: string): void {
+    assert.equal(Number.isInteger(tile.x), true, `${context} x integer`);
+    assert.equal(Number.isInteger(tile.y), true, `${context} y integer`);
+    assert.ok(tile.x >= 0, `${context} x bounds`);
+    assert.ok(tile.y >= 0, `${context} y bounds`);
+}
+
+function assertStoryStep(step: StoryScenarioEventStep, context: string): void {
+    const duration = getStoryScenarioEventStepDurationMs(step);
+    assert.equal(Number.isFinite(duration), true, `${context} finite duration`);
+    assert.ok(duration > 0, `${context} positive duration`);
+
+    if (step.kind === 'focus') assertStoryTile(step.target, `${context} target`);
+    if (step.kind === 'moveActor') assertStoryTile(step.target, `${context} target`);
+    if ('focus' in step && step.focus) assertStoryTile(step.focus, `${context} focus`);
 }
 
 test('town facility guards reject prototype keys and return copies', () => {
@@ -817,6 +838,8 @@ test('story scenario field events stay presentable and replay-safe', () => {
     for (const sequence of STORY_SCENARIO_EVENT_SEQUENCES) {
         assert.ok(sequence.entry.length > 0, `${sequence.dungeonId} entry presentation`);
         assert.ok(sequence.bossDefeat.length > 0, `${sequence.dungeonId} boss defeat presentation`);
+        sequence.entry.forEach((step, index) => assertStoryStep(step, `${sequence.dungeonId} entry step ${index}`));
+        sequence.bossDefeat.forEach((step, index) => assertStoryStep(step, `${sequence.dungeonId} boss defeat step ${index}`));
 
         const fieldEventIds = new Set<string>();
         const runtimeFlags = new Set<string>();
@@ -830,11 +853,9 @@ test('story scenario field events stay presentable and replay-safe', () => {
 
             assert.ok(event.triggerTiles.length > 0, `${sequence.dungeonId} ${event.id} trigger tiles`);
             assert.ok(event.steps.length > 0, `${sequence.dungeonId} ${event.id} presentation steps`);
+            event.steps.forEach((step, index) => assertStoryStep(step, `${sequence.dungeonId} ${event.id} step ${index}`));
             for (const tile of event.triggerTiles) {
-                assert.equal(Number.isInteger(tile.x), true, `${sequence.dungeonId} ${event.id} trigger tile x`);
-                assert.equal(Number.isInteger(tile.y), true, `${sequence.dungeonId} ${event.id} trigger tile y`);
-                assert.ok(tile.x >= 0, `${sequence.dungeonId} ${event.id} trigger tile x bounds`);
-                assert.ok(tile.y >= 0, `${sequence.dungeonId} ${event.id} trigger tile y bounds`);
+                assertStoryTile(tile, `${sequence.dungeonId} ${event.id} trigger tile`);
             }
 
             const hasPersistentReward = Boolean(event.questItemId || event.rewards?.length);
@@ -852,6 +873,7 @@ test('story scenario field events stay presentable and replay-safe', () => {
 
         for (const event of sequence.enemyDefeatEvents ?? []) {
             assert.ok(event.steps.length > 0, `${sequence.dungeonId} ${event.id} presentation steps`);
+            event.steps.forEach((step, index) => assertStoryStep(step, `${sequence.dungeonId} ${event.id} step ${index}`));
         }
         for (const marker of sequence.markers ?? []) {
             if (marker.hideWhenRuntimeFlag) {
