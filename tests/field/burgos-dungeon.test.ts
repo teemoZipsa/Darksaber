@@ -1461,6 +1461,39 @@ test('episode 31 local story interior starts a playable story bgm key', () => {
     }
 });
 
+test('episode 31 network story snapshot starts story bgm once on entry', () => {
+    const originalPlayBgm = AudioManager.playBgm.bind(AudioManager);
+    const playedBgmKeys: string[] = [];
+    (AudioManager as unknown as { playBgm: (key: string) => void }).playBgm = (key: string) => {
+        playedBgmKeys.push(key);
+    };
+    try {
+        const player = new Player(20, 20);
+        const raidSession = new WorldRaidSession('central_castle');
+        raidSession.beginRaidFromTown('central_castle');
+        const harness = createStoryScenarioHarness({ player, raidSession, isNetworkRaid: true });
+        const quest = getStoryQuestByDungeonId('demon_fixers_den');
+        assert.ok(quest);
+
+        harness.controller.applyNetworkScenarioSnapshot({
+            enteredDungeonIds: ['demon_fixers_den'],
+            activeDungeonId: 'demon_fixers_den',
+            completedDungeonIds: [],
+        });
+        harness.controller.applyNetworkScenarioSnapshot({
+            enteredDungeonIds: ['demon_fixers_den'],
+            activeDungeonId: 'demon_fixers_den',
+            completedDungeonIds: [],
+        });
+
+        assert.deepEqual(playedBgmKeys, [quest.bgmKey]);
+        assert.ok(harness.worldMap instanceof StoryInteriorMap);
+        assert.equal(raidSession.activeDungeonId, 'demon_fixers_den');
+    } finally {
+        (AudioManager as unknown as { playBgm: typeof originalPlayBgm }).playBgm = originalPlayBgm;
+    }
+});
+
 test('late story presentation steps focus the camera on original event tiles', () => {
     const player = new Player(0, 0);
     const raidSession = new WorldRaidSession('central_castle');
