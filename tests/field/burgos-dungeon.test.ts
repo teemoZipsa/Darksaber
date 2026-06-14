@@ -45,7 +45,7 @@ import { WorldLootController } from '../../src/engine/world/WorldLootController'
 import { WorldSelectionController } from '../../src/engine/world/WorldSelectionController';
 import { WorldStoryScenarioController } from '../../src/engine/world/WorldStoryScenarioController';
 import { GridInventory } from '../../src/inventory/GridInventory';
-import { t } from '../../src/i18n/LanguageManager';
+import { formatT, t } from '../../src/i18n/LanguageManager';
 import { generateWorldLootNear } from '../../src/loot/WorldLootGenerator';
 import { BURGOS_CASTLE_HMAP_ROWS, BURGOS_CASTLE_HMAP_SIZE } from '../../src/map/BurgosCastleHmap';
 import { getStoryHmapTileAt, STORY_HMAP_EPISODES, STORY_HMAP_SIZE } from '../../src/map/StoryHmaps';
@@ -1614,6 +1614,11 @@ test('episodes 23 through 31 launch late story interiors through the runtime con
         assert.deepEqual({ x: player.gridX, y: player.gridY }, layout.playerStart, `episode ${episode} player start`);
         assert.deepEqual(harness.cameraFocusTiles[0], getOriginalLateStoryBossTile(episode), `episode ${episode} first focus`);
         assert.equal(harness.controller.getLastPresentationDurationMs(), getStoryScenarioPresentationDurationMs(sequence.entry));
+        assert.ok(
+            harness.logs.includes(formatT('story.interior.enterLog', { dungeon: scenario.dungeonNameKr })),
+            `episode ${episode} interior enter log`
+        );
+        assert.ok(harness.logs.includes(t(quest.enterLogKey)), `episode ${episode} quest enter log`);
         assert.equal(harness.fieldEnemies.length, scenario.guardCount + 1, `episode ${episode} enemy count`);
         assert.equal(harness.fieldEnemies.filter((entry) => entry.enemy.isBoss).length, 1, `episode ${episode} boss count`);
         assert.ok(harness.fieldEnemies.every((entry) => harness.worldMap.isWalkable(entry.enemy.gridX, entry.enemy.gridY)), `episode ${episode} enemy tile`);
