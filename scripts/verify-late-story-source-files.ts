@@ -35,6 +35,13 @@ function requireSourceFile(sourceRoot: string, episode: number, sourceFile: stri
     }
 }
 
+function requireAbsentSourceFile(sourceRoot: string, episode: number, sourceFile: string): void {
+    const path = join(sourceRoot, sourceFile);
+    if (existsSync(path)) {
+        throw new Error(`Episode ${episode} declares missing original source file ${sourceFile}, but it exists: ${path}`);
+    }
+}
+
 const options = parseArgs(process.argv.slice(2));
 const sourceRoot = resolve(options.sourceRoot);
 const verified: string[] = [];
@@ -49,6 +56,8 @@ for (let episode = LATE_STORY_START; episode <= LATE_STORY_END; episode++) {
     requireSourceFile(sourceRoot, episode, sequence.originalSources.sceneScript);
     if (sequence.originalSources.globalScript !== 'missing') {
         requireSourceFile(sourceRoot, episode, sequence.originalSources.globalScript);
+    } else {
+        requireAbsentSourceFile(sourceRoot, episode, `Glib/gscene${episode}.lsc`);
     }
     for (const sourceFile of sequence.originalSources.mapFiles) {
         requireSourceFile(sourceRoot, episode, sourceFile);
