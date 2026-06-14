@@ -528,6 +528,7 @@ export class WorldStoryScenarioController {
             ? this.getFieldEventPresentationSteps(result.dungeonId, event, result.presentationSteps)
             : result.presentationSteps);
         for (const reward of result.rewards) this.applyNetworkFieldEventReward(reward);
+        this.syncActiveInteriorInspectMarkers();
         this.syncActiveWorldScenarioMarkers();
     }
 
@@ -538,6 +539,7 @@ export class WorldStoryScenarioController {
         if (this.isFieldEventCompleted(message.dungeonId, event)) return;
         this.markNetworkFieldEventComplete(message.dungeonId, message.eventId, message.flag);
         this.enqueueStoryScenarioPresentation(this.getFieldEventPresentationSteps(message.dungeonId, event, message.presentationSteps));
+        this.syncActiveInteriorInspectMarkers();
         this.syncActiveWorldScenarioMarkers();
     }
 
@@ -666,10 +668,6 @@ export class WorldStoryScenarioController {
         const active = this.activeInterior;
         const worldMap = this.context.getWorldMap();
         if (!active || !(worldMap instanceof StoryInteriorMap)) return;
-        if (this.context.isNetworkRaid()) {
-            worldMap.setInspectMarkers([]);
-            return;
-        }
 
         const sequence = getStoryScenarioEventSequence(active.dungeonId);
         if (!sequence) {

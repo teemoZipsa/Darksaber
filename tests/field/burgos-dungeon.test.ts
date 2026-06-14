@@ -54,6 +54,7 @@ import { getStoryInteriorLayout, isStoryInteriorDungeon } from '../../src/data/S
 import { StoryInteriorMap, type StoryInteriorInspectMarker } from '../../src/map/StoryInteriorMap';
 import { NEUTRAL_BIRD_SPRITE_SRC, WorldMap } from '../../src/map/WorldMap';
 import { TileType } from '../../src/map/Tile';
+import type { ScenarioFieldEventRewardResult } from '../../src/net/WorldProtocol';
 
 class ImageStub {
     public src = '';
@@ -1570,6 +1571,65 @@ test('network late story completion snapshots exit interiors through episode 31'
         assert.equal(harness.selectionCleared, true, `episode ${episode} selection cleared`);
         assert.equal(harness.turnStateCleared, true, `episode ${episode} turn state cleared`);
         assert.ok(harness.logs.includes(t(quest.objectiveCompleteLogKey)), `episode ${episode} objective log`);
+    }
+});
+
+test('network late story cache results update interior markers and presentations through episode 31', () => {
+    for (let episode = 23; episode <= 31; episode++) {
+        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+        assert.ok(scenario, `missing episode ${episode}`);
+        const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+        assert.ok(sequence, `missing episode ${episode} sequence`);
+
+        const player = new Player(0, 0);
+        const raidSession = new WorldRaidSession('central_castle');
+        raidSession.beginRaidFromTown('central_castle');
+        const harness = createStoryScenarioHarness({
+            player,
+            raidSession,
+            worldMap: new WorldMap(),
+            isNetworkRaid: true,
+        });
+
+        harness.controller.applyNetworkScenarioSnapshot({
+            enteredDungeonIds: [scenario.dungeonId],
+            activeDungeonId: scenario.dungeonId,
+            completedDungeonIds: [],
+        });
+        drainStoryPresentation(harness.controller);
+
+        const interiorMap = harness.worldMap;
+        assert.ok(interiorMap instanceof StoryInteriorMap, `episode ${episode} active map`);
+        for (const cache of getOriginalLateStoryCacheEvents(episode)) {
+            const event: StoryScenarioFieldEvent | undefined = sequence.fieldEvents.find((candidate) => candidate.originalEventId === `EVENT ${cache.eventNumber}`);
+            assert.ok(event, `episode ${episode} EVENT ${cache.eventNumber}`);
+            const markerId: string = `${event.id}:${cache.tile.x},${cache.tile.y}`;
+            const rewards: ScenarioFieldEventRewardResult[] = (event.rewards ?? []).map((reward) => reward.type === 'item'
+                ? { type: 'item', itemId: reward.itemId }
+                : { type: 'gold', amount: reward.amount });
+            assert.equal(interiorMap.getInspectMarkers().some((marker) => marker.id === markerId), true, `episode ${episode} ${event.id} marker before`);
+
+            harness.controller.applyNetworkScenarioFieldEventResult({
+                type: 'SCENARIO_FIELD_EVENT_RESULT',
+                intentId: `cache-${episode}-${event.id}`,
+                dungeonId: scenario.dungeonId,
+                eventId: event.id,
+                scope: 'player',
+                flag: getStoryScenarioFieldEventFlag(event),
+                presentationSteps: event.steps,
+                rewards,
+            });
+
+            assert.equal(interiorMap.getInspectMarkers().some((marker) => marker.id === markerId), false, `episode ${episode} ${event.id} marker after`);
+            assert.equal(raidSession.hasScenarioFlag(scenario.dungeonId, getStoryScenarioFieldEventFlag(event)), true, `episode ${episode} ${event.id} flag`);
+            assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], cache.tile, `episode ${episode} ${event.id} focus`);
+            assert.equal(
+                harness.controller.getLastPresentationDurationMs(),
+                getStoryScenarioPresentationDurationMs(event.steps),
+                `episode ${episode} ${event.id} duration`
+            );
+            drainStoryPresentation(harness.controller);
+        }
     }
 });
 
