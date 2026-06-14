@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { AUDIO_CATALOG } from '../src/engine/AudioManager';
 import { parseOriginalArcArchive } from '../src/data/original/originalArcArchive';
 import { i18n } from '../src/i18n/LanguageManager';
 import { getBurgosCastleHmapTileAt, BURGOS_CASTLE_HMAP_SIZE } from '../src/map/BurgosCastleHmap';
@@ -143,6 +144,7 @@ function readScenarioImportDocRows(): Map<number, ScenarioImportDocRow> {
         const globalValues = extractBacktickValues(cells[4] ?? '');
         const globalScript = globalValues[0] ?? cells[4];
         const mapFiles = extractBacktickValues(cells[5] ?? '');
+        if (rows.has(episode)) throw new Error(`Duplicate docs/original-scenario-import.md row for episode ${episode}`);
         rows.set(episode, { episode, dungeonId, sceneScript, globalScript, mapFiles });
     }
     return rows;
@@ -156,6 +158,7 @@ function readRoadmapDocRows(): Map<number, RoadmapDocRow> {
         const cells = line.slice(1, line.endsWith('|') ? -1 : undefined).split('|').map((cell) => cell.trim());
         const episode = Number(cells[0]);
         if (!Number.isInteger(episode)) continue;
+        if (rows.has(episode)) throw new Error(`Duplicate docs/main-quest-roadmap.md row for episode ${episode}`);
         rows.set(episode, {
             episode,
             questId: extractBacktickValues(cells[1] ?? '')[0],
@@ -173,6 +176,7 @@ function readStoryScenarioContentRows(): Map<number, StoryScenarioDefinition> {
     const contentScenarios = JSON.parse(readFileSync(path, 'utf8')) as StoryScenarioDefinition[];
     for (const scenario of contentScenarios) {
         if (!Number.isInteger(scenario.episode)) throw new Error(`${path} has a scenario without an integer episode`);
+        if (rows.has(scenario.episode)) throw new Error(`${path} has a duplicate episode ${scenario.episode}`);
         rows.set(scenario.episode, scenario);
     }
     return rows;
@@ -181,6 +185,81 @@ function readStoryScenarioContentRows(): Map<number, StoryScenarioDefinition> {
 function requireArrayEqual(episode: number, label: string, actual: string[], expected: string[]): void {
     if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
         throw new Error(`Episode ${episode} ${label} mismatch.\n  docs: ${actual.join(', ')}\n  data: ${expected.join(', ')}`);
+    }
+}
+
+function requireUniqueValues(label: string, values: string[]): void {
+    const seen = new Set<string>();
+    for (const value of values) {
+        if (seen.has(value)) throw new Error(`Duplicate ${label}: ${value}`);
+        seen.add(value);
+    }
+}
+
+function requireNumberArrayEqual(label: string, actual: number[], expected: number[]): void {
+    if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
+        throw new Error(`${label} mismatch.\n  actual: ${actual.join(', ')}\n  expected: ${expected.join(', ')}`);
+    }
+}
+
+function requireStringArrayEqual(label: string, actual: string[], expected: string[]): void {
+    if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
+        throw new Error(`${label} mismatch.\n  actual: ${actual.join(', ')}\n  expected: ${expected.join(', ')}`);
+    }
+}
+
+function verifyStoryCollectionContracts(
+    start: number,
+    end: number,
+    docRows: Map<number, ScenarioImportDocRow>,
+    roadmapRows: Map<number, RoadmapDocRow>,
+    contentRows: Map<number, StoryScenarioDefinition>
+): void {
+    const expectedEpisodes = Array.from({ length: DEFAULT_END - DEFAULT_START + 1 }, (_, index) => DEFAULT_START + index);
+    const requestedEpisodes = Array.from({ length: end - start + 1 }, (_, index) => start + index);
+
+    requireNumberArrayEqual('story scenario episode chain', STORY_SCENARIOS.map((scenario) => scenario.episode), expectedEpisodes);
+    requireNumberArrayEqual('story quest episode chain', STORY_QUESTS.map((quest) => quest.episode), expectedEpisodes);
+    requireNumberArrayEqual('story content ledger episode chain', [...contentRows.keys()].sort((left, right) => left - right), expectedEpisodes);
+    requireNumberArrayEqual('story import doc requested episodes', requestedEpisodes.filter((episode) => docRows.has(episode)), requestedEpisodes);
+    requireNumberArrayEqual('story roadmap doc requested episodes', requestedEpisodes.filter((episode) => roadmapRows.has(episode)), requestedEpisodes);
+
+    requireUniqueValues('story quest id', STORY_SCENARIOS.map((scenario) => scenario.questId));
+    requireUniqueValues('story scenario dungeon id', STORY_SCENARIOS.map((scenario) => scenario.dungeonId));
+    requireUniqueValues('story quest dungeon id', STORY_QUESTS.map((quest) => quest.dungeonId));
+    requireUniqueValues('story event sequence dungeon id', STORY_SCENARIO_EVENT_SEQUENCES.map((sequence) => sequence.dungeonId));
+
+    requireStringArrayEqual(
+        'story event sequence dungeon coverage',
+        STORY_SCENARIO_EVENT_SEQUENCES.map((sequence) => sequence.dungeonId).sort(),
+        STORY_SCENARIOS.map((scenario) => scenario.dungeonId).sort()
+    );
+    requireStringArrayEqual(
+        'story interior layout dungeon coverage',
+        STORY_INTERIOR_LAYOUTS.map((layout) => layout.dungeonId).sort(),
+        STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'soloInterior').map((scenario) => scenario.dungeonId).sort()
+    );
+    requireNumberArrayEqual(
+        'story solo interior episode set',
+        STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'soloInterior').map((scenario) => scenario.episode),
+        [1, 2, 3, 7, 13, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+    );
+    requireNumberArrayEqual(
+        'story vehicle episode set',
+        STORY_SCENARIOS.filter((scenario) => scenario.missionKind === 'vehicle').map((scenario) => scenario.episode),
+        [17]
+    );
+
+    for (const [index, quest] of STORY_QUESTS.entries()) {
+        const expectedPrerequisiteQuestId = index === 0 ? undefined : STORY_QUESTS[index - 1].id;
+        if (quest.prerequisiteQuestId !== expectedPrerequisiteQuestId) {
+            throw new Error(`Episode ${quest.episode} quest chain mismatch: ${quest.prerequisiteQuestId} !== ${expectedPrerequisiteQuestId}`);
+        }
+        if (!quest.bgmKey) throw new Error(`Episode ${quest.episode} missing story BGM key`);
+        const bgm = AUDIO_CATALOG[quest.bgmKey];
+        if (bgm?.channel !== 'bgm') throw new Error(`Episode ${quest.episode} missing playable story BGM catalog entry ${quest.bgmKey}`);
+        const bgmPath = join(process.cwd(), 'public', bgm.src.replace(/^\//, ''));
+        if (!existsSync(bgmPath)) throw new Error(`Episode ${quest.episode} missing playable story BGM asset ${bgm.src}: ${bgmPath}`);
     }
 }
 
@@ -560,6 +639,8 @@ const completionFlags = new Map<string, string>();
 const worldMap = new WorldMap();
 const verified: string[] = [];
 
+verifyStoryCollectionContracts(options.start, options.end, docRows, roadmapRows, contentRows);
+
 for (let episode = options.start; episode <= options.end; episode++) {
     const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
     if (!scenario) throw new Error(`Missing story scenario ${episode}`);
@@ -609,4 +690,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, quests, scenario ledgers, world entrances, hmaps, field placements, monsters, i18n, and completion contracts: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, collection chains, quests, scenario ledgers, world entrances, hmaps, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
