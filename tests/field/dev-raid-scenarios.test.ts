@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import type { GameManager } from '../../src/engine/GameManager';
 import { WorldEngine } from '../../src/engine/WorldEngine';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
@@ -151,6 +152,17 @@ test('dev raid scenario parser accepts late story interiors 23 through 31 only',
     assert.equal(parseDevRaidScenario('story22'), null);
     assert.equal(parseDevRaidScenario('story32'), null);
     assert.equal(parseDevRaidScenario('storyxx'), null);
+});
+
+test('package scripts expose each late story dev entry through episode 31', () => {
+    const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
+    for (let episode = 23; episode <= 31; episode++) {
+        assert.equal(
+            packageJson.scripts[`dev:raid:story${episode}`],
+            `node scripts/dev-town.mjs raid story${episode}`,
+            `episode ${episode} dev script`
+        );
+    }
 });
 
 test('WorldEngine close hook delegates to the raid lifecycle controller', () => {
