@@ -1234,6 +1234,94 @@ test('server late story boss rewards are not persisted on failed raid results', 
     }
 });
 
+test('server late story objectives do not persist when extracting back to the departure town through episode 31', () => {
+    const world = new WorldMap();
+
+    for (let episode = 23; episode <= 31; episode++) {
+        const session = new WorldSession();
+        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+        assert.ok(scenario, `episode ${episode} scenario`);
+        const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+        const departureTown = world.getTowns().find((town) => town.id === 'central_castle');
+        assert.ok(dungeon, `episode ${episode} dungeon`);
+        assert.ok(departureTown, `episode ${episode} departure town`);
+        const completedQuestIds = STORY_SCENARIOS
+            .filter((entry) => entry.episode < episode)
+            .map((entry) => entry.questId);
+        const character = authCharacter(`departure-ep${episode}`);
+        const save = createDefaultCharacterSave(character);
+        save.questState = { ...save.questState, completedQuestIds };
+        const joined = session.join({
+            ...joinMessage('central_castle', character.id),
+            completedQuestIds,
+            partyComposition: [actor(character.id, {
+                stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+            })],
+        }, episode, {
+            accountId: character.accountId,
+            characterId: character.id,
+            completedQuestIds,
+            saveSnapshot: save,
+        });
+        const internals = session as any;
+        const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+        assert.ok(serverActor, `episode ${episode} actor`);
+        serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+        const enter = session.handleMessage(joined.playerId, {
+            type: 'SCENARIO_ENTER',
+            intentId: `enter-departure-ep${episode}`,
+            actorId: serverActor.id,
+            dungeonId: scenario.dungeonId,
+        }, 1_000 + episode);
+        assert.equal(enter.replies.length, 0, `episode ${episode} enter`);
+
+        const bossEntry = [...internals.enemies.values()].find((entry: any) => entry.scenarioObjective);
+        assert.ok(bossEntry, `episode ${episode} boss`);
+        serverActor.actionGauge = 100;
+        serverActor.remainingAp = 80;
+        serverActor.tile = { x: bossEntry.enemy.gridX - 1, y: bossEntry.enemy.gridY };
+        bossEntry.enemy.stats.hp = 1;
+        bossEntry.enemy.stats.def = 0;
+        bossEntry.enemy.stats.spd = 0;
+
+        withFixedRandom(0, () => session.handleMessage(joined.playerId, {
+            type: 'PLAYER_INTENT',
+            intentId: `kill-departure-ep${episode}`,
+            actorId: serverActor.id,
+            kind: 'attack',
+            payload: { targetId: bossEntry.enemy.id },
+        }, 2_000 + episode));
+
+        serverActor.tile = world.getTownSpawnTile(departureTown);
+        const leave = session.handleMessage(joined.playerId, { type: 'WORLD_LEAVE', reason: 'town' }, 3_000 + episode);
+        const result = leave.replies[0];
+        assert.equal(result?.type, 'RAID_RESULT', `episode ${episode} raid result`);
+        if (result?.type === 'RAID_RESULT') {
+            assert.equal(result.result, 'LEFT', `episode ${episode} departure town result`);
+            assert.equal(result.extractionTownId, 'central_castle', `episode ${episode} extraction town`);
+        }
+
+        const finalPatch = session.createCharacterSavePatch(joined.playerId);
+        const expectedRewards = getOriginalLateStoryItemsForSourceEvent(episode, 99).map((item) => item.currentItemId);
+        assert.ok(finalPatch?.inventory, `episode ${episode} final patch`);
+        const finalQuestState = finalPatch.questState;
+        assert.ok(finalQuestState, `episode ${episode} final quest state`);
+        assert.deepEqual(
+            finalPatch.inventory.items
+                .filter((item) => expectedRewards.includes(item.itemId))
+                .map((item) => item.itemId),
+            [],
+            `episode ${episode} departure town final patch excludes EVENT 99 rewards`
+        );
+        assert.deepEqual(
+            finalQuestState.completedQuestIds,
+            completedQuestIds,
+            `episode ${episode} departure town final patch excludes raid quest completion`
+        );
+    }
+});
+
 test('scenario entry validates quest prerequisites on the server', () => {
     const session = new WorldSession();
     const world = new WorldMap();
