@@ -11,8 +11,8 @@ import { createDefaultCharacterSave, type AuthCharacter } from '../../server/Aut
 import { getItemDef } from '../../src/data/ItemDB';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import { getStoryScenarioMonsterLayout } from '../../src/data/StoryScenarioMonsterData';
-import { getStoryScenarioEventSequence } from '../../src/data/StoryScenarioEventData';
-import { getStoryScenarioFieldEventTiles } from '../../src/data/StoryScenarioFieldEventPlacement';
+import { getStoryScenarioEventSequence, getStoryScenarioPresentationDurationMs } from '../../src/data/StoryScenarioEventData';
+import { getStoryScenarioFieldEventFlag, getStoryScenarioFieldEventTiles } from '../../src/data/StoryScenarioFieldEventPlacement';
 import { getStoryInteriorLayout } from '../../src/data/StoryInteriorData';
 import {
     getOriginalLateStoryBossTile,
@@ -994,6 +994,12 @@ test('server late story interior cache rewards persist only after survival throu
             const fieldResult = result.replies[0];
             assert.equal(fieldResult?.type, 'SCENARIO_FIELD_EVENT_RESULT', `episode ${episode} ${event.id} result`);
             if (fieldResult?.type !== 'SCENARIO_FIELD_EVENT_RESULT') continue;
+            assert.equal(fieldResult.flag, getStoryScenarioFieldEventFlag(event), `episode ${episode} ${event.id} flag`);
+            assert.deepEqual(fieldResult.presentationSteps, event.steps, `episode ${episode} ${event.id} presentation steps`);
+            assert.ok(
+                getStoryScenarioPresentationDurationMs(fieldResult.presentationSteps) > 0,
+                `episode ${episode} ${event.id} presentation duration`
+            );
             const eventRewardIds = (event.rewards ?? [])
                 .filter((reward) => reward.type === 'item')
                 .map((reward) => reward.itemId)
