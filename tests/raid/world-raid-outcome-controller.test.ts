@@ -394,6 +394,40 @@ test('episode 31 objective cannot bypass story quest prerequisites at raid resul
     assert.equal(getOutcome()?.questRewards?.some((line) => line.includes('31화')), false);
 });
 
+test('story quest views show objective complete before extraction through episode 31', () => {
+    for (const quest of STORY_QUESTS) {
+        const { playerData, raidSession } = createController();
+        for (const previousQuest of STORY_QUESTS.filter((candidate) => candidate.episode < quest.episode)) {
+            playerData.markCleared(previousQuest.id);
+        }
+
+        raidSession.beginRaidFromTown('central_castle');
+        assert.equal(
+            getStoryQuestViews(playerData, raidSession).find((view) => view.quest.id === quest.id)?.status,
+            'active',
+            `episode ${quest.episode} starts active`
+        );
+
+        markStoryObjectiveComplete(raidSession, quest.dungeonId);
+        const viewsAfterObjective = getStoryQuestViews(playerData, raidSession);
+        assert.equal(
+            viewsAfterObjective.find((view) => view.quest.id === quest.id)?.status,
+            'objectiveComplete',
+            `episode ${quest.episode} objective complete before extraction`
+        );
+        assert.equal(playerData.isCleared(quest.id), false, `episode ${quest.episode} not permanently complete before extraction`);
+
+        const nextQuest = STORY_QUESTS.find((candidate) => candidate.episode === quest.episode + 1);
+        if (nextQuest) {
+            assert.equal(
+                viewsAfterObjective.some((view) => view.quest.id === nextQuest.id),
+                false,
+                `episode ${quest.episode} does not unlock episode ${nextQuest.episode} before extraction`
+            );
+        }
+    }
+});
+
 test('story objectives 1 through 31 grant quest completion once after survival', () => {
     for (const quest of STORY_QUESTS) {
         const { controller, playerData, raidSession, getOutcome } = createController();
