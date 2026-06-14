@@ -2,8 +2,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseOriginalArcArchive } from '../src/data/original/originalArcArchive';
 import { i18n } from '../src/i18n/LanguageManager';
-import { STORY_INTERIOR_LAYOUTS } from '../src/data/StoryInteriorData';
+import { getStoryInteriorLayout, STORY_INTERIOR_LAYOUTS } from '../src/data/StoryInteriorData';
+import { getMonsterDefinitionSafe } from '../src/data/MonsterCatalog';
 import { STORY_QUESTS } from '../src/data/StoryQuestData';
+import { getStoryScenarioMonsterLayout } from '../src/data/StoryScenarioMonsterData';
 import {
     getStoryScenarioEventStepDurationMs,
     getStoryScenarioPresentationDurationMs,
@@ -44,6 +46,26 @@ const ROADMAP_TREATMENT_BY_MISSION_KIND: Record<StoryScenarioMissionKind, string
     soloInterior: '실내',
     vehicle: '비공정',
 };
+
+function scenarioSignature(scenario: StoryScenarioDefinition): StoryScenarioDefinition {
+    return {
+        episode: scenario.episode,
+        questId: scenario.questId,
+        dungeonId: scenario.dungeonId,
+        dungeonNameKr: scenario.dungeonNameKr,
+        dungeonNameEn: scenario.dungeonNameEn,
+        chunkX: scenario.chunkX,
+        chunkY: scenario.chunkY,
+        sprite: scenario.sprite,
+        bossName: scenario.bossName,
+        bossLevel: scenario.bossLevel,
+        bossColor: scenario.bossColor,
+        guardLevel: scenario.guardLevel,
+        guardCount: scenario.guardCount,
+        missionKind: scenario.missionKind,
+        reward: scenario.reward,
+    };
+}
 
 function parseArgs(argv: string[]): Options {
     const options: Options = { sourceRoot: DEFAULT_ROOT, start: DEFAULT_START, end: DEFAULT_END };
@@ -136,6 +158,17 @@ function readRoadmapDocRows(): Map<number, RoadmapDocRow> {
     return rows;
 }
 
+function readStoryScenarioContentRows(): Map<number, StoryScenarioDefinition> {
+    const path = 'src/data/content/story-scenarios.json';
+    const rows = new Map<number, StoryScenarioDefinition>();
+    const contentScenarios = JSON.parse(readFileSync(path, 'utf8')) as StoryScenarioDefinition[];
+    for (const scenario of contentScenarios) {
+        if (!Number.isInteger(scenario.episode)) throw new Error(`${path} has a scenario without an integer episode`);
+        rows.set(scenario.episode, scenario);
+    }
+    return rows;
+}
+
 function requireArrayEqual(episode: number, label: string, actual: string[], expected: string[]): void {
     if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
         throw new Error(`Episode ${episode} ${label} mismatch.\n  docs: ${actual.join(', ')}\n  data: ${expected.join(', ')}`);
@@ -205,6 +238,64 @@ function verifyStoryQuestDefinition(episode: number, scenario: StoryScenarioDefi
     for (const [key, expectedValue] of Object.entries(expectedKeys)) {
         if (quest[key as keyof typeof expectedKeys] !== expectedValue) {
             throw new Error(`Episode ${episode} quest ${key} mismatch: ${quest[key as keyof typeof expectedKeys]} !== ${expectedValue}`);
+        }
+    }
+}
+
+function verifyStoryScenarioContentLedger(episode: number, scenario: StoryScenarioDefinition, contentRows: Map<number, StoryScenarioDefinition>): void {
+    const row = contentRows.get(episode);
+    if (!row) throw new Error(`Missing src/data/content/story-scenarios.json row for episode ${episode}`);
+    if (JSON.stringify(scenarioSignature(row)) !== JSON.stringify(scenarioSignature(scenario))) {
+        throw new Error(`Episode ${episode} story scenario content ledger mismatch with runtime scenario definition`);
+    }
+}
+
+function verifyStoryScenarioMonsterContract(episode: number, scenario: StoryScenarioDefinition): void {
+    if (scenario.guardCount < 0 || !Number.isInteger(scenario.guardCount)) {
+        throw new Error(`Episode ${episode} invalid guard count ${scenario.guardCount}`);
+    }
+    if (scenario.guardLevel < 1 || !Number.isInteger(scenario.guardLevel)) {
+        throw new Error(`Episode ${episode} invalid guard level ${scenario.guardLevel}`);
+    }
+    if (scenario.bossLevel < scenario.guardLevel) {
+        throw new Error(`Episode ${episode} boss level ${scenario.bossLevel} is below guard level ${scenario.guardLevel}`);
+    }
+    if (scenario.missionKind === 'vehicle') {
+        if (scenario.bossName !== null) throw new Error(`Episode ${episode} vehicle mission should not declare a boss name`);
+    } else if (!scenario.bossName) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} needs an objective boss name`);
+    }
+
+    const monsterLayout = getStoryScenarioMonsterLayout(scenario);
+    if (scenario.guardCount > 0 && monsterLayout.guardMonsterIds.length === 0) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} has guards but no guard monster ids`);
+    }
+    for (const guardMonsterId of monsterLayout.guardMonsterIds) {
+        if (!getMonsterDefinitionSafe(guardMonsterId)) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} unknown guard monster id ${guardMonsterId}`);
+        }
+    }
+    if (monsterLayout.guardOffsets && monsterLayout.guardOffsets.length !== scenario.guardCount) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} guard offset count mismatch: ${monsterLayout.guardOffsets.length} !== ${scenario.guardCount}`);
+    }
+
+    if (scenario.missionKind !== 'vehicle') {
+        if (!monsterLayout.bossMonsterId) throw new Error(`Episode ${episode} ${scenario.dungeonId} missing boss monster id`);
+        if (!getMonsterDefinitionSafe(monsterLayout.bossMonsterId)) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} unknown boss monster id ${monsterLayout.bossMonsterId}`);
+        }
+    }
+
+    if (scenario.missionKind === 'soloInterior') {
+        const layout = getStoryInteriorLayout(scenario.dungeonId);
+        if (!layout) throw new Error(`Episode ${episode} ${scenario.dungeonId} missing story interior layout`);
+        if (layout.guardTiles.length < scenario.guardCount) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} guard tile count is too low: ${layout.guardTiles.length} < ${scenario.guardCount}`);
+        }
+        const usedGuardTiles = layout.guardTiles.slice(0, scenario.guardCount);
+        const occupied = new Set([layout.playerStart, layout.bossTile, ...usedGuardTiles].map((tile) => `${tile.x},${tile.y}`));
+        if (occupied.size !== usedGuardTiles.length + 2) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} combat spawn tiles overlap`);
         }
     }
 }
@@ -337,6 +428,7 @@ const options = parseArgs(process.argv.slice(2));
 const sourceRoot = resolve(options.sourceRoot);
 const docRows = readScenarioImportDocRows();
 const roadmapRows = readRoadmapDocRows();
+const contentRows = readStoryScenarioContentRows();
 const completionFlags = new Map<string, string>();
 const verified: string[] = [];
 
@@ -351,6 +443,8 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verifyScenarioImportDocRow(episode, sequence, docRows);
     verifyRoadmapDocRow(episode, scenario, roadmapRows);
     verifyStoryQuestDefinition(episode, scenario);
+    verifyStoryScenarioContentLedger(episode, scenario, contentRows);
+    verifyStoryScenarioMonsterContract(episode, scenario);
     verifyStoryI18nKeys(episode, scenario, sequence);
     verifyStoryCompletionContract(episode, scenario, sequence, completionFlags);
     requireSourceFile(sourceRoot, episode, sequence.originalSources.sceneScript);
@@ -384,4 +478,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, quests, i18n, and completion contracts: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, quests, scenario ledgers, monsters, i18n, and completion contracts: ${verified.join(', ')}`);

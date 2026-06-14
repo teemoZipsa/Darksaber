@@ -946,7 +946,7 @@ const AMENT_1F_LAYOUT: StoryInteriorLayout = {
     playerStart: { x: 28, y: 35 },
     guardTiles: [
         { x: 28, y: 31 },
-        { x: 28, y: 40 },
+        { x: 27, y: 40 },
         { x: 23, y: 35 },
         { x: 33, y: 35 },
         { x: 30, y: 14 },
