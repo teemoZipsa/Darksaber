@@ -1222,6 +1222,29 @@ test('Flame Castle exposes original episode 22 Beramode, relic, and clear flow',
 });
 
 test('episodes 23 through 31 use original late interior routes and events', () => {
+    const expectedEntryDialogueCounts: Record<number, number> = {
+        23: 4,
+        24: 1,
+        25: 6,
+        26: 0,
+        27: 0,
+        28: 21,
+        29: 17,
+        30: 14,
+        31: 14,
+    };
+    const expectedBossDefeatDialogueCounts: Record<number, number> = {
+        23: 1,
+        24: 1,
+        25: 4,
+        26: 0,
+        27: 0,
+        28: 2,
+        29: 3,
+        30: 10,
+        31: 8,
+    };
+
     for (const episode of [23, 24, 25, 26, 27, 28, 29, 30, 31]) {
         const fact = getOriginalLateStoryFact(episode);
         const mrcFact = getOriginalLateStoryMrcFact(episode);
@@ -1282,12 +1305,14 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         );
         assert.equal(sequence.entry.filter((step) => step.kind === 'combatStart').length, 1);
         const entryDialogueCount = sequence.entry.filter((step) => step.kind === 'dialogue').length;
+        assert.equal(entryDialogueCount, expectedEntryDialogueCounts[episode], `${fact.dungeonId}:entry dialogue count`);
         if (fact.deoMember) {
             assert.ok(entryDialogueCount > 0, `${fact.dungeonId}:entry dialogue from ${fact.deoMember}`);
         } else {
             assert.equal(entryDialogueCount, 0, `${fact.dungeonId}:no DEO-backed entry dialogue`);
         }
         const bossDefeatDialogueCount = sequence.bossDefeat.filter((step) => step.kind === 'dialogue').length;
+        assert.equal(bossDefeatDialogueCount, expectedBossDefeatDialogueCounts[episode], `${fact.dungeonId}:boss defeat dialogue count`);
         if (fact.deeMember) {
             assert.ok(bossDefeatDialogueCount > 0, `${fact.dungeonId}:boss defeat dialogue from ${fact.deeMember}`);
         } else {
