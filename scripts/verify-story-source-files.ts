@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseOriginalArcArchive } from '../src/data/original/originalArcArchive';
 import { i18n } from '../src/i18n/LanguageManager';
+import { TileType } from '../src/map/Tile';
+import { WorldMap } from '../src/map/WorldMap';
 import { getStoryInteriorLayout, STORY_INTERIOR_LAYOUTS } from '../src/data/StoryInteriorData';
 import { getMonsterDefinitionSafe } from '../src/data/MonsterCatalog';
 import { STORY_QUESTS } from '../src/data/StoryQuestData';
@@ -250,6 +252,33 @@ function verifyStoryScenarioContentLedger(episode: number, scenario: StoryScenar
     }
 }
 
+function verifyStoryWorldEntrance(episode: number, scenario: StoryScenarioDefinition, worldMap: WorldMap): void {
+    const dungeon = worldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+    if (!dungeon) throw new Error(`Episode ${episode} ${scenario.dungeonId} missing world dungeon landmark`);
+    if (dungeon.nameKr !== scenario.dungeonNameKr) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} Korean dungeon name mismatch: ${dungeon.nameKr} !== ${scenario.dungeonNameKr}`);
+    }
+    if (dungeon.chunkX !== scenario.chunkX || dungeon.chunkY !== scenario.chunkY) {
+        throw new Error(
+            `Episode ${episode} ${scenario.dungeonId} world chunk mismatch: ` +
+            `${dungeon.chunkX},${dungeon.chunkY} !== ${scenario.chunkX},${scenario.chunkY}`
+        );
+    }
+    if (dungeon.sprite !== scenario.sprite) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} sprite mismatch: ${dungeon.sprite} !== ${scenario.sprite}`);
+    }
+
+    const entrance = worldMap.getDungeonEntranceTile(dungeon);
+    const resolvedDungeon = worldMap.getDungeonAtTile(entrance.x, entrance.y);
+    if (resolvedDungeon?.id !== scenario.dungeonId) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} entrance resolves to ${resolvedDungeon?.id ?? 'none'}`);
+    }
+    const entranceTile = worldMap.getTileAt(entrance.x, entrance.y);
+    if (entranceTile !== TileType.DUNGEON_ENTRANCE) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} entrance tile mismatch: ${TileType[entranceTile]} !== DUNGEON_ENTRANCE`);
+    }
+}
+
 function verifyStoryScenarioMonsterContract(episode: number, scenario: StoryScenarioDefinition): void {
     if (scenario.guardCount < 0 || !Number.isInteger(scenario.guardCount)) {
         throw new Error(`Episode ${episode} invalid guard count ${scenario.guardCount}`);
@@ -430,6 +459,7 @@ const docRows = readScenarioImportDocRows();
 const roadmapRows = readRoadmapDocRows();
 const contentRows = readStoryScenarioContentRows();
 const completionFlags = new Map<string, string>();
+const worldMap = new WorldMap();
 const verified: string[] = [];
 
 for (let episode = options.start; episode <= options.end; episode++) {
@@ -444,6 +474,7 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verifyRoadmapDocRow(episode, scenario, roadmapRows);
     verifyStoryQuestDefinition(episode, scenario);
     verifyStoryScenarioContentLedger(episode, scenario, contentRows);
+    verifyStoryWorldEntrance(episode, scenario, worldMap);
     verifyStoryScenarioMonsterContract(episode, scenario);
     verifyStoryI18nKeys(episode, scenario, sequence);
     verifyStoryCompletionContract(episode, scenario, sequence, completionFlags);
@@ -478,4 +509,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, quests, scenario ledgers, monsters, i18n, and completion contracts: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, quests, scenario ledgers, world entrances, monsters, i18n, and completion contracts: ${verified.join(', ')}`);
