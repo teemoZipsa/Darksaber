@@ -344,6 +344,41 @@ function verifyStoryQuestDefinition(episode: number, scenario: StoryScenarioDefi
     }
 }
 
+function requireStoryTextIncludes(episode: number, label: string, text: string | undefined, expected: string): void {
+    if (!text) throw new Error(`Episode ${episode} missing ${label} text`);
+    if (!text.includes(expected)) {
+        throw new Error(`Episode ${episode} ${label} text does not include ${expected}: ${text}`);
+    }
+}
+
+function verifyStoryQuestDisplayTextContract(episode: number, scenario: StoryScenarioDefinition): void {
+    const quest = STORY_QUESTS.find((entry) => entry.episode === episode);
+    if (!quest) throw new Error(`Missing story quest for episode ${episode}`);
+    const ko = i18n.strings.ko as Record<string, string>;
+    const en = i18n.strings.en as Record<string, string>;
+    const episodeKo = `${episode}화`;
+    const episodeEn = `Episode ${episode}`;
+
+    requireStoryTextIncludes(episode, 'ko title', ko[quest.titleKey], episodeKo);
+    requireStoryTextIncludes(episode, 'ko title', ko[quest.titleKey], scenario.dungeonNameKr);
+    requireStoryTextIncludes(episode, 'en title', en[quest.titleKey], episodeEn);
+    requireStoryTextIncludes(episode, 'en title', en[quest.titleKey], scenario.dungeonNameEn);
+
+    requireStoryTextIncludes(episode, 'ko objective', ko[quest.objectiveKey], scenario.dungeonNameKr);
+    requireStoryTextIncludes(episode, 'en objective', en[quest.objectiveKey], scenario.dungeonNameEn);
+    requireStoryTextIncludes(episode, 'ko enter log', ko[quest.enterLogKey], scenario.dungeonNameKr);
+    requireStoryTextIncludes(episode, 'en enter log', en[quest.enterLogKey], scenario.dungeonNameEn);
+    requireStoryTextIncludes(episode, 'ko completion log', ko[quest.objectiveCompleteLogKey], scenario.dungeonNameKr);
+    requireStoryTextIncludes(episode, 'ko completion log', ko[quest.objectiveCompleteLogKey], episodeKo);
+    requireStoryTextIncludes(episode, 'en completion log', en[quest.objectiveCompleteLogKey], scenario.dungeonNameEn);
+    requireStoryTextIncludes(episode, 'en completion log', en[quest.objectiveCompleteLogKey], episodeEn);
+
+    if (quest.recommendedLevelKey) {
+        requireStoryTextIncludes(episode, 'ko recommended level', ko[quest.recommendedLevelKey], '단');
+        requireStoryTextIncludes(episode, 'en recommended level', en[quest.recommendedLevelKey], 'Tier');
+    }
+}
+
 function verifyStoryRewardContract(
     episode: number,
     reward: StoryQuestRewardData,
@@ -939,6 +974,7 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verifyScenarioImportDocRow(episode, sequence, docRows);
     verifyRoadmapDocRow(episode, scenario, roadmapRows);
     verifyStoryQuestDefinition(episode, scenario);
+    verifyStoryQuestDisplayTextContract(episode, scenario);
     verifyStoryRewardContract(episode, scenario.reward, `episode ${episode} reward`, rewardContractState);
     verifyStoryEventReferenceContract(episode, sequence);
     verifyStoryScenarioContentLedger(episode, scenario, contentRows);
@@ -980,4 +1016,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, collection chains, quests, rewards, event references, scenario ledgers, world entrances, hmaps, interior accessibility, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, collection chains, quests, quest display text, rewards, event references, scenario ledgers, world entrances, hmaps, interior accessibility, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
