@@ -32,6 +32,7 @@ import type {
     ScenarioFieldEventResultMessage,
     ScenarioFieldEventRewardResult,
 } from '../../net/WorldProtocol';
+import { AudioManager } from '../AudioManager';
 import type { WorldRaidSession } from './WorldRaidSession';
 
 export interface WorldStoryInteriorState {
@@ -384,6 +385,7 @@ export class WorldStoryScenarioController {
         this.context.setFieldEnemies(enemies);
 
         this.context.followCameraToPlayer();
+        if (storyQuest.bgmKey) AudioManager.playBgm(storyQuest.bgmKey, { fadeMs: 600 });
         this.playStoryScenarioSequence(dungeon.id, 'entry');
         this.context.log(formatT('story.interior.enterLog', { dungeon: dungeon.nameKr }));
         this.context.log(t(storyQuest.enterLogKey));

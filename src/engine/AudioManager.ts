@@ -154,6 +154,18 @@ export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = 
     'bgm.story.episode18': { src: '/assets/sounds/bgm/story/18.mid', channel: 'bgm' },
     'bgm.story.episode19': { src: '/assets/sounds/bgm/story/19.mid', channel: 'bgm' },
     'bgm.story.episode20': { src: '/assets/sounds/bgm/story/20.mid', channel: 'bgm' },
+    // Late story episodes do not have separate recovered MIDI assets yet; keep their quest BGM keys playable.
+    'bgm.story.episode21': { src: '/assets/sounds/bgm/story/20.mid', channel: 'bgm' },
+    'bgm.story.episode22': { src: '/assets/sounds/bgm/story/20.mid', channel: 'bgm' },
+    'bgm.story.episode23': { src: '/assets/sounds/bgm/story/20.mid', channel: 'bgm' },
+    'bgm.story.episode24': { src: '/assets/sounds/bgm/story/20.mid', channel: 'bgm' },
+    'bgm.story.episode25': { src: '/assets/sounds/bgm/story/20.mid', channel: 'bgm' },
+    'bgm.story.episode26': { src: '/assets/sounds/bgm/story/20.mid', channel: 'bgm' },
+    'bgm.story.episode27': { src: '/assets/sounds/bgm/story/20.mid', channel: 'bgm' },
+    'bgm.story.episode28': { src: '/assets/sounds/bgm/story/20.mid', channel: 'bgm' },
+    'bgm.story.episode29': { src: '/assets/sounds/bgm/story/20.mid', channel: 'bgm' },
+    'bgm.story.episode30': { src: '/assets/sounds/bgm/story/20.mid', channel: 'bgm' },
+    'bgm.story.episode31': { src: '/assets/sounds/bgm/story/20.mid', channel: 'bgm' },
 };
 
 class AudioManagerClass {

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
 import { getMasterClass, isMasterClassLineId } from '../../src/data/ClassTree';
@@ -48,6 +49,7 @@ import {
     isTownFacilityId,
     isTownId,
 } from '../../src/data/TownFacilityData';
+import { AUDIO_CATALOG } from '../../src/engine/AudioManager';
 
 type StoryScenarioContentRecord = {
     episode: number;
@@ -687,6 +689,14 @@ test('story episodes 1 through 31 are chained and fully localized', () => {
     for (const [index, quest] of STORY_QUESTS.entries()) {
         assert.equal(quest.episode, index + 1);
         assert.equal(quest.prerequisiteQuestId, index === 0 ? undefined : STORY_QUESTS[index - 1].id);
+        assert.ok(quest.bgmKey, `missing story bgm key for episode ${quest.episode}`);
+        const bgm = AUDIO_CATALOG[quest.bgmKey];
+        assert.equal(bgm?.channel, 'bgm', `missing playable story bgm catalog entry ${quest.bgmKey}`);
+        assert.equal(
+            existsSync(join(process.cwd(), 'public', bgm.src.replace(/^\//, ''))),
+            true,
+            `missing playable story bgm asset ${bgm.src}`
+        );
         for (const key of [
             quest.titleKey,
             quest.summaryKey,

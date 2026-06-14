@@ -39,6 +39,7 @@ import { Enemy } from '../../src/entity/Enemy';
 import { LootObject } from '../../src/entity/LootObject';
 import { Player } from '../../src/entity/Player';
 import { WorldEngine } from '../../src/engine/WorldEngine';
+import { AudioManager } from '../../src/engine/AudioManager';
 import { WorldRaidSession } from '../../src/engine/world/WorldRaidSession';
 import { WorldLootController } from '../../src/engine/world/WorldLootController';
 import { WorldSelectionController } from '../../src/engine/world/WorldSelectionController';
@@ -1434,6 +1435,29 @@ test('late story boss clear rewards match original EVENT 99 item sources through
         );
         assert.ok(harness.logs.includes('시나리오 클리어'), `episode ${episode} clear log`);
         assert.ok(harness.logs.includes(t(quest.objectiveCompleteLogKey)), `episode ${episode} objective log`);
+    }
+});
+
+test('episode 31 local story interior starts a playable story bgm key', () => {
+    const originalPlayBgm = AudioManager.playBgm.bind(AudioManager);
+    const playedBgmKeys: string[] = [];
+    (AudioManager as unknown as { playBgm: (key: string) => void }).playBgm = (key: string) => {
+        playedBgmKeys.push(key);
+    };
+    try {
+        const raidSession = new WorldRaidSession('central_castle');
+        raidSession.beginRaidFromTown('central_castle');
+        const harness = createStoryScenarioHarness({ raidSession });
+        const dungeon = harness.worldMap.getDungeons().find((entry) => entry.id === 'demon_fixers_den');
+        const quest = getStoryQuestByDungeonId('demon_fixers_den');
+        assert.ok(dungeon);
+        assert.ok(quest);
+
+        harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+
+        assert.deepEqual(playedBgmKeys, [quest.bgmKey]);
+    } finally {
+        (AudioManager as unknown as { playBgm: typeof originalPlayBgm }).playBgm = originalPlayBgm;
     }
 });
 
