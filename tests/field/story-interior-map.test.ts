@@ -10,8 +10,10 @@ import type { StoryScenarioEventStep } from '../../src/data/StoryScenarioEventDa
 import {
     getStoryScenarioFieldEventPlacements,
     getStoryScenarioFieldEventTiles,
+    projectStoryScenarioFieldTileToWorld,
 } from '../../src/data/StoryScenarioFieldEventPlacement';
-import { getStoryInteriorLayout, getStoryInteriorTileAt, STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
+import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { getStoryInteriorLayout, getStoryInteriorTileAt, isStoryInteriorDungeon, STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
 import {
     getOriginalLateStoryBossTile,
     getOriginalLateStoryCacheEvents,
@@ -1371,6 +1373,31 @@ test('outdoor field event placement is deterministic, walkable, and shared by ca
                 .sort((a, b) => a.triggerIndex - b.triggerIndex)
                 .map((placement) => placement.tile);
             assert.deepEqual(eventTiles, placementTiles);
+        }
+    }
+});
+
+test('outdoor story entry and clear presentation focuses project onto walkable world tiles', () => {
+    const worldMap = new WorldMap();
+    for (const scenario of STORY_SCENARIOS.filter((entry) => !isStoryInteriorDungeon(entry.dungeonId))) {
+        const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+        const dungeon = worldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+        assert.ok(sequence, `${scenario.dungeonId} sequence`);
+        assert.ok(dungeon, `${scenario.dungeonId} dungeon`);
+        const entrance = worldMap.getDungeonEntranceTile(dungeon);
+
+        for (const [group, steps] of [
+            ['entry', sequence.entry],
+            ['bossDefeat', sequence.bossDefeat],
+        ] as const) {
+            steps.forEach((step, index) => {
+                for (const point of getPresentationStepTiles(step)) {
+                    const projected = projectStoryScenarioFieldTileToWorld(scenario.dungeonId, worldMap, point.tile);
+                    assert.equal(worldMap.isWalkable(projected.x, projected.y), true, `${scenario.dungeonId}:${group}:${index}:${point.label}`);
+                    assert.ok(Math.abs(projected.x - entrance.x) <= 12, `${scenario.dungeonId}:${group}:${index}:${point.label}:x`);
+                    assert.ok(Math.abs(projected.y - entrance.y) <= 12, `${scenario.dungeonId}:${group}:${index}:${point.label}:y`);
+                }
+            });
         }
     }
 });

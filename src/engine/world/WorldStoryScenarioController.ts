@@ -6,6 +6,7 @@ import {
     getStoryScenarioFieldEventFlag,
     getStoryScenarioFieldEventScope,
     getStoryScenarioFieldEventTiles,
+    projectStoryScenarioFieldTileToWorld,
 } from '../../data/StoryScenarioFieldEventPlacement';
 import {
     getStoryScenarioEventStepDurationMs,
@@ -547,7 +548,7 @@ export class WorldStoryScenarioController {
 
     private playStoryScenarioSequence(dungeonId: string, phase: 'entry' | 'bossDefeat', onComplete?: () => void): void {
         const sequence = getStoryScenarioEventSequence(dungeonId);
-        this.startStoryScenarioPresentation(sequence?.[phase] ?? [], onComplete);
+        this.startStoryScenarioPresentation(this.getScenarioPresentationSteps(dungeonId, sequence?.[phase] ?? []), onComplete);
     }
 
     private fieldEventKey(dungeonId: string, eventId: string): string {
@@ -575,6 +576,35 @@ export class WorldStoryScenarioController {
         const [focusTile] = this.getScenarioFieldEventTiles(dungeonId, event);
         if (!focusTile) return steps.map((step) => ({ ...step }));
         return steps.map((step) => this.withPresentationStepFocus(step, focusTile));
+    }
+
+    private getScenarioPresentationSteps(
+        dungeonId: string,
+        steps: readonly StoryScenarioEventStep[]
+    ): StoryScenarioEventStep[] {
+        if (isStoryInteriorDungeon(dungeonId) || this.activeInterior?.dungeonId === dungeonId) {
+            return steps.map((step) => ({ ...step }));
+        }
+        return steps.map((step) => this.withProjectedPresentationTiles(dungeonId, step));
+    }
+
+    private withProjectedPresentationTiles(dungeonId: string, step: StoryScenarioEventStep): StoryScenarioEventStep {
+        const project = (tile: TilePoint): TilePoint =>
+            projectStoryScenarioFieldTileToWorld(dungeonId, this.context.getWorldMap(), tile);
+        switch (step.kind) {
+            case 'focus':
+                return { ...step, target: project(step.target) };
+            case 'moveActor':
+                return {
+                    ...step,
+                    target: project(step.target),
+                    ...(step.focus ? { focus: project(step.focus) } : {}),
+                };
+            case 'dialogue':
+            case 'combatStart':
+            case 'objective':
+                return step.focus ? { ...step, focus: project(step.focus) } : { ...step };
+        }
     }
 
     private withPresentationStepFocus(step: StoryScenarioEventStep, focusTile: TilePoint): StoryScenarioEventStep {

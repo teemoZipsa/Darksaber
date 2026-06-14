@@ -922,6 +922,8 @@ test('network field scenario entry plays original episode 4 event flow once', ()
     drainStoryPresentation(harness.controller);
 
     assert.equal(raidSession.activeDungeonId, 'arcadia_plain');
+    assert.ok(harness.cameraFocusTiles.length > 0);
+    assert.ok(harness.cameraFocusTiles.every((tile) => harness.worldMap.isWalkable(tile.x, tile.y)));
     assert.ok(harness.logs.some((entry) => entry.includes('알카디아 평원 진입.')));
     assert.ok(harness.logs.some((entry) => entry.includes('시선 이동: 알카디아 평원')));
     assert.ok(harness.logs.some((entry) => entry.includes('에우리티온: 네가 우리 일을')));

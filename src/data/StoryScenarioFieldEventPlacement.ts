@@ -67,6 +67,20 @@ export function getStoryScenarioFieldEventTiles(
     return event.triggerTiles.map((tile) => projectOriginalFieldTile(center, origin, tile));
 }
 
+export function projectStoryScenarioFieldTileToWorld(
+    dungeonId: string,
+    worldMap: WorldMap,
+    tile: TilePoint
+): TilePoint {
+    const origin = getOriginalFieldScenarioOrigin(dungeonId);
+    const dungeon = worldMap.getDungeons().find((entry) => entry.id === dungeonId);
+    if (!origin || !dungeon) return { ...tile };
+
+    const center = worldMap.getDungeonEntranceTile(dungeon);
+    const preferred = projectOriginalFieldTile(center, origin, tile);
+    return findNearestAvailableFieldEventTile(preferred, worldMap, new Set());
+}
+
 export function getOriginalFieldScenarioOrigin(dungeonId: string): TilePoint | null {
     switch (dungeonId) {
         case 'arcadia_plain':
@@ -77,6 +91,10 @@ export function getOriginalFieldScenarioOrigin(dungeonId: string): TilePoint | n
             return { x: 19, y: 34 };
         case 'sagunto_port':
             return { x: 10, y: 9 };
+        case 'sicilio_island':
+            return { x: 13, y: 15 };
+        case 'dalai_lake':
+            return { x: 17, y: 45 };
         case 'oasis':
             return { x: 6, y: 3 };
         case 'pyramid_front':
