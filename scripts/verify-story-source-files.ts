@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseOriginalArcArchive } from '../src/data/original/originalArcArchive';
+import { STORY_QUESTS } from '../src/data/StoryQuestData';
 import { STORY_SCENARIO_EVENT_SEQUENCES, type StoryScenarioEventSequence } from '../src/data/StoryScenarioEventData';
 import { STORY_SCENARIOS, type StoryScenarioDefinition, type StoryScenarioMissionKind } from '../src/data/StoryScenarioData';
 
@@ -167,6 +168,39 @@ function verifyRoadmapDocRow(episode: number, scenario: StoryScenarioDefinition,
     }
 }
 
+function verifyStoryQuestDefinition(episode: number, scenario: StoryScenarioDefinition): void {
+    const quest = STORY_QUESTS.find((entry) => entry.episode === episode);
+    if (!quest) throw new Error(`Missing story quest for episode ${episode}`);
+    if (quest.id !== scenario.questId) {
+        throw new Error(`Episode ${episode} quest id mismatch: ${quest.id} !== ${scenario.questId}`);
+    }
+    if (quest.dungeonId !== scenario.dungeonId) {
+        throw new Error(`Episode ${episode} quest dungeon mismatch: ${quest.dungeonId} !== ${scenario.dungeonId}`);
+    }
+    const expectedPrerequisiteQuestId = episode === 1 ? undefined : STORY_SCENARIOS.find((entry) => entry.episode === episode - 1)?.questId;
+    if (quest.prerequisiteQuestId !== expectedPrerequisiteQuestId) {
+        throw new Error(`Episode ${episode} quest prerequisite mismatch: ${quest.prerequisiteQuestId} !== ${expectedPrerequisiteQuestId}`);
+    }
+    if (JSON.stringify(quest.reward) !== JSON.stringify(scenario.reward)) {
+        throw new Error(`Episode ${episode} quest reward mismatch with runtime scenario reward`);
+    }
+    const paddedEpisode = String(episode).padStart(2, '0');
+    const expectedKeys = {
+        titleKey: `story.ep${paddedEpisode}.title`,
+        summaryKey: `story.ep${paddedEpisode}.summary`,
+        objectiveKey: `story.ep${paddedEpisode}.objective`,
+        recommendedLevelKey: `story.ep${paddedEpisode}.recommendedLevel`,
+        enterLogKey: `story.ep${paddedEpisode}.enterDungeonLog`,
+        objectiveCompleteLogKey: `story.ep${paddedEpisode}.objectiveCompleteLog`,
+        bgmKey: `bgm.story.episode${paddedEpisode}`,
+    };
+    for (const [key, expectedValue] of Object.entries(expectedKeys)) {
+        if (quest[key as keyof typeof expectedKeys] !== expectedValue) {
+            throw new Error(`Episode ${episode} quest ${key} mismatch: ${quest[key as keyof typeof expectedKeys]} !== ${expectedValue}`);
+        }
+    }
+}
+
 const options = parseArgs(process.argv.slice(2));
 const sourceRoot = resolve(options.sourceRoot);
 const docRows = readScenarioImportDocRows();
@@ -183,6 +217,7 @@ for (let episode = options.start; episode <= options.end; episode++) {
     const declaredMapFiles = new Set(sequence.originalSources.mapFiles);
     verifyScenarioImportDocRow(episode, sequence, docRows);
     verifyRoadmapDocRow(episode, scenario, roadmapRows);
+    verifyStoryQuestDefinition(episode, scenario);
     requireSourceFile(sourceRoot, episode, sequence.originalSources.sceneScript);
     if (sequence.originalSources.globalScript !== 'missing') {
         requireSourceFile(sourceRoot, episode, sequence.originalSources.globalScript);
@@ -214,4 +249,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, and roadmap docs: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, and quests: ${verified.join(', ')}`);
