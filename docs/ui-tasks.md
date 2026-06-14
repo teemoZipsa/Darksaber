@@ -96,7 +96,7 @@
 ## 검증 명령
 - 타입체크: `npx tsc --noEmit` (반드시 통과).
 - 개발 서버: `npm run dev` → http://127.0.0.1:5731 (프리뷰 도구는 `.claude/launch.json`의 5742).
-- 개발자 바로 시작: `npm run dev:town`, `npm run dev:raid`, `npm run dev:raid:aggro`, `npm run dev:raid:loot`, `npm run dev:raid:story31`, `npm run dev:tutorial`.
+- 개발자 바로 시작: `npm run dev:town`, `npm run dev:raid`, `npm run dev:raid:aggro`, `npm run dev:raid:loot`, `npm run dev:raid:story23`, `npm run dev:raid:story31`, `npm run dev:tutorial`. 후반 실내 직접 진입 URL은 `/?devStart=raid&devScenario=storyNN` 형식으로 23~31을 지원.
 - 테스트: `npm test`.
 
 ## 알려진 함정

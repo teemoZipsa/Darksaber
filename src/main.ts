@@ -11,7 +11,7 @@ import { mountUiOverlay } from './ui/react/mountOverlay';
 import { mountAuthGate } from './ui/react/auth/mountAuthGate';
 import { AuthApiError, AuthClient, type AuthSessionResponse } from './net/AuthClient';
 import { t } from './i18n/LanguageManager';
-import { applyDevRaidScenario, type DevRaidScenario } from './dev/DevRaidScenarios';
+import { applyDevRaidScenario, parseDevRaidScenario, type DevRaidScenario } from './dev/DevRaidScenarios';
 
 type DevStartMode = 'town' | 'raid' | 'tutorial';
 
@@ -79,10 +79,7 @@ function getDevStartMode(): DevStartMode | null {
 function getDevRaidScenario(): DevRaidScenario | null {
     if (!import.meta.env.DEV) return null;
     const value = new URLSearchParams(window.location.search).get('devScenario');
-    if (value === 'aggro') return 'aggro';
-    if (value === 'loot') return 'loot';
-    if (value === 'story31') return 'story31';
-    return null;
+    return parseDevRaidScenario(value);
 }
 
 function clearDevWorldResumeToken(): void {
@@ -161,6 +158,7 @@ function mountDevLauncher(): void {
         <a href="/?devStart=raid">${t('dev.launcher.raid')}</a>
         <a href="/?devStart=raid&devScenario=aggro">${t('dev.launcher.raidAggro')}</a>
         <a href="/?devStart=raid&devScenario=loot">${t('dev.launcher.raidLoot')}</a>
+        <a href="/?devStart=raid&devScenario=story23">${t('dev.launcher.raidLateStory')}</a>
         <a href="/?devStart=raid&devScenario=story31">${t('dev.launcher.raidStory31')}</a>
         <a href="/?devStart=tutorial">${t('dev.launcher.tutorial')}</a>
     `;

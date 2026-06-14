@@ -1,11 +1,26 @@
 import { getStoryQuestByDungeonId } from '../data/StoryQuestData';
+import { STORY_SCENARIOS } from '../data/StoryScenarioData';
 import { getItemDef } from '../data/ItemDB';
 import { Enemy } from '../entity/Enemy';
 import { LootObject } from '../entity/LootObject';
 import type { GameManager } from '../engine/GameManager';
-import { t } from '../i18n/LanguageManager';
+import { formatT, t } from '../i18n/LanguageManager';
 
-export type DevRaidScenario = 'aggro' | 'loot' | 'story31';
+const DEV_LATE_STORY_EPISODES = [23, 24, 25, 26, 27, 28, 29, 30, 31] as const;
+type DevLateStoryEpisode = typeof DEV_LATE_STORY_EPISODES[number];
+type DevLateStoryScenario = `story${DevLateStoryEpisode}`;
+
+export type DevRaidScenario = 'aggro' | 'loot' | DevLateStoryScenario;
+
+export function parseDevRaidScenario(value: string | null): DevRaidScenario | null {
+    if (value === 'aggro' || value === 'loot') return value;
+    const match = value?.match(/^story(\d+)$/);
+    if (!match) return null;
+    const episode = Number(match[1]);
+    return DEV_LATE_STORY_EPISODES.includes(episode as DevLateStoryEpisode)
+        ? `story${episode as DevLateStoryEpisode}`
+        : null;
+}
 
 type DevTile = { x: number; y: number };
 type DevEntity = {
@@ -60,7 +75,7 @@ export function applyDevRaidScenario(manager: GameManager, scenario: DevRaidScen
 
     if (scenario === 'aggro') applyDevAggroScenario(world, actor);
     else if (scenario === 'loot') applyDevLootScenario(manager, world, actor);
-    else applyDevStory31Scenario(world);
+    else applyDevStoryScenario(world, scenario);
 }
 
 function getDevWorldEngine(manager: GameManager): DevWorldEngine | null {
@@ -154,18 +169,20 @@ function applyDevLootScenario(manager: GameManager, world: DevWorldEngine, actor
     setDevScenarioStatus('loot', 'loot-open');
 }
 
-function applyDevStory31Scenario(world: DevWorldEngine): void {
+function applyDevStoryScenario(world: DevWorldEngine, scenarioId: DevLateStoryScenario): void {
     deactivateDevNetworkRaid(world);
-    const dungeon = world.worldMap.getDungeons?.().find((candidate) => candidate.id === 'demon_fixers_den');
-    const quest = getStoryQuestByDungeonId('demon_fixers_den');
+    const episode = Number(scenarioId.replace('story', ''));
+    const scenario = STORY_SCENARIOS.find((candidate) => candidate.episode === episode);
+    const dungeon = world.worldMap.getDungeons?.().find((candidate) => candidate.id === scenario?.dungeonId);
+    const quest = scenario ? getStoryQuestByDungeonId(scenario.dungeonId) : null;
     if (!dungeon || !quest || !world.storyScenarioController) {
-        console.warn('[Darksaber] Dev story31 scenario could not find the dungeon, quest, or controller.');
+        console.warn(`[Darksaber] Dev ${scenarioId} scenario could not find the dungeon, quest, or controller.`);
         return;
     }
 
     world.storyScenarioController.startLocalStoryInteriorDungeon(dungeon, quest);
-    world.addCombatLog?.(t('dev.scenario.story31Ready'));
-    setDevScenarioStatus('story31', 'interior-ready');
+    world.addCombatLog?.(formatT('dev.scenario.storyReady', { episode, dungeon: dungeon.nameKr }));
+    setDevScenarioStatus(scenarioId, 'interior-ready');
 }
 
 function createDevLootClient(): unknown {

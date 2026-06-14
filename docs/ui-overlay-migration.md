@@ -39,7 +39,7 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
 ## 완료된 최종 수동 검증
 - **레이드 전리품 end-to-end** — `devStart=raid&devScenario=loot` 실제 레이드 화면에서 DOM 전리품 패널을 열고 Browser 포인터 드래그로 전리품을 배낭에 드롭. 외부 전리품 1→0, 배낭 4→5, DEV 상태 `picked:dev_raid_loot:0,0` 확인.
 - **실제 레이드 화면 어그로** — `devStart=raid&devScenario=aggro` 실제 레이드 화면에서 어그로 적의 추격 후 강제 인접 공격 로그/상태 배지 확인.
-- **31화 실내 시나리오 진입** — Chrome headless에서 `devStart=raid&devScenario=story31`로 `StoryInteriorMap`/`demon_fixers_den` 진입, DEV 상태 `story31 / interior-ready`, 보스 1명(마계 해결사 `{22,11}`), 경비 보스 오인 0개, 입장 로그 확인.
+- **후반 실내 시나리오 진입** — Chrome headless에서 `devStart=raid&devScenario=story31`로 `StoryInteriorMap`/`demon_fixers_den` 진입, DEV 상태 `story31 / interior-ready`, 보스 1명(마계 해결사 `{22,11}`), 경비 보스 오인 0개, 입장 로그 확인. 같은 DEV 경로는 `story23`~`story31`을 지원한다.
 
 ## 마을(Town) 이전 메모
 - `TownUI`는 더 이상 캔버스 크롬이나 storage 인벤토리를 그리지 않음. 상태·탭·소문·상점/인벤토리 모델 참조만 유지하고 React `TownScreen`/`InventoryPanel`이 그림.
@@ -63,7 +63,8 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
   - `npm run dev:raid` 또는 `/?devStart=raid`: 마을 출격 경로를 통해 레이드 자동 진입.
   - `npm run dev:raid:aggro` 또는 `/?devStart=raid&devScenario=aggro`: 레이드 자동 진입 후 어그로 추격/공격 검증 상태 구성.
   - `npm run dev:raid:loot` 또는 `/?devStart=raid&devScenario=loot`: 레이드 자동 진입 후 전리품 DOM 패널 검증 상태 구성.
-  - `npm run dev:raid:story31` 또는 `/?devStart=raid&devScenario=story31`: 레이드 자동 진입 후 31화 마계 해결사의 소굴 실내맵으로 바로 진입.
+  - `npm run dev:raid:story23` 또는 `/?devStart=raid&devScenario=story23`: 레이드 자동 진입 후 23화 벨제뷔트 회랑 실내맵으로 바로 진입.
+  - `npm run dev:raid:story31` 또는 `/?devStart=raid&devScenario=story31`: 레이드 자동 진입 후 31화 마계 해결사의 소굴 실내맵으로 바로 진입. URL의 `devScenario=storyNN`은 23~31 범위를 지원.
   - `npm run dev:tutorial` 또는 `/?devStart=tutorial`: 캐릭터 생성 없이 튜토리얼 대련장으로 진입.
 - 타입체크: `npx tsc --noEmit`.
 - **헤드리스 프리뷰 주의**: 탭이 숨겨지면 브라우저가 `requestAnimationFrame`을 멈춰 루프가 정지 → 스크린샷/자동 tick 불가. 대응:

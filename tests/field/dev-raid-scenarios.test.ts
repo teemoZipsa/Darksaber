@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { GameManager } from '../../src/engine/GameManager';
 import { WorldEngine } from '../../src/engine/WorldEngine';
-import { applyDevRaidScenario } from '../../src/dev/DevRaidScenarios';
+import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { applyDevRaidScenario, parseDevRaidScenario } from '../../src/dev/DevRaidScenarios';
 
 function createActor() {
     const entity = {
@@ -60,7 +61,14 @@ function createManagerHarness() {
         worldMap: {
             loot: [] as Array<{ id: string; inventory: unknown }>,
             isWalkable: () => true,
-            getDungeons: () => [{ id: 'demon_fixers_den', nameKr: '마계 해결사의 소굴', x: 1198, y: 1439 }],
+            getDungeons: () => STORY_SCENARIOS
+                .filter((scenario) => scenario.episode >= 23 && scenario.episode <= 31)
+                .map((scenario) => ({
+                    id: scenario.dungeonId,
+                    nameKr: scenario.dungeonNameKr,
+                    x: scenario.chunkX * 16,
+                    y: scenario.chunkY * 16,
+                })),
         },
         selectionController: {
             selectActor: (actorId: string | null) => { selected.actorId = actorId; },
@@ -95,6 +103,17 @@ function createManagerHarness() {
     return { actor, inventory, logs, manager: manager as unknown as GameManager, selected, world };
 }
 
+test('dev raid scenario parser accepts late story interiors 23 through 31 only', () => {
+    assert.equal(parseDevRaidScenario('aggro'), 'aggro');
+    assert.equal(parseDevRaidScenario('loot'), 'loot');
+    for (let episode = 23; episode <= 31; episode++) {
+        assert.equal(parseDevRaidScenario(`story${episode}`), `story${episode}`);
+    }
+    assert.equal(parseDevRaidScenario('story22'), null);
+    assert.equal(parseDevRaidScenario('story32'), null);
+    assert.equal(parseDevRaidScenario('storyxx'), null);
+});
+
 test('WorldEngine close hook delegates to the raid lifecycle controller', () => {
     const calls: Array<{ sendLeave: boolean; reason: string | undefined }> = [];
     const engine = Object.create(WorldEngine.prototype) as unknown as {
@@ -127,6 +146,28 @@ test('dev story31 scenario launches local Demon Fixer Den without network raid s
         questId: 'main:episode_31_demon_fixers',
     });
     assert.equal(logs.length, 1);
+});
+
+test('dev late story scenarios launch local interiors through episode 31', () => {
+    for (let episode = 23; episode <= 31; episode++) {
+        const { logs, manager, world } = createManagerHarness();
+        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+        const scenarioId = parseDevRaidScenario(`story${episode}`);
+        assert.ok(scenario);
+        assert.ok(scenarioId);
+
+        applyDevRaidScenario(manager, scenarioId);
+
+        assert.equal(world.currentPhase, 'raid', `episode ${episode} phase`);
+        assert.equal(world.isNetworkRaid, false, `episode ${episode} network raid`);
+        assert.equal(world.networkRaidClient, null, `episode ${episode} network client`);
+        assert.deepEqual(world.storyScenarioController.started, {
+            dungeonId: scenario.dungeonId,
+            questId: scenario.questId,
+        }, `episode ${episode} story start`);
+        assert.equal(logs.length, 1, `episode ${episode} dev log`);
+        assert.match(logs[0], new RegExp(`${episode}화|Episode ${episode}`), `episode ${episode} log text`);
+    }
 });
 
 test('dev loot scenario enables the raid loot client path without getNetworkRaidState', () => {

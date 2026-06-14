@@ -53,8 +53,9 @@ process.on('SIGTERM', () => {
 process.on('exit', shutdown);
 
 const mode = process.argv[2] === 'raid' ? 'raid' : 'town';
-const scenario = process.argv[3] === 'aggro' || process.argv[3] === 'loot' || process.argv[3] === 'story31'
-    ? process.argv[3]
+const scenarioArg = process.argv[3] ?? null;
+const scenario = scenarioArg === 'aggro' || scenarioArg === 'loot' || /^story(2[3-9]|3[0-1])$/.test(scenarioArg)
+    ? scenarioArg
     : null;
 const openPath = scenario
     ? `/?devStart=${mode}&devScenario=${scenario}`
