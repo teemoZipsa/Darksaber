@@ -1584,11 +1584,19 @@ test('network late story cache results update interior markers and presentations
         const player = new Player(0, 0);
         const raidSession = new WorldRaidSession('central_castle');
         raidSession.beginRaidFromTown('central_castle');
+        const sentFieldEvents: Array<{ actorId: string; dungeonId: string; eventId: string }> = [];
         const harness = createStoryScenarioHarness({
             player,
             raidSession,
             worldMap: new WorldMap(),
             isNetworkRaid: true,
+            networkClient: {
+                sendScenarioEnter: () => 'unused',
+                sendScenarioFieldEventInteract: (actorId, dungeonId, eventId) => {
+                    sentFieldEvents.push({ actorId, dungeonId, eventId });
+                    return `cache-${episode}-${eventId}`;
+                },
+            },
         });
 
         harness.controller.applyNetworkScenarioSnapshot({
@@ -1608,6 +1616,20 @@ test('network late story cache results update interior markers and presentations
                 ? { type: 'item', itemId: reward.itemId }
                 : { type: 'gold', amount: reward.amount });
             assert.equal(interiorMap.getInspectMarkers().some((marker) => marker.id === markerId), true, `episode ${episode} ${event.id} marker before`);
+            player.setGridPosition(cache.tile.x, cache.tile.y + 1, true);
+            assert.equal(
+                harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any).has(`${cache.tile.x},${cache.tile.y}`),
+                true,
+                `episode ${episode} ${event.id} inspectable`
+            );
+            assert.equal(harness.controller.playFieldEventAt(cache.tile, { id: 'hero', entity: player } as any), true, `episode ${episode} ${event.id} send`);
+            assert.deepEqual(
+                sentFieldEvents[sentFieldEvents.length - 1],
+                { actorId: 'hero', dungeonId: scenario.dungeonId, eventId: event.id },
+                `episode ${episode} ${event.id} sent`
+            );
+            assert.equal(raidSession.hasScenarioFlag(scenario.dungeonId, getStoryScenarioFieldEventFlag(event)), false, `episode ${episode} ${event.id} flag waits for server`);
+            assert.equal(harness.rewardItemIds.length, sentFieldEvents.length - 1, `episode ${episode} ${event.id} reward waits for server`);
 
             harness.controller.applyNetworkScenarioFieldEventResult({
                 type: 'SCENARIO_FIELD_EVENT_RESULT',
