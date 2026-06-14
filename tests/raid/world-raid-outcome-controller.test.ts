@@ -380,6 +380,20 @@ test('episode 31 objective grants final implemented quest completion only after 
     assert.equal(failed.getOutcome()?.questRewards, undefined);
 });
 
+test('episode 31 objective cannot bypass story quest prerequisites at raid result', () => {
+    const { controller, playerData, raidSession, getOutcome } = createController();
+    const episode31 = STORY_QUESTS.find((quest) => quest.episode === 31);
+    assert.ok(episode31);
+    raidSession.beginRaidFromTown('central_castle');
+    markStoryObjectiveComplete(raidSession, episode31.dungeonId);
+
+    controller.completeSuccess(DESTINATION_TOWN);
+
+    assert.equal(playerData.isCleared(episode31.id), false);
+    assert.equal(getStoryQuestViews(playerData, null).some((view) => view.quest.id === episode31.id), false);
+    assert.equal(getOutcome()?.questRewards?.some((line) => line.includes('31화')), false);
+});
+
 test('story objectives 1 through 31 grant quest completion once after survival', () => {
     for (const quest of STORY_QUESTS) {
         const { controller, playerData, raidSession, getOutcome } = createController();

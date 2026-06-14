@@ -5,7 +5,12 @@ import type { PlayerData } from '../../data/PlayerData';
 import { GridInventory, type PlacedItem } from '../../inventory/GridInventory';
 import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../../data/StarterKitData';
 import { STORY_SCENARIO_EVENT_SEQUENCES } from '../../data/StoryScenarioEventData';
-import { isStoryRewardOwned, STORY_QUESTS, type StoryQuestReward } from '../../data/StoryQuestData';
+import {
+    isStoryQuestAvailable,
+    isStoryRewardOwned,
+    STORY_QUESTS,
+    type StoryQuestReward,
+} from '../../data/StoryQuestData';
 import { t } from '../../i18n/LanguageManager';
 import type { TownInfo } from '../../map/BiomeMask';
 import {
@@ -199,6 +204,7 @@ export class WorldRaidOutcomeController {
         for (const quest of STORY_QUESTS) {
             if (!this.context.raidSession.isDungeonCleared(quest.dungeonId)) continue;
             if (this.context.playerData.isCleared(quest.id)) continue;
+            if (!isStoryQuestAvailable(quest, this.context.playerData)) continue;
 
             if (!this.canStoreStoryQuestReward(quest.reward)) {
                 rewards.push(`${t('quest.rewardStorageFull')}: ${t(quest.titleKey)}`);
@@ -219,6 +225,8 @@ export class WorldRaidOutcomeController {
     private completeScenarioRuntimeQuestItems(): string[] {
         const rewards: string[] = [];
         for (const sequence of STORY_SCENARIO_EVENT_SEQUENCES) {
+            const quest = STORY_QUESTS.find((candidate) => candidate.dungeonId === sequence.dungeonId);
+            if (quest && !isStoryQuestAvailable(quest, this.context.playerData)) continue;
             for (const event of sequence.fieldEvents) {
                 if (!event.runtimeFlag || !event.questItemId) continue;
                 if (!this.context.raidSession.hasScenarioFlag(sequence.dungeonId, event.runtimeFlag)) continue;
