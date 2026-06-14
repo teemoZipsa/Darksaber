@@ -33,7 +33,7 @@ import { createBaseStats, getBaseStatsForClass } from '../../src/data/Stats';
 import { STORY_QUESTS, getStoryCompanionRewards } from '../../src/data/StoryQuestData';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import { STORY_SCENARIO_EVENT_SEQUENCES } from '../../src/data/StoryScenarioEventData';
-import { STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
+import { STORY_INTERIOR_LAYOUTS, getStoryInteriorLayout } from '../../src/data/StoryInteriorData';
 import { i18n } from '../../src/i18n/LanguageManager';
 import {
     ORIGINAL_MONSTER_COUNT,
@@ -583,12 +583,18 @@ test('late original story source ledgers cover exactly episodes 23 through 31', 
         const mrcFact = ORIGINAL_LATE_STORY_MRC_FACTS[episodeKey];
         const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
         const sequence = STORY_SCENARIO_EVENT_SEQUENCES.find((entry) => entry.dungeonId === fact.dungeonId);
+        const layout = getStoryInteriorLayout(fact.dungeonId);
 
         assert.ok(scenario, `missing story scenario ${episode}`);
         assert.ok(sequence, `missing story sequence ${episode}`);
+        assert.ok(layout, `missing story layout ${episode}`);
         assert.equal(scenario.dungeonId, fact.dungeonId, `episode ${episode} dungeon id`);
         assert.equal(scenario.missionKind, 'soloInterior', `episode ${episode} mission kind`);
         assert.equal(scenario.guardCount, fact.guardAreas.length, `episode ${episode} guard count`);
+        assert.equal(layout.originalAi?.source, `${fact.setArc}:${fact.aiMember}`, `episode ${episode} original AI source`);
+        assert.deepEqual(layout.originalAi?.bossArea, fact.bossArea, `episode ${episode} original boss AI area`);
+        assert.deepEqual(layout.originalAi?.guardAreas, fact.guardAreas, `episode ${episode} original guard AI areas`);
+        assert.deepEqual(layout.originalAi?.staging, fact.staging, `episode ${episode} original staging positions`);
         assert.equal(mrcFact.source, `MAP/${paddedEpisode}.mrc`, `episode ${episode} source mrc`);
         assert.equal(mrcFact.translatedSource, `MAP/${paddedEpisode}t.mrc`, `episode ${episode} translated mrc`);
         assert.equal(sequence.originalSources.mapFiles.includes(mrcFact.source), true, `episode ${episode} sequence mrc`);
