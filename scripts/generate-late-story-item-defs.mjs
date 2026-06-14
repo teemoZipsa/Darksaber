@@ -1,6 +1,6 @@
 // Generate the late-story reward item ledger from the original Dark Saver item table.
 //
-// Usage: node scripts/generate-late-story-item-defs.mjs [SET_DIR]
+// Usage: node scripts/generate-late-story-item-defs.mjs [SET_DIR] [--check]
 // SET_DIR defaults to the extracted gameres `set` folder used by decode-original-atr.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -10,7 +10,34 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..');
 const DEFAULT_SET = 'C:/Users/Seonkyu/Documents/Codex/2026-06-03/c-users-seonkyu-downloads-saver200010-extracted/outputs/gameres_unpacked/set';
-const SET_DIR = process.argv[2] ?? DEFAULT_SET;
+
+function parseArgs(argv) {
+    const options = {
+        setDir: DEFAULT_SET,
+        check: false,
+    };
+
+    for (let index = 0; index < argv.length; index++) {
+        const arg = argv[index];
+        if (arg === '--check') {
+            options.check = true;
+        } else if (arg === '--set-dir') {
+            options.setDir = argv[++index] ?? '';
+        } else if (arg === '--help' || arg === '-h') {
+            console.log('Usage: node scripts/generate-late-story-item-defs.mjs [SET_DIR] [--set-dir <dir>] [--check]');
+            process.exit(0);
+        } else if (!arg.startsWith('--') && options.setDir === DEFAULT_SET) {
+            options.setDir = arg;
+        } else {
+            throw new Error(`Unknown argument: ${arg}`);
+        }
+    }
+
+    return options;
+}
+
+const options = parseArgs(process.argv.slice(2));
+const SET_DIR = options.setDir;
 
 const ITEMS_PATH = join(REPO, 'src', 'data', 'content', 'original-late-story-items.json');
 const FACTS_PATH = join(REPO, 'src', 'data', 'content', 'original-late-story-facts.json');
@@ -169,15 +196,32 @@ function main() {
         if (!row) throw new Error(`Missing itemtbl row for original item ${item.originalItemId}`);
         return enrichItem(item, row);
     });
-    writeFileSync(ITEMS_PATH, `${JSON.stringify({ items: enrichedItems }, null, 2)}\n`);
+    const itemsText = `${JSON.stringify({ items: enrichedItems }, null, 2)}\n`;
 
     let factsText = readFileSync(FACTS_PATH, 'utf8');
     for (const item of enrichedItems) {
         const pattern = new RegExp(`("originalItemId": ${item.originalItemId}, "currentItemId": ")[^"]+(")`, 'g');
         factsText = factsText.replace(pattern, `$1${item.currentItemId}$2`);
     }
-    writeFileSync(FACTS_PATH, factsText.endsWith('\n') ? factsText : `${factsText}\n`);
-    console.log(`wrote ${enrichedItems.length} late-story reward item records`);
+    const updatedFactsText = factsText.endsWith('\n') ? factsText : `${factsText}\n`;
+
+    if (options.check) {
+        let ok = true;
+        if (readFileSync(ITEMS_PATH, 'utf8') !== itemsText) {
+            console.error(`late story item ledger is stale: ${ITEMS_PATH}`);
+            ok = false;
+        }
+        if (readFileSync(FACTS_PATH, 'utf8') !== updatedFactsText) {
+            console.error(`late story fact currentItemId mappings are stale: ${FACTS_PATH}`);
+            ok = false;
+        }
+        if (!ok) process.exit(1);
+        console.log(`verified ${enrichedItems.length} late-story reward item records`);
+    } else {
+        writeFileSync(ITEMS_PATH, itemsText);
+        writeFileSync(FACTS_PATH, updatedFactsText);
+        console.log(`wrote ${enrichedItems.length} late-story reward item records`);
+    }
 }
 
 main();
