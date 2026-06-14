@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import type { GameManager } from '../../src/engine/GameManager';
 import { WorldEngine } from '../../src/engine/WorldEngine';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
-import { applyDevRaidScenario, parseDevRaidScenario } from '../../src/dev/DevRaidScenarios';
+import { applyDevRaidScenario, DEV_LATE_STORY_EPISODES, parseDevRaidScenario } from '../../src/dev/DevRaidScenarios';
 
 type MockDevStatusElement = {
     className: string;
@@ -144,9 +144,10 @@ function createManagerHarness() {
 }
 
 test('dev raid scenario parser accepts late story interiors 23 through 31 only', () => {
+    assert.deepEqual([...DEV_LATE_STORY_EPISODES], [23, 24, 25, 26, 27, 28, 29, 30, 31]);
     assert.equal(parseDevRaidScenario('aggro'), 'aggro');
     assert.equal(parseDevRaidScenario('loot'), 'loot');
-    for (let episode = 23; episode <= 31; episode++) {
+    for (const episode of DEV_LATE_STORY_EPISODES) {
         assert.equal(parseDevRaidScenario(`story${episode}`), `story${episode}`);
     }
     assert.equal(parseDevRaidScenario('story22'), null);
@@ -156,7 +157,7 @@ test('dev raid scenario parser accepts late story interiors 23 through 31 only',
 
 test('package scripts expose each late story dev entry through episode 31', () => {
     const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
-    for (let episode = 23; episode <= 31; episode++) {
+    for (const episode of DEV_LATE_STORY_EPISODES) {
         assert.equal(
             packageJson.scripts[`dev:raid:story${episode}`],
             `node scripts/dev-town.mjs raid story${episode}`,
@@ -201,7 +202,7 @@ test('dev story31 scenario launches local Demon Fixer Den without network raid s
 
 test('dev late story scenarios launch local interiors through episode 31', () => {
     withMockDocument((getStatus) => {
-        for (let episode = 23; episode <= 31; episode++) {
+        for (const episode of DEV_LATE_STORY_EPISODES) {
             const { logs, manager, world } = createManagerHarness();
             const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
             const scenarioId = parseDevRaidScenario(`story${episode}`);

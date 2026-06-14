@@ -6,7 +6,7 @@ import { LootObject } from '../entity/LootObject';
 import type { GameManager } from '../engine/GameManager';
 import { formatT, t } from '../i18n/LanguageManager';
 
-const DEV_LATE_STORY_EPISODES = [23, 24, 25, 26, 27, 28, 29, 30, 31] as const;
+export const DEV_LATE_STORY_EPISODES = [23, 24, 25, 26, 27, 28, 29, 30, 31] as const;
 type DevLateStoryEpisode = typeof DEV_LATE_STORY_EPISODES[number];
 type DevLateStoryScenario = `story${DevLateStoryEpisode}`;
 

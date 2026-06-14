@@ -10,8 +10,8 @@ import { DarksaberSpriteAtlas } from './ui/DarksaberSpriteAtlas';
 import { mountUiOverlay } from './ui/react/mountOverlay';
 import { mountAuthGate } from './ui/react/auth/mountAuthGate';
 import { AuthApiError, AuthClient, type AuthSessionResponse } from './net/AuthClient';
-import { t } from './i18n/LanguageManager';
-import { applyDevRaidScenario, parseDevRaidScenario, type DevRaidScenario } from './dev/DevRaidScenarios';
+import { formatT, t } from './i18n/LanguageManager';
+import { applyDevRaidScenario, DEV_LATE_STORY_EPISODES, parseDevRaidScenario, type DevRaidScenario } from './dev/DevRaidScenarios';
 
 type DevStartMode = 'town' | 'raid' | 'tutorial';
 
@@ -152,14 +152,16 @@ function mountDevLauncher(): void {
     if (!import.meta.env.DEV) return;
     const root = document.createElement('div');
     root.className = 'dev-launcher';
+    const lateStoryLinks = DEV_LATE_STORY_EPISODES.map((episode) =>
+        `<a href="/?devStart=raid&devScenario=story${episode}">${formatT('dev.launcher.raidStoryEpisode', { episode })}</a>`
+    ).join('');
     root.innerHTML = `
         <div class="dev-launcher__title">${t('dev.launcher.title')}</div>
         <a href="/?devStart=town">${t('dev.launcher.town')}</a>
         <a href="/?devStart=raid">${t('dev.launcher.raid')}</a>
         <a href="/?devStart=raid&devScenario=aggro">${t('dev.launcher.raidAggro')}</a>
         <a href="/?devStart=raid&devScenario=loot">${t('dev.launcher.raidLoot')}</a>
-        <a href="/?devStart=raid&devScenario=story23">${t('dev.launcher.raidLateStory')}</a>
-        <a href="/?devStart=raid&devScenario=story31">${t('dev.launcher.raidStory31')}</a>
+        ${lateStoryLinks}
         <a href="/?devStart=tutorial">${t('dev.launcher.tutorial')}</a>
     `;
     document.body.appendChild(root);
