@@ -841,7 +841,8 @@ test('server late story boss clears secure original EVENT 99 rewards only after 
         const internals = session as any;
         const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
         assert.ok(serverActor, `episode ${episode} actor`);
-        serverActor.tile = world.getDungeonEntranceTile(dungeon);
+        const entranceTile = world.getDungeonEntranceTile(dungeon);
+        serverActor.tile = entranceTile;
 
         const enter = session.handleMessage(joined.playerId, {
             type: 'SCENARIO_ENTER',
@@ -870,6 +871,12 @@ test('server late story boss clears secure original EVENT 99 rewards only after 
         const kill = attack.broadcasts.find((message) => message.type === 'COMBAT_EVENT');
         assert.equal(kill?.type, 'COMBAT_EVENT', `episode ${episode} kill event type`);
         assert.equal(kill?.kind, 'kill', `episode ${episode} kill event`);
+        const bossLoot = session.createSnapshot(joined.playerId, 2_500 + episode).loot.find((loot) =>
+            loot.kind === 'corpse' && loot.sourceLabel.includes(bossEntry.enemy.name)
+        );
+        assert.ok(bossLoot, `episode ${episode} boss corpse loot`);
+        assert.deepEqual(bossLoot.tile, entranceTile, `episode ${episode} boss corpse returns to entrance`);
+        assert.notDeepEqual(bossLoot.tile, getOriginalLateStoryBossTile(episode), `episode ${episode} boss corpse avoids interior boss tile`);
 
         const serverPlayer = internals.players.get(joined.playerId);
         assert.ok(serverPlayer, `episode ${episode} server player`);
