@@ -1038,6 +1038,15 @@ test('network field scenario events expose world inspect tiles and one-shot rewa
         },
     });
 
+    harness.controller.applyNetworkScenarioSnapshot({
+        enteredDungeonIds: [ARCADIA_PLAIN_DUNGEON_ID],
+        activeDungeonId: ARCADIA_PLAIN_DUNGEON_ID,
+        completedDungeonIds: [],
+    });
+
+    const markerId = `arcadia_gold_chest_01:${eventTile.x},${eventTile.y}`;
+    assert.equal(harness.worldMap.getInspectMarkers().some((marker) => marker.id === markerId), true);
+
     const inspectable = harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any);
     assert.equal(inspectable.has(`${eventTile.x},${eventTile.y}`), true);
 
@@ -1062,6 +1071,11 @@ test('network field scenario events expose world inspect tiles and one-shot rewa
     assert.equal(raidSession.hasScenarioFlag(ARCADIA_PLAIN_DUNGEON_ID, 'arcadia_gold_chest_01'), true);
     assert.ok(harness.logs.includes('%s가(이) 상자를 열었습니다.'));
     assert.ok(harness.logs.includes('100 GOLD를 얻었습니다.'));
+    assert.equal(harness.worldMap.getInspectMarkers().some((marker) => marker.id === markerId), false);
+    assert.equal(
+        harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any).has(`${eventTile.x},${eventTile.y}`),
+        false,
+    );
     assert.equal(harness.controller.playFieldEventAt(eventTile, { id: 'hero', entity: player } as any), false);
 });
 
