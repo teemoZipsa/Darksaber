@@ -110,4 +110,5 @@
 
 - `npm run verify:story`: 1~31화의 선언된 원본 `Wlib`/`Glib`/`MAP` 파일과 `set.arc`
   멤버를 추출 원본과 대조하고, `original-scenario-import`/메인퀘스트 로드맵 표가
-  런타임 선언과 일치하는지 확인하며, 퀘스트 정의와 23~31화 후반 원장(아이템/MRC/set.arc/source)을 함께 검증한다.
+  런타임 선언과 일치하는지 확인하며, 퀘스트 정의/스토리 i18n과
+  23~31화 후반 원장(아이템/MRC/set.arc/source)을 함께 검증한다.

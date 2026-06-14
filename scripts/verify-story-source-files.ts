@@ -1,8 +1,14 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parseOriginalArcArchive } from '../src/data/original/originalArcArchive';
+import { i18n } from '../src/i18n/LanguageManager';
+import { STORY_INTERIOR_LAYOUTS } from '../src/data/StoryInteriorData';
 import { STORY_QUESTS } from '../src/data/StoryQuestData';
-import { STORY_SCENARIO_EVENT_SEQUENCES, type StoryScenarioEventSequence } from '../src/data/StoryScenarioEventData';
+import {
+    STORY_SCENARIO_EVENT_SEQUENCES,
+    type StoryScenarioEventSequence,
+    type StoryScenarioEventStep,
+} from '../src/data/StoryScenarioEventData';
 import { STORY_SCENARIOS, type StoryScenarioDefinition, type StoryScenarioMissionKind } from '../src/data/StoryScenarioData';
 
 const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Saver_Files\\Saver';
@@ -201,6 +207,60 @@ function verifyStoryQuestDefinition(episode: number, scenario: StoryScenarioDefi
     }
 }
 
+function addStoryStepKeys(keys: Map<string, string>, context: string, step: StoryScenarioEventStep): void {
+    if (step.kind === 'dialogue') {
+        keys.set(step.speakerNameKey, `${context} speaker`);
+        keys.set(step.textKey, `${context} text`);
+    } else if (step.kind === 'focus' || step.kind === 'combatStart' || step.kind === 'objective') {
+        keys.set(step.labelKey, `${context} label`);
+    }
+}
+
+function collectStoryI18nKeys(episode: number, scenario: StoryScenarioDefinition, sequence: StoryScenarioEventSequence): Map<string, string> {
+    const keys = new Map<string, string>();
+    const quest = STORY_QUESTS.find((entry) => entry.episode === episode);
+    const layout = STORY_INTERIOR_LAYOUTS.find((entry) => entry.dungeonId === scenario.dungeonId);
+    const add = (key: string | undefined | null, context: string) => {
+        if (key) keys.set(key, context);
+    };
+
+    if (quest) {
+        add(quest.titleKey, `episode ${episode} quest title`);
+        add(quest.summaryKey, `episode ${episode} quest summary`);
+        add(quest.objectiveKey, `episode ${episode} quest objective`);
+        add(quest.recommendedLevelKey, `episode ${episode} quest recommended level`);
+        add(quest.enterLogKey, `episode ${episode} quest enter log`);
+        add(quest.objectiveCompleteLogKey, `episode ${episode} quest completion log`);
+    }
+    if (layout) {
+        add(layout.displayNameKey, `episode ${episode} interior display name`);
+        add(layout.objectiveKey, `episode ${episode} interior objective`);
+        for (const room of layout.rooms) add(room.nameKey, `episode ${episode} interior room ${room.id}`);
+        for (const prop of layout.props) add(prop.labelKey, `episode ${episode} interior prop`);
+        for (const door of layout.doors ?? []) add(door.lockedLogKey, `episode ${episode} interior door ${door.id}`);
+    }
+    for (const marker of sequence.markers ?? []) add(marker.markerLabelKey, `episode ${episode} marker ${marker.id}`);
+    for (const [index, step] of sequence.entry.entries()) addStoryStepKeys(keys, `episode ${episode} entry step ${index}`, step);
+    for (const [index, step] of sequence.bossDefeat.entries()) addStoryStepKeys(keys, `episode ${episode} boss step ${index}`, step);
+    for (const event of sequence.fieldEvents) {
+        add(event.markerLabelKey, `episode ${episode} field event ${event.id} marker`);
+        for (const [index, step] of event.steps.entries()) addStoryStepKeys(keys, `episode ${episode} field event ${event.id} step ${index}`, step);
+    }
+    for (const event of sequence.enemyDefeatEvents ?? []) {
+        for (const [index, step] of event.steps.entries()) addStoryStepKeys(keys, `episode ${episode} enemy event ${event.id} step ${index}`, step);
+    }
+    return keys;
+}
+
+function verifyStoryI18nKeys(episode: number, scenario: StoryScenarioDefinition, sequence: StoryScenarioEventSequence): void {
+    const ko = i18n.strings.ko as Record<string, string>;
+    const en = i18n.strings.en as Record<string, string>;
+    for (const [key, context] of collectStoryI18nKeys(episode, scenario, sequence)) {
+        if (!ko[key]) throw new Error(`Missing ko i18n key ${key}: ${context}`);
+        if (!en[key]) throw new Error(`Missing en i18n key ${key}: ${context}`);
+    }
+}
+
 const options = parseArgs(process.argv.slice(2));
 const sourceRoot = resolve(options.sourceRoot);
 const docRows = readScenarioImportDocRows();
@@ -218,6 +278,7 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verifyScenarioImportDocRow(episode, sequence, docRows);
     verifyRoadmapDocRow(episode, scenario, roadmapRows);
     verifyStoryQuestDefinition(episode, scenario);
+    verifyStoryI18nKeys(episode, scenario, sequence);
     requireSourceFile(sourceRoot, episode, sequence.originalSources.sceneScript);
     if (sequence.originalSources.globalScript !== 'missing') {
         requireSourceFile(sourceRoot, episode, sequence.originalSources.globalScript);
@@ -249,4 +310,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, and quests: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, quests, and i18n: ${verified.join(', ')}`);
