@@ -5,6 +5,45 @@ import { WorldEngine } from '../../src/engine/WorldEngine';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import { applyDevRaidScenario, parseDevRaidScenario } from '../../src/dev/DevRaidScenarios';
 
+type MockDevStatusElement = {
+    className: string;
+    dataset: Record<string, string>;
+    textContent: string | null;
+};
+
+function withMockDocument<T>(run: (getStatus: () => MockDevStatusElement | null) => T): T {
+    const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+    const elements: MockDevStatusElement[] = [];
+    const documentMock = {
+        querySelector: (selector: string) => {
+            if (selector !== '.dev-scenario-status') return null;
+            return elements.find((element) => element.className === 'dev-scenario-status') ?? null;
+        },
+        createElement: (tag: string) => {
+            assert.equal(tag, 'div');
+            return { className: '', dataset: {}, textContent: null };
+        },
+        body: {
+            appendChild: (element: MockDevStatusElement) => {
+                elements.push(element);
+                return element;
+            },
+        },
+    };
+
+    Object.defineProperty(globalThis, 'document', {
+        configurable: true,
+        value: documentMock,
+    });
+
+    try {
+        return run(() => documentMock.querySelector('.dev-scenario-status'));
+    } finally {
+        if (previousDocument) Object.defineProperty(globalThis, 'document', previousDocument);
+        else Reflect.deleteProperty(globalThis, 'document');
+    }
+}
+
 function createActor() {
     const entity = {
         gridX: 14,
@@ -149,25 +188,33 @@ test('dev story31 scenario launches local Demon Fixer Den without network raid s
 });
 
 test('dev late story scenarios launch local interiors through episode 31', () => {
-    for (let episode = 23; episode <= 31; episode++) {
-        const { logs, manager, world } = createManagerHarness();
-        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
-        const scenarioId = parseDevRaidScenario(`story${episode}`);
-        assert.ok(scenario);
-        assert.ok(scenarioId);
+    withMockDocument((getStatus) => {
+        for (let episode = 23; episode <= 31; episode++) {
+            const { logs, manager, world } = createManagerHarness();
+            const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+            const scenarioId = parseDevRaidScenario(`story${episode}`);
+            assert.ok(scenario);
+            assert.ok(scenarioId);
 
-        applyDevRaidScenario(manager, scenarioId);
+            applyDevRaidScenario(manager, scenarioId);
 
-        assert.equal(world.currentPhase, 'raid', `episode ${episode} phase`);
-        assert.equal(world.isNetworkRaid, false, `episode ${episode} network raid`);
-        assert.equal(world.networkRaidClient, null, `episode ${episode} network client`);
-        assert.deepEqual(world.storyScenarioController.started, {
-            dungeonId: scenario.dungeonId,
-            questId: scenario.questId,
-        }, `episode ${episode} story start`);
-        assert.equal(logs.length, 1, `episode ${episode} dev log`);
-        assert.match(logs[0], new RegExp(`${episode}화|Episode ${episode}`), `episode ${episode} log text`);
-    }
+            assert.equal(world.currentPhase, 'raid', `episode ${episode} phase`);
+            assert.equal(world.isNetworkRaid, false, `episode ${episode} network raid`);
+            assert.equal(world.networkRaidClient, null, `episode ${episode} network client`);
+            assert.deepEqual(world.storyScenarioController.started, {
+                dungeonId: scenario.dungeonId,
+                questId: scenario.questId,
+            }, `episode ${episode} story start`);
+            assert.equal(logs.length, 1, `episode ${episode} dev log`);
+            assert.match(logs[0], new RegExp(`${episode}화|Episode ${episode}`), `episode ${episode} log text`);
+
+            const status = getStatus();
+            assert.ok(status, `episode ${episode} dev status`);
+            assert.equal(status.dataset.scenario, scenarioId, `episode ${episode} dev status scenario`);
+            assert.equal(status.dataset.state, 'interior-ready', `episode ${episode} dev status state`);
+            assert.equal(status.textContent?.includes(`${scenarioId} / interior-ready`), true, `episode ${episode} dev status text`);
+        }
+    });
 });
 
 test('dev loot scenario enables the raid loot client path without getNetworkRaidState', () => {
