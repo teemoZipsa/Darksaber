@@ -5,6 +5,8 @@ import { i18n } from '../src/i18n/LanguageManager';
 import { STORY_INTERIOR_LAYOUTS } from '../src/data/StoryInteriorData';
 import { STORY_QUESTS } from '../src/data/StoryQuestData';
 import {
+    getStoryScenarioEventStepDurationMs,
+    getStoryScenarioPresentationDurationMs,
     STORY_SCENARIO_EVENT_SEQUENCES,
     type StoryScenarioEventSequence,
     type StoryScenarioEventStep,
@@ -261,10 +263,81 @@ function verifyStoryI18nKeys(episode: number, scenario: StoryScenarioDefinition,
     }
 }
 
+function requireUniqueCompletionFlag(flags: Map<string, string>, flag: string, context: string): void {
+    const existing = flags.get(flag);
+    if (existing && existing !== context) {
+        throw new Error(`Duplicate story completion flag ${flag}: ${existing} and ${context}`);
+    }
+    flags.set(flag, context);
+}
+
+function verifyPositivePresentation(episode: number, dungeonId: string, label: string, steps: readonly StoryScenarioEventStep[]): void {
+    if (steps.length === 0) throw new Error(`Episode ${episode} ${dungeonId} ${label} presentation is empty`);
+    for (const [index, step] of steps.entries()) {
+        const durationMs = getStoryScenarioEventStepDurationMs(step);
+        if (durationMs <= 0) {
+            throw new Error(`Episode ${episode} ${dungeonId} ${label} step ${index} has non-positive duration ${durationMs}`);
+        }
+    }
+    const totalDurationMs = getStoryScenarioPresentationDurationMs(steps);
+    if (totalDurationMs <= 0) {
+        throw new Error(`Episode ${episode} ${dungeonId} ${label} presentation has non-positive total duration ${totalDurationMs}`);
+    }
+}
+
+function verifyStoryCompletionContract(
+    episode: number,
+    scenario: StoryScenarioDefinition,
+    sequence: StoryScenarioEventSequence,
+    completionFlags: Map<string, string>
+): void {
+    const context = `episode ${episode} ${scenario.dungeonId}`;
+    verifyPositivePresentation(episode, scenario.dungeonId, 'entry', sequence.entry);
+    verifyPositivePresentation(episode, scenario.dungeonId, 'boss defeat', sequence.bossDefeat);
+
+    if (sequence.objectiveRuntimeFlag) {
+        requireUniqueCompletionFlag(completionFlags, sequence.objectiveRuntimeFlag, context);
+    }
+
+    if (sequence.bossDefeatEvent) {
+        requireUniqueCompletionFlag(completionFlags, sequence.bossDefeatEvent.runtimeFlag, context);
+        if (!sequence.bossDefeatEvent.trigger.includes('SCENECLEAR')) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} boss defeat event does not declare SCENECLEAR`);
+        }
+        if (sequence.objectiveRuntimeFlag && sequence.bossDefeatEvent.runtimeFlag !== sequence.objectiveRuntimeFlag) {
+            throw new Error(
+                `Episode ${episode} ${scenario.dungeonId} boss defeat flag mismatch: ` +
+                `${sequence.bossDefeatEvent.runtimeFlag} !== ${sequence.objectiveRuntimeFlag}`
+            );
+        }
+    }
+
+    if (episode >= 23 && episode <= 31) {
+        const expectedFlag = `${scenario.dungeonId}_objective_complete`;
+        if (sequence.objectiveRuntimeFlag !== expectedFlag) {
+            throw new Error(`Episode ${episode} late story objective flag mismatch: ${sequence.objectiveRuntimeFlag} !== ${expectedFlag}`);
+        }
+        if (!sequence.bossDefeatEvent) throw new Error(`Episode ${episode} late story boss defeat event is missing`);
+        if (sequence.bossDefeatEvent.originalEventId !== 'EVENT 99') {
+            throw new Error(`Episode ${episode} late story boss event mismatch: ${sequence.bossDefeatEvent.originalEventId} !== EVENT 99`);
+        }
+        if (sequence.bossDefeatEvent.runtimeFlag !== expectedFlag) {
+            throw new Error(`Episode ${episode} late story boss flag mismatch: ${sequence.bossDefeatEvent.runtimeFlag} !== ${expectedFlag}`);
+        }
+        if (!/\bCHARDEAD 700\b/.test(sequence.bossDefeatEvent.trigger)) {
+            throw new Error(`Episode ${episode} late story boss trigger does not declare CHARDEAD 700`);
+        }
+        if (!/\bSCENECLEAR\b/.test(sequence.bossDefeatEvent.trigger)) {
+            throw new Error(`Episode ${episode} late story boss trigger does not declare SCENECLEAR`);
+        }
+    }
+}
+
 const options = parseArgs(process.argv.slice(2));
 const sourceRoot = resolve(options.sourceRoot);
 const docRows = readScenarioImportDocRows();
 const roadmapRows = readRoadmapDocRows();
+const completionFlags = new Map<string, string>();
 const verified: string[] = [];
 
 for (let episode = options.start; episode <= options.end; episode++) {
@@ -279,6 +352,7 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verifyRoadmapDocRow(episode, scenario, roadmapRows);
     verifyStoryQuestDefinition(episode, scenario);
     verifyStoryI18nKeys(episode, scenario, sequence);
+    verifyStoryCompletionContract(episode, scenario, sequence, completionFlags);
     requireSourceFile(sourceRoot, episode, sequence.originalSources.sceneScript);
     if (sequence.originalSources.globalScript !== 'missing') {
         requireSourceFile(sourceRoot, episode, sequence.originalSources.globalScript);
@@ -310,4 +384,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, quests, and i18n: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, quests, i18n, and completion contracts: ${verified.join(', ')}`);
