@@ -34,6 +34,7 @@ import {
     getOriginalLateStoryCacheEvents,
 } from '../../src/data/OriginalLateStoryFacts';
 import { getOriginalLateStoryItemsForSourceEvent } from '../../src/data/OriginalLateStoryItems';
+import { getStoryScenarioMonsterLayout } from '../../src/data/StoryScenarioMonsterData';
 import { Enemy } from '../../src/entity/Enemy';
 import { LootObject } from '../../src/entity/LootObject';
 import { Player } from '../../src/entity/Player';
@@ -429,6 +430,60 @@ test('Burgos boss corpse loot includes a guaranteed rune', () => {
 
     assert.equal(engine.worldMap.loot.length, 1);
     assert.ok(engine.worldMap.loot[0].inventory.items.some((placed: { item: { slot: string } }) => placed.item.slot === 'rune'));
+});
+
+test('late story interior boss loot returns to the original world entrance through episode 31', () => {
+    for (const episode of [23, 24, 25, 26, 27, 28, 29, 30, 31]) {
+        const scenario = STORY_SCENARIOS.find((candidate) => candidate.episode === episode);
+        assert.ok(scenario, `missing scenario ${episode}`);
+        const layout = getStoryInteriorLayout(scenario.dungeonId);
+        assert.ok(layout, `missing layout ${scenario.dungeonId}`);
+        const monsterLayout = getStoryScenarioMonsterLayout(scenario);
+        assert.ok(monsterLayout.bossMonsterId, `missing boss monster ${scenario.dungeonId}`);
+        const bossDef = getMonsterDefinition(monsterLayout.bossMonsterId);
+        const boss = new Enemy(
+            `story_${scenario.dungeonId}_boss`,
+            layout.bossTile.x,
+            layout.bossTile.y,
+            scenario.bossName ?? bossDef.name,
+            Math.max(scenario.bossLevel, bossDef.level),
+            bossDef.color,
+            'boss',
+            monsterLayout.bossMonsterId
+        );
+        boss.isBoss = true;
+
+        const previousWorldMap = new WorldMap();
+        const dungeon = previousWorldMap.getDungeons().find((candidate) => candidate.id === scenario.dungeonId);
+        assert.ok(dungeon, `missing dungeon ${scenario.dungeonId}`);
+        const returnTile = previousWorldMap.getDungeonEntranceTile(dungeon);
+        previousWorldMap.loot = [];
+
+        const interiorMap = new StoryInteriorMap(layout);
+        interiorMap.loot = [];
+        const logs: string[] = [];
+        const engine = Object.create(WorldEngine.prototype) as any;
+        engine.worldMap = interiorMap;
+        engine.storyScenarioController = {
+            getActiveInterior: () => ({
+                dungeonId: scenario.dungeonId,
+                layout,
+                previousWorldMap,
+                returnTile,
+            }),
+        };
+        installLootController(engine, { logs });
+
+        engine.spawnEnemyLoot(boss);
+
+        assert.equal(interiorMap.loot.length, 0, `${scenario.dungeonId} interior loot`);
+        assert.equal(previousWorldMap.loot.length, 1, `${scenario.dungeonId} entrance loot`);
+        const loot = previousWorldMap.loot[0];
+        assert.deepEqual({ x: loot.x, y: loot.y }, returnTile, `${scenario.dungeonId} return loot tile`);
+        assert.equal(loot.kind, 'corpse', `${scenario.dungeonId} loot kind`);
+        assert.ok(loot.inventory.items.some((placed) => placed.item.slot === 'rune'), `${scenario.dungeonId} boss rune`);
+        assert.ok(logs.some((entry) => /입구에 남았습니다|left at the entrance/.test(entry)), `${scenario.dungeonId} entrance log`);
+    }
 });
 
 test('story episodes 3 through 31 have map entrances and server-session objective data', () => {
