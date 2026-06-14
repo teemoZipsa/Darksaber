@@ -775,6 +775,58 @@ test('story scenario item rewards preserve their original GETITEM ids', () => {
     }
 });
 
+test('story scenario field events stay presentable and replay-safe', () => {
+    for (const sequence of STORY_SCENARIO_EVENT_SEQUENCES) {
+        assert.ok(sequence.entry.length > 0, `${sequence.dungeonId} entry presentation`);
+        assert.ok(sequence.bossDefeat.length > 0, `${sequence.dungeonId} boss defeat presentation`);
+
+        const fieldEventIds = new Set<string>();
+        const runtimeFlags = new Set<string>();
+        if (sequence.objectiveRuntimeFlag) runtimeFlags.add(sequence.objectiveRuntimeFlag);
+        if (sequence.bossDefeatEvent?.runtimeFlag) runtimeFlags.add(sequence.bossDefeatEvent.runtimeFlag);
+
+        for (const event of sequence.fieldEvents) {
+            assert.equal(fieldEventIds.has(event.id), false, `${sequence.dungeonId} duplicate field event ${event.id}`);
+            fieldEventIds.add(event.id);
+            if (event.runtimeFlag) runtimeFlags.add(event.runtimeFlag);
+
+            assert.ok(event.triggerTiles.length > 0, `${sequence.dungeonId} ${event.id} trigger tiles`);
+            assert.ok(event.steps.length > 0, `${sequence.dungeonId} ${event.id} presentation steps`);
+            for (const tile of event.triggerTiles) {
+                assert.equal(Number.isInteger(tile.x), true, `${sequence.dungeonId} ${event.id} trigger tile x`);
+                assert.equal(Number.isInteger(tile.y), true, `${sequence.dungeonId} ${event.id} trigger tile y`);
+                assert.ok(tile.x >= 0, `${sequence.dungeonId} ${event.id} trigger tile x bounds`);
+                assert.ok(tile.y >= 0, `${sequence.dungeonId} ${event.id} trigger tile y bounds`);
+            }
+
+            const hasPersistentReward = Boolean(event.questItemId || event.rewards?.length);
+            if (hasPersistentReward) {
+                assert.ok(event.runtimeFlag, `${sequence.dungeonId} ${event.id} reward runtime flag`);
+                assert.ok(event.markerLabelKey, `${sequence.dungeonId} ${event.id} reward marker label`);
+            }
+            for (const reward of event.rewards ?? []) {
+                if (reward.type === 'gold') {
+                    assert.ok(Number.isInteger(reward.amount), `${sequence.dungeonId} ${event.id} gold reward integer`);
+                    assert.ok(reward.amount > 0, `${sequence.dungeonId} ${event.id} gold reward positive`);
+                }
+            }
+        }
+
+        for (const event of sequence.enemyDefeatEvents ?? []) {
+            assert.ok(event.steps.length > 0, `${sequence.dungeonId} ${event.id} presentation steps`);
+        }
+        for (const marker of sequence.markers ?? []) {
+            if (marker.hideWhenRuntimeFlag) {
+                assert.equal(
+                    runtimeFlags.has(marker.hideWhenRuntimeFlag),
+                    true,
+                    `${sequence.dungeonId} ${marker.id} hide flag ${marker.hideWhenRuntimeFlag}`
+                );
+            }
+        }
+    }
+});
+
 test('player data guards gold and normalizes old save shapes', () => {
     const previousStorage = globalThis.localStorage;
     const store = new Map<string, string>();
