@@ -56,6 +56,7 @@
 - `scripts/analyze-original-burgos-map.mjs` extracts and summarizes `MAP/01.mrc`, `01t.mrc`, `01hmap.BMP`, and `01set.arc` into `outputs/original_burgos_map_analysis/burgos-map-summary.json`.
 - `scripts/analyze-original-story-map.mjs --episode N` extracts and summarizes any numbered `MAP/NN.mrc`, `NNt.mrc`, `NNhmap.BMP`, and `NNset.arc` into `outputs/original_story_map_analysis/NN/NN-map-summary.json`.
 - `scripts/generate-late-story-mrc-facts.mjs` reads `MAP/23.mrc` through `MAP/31.mrc` and writes compact source dimensions plus per-layer value summaries for runtime use in late-story interiors.
+- `scripts/generate-story-hmaps.mjs --check` regenerates 23~31 hmap rows from original `MAP/NNhmap.bmp` using only the 2~20 hmap color classifier seed, then verifies the checked-in rows and expected approximate-pixel counts.
 - Original `.arc` files use the `0901` archive table. For Burgos dialogue verification, `Compress.dll` exports (`OpenArcFile`, `UnpackAFile`, `GetPointer`, `GetBuf2Size`) were used from 32-bit PowerShell to unpack CP949 text members.
 - The scanner reports byte/word counts, stable hashes, opcode candidates, coordinate candidates, text-reference candidates, scene-reference candidates, and `MAP` file manifest entries.
 - The scanner is intentionally descriptive only; it does not rewrite game data.
