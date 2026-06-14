@@ -7,6 +7,7 @@ import { parseOriginalArcArchive } from '../src/data/original/originalArcArchive
 import { i18n } from '../src/i18n/LanguageManager';
 import { getBurgosCastleHmapTileAt, BURGOS_CASTLE_HMAP_SIZE } from '../src/map/BurgosCastleHmap';
 import { getStoryHmapTileAt, STORY_HMAP_EPISODES, STORY_HMAP_SIZE } from '../src/map/StoryHmaps';
+import { StoryInteriorMap } from '../src/map/StoryInteriorMap';
 import { TileType } from '../src/map/Tile';
 import { WorldMap } from '../src/map/WorldMap';
 import { getStoryInteriorLayout, STORY_INTERIOR_LAYOUTS } from '../src/data/StoryInteriorData';
@@ -595,6 +596,103 @@ function getPresentationStepTiles(step: StoryScenarioEventStep): Array<{ label: 
     return step.focus ? [{ label: 'focus', tile: step.focus }] : [];
 }
 
+function hasWalkableInteriorPath(map: StoryInteriorMap, from: { x: number; y: number }, to: { x: number; y: number }): boolean {
+    const bounds = map.getBoundsTiles();
+    const queue = [{ ...from }];
+    const seen = new Set<string>([`${from.x},${from.y}`]);
+    for (let index = 0; index < queue.length; index++) {
+        const tile = queue[index];
+        if (tile.x === to.x && tile.y === to.y) return true;
+        for (const next of [
+            { x: tile.x + 1, y: tile.y },
+            { x: tile.x - 1, y: tile.y },
+            { x: tile.x, y: tile.y + 1 },
+            { x: tile.x, y: tile.y - 1 },
+        ]) {
+            const key = `${next.x},${next.y}`;
+            if (seen.has(key)) continue;
+            if (next.x < 0 || next.y < 0 || next.x >= bounds.width || next.y >= bounds.height) continue;
+            if (!map.isWalkable(next.x, next.y)) continue;
+            seen.add(key);
+            queue.push(next);
+        }
+    }
+    return false;
+}
+
+function verifyStoryInteriorTileAccessible(
+    episode: number,
+    dungeonId: string,
+    map: StoryInteriorMap,
+    label: string,
+    tile: { x: number; y: number }
+): void {
+    const bounds = map.getBoundsTiles();
+    if (tile.x < 0 || tile.y < 0 || tile.x >= bounds.width || tile.y >= bounds.height) {
+        throw new Error(`Episode ${episode} ${dungeonId} ${label} is outside interior bounds: ${tile.x},${tile.y}`);
+    }
+    if (!map.isWalkable(tile.x, tile.y)) {
+        throw new Error(`Episode ${episode} ${dungeonId} ${label} is not walkable: ${tile.x},${tile.y}`);
+    }
+    const playerStart = map.getPlayerStartTile();
+    if (!hasWalkableInteriorPath(map, playerStart, tile)) {
+        throw new Error(`Episode ${episode} ${dungeonId} ${label} is unreachable from player start: ${tile.x},${tile.y}`);
+    }
+}
+
+function verifyStoryInteriorAccessibilityContract(
+    episode: number,
+    scenario: StoryScenarioDefinition,
+    sequence: StoryScenarioEventSequence
+): void {
+    if (scenario.missionKind !== 'soloInterior') return;
+    const layout = getStoryInteriorLayout(scenario.dungeonId);
+    if (!layout) throw new Error(`Episode ${episode} ${scenario.dungeonId} missing story interior layout`);
+    const map = new StoryInteriorMap(layout);
+
+    verifyStoryInteriorTileAccessible(episode, scenario.dungeonId, map, 'entry tile', layout.entryTile);
+    verifyStoryInteriorTileAccessible(episode, scenario.dungeonId, map, 'player start', layout.playerStart);
+    verifyStoryInteriorTileAccessible(episode, scenario.dungeonId, map, 'boss tile', layout.bossTile);
+
+    for (const [index, tile] of layout.guardTiles.slice(0, scenario.guardCount).entries()) {
+        verifyStoryInteriorTileAccessible(episode, scenario.dungeonId, map, `guard tile ${index}`, tile);
+    }
+
+    for (const [group, steps] of [
+        ['entry', sequence.entry],
+        ['bossDefeat', sequence.bossDefeat],
+    ] as const) {
+        for (const [index, step] of steps.entries()) {
+            for (const point of getPresentationStepTiles(step)) {
+                verifyStoryInteriorTileAccessible(episode, scenario.dungeonId, map, `${group} step ${index} ${point.label}`, point.tile);
+            }
+        }
+    }
+
+    for (const event of sequence.fieldEvents) {
+        for (const [index, tile] of event.triggerTiles.entries()) {
+            verifyStoryInteriorTileAccessible(episode, scenario.dungeonId, map, `${event.id} trigger ${index}`, tile);
+        }
+        for (const [index, step] of event.steps.entries()) {
+            for (const point of getPresentationStepTiles(step)) {
+                verifyStoryInteriorTileAccessible(episode, scenario.dungeonId, map, `${event.id} step ${index} ${point.label}`, point.tile);
+            }
+        }
+    }
+
+    for (const event of sequence.enemyDefeatEvents ?? []) {
+        for (const [index, step] of event.steps.entries()) {
+            for (const point of getPresentationStepTiles(step)) {
+                verifyStoryInteriorTileAccessible(episode, scenario.dungeonId, map, `${event.id} step ${index} ${point.label}`, point.tile);
+            }
+        }
+    }
+
+    for (const marker of sequence.markers ?? []) {
+        verifyStoryInteriorTileAccessible(episode, scenario.dungeonId, map, `marker ${marker.id}`, marker.tile);
+    }
+}
+
 function verifyFieldScenarioWorldProjection(episode: number, scenario: StoryScenarioDefinition, sequence: StoryScenarioEventSequence, worldMap: WorldMap): void {
     if (scenario.missionKind === 'soloInterior') return;
     const dungeon = worldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
@@ -846,6 +944,7 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verifyStoryScenarioContentLedger(episode, scenario, contentRows);
     verifyStoryWorldEntrance(episode, scenario, worldMap);
     verifyStoryHmapContract(episode, scenario, worldMap);
+    verifyStoryInteriorAccessibilityContract(episode, scenario, sequence);
     verifyFieldScenarioWorldProjection(episode, scenario, sequence, worldMap);
     verifyStoryScenarioMonsterContract(episode, scenario);
     verifyStoryI18nKeys(episode, scenario, sequence);
@@ -881,4 +980,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, collection chains, quests, rewards, event references, scenario ledgers, world entrances, hmaps, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, collection chains, quests, rewards, event references, scenario ledgers, world entrances, hmaps, interior accessibility, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
