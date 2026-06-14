@@ -1,5 +1,6 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { parseOriginalArcArchive } from '../src/data/original/originalArcArchive';
 import { STORY_SCENARIO_EVENT_SEQUENCES } from '../src/data/StoryScenarioEventData';
 import { STORY_SCENARIOS } from '../src/data/StoryScenarioData';
 
@@ -42,6 +43,21 @@ function requireAbsentSourceFile(sourceRoot: string, episode: number, sourceFile
     }
 }
 
+function requireSetArcMembers(sourceRoot: string, episode: number, setArcFile: string, members: readonly string[] | undefined): void {
+    if (!members?.length) {
+        throw new Error(`Episode ${episode} is missing declared set.arc members`);
+    }
+
+    const path = join(sourceRoot, setArcFile);
+    const manifest = parseOriginalArcArchive(readFileSync(path));
+    const actualMembers = new Set(manifest.entries.map((entry) => entry.name.toLowerCase()));
+    for (const member of members) {
+        if (!actualMembers.has(member.toLowerCase())) {
+            throw new Error(`Episode ${episode} declares missing ${setArcFile} member ${member}`);
+        }
+    }
+}
+
 const options = parseArgs(process.argv.slice(2));
 const sourceRoot = resolve(options.sourceRoot);
 const verified: string[] = [];
@@ -62,6 +78,9 @@ for (let episode = LATE_STORY_START; episode <= LATE_STORY_END; episode++) {
     for (const sourceFile of sequence.originalSources.mapFiles) {
         requireSourceFile(sourceRoot, episode, sourceFile);
     }
+    const setArcFile = sequence.originalSources.mapFiles.find((sourceFile) => sourceFile.toLowerCase().endsWith('set.arc'));
+    if (!setArcFile) throw new Error(`Missing episode ${episode} declared set.arc source`);
+    requireSetArcMembers(sourceRoot, episode, setArcFile, sequence.originalSources.setArcMembers);
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
