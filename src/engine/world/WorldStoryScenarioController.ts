@@ -128,6 +128,17 @@ export class WorldStoryScenarioController {
         this.networkScenarioEnteredDungeonIds.clear();
     }
 
+    public resetRunState(): void {
+        this.beginStoryScenarioPresentation();
+        if (this.activeInterior) this.exitActiveInterior();
+        this.dismissedDungeonVisitKey = null;
+        this.pendingNetworkScenarioEnter = null;
+        this.pendingNetworkFieldEventIntentIds.clear();
+        this.networkScenarioEnteredDungeonIds.clear();
+        this.completedFieldEventKeys.clear();
+        this.context.getWorldMap().setInspectMarkers([]);
+    }
+
     public enterInteriorMap(dungeonId: string, returnTile: TilePoint): StoryInteriorLayout | null {
         const layout = getStoryInteriorLayout(dungeonId);
         if (!layout) return null;

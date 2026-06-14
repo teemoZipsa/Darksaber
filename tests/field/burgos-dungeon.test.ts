@@ -617,6 +617,30 @@ test('story interior completion restores the previous world map at the return ti
     assert.ok(harness.logs.some((entry) => entry.includes('으.. 분하다.. | 억울하지만.. 여기선 일단 물러나야겠군..')));
 });
 
+test('story scenario run reset exits active interiors and clears presentation markers', () => {
+    const previousWorldMap = new WorldMap();
+    const player = new Player(10, 10);
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ player, raidSession, worldMap: previousWorldMap });
+    const dungeon = previousWorldMap.getDungeons().find((entry) => entry.id === ZAMORA_FORTRESS_DUNGEON_ID);
+    const quest = getStoryQuestByDungeonId(ZAMORA_FORTRESS_DUNGEON_ID);
+    assert.ok(dungeon);
+    assert.ok(quest);
+
+    harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+    assert.ok(harness.worldMap instanceof StoryInteriorMap);
+    assert.equal(harness.controller.isPresentationActive(), true);
+    assert.ok(harness.worldMap.getInspectMarkers().length > 0);
+
+    harness.controller.resetRunState();
+
+    assert.equal(harness.worldMap, previousWorldMap);
+    assert.equal(harness.controller.getActiveInterior(), null);
+    assert.equal(harness.controller.isPresentationActive(), false);
+    assert.deepEqual(harness.worldMap.getInspectMarkers(), []);
+});
+
 test('Zamora local story interior plays original entry flow before Fenris objective', () => {
     const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === ZAMORA_FORTRESS_DUNGEON_ID);
     const quest = getStoryQuestByDungeonId(ZAMORA_FORTRESS_DUNGEON_ID);

@@ -583,6 +583,7 @@ export class WorldEngine {
             townSession: this.townSession,
             getTownById: (townId) => this.getTownById(townId),
             getCurrentHubTown: () => this.getCurrentHubTown(),
+            resetStoryScenarioStateForRaidEnd: () => this.storyScenarioController.resetRunState(),
             placePartyAtTown: (town) => {
                 this.placePartyNear(this.worldMap.getTownSpawnTile(town));
                 this.player = this.getControlledActor()?.entity ?? this.player;

@@ -30,6 +30,7 @@ export interface WorldRaidOutcomeContext {
     townSession: WorldTownSession;
     getTownById: (townId: string) => TownInfo | null;
     getCurrentHubTown: () => TownInfo;
+    resetStoryScenarioStateForRaidEnd: () => void;
     placePartyAtTown: (town: TownInfo) => void;
     openTown: (town: TownInfo) => void;
     setPhase: (phase: WorldPhase) => void;
@@ -88,6 +89,7 @@ export class WorldRaidOutcomeController {
         this.context.townSession.clearRestStatusesFromParty();
         this.context.townSession.applyRaidInjuries(raidSession.downedCharacterIds);
         this.context.party.resetForNewRaid();
+        this.context.resetStoryScenarioStateForRaidEnd();
         this.context.placePartyAtTown(destination);
 
         const outcome: RaidOutcome = {
@@ -130,6 +132,7 @@ export class WorldRaidOutcomeController {
         this.context.townSession.clearRestStatusesFromParty();
         this.context.townSession.applyRaidInjuries(raidSession.downedCharacterIds);
         this.context.party.resetForNewRaid();
+        this.context.resetStoryScenarioStateForRaidEnd();
         this.context.placePartyAtTown(returnTown);
 
         const outcome: RaidOutcome = {

@@ -63,6 +63,7 @@ function createController() {
     playerData.markCleared('quest:first_survival');
     const raidSession = new WorldRaidSession('central_castle');
     const party = new PartyManager();
+    const calls: string[] = [];
     const townSession = {
         clearRestStatusesFromParty: () => undefined,
         applyRaidInjuries: (_downedCharacterIds: Set<string>) => undefined,
@@ -80,7 +81,8 @@ function createController() {
         townSession,
         getTownById: () => DESTINATION_TOWN,
         getCurrentHubTown: () => DESTINATION_TOWN,
-        placePartyAtTown: (_town: TownInfo) => undefined,
+        resetStoryScenarioStateForRaidEnd: () => { calls.push('resetStoryScenarioStateForRaidEnd'); },
+        placePartyAtTown: (_town: TownInfo) => { calls.push('placePartyAtTown'); },
         openTown: (_town: TownInfo) => undefined,
         setPhase: () => undefined,
         log: () => undefined,
@@ -89,7 +91,7 @@ function createController() {
     const getOutcome = (): RaidOutcome | null =>
         (controller as unknown as { raidResultUI: { outcome: RaidOutcome | null } }).raidResultUI.outcome;
 
-    return { controller, playerData, raidSession, party, gameManager, getOutcome };
+    return { controller, playerData, raidSession, party, gameManager, getOutcome, calls };
 }
 
 test('Burgos objective grants episode 1 completion and bomb only after survival', () => {
@@ -138,6 +140,24 @@ test('raid gold rewards are secured only after survival', () => {
     assert.equal(failed.playerData.gold, 500);
     assert.equal(failed.raidSession.raidGoldReward, 0);
     assert.equal(failed.getOutcome()?.goldReward, undefined);
+});
+
+test('raid result clears story scenario runtime state before town placement', () => {
+    const survived = createController();
+    survived.raidSession.beginRaidFromTown('central_castle');
+    survived.raidSession.startDungeonEncounter('sicilio_island');
+
+    survived.controller.completeSuccess(DESTINATION_TOWN);
+
+    assert.deepEqual(survived.calls, ['resetStoryScenarioStateForRaidEnd', 'placePartyAtTown']);
+
+    const failed = createController();
+    failed.raidSession.beginRaidFromTown('central_castle');
+    failed.raidSession.startDungeonEncounter('demon_fixers_den');
+
+    failed.controller.completeFailure('DEAD');
+
+    assert.deepEqual(failed.calls, ['resetStoryScenarioStateForRaidEnd', 'placePartyAtTown']);
 });
 
 test('Burgos objective does not grant episode 1 reward on raid failure', () => {
