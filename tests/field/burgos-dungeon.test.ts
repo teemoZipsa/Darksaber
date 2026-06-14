@@ -1629,7 +1629,15 @@ test('network late story cache results update interior markers and presentations
             const rewards: ScenarioFieldEventRewardResult[] = (event.rewards ?? []).map((reward) => reward.type === 'item'
                 ? { type: 'item', itemId: reward.itemId }
                 : { type: 'gold', amount: reward.amount });
-            assert.equal(interiorMap.getInspectMarkers().some((marker) => marker.id === markerId), true, `episode ${episode} ${event.id} marker before`);
+            const marker: StoryInteriorInspectMarker | undefined = interiorMap.getInspectMarkers().find((candidate) => candidate.id === markerId);
+            assert.ok(marker, `episode ${episode} ${event.id} marker before`);
+            assert.deepEqual(marker.tile, cache.tile, `episode ${episode} ${event.id} marker tile`);
+            assert.equal(marker.kind, 'chest', `episode ${episode} ${event.id} marker kind`);
+            assert.equal(
+                marker.labelKey,
+                `story.event.ep${String(episode).padStart(2, '0')}.cache.marker`,
+                `episode ${episode} ${event.id} marker label`
+            );
             player.setGridPosition(cache.tile.x, cache.tile.y + 1, true);
             assert.equal(
                 harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any).has(`${cache.tile.x},${cache.tile.y}`),
