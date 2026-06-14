@@ -1438,57 +1438,67 @@ test('late story boss clear rewards match original EVENT 99 item sources through
     }
 });
 
-test('episode 31 local story interior starts a playable story bgm key', () => {
+test('late story local interiors start playable story bgm keys through episode 31', () => {
     const originalPlayBgm = AudioManager.playBgm.bind(AudioManager);
     const playedBgmKeys: string[] = [];
     (AudioManager as unknown as { playBgm: (key: string) => void }).playBgm = (key: string) => {
         playedBgmKeys.push(key);
     };
     try {
-        const raidSession = new WorldRaidSession('central_castle');
-        raidSession.beginRaidFromTown('central_castle');
-        const harness = createStoryScenarioHarness({ raidSession });
-        const dungeon = harness.worldMap.getDungeons().find((entry) => entry.id === 'demon_fixers_den');
-        const quest = getStoryQuestByDungeonId('demon_fixers_den');
-        assert.ok(dungeon);
-        assert.ok(quest);
+        for (let episode = 23; episode <= 31; episode++) {
+            playedBgmKeys.length = 0;
+            const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+            assert.ok(scenario, `missing episode ${episode}`);
+            const raidSession = new WorldRaidSession('central_castle');
+            raidSession.beginRaidFromTown('central_castle');
+            const harness = createStoryScenarioHarness({ raidSession });
+            const dungeon = harness.worldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+            const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+            assert.ok(dungeon, `missing episode ${episode} dungeon`);
+            assert.ok(quest, `missing episode ${episode} quest`);
 
-        harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+            harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
 
-        assert.deepEqual(playedBgmKeys, [quest.bgmKey]);
+            assert.deepEqual(playedBgmKeys, [quest.bgmKey], `episode ${episode} local bgm`);
+        }
     } finally {
         (AudioManager as unknown as { playBgm: typeof originalPlayBgm }).playBgm = originalPlayBgm;
     }
 });
 
-test('episode 31 network story snapshot starts story bgm once on entry', () => {
+test('late story network snapshots start story bgm once on entry through episode 31', () => {
     const originalPlayBgm = AudioManager.playBgm.bind(AudioManager);
     const playedBgmKeys: string[] = [];
     (AudioManager as unknown as { playBgm: (key: string) => void }).playBgm = (key: string) => {
         playedBgmKeys.push(key);
     };
     try {
-        const player = new Player(20, 20);
-        const raidSession = new WorldRaidSession('central_castle');
-        raidSession.beginRaidFromTown('central_castle');
-        const harness = createStoryScenarioHarness({ player, raidSession, isNetworkRaid: true });
-        const quest = getStoryQuestByDungeonId('demon_fixers_den');
-        assert.ok(quest);
+        for (let episode = 23; episode <= 31; episode++) {
+            playedBgmKeys.length = 0;
+            const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+            assert.ok(scenario, `missing episode ${episode}`);
+            const player = new Player(20, 20);
+            const raidSession = new WorldRaidSession('central_castle');
+            raidSession.beginRaidFromTown('central_castle');
+            const harness = createStoryScenarioHarness({ player, raidSession, isNetworkRaid: true });
+            const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+            assert.ok(quest, `missing episode ${episode} quest`);
 
-        harness.controller.applyNetworkScenarioSnapshot({
-            enteredDungeonIds: ['demon_fixers_den'],
-            activeDungeonId: 'demon_fixers_den',
-            completedDungeonIds: [],
-        });
-        harness.controller.applyNetworkScenarioSnapshot({
-            enteredDungeonIds: ['demon_fixers_den'],
-            activeDungeonId: 'demon_fixers_den',
-            completedDungeonIds: [],
-        });
+            harness.controller.applyNetworkScenarioSnapshot({
+                enteredDungeonIds: [scenario.dungeonId],
+                activeDungeonId: scenario.dungeonId,
+                completedDungeonIds: [],
+            });
+            harness.controller.applyNetworkScenarioSnapshot({
+                enteredDungeonIds: [scenario.dungeonId],
+                activeDungeonId: scenario.dungeonId,
+                completedDungeonIds: [],
+            });
 
-        assert.deepEqual(playedBgmKeys, [quest.bgmKey]);
-        assert.ok(harness.worldMap instanceof StoryInteriorMap);
-        assert.equal(raidSession.activeDungeonId, 'demon_fixers_den');
+            assert.deepEqual(playedBgmKeys, [quest.bgmKey], `episode ${episode} network bgm`);
+            assert.ok(harness.worldMap instanceof StoryInteriorMap, `episode ${episode} interior map`);
+            assert.equal(raidSession.activeDungeonId, scenario.dungeonId, `episode ${episode} active dungeon`);
+        }
     } finally {
         (AudioManager as unknown as { playBgm: typeof originalPlayBgm }).playBgm = originalPlayBgm;
     }
