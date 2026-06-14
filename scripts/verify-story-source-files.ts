@@ -210,6 +210,24 @@ function readStoryScenarioContentRows(): Map<number, StoryScenarioDefinition> {
     return rows;
 }
 
+function verifyPlanningDocCurrent(): void {
+    const path = 'docs/darksaber_tarkov_plan.md';
+    const content = readFileSync(path, 'utf8');
+    const requiredPhrases = [
+        '현재는 1~31화 시나리오 데이터',
+        '`docs/main-quest-roadmap.md`의 1~31화 표',
+        '23~31화는 같은 대륙 안의 후반 봉인 권역',
+    ];
+    for (const phrase of requiredPhrases) {
+        if (!content.includes(phrase)) {
+            throw new Error(`${path} is missing current 1~31 planning phrase: ${phrase}`);
+        }
+    }
+    if (content.includes('현재는 1~22화 시나리오 데이터') || content.includes('`docs/main-quest-roadmap.md`의 1~22화 표')) {
+        throw new Error(`${path} still contains stale 1~22 implementation status`);
+    }
+}
+
 function requireArrayEqual(episode: number, label: string, actual: string[], expected: string[]): void {
     if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
         throw new Error(`Episode ${episode} ${label} mismatch.\n  docs: ${actual.join(', ')}\n  data: ${expected.join(', ')}`);
@@ -1067,6 +1085,7 @@ const rewardContractState: RewardContractState = { companionIds: new Map() };
 const worldMap = new WorldMap();
 const verified: string[] = [];
 
+verifyPlanningDocCurrent();
 verifyStoryCollectionContracts(options.start, options.end, docRows, roadmapRows, contentRows);
 
 for (let episode = options.start; episode <= options.end; episode++) {
@@ -1124,4 +1143,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, collection chains, quests, quest display text, rewards, event references, scenario ledgers, world entrances, hmaps, late-story biomes, interior accessibility, late-story original AI/MRC, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, planning docs, collection chains, quests, quest display text, rewards, event references, scenario ledgers, world entrances, hmaps, late-story biomes, interior accessibility, late-story original AI/MRC, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
