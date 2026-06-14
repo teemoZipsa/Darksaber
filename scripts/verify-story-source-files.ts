@@ -12,6 +12,8 @@ import { TileType } from '../src/map/Tile';
 import { WorldMap } from '../src/map/WorldMap';
 import { getStoryInteriorLayout, STORY_INTERIOR_LAYOUTS } from '../src/data/StoryInteriorData';
 import { getMonsterDefinitionSafe } from '../src/data/MonsterCatalog';
+import { getOriginalLateStoryFact } from '../src/data/OriginalLateStoryFacts';
+import { getOriginalLateStoryMrcFact, getOriginalLateStoryMrcVisualSymbol } from '../src/data/OriginalLateStoryMapFacts';
 import {
     getStoryScenarioFieldEventPlacements,
     getStoryScenarioFieldEventTiles,
@@ -219,6 +221,14 @@ function requireNumberArrayEqual(label: string, actual: number[], expected: numb
 function requireStringArrayEqual(label: string, actual: string[], expected: string[]): void {
     if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
         throw new Error(`${label} mismatch.\n  actual: ${actual.join(', ')}\n  expected: ${expected.join(', ')}`);
+    }
+}
+
+function requireJsonEqual(episode: number, label: string, actual: unknown, expected: unknown): void {
+    const actualJson = JSON.stringify(actual);
+    const expectedJson = JSON.stringify(expected);
+    if (actualJson !== expectedJson) {
+        throw new Error(`Episode ${episode} ${label} mismatch.\n  actual: ${actualJson}\n  expected: ${expectedJson}`);
     }
 }
 
@@ -728,6 +738,75 @@ function verifyStoryInteriorAccessibilityContract(
     }
 }
 
+function verifyLateStoryOriginalMapContract(
+    episode: number,
+    scenario: StoryScenarioDefinition,
+    sequence: StoryScenarioEventSequence
+): void {
+    if (episode < 23 || episode > 31) return;
+
+    const fact = getOriginalLateStoryFact(episode);
+    const mrcFact = getOriginalLateStoryMrcFact(episode);
+    const layout = getStoryInteriorLayout(scenario.dungeonId);
+    if (!layout) throw new Error(`Episode ${episode} ${scenario.dungeonId} missing late story interior layout`);
+
+    const map = new StoryInteriorMap(layout);
+    const paddedEpisode = String(episode).padStart(2, '0');
+    const declaredMapFiles = new Set(sequence.originalSources.mapFiles);
+    const expectedMrcSource = `MAP/${paddedEpisode}.mrc`;
+    const expectedTranslatedMrcSource = `MAP/${paddedEpisode}t.mrc`;
+    const expectedHmapSource = `MAP/${paddedEpisode}hmap.bmp`;
+
+    if (scenario.dungeonId !== fact.dungeonId) {
+        throw new Error(`Episode ${episode} late story dungeon mismatch: ${scenario.dungeonId} !== ${fact.dungeonId}`);
+    }
+    if (scenario.missionKind !== 'soloInterior') {
+        throw new Error(`Episode ${episode} late story mission kind mismatch: ${scenario.missionKind} !== soloInterior`);
+    }
+    if (scenario.guardCount !== fact.guardAreas.length) {
+        throw new Error(`Episode ${episode} late story guard count mismatch: ${scenario.guardCount} !== ${fact.guardAreas.length}`);
+    }
+    if (layout.width !== mrcFact.width || layout.height !== mrcFact.height) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} MRC size mismatch: ${layout.width}x${layout.height} !== ${mrcFact.width}x${mrcFact.height}`);
+    }
+    if (layout.originalMrc?.source !== expectedMrcSource) {
+        throw new Error(`Episode ${episode} original MRC source mismatch: ${layout.originalMrc?.source} !== ${expectedMrcSource}`);
+    }
+    if (layout.originalMrc?.translatedSource !== expectedTranslatedMrcSource) {
+        throw new Error(
+            `Episode ${episode} translated MRC source mismatch: ${layout.originalMrc?.translatedSource} !== ${expectedTranslatedMrcSource}`
+        );
+    }
+    if (layout.originalMrc?.layerCount !== mrcFact.layerCount) {
+        throw new Error(`Episode ${episode} original MRC layer count mismatch: ${layout.originalMrc?.layerCount} !== ${mrcFact.layerCount}`);
+    }
+    if (mrcFact.source !== expectedMrcSource || mrcFact.translatedSource !== expectedTranslatedMrcSource) {
+        throw new Error(`Episode ${episode} late story MRC fact source mismatch`);
+    }
+    if (layout.originalAi?.source !== `${fact.setArc}:${fact.aiMember}`) {
+        throw new Error(`Episode ${episode} original AI source mismatch: ${layout.originalAi?.source} !== ${fact.setArc}:${fact.aiMember}`);
+    }
+    requireJsonEqual(episode, 'original boss AI area', layout.originalAi?.bossArea, fact.bossArea);
+    requireJsonEqual(episode, 'original guard AI areas', layout.originalAi?.guardAreas, fact.guardAreas);
+    requireJsonEqual(episode, 'original staging positions', layout.originalAi?.staging, fact.staging);
+
+    if (sequence.originalSources.sceneScript !== `Wlib/scene${episode}.lsc`) {
+        throw new Error(`Episode ${episode} scene script mismatch: ${sequence.originalSources.sceneScript}`);
+    }
+    for (const sourceFile of [mrcFact.source, mrcFact.translatedSource, expectedHmapSource, fact.setArc]) {
+        if (!declaredMapFiles.has(sourceFile)) {
+            throw new Error(`Episode ${episode} late story source file not declared: ${sourceFile}`);
+        }
+    }
+    if (getOriginalLateStoryMrcVisualSymbol(mrcFact, layout.bossTile.x, layout.bossTile.y) === null) {
+        throw new Error(`Episode ${episode} ${scenario.dungeonId} boss tile has no original MRC visual cell`);
+    }
+
+    for (const [index, position] of fact.staging.entries()) {
+        verifyStoryInteriorTileAccessible(episode, scenario.dungeonId, map, `original staging ${index}`, { x: position.x, y: position.y });
+    }
+}
+
 function verifyFieldScenarioWorldProjection(episode: number, scenario: StoryScenarioDefinition, sequence: StoryScenarioEventSequence, worldMap: WorldMap): void {
     if (scenario.missionKind === 'soloInterior') return;
     const dungeon = worldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
@@ -981,6 +1060,7 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verifyStoryWorldEntrance(episode, scenario, worldMap);
     verifyStoryHmapContract(episode, scenario, worldMap);
     verifyStoryInteriorAccessibilityContract(episode, scenario, sequence);
+    verifyLateStoryOriginalMapContract(episode, scenario, sequence);
     verifyFieldScenarioWorldProjection(episode, scenario, sequence, worldMap);
     verifyStoryScenarioMonsterContract(episode, scenario);
     verifyStoryI18nKeys(episode, scenario, sequence);
@@ -1016,4 +1096,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, collection chains, quests, quest display text, rewards, event references, scenario ledgers, world entrances, hmaps, interior accessibility, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, collection chains, quests, quest display text, rewards, event references, scenario ledgers, world entrances, hmaps, interior accessibility, late-story original AI/MRC, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
