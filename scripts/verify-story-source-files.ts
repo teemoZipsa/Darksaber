@@ -14,6 +14,14 @@ interface Options {
     end: number;
 }
 
+interface ScenarioImportDocRow {
+    episode: number;
+    dungeonId: string;
+    sceneScript: string;
+    globalScript: string;
+    mapFiles: string[];
+}
+
 function parseArgs(argv: string[]): Options {
     const options: Options = { sourceRoot: DEFAULT_ROOT, start: DEFAULT_START, end: DEFAULT_END };
 
@@ -64,8 +72,52 @@ function getSourcedEvents(sequence: StoryScenarioEventSequence) {
     ];
 }
 
+function extractBacktickValues(value: string): string[] {
+    return [...value.matchAll(/`([^`]+)`/g)].map((match) => match[1]);
+}
+
+function readScenarioImportDocRows(): Map<number, ScenarioImportDocRow> {
+    const path = 'docs/original-scenario-import.md';
+    const rows = new Map<number, ScenarioImportDocRow>();
+    for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+        if (!line.startsWith('|')) continue;
+        const cells = line.slice(1, line.endsWith('|') ? -1 : undefined).split('|').map((cell) => cell.trim());
+        const episode = Number(cells[0]);
+        if (!Number.isInteger(episode)) continue;
+        const dungeonId = extractBacktickValues(cells[1] ?? '')[0];
+        const sceneScript = extractBacktickValues(cells[3] ?? '')[0];
+        const globalValues = extractBacktickValues(cells[4] ?? '');
+        const globalScript = globalValues[0] ?? cells[4];
+        const mapFiles = extractBacktickValues(cells[5] ?? '');
+        rows.set(episode, { episode, dungeonId, sceneScript, globalScript, mapFiles });
+    }
+    return rows;
+}
+
+function requireArrayEqual(episode: number, label: string, actual: string[], expected: string[]): void {
+    if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
+        throw new Error(`Episode ${episode} ${label} mismatch.\n  docs: ${actual.join(', ')}\n  data: ${expected.join(', ')}`);
+    }
+}
+
+function verifyScenarioImportDocRow(episode: number, sequence: StoryScenarioEventSequence, docRows: Map<number, ScenarioImportDocRow>): void {
+    const row = docRows.get(episode);
+    if (!row) throw new Error(`Missing docs/original-scenario-import.md row for episode ${episode}`);
+    if (row.dungeonId !== sequence.dungeonId) {
+        throw new Error(`Episode ${episode} docs dungeon mismatch: ${row.dungeonId} !== ${sequence.dungeonId}`);
+    }
+    if (row.sceneScript !== sequence.originalSources.sceneScript) {
+        throw new Error(`Episode ${episode} docs scene mismatch: ${row.sceneScript} !== ${sequence.originalSources.sceneScript}`);
+    }
+    if (row.globalScript !== sequence.originalSources.globalScript) {
+        throw new Error(`Episode ${episode} docs global mismatch: ${row.globalScript} !== ${sequence.originalSources.globalScript}`);
+    }
+    requireArrayEqual(episode, 'docs map candidates', row.mapFiles, sequence.originalSources.mapFiles);
+}
+
 const options = parseArgs(process.argv.slice(2));
 const sourceRoot = resolve(options.sourceRoot);
+const docRows = readScenarioImportDocRows();
 const verified: string[] = [];
 
 for (let episode = options.start; episode <= options.end; episode++) {
@@ -76,6 +128,7 @@ for (let episode = options.start; episode <= options.end; episode++) {
     if (!sequence) throw new Error(`Missing story event sequence ${episode}: ${scenario.dungeonId}`);
 
     const declaredMapFiles = new Set(sequence.originalSources.mapFiles);
+    verifyScenarioImportDocRow(episode, sequence, docRows);
     requireSourceFile(sourceRoot, episode, sequence.originalSources.sceneScript);
     if (sequence.originalSources.globalScript !== 'missing') {
         requireSourceFile(sourceRoot, episode, sequence.originalSources.globalScript);
@@ -107,4 +160,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files: ${verified.join(', ')}`);
+console.log(`verified story source files and import docs: ${verified.join(', ')}`);
