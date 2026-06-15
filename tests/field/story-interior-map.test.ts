@@ -1177,19 +1177,21 @@ test('Nergal Castle exposes original episode 21 summoning, relic, and clear flow
     assert.equal(nergal.objectiveRuntimeFlag, 'nergal_defeated');
     assert.equal(nergal.entry.filter((step) => step.kind === 'dialogue').length, 6);
     assert.equal(nergal.entry.filter((step) => step.kind === 'combatStart').length, 1);
-    assert.equal(nergal.fieldEvents.length, 5);
-    assert.deepEqual(nergal.fieldEvents.map((event) => event.originalEventId), ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94', 'EVENT 99']);
+    assert.equal(nergal.fieldEvents.length, 4);
+    assert.deepEqual(nergal.fieldEvents.map((event) => event.originalEventId), ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94']);
     assert.deepEqual(nergal.fieldEvents.map((event) => event.rewards?.[0]), [
         { type: 'item', itemId: 'orig_story_0974_longinus', originalItemId: 974 },
         { type: 'item', itemId: 'orig_story_1037_earth_armageddon', originalItemId: 1037 },
         { type: 'item', itemId: 'orig_story_0995_valkyrie', originalItemId: 995 },
         { type: 'item', itemId: 'orig_story_0990_bernium', originalItemId: 990 },
-        { type: 'item', itemId: 'orig_story_0970_enigma_blade', originalItemId: 970 },
     ]);
+    assert.equal(nergal.bossDefeatEvent?.originalEventId, 'EVENT 99');
+    assert.equal(nergal.bossDefeatEvent?.runtimeFlag, 'nergal_defeated');
+    assert.deepEqual(nergal.bossDefeatEvent?.rewards?.[0], { type: 'item', itemId: 'orig_story_0970_enigma_blade', originalItemId: 970 });
     assert.ok(nergal.fieldEvents.every((event) => event.originalSource === 'MAP/21set.arc:21.evt'));
     assert.ok(nergal.fieldEvents.every((event) => event.triggerTiles.every((tile) => map.isWalkable(tile.x, tile.y))));
     assert.equal(nergal.bossDefeat.filter((step) => step.kind === 'dialogue').length, 0);
-    assert.equal(nergal.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
+    assert.equal(nergal.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
 });
 
 test('Flame Castle exposes original episode 22 Beramode, relic, and clear flow', () => {
@@ -1207,19 +1209,21 @@ test('Flame Castle exposes original episode 22 Beramode, relic, and clear flow',
     assert.equal(flame.objectiveRuntimeFlag, 'flame_castle_beramode_defeated');
     assert.equal(flame.entry.filter((step) => step.kind === 'dialogue').length, 4);
     assert.equal(flame.entry.filter((step) => step.kind === 'combatStart').length, 1);
-    assert.equal(flame.fieldEvents.length, 5);
-    assert.deepEqual(flame.fieldEvents.map((event) => event.originalEventId), ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94', 'EVENT 99']);
+    assert.equal(flame.fieldEvents.length, 4);
+    assert.deepEqual(flame.fieldEvents.map((event) => event.originalEventId), ['EVENT 91', 'EVENT 92', 'EVENT 93', 'EVENT 94']);
     assert.deepEqual(flame.fieldEvents.map((event) => event.rewards?.[0]), [
         { type: 'item', itemId: 'orig_story_1035_discovery', originalItemId: 1035 },
         { type: 'item', itemId: 'orig_story_0969_excalibur', originalItemId: 969 },
         { type: 'item', itemId: 'orig_story_1015_gr_carium', originalItemId: 1015 },
         { type: 'item', itemId: 'orig_story_1000_arondight', originalItemId: 1000 },
-        { type: 'item', itemId: 'orig_story_0975_chaos_linger', originalItemId: 975 },
     ]);
+    assert.equal(flame.bossDefeatEvent?.originalEventId, 'EVENT 99');
+    assert.equal(flame.bossDefeatEvent?.runtimeFlag, 'flame_castle_beramode_defeated');
+    assert.deepEqual(flame.bossDefeatEvent?.rewards?.[0], { type: 'item', itemId: 'orig_story_0975_chaos_linger', originalItemId: 975 });
     assert.ok(flame.fieldEvents.every((event) => event.originalSource === 'MAP/22set.arc:22.evt'));
     assert.ok(flame.fieldEvents.every((event) => event.triggerTiles.every((tile) => map.isWalkable(tile.x, tile.y))));
     assert.equal(flame.bossDefeat.filter((step) => step.kind === 'dialogue').length, 2);
-    assert.equal(flame.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
+    assert.equal(flame.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
 });
 
 test('episodes 23 through 31 use original late interior routes and events', () => {

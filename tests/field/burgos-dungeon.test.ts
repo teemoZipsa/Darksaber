@@ -1614,6 +1614,47 @@ test('late story boss clear GETITEM rewards are granted on boss defeat', () => {
     assert.ok(harness.logs.includes('시나리오 클리어'));
 });
 
+test('episodes 21 and 22 final relic GETITEM rewards are granted on boss defeat', () => {
+    const expectedRewards = new Map([
+        [21, 'orig_story_0970_enigma_blade'],
+        [22, 'orig_story_0975_chaos_linger'],
+    ]);
+    for (const episode of [21, 22]) {
+        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+        assert.ok(scenario, `missing episode ${episode}`);
+        const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+        assert.ok(sequence, `missing episode ${episode} sequence`);
+        assert.equal(
+            sequence.fieldEvents.some((event) => event.originalEventId === 'EVENT 99'),
+            false,
+            `episode ${episode} final relic should not start as an inspect marker`
+        );
+        assert.equal(sequence.bossDefeatEvent?.originalEventId, 'EVENT 99', `episode ${episode} boss event`);
+
+        const raidSession = new WorldRaidSession('central_castle');
+        raidSession.beginRaidFromTown('central_castle');
+        raidSession.startDungeonEncounter(scenario.dungeonId);
+        const harness = createStoryScenarioHarness({ raidSession });
+        const boss = new Enemy(
+            `story_${scenario.dungeonId}_boss`,
+            0,
+            0,
+            scenario.bossName ?? `episode ${episode} boss`,
+            scenario.bossLevel,
+            scenario.bossColor,
+            'boss'
+        );
+        boss.isBoss = true;
+
+        harness.controller.completeDungeonIfBossDefeated(boss);
+        drainStoryPresentation(harness.controller);
+
+        assert.equal(raidSession.isDungeonCleared(scenario.dungeonId), true, `episode ${episode} cleared`);
+        assert.equal(raidSession.hasScenarioFlag(scenario.dungeonId, sequence.objectiveRuntimeFlag ?? ''), true, `episode ${episode} objective flag`);
+        assert.deepEqual(harness.rewardItemIds, [expectedRewards.get(episode)], `episode ${episode} final relic reward`);
+    }
+});
+
 test('late story boss clear rewards match original EVENT 99 item sources through episode 31', () => {
     for (let episode = 23; episode <= 31; episode++) {
         const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
