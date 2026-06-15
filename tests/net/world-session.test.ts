@@ -1376,6 +1376,86 @@ test('bossless server scenarios complete immediately while keeping optional enem
     assert.ok(snapshot.enemies.filter((enemy) => enemy.id.startsWith('scenario_')).length >= 2);
 });
 
+test('server scenario entry starts every implemented episode through 31', () => {
+    const world = new WorldMap();
+
+    for (const scenario of STORY_SCENARIOS) {
+        const session = new WorldSession();
+        const completedQuestIds = STORY_SCENARIOS
+            .filter((entry) => entry.episode < scenario.episode)
+            .map((entry) => entry.questId);
+        const joined = session.join({
+            ...joinMessage('central_castle', `hero-episode-${scenario.episode}`),
+            completedQuestIds,
+        }, scenario.episode);
+        const internals = session as any;
+        const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+        const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+        const monsterLayout = getStoryScenarioMonsterLayout(scenario);
+        assert.ok(serverActor, `episode ${scenario.episode} actor`);
+        assert.ok(dungeon, `episode ${scenario.episode} dungeon`);
+        serverActor.tile = world.getDungeonEntranceTile(dungeon);
+        const entrance = { ...serverActor.tile };
+
+        const result = session.handleMessage(joined.playerId, {
+            type: 'SCENARIO_ENTER',
+            intentId: `enter-episode-${scenario.episode}`,
+            actorId: serverActor.id,
+            dungeonId: scenario.dungeonId,
+        }, 10_000 + scenario.episode);
+
+        assert.equal(result.replies.length, 0, `episode ${scenario.episode} enter`);
+        const state = internals.scenarioStates.get(joined.playerId);
+        assert.ok(state, `episode ${scenario.episode} scenario state`);
+        assert.equal(state.dungeonId, scenario.dungeonId, `episode ${scenario.episode} state dungeon`);
+        assert.equal(state.missionKind, scenario.missionKind, `episode ${scenario.episode} mission kind`);
+        assert.equal(state.enemyIds.length, scenario.guardCount + (scenario.bossName ? 1 : 0), `episode ${scenario.episode} enemy count`);
+
+        const serverEnemies = state.enemyIds.map((id: string) => internals.enemies.get(id));
+        assert.equal(serverEnemies.every(Boolean), true, `episode ${scenario.episode} server enemies`);
+        const guards = serverEnemies.filter((entry: any) => !entry.scenarioObjective);
+        const boss = serverEnemies.find((entry: any) => entry.scenarioObjective);
+        assert.equal(guards.length, scenario.guardCount, `episode ${scenario.episode} guard count`);
+        guards.forEach((entry: any, index: number) => {
+            assert.equal(
+                entry.monsterId,
+                monsterLayout.guardMonsterIds[index % monsterLayout.guardMonsterIds.length],
+                `episode ${scenario.episode} guard ${index} monster`
+            );
+        });
+
+        const snapshot = session.createSnapshot(joined.playerId, 20_000 + scenario.episode);
+        assert.ok(snapshot.scenario.enteredDungeonIds.includes(scenario.dungeonId), `episode ${scenario.episode} entered snapshot`);
+        for (const enemyId of state.enemyIds) {
+            assert.ok(snapshot.enemies.some((enemy) => enemy.id === enemyId), `episode ${scenario.episode} visible enemy ${enemyId}`);
+        }
+
+        const interior = getStoryInteriorLayout(scenario.dungeonId);
+        if (interior) {
+            assert.deepEqual(state.returnTile, entrance, `episode ${scenario.episode} return tile`);
+            assert.deepEqual(snapshot.partyActors.find((entry) => entry.id === serverActor.id)?.tile, interior.playerStart, `episode ${scenario.episode} interior start`);
+        } else {
+            assert.equal(state.returnTile, null, `episode ${scenario.episode} has no return tile`);
+            assert.deepEqual(snapshot.partyActors.find((entry) => entry.id === serverActor.id)?.tile, entrance, `episode ${scenario.episode} field start`);
+        }
+
+        if (scenario.bossName) {
+            assert.ok(boss, `episode ${scenario.episode} objective boss`);
+            assert.equal(state.objectiveEnemyId, boss.enemy.id, `episode ${scenario.episode} objective id`);
+            assert.equal(boss.enemy.name, scenario.bossName, `episode ${scenario.episode} boss name`);
+            assert.equal(boss.monsterId, monsterLayout.bossMonsterId, `episode ${scenario.episode} boss monster`);
+            assert.equal(snapshot.scenario.activeDungeonId, scenario.dungeonId, `episode ${scenario.episode} active snapshot`);
+            assert.equal(snapshot.scenario.completedDungeonIds.includes(scenario.dungeonId), false, `episode ${scenario.episode} not completed on entry`);
+        } else {
+            assert.equal(boss, undefined, `episode ${scenario.episode} no objective boss`);
+            assert.equal(state.objectiveEnemyId, null, `episode ${scenario.episode} no objective id`);
+            assert.equal(state.completed, true, `episode ${scenario.episode} completed immediately`);
+            assert.equal(snapshot.scenario.activeDungeonId, null, `episode ${scenario.episode} inactive snapshot`);
+            assert.ok(snapshot.scenario.completedDungeonIds.includes(scenario.dungeonId), `episode ${scenario.episode} completed snapshot`);
+        }
+    }
+});
+
 test('server-authoritative field scenario events complete per player without trusting reward payloads', () => {
     const session = new WorldSession();
     const world = new WorldMap();
