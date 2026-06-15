@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type { GameManager } from '../../src/engine/GameManager';
 import { WorldEngine } from '../../src/engine/WorldEngine';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
@@ -180,6 +182,25 @@ test('package scripts expose each story dev entry through episode 31', () => {
             `episode ${episode} dev script`
         );
     }
+});
+
+test('dev town launcher forwards each implemented story scenario to the open URL', async () => {
+    const helper = await import(pathToFileURL(resolve('scripts/dev-town.mjs')).href) as {
+        buildDevOpenPath: (modeArg: string, scenarioArg?: string | null) => string;
+        normalizeDevScenarioArg: (scenarioArg: string | null) => string | null;
+    };
+    assert.equal(helper.buildDevOpenPath('raid', 'aggro'), '/?devStart=raid&devScenario=aggro');
+    assert.equal(helper.buildDevOpenPath('raid', 'loot'), '/?devStart=raid&devScenario=loot');
+    for (const episode of DEV_STORY_EPISODES) {
+        assert.equal(helper.normalizeDevScenarioArg(`story${episode}`), `story${episode}`);
+        assert.equal(
+            helper.buildDevOpenPath('raid', `story${episode}`),
+            `/?devStart=raid&devScenario=story${episode}`,
+            `episode ${episode} open path`
+        );
+    }
+    assert.equal(helper.normalizeDevScenarioArg('story32'), null);
+    assert.equal(helper.buildDevOpenPath('raid', 'story32'), '/?devStart=raid');
 });
 
 test('WorldEngine close hook delegates to the raid lifecycle controller', () => {

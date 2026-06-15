@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 const isWin = process.platform === 'win32';
 const npmCmd = isWin ? 'npm.cmd' : 'npm';
@@ -52,14 +53,28 @@ process.on('SIGTERM', () => {
 });
 process.on('exit', shutdown);
 
-const mode = process.argv[2] === 'raid' ? 'raid' : 'town';
-const scenarioArg = process.argv[3] ?? null;
-const scenario = scenarioArg === 'aggro' || scenarioArg === 'loot' || /^story(2[3-9]|3[0-1])$/.test(scenarioArg)
-    ? scenarioArg
-    : null;
-const openPath = scenario
-    ? `/?devStart=${mode}&devScenario=${scenario}`
-    : `/?devStart=${mode}`;
+export function normalizeDevScenarioArg(scenarioArg) {
+    if (scenarioArg === 'aggro' || scenarioArg === 'loot') return scenarioArg;
+    const match = /^story(\d+)$/.exec(scenarioArg ?? '');
+    if (!match) return null;
+    const episode = Number(match[1]);
+    return episode >= 1 && episode <= 31 ? `story${episode}` : null;
+}
 
-run('world', ['run', 'server']);
-run('vite', ['run', 'dev', '--', '--open', openPath]);
+export function buildDevOpenPath(modeArg, scenarioArg = null) {
+    const mode = modeArg === 'raid' ? 'raid' : 'town';
+    const scenario = normalizeDevScenarioArg(scenarioArg);
+    return scenario
+        ? `/?devStart=${mode}&devScenario=${scenario}`
+        : `/?devStart=${mode}`;
+}
+
+function main() {
+    const openPath = buildDevOpenPath(process.argv[2], process.argv[3] ?? null);
+    run('world', ['run', 'server']);
+    run('vite', ['run', 'dev', '--', '--open', openPath]);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    main();
+}
