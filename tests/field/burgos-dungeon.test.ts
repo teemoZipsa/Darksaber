@@ -1268,8 +1268,8 @@ test('local field scenario event presentation focuses the placed world event til
     assert.equal(raidSession.hasScenarioFlag(ARCADIA_PLAIN_DUNGEON_ID, 'arcadia_gold_chest_01'), true);
 });
 
-test('local field story inspect events complete once with projected markers through episode 16', () => {
-    for (const scenario of STORY_SCENARIOS.filter((entry) => entry.missionKind === 'field' && entry.episode <= 16)) {
+test('local field and vehicle story inspect events complete once with projected markers through episode 17', () => {
+    for (const scenario of STORY_SCENARIOS.filter((entry) => entry.missionKind !== 'soloInterior' && entry.episode <= 17)) {
         const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
         assert.ok(sequence, `episode ${scenario.episode} sequence`);
         if (sequence.fieldEvents.length === 0) continue;
@@ -2218,12 +2218,15 @@ test('local field story scenarios start projected world objectives through episo
     }
 });
 
-test('local airship scenario starts boarding objective and keeps variant guards optional', () => {
+test('local airship scenario keeps boarding events inspectable until arrival completes the objective', () => {
     const scenario = STORY_SCENARIOS.find((entry) => entry.episode === 17);
     assert.ok(scenario);
+    const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+    assert.ok(sequence);
     const raidSession = new WorldRaidSession('central_castle');
     raidSession.beginRaidFromTown('central_castle');
-    const harness = createStoryScenarioHarness({ raidSession });
+    const player = new Player(0, 0);
+    const harness = createStoryScenarioHarness({ player, raidSession });
     const previousWorldMap = harness.worldMap;
     const dungeon = previousWorldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
     const quest = getStoryQuestByDungeonId(scenario.dungeonId);
@@ -2235,11 +2238,37 @@ test('local airship scenario starts boarding objective and keeps variant guards 
 
     assert.equal(harness.worldMap, previousWorldMap);
     assert.deepEqual(harness.placedNear, previousWorldMap.getDungeonEntranceTile(dungeon));
-    assert.equal(raidSession.activeDungeonId, null);
-    assert.equal(raidSession.isDungeonCleared('airship'), true);
+    assert.equal(raidSession.activeDungeonId, 'airship');
+    assert.equal(raidSession.isDungeonCleared('airship'), false);
     assert.equal(harness.fieldEnemies.length, scenario.guardCount);
     assert.equal(harness.fieldEnemies.filter((entry) => entry.enemy.isBoss).length, 0);
     assert.ok(harness.logs.includes(t(quest.enterLogKey)));
+    assert.equal(harness.logs.includes(t(quest.objectiveCompleteLogKey)), false);
+    for (const event of sequence.fieldEvents) {
+        for (const tile of getStoryScenarioFieldEventTiles(scenario.dungeonId, event, previousWorldMap)) {
+            assert.equal(
+                harness.worldMap.getInspectMarkers().some((marker) => marker.id === `${event.id}:${tile.x},${tile.y}`),
+                true,
+                `${event.id} marker before arrival`
+            );
+        }
+    }
+
+    const arrival = sequence.fieldEvents.find((event) => event.id === 'airship_arrival');
+    assert.ok(arrival);
+    const [arrivalTile] = getStoryScenarioFieldEventTiles(scenario.dungeonId, arrival, previousWorldMap);
+    assert.ok(arrivalTile);
+    player.setGridPosition(arrivalTile.x, arrivalTile.y, true);
+    assert.equal(
+        harness.controller.getInspectableFieldEventTiles({ id: 'hero', entity: player } as any).has(`${arrivalTile.x},${arrivalTile.y}`),
+        true
+    );
+    assert.equal(harness.controller.playFieldEventAt(arrivalTile, { id: 'hero', entity: player } as any), true);
+    assert.equal(harness.controller.getLastPresentationDurationMs(), getStoryScenarioPresentationDurationMs(arrival.steps));
+    assert.equal(raidSession.isDungeonCleared('airship'), true);
+    assert.equal(raidSession.activeDungeonId, null);
+    assert.equal(raidSession.hasScenarioFlag('airship', sequence.objectiveRuntimeFlag ?? ''), true);
+    drainStoryPresentation(harness.controller);
     assert.ok(harness.logs.includes(t(quest.objectiveCompleteLogKey)));
 });
 

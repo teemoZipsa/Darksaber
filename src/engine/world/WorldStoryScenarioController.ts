@@ -194,7 +194,17 @@ export class WorldStoryScenarioController {
         this.syncActiveInteriorDoorLocks();
         this.syncActiveInteriorInspectMarkers();
         this.syncActiveWorldScenarioMarkers();
-        this.enqueueStoryScenarioPresentation(this.getFieldEventPresentationSteps(dungeonId, event, event.steps));
+        const presentationSteps = this.getFieldEventPresentationSteps(dungeonId, event, event.steps);
+        if (event.completesObjective) {
+            const storyQuest = getStoryQuestByDungeonId(dungeonId);
+            if (storyQuest) this.completeStoryDungeonObjective(dungeonId, storyQuest, {
+                clearEnemies: false,
+                presentationSteps,
+            });
+            else this.enqueueStoryScenarioPresentation(presentationSteps);
+        } else {
+            this.enqueueStoryScenarioPresentation(presentationSteps);
+        }
         this.applyFieldEventRewards(event);
         return true;
     }
@@ -347,7 +357,7 @@ export class WorldStoryScenarioController {
         this.playStoryScenarioSequence(dungeon.id, 'entry');
         this.context.log(t(storyQuest.enterLogKey));
 
-        if (!scenario.bossName) {
+        if (!scenario.bossName && scenario.missionKind !== 'vehicle') {
             this.completeStoryDungeonObjective(dungeon.id, storyQuest, { clearEnemies: false });
         }
     }
@@ -497,7 +507,7 @@ export class WorldStoryScenarioController {
     public completeStoryDungeonObjective(
         dungeonId: string,
         storyQuest: StoryQuestDefinition,
-        options: { clearEnemies?: boolean } = {}
+        options: { clearEnemies?: boolean; presentationSteps?: readonly StoryScenarioEventStep[] } = {}
     ): void {
         this.context.raidSession.completeDungeonEncounter(dungeonId);
         const eventSequence = getStoryScenarioEventSequence(dungeonId);
@@ -508,7 +518,9 @@ export class WorldStoryScenarioController {
         this.syncActiveWorldScenarioMarkers();
         if (options.clearEnemies ?? true) this.context.setFieldEnemies([]);
         const completedInterior = this.activeInterior?.dungeonId === dungeonId ? this.activeInterior : null;
-        this.playStoryScenarioSequence(dungeonId, 'bossDefeat', () => {
+        const completionSteps = options.presentationSteps
+            ?? this.getScenarioPresentationSteps(dungeonId, eventSequence?.bossDefeat ?? []);
+        this.startStoryScenarioPresentation(completionSteps, () => {
             if (this.activeInterior?.dungeonId === dungeonId) {
                 this.exitActiveInterior({ placePartyAtReturn: !this.context.isNetworkRaid() });
                 this.context.followCameraToPlayer();

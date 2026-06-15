@@ -77,6 +77,7 @@ export interface StoryScenarioFieldEvent {
     markerLabelKey?: string;
     markerKind?: 'person' | 'chest';
     rewards?: StoryScenarioFieldEventReward[];
+    completesObjective?: boolean;
     steps: StoryScenarioEventStep[];
 }
 
@@ -2583,6 +2584,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 triggerTiles: [{ x: 18, y: 1 }, { x: 19, y: 1 }, { x: 20, y: 1 }, { x: 21, y: 1 }],
                 runtimeFlag: 'airship_arrival',
                 markerLabelKey: 'story.event.ep17.arrival.marker',
+                completesObjective: true,
                 steps: [
                     { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep17.arrival.99', focus: { x: 19, y: 1 } },
                     { kind: 'objective', labelKey: 'story.event.ep17.objective', focus: { x: 21, y: 1 } },

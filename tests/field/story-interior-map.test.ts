@@ -1025,6 +1025,7 @@ test('Airship exposes original episode 17 purity seal and boarding flow', () => 
         'EVENT 99',
     ]);
     assert.equal(airship.fieldEvents.filter((event) => event.originalEventId === 'EVENT 91').length, 2);
+    assert.equal(airship.fieldEvents.find((event) => event.originalEventId === 'EVENT 99')?.completesObjective, true);
     assert.deepEqual(airship.fieldEvents.filter((event) => event.rewards?.length).map((event) => event.rewards?.[0]), [
         { type: 'item', itemId: 'orig_story_0180_light_robe', originalItemId: 180 },
         { type: 'gold', amount: 500 },
