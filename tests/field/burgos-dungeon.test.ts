@@ -1951,6 +1951,83 @@ test('episodes 23 through 31 launch late story interiors through the runtime con
     }
 });
 
+test('local field story scenarios start projected world objectives through episode 16', () => {
+    for (const scenario of STORY_SCENARIOS.filter((entry) => entry.missionKind === 'field' && entry.episode <= 16)) {
+        const raidSession = new WorldRaidSession('central_castle');
+        raidSession.beginRaidFromTown('central_castle');
+        const harness = createStoryScenarioHarness({ raidSession });
+        const previousWorldMap = harness.worldMap;
+        const dungeon = previousWorldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+        const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+        const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+        assert.ok(dungeon, `episode ${scenario.episode} dungeon`);
+        assert.ok(quest, `episode ${scenario.episode} quest`);
+        assert.ok(sequence, `episode ${scenario.episode} sequence`);
+        const entrance = previousWorldMap.getDungeonEntranceTile(dungeon);
+
+        harness.controller.startLocalStoryScenarioDungeon(dungeon, quest);
+
+        assert.equal(harness.worldMap, previousWorldMap, `episode ${scenario.episode} stays on world map`);
+        assert.equal(raidSession.activeDungeonId, scenario.dungeonId, `episode ${scenario.episode} active dungeon`);
+        assert.deepEqual(harness.placedNear, entrance, `episode ${scenario.episode} party placed at entrance`);
+        assert.equal(harness.selectedActorId, 'hero', `episode ${scenario.episode} selected actor`);
+        assert.equal(harness.turnStateCleared, true, `episode ${scenario.episode} turn state`);
+        assert.equal(harness.cameraFollowed, true, `episode ${scenario.episode} camera follow`);
+        assert.equal(harness.controller.getLastPresentationDurationMs(), getStoryScenarioPresentationDurationMs(sequence.entry), `episode ${scenario.episode} entry duration`);
+        assert.ok(harness.logs.includes(t(quest.enterLogKey)), `episode ${scenario.episode} quest enter log`);
+        assert.equal(harness.fieldEnemies.length, scenario.guardCount + 1, `episode ${scenario.episode} enemy count`);
+        assert.equal(harness.fieldEnemies.filter((entry) => entry.enemy.isBoss).length, 1, `episode ${scenario.episode} boss count`);
+        assert.ok(harness.fieldEnemies.every((entry) => previousWorldMap.isWalkable(entry.enemy.gridX, entry.enemy.gridY)), `episode ${scenario.episode} enemy walkable`);
+
+        const inspectMarkers = previousWorldMap.getInspectMarkers();
+        for (const event of sequence.fieldEvents) {
+            const expectedTiles = getStoryScenarioFieldEventTiles(scenario.dungeonId, event, previousWorldMap);
+            assert.ok(expectedTiles.length > 0, `episode ${scenario.episode} ${event.id} projected tiles`);
+            for (const tile of expectedTiles) {
+                assert.ok(
+                    inspectMarkers.some((marker) => marker.id === `${event.id}:${tile.x},${tile.y}`),
+                    `episode ${scenario.episode} ${event.id} projected marker`
+                );
+            }
+        }
+
+        const boss = harness.fieldEnemies.find((entry) => entry.enemy.isBoss)?.enemy;
+        assert.ok(boss, `episode ${scenario.episode} boss`);
+        harness.controller.completeDungeonIfBossDefeated(boss);
+        drainStoryPresentation(harness.controller);
+
+        assert.equal(raidSession.activeDungeonId, null, `episode ${scenario.episode} active cleared`);
+        assert.equal(raidSession.isDungeonCleared(scenario.dungeonId), true, `episode ${scenario.episode} cleared`);
+        assert.deepEqual(harness.fieldEnemies, [], `episode ${scenario.episode} enemies cleared`);
+        assert.ok(harness.logs.includes(t(quest.objectiveCompleteLogKey)), `episode ${scenario.episode} objective log`);
+    }
+});
+
+test('local airship scenario starts boarding objective and keeps variant guards optional', () => {
+    const scenario = STORY_SCENARIOS.find((entry) => entry.episode === 17);
+    assert.ok(scenario);
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ raidSession });
+    const previousWorldMap = harness.worldMap;
+    const dungeon = previousWorldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+    const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+    assert.ok(dungeon);
+    assert.ok(quest);
+
+    harness.controller.startLocalStoryScenarioDungeon(dungeon, quest);
+    drainStoryPresentation(harness.controller);
+
+    assert.equal(harness.worldMap, previousWorldMap);
+    assert.deepEqual(harness.placedNear, previousWorldMap.getDungeonEntranceTile(dungeon));
+    assert.equal(raidSession.activeDungeonId, null);
+    assert.equal(raidSession.isDungeonCleared('airship'), true);
+    assert.equal(harness.fieldEnemies.length, scenario.guardCount);
+    assert.equal(harness.fieldEnemies.filter((entry) => entry.enemy.isBoss).length, 0);
+    assert.ok(harness.logs.includes(t(quest.enterLogKey)));
+    assert.ok(harness.logs.includes(t(quest.objectiveCompleteLogKey)));
+});
+
 test('Airship objective completion keeps variant monsters as optional encounters', () => {
     const raidSession = new WorldRaidSession('central_castle');
     raidSession.beginRaidFromTown('central_castle');

@@ -6,20 +6,21 @@ import { LootObject } from '../entity/LootObject';
 import type { GameManager } from '../engine/GameManager';
 import { formatT, t } from '../i18n/LanguageManager';
 
+export const DEV_STORY_EPISODES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31] as const;
 export const DEV_STORY_INTERIOR_EPISODES = [1, 2, 3, 7, 13, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31] as const;
 export const DEV_LATE_STORY_EPISODES = [23, 24, 25, 26, 27, 28, 29, 30, 31] as const;
-type DevStoryInteriorEpisode = typeof DEV_STORY_INTERIOR_EPISODES[number];
-type DevStoryInteriorScenario = `story${DevStoryInteriorEpisode}`;
+type DevStoryEpisode = typeof DEV_STORY_EPISODES[number];
+type DevStoryScenario = `story${DevStoryEpisode}`;
 
-export type DevRaidScenario = 'aggro' | 'loot' | DevStoryInteriorScenario;
+export type DevRaidScenario = 'aggro' | 'loot' | DevStoryScenario;
 
 export function parseDevRaidScenario(value: string | null): DevRaidScenario | null {
     if (value === 'aggro' || value === 'loot') return value;
     const match = value?.match(/^story(\d+)$/);
     if (!match) return null;
     const episode = Number(match[1]);
-    return DEV_STORY_INTERIOR_EPISODES.includes(episode as DevStoryInteriorEpisode)
-        ? `story${episode as DevStoryInteriorEpisode}`
+    return DEV_STORY_EPISODES.includes(episode as DevStoryEpisode)
+        ? `story${episode as DevStoryEpisode}`
         : null;
 }
 
@@ -39,17 +40,27 @@ type DevFieldActor = {
     path: DevTile[];
     queuedIntent: unknown;
 };
+type DevDungeon = {
+    id: string;
+    nameKr: string;
+    chunkX: number;
+    chunkY: number;
+    sprite: string;
+    tileSpan: number;
+    tileRadius: number;
+};
 type DevWorldEngine = {
     partyActors: DevFieldActor[];
     fieldEnemies: Array<{ enemy: Enemy; home: DevTile; path: DevTile[] }>;
     worldMap: {
         loot: LootObject[];
         isWalkable: (x: number, y: number) => boolean;
-        getDungeons?: () => Array<{ id: string; nameKr: string; x: number; y: number }>;
+        getDungeons?: () => DevDungeon[];
     };
     selectionController: { selectActor: (actorId: string | null) => void; selectLoot: (lootId: string) => void };
     storyScenarioController?: {
-        startLocalStoryInteriorDungeon: (dungeon: { id: string; nameKr: string; x: number; y: number }, storyQuest: NonNullable<ReturnType<typeof getStoryQuestByDungeonId>>) => void;
+        startLocalStoryScenarioDungeon?: (dungeon: DevDungeon, storyQuest: NonNullable<ReturnType<typeof getStoryQuestByDungeonId>>) => void;
+        startLocalStoryInteriorDungeon: (dungeon: DevDungeon, storyQuest: NonNullable<ReturnType<typeof getStoryQuestByDungeonId>>) => void;
     };
     clearFieldTurnState: () => void;
     closeNetworkRaidClient?: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => void;
@@ -170,20 +181,24 @@ function applyDevLootScenario(manager: GameManager, world: DevWorldEngine, actor
     setDevScenarioStatus('loot', 'loot-open');
 }
 
-function applyDevStoryScenario(world: DevWorldEngine, scenarioId: DevStoryInteriorScenario): void {
+function applyDevStoryScenario(world: DevWorldEngine, scenarioId: DevStoryScenario): void {
     deactivateDevNetworkRaid(world);
     const episode = Number(scenarioId.replace('story', ''));
     const scenario = STORY_SCENARIOS.find((candidate) => candidate.episode === episode);
     const dungeon = world.worldMap.getDungeons?.().find((candidate) => candidate.id === scenario?.dungeonId);
     const quest = scenario ? getStoryQuestByDungeonId(scenario.dungeonId) : null;
-    if (!dungeon || !quest || !world.storyScenarioController) {
+    if (!scenario || !dungeon || !quest || !world.storyScenarioController) {
         console.warn(`[Darksaber] Dev ${scenarioId} scenario could not find the dungeon, quest, or controller.`);
         return;
     }
 
-    world.storyScenarioController.startLocalStoryInteriorDungeon(dungeon, quest);
+    if (world.storyScenarioController.startLocalStoryScenarioDungeon) {
+        world.storyScenarioController.startLocalStoryScenarioDungeon(dungeon, quest);
+    } else {
+        world.storyScenarioController.startLocalStoryInteriorDungeon(dungeon, quest);
+    }
     world.addCombatLog?.(formatT('dev.scenario.storyReady', { episode, dungeon: dungeon.nameKr }));
-    setDevScenarioStatus(scenarioId, 'interior-ready');
+    setDevScenarioStatus(scenarioId, scenario.missionKind === 'soloInterior' ? 'interior-ready' : 'scenario-ready');
 }
 
 function createDevLootClient(): unknown {

@@ -1,7 +1,7 @@
 import type { PlayerData } from '../../data/PlayerData';
 import { getItemDef } from '../../data/ItemDB';
 import { getStoryQuestByDungeonId, isStoryQuestAvailable, type StoryQuestDefinition } from '../../data/StoryQuestData';
-import { getStoryScenarioByDungeonId } from '../../data/StoryScenarioData';
+import { getStoryScenarioByDungeonId, type StoryScenarioDefinition } from '../../data/StoryScenarioData';
 import {
     getStoryScenarioFieldEventFlag,
     getStoryScenarioFieldEventScope,
@@ -322,6 +322,36 @@ export class WorldStoryScenarioController {
         this.context.log(`${dungeon.nameKr} 시나리오는 서버 세션 이관 후 진입할 수 있습니다.`);
     }
 
+    public startLocalStoryScenarioDungeon(dungeon: WorldDungeonInfo, storyQuest: StoryQuestDefinition): void {
+        const actor = this.context.getControlledActor();
+        const scenario = getStoryScenarioByDungeonId(dungeon.id);
+        if (!actor || !scenario) return;
+        if (isStoryInteriorDungeon(dungeon.id)) {
+            this.startLocalStoryInteriorDungeon(dungeon, storyQuest);
+            return;
+        }
+
+        const entranceTile = this.context.getWorldMap().getDungeonEntranceTile(dungeon);
+        this.context.raidSession.startDungeonEncounter(dungeon.id);
+        this.clearFieldEventState(dungeon.id);
+        this.context.closeFieldOverlays();
+        this.context.getWorldMap().loot = [];
+        this.context.placePartyNear(entranceTile);
+        this.context.setPlayer(this.context.getControlledActor()?.entity ?? this.context.getPlayer());
+        this.context.selectActor(this.context.getControlledActor()?.id ?? null);
+        this.context.clearFieldTurnState();
+        this.context.setFieldEnemies(this.createScenarioEnemies(scenario, entranceTile));
+        this.syncActiveWorldScenarioMarkers();
+        this.context.followCameraToPlayer();
+        this.playStoryQuestBgm(dungeon.id);
+        this.playStoryScenarioSequence(dungeon.id, 'entry');
+        this.context.log(t(storyQuest.enterLogKey));
+
+        if (!scenario.bossName) {
+            this.completeStoryDungeonObjective(dungeon.id, storyQuest, { clearEnemies: false });
+        }
+    }
+
     public startLocalStoryInteriorDungeon(dungeon: WorldDungeonInfo, storyQuest: StoryQuestDefinition): void {
         const actor = this.context.getControlledActor();
         if (!actor) return;
@@ -340,15 +370,35 @@ export class WorldStoryScenarioController {
         this.context.selectActor(this.context.getControlledActor()?.id ?? null);
         this.context.clearFieldTurnState();
 
+        this.context.setFieldEnemies(this.createScenarioEnemies(scenario, layout.playerStart, layout));
+
+        this.context.followCameraToPlayer();
+        this.playStoryQuestBgm(dungeon.id);
+        this.playStoryScenarioSequence(dungeon.id, 'entry');
+        this.context.log(formatT('story.interior.enterLog', { dungeon: dungeon.nameKr }));
+        this.context.log(t(storyQuest.enterLogKey));
+    }
+
+    private createScenarioEnemies(
+        scenario: StoryScenarioDefinition,
+        anchor: TilePoint,
+        layout: StoryInteriorLayout | null = null
+    ): FieldEnemy[] {
         const monsterLayout = getStoryScenarioMonsterLayout(scenario);
+        const guardOffsets = monsterLayout.guardOffsets ?? this.getDefaultScenarioGuardOffsets(scenario.guardCount, Boolean(scenario.bossName));
         const enemies: FieldEnemy[] = [];
+
         for (let index = 0; index < scenario.guardCount; index++) {
             const monsterId = monsterLayout.guardMonsterIds[index % monsterLayout.guardMonsterIds.length];
             const guardDefinition = getMonsterDefinition(monsterId);
             const guardRole = guardDefinition.role === 'boss' ? 'bruiser' : guardDefinition.role;
-            const tile = layout.guardTiles[index] ?? layout.guardTiles[layout.guardTiles.length - 1] ?? layout.playerStart;
+            const offset = guardOffsets[index] ?? { x: index % 2 === 0 ? 2 : -2, y: Math.floor(index / 2) + 1 };
+            const requestedTile = layout?.guardTiles[index]
+                ?? (layout?.guardTiles.length ? layout.guardTiles[layout.guardTiles.length - 1] : null)
+                ?? { x: anchor.x + offset.x, y: anchor.y + offset.y };
+            const tile = this.findScenarioEnemyTile(requestedTile, enemies);
             const enemy = new Enemy(
-                `story_${dungeon.id}_guard_${index}`,
+                `story_${scenario.dungeonId}_guard_${index}`,
                 tile.x,
                 tile.y,
                 guardDefinition.name,
@@ -366,10 +416,13 @@ export class WorldStoryScenarioController {
         if (scenario.bossName) {
             const monsterId = monsterLayout.bossMonsterId;
             const bossDefinition = monsterId ? getMonsterDefinition(monsterId) : null;
+            const requestedTile = layout?.bossTile
+                ?? { x: anchor.x + (monsterLayout.bossOffset?.x ?? 4), y: anchor.y + (monsterLayout.bossOffset?.y ?? 0) };
+            const tile = this.findScenarioEnemyTile(requestedTile, enemies);
             const boss = new Enemy(
-                `story_${dungeon.id}_boss`,
-                layout.bossTile.x,
-                layout.bossTile.y,
+                `story_${scenario.dungeonId}_boss`,
+                tile.x,
+                tile.y,
                 scenario.bossName,
                 scenario.bossLevel,
                 scenario.bossColor,
@@ -380,15 +433,40 @@ export class WorldStoryScenarioController {
             boss.isAggro = true;
             boss.isBoss = true;
             if (monsterId) this.context.applyMonsterSprite(boss, monsterId);
-            enemies.push({ enemy: boss, home: { ...layout.bossTile }, path: [] });
+            enemies.push({ enemy: boss, home: { ...tile }, path: [] });
         }
-        this.context.setFieldEnemies(enemies);
 
-        this.context.followCameraToPlayer();
-        this.playStoryQuestBgm(dungeon.id);
-        this.playStoryScenarioSequence(dungeon.id, 'entry');
-        this.context.log(formatT('story.interior.enterLog', { dungeon: dungeon.nameKr }));
-        this.context.log(t(storyQuest.enterLogKey));
+        return enemies;
+    }
+
+    private getDefaultScenarioGuardOffsets(count: number, hasBoss: boolean): TilePoint[] {
+        const offsets: TilePoint[] = [];
+        const startX = hasBoss ? -3 : -1;
+        for (let index = 0; index < count; index++) {
+            const row = Math.floor(index / 4);
+            const column = index % 4;
+            offsets.push({ x: startX + column * 2, y: 2 + row * 2 });
+        }
+        return offsets;
+    }
+
+    private findScenarioEnemyTile(preferred: TilePoint, plannedEnemies: readonly FieldEnemy[]): TilePoint {
+        const worldMap = this.context.getWorldMap();
+        const occupied = (tile: TilePoint): boolean =>
+            plannedEnemies.some((entry) => entry.enemy.gridX === tile.x && entry.enemy.gridY === tile.y)
+            || this.context.getFieldEnemies().some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.gridX === tile.x && entry.enemy.gridY === tile.y);
+        if (worldMap.isWalkable(preferred.x, preferred.y) && !occupied(preferred)) return preferred;
+
+        for (let radius = 1; radius <= 10; radius++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+                for (let dx = -radius; dx <= radius; dx++) {
+                    if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
+                    const candidate = { x: preferred.x + dx, y: preferred.y + dy };
+                    if (worldMap.isWalkable(candidate.x, candidate.y) && !occupied(candidate)) return candidate;
+                }
+            }
+        }
+        return preferred;
     }
 
     public completeDungeonIfBossDefeated(enemy: Enemy): void {

@@ -83,7 +83,7 @@
    - 완료: 자동 테스트에서 1~31화 실내 시나리오 전체가 로컬 진입 시 공통 실내 진입 로그와 퀘스트 진입 로그를 남기고, 보스 목표 달성 뒤 원래 월드로 복귀하며 복귀 로그와 목표 완료 로그를 남기는지 검증한다.
    - 완료: 자동 테스트에서 1~31화 실내 시나리오 전체의 보스 전리품이 실내맵이 아니라 원래 월드 입구 타일에 남고, 입구 전리품 로그를 남기는지 검증한다.
    - 완료: Chrome headless에서 `/?devStart=raid&devScenario=story31`로 바로 진입해 `StoryInteriorMap`, `demon_fixers_den`, DEV 상태 `story31 / interior-ready`, 보스 1명(마계 해결사 `{22,11}`), 경비 보스 오인 0개, 입장 로그를 확인했다.
-   - 완료: 같은 DEV 직접 진입 경로를 구현된 실내 시나리오 전체로 확장했다. `npm run dev:raid:story1`, `story2`, `story3`, `story7`, `story13`, `story18`~`story31`로 실내 전체를 개별 점검할 수 있고, URL의 `devScenario=storyNN` 형식도 유지한다. 자동 테스트는 각 실내 에피소드가 로컬 실내 던전으로 시작되고 DEV 상태가 `storyNN / interior-ready`로 표시되는지 검증한다.
+   - 완료: 같은 DEV 직접 진입 경로를 1~31화 전체로 확장했다. `npm run dev:raid:story1`~`npm run dev:raid:story31`로 모든 구현 시나리오를 개별 점검할 수 있고, URL의 `devScenario=storyNN` 형식도 유지한다. 자동 테스트는 실내 에피소드가 로컬 실내 던전으로 시작되고 필드/비공정 에피소드가 월드맵 목표 상태로 시작되는지, DEV 상태가 각각 `interior-ready` 또는 `scenario-ready`로 표시되는지 검증한다.
 2. 23~31화 GETITEM 보상은 `src/data/content/original-late-story-items.json`에 원작 아이템 ID, 출처 이벤트, 원작 이름/스탯을 원장화했고 `orig_late_####` 아이템 정의로 지급한다. 원장은 `scripts/generate-late-story-item-defs.mjs`로 원작 `itemtbl.atr`에서 재생성할 수 있다.
 3. 컷신 발표 단계의 카메라 포커스, 단계별 duration, 실제 지연 재생, 연출 중 월드 입력/이동 동결, 23~31화 주인공 진입 이동 연출은 런타임에 연결했다.
 
@@ -98,6 +98,7 @@
 - 항구/섬/호수/오아시스: 접근 경로, 다리/해안/물가 지형을 이용한 전투 흐름.
 - 스케리아/발할라: 중후반 필드 보스 접근 루트와 위험 구역 분리.
 - 17화 비공정은 `vehicle` 미션으로 유지하되, 원작 `DEO` 탑승 대사와 `evt` 보급/도착 이벤트가 들어갔다.
+- DEV 직접 진입과 자동 테스트에서 4~6, 8~12, 14~16화 필드 시나리오는 월드맵 목표 상태로 시작되어 원작 투영 필드 이벤트 마커, 목표 적 배치, 입장/완료 로그를 검증한다. 17화 비공정은 보스 없는 탑승 목표로 즉시 완료되며 선택 경비는 유지된다.
 
 ## 통합 규칙
 

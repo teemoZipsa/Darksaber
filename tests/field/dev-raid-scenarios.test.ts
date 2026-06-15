@@ -7,6 +7,7 @@ import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import {
     applyDevRaidScenario,
     DEV_LATE_STORY_EPISODES,
+    DEV_STORY_EPISODES,
     DEV_STORY_INTERIOR_EPISODES,
     parseDevRaidScenario,
 } from '../../src/dev/DevRaidScenarios';
@@ -107,12 +108,14 @@ function createManagerHarness() {
             loot: [] as Array<{ id: string; inventory: unknown }>,
             isWalkable: () => true,
             getDungeons: () => STORY_SCENARIOS
-                .filter((scenario) => DEV_STORY_INTERIOR_EPISODES.includes(scenario.episode as typeof DEV_STORY_INTERIOR_EPISODES[number]))
                 .map((scenario) => ({
                     id: scenario.dungeonId,
                     nameKr: scenario.dungeonNameKr,
-                    x: scenario.chunkX * 16,
-                    y: scenario.chunkY * 16,
+                    chunkX: scenario.chunkX,
+                    chunkY: scenario.chunkY,
+                    sprite: scenario.sprite,
+                    tileSpan: 3,
+                    tileRadius: 1,
                 })),
         },
         selectionController: {
@@ -121,6 +124,13 @@ function createManagerHarness() {
         },
         storyScenarioController: {
             started: null as null | { dungeonId: string; questId: string },
+            startedScenario: null as null | { dungeonId: string; questId: string },
+            startLocalStoryScenarioDungeon(dungeon: { id: string }, storyQuest: { id: string }) {
+                this.startedScenario = { dungeonId: dungeon.id, questId: storyQuest.id };
+                if (STORY_SCENARIOS.find((scenario) => scenario.dungeonId === dungeon.id)?.missionKind === 'soloInterior') {
+                    this.startLocalStoryInteriorDungeon(dungeon, storyQuest);
+                }
+            },
             startLocalStoryInteriorDungeon(dungeon: { id: string }, storyQuest: { id: string }) {
                 this.started = { dungeonId: dungeon.id, questId: storyQuest.id };
             },
@@ -148,23 +158,22 @@ function createManagerHarness() {
     return { actor, inventory, logs, manager: manager as unknown as GameManager, selected, world };
 }
 
-test('dev raid scenario parser accepts implemented story interiors through episode 31 only', () => {
+test('dev raid scenario parser accepts implemented story episodes through episode 31 only', () => {
+    assert.deepEqual([...DEV_STORY_EPISODES], Array.from({ length: 31 }, (_, index) => index + 1));
     assert.deepEqual([...DEV_STORY_INTERIOR_EPISODES], [1, 2, 3, 7, 13, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]);
     assert.deepEqual([...DEV_LATE_STORY_EPISODES], [23, 24, 25, 26, 27, 28, 29, 30, 31]);
     assert.equal(parseDevRaidScenario('aggro'), 'aggro');
     assert.equal(parseDevRaidScenario('loot'), 'loot');
-    for (const episode of DEV_STORY_INTERIOR_EPISODES) {
+    for (const episode of DEV_STORY_EPISODES) {
         assert.equal(parseDevRaidScenario(`story${episode}`), `story${episode}`);
     }
-    assert.equal(parseDevRaidScenario('story4'), null);
-    assert.equal(parseDevRaidScenario('story17'), null);
     assert.equal(parseDevRaidScenario('story32'), null);
     assert.equal(parseDevRaidScenario('storyxx'), null);
 });
 
-test('package scripts expose each story interior dev entry through episode 31', () => {
+test('package scripts expose each story dev entry through episode 31', () => {
     const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
-    for (const episode of DEV_STORY_INTERIOR_EPISODES) {
+    for (const episode of DEV_STORY_EPISODES) {
         assert.equal(
             packageJson.scripts[`dev:raid:story${episode}`],
             `node scripts/dev-town.mjs raid story${episode}`,
@@ -204,12 +213,16 @@ test('dev story31 scenario launches local Demon Fixer Den without network raid s
         dungeonId: 'demon_fixers_den',
         questId: 'main:episode_31_demon_fixers',
     });
+    assert.deepEqual(world.storyScenarioController.startedScenario, {
+        dungeonId: 'demon_fixers_den',
+        questId: 'main:episode_31_demon_fixers',
+    });
     assert.equal(logs.length, 1);
 });
 
-test('dev story interior scenarios launch local interiors through episode 31', () => {
+test('dev story scenarios launch local starts through episode 31', () => {
     withMockDocument((getStatus) => {
-        for (const episode of DEV_STORY_INTERIOR_EPISODES) {
+        for (const episode of DEV_STORY_EPISODES) {
             const { logs, manager, world } = createManagerHarness();
             const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
             const scenarioId = parseDevRaidScenario(`story${episode}`);
@@ -221,18 +234,27 @@ test('dev story interior scenarios launch local interiors through episode 31', (
             assert.equal(world.currentPhase, 'raid', `episode ${episode} phase`);
             assert.equal(world.isNetworkRaid, false, `episode ${episode} network raid`);
             assert.equal(world.networkRaidClient, null, `episode ${episode} network client`);
-            assert.deepEqual(world.storyScenarioController.started, {
+            assert.deepEqual(world.storyScenarioController.startedScenario, {
                 dungeonId: scenario.dungeonId,
                 questId: scenario.questId,
             }, `episode ${episode} story start`);
+            if (scenario.missionKind === 'soloInterior') {
+                assert.deepEqual(world.storyScenarioController.started, {
+                    dungeonId: scenario.dungeonId,
+                    questId: scenario.questId,
+                }, `episode ${episode} interior start`);
+            } else {
+                assert.equal(world.storyScenarioController.started, null, `episode ${episode} should not start an interior`);
+            }
             assert.equal(logs.length, 1, `episode ${episode} dev log`);
             assert.match(logs[0], new RegExp(`${episode}화|Episode ${episode}`), `episode ${episode} log text`);
 
             const status = getStatus();
             assert.ok(status, `episode ${episode} dev status`);
             assert.equal(status.dataset.scenario, scenarioId, `episode ${episode} dev status scenario`);
-            assert.equal(status.dataset.state, 'interior-ready', `episode ${episode} dev status state`);
-            assert.equal(status.textContent?.includes(`${scenarioId} / interior-ready`), true, `episode ${episode} dev status text`);
+            const expectedStatus = scenario.missionKind === 'soloInterior' ? 'interior-ready' : 'scenario-ready';
+            assert.equal(status.dataset.state, expectedStatus, `episode ${episode} dev status state`);
+            assert.equal(status.textContent?.includes(`${scenarioId} / ${expectedStatus}`), true, `episode ${episode} dev status text`);
         }
     });
 });
