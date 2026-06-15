@@ -109,7 +109,7 @@
 
 ## 검증 명령
 
-- `npm run verify:story`: 1~31화의 선언된 원본 `Wlib`/`Glib`/`MAP` 파일과 `set.arc`
+- `npm run verify:story`: 필수 렌더/BGM/font 자산 참조와 1~31화의 선언된 원본 `Wlib`/`Glib`/`MAP` 파일과 `set.arc`
   멤버를 추출 원본과 대조하고, `original-scenario-import`/메인퀘스트 로드맵 표가
   런타임 선언과 일치하는지 확인하며, 1~31화 체인/중복, 퀘스트 정의/
   표시 텍스트/보상/이벤트 참조/시나리오 원장/월드맵 입구/hmap 지형/

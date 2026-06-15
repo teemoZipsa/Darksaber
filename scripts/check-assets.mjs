@@ -4,6 +4,7 @@ import path from 'path';
 const rootDir = process.cwd();
 const publicDir = path.join(rootDir, 'public');
 const srcDir = path.join(rootDir, 'src');
+const quiet = process.argv.includes('--quiet');
 
 const sourceRoots = [
   srcDir,
@@ -95,7 +96,7 @@ let checked = 0;
 let optionalMissing = 0;
 let skippedDynamic = 0;
 
-console.log('Checking asset references...');
+if (!quiet) console.log('Checking asset references...');
 
 for (const file of sourceRoots.flatMap(walkFiles)) {
   const content = fs.readFileSync(file, 'utf8');
@@ -117,14 +118,14 @@ for (const file of sourceRoots.flatMap(walkFiles)) {
 
     checked += 1;
     if (existsAsset(resolvedAssetString)) {
-      console.log(`OK ${resolvedAssetString}`);
+      if (!quiet) console.log(`OK ${resolvedAssetString}`);
       continue;
     }
 
     const location = path.relative(rootDir, file);
     if (isOptionalAsset(resolvedAssetString)) {
       optionalMissing += 1;
-      console.warn(`WARN optional missing ${resolvedAssetString} (${location})`);
+      if (!quiet) console.warn(`WARN optional missing ${resolvedAssetString} (${location})`);
       continue;
     }
 
