@@ -20,7 +20,8 @@ Monster data is split into three layers:
    - Original raw values preserve relative ordering within that curve.
    - Custom early story boss ids alias back to original special boss rows:
      `burgos_wolf_boss` → `701R` (키스라), `zamora_fenris_boss` → `702R` (펜리스).
-   - Missing original rows, such as some newly authored 600-series sprites, use the previous formula as fallback.
+   - Missing original rows, currently limited in story scenarios to authored 600-series sprites
+     `634R`~`639R`, use the previous formula as fallback.
 
 ## Why Raw Stats Are Not Used Directly
 

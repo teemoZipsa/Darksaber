@@ -100,6 +100,24 @@ test('late story scenario monsters use original balance rows through episode 31'
     }
 });
 
+test('story scenario fallback balance is limited to documented 600-series authored sprites', () => {
+    const allowedFallbackIds = new Set(['634R', '635R', '636R', '637R', '638R', '639R']);
+    const fallbackIds = new Set<string>();
+
+    for (const scenario of STORY_SCENARIOS) {
+        const layout = getStoryScenarioMonsterLayout(scenario);
+        for (const id of [layout.bossMonsterId, ...layout.guardMonsterIds]) {
+            if (!id) continue;
+            if (getNormalizedMonsterBalance(id, scenario.bossLevel).source === 'fallback') {
+                assert.equal(allowedFallbackIds.has(id), true, `${scenario.dungeonId}:${id}`);
+                fallbackIds.add(id);
+            }
+        }
+    }
+
+    assert.deepEqual([...fallbackIds].sort(), [...allowedFallbackIds].sort());
+});
+
 test('monster balance report exposes raw and normalized values side by side', () => {
     const report = createMonsterBalanceReport([
         { id: '304R', level: 1 },
