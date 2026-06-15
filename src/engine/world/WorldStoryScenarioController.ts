@@ -480,13 +480,17 @@ export class WorldStoryScenarioController {
         const dungeonId = this.context.raidSession.activeDungeonId;
         if (!dungeonId || this.context.isNetworkRaid()) return false;
         const sequence = getStoryScenarioEventSequence(dungeonId);
-        const event = sequence?.enemyDefeatEvents?.find((candidate) => candidate.enemyId === enemy.id);
+        const scenarioEnemyIndex = this.context.getFieldEnemies().findIndex((entry) => entry.enemy.id === enemy.id);
+        const event = sequence?.enemyDefeatEvents?.find((candidate) =>
+            candidate.enemyId === enemy.id
+            || (candidate.scenarioEnemyIndex !== undefined && candidate.scenarioEnemyIndex === scenarioEnemyIndex)
+        );
         if (!event) return false;
 
         const key = this.fieldEventKey(dungeonId, event.id);
         if (this.completedFieldEventKeys.has(key)) return false;
         this.completedFieldEventKeys.add(key);
-        this.startStoryScenarioPresentation(event.steps);
+        this.startStoryScenarioPresentation(event.steps.map((step) => this.withPresentationStepFocus(step, { x: enemy.gridX, y: enemy.gridY })));
         return true;
     }
 

@@ -719,6 +719,68 @@ test('Etna local story interior maps original guard death events 400 through 470
     assert.equal(harness.controller.playEnemyDefeatEvent(guard), false);
 });
 
+test('local scenario enemy deaths return all original CHARDEAD presentation steps through episode 31', () => {
+    const world = new WorldMap();
+    const scenariosWithEnemyDefeatEvents = STORY_SCENARIOS
+        .map((scenario) => ({
+            scenario,
+            sequence: getStoryScenarioEventSequence(scenario.dungeonId),
+        }))
+        .filter((entry) => (entry.sequence?.enemyDefeatEvents?.length ?? 0) > 0);
+    assert.deepEqual(
+        scenariosWithEnemyDefeatEvents.map((entry) => entry.scenario.episode),
+        [3, 12],
+        'all local CHARDEAD story events are covered by this test'
+    );
+
+    for (const { scenario, sequence } of scenariosWithEnemyDefeatEvents) {
+        assert.ok(sequence?.enemyDefeatEvents, `episode ${scenario.episode} enemy defeat events`);
+        for (const enemyDefeatEvent of sequence.enemyDefeatEvents) {
+            assert.equal(
+                Number.isInteger(enemyDefeatEvent.scenarioEnemyIndex),
+                true,
+                `episode ${scenario.episode} ${enemyDefeatEvent.id} declares local scenario enemy index`
+            );
+
+            const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+            const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+            assert.ok(dungeon, `episode ${scenario.episode} dungeon`);
+            assert.ok(quest, `episode ${scenario.episode} quest`);
+
+            const raidSession = new WorldRaidSession('central_castle');
+            raidSession.beginRaidFromTown('central_castle');
+            const harness = createStoryScenarioHarness({ raidSession, worldMap: new WorldMap() });
+            harness.controller.startLocalStoryScenarioDungeon(dungeon, quest);
+            drainStoryPresentation(harness.controller);
+
+            const target = harness.fieldEnemies[enemyDefeatEvent.scenarioEnemyIndex as number]?.enemy;
+            assert.ok(target, `episode ${scenario.episode} ${enemyDefeatEvent.id} target`);
+            assert.equal(target.isBoss, false, `episode ${scenario.episode} ${enemyDefeatEvent.id} target is not objective`);
+
+            assert.equal(
+                harness.controller.playEnemyDefeatEvent(target),
+                true,
+                `episode ${scenario.episode} ${enemyDefeatEvent.id} plays`
+            );
+            assert.equal(
+                harness.controller.getLastPresentationDurationMs(),
+                getStoryScenarioPresentationDurationMs(enemyDefeatEvent.steps),
+                `episode ${scenario.episode} ${enemyDefeatEvent.id} duration`
+            );
+            assert.deepEqual(
+                harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1],
+                { x: target.gridX, y: target.gridY },
+                `episode ${scenario.episode} ${enemyDefeatEvent.id} focuses current enemy tile`
+            );
+            assert.equal(
+                harness.controller.playEnemyDefeatEvent(target),
+                false,
+                `episode ${scenario.episode} ${enemyDefeatEvent.id} does not replay`
+            );
+        }
+    }
+});
+
 test('Zamora chest events grant raid rewards once per chest', () => {
     const dungeon = new WorldMap().getDungeons().find((entry) => entry.id === ZAMORA_FORTRESS_DUNGEON_ID);
     const quest = getStoryQuestByDungeonId(ZAMORA_FORTRESS_DUNGEON_ID);
