@@ -52,6 +52,50 @@ const LATE_STORY_WORLD_BIOMES = new Map<number, string>([
     [30, 'special'],
     [31, 'special'],
 ]);
+const LATE_STORY_ENTRY_DIALOGUE_COUNTS = new Map<number, number>([
+    [23, 4],
+    [24, 1],
+    [25, 6],
+    [26, 0],
+    [27, 0],
+    [28, 21],
+    [29, 17],
+    [30, 14],
+    [31, 14],
+]);
+const LATE_STORY_BOSS_DEFEAT_DIALOGUE_COUNTS = new Map<number, number>([
+    [23, 1],
+    [24, 1],
+    [25, 4],
+    [26, 0],
+    [27, 0],
+    [28, 2],
+    [29, 3],
+    [30, 10],
+    [31, 8],
+]);
+const LATE_STORY_ENTRY_FOCUSES = new Map<number, string[]>([
+    [23, ['18,15', '21,15', '18,15', '21,15']],
+    [24, ['19,7']],
+    [25, ['19,7', '19,23', '19,7', '19,23', '19,7', '19,23']],
+    [26, []],
+    [27, []],
+    [28, ['19,7', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7']],
+    [29, ['19,7', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7', '14,32', '19,7']],
+    [30, ['19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7', '14,32', '19,7']],
+    [31, ['19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7', '14,32', '19,7']],
+]);
+const LATE_STORY_BOSS_DEFEAT_FOCUSES = new Map<number, string[]>([
+    [23, ['19,7']],
+    [24, ['19,7']],
+    [25, ['19,7', '19,9', '19,7', '19,9']],
+    [26, []],
+    [27, []],
+    [28, ['19,7', '19,9']],
+    [29, ['19,9', '19,7', '19,9']],
+    [30, ['19,9', '19,7', '19,7', '19,7', '19,9', '19,7', '19,7', '19,9', '19,7', '19,9']],
+    [31, ['19,7', '19,9', '19,7', '19,9', '19,7', '19,9', '19,7', '19,9']],
+]);
 
 interface Options {
     sourceRoot: string;
@@ -686,6 +730,11 @@ function getPresentationStepTiles(step: StoryScenarioEventStep): Array<{ label: 
     return step.focus ? [{ label: 'focus', tile: step.focus }] : [];
 }
 
+function getPresentationStepFocusKey(step: StoryScenarioEventStep): string | null {
+    const tile = step.kind === 'focus' ? step.target : step.focus;
+    return tile ? `${tile.x},${tile.y}` : null;
+}
+
 function hasWalkableInteriorPath(map: StoryInteriorMap, from: { x: number; y: number }, to: { x: number; y: number }): boolean {
     const bounds = map.getBoundsTiles();
     const queue = [{ ...from }];
@@ -838,6 +887,17 @@ function verifyLateStoryOriginalMapContract(
     if (sequence.originalSources.sceneScript !== `Wlib/scene${episode}.lsc`) {
         throw new Error(`Episode ${episode} scene script mismatch: ${sequence.originalSources.sceneScript}`);
     }
+    requireJsonEqual(
+        episode,
+        'late story set.arc member declaration',
+        sequence.originalSources.setArcMembers,
+        [
+            fact.aiMember,
+            fact.eventMember,
+            ...(fact.deoMember ? [fact.deoMember] : []),
+            ...(fact.deeMember ? [fact.deeMember] : []),
+        ]
+    );
     for (const sourceFile of [mrcFact.source, mrcFact.translatedSource, expectedHmapSource, fact.setArc]) {
         if (!declaredMapFiles.has(sourceFile)) {
             throw new Error(`Episode ${episode} late story source file not declared: ${sourceFile}`);
@@ -850,6 +910,58 @@ function verifyLateStoryOriginalMapContract(
     for (const [index, position] of fact.staging.entries()) {
         verifyStoryInteriorTileAccessible(episode, scenario.dungeonId, map, `original staging ${index}`, { x: position.x, y: position.y });
     }
+
+    const entryDialogues = sequence.entry.filter((step) => step.kind === 'dialogue');
+    const bossDefeatDialogues = sequence.bossDefeat.filter((step) => step.kind === 'dialogue');
+    if (entryDialogues.length !== LATE_STORY_ENTRY_DIALOGUE_COUNTS.get(episode)) {
+        throw new Error(`Episode ${episode} entry dialogue count mismatch: ${entryDialogues.length}`);
+    }
+    if (bossDefeatDialogues.length !== LATE_STORY_BOSS_DEFEAT_DIALOGUE_COUNTS.get(episode)) {
+        throw new Error(`Episode ${episode} boss defeat dialogue count mismatch: ${bossDefeatDialogues.length}`);
+    }
+    requireJsonEqual(
+        episode,
+        'late story entry dialogue focuses',
+        entryDialogues.map((step) => getPresentationStepFocusKey(step) ?? 'none'),
+        LATE_STORY_ENTRY_FOCUSES.get(episode)
+    );
+    requireJsonEqual(
+        episode,
+        'late story boss defeat dialogue focuses',
+        bossDefeatDialogues.map((step) => getPresentationStepFocusKey(step) ?? 'none'),
+        LATE_STORY_BOSS_DEFEAT_FOCUSES.get(episode)
+    );
+    if (fact.deoMember && entryDialogues.length === 0) {
+        throw new Error(`Episode ${episode} declares ${fact.deoMember} but has no entry dialogue`);
+    }
+    if (!fact.deoMember && entryDialogues.length !== 0) {
+        throw new Error(`Episode ${episode} has entry dialogue without a DEO member`);
+    }
+    if (fact.deeMember && bossDefeatDialogues.length === 0) {
+        throw new Error(`Episode ${episode} declares ${fact.deeMember} but has no boss defeat dialogue`);
+    }
+    if (!fact.deeMember && bossDefeatDialogues.length !== 0) {
+        throw new Error(`Episode ${episode} has boss defeat dialogue without a DEE member`);
+    }
+    if (sequence.entry.filter((step) => step.kind === 'combatStart').length !== 1) {
+        throw new Error(`Episode ${episode} entry sequence must contain exactly one combatStart step`);
+    }
+    if (sequence.bossDefeat.filter((step) => step.kind === 'objective').length !== 1) {
+        throw new Error(`Episode ${episode} boss defeat sequence must contain exactly one objective step`);
+    }
+    const entryMove = sequence.entry.find(
+        (step): step is Extract<StoryScenarioEventStep, { kind: 'moveActor' }> => step.kind === 'moveActor'
+    );
+    if (!entryMove) throw new Error(`Episode ${episode} entry sequence is missing hero moveActor step`);
+    if (entryMove.actorId !== 'hero') {
+        throw new Error(`Episode ${episode} entry move actor mismatch: ${entryMove.actorId} !== hero`);
+    }
+    requireJsonEqual(
+        episode,
+        'late story entry move target',
+        entryMove.target,
+        { x: layout.playerStart.x, y: layout.playerStart.y - 1 }
+    );
 }
 
 function verifyFieldScenarioWorldProjection(episode: number, scenario: StoryScenarioDefinition, sequence: StoryScenarioEventSequence, worldMap: WorldMap): void {
@@ -1143,4 +1255,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, planning docs, collection chains, quests, quest display text, rewards, event references, scenario ledgers, world entrances, hmaps, late-story biomes, interior accessibility, late-story original AI/MRC, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, planning docs, collection chains, quests, quest display text, rewards, event references, scenario ledgers, world entrances, hmaps, late-story biomes, interior accessibility, late-story original AI/MRC/DEO/DEE presentations, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
