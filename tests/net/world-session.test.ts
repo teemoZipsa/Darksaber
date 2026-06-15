@@ -1813,65 +1813,102 @@ test('server-authoritative field scenario events reject invalid actors and dista
     assert.match(distant.replies[0]?.type === 'ACTION_REJECTED' ? distant.replies[0].reason : '', /too far/);
 });
 
-test('server field scenario enemy deaths return original CHARDEAD presentation steps', () => {
-    const session = new WorldSession();
+test('server scenario enemy deaths return all original CHARDEAD presentation steps through episode 31', () => {
     const world = new WorldMap();
-    const completedQuestIds = STORY_SCENARIOS
-        .filter((scenario) => scenario.episode < 12)
-        .map((scenario) => scenario.questId);
-    const joined = session.join({
-        ...joinMessage('central_castle', 'hero-a'),
-        completedQuestIds,
-        partyComposition: [actor('hero-a', {
-            stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
-        })],
-    }, 0);
-    const internals = session as any;
-    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
-    const dungeon = world.getDungeons().find((entry) => entry.id === 'pyramid_front');
-    assert.ok(serverActor);
-    assert.ok(dungeon);
-    serverActor.tile = world.getDungeonEntranceTile(dungeon);
+    const scenariosWithEnemyDefeatEvents = STORY_SCENARIOS
+        .map((scenario) => ({
+            scenario,
+            sequence: getStoryScenarioEventSequence(scenario.dungeonId),
+        }))
+        .filter((entry) => (entry.sequence?.enemyDefeatEvents?.length ?? 0) > 0);
+    assert.deepEqual(
+        scenariosWithEnemyDefeatEvents.map((entry) => entry.scenario.episode),
+        [3, 12],
+        'all server CHARDEAD story events are covered by this test'
+    );
 
-    session.handleMessage(joined.playerId, {
-        type: 'SCENARIO_ENTER',
-        intentId: 'enter-pyramid-front',
-        actorId: serverActor.id,
-        dungeonId: 'pyramid_front',
-    }, 1_000);
+    for (const { scenario, sequence } of scenariosWithEnemyDefeatEvents) {
+        assert.ok(sequence?.enemyDefeatEvents, `episode ${scenario.episode} enemy defeat events`);
+        for (const enemyDefeatEvent of sequence.enemyDefeatEvents) {
+            assert.equal(
+                Number.isInteger(enemyDefeatEvent.scenarioEnemyIndex),
+                true,
+                `episode ${scenario.episode} ${enemyDefeatEvent.id} declares server scenario enemy index`
+            );
 
-    const state = internals.scenarioStates.get(joined.playerId);
-    assert.ok(state);
-    assert.equal(state.enemyIds.length, 18);
-    const guard = internals.enemies.get(state.enemyIds[16]);
-    assert.ok(guard);
-    guard.enemy.stats.hp = 1;
-    guard.enemy.stats.def = 0;
-    guard.enemy.stats.spd = 0;
-    serverActor.actionGauge = 100;
-    serverActor.remainingAp = 80;
-    serverActor.tile = { x: guard.enemy.gridX - 1, y: guard.enemy.gridY };
+            const session = new WorldSession();
+            const completedQuestIds = STORY_SCENARIOS
+                .filter((entry) => entry.episode < scenario.episode)
+                .map((entry) => entry.questId);
+            const joined = session.join({
+                ...joinMessage('central_castle', `hero-${scenario.episode}-${enemyDefeatEvent.id}`),
+                completedQuestIds,
+                partyComposition: [actor(`hero-${scenario.episode}-${enemyDefeatEvent.id}`, {
+                    stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+                })],
+            }, scenario.episode);
+            const internals = session as any;
+            const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+            const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+            assert.ok(serverActor, `episode ${scenario.episode} actor`);
+            assert.ok(dungeon, `episode ${scenario.episode} dungeon`);
+            serverActor.tile = world.getDungeonEntranceTile(dungeon);
 
-    const result = withFixedRandom(0, () => session.handleMessage(joined.playerId, {
-        type: 'PLAYER_INTENT',
-        intentId: 'kill-pyramid-front-late-guard',
-        actorId: serverActor.id,
-        kind: 'attack',
-        payload: { targetId: guard.enemy.id },
-    }, 1_100));
+            const enter = session.handleMessage(joined.playerId, {
+                type: 'SCENARIO_ENTER',
+                intentId: `enter-${scenario.episode}-${enemyDefeatEvent.id}`,
+                actorId: serverActor.id,
+                dungeonId: scenario.dungeonId,
+            }, 1_000 + scenario.episode);
+            assert.equal(enter.replies.length, 0, `episode ${scenario.episode} enter`);
 
-    const deathEvent = result.replies.find((message) => message.type === 'SCENARIO_ENEMY_DEFEAT_EVENT');
-    assert.equal(deathEvent?.type, 'SCENARIO_ENEMY_DEFEAT_EVENT');
-    assert.equal(deathEvent.dungeonId, 'pyramid_front');
-    assert.equal(deathEvent.enemyId, guard.enemy.id);
-    assert.equal(deathEvent.eventId, 'pyramid_front_enemy_defeat_730');
-    assert.deepEqual(deathEvent.presentationSteps.map((step) => step.kind === 'dialogue' ? step.textKey : ''), [
-        'story.event.ep12.enemyDefeat.730',
-    ]);
-    assert.deepEqual(deathEvent.presentationSteps[0]?.kind === 'dialogue' ? deathEvent.presentationSteps[0].focus : null, {
-        x: guard.enemy.gridX,
-        y: guard.enemy.gridY,
-    });
+            const state = internals.scenarioStates.get(joined.playerId);
+            assert.ok(state, `episode ${scenario.episode} state`);
+            const targetEnemyId = state.enemyIds[enemyDefeatEvent.scenarioEnemyIndex as number];
+            const target = internals.enemies.get(targetEnemyId);
+            assert.ok(target, `episode ${scenario.episode} ${enemyDefeatEvent.id} target`);
+            assert.equal(target.scenarioObjective, false, `episode ${scenario.episode} ${enemyDefeatEvent.id} target is not objective`);
+
+            target.enemy.stats.hp = 1;
+            target.enemy.stats.def = 0;
+            target.enemy.stats.spd = 0;
+            serverActor.actionGauge = 100;
+            serverActor.remainingAp = 80;
+            serverActor.tile = { x: target.enemy.gridX - 1, y: target.enemy.gridY };
+
+            const result = withFixedRandom(0, () => session.handleMessage(joined.playerId, {
+                type: 'PLAYER_INTENT',
+                intentId: `kill-${scenario.episode}-${enemyDefeatEvent.id}`,
+                actorId: serverActor.id,
+                kind: 'attack',
+                payload: { targetId: target.enemy.id },
+            }, 2_000 + scenario.episode));
+
+            const deathEvent = result.replies.find((message) => message.type === 'SCENARIO_ENEMY_DEFEAT_EVENT');
+            assert.equal(deathEvent?.type, 'SCENARIO_ENEMY_DEFEAT_EVENT', `episode ${scenario.episode} ${enemyDefeatEvent.id} event type`);
+            assert.equal(deathEvent.dungeonId, scenario.dungeonId, `episode ${scenario.episode} ${enemyDefeatEvent.id} dungeon`);
+            assert.equal(deathEvent.enemyId, target.enemy.id, `episode ${scenario.episode} ${enemyDefeatEvent.id} enemy id`);
+            assert.equal(deathEvent.eventId, enemyDefeatEvent.id, `episode ${scenario.episode} ${enemyDefeatEvent.id} event id`);
+            assert.equal(
+                getStoryScenarioPresentationDurationMs(deathEvent.presentationSteps),
+                getStoryScenarioPresentationDurationMs(enemyDefeatEvent.steps),
+                `episode ${scenario.episode} ${enemyDefeatEvent.id} presentation duration`
+            );
+            assert.deepEqual(
+                deathEvent.presentationSteps.map((step) => step.kind),
+                enemyDefeatEvent.steps.map((step) => step.kind),
+                `episode ${scenario.episode} ${enemyDefeatEvent.id} presentation kinds`
+            );
+            for (const step of deathEvent.presentationSteps) {
+                const focus = step.kind === 'focus' ? step.target : step.focus;
+                assert.deepEqual(
+                    focus,
+                    { x: target.enemy.gridX, y: target.enemy.gridY },
+                    `episode ${scenario.episode} ${enemyDefeatEvent.id} step focus`
+                );
+            }
+        }
+    }
 });
 
 test('shared field scenario event flags are included for late join snapshots', () => {

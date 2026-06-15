@@ -1166,6 +1166,18 @@ function verifyStoryCompletionContract(
         }
     }
 
+    for (const event of sequence.enemyDefeatEvents ?? []) {
+        if (!Number.isInteger(event.scenarioEnemyIndex)) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} enemy defeat event ${event.id} is missing server scenarioEnemyIndex`);
+        }
+        if ((event.scenarioEnemyIndex as number) < 0 || (event.scenarioEnemyIndex as number) >= scenario.guardCount) {
+            throw new Error(
+                `Episode ${episode} ${scenario.dungeonId} enemy defeat event ${event.id} scenarioEnemyIndex ` +
+                `${event.scenarioEnemyIndex} is outside guard count ${scenario.guardCount}`
+            );
+        }
+    }
+
     if (episode >= 23 && episode <= 31) {
         const expectedFlag = `${scenario.dungeonId}_objective_complete`;
         if (sequence.objectiveRuntimeFlag !== expectedFlag) {
