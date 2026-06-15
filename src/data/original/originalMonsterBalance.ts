@@ -49,12 +49,17 @@ const MONSTER_SOFTENING = {
     evasion: 0.75,
 } as const;
 
+const ORIGINAL_MONSTER_BALANCE_ALIASES: Record<string, string> = {
+    burgos_wolf_boss: '701R',
+    zamora_fenris_boss: '702R',
+};
+
 export function getNormalizedMonsterBalance(
     monsterId: string | number | undefined,
     level: number
 ): NormalizedMonsterBalance {
     const safeLevel = normalizeLevel(level);
-    const original = getOriginalMonsterRow(monsterId);
+    const original = getOriginalMonsterRow(resolveOriginalMonsterBalanceId(monsterId));
     if (!original) {
         return {
             source: 'fallback',
@@ -164,6 +169,11 @@ function softenCombatStat(value: number, multiplier: number): number {
 function pairedRaw(lo: number | null, hi: number | null): number | null {
     if (lo !== null && hi !== null) return (lo + hi) / 2;
     return lo ?? hi;
+}
+
+function resolveOriginalMonsterBalanceId(monsterId: string | number | undefined): string | number | undefined {
+    if (typeof monsterId !== 'string') return monsterId;
+    return ORIGINAL_MONSTER_BALANCE_ALIASES[monsterId] ?? monsterId;
 }
 
 function normalizeLevel(level: number): number {

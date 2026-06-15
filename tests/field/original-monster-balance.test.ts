@@ -7,6 +7,8 @@ import {
     createMonsterBalanceReport,
     getNormalizedMonsterBalance,
 } from '../../src/data/original/originalMonsterBalance';
+import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { getStoryScenarioMonsterLayout } from '../../src/data/StoryScenarioMonsterData';
 import { TileType } from '../../src/map/Tile';
 
 class ImageStub {
@@ -66,6 +68,36 @@ test('normalization falls back for catalog monsters without original rows', () =
     assert.ok(fallback.maxHp < 400);
     assert.ok(fallback.atk < 125);
     assert.ok(fallback.def < 90);
+});
+
+test('custom early story bosses use their original special boss rows', () => {
+    const burgos = getNormalizedMonsterBalance('burgos_wolf_boss', 3);
+    const fenris = getNormalizedMonsterBalance('zamora_fenris_boss', 4);
+
+    assert.equal(burgos.source, 'original');
+    assert.equal(burgos.original?.id, 701);
+    assert.equal(burgos.original?.label, '키스라');
+    assert.notDeepEqual(burgos.stats, createFallbackMonsterStats(3));
+
+    assert.equal(fenris.source, 'original');
+    assert.equal(fenris.original?.id, 702);
+    assert.equal(fenris.original?.label, '펜리스');
+    assert.notDeepEqual(fenris.stats, createFallbackMonsterStats(4));
+});
+
+test('late story scenario monsters use original balance rows through episode 31', () => {
+    for (const scenario of STORY_SCENARIOS.filter((entry) => entry.episode >= 23 && entry.episode <= 31)) {
+        const layout = getStoryScenarioMonsterLayout(scenario);
+        const ids = [layout.bossMonsterId, ...layout.guardMonsterIds];
+        for (const id of ids) {
+            if (!id) continue;
+            assert.equal(
+                getNormalizedMonsterBalance(id, scenario.bossLevel).source,
+                'original',
+                `${scenario.dungeonId}:${id}`
+            );
+        }
+    }
 });
 
 test('monster balance report exposes raw and normalized values side by side', () => {
