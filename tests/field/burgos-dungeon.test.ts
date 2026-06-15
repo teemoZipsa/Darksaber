@@ -2336,3 +2336,39 @@ test('Airship objective completion keeps variant monsters as optional encounters
     assert.equal(harness.turnStateCleared, true);
     assert.ok(harness.logs.includes('비공정 목표 달성. 다른 마을로 생환하면 17화가 완료됩니다.'));
 });
+
+test('local Ament SCENECLEAR inspect events complete the scenario objective', () => {
+    for (const episode of [18, 19]) {
+        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
+        assert.ok(scenario, `episode ${episode} scenario`);
+        const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+        assert.ok(sequence, `episode ${episode} sequence`);
+        const clearEvent = sequence.fieldEvents.find((event) => event.completesObjective);
+        assert.ok(clearEvent, `episode ${episode} clear event`);
+        assert.match(clearEvent.trigger, /SCENECLEAR/, `episode ${episode} original clear trigger`);
+
+        const raidSession = new WorldRaidSession('central_castle');
+        raidSession.beginRaidFromTown('central_castle');
+        const player = new Player(0, 0);
+        const harness = createStoryScenarioHarness({ player, raidSession });
+        const previousWorldMap = harness.worldMap;
+        const dungeon = previousWorldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+        const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+        assert.ok(dungeon, `episode ${episode} dungeon`);
+        assert.ok(quest, `episode ${episode} quest`);
+
+        harness.controller.startLocalStoryScenarioDungeon(dungeon, quest);
+        drainStoryPresentation(harness.controller);
+
+        const [tile] = clearEvent.triggerTiles;
+        assert.ok(tile, `episode ${episode} clear tile`);
+        player.setGridPosition(tile.x, tile.y, true);
+        assert.equal(harness.controller.playFieldEventAt(tile, { id: 'hero', entity: player } as any), true, `episode ${episode} play clear event`);
+        assert.equal(harness.controller.getLastPresentationDurationMs(), getStoryScenarioPresentationDurationMs(clearEvent.steps), `episode ${episode} duration`);
+        assert.equal(raidSession.isDungeonCleared(scenario.dungeonId), true, `episode ${episode} cleared`);
+        assert.equal(raidSession.activeDungeonId, null, `episode ${episode} active cleared`);
+        assert.equal(raidSession.hasScenarioFlag(scenario.dungeonId, sequence.objectiveRuntimeFlag ?? ''), true, `episode ${episode} objective flag`);
+        drainStoryPresentation(harness.controller);
+        assert.ok(harness.logs.includes(t(quest.objectiveCompleteLogKey)), `episode ${episode} objective log`);
+    }
+});

@@ -1640,6 +1640,80 @@ test('server-authoritative field scenario events complete per player without tru
     assert.equal(finalPatch.questState.gold, 600);
 });
 
+test('server-authoritative SCENECLEAR field events complete scenario objectives', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const scenario = STORY_SCENARIOS.find((entry) => entry.episode === 18);
+    assert.ok(scenario);
+    const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+    const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'ament_gate_true_door');
+    assert.ok(sequence);
+    assert.ok(event);
+    assert.equal(event.completesObjective, true);
+    assert.match(event.trigger, /SCENECLEAR/);
+    const completedQuestIds = STORY_SCENARIOS
+        .filter((entry) => entry.episode < scenario.episode)
+        .map((entry) => entry.questId);
+    const character = authCharacter('scenario-clear-field');
+    const save = createDefaultCharacterSave(character);
+    save.questState = { ...save.questState, completedQuestIds };
+    const joined = session.join({
+        ...joinMessage('central_castle', character.id),
+        completedQuestIds,
+    }, 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        completedQuestIds,
+        saveSnapshot: save,
+    });
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+    assert.ok(serverActor);
+    assert.ok(dungeon);
+    serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+    session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-ament-gate',
+        actorId: serverActor.id,
+        dungeonId: scenario.dungeonId,
+    }, 1_000);
+
+    const [tile] = event.triggerTiles;
+    assert.ok(tile);
+    serverActor.tile = { x: tile.x, y: tile.y + 1 };
+    const result = session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'ament-gate-clear',
+        actorId: serverActor.id,
+        dungeonId: scenario.dungeonId,
+        eventId: event.id,
+    }, 1_100);
+
+    const fieldResult = result.replies.find((message) => message.type === 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.equal(fieldResult?.type, 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.equal(fieldResult.flag, getStoryScenarioFieldEventFlag(event));
+    const serverPlayer = internals.players.get(joined.playerId);
+    assert.ok(serverPlayer);
+    assert.equal(serverPlayer.activeDungeonId, null);
+    assert.equal(serverPlayer.completedDungeonIds.has(scenario.dungeonId), true);
+    assert.equal(serverPlayer.completedQuestIds.has(scenario.questId), true);
+    const snapshot = session.createSnapshot(joined.playerId, 1_200);
+    assert.equal(snapshot.scenario.activeDungeonId, null);
+    assert.ok(snapshot.scenario.completedDungeonIds.includes(scenario.dungeonId));
+
+    const extractionTown = world.getTowns().find((town) => town.id === 'w_forest_village');
+    assert.ok(extractionTown);
+    serverActor.tile = world.getTownSpawnTile(extractionTown);
+    const leave = session.handleMessage(joined.playerId, { type: 'WORLD_LEAVE', reason: 'town' }, 1_300);
+    assert.equal(leave.replies[0]?.type, 'RAID_RESULT');
+    assert.equal(leave.replies[0]?.type === 'RAID_RESULT' ? leave.replies[0].result : '', 'SURVIVED');
+    const finalPatch = session.createCharacterSavePatch(joined.playerId);
+    assert.ok(finalPatch?.questState);
+    assert.deepEqual(finalPatch.questState.completedQuestIds, [...completedQuestIds, scenario.questId]);
+});
+
 test('server-authoritative field scenario gold rewards are lost on failed raids', () => {
     const session = new WorldSession();
     const world = new WorldMap();

@@ -1078,7 +1078,7 @@ test('Ament Gate exposes original episode 18 Amphit, trap, cache, and true-door 
         itemId: 'orig_story_0577_zambia6',
         originalItemId: 577,
     });
-    assert.ok(ament.fieldEvents.some((event) => event.originalEventId === 'EVENT 99' && event.runtimeFlag === 'ament_gate_route_opened'));
+    assert.ok(ament.fieldEvents.some((event) => event.originalEventId === 'EVENT 99' && event.runtimeFlag === 'ament_gate_route_opened' && event.completesObjective));
     assert.ok(ament.fieldEvents.every((event) => event.originalSource === 'MAP/18set.arc:18.evt'));
     assert.ok(ament.fieldEvents.every((event) => event.triggerTiles.every((tile) => map.isWalkable(tile.x, tile.y))));
     assert.equal(ament.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
@@ -1109,6 +1109,7 @@ test('Ament 1F exposes original episode 19 Uraeus, ice trap, cache, and shard fl
         { type: 'item', itemId: 'orig_story_0578_zambia7', originalItemId: 578 },
     ]);
     assert.deepEqual(ament.fieldEvents.slice(8).map((event) => event.originalEventId), ['EVENT 99', 'EVENT 95', 'EVENT 97', 'EVENT 96']);
+    assert.ok(ament.fieldEvents.slice(8).every((event) => event.completesObjective));
     assert.deepEqual(ament.fieldEvents.slice(8).map((event) => event.rewards?.[0]), [
         { type: 'item', itemId: 'orig_ep19_shard_0386', originalItemId: 386 },
         { type: 'item', itemId: 'orig_ep19_shard_0387', originalItemId: 387 },

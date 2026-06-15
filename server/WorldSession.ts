@@ -1054,6 +1054,7 @@ export class WorldSession {
 
         this.markScenarioFieldEventFlagComplete(player!, dungeonId, flag, scope);
         const rewards = this.applyScenarioFieldEventRewards(player!, event);
+        if (event.completesObjective) this.completeScenarioObjective(player!, dungeonId, { clearEnemies: false });
         const result: ScenarioFieldEventResultMessage = {
             type: 'SCENARIO_FIELD_EVENT_RESULT',
             intentId: message.intentId,
