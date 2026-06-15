@@ -80,6 +80,7 @@
 
 1. 각 실내맵의 목표 HUD와 입장/복귀/전리품 로그가 자연스럽게 보이는지 실제 플레이로 확인한다.
    - 완료: 자동 테스트에서 1~31화 실내 시나리오 전체(1, 2, 3, 7, 13, 18~31화)가 전용 목표 HUD 키, 현지화된 목표 문구, 실내 제목, 남은 적 수 모델을 노출하는지 검증한다.
+   - 완료: 자동 테스트에서 1~31화 실내 시나리오 전체가 로컬 진입 시 공통 실내 진입 로그와 퀘스트 진입 로그를 남기고, 보스 목표 달성 뒤 원래 월드로 복귀하며 복귀 로그와 목표 완료 로그를 남기는지 검증한다.
    - 완료: Chrome headless에서 `/?devStart=raid&devScenario=story31`로 바로 진입해 `StoryInteriorMap`, `demon_fixers_den`, DEV 상태 `story31 / interior-ready`, 보스 1명(마계 해결사 `{22,11}`), 경비 보스 오인 0개, 입장 로그를 확인했다.
    - 완료: 같은 DEV 직접 진입 경로를 `story23`~`story31`로 확장했다. `npm run dev:raid:story23`~`npm run dev:raid:story31`로 후반 실내 전체를 개별 점검할 수 있고, URL의 `devScenario=storyNN` 형식도 유지한다. 자동 테스트는 23~31화 각각이 로컬 실내 던전으로 시작되고 DEV 상태가 `storyNN / interior-ready`로 표시되는지 검증한다.
 2. 23~31화 GETITEM 보상은 `src/data/content/original-late-story-items.json`에 원작 아이템 ID, 출처 이벤트, 원작 이름/스탯을 원장화했고 `orig_late_####` 아이템 정의로 지급한다. 원장은 `scripts/generate-late-story-item-defs.mjs`로 원작 `itemtbl.atr`에서 재생성할 수 있다.

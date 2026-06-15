@@ -1730,6 +1730,54 @@ test('network late story cache snapshots hide already completed interior markers
     }
 });
 
+test('local story interiors emit entry return and objective logs through episode 31', () => {
+    for (const scenario of STORY_SCENARIOS.filter((entry) => entry.missionKind === 'soloInterior')) {
+        const layout = getStoryInteriorLayout(scenario.dungeonId);
+        const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+        assert.ok(layout, `missing layout for episode ${scenario.episode}`);
+        assert.ok(quest, `missing quest for episode ${scenario.episode}`);
+
+        const player = new Player(0, 0);
+        const raidSession = new WorldRaidSession('central_castle');
+        raidSession.beginRaidFromTown('central_castle');
+        const harness = createStoryScenarioHarness({ player, raidSession });
+        const previousWorldMap = harness.worldMap;
+        const dungeon = harness.worldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+        assert.ok(dungeon, `missing dungeon for episode ${scenario.episode}`);
+
+        harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+        drainStoryPresentation(harness.controller);
+
+        assert.ok(
+            harness.logs.includes(formatT('story.interior.enterLog', { dungeon: dungeon.nameKr })),
+            `episode ${scenario.episode} interior enter log`
+        );
+        assert.ok(harness.logs.includes(t(quest.enterLogKey)), `episode ${scenario.episode} quest enter log`);
+
+        const boss = new Enemy(
+            `story_${scenario.dungeonId}_boss`,
+            layout.bossTile.x,
+            layout.bossTile.y,
+            scenario.bossName ?? `episode ${scenario.episode} boss`,
+            scenario.bossLevel,
+            scenario.bossColor,
+            'boss'
+        );
+        boss.isBoss = true;
+        harness.controller.completeDungeonIfBossDefeated(boss);
+        drainStoryPresentation(harness.controller);
+
+        assert.equal(raidSession.isDungeonCleared(scenario.dungeonId), true, `episode ${scenario.episode} cleared`);
+        assert.equal(harness.controller.getActiveInterior(), null, `episode ${scenario.episode} interior cleared`);
+        assert.equal(harness.worldMap, previousWorldMap, `episode ${scenario.episode} restored previous world`);
+        assert.ok(
+            harness.logs.includes(formatT('story.interior.returnLog', { dungeon: scenario.dungeonNameKr })),
+            `episode ${scenario.episode} return log`
+        );
+        assert.ok(harness.logs.includes(t(quest.objectiveCompleteLogKey)), `episode ${scenario.episode} objective complete log`);
+    }
+});
+
 test('late story presentation steps focus the camera on original event tiles', () => {
     const player = new Player(0, 0);
     const raidSession = new WorldRaidSession('central_castle');
