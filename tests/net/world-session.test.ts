@@ -1456,6 +1456,96 @@ test('server scenario entry starts every implemented episode through 31', () => 
     }
 });
 
+test('server story objectives through episode 31 persist only after valid survival', () => {
+    const world = new WorldMap();
+    const extractionTown = world.getTowns().find((town) => town.id === 'w_forest_village');
+    assert.ok(extractionTown);
+
+    for (const scenario of STORY_SCENARIOS) {
+        const session = new WorldSession();
+        const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+        const completedQuestIds = STORY_SCENARIOS
+            .filter((entry) => entry.episode < scenario.episode)
+            .map((entry) => entry.questId);
+        const character = authCharacter(`survive-episode-${scenario.episode}`);
+        const save = createDefaultCharacterSave(character);
+        save.questState = { ...save.questState, completedQuestIds };
+        const joined = session.join({
+            ...joinMessage('central_castle', character.id),
+            completedQuestIds,
+            partyComposition: [actor(character.id, {
+                stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+            })],
+        }, scenario.episode, {
+            accountId: character.accountId,
+            characterId: character.id,
+            completedQuestIds,
+            saveSnapshot: save,
+        });
+        const internals = session as any;
+        const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+        assert.ok(dungeon, `episode ${scenario.episode} dungeon`);
+        assert.ok(serverActor, `episode ${scenario.episode} actor`);
+        serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+        const enter = session.handleMessage(joined.playerId, {
+            type: 'SCENARIO_ENTER',
+            intentId: `enter-survive-episode-${scenario.episode}`,
+            actorId: serverActor.id,
+            dungeonId: scenario.dungeonId,
+        }, 1_000 + scenario.episode);
+        assert.equal(enter.replies.length, 0, `episode ${scenario.episode} enter`);
+
+        if (scenario.bossName) {
+            const bossEntry = [...internals.enemies.values()].find((entry: any) => entry.scenarioObjective);
+            assert.ok(bossEntry, `episode ${scenario.episode} boss`);
+            serverActor.actionGauge = 100;
+            serverActor.remainingAp = 80;
+            serverActor.tile = { x: bossEntry.enemy.gridX - 1, y: bossEntry.enemy.gridY };
+            bossEntry.enemy.stats.hp = 1;
+            bossEntry.enemy.stats.def = 0;
+            bossEntry.enemy.stats.spd = 0;
+
+            const attack = withFixedRandom(0, () => session.handleMessage(joined.playerId, {
+                type: 'PLAYER_INTENT',
+                intentId: `kill-survive-episode-${scenario.episode}`,
+                actorId: serverActor.id,
+                kind: 'attack',
+                payload: { targetId: bossEntry.enemy.id },
+            }, 2_000 + scenario.episode));
+            const kill = attack.broadcasts.find((message) => message.type === 'COMBAT_EVENT');
+            assert.equal(kill?.type, 'COMBAT_EVENT', `episode ${scenario.episode} kill event type`);
+            assert.equal(kill?.kind, 'kill', `episode ${scenario.episode} kill event`);
+        }
+
+        const serverPlayer = internals.players.get(joined.playerId);
+        assert.ok(serverPlayer, `episode ${scenario.episode} server player`);
+        assert.equal(serverPlayer.completedDungeonIds.has(scenario.dungeonId), true, `episode ${scenario.episode} completed dungeon`);
+        assert.equal(serverPlayer.completedQuestIds.has(scenario.questId), true, `episode ${scenario.episode} in-raid quest complete`);
+
+        const dirtyPatch = session.createCharacterSavePatch(joined.playerId);
+        assert.ok(dirtyPatch?.questState, `episode ${scenario.episode} dirty quest patch`);
+        assert.deepEqual(
+            dirtyPatch.questState.completedQuestIds,
+            completedQuestIds,
+            `episode ${scenario.episode} dirty patch excludes raid quest completion`
+        );
+
+        serverActor.tile = world.getTownSpawnTile(extractionTown);
+        const leave = session.handleMessage(joined.playerId, { type: 'WORLD_LEAVE', reason: 'town' }, 3_000 + scenario.episode);
+        assert.equal(leave.replies[0]?.type, 'RAID_RESULT', `episode ${scenario.episode} raid result`);
+        assert.equal(leave.replies[0]?.type === 'RAID_RESULT' ? leave.replies[0].result : '', 'SURVIVED', `episode ${scenario.episode} survived result`);
+
+        const finalPatch = session.createCharacterSavePatch(joined.playerId);
+        assert.ok(finalPatch?.questState, `episode ${scenario.episode} final quest patch`);
+        assert.deepEqual(
+            finalPatch.questState.completedQuestIds,
+            [...completedQuestIds, scenario.questId],
+            `episode ${scenario.episode} survived final patch includes raid quest completion`
+        );
+    }
+});
+
 test('server-authoritative field scenario events complete per player without trusting reward payloads', () => {
     const session = new WorldSession();
     const world = new WorldMap();
