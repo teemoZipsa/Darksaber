@@ -30,6 +30,7 @@ import {
     getStoryScenarioFieldEventFlag,
     getStoryScenarioFieldEventScope,
     getStoryScenarioFieldEventTiles,
+    projectStoryScenarioFieldTileToWorld,
 } from '../../src/data/StoryScenarioFieldEventPlacement';
 import {
     getOriginalLateStoryBossTile,
@@ -2124,7 +2125,24 @@ test('local field story scenarios start projected world objectives through episo
 
         const boss = harness.fieldEnemies.find((entry) => entry.enemy.isBoss)?.enemy;
         assert.ok(boss, `episode ${scenario.episode} boss`);
+        const focusCountBeforeCompletion = harness.cameraFocusTiles.length;
         harness.controller.completeDungeonIfBossDefeated(boss);
+
+        const expectedCompletionFocus = getPresentationStepFocus(sequence.bossDefeat[0]);
+        assert.equal(
+            harness.controller.getLastPresentationDurationMs(),
+            getStoryScenarioPresentationDurationMs(sequence.bossDefeat),
+            `episode ${scenario.episode} boss defeat presentation duration`
+        );
+        assert.equal(harness.controller.isPresentationActive(), true, `episode ${scenario.episode} boss defeat presentation active`);
+        assert.ok(harness.cameraFocusTiles.length > focusCountBeforeCompletion, `episode ${scenario.episode} boss defeat focus`);
+        if (expectedCompletionFocus) {
+            assert.deepEqual(
+                harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1],
+                projectStoryScenarioFieldTileToWorld(scenario.dungeonId, previousWorldMap, expectedCompletionFocus),
+                `episode ${scenario.episode} boss defeat projected focus`
+            );
+        }
         drainStoryPresentation(harness.controller);
 
         assert.equal(raidSession.activeDungeonId, null, `episode ${scenario.episode} active cleared`);
