@@ -4,7 +4,12 @@ import { readFileSync } from 'node:fs';
 import type { GameManager } from '../../src/engine/GameManager';
 import { WorldEngine } from '../../src/engine/WorldEngine';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
-import { applyDevRaidScenario, DEV_LATE_STORY_EPISODES, parseDevRaidScenario } from '../../src/dev/DevRaidScenarios';
+import {
+    applyDevRaidScenario,
+    DEV_LATE_STORY_EPISODES,
+    DEV_STORY_INTERIOR_EPISODES,
+    parseDevRaidScenario,
+} from '../../src/dev/DevRaidScenarios';
 
 type MockDevStatusElement = {
     className: string;
@@ -102,7 +107,7 @@ function createManagerHarness() {
             loot: [] as Array<{ id: string; inventory: unknown }>,
             isWalkable: () => true,
             getDungeons: () => STORY_SCENARIOS
-                .filter((scenario) => scenario.episode >= 23 && scenario.episode <= 31)
+                .filter((scenario) => DEV_STORY_INTERIOR_EPISODES.includes(scenario.episode as typeof DEV_STORY_INTERIOR_EPISODES[number]))
                 .map((scenario) => ({
                     id: scenario.dungeonId,
                     nameKr: scenario.dungeonNameKr,
@@ -143,21 +148,23 @@ function createManagerHarness() {
     return { actor, inventory, logs, manager: manager as unknown as GameManager, selected, world };
 }
 
-test('dev raid scenario parser accepts late story interiors 23 through 31 only', () => {
+test('dev raid scenario parser accepts implemented story interiors through episode 31 only', () => {
+    assert.deepEqual([...DEV_STORY_INTERIOR_EPISODES], [1, 2, 3, 7, 13, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]);
     assert.deepEqual([...DEV_LATE_STORY_EPISODES], [23, 24, 25, 26, 27, 28, 29, 30, 31]);
     assert.equal(parseDevRaidScenario('aggro'), 'aggro');
     assert.equal(parseDevRaidScenario('loot'), 'loot');
-    for (const episode of DEV_LATE_STORY_EPISODES) {
+    for (const episode of DEV_STORY_INTERIOR_EPISODES) {
         assert.equal(parseDevRaidScenario(`story${episode}`), `story${episode}`);
     }
-    assert.equal(parseDevRaidScenario('story22'), null);
+    assert.equal(parseDevRaidScenario('story4'), null);
+    assert.equal(parseDevRaidScenario('story17'), null);
     assert.equal(parseDevRaidScenario('story32'), null);
     assert.equal(parseDevRaidScenario('storyxx'), null);
 });
 
-test('package scripts expose each late story dev entry through episode 31', () => {
+test('package scripts expose each story interior dev entry through episode 31', () => {
     const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
-    for (const episode of DEV_LATE_STORY_EPISODES) {
+    for (const episode of DEV_STORY_INTERIOR_EPISODES) {
         assert.equal(
             packageJson.scripts[`dev:raid:story${episode}`],
             `node scripts/dev-town.mjs raid story${episode}`,
@@ -200,9 +207,9 @@ test('dev story31 scenario launches local Demon Fixer Den without network raid s
     assert.equal(logs.length, 1);
 });
 
-test('dev late story scenarios launch local interiors through episode 31', () => {
+test('dev story interior scenarios launch local interiors through episode 31', () => {
     withMockDocument((getStatus) => {
-        for (const episode of DEV_LATE_STORY_EPISODES) {
+        for (const episode of DEV_STORY_INTERIOR_EPISODES) {
             const { logs, manager, world } = createManagerHarness();
             const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
             const scenarioId = parseDevRaidScenario(`story${episode}`);

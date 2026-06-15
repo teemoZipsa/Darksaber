@@ -6,19 +6,20 @@ import { LootObject } from '../entity/LootObject';
 import type { GameManager } from '../engine/GameManager';
 import { formatT, t } from '../i18n/LanguageManager';
 
+export const DEV_STORY_INTERIOR_EPISODES = [1, 2, 3, 7, 13, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31] as const;
 export const DEV_LATE_STORY_EPISODES = [23, 24, 25, 26, 27, 28, 29, 30, 31] as const;
-type DevLateStoryEpisode = typeof DEV_LATE_STORY_EPISODES[number];
-type DevLateStoryScenario = `story${DevLateStoryEpisode}`;
+type DevStoryInteriorEpisode = typeof DEV_STORY_INTERIOR_EPISODES[number];
+type DevStoryInteriorScenario = `story${DevStoryInteriorEpisode}`;
 
-export type DevRaidScenario = 'aggro' | 'loot' | DevLateStoryScenario;
+export type DevRaidScenario = 'aggro' | 'loot' | DevStoryInteriorScenario;
 
 export function parseDevRaidScenario(value: string | null): DevRaidScenario | null {
     if (value === 'aggro' || value === 'loot') return value;
     const match = value?.match(/^story(\d+)$/);
     if (!match) return null;
     const episode = Number(match[1]);
-    return DEV_LATE_STORY_EPISODES.includes(episode as DevLateStoryEpisode)
-        ? `story${episode as DevLateStoryEpisode}`
+    return DEV_STORY_INTERIOR_EPISODES.includes(episode as DevStoryInteriorEpisode)
+        ? `story${episode as DevStoryInteriorEpisode}`
         : null;
 }
 
@@ -169,7 +170,7 @@ function applyDevLootScenario(manager: GameManager, world: DevWorldEngine, actor
     setDevScenarioStatus('loot', 'loot-open');
 }
 
-function applyDevStoryScenario(world: DevWorldEngine, scenarioId: DevLateStoryScenario): void {
+function applyDevStoryScenario(world: DevWorldEngine, scenarioId: DevStoryInteriorScenario): void {
     deactivateDevNetworkRaid(world);
     const episode = Number(scenarioId.replace('story', ''));
     const scenario = STORY_SCENARIOS.find((candidate) => candidate.episode === episode);

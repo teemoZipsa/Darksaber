@@ -11,7 +11,7 @@ import { mountUiOverlay } from './ui/react/mountOverlay';
 import { mountAuthGate } from './ui/react/auth/mountAuthGate';
 import { AuthApiError, AuthClient, type AuthSessionResponse } from './net/AuthClient';
 import { formatT, t } from './i18n/LanguageManager';
-import { applyDevRaidScenario, DEV_LATE_STORY_EPISODES, parseDevRaidScenario, type DevRaidScenario } from './dev/DevRaidScenarios';
+import { applyDevRaidScenario, DEV_STORY_INTERIOR_EPISODES, parseDevRaidScenario, type DevRaidScenario } from './dev/DevRaidScenarios';
 
 type DevStartMode = 'town' | 'raid' | 'tutorial';
 
@@ -152,7 +152,7 @@ function mountDevLauncher(): void {
     if (!import.meta.env.DEV) return;
     const root = document.createElement('div');
     root.className = 'dev-launcher';
-    const lateStoryLinks = DEV_LATE_STORY_EPISODES.map((episode) =>
+    const storyInteriorLinks = DEV_STORY_INTERIOR_EPISODES.map((episode) =>
         `<a href="/?devStart=raid&devScenario=story${episode}">${formatT('dev.launcher.raidStoryEpisode', { episode })}</a>`
     ).join('');
     root.innerHTML = `
@@ -161,7 +161,7 @@ function mountDevLauncher(): void {
         <a href="/?devStart=raid">${t('dev.launcher.raid')}</a>
         <a href="/?devStart=raid&devScenario=aggro">${t('dev.launcher.raidAggro')}</a>
         <a href="/?devStart=raid&devScenario=loot">${t('dev.launcher.raidLoot')}</a>
-        ${lateStoryLinks}
+        ${storyInteriorLinks}
         <a href="/?devStart=tutorial">${t('dev.launcher.tutorial')}</a>
     `;
     document.body.appendChild(root);
