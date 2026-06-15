@@ -1268,6 +1268,72 @@ test('local field scenario event presentation focuses the placed world event til
     assert.equal(raidSession.hasScenarioFlag(ARCADIA_PLAIN_DUNGEON_ID, 'arcadia_gold_chest_01'), true);
 });
 
+test('local field story inspect events complete once with projected markers through episode 16', () => {
+    for (const scenario of STORY_SCENARIOS.filter((entry) => entry.missionKind === 'field' && entry.episode <= 16)) {
+        const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+        assert.ok(sequence, `episode ${scenario.episode} sequence`);
+        if (sequence.fieldEvents.length === 0) continue;
+
+        const raidSession = new WorldRaidSession('central_castle');
+        raidSession.beginRaidFromTown('central_castle');
+        const harness = createStoryScenarioHarness({ raidSession });
+        const worldMap = harness.worldMap;
+        const dungeon = worldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+        const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+        assert.ok(dungeon, `episode ${scenario.episode} dungeon`);
+        assert.ok(quest, `episode ${scenario.episode} quest`);
+
+        harness.controller.startLocalStoryScenarioDungeon(dungeon, quest);
+        drainStoryPresentation(harness.controller);
+
+        let expectedGold = 0;
+        const expectedItemIds: string[] = [];
+        for (const event of sequence.fieldEvents) {
+            const projectedTiles = getStoryScenarioFieldEventTiles(scenario.dungeonId, event, worldMap);
+            assert.equal(projectedTiles.length, event.triggerTiles.length, `episode ${scenario.episode} ${event.id} projected tile count`);
+            for (const tile of projectedTiles) {
+                assert.equal(
+                    harness.worldMap.getInspectMarkers().some((marker) => marker.id === `${event.id}:${tile.x},${tile.y}`),
+                    true,
+                    `episode ${scenario.episode} ${event.id} marker before play`
+                );
+            }
+
+            assert.equal(harness.controller.playFieldEvent(scenario.dungeonId, event.id), true, `episode ${scenario.episode} ${event.id} play`);
+            assert.equal(
+                harness.controller.getLastPresentationDurationMs(),
+                getStoryScenarioPresentationDurationMs(event.steps),
+                `episode ${scenario.episode} ${event.id} presentation duration`
+            );
+            assert.deepEqual(
+                harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1],
+                projectedTiles[0],
+                `episode ${scenario.episode} ${event.id} projected focus`
+            );
+            drainStoryPresentation(harness.controller);
+
+            assert.equal(raidSession.hasScenarioFlag(scenario.dungeonId, getStoryScenarioFieldEventFlag(event)), true, `episode ${scenario.episode} ${event.id} flag`);
+            for (const reward of event.rewards ?? []) {
+                if (reward.type === 'gold') expectedGold += reward.amount;
+                else expectedItemIds.push(reward.itemId);
+            }
+            assert.equal(raidSession.raidGoldReward, expectedGold, `episode ${scenario.episode} ${event.id} gold rewards`);
+            assert.deepEqual(harness.rewardItemIds, expectedItemIds, `episode ${scenario.episode} ${event.id} item rewards`);
+
+            for (const tile of projectedTiles) {
+                assert.equal(
+                    harness.worldMap.getInspectMarkers().some((marker) => marker.id === `${event.id}:${tile.x},${tile.y}`),
+                    false,
+                    `episode ${scenario.episode} ${event.id} marker after play`
+                );
+            }
+            assert.equal(harness.controller.playFieldEvent(scenario.dungeonId, event.id), false, `episode ${scenario.episode} ${event.id} duplicate`);
+            assert.equal(raidSession.raidGoldReward, expectedGold, `episode ${scenario.episode} ${event.id} duplicate gold`);
+            assert.deepEqual(harness.rewardItemIds, expectedItemIds, `episode ${scenario.episode} ${event.id} duplicate item`);
+        }
+    }
+});
+
 test('episodes 5 and 6 field scenario inspect events map to current world scenario entrances', () => {
     const worldMap = new WorldMap();
     const cacaora = worldMap.getDungeons().find((entry) => entry.id === CACAORA_HIGHLAND_DUNGEON_ID);
