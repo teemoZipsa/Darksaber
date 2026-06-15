@@ -28,6 +28,7 @@ import {
 } from '../../src/data/StoryScenarioEventData';
 import {
     getStoryScenarioFieldEventFlag,
+    getStoryScenarioFieldEventScope,
     getStoryScenarioFieldEventTiles,
 } from '../../src/data/StoryScenarioFieldEventPlacement';
 import {
@@ -1007,6 +1008,74 @@ test('network outdoor story scenarios expose projected world inspect markers', (
         completedDungeonIds: [SICILIO_ISLAND_DUNGEON_ID],
     });
     assert.equal(sicilioHarness.worldMap.getInspectMarkers().some((marker) => marker.id.startsWith('sicilio_kamora_son:')), false);
+});
+
+test('network field and vehicle story scenarios expose every projected inspect marker through episode 31', () => {
+    for (const scenario of STORY_SCENARIOS.filter((entry) => entry.missionKind !== 'soloInterior')) {
+        const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+        assert.ok(sequence, `episode ${scenario.episode} sequence`);
+        if (sequence.fieldEvents.length === 0) continue;
+
+        const worldMap = new WorldMap();
+        const raidSession = new WorldRaidSession('central_castle');
+        raidSession.beginRaidFromTown('central_castle');
+        raidSession.startDungeonEncounter(scenario.dungeonId);
+        const harness = createStoryScenarioHarness({
+            raidSession,
+            worldMap,
+            isNetworkRaid: true,
+            networkClient: {
+                sendScenarioEnter: () => 'unused',
+                sendScenarioFieldEventInteract: () => 'unused-field-event',
+            },
+        });
+
+        harness.controller.applyNetworkScenarioSnapshot({
+            enteredDungeonIds: [scenario.dungeonId],
+            activeDungeonId: scenario.dungeonId,
+            completedDungeonIds: [],
+        });
+
+        const markers = new Map(harness.worldMap.getInspectMarkers().map((marker) => [marker.id, marker]));
+        const playerFlags: string[] = [];
+        const sharedFlags: string[] = [];
+
+        for (const event of sequence.fieldEvents) {
+            const eventTiles = getStoryScenarioFieldEventTiles(scenario.dungeonId, event, worldMap);
+            assert.equal(eventTiles.length, event.triggerTiles.length, `episode ${scenario.episode} ${event.id} projected tile count`);
+            for (const tile of eventTiles) {
+                const markerId = `${event.id}:${tile.x},${tile.y}`;
+                const marker = markers.get(markerId);
+                assert.ok(marker, `episode ${scenario.episode} ${markerId} marker`);
+                assert.equal(worldMap.isWalkable(marker.tile.x, marker.tile.y), true, `episode ${scenario.episode} ${markerId} walkable`);
+                assert.equal(marker.labelKey, event.markerLabelKey, `episode ${scenario.episode} ${markerId} label`);
+                assert.equal(marker.kind, event.markerKind, `episode ${scenario.episode} ${markerId} kind`);
+            }
+
+            const flag = getStoryScenarioFieldEventFlag(event);
+            if (getStoryScenarioFieldEventScope(event) === 'shared') sharedFlags.push(flag);
+            else playerFlags.push(flag);
+        }
+
+        harness.controller.applyNetworkScenarioSnapshot({
+            enteredDungeonIds: [scenario.dungeonId],
+            activeDungeonId: scenario.dungeonId,
+            completedDungeonIds: [],
+            playerFieldEventFlagsByDungeonId: playerFlags.length > 0 ? { [scenario.dungeonId]: playerFlags } : undefined,
+            sharedFieldEventFlagsByDungeonId: sharedFlags.length > 0 ? { [scenario.dungeonId]: sharedFlags } : undefined,
+        });
+        const hiddenMarkers = harness.worldMap.getInspectMarkers();
+        for (const event of sequence.fieldEvents) {
+            for (const tile of getStoryScenarioFieldEventTiles(scenario.dungeonId, event, worldMap)) {
+                const markerId = `${event.id}:${tile.x},${tile.y}`;
+                assert.equal(
+                    hiddenMarkers.some((marker) => marker.id === markerId),
+                    false,
+                    `episode ${scenario.episode} ${markerId} hidden after completion snapshot`
+                );
+            }
+        }
+    }
 });
 
 test('network field scenario events expose world inspect tiles and one-shot rewards', () => {
