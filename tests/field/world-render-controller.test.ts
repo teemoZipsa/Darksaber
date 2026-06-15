@@ -66,25 +66,23 @@ function buildStoryInteriorRenderModel(dungeonId: string): WorldRenderModel {
     return (controller as unknown as { buildRenderModel: () => WorldRenderModel }).buildRenderModel();
 }
 
-test('late story interiors expose dedicated objective HUD models through episode 31', () => {
-    for (let episode = 23; episode <= 31; episode++) {
-        const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
-        assert.ok(scenario, `missing episode ${episode}`);
+test('story interiors expose dedicated objective HUD models through episode 31', () => {
+    for (const scenario of STORY_SCENARIOS.filter((entry) => entry.missionKind === 'soloInterior')) {
         const layout = getStoryInteriorLayout(scenario.dungeonId);
-        assert.ok(layout, `missing layout ${episode}`);
+        assert.ok(layout, `missing layout ${scenario.episode}`);
 
         const model = buildStoryInteriorRenderModel(scenario.dungeonId);
 
-        assert.equal(model.storyInterior.active, true, `episode ${episode} active`);
-        assert.equal(model.storyInterior.dungeonId, scenario.dungeonId, `episode ${episode} dungeon`);
-        assert.equal(model.storyInterior.objectiveKey, layout.objectiveKey, `episode ${episode} objective key`);
+        assert.equal(model.storyInterior.active, true, `episode ${scenario.episode} active`);
+        assert.equal(model.storyInterior.dungeonId, scenario.dungeonId, `episode ${scenario.episode} dungeon`);
+        assert.equal(model.storyInterior.objectiveKey, layout.objectiveKey, `episode ${scenario.episode} objective key`);
         assert.equal(
             model.storyInterior.objectiveKey,
             `story.interior.${scenario.dungeonId}.objective`,
-            `episode ${episode} dedicated objective key`
+            `episode ${scenario.episode} dedicated objective key`
         );
-        assert.notEqual(t(model.storyInterior.objectiveKey), model.storyInterior.objectiveKey, `episode ${episode} localized objective`);
-        assert.equal(model.storyInterior.title, new StoryInteriorMap(layout).getDisplayName(), `episode ${episode} title`);
-        assert.equal(model.storyInterior.enemiesLeft, 1, `episode ${episode} live enemy count`);
+        assert.notEqual(t(model.storyInterior.objectiveKey), model.storyInterior.objectiveKey, `episode ${scenario.episode} localized objective`);
+        assert.equal(model.storyInterior.title, new StoryInteriorMap(layout).getDisplayName(), `episode ${scenario.episode} title`);
+        assert.equal(model.storyInterior.enemiesLeft, 1, `episode ${scenario.episode} live enemy count`);
     }
 });
