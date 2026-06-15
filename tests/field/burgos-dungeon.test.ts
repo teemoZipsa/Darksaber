@@ -441,10 +441,8 @@ test('Burgos boss corpse loot includes a guaranteed rune', () => {
     assert.ok(engine.worldMap.loot[0].inventory.items.some((placed: { item: { slot: string } }) => placed.item.slot === 'rune'));
 });
 
-test('late story interior boss loot returns to the original world entrance through episode 31', () => {
-    for (const episode of [23, 24, 25, 26, 27, 28, 29, 30, 31]) {
-        const scenario = STORY_SCENARIOS.find((candidate) => candidate.episode === episode);
-        assert.ok(scenario, `missing scenario ${episode}`);
+test('story interior boss loot returns to the original world entrance through episode 31', () => {
+    for (const scenario of STORY_SCENARIOS.filter((entry) => entry.missionKind === 'soloInterior')) {
         const layout = getStoryInteriorLayout(scenario.dungeonId);
         assert.ok(layout, `missing layout ${scenario.dungeonId}`);
         const monsterLayout = getStoryScenarioMonsterLayout(scenario);
