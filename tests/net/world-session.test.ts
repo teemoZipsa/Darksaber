@@ -806,7 +806,12 @@ test('server late story interiors spawn original objective and guard layouts thr
         assert.ok(snapshot.scenario.enteredDungeonIds.includes(scenario.dungeonId), `episode ${episode} entered`);
         assert.deepEqual(snapshot.partyActors.find((entry) => entry.id === serverActor.id)?.tile, interior.playerStart, `episode ${episode} player start`);
         for (const enemyId of state.enemyIds) {
-            assert.ok(snapshot.enemies.some((enemy) => enemy.id === enemyId), `episode ${episode} visible enemy ${enemyId}`);
+            const serverEnemy = internals.enemies.get(enemyId);
+            const snapshotEnemy = snapshot.enemies.find((enemy) => enemy.id === enemyId);
+            assert.ok(snapshotEnemy, `episode ${episode} visible enemy ${enemyId}`);
+            assert.equal(snapshotEnemy.monsterId, serverEnemy.monsterId, `episode ${episode} snapshot monster ${enemyId}`);
+            assert.deepEqual(snapshotEnemy.tile, { x: serverEnemy.enemy.gridX, y: serverEnemy.enemy.gridY }, `episode ${episode} snapshot tile ${enemyId}`);
+            assert.equal(snapshotEnemy.isBoss, serverEnemy.enemy.isBoss, `episode ${episode} snapshot boss flag ${enemyId}`);
         }
     }
 });
