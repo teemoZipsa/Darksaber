@@ -14,6 +14,7 @@ import { WorldMap } from '../src/map/WorldMap';
 import { getStoryInteriorLayout, STORY_INTERIOR_LAYOUTS } from '../src/data/StoryInteriorData';
 import { getMonsterDefinitionSafe } from '../src/data/MonsterCatalog';
 import { getOriginalLateStoryFact } from '../src/data/OriginalLateStoryFacts';
+import { getOriginalLateStoryItemsForSourceEvent } from '../src/data/OriginalLateStoryItems';
 import { getOriginalLateStoryMrcFact, getOriginalLateStoryMrcVisualSymbol } from '../src/data/OriginalLateStoryMapFacts';
 import {
     getStoryScenarioFieldEventPlacements,
@@ -109,6 +110,7 @@ interface ScenarioImportDocRow {
     sceneScript: string;
     globalScript: string;
     mapFiles: string[];
+    notes: string;
 }
 
 interface RoadmapDocRow {
@@ -216,8 +218,9 @@ function readScenarioImportDocRows(): Map<number, ScenarioImportDocRow> {
         const globalValues = extractBacktickValues(cells[4] ?? '');
         const globalScript = globalValues[0] ?? cells[4];
         const mapFiles = extractBacktickValues(cells[5] ?? '');
+        const notes = cells[6] ?? '';
         if (rows.has(episode)) throw new Error(`Duplicate docs/original-scenario-import.md row for episode ${episode}`);
-        rows.set(episode, { episode, dungeonId, sceneScript, globalScript, mapFiles });
+        rows.set(episode, { episode, dungeonId, sceneScript, globalScript, mapFiles, notes });
     }
     return rows;
 }
@@ -374,6 +377,22 @@ function verifyScenarioImportDocRow(episode: number, sequence: StoryScenarioEven
         throw new Error(`Episode ${episode} docs global mismatch: ${row.globalScript} !== ${sequence.originalSources.globalScript}`);
     }
     requireArrayEqual(episode, 'docs map candidates', row.mapFiles, sequence.originalSources.mapFiles);
+    if (episode >= 23 && episode <= 31) {
+        if (!/\bEVENT 99\b/.test(row.notes)) {
+            throw new Error(`Episode ${episode} docs notes do not mention EVENT 99 boss clear`);
+        }
+        if (!/\bCHARDEAD 700\b/.test(row.notes)) {
+            throw new Error(`Episode ${episode} docs notes do not mention CHARDEAD 700 boss clear`);
+        }
+        if (!/(scenario clear|SCENECLEAR)/i.test(row.notes)) {
+            throw new Error(`Episode ${episode} docs notes do not mention scenario clear`);
+        }
+        for (const item of getOriginalLateStoryItemsForSourceEvent(episode, 99)) {
+            if (!new RegExp(`\\bGETITEM ${item.originalItemId}\\b`).test(row.notes)) {
+                throw new Error(`Episode ${episode} docs notes do not mention EVENT 99 GETITEM ${item.originalItemId}`);
+            }
+        }
+    }
 }
 
 function verifyRoadmapDocRow(episode: number, scenario: StoryScenarioDefinition, docRows: Map<number, RoadmapDocRow>): void {

@@ -597,7 +597,9 @@ test('late original story reward item ledger covers every GETITEM cache event', 
     for (const originalItemId of seenOriginalItemIds) assert.equal(ledgerIds.includes(originalItemId), true);
     assert.equal(getOriginalLateStoryItemsForSourceEvent(23, 99).map((item) => item.originalItemId).join(','), '984');
     assert.equal(getOriginalLateStoryItemsForSourceEvent(24, 99).map((item) => item.originalItemId).join(','), '976');
-    assert.equal(getOriginalLateStoryItemsForSourceEvent(25, 99).length, 0);
+    for (const episode of [25, 26, 27, 28, 29, 30, 31]) {
+        assert.equal(getOriginalLateStoryItemsForSourceEvent(episode, 99).length, 0);
+    }
     assert.equal(ORIGINAL_LATE_STORY_ITEMS.length, 30);
     assert.equal(ORIGINAL_LATE_STORY_REWARD_ITEMS.length, ORIGINAL_LATE_STORY_ITEMS.length);
     assert.equal(getItemDef('orig_late_1122')?.nameKr, '레지넨');
