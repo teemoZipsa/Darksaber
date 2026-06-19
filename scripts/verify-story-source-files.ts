@@ -1310,11 +1310,30 @@ function verifyLateStoryOriginalMapContract(
     if (sequence.bossDefeatEvent.originalEventId !== 'EVENT 99') {
         throw new Error(`Episode ${episode} late story boss event mismatch: ${sequence.bossDefeatEvent.originalEventId} !== EVENT 99`);
     }
+    const expectedBossClearItems = getOriginalLateStoryItemsForSourceEvent(episode, 99);
+    requireJsonEqual(
+        episode,
+        'late story boss EVENT 99 trigger',
+        sequence.bossDefeatEvent.trigger,
+        [
+            'ALL CHARDEAD 700',
+            ...expectedBossClearItems.map((item) => `GETITEM ${item.originalItemId}`),
+            'SCENECLEAR',
+        ].join(' ')
+    );
     requireJsonEqual(
         episode,
         'late story boss EVENT 99 GETITEM rewards',
         (sequence.bossDefeatEvent.rewards ?? []).map((reward) => reward.type === 'item' ? reward.originalItemId : null),
-        getOriginalLateStoryItemsForSourceEvent(episode, 99).map((item) => item.originalItemId)
+        expectedBossClearItems.map((item) => item.originalItemId)
+    );
+    requireJsonEqual(
+        episode,
+        'late story boss EVENT 99 reward payload',
+        (sequence.bossDefeatEvent.rewards ?? []).map((reward) => reward.type === 'item'
+            ? { itemId: reward.itemId, originalItemId: reward.originalItemId }
+            : reward),
+        expectedBossClearItems.map((item) => ({ itemId: item.currentItemId, originalItemId: item.originalItemId }))
     );
 }
 
