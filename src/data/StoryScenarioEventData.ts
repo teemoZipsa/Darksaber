@@ -1491,8 +1491,8 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
         bossDefeatEvent: {
             id: 'sicilio_dangu_clear',
             originalSource: 'MAP/09set.arc:09.EVT',
-            originalEventId: 'EVENT 50/99',
-            trigger: 'CHARDEAD Dangu / SCENECLEAR',
+            originalEventId: 'EVENT 50/51/99',
+            trigger: 'CHARDEAD Dangu / Kamora son rescue / SCENECLEAR',
             runtimeFlag: 'kamora_son_rescued',
         },
         bossDefeat: [
@@ -1562,8 +1562,8 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
         bossDefeatEvent: {
             id: 'dalai_naiad_clear',
             originalSource: 'MAP/10set.arc:10.EVT',
-            originalEventId: 'EVENT 99',
-            trigger: 'CHARDEAD Naiad / SCENECLEAR',
+            originalEventId: 'EVENT 51/99',
+            trigger: 'CHARDEAD Naiad / Tripani fiancee rescue / SCENECLEAR',
             runtimeFlag: 'tripani_fiancee_rescued',
         },
         bossDefeat: [
@@ -2200,6 +2200,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep13.chest.magicPotion', focus: { x: 31, y: 2 } }],
             },
         ],
+        bossDefeatEvent: {
+            id: 'pyramid_inside_myant_clear',
+            originalSource: 'MAP/13set.arc:13.evt',
+            originalEventId: 'EVENT 80/99',
+            trigger: 'CHARDEAD Myant / SCENECLEAR',
+            runtimeFlag: 'pyramid_inside_myant_defeated',
+        },
         bossDefeat: [
             { kind: 'objective', labelKey: 'story.event.ep13.thirdSeal.result', focus: { x: 19, y: 5 } },
             { kind: 'objective', labelKey: 'story.event.ep13.objective', focus: { x: 19, y: 38 } },
@@ -2365,6 +2372,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 ],
             },
         ],
+        bossDefeatEvent: {
+            id: 'skeria_shut_clear',
+            originalSource: 'MAP/14set.arc:14.evt',
+            originalEventId: 'EVENT 65/66/70/99',
+            trigger: 'CHARDEAD Shut / curse removal / SCENECLEAR',
+            runtimeFlag: 'skeria_yadua_saved',
+        },
         bossDefeat: [
             { kind: 'dialogue', speakerId: 'shut', speakerNameKey: 'story.event.speaker.shut', textKey: 'story.event.ep14.bossDefeat.65', focus: { x: 28, y: 30 } },
             { kind: 'objective', labelKey: 'story.event.ep14.curse.result', focus: { x: 28, y: 30 } },
@@ -2538,6 +2552,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             skeria2FlowerEvent(23, { x: 45, y: 34 }, 50),
             skeria2FlowerEvent(24, { x: 23, y: 28 }, 50),
         ],
+        bossDefeatEvent: {
+            id: 'skeria_2_magi_clear',
+            originalSource: 'MAP/15set.arc:15.evt',
+            originalEventId: 'EVENT 90/99',
+            trigger: 'CHARDEAD Magi / yellow flower delivery / SCENECLEAR',
+            runtimeFlag: 'skeria_2_yellow_flower_delivered',
+        },
         bossDefeat: [
             { kind: 'objective', labelKey: 'story.event.ep15.objective', focus: { x: 45, y: 53 } },
         ],
@@ -2581,6 +2602,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { id: 'valhalla_oil_can_cache', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 91', trigger: 'COMMANDER CHARPOS 38 14 SET_DUTY_STEP 16 4', triggerTiles: [{ x: 38, y: 14 }], runtimeFlag: 'valhalla_oil_can_cache', markerLabelKey: 'story.event.ep16.cache.marker', rewards: [{ type: 'item', itemId: 'orig_story_ep16_oil_can', originalItemId: 0 }], steps: [{ kind: 'objective', labelKey: 'story.event.ep16.cache.oilCan', focus: { x: 38, y: 14 } }] },
             { id: 'valhalla_dragon_killer_cache', originalSource: 'MAP/16set.arc:16.evt', originalEventId: 'EVENT 92', trigger: 'CHARPOS3 6 25 149 GETITEM 619', triggerTiles: [{ x: 6, y: 25 }], runtimeFlag: 'valhalla_dragon_killer_cache', markerLabelKey: 'story.event.ep16.cache.marker', rewards: [{ type: 'item', itemId: 'orig_story_0619_dragon_killer6', originalItemId: 619 }], steps: [{ kind: 'objective', labelKey: 'story.event.ep16.cache.dragonKiller', focus: { x: 6, y: 25 } }] },
         ],
+        bossDefeatEvent: {
+            id: 'valhalla_barbatu_clear',
+            originalSource: 'MAP/16set.arc:16.evt',
+            originalEventId: 'EVENT 99',
+            trigger: 'CHARDEAD Barbatu / SCENECLEAR',
+            runtimeFlag: 'valhalla_airship_route_opened',
+        },
         bossDefeat: [
             { kind: 'dialogue', speakerId: 'barbatu', speakerNameKey: 'story.event.speaker.barbatu', textKey: 'story.event.ep16.bossDefeat.99', focus: { x: 21, y: 6 } },
             { kind: 'objective', labelKey: 'story.event.ep16.objective', focus: { x: 21, y: 20 } },

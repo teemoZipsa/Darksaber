@@ -652,7 +652,8 @@ test('Sicilio Island exposes original episode 9 coast ambush and rescue flow', (
         hideWhenRuntimeFlag: 'kamora_son_rescued',
     }]);
     assert.equal(sicilio.bossDefeatEvent?.originalSource, 'MAP/09set.arc:09.EVT');
-    assert.equal(sicilio.bossDefeatEvent?.originalEventId, 'EVENT 50/99');
+    assert.equal(sicilio.bossDefeatEvent?.originalEventId, 'EVENT 50/51/99');
+    assert.ok(sicilio.bossDefeatEvent?.trigger.includes('Kamora son rescue'));
     assert.equal(sicilio.bossDefeatEvent?.runtimeFlag, 'kamora_son_rescued');
     assert.equal(sicilio.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
     assert.equal(sicilio.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
@@ -682,7 +683,8 @@ test('Dalai Lake exposes original episode 10 lake temptation and rescue flow', (
         hideWhenRuntimeFlag: 'tripani_fiancee_rescued',
     }]);
     assert.equal(dalai.bossDefeatEvent?.originalSource, 'MAP/10set.arc:10.EVT');
-    assert.equal(dalai.bossDefeatEvent?.originalEventId, 'EVENT 99');
+    assert.equal(dalai.bossDefeatEvent?.originalEventId, 'EVENT 51/99');
+    assert.ok(dalai.bossDefeatEvent?.trigger.includes('Tripani fiancee rescue'));
     assert.equal(dalai.bossDefeatEvent?.runtimeFlag, 'tripani_fiancee_rescued');
     assert.equal(dalai.bossDefeat.filter((step) => step.kind === 'dialogue').length, 0);
     assert.equal(dalai.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
@@ -844,6 +846,10 @@ test('Pyramid Interior exposes original episode 13 Myant, trap, and chest flow',
         { type: 'item', itemId: 'orig_story_0305_magic_potion', originalItemId: 305 },
     ]);
     assert.ok(pyramid.fieldEvents.slice(8).every((event) => event.markerKind === 'chest'));
+    assert.equal(pyramid.bossDefeatEvent?.originalSource, 'MAP/13set.arc:13.evt');
+    assert.equal(pyramid.bossDefeatEvent?.originalEventId, 'EVENT 80/99');
+    assert.ok(pyramid.bossDefeatEvent?.trigger.includes('SCENECLEAR'));
+    assert.equal(pyramid.bossDefeatEvent?.runtimeFlag, 'pyramid_inside_myant_defeated');
     assert.equal(pyramid.bossDefeat.filter((step) => step.kind === 'dialogue').length, 0);
     assert.equal(pyramid.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
 });
@@ -880,6 +886,10 @@ test('Skeria exposes original episode 14 Yadua, quake trap, and cache flow', () 
         { type: 'gold', amount: 200 },
         { type: 'item', itemId: 'orig_story_0018_power_staff', originalItemId: 18 },
     ]);
+    assert.equal(skeria.bossDefeatEvent?.originalSource, 'MAP/14set.arc:14.evt');
+    assert.equal(skeria.bossDefeatEvent?.originalEventId, 'EVENT 65/66/70/99');
+    assert.ok(skeria.bossDefeatEvent?.trigger.includes('SCENECLEAR'));
+    assert.equal(skeria.bossDefeatEvent?.runtimeFlag, 'skeria_yadua_saved');
     assert.equal(skeria.bossDefeat.filter((step) => step.kind === 'dialogue').length, 2);
     assert.equal(skeria.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
 });
@@ -935,6 +945,10 @@ test('Skeria 2 exposes original episode 15 nameless village and yellow flower fl
         'EVENT 24',
     ]);
     assert.ok(skeria.fieldEvents.slice(8).every((event) => event.trigger.includes('MAGIC 1602')));
+    assert.equal(skeria.bossDefeatEvent?.originalSource, 'MAP/15set.arc:15.evt');
+    assert.equal(skeria.bossDefeatEvent?.originalEventId, 'EVENT 90/99');
+    assert.ok(skeria.bossDefeatEvent?.trigger.includes('SCENECLEAR'));
+    assert.equal(skeria.bossDefeatEvent?.runtimeFlag, 'skeria_2_yellow_flower_delivered');
     assert.equal(skeria.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
 });
 
@@ -999,6 +1013,10 @@ test('Valhalla Plain exposes original episode 16 Barbatu, trap, and cache flow',
         itemId: 'orig_story_0619_dragon_killer6',
         originalItemId: 619,
     });
+    assert.equal(valhalla.bossDefeatEvent?.originalSource, 'MAP/16set.arc:16.evt');
+    assert.equal(valhalla.bossDefeatEvent?.originalEventId, 'EVENT 99');
+    assert.ok(valhalla.bossDefeatEvent?.trigger.includes('SCENECLEAR'));
+    assert.equal(valhalla.bossDefeatEvent?.runtimeFlag, 'valhalla_airship_route_opened');
     assert.equal(valhalla.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
     assert.equal(valhalla.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
 });
