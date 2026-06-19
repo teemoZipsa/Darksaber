@@ -613,7 +613,7 @@ function isScenarioFieldEventResultMessage(message: unknown): message is Scenari
 
 function isScenarioFieldEventRewardResult(value: unknown): value is ScenarioFieldEventRewardResult {
     if (!isRecord(value)) return false;
-    if (value.type === 'gold') return typeof value.amount === 'number' && Number.isFinite(value.amount) && value.amount >= 0;
+    if (value.type === 'gold') return typeof value.amount === 'number' && Number.isInteger(value.amount) && value.amount > 0;
     return value.type === 'item'
         && typeof value.itemId === 'string'
         && (

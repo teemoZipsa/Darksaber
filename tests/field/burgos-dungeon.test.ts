@@ -1207,6 +1207,19 @@ test('network field scenario events expose world inspect tiles and one-shot rewa
         false,
     );
     assert.equal(harness.controller.playFieldEventAt(eventTile, { id: 'hero', entity: player } as any), false);
+
+    harness.controller.applyNetworkScenarioFieldEventResult({
+        type: 'SCENARIO_FIELD_EVENT_RESULT',
+        intentId: 'field-event-intent-bad-gold',
+        dungeonId: ARCADIA_PLAIN_DUNGEON_ID,
+        eventId: 'arcadia_gold_chest_01',
+        scope: 'player',
+        flag: 'arcadia_gold_chest_01',
+        presentationSteps: [],
+        rewards: [{ type: 'gold', amount: Number.NaN }],
+    });
+    assert.equal(raidSession.raidGoldReward, 100);
+    assert.equal(harness.logs.some((line) => line.includes('NaN')), false);
 });
 
 test('network shared field event snapshot hides already completed inspect tiles', () => {

@@ -996,6 +996,7 @@ export class WorldStoryScenarioController {
 
     private applyNetworkFieldEventReward(reward: ScenarioFieldEventRewardResult): void {
         if (reward.type === 'gold') {
+            if (!Number.isInteger(reward.amount) || reward.amount <= 0) return;
             this.context.raidSession.addRaidGoldReward(reward.amount);
             this.context.log(formatT('story.event.reward.gold', { amount: reward.amount }));
             return;
