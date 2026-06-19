@@ -427,9 +427,29 @@ test('client validates scenario field reward payloads with original item ids', (
         presentationSteps: [],
         rewards: [{ type: 'item', originalItemId: '1052' }],
     }));
+    harness.handleMessage(JSON.stringify({
+        type: 'SCENARIO_FIELD_EVENT_RESULT',
+        intentId: 'bad-cache-nan',
+        dungeonId: 'beelzebuth_hall',
+        eventId: 'beelzebuth_hall_cache_93',
+        scope: 'player',
+        flag: 'beelzebuth_hall_cache_93',
+        presentationSteps: [],
+        rewards: [{ type: 'gold', amount: Number.NaN }],
+    }));
+    harness.handleMessage(JSON.stringify({
+        type: 'SCENARIO_FIELD_EVENT_RESULT',
+        intentId: 'bad-cache-original-id',
+        dungeonId: 'beelzebuth_hall',
+        eventId: 'beelzebuth_hall_cache_94',
+        scope: 'player',
+        flag: 'beelzebuth_hall_cache_94',
+        presentationSteps: [],
+        rewards: [{ type: 'item', itemId: 'orig_late_1010', originalItemId: -1010 }],
+    }));
 
     assert.deepEqual(seen, [[{ type: 'item', itemId: 'orig_late_1005', originalItemId: 1005 }]]);
-    assert.deepEqual(errors, ['BAD_MESSAGE']);
+    assert.deepEqual(errors, ['BAD_MESSAGE', 'BAD_MESSAGE', 'BAD_MESSAGE']);
 });
 
 test('client dispatches market messages from the shared world socket', () => {

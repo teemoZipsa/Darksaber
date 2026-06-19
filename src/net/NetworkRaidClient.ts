@@ -613,10 +613,13 @@ function isScenarioFieldEventResultMessage(message: unknown): message is Scenari
 
 function isScenarioFieldEventRewardResult(value: unknown): value is ScenarioFieldEventRewardResult {
     if (!isRecord(value)) return false;
-    if (value.type === 'gold') return typeof value.amount === 'number';
+    if (value.type === 'gold') return typeof value.amount === 'number' && Number.isFinite(value.amount) && value.amount >= 0;
     return value.type === 'item'
         && typeof value.itemId === 'string'
-        && (value.originalItemId === undefined || typeof value.originalItemId === 'number');
+        && (
+            value.originalItemId === undefined
+            || (typeof value.originalItemId === 'number' && Number.isInteger(value.originalItemId) && value.originalItemId > 0)
+        );
 }
 
 function isScenarioFieldEventBroadcastMessage(message: unknown): message is ScenarioFieldEventBroadcastMessage {
