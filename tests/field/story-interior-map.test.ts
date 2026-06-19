@@ -174,6 +174,11 @@ test('Burgos interior uses a dedicated original-inspired route and event sequenc
     assert.ok(sequence.fieldEvents.every((event) => event.steps.length > 0));
     assert.ok(sequence.fieldEvents.every((event) => event.triggerTiles.length > 0));
     assert.ok(sequence.fieldEvents.every((event) => event.markerLabelKey));
+    assert.equal(sequence.bossDefeatEvent?.originalSource, 'MAP/01set.arc:01.evt');
+    assert.equal(sequence.bossDefeatEvent?.originalEventId, 'EVENT 99');
+    assert.match(sequence.bossDefeatEvent?.trigger ?? '', /CHARDEAD 700/);
+    assert.match(sequence.bossDefeatEvent?.trigger ?? '', /SCENECLEAR/);
+    assert.equal(sequence.bossDefeatEvent?.runtimeFlag, 'burgos_kisra_defeated');
 });
 
 test('Burgos interior exposes original-inspired doors, blocked paths, and event access', () => {
@@ -508,6 +513,11 @@ test('Zamora Fortress exposes original episode 2 entry event flow', () => {
         markerLabelKey: 'story.event.ep02.princess.marker.captive',
         hideWhenRuntimeFlag: 'princess_rescued',
     }]);
+    assert.equal(sequence.bossDefeatEvent?.originalSource, 'MAP/02set.arc:02.evt');
+    assert.equal(sequence.bossDefeatEvent?.originalEventId, 'EVENT 99');
+    assert.match(sequence.bossDefeatEvent?.trigger ?? '', /CHARDEAD 700/);
+    assert.match(sequence.bossDefeatEvent?.trigger ?? '', /SCENECLEAR/);
+    assert.equal(sequence.bossDefeatEvent?.runtimeFlag, 'princess_rescued');
     assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
 });
 
@@ -570,6 +580,11 @@ test('Sagrajas Temple exposes original episode 7 entry, scripture, and Amphisbae
         markerLabelKey: 'story.event.ep07.hagen.marker',
         hideWhenRuntimeFlag: 'sagrajas_scripture_recovered',
     }]);
+    assert.equal(sequence.bossDefeatEvent?.originalSource, 'MAP/07set.arc:07.evt');
+    assert.equal(sequence.bossDefeatEvent?.originalEventId, 'EVENT 01/99');
+    assert.match(sequence.bossDefeatEvent?.trigger ?? '', /GETGENERAL 111/);
+    assert.match(sequence.bossDefeatEvent?.trigger ?? '', /SCENECLEAR/);
+    assert.equal(sequence.bossDefeatEvent?.runtimeFlag, 'sagrajas_scripture_recovered');
     assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
     assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
 });

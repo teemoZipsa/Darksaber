@@ -456,6 +456,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 ],
             },
         ],
+        bossDefeatEvent: {
+            id: 'burgos_kisra_clear',
+            originalSource: 'MAP/01set.arc:01.evt',
+            originalEventId: 'EVENT 99',
+            trigger: 'CHARDEAD 700 / SCENECLEAR',
+            runtimeFlag: 'burgos_kisra_defeated',
+        },
         bossDefeat: [
             {
                 kind: 'dialogue',
@@ -671,6 +678,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep02.chest.opened', focus: { x: 24, y: 12 } }],
             },
         ],
+        bossDefeatEvent: {
+            id: 'zamora_fenris_clear',
+            originalSource: 'MAP/02set.arc:02.evt',
+            originalEventId: 'EVENT 99',
+            trigger: 'ALL CHARDEAD 700 / SCENECLEAR',
+            runtimeFlag: 'princess_rescued',
+        },
         bossDefeat: [
             { kind: 'objective', labelKey: 'story.event.ep02.objective', focus: { x: 1, y: 10 } },
         ],
@@ -1320,6 +1334,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 ],
             },
         ],
+        bossDefeatEvent: {
+            id: 'sagrajas_amphisbaena_clear',
+            originalSource: 'MAP/07set.arc:07.evt',
+            originalEventId: 'EVENT 01/99',
+            trigger: 'ALL CHARDEAD 700 / GETGENERAL 111 / SCENECLEAR',
+            runtimeFlag: 'sagrajas_scripture_recovered',
+        },
         bossDefeat: [
             { kind: 'dialogue', speakerId: 'amphisbaena', speakerNameKey: 'story.event.speaker.amphisbaena', textKey: 'story.event.ep07.bossDefeat.01', focus: { x: 19, y: 6 } },
             { kind: 'objective', labelKey: 'story.event.ep07.scripture.result', focus: { x: 19, y: 10 } },
