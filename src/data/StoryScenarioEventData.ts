@@ -2758,6 +2758,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { id: 'ament_2f_crystal_mail7_cache', originalSource: 'MAP/20set.arc:20.evt', originalEventId: 'EVENT 84', trigger: 'COMMANDER ONLY_CHAR 700 CHARPOS 31 60 GETITEM 855', triggerTiles: [{ x: 31, y: 60 }], runtimeFlag: 'ament_2f_crystal_mail7_cache', markerLabelKey: 'story.event.ep20.cache.marker', rewards: [{ type: 'item', itemId: 'orig_story_0855_crystal_mail7', originalItemId: 855 }], steps: [{ kind: 'objective', labelKey: 'story.event.ep20.cache.crystalMail7', focus: { x: 31, y: 60 } }] },
         ],
         enemyDefeatEvents: ament2fEnemyDefeatEvents(),
+        bossDefeatEvent: {
+            id: 'ament_2f_dark_sword_clear',
+            originalSource: 'MAP/20set.arc:20.evt',
+            originalEventId: 'EVENT 90/99',
+            trigger: 'ALL CHARDEAD 720 ITEM 386 ITEM 387 ITEM 388 ITEM 389 DUTY_STEP 18 1 SET_DUTY_STEP 18 2 / ALL CHARDEAD 700 SCENECLEAR',
+            runtimeFlag: 'ament_2f_dark_sword_recovered',
+        },
         bossDefeat: [
             { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep20.darkSword.inspect', focus: { x: 29, y: 7 } },
             { kind: 'objective', labelKey: 'story.event.ep20.darkSword.objective', focus: { x: 29, y: 7 } },

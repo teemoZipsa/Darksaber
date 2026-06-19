@@ -1179,6 +1179,13 @@ test('Ament 2F exposes original episode 20 Mephistopheles, lightning trap, cache
             { eventId: 'EVENT 13', charId: 520, index: 9, textKey: 'story.event.ep20.enemyDefeat.520' },
         ]
     );
+    assert.equal(ament.bossDefeatEvent?.originalSource, 'MAP/20set.arc:20.evt');
+    assert.equal(ament.bossDefeatEvent?.originalEventId, 'EVENT 90/99');
+    assert.equal(ament.bossDefeatEvent?.runtimeFlag, 'ament_2f_dark_sword_recovered');
+    assert.match(ament.bossDefeatEvent?.trigger ?? '', /CHARDEAD 720/);
+    assert.match(ament.bossDefeatEvent?.trigger ?? '', /ITEM 386/);
+    assert.match(ament.bossDefeatEvent?.trigger ?? '', /CHARDEAD 700/);
+    assert.match(ament.bossDefeatEvent?.trigger ?? '', /SCENECLEAR/);
     assert.ok(ament.bossDefeat.some((step) => step.kind === 'objective' && step.labelKey === 'story.event.ep20.darkSword.objective'));
     assert.equal(ament.bossDefeat.filter((step) => step.kind === 'dialogue').length, 2);
     assert.equal(ament.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
