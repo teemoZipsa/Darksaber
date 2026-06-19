@@ -97,6 +97,7 @@ const LATE_STORY_BOSS_DEFEAT_FOCUSES = new Map<number, string[]>([
     [30, ['19,9', '19,7', '19,7', '19,7', '19,9', '19,7', '19,7', '19,9', '19,7', '19,9']],
     [31, ['19,7', '19,9', '19,7', '19,9', '19,7', '19,9', '19,7', '19,9']],
 ]);
+const LATE_STORY_CACHE_STEP_DURATION_MS = 700;
 
 interface Options {
     sourceRoot: string;
@@ -1076,6 +1077,30 @@ function verifyLateStoryOriginalMapContract(
     const expectedCaches = getOriginalLateStoryCacheEvents(episode);
     requireJsonEqual(
         episode,
+        'late story cache runtime ids',
+        sequence.fieldEvents.map((event) => event.id),
+        expectedCaches.map((event) => `${fact.dungeonId}_cache_${event.eventNumber}`)
+    );
+    requireJsonEqual(
+        episode,
+        'late story cache runtime flags',
+        sequence.fieldEvents.map((event) => event.runtimeFlag),
+        expectedCaches.map((event) => `${fact.dungeonId}_cache_${event.eventNumber}`)
+    );
+    requireJsonEqual(
+        episode,
+        'late story cache marker labels',
+        sequence.fieldEvents.map((event) => event.markerLabelKey),
+        expectedCaches.map(() => `story.event.ep${paddedEpisode}.cache.marker`)
+    );
+    requireJsonEqual(
+        episode,
+        'late story cache marker kinds',
+        sequence.fieldEvents.map((event) => event.markerKind),
+        expectedCaches.map(() => 'chest')
+    );
+    requireJsonEqual(
+        episode,
         'late story cache original sources',
         sequence.fieldEvents.map((event) => event.originalSource),
         expectedCaches.map(() => `${fact.setArc}:${fact.eventMember}`)
@@ -1097,6 +1122,28 @@ function verifyLateStoryOriginalMapContract(
         'late story cache GETITEM rewards',
         sequence.fieldEvents.map((event) => (event.rewards ?? []).map((reward) => reward.type === 'item' ? reward.originalItemId : null)),
         expectedCaches.map((event) => [event.originalItemId])
+    );
+    requireJsonEqual(
+        episode,
+        'late story cache trigger strings',
+        sequence.fieldEvents.map((event) => event.trigger),
+        expectedCaches.map((event) => `COMMANDER original CHARPOS ${event.tile.x} ${event.tile.y} GETITEM ${event.originalItemId}`)
+    );
+    requireJsonEqual(
+        episode,
+        'late story cache presentation steps',
+        sequence.fieldEvents.map((event) => event.steps.map((step) => ({
+            kind: step.kind,
+            labelKey: step.kind === 'objective' ? step.labelKey : null,
+            focus: step.kind === 'objective' ? step.focus ?? null : null,
+            durationMs: getStoryScenarioEventStepDurationMs(step),
+        }))),
+        expectedCaches.map((event) => [{
+            kind: 'objective',
+            labelKey: `story.event.ep${paddedEpisode}.cache.recovered`,
+            focus: event.tile,
+            durationMs: LATE_STORY_CACHE_STEP_DURATION_MS,
+        }])
     );
 
     if (!sequence.bossDefeatEvent) throw new Error(`Episode ${episode} late story boss defeat event is missing`);
