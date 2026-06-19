@@ -1076,6 +1076,12 @@ function verifyLateStoryOriginalMapContract(
     const expectedCaches = getOriginalLateStoryCacheEvents(episode);
     requireJsonEqual(
         episode,
+        'late story cache original sources',
+        sequence.fieldEvents.map((event) => event.originalSource),
+        expectedCaches.map(() => `${fact.setArc}:${fact.eventMember}`)
+    );
+    requireJsonEqual(
+        episode,
         'late story cache event order',
         sequence.fieldEvents.map((event) => event.originalEventId),
         expectedCaches.map((event) => `EVENT ${event.eventNumber}`)
