@@ -97,6 +97,38 @@ const LATE_STORY_BOSS_DEFEAT_FOCUSES = new Map<number, string[]>([
     [30, ['19,9', '19,7', '19,7', '19,7', '19,9', '19,7', '19,7', '19,9', '19,7', '19,9']],
     [31, ['19,7', '19,9', '19,7', '19,9', '19,7', '19,9', '19,7', '19,9']],
 ]);
+const LATE_STORY_ENTRY_SPEAKERS = new Map<number, string[]>([
+    [23, ['nergal', 'beelzebuth', 'nergal', 'beelzebuth']],
+    [24, ['nergal']],
+    [25, ['nergal', 'hero', 'nergal', 'hero', 'nergal', 'hero']],
+    [26, []],
+    [27, []],
+    [28, ['jade', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'ergion', 'hero', 'ergion']],
+    [29, ['jade', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'martani', 'hero', 'martani', 'hero', 'martani']],
+    [30, ['jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'hero', 'blin', 'hero', 'blin']],
+    [31, ['jade', 'demonFixer', 'jade', 'demonFixer', 'jade', 'demonFixer', 'jade', 'demonFixer', 'jade', 'demonFixer', 'hero', 'demonFixer', 'hero', 'demonFixer']],
+]);
+const LATE_STORY_BOSS_DEFEAT_SPEAKERS = new Map<number, string[]>([
+    [23, ['nergal']],
+    [24, ['nergal']],
+    [25, ['nergal', 'hero', 'nergal', 'hero']],
+    [26, []],
+    [27, []],
+    [28, ['ergion', 'hero']],
+    [29, ['hero', 'martani', 'hero']],
+    [30, ['hero', 'blin', 'blin', 'blin', 'hero', 'blin', 'blin', 'hero', 'blin', 'hero']],
+    [31, ['demonFixer', 'hero', 'demonFixer', 'hero', 'demonFixer', 'hero', 'demonFixer', 'hero']],
+]);
+const LATE_STORY_SPEAKER_NAME_KEYS = new Map<string, string>([
+    ['beelzebuth', 'story.event.speaker.beelzebuth'],
+    ['blin', 'story.event.speaker.blin'],
+    ['demonFixer', 'story.event.speaker.demonFixer'],
+    ['ergion', 'story.event.speaker.ergion'],
+    ['hero', 'story.event.speaker.hero'],
+    ['jade', 'story.event.speaker.jade'],
+    ['martani', 'story.event.speaker.martani'],
+    ['nergal', 'story.event.speaker.nergal'],
+]);
 const LATE_STORY_FOCUS_STEP_DURATION_MS = 650;
 const LATE_STORY_MOVE_ACTOR_STEP_DURATION_MS = 700;
 const LATE_STORY_DIALOGUE_STEP_DURATION_MS = 1600;
@@ -1047,6 +1079,26 @@ function verifyLateStoryOriginalMapContract(
         bossDefeatDialogues.map((step) => getPresentationStepFocusKey(step) ?? 'none'),
         LATE_STORY_BOSS_DEFEAT_FOCUSES.get(episode)
     );
+    requireJsonEqual(
+        episode,
+        'late story entry dialogue speakers',
+        entryDialogues.map((step) => step.speakerId),
+        LATE_STORY_ENTRY_SPEAKERS.get(episode)
+    );
+    requireJsonEqual(
+        episode,
+        'late story boss defeat dialogue speakers',
+        bossDefeatDialogues.map((step) => step.speakerId),
+        LATE_STORY_BOSS_DEFEAT_SPEAKERS.get(episode)
+    );
+    for (const step of [...entryDialogues, ...bossDefeatDialogues]) {
+        const expectedSpeakerNameKey = LATE_STORY_SPEAKER_NAME_KEYS.get(step.speakerId);
+        if (step.speakerNameKey !== expectedSpeakerNameKey) {
+            throw new Error(
+                `Episode ${episode} speaker key mismatch for ${step.textKey}: ${step.speakerNameKey} !== ${expectedSpeakerNameKey}`
+            );
+        }
+    }
     if (fact.deoMember && entryDialogues.length === 0) {
         throw new Error(`Episode ${episode} declares ${fact.deoMember} but has no entry dialogue`);
     }
