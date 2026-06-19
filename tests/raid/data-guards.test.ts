@@ -863,6 +863,11 @@ test('story scenario field events stay presentable and replay-safe', () => {
                 assert.ok(event.runtimeFlag, `${sequence.dungeonId} ${event.id} reward runtime flag`);
                 assert.ok(event.markerLabelKey, `${sequence.dungeonId} ${event.id} reward marker label`);
             }
+            if (event.completesObjective) {
+                assert.ok(sequence.objectiveRuntimeFlag, `${sequence.dungeonId} ${event.id} objective runtime flag`);
+                assert.equal(event.runtimeFlag, sequence.objectiveRuntimeFlag, `${sequence.dungeonId} ${event.id} completion flag`);
+                assert.match(event.trigger, /SCENECLEAR/, `${sequence.dungeonId} ${event.id} completion trigger`);
+            }
             for (const reward of event.rewards ?? []) {
                 if (reward.type === 'gold') {
                     assert.ok(Number.isInteger(reward.amount), `${sequence.dungeonId} ${event.id} gold reward integer`);

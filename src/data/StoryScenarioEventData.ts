@@ -2642,7 +2642,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { id: 'airship_necklace_cache', originalSource: 'MAP/17set.arc:17.evt', originalEventId: 'EVENT 91', trigger: 'COMMANDER CHARPOS 17 12 GETITEM 208 necklace', triggerTiles: [{ x: 17, y: 12 }], runtimeFlag: 'airship_necklace_cache', markerLabelKey: 'story.event.ep17.cache.marker', rewards: [{ type: 'item', itemId: 'orig_story_0208_necklace', originalItemId: 208 }], steps: [{ kind: 'objective', labelKey: 'story.event.ep17.cache.necklace', focus: { x: 17, y: 12 } }] },
             { id: 'airship_arrival', originalSource: 'MAP/17set.arc:17.evt', originalEventId: 'EVENT 99', trigger: 'COMMANDER CHARPOS 18..21 1 SCENECLEAR 2',
                 triggerTiles: [{ x: 18, y: 1 }, { x: 19, y: 1 }, { x: 20, y: 1 }, { x: 21, y: 1 }],
-                runtimeFlag: 'airship_arrival',
+                runtimeFlag: 'airship_boarded',
                 markerLabelKey: 'story.event.ep17.arrival.marker',
                 completesObjective: true,
                 steps: [

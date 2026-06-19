@@ -1166,6 +1166,21 @@ function verifyStoryCompletionContract(
         }
     }
 
+    for (const event of sequence.fieldEvents.filter((candidate) => candidate.completesObjective)) {
+        if (!sequence.objectiveRuntimeFlag) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} field clear event ${event.id} has no objective runtime flag`);
+        }
+        if (event.runtimeFlag !== sequence.objectiveRuntimeFlag) {
+            throw new Error(
+                `Episode ${episode} ${scenario.dungeonId} field clear flag mismatch for ${event.id}: ` +
+                `${event.runtimeFlag ?? 'missing'} !== ${sequence.objectiveRuntimeFlag}`
+            );
+        }
+        if (!event.trigger.includes('SCENECLEAR')) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} field clear event ${event.id} does not declare SCENECLEAR`);
+        }
+    }
+
     for (const event of sequence.enemyDefeatEvents ?? []) {
         if (!Number.isInteger(event.scenarioEnemyIndex)) {
             throw new Error(`Episode ${episode} ${scenario.dungeonId} enemy defeat event ${event.id} is missing server scenarioEnemyIndex`);
