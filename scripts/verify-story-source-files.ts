@@ -210,8 +210,16 @@ function originalEventIdNumbers(originalEventId: string): number[] {
 }
 
 function notesMentionOriginalEvent(notes: string, eventNumber: number): boolean {
-    return [...notes.matchAll(/\bEVENT\s+([\d/]+)/g)].some((match) =>
-        match[1].split('/').some((part) => Number(part) === eventNumber)
+    return [...notes.matchAll(/\bevents?\s+([\d\s,/-]+)/gi)].some((match) =>
+        match[1].split(/[,/]/).some((part) => {
+            const range = part.trim().match(/^(\d+)\s*-\s*(\d+)$/);
+            if (range) {
+                const start = Number(range[1]);
+                const end = Number(range[2]);
+                return eventNumber >= Math.min(start, end) && eventNumber <= Math.max(start, end);
+            }
+            return Number(part.trim()) === eventNumber;
+        })
     );
 }
 
@@ -421,6 +429,18 @@ function verifyScenarioImportDocRow(episode: number, sequence: StoryScenarioEven
         }
     }
     if (episode >= 23 && episode <= 31) {
+        for (const event of sequence.fieldEvents) {
+            for (const eventNumber of originalEventIdNumbers(event.originalEventId)) {
+                if (!notesMentionOriginalEvent(row.notes, eventNumber)) {
+                    throw new Error(`Episode ${episode} docs notes do not mention late cache EVENT ${eventNumber}`);
+                }
+            }
+            for (const reward of event.rewards ?? []) {
+                if (reward.type === 'item' && !new RegExp(`\\bGETITEM ${reward.originalItemId}\\b`).test(row.notes)) {
+                    throw new Error(`Episode ${episode} docs notes do not mention late cache GETITEM ${reward.originalItemId}`);
+                }
+            }
+        }
         if (!/\bEVENT 99\b/.test(row.notes)) {
             throw new Error(`Episode ${episode} docs notes do not mention EVENT 99 boss clear`);
         }
