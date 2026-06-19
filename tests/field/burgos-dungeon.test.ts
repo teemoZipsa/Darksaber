@@ -1873,7 +1873,11 @@ test('network late story cache results update interior markers and presentations
             assert.ok(event, `episode ${episode} EVENT ${cache.eventNumber}`);
             const markerId: string = `${event.id}:${cache.tile.x},${cache.tile.y}`;
             const rewards: ScenarioFieldEventRewardResult[] = (event.rewards ?? []).map((reward) => reward.type === 'item'
-                ? { type: 'item', itemId: reward.itemId }
+                ? {
+                    type: 'item',
+                    itemId: reward.itemId,
+                    ...(reward.originalItemId !== undefined ? { originalItemId: reward.originalItemId } : {}),
+                }
                 : { type: 'gold', amount: reward.amount });
             const marker: StoryInteriorInspectMarker | undefined = interiorMap.getInspectMarkers().find((candidate) => candidate.id === markerId);
             assert.ok(marker, `episode ${episode} ${event.id} marker before`);

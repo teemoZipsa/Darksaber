@@ -398,6 +398,40 @@ test('client reports malformed server messages instead of throwing', () => {
     assert.deepEqual(errors, ['BAD_JSON', 'BAD_MESSAGE', 'BAD_MESSAGE']);
 });
 
+test('client validates scenario field reward payloads with original item ids', () => {
+    const seen: unknown[] = [];
+    const errors: string[] = [];
+    const client = new NetworkRaidClient({
+        onScenarioFieldEventResult: (message) => seen.push(message.rewards),
+        onErrorMessage: (error) => errors.push(error.code),
+    });
+    const harness = client as unknown as { handleMessage(raw: string): void };
+
+    harness.handleMessage(JSON.stringify({
+        type: 'SCENARIO_FIELD_EVENT_RESULT',
+        intentId: 'cache-23-91',
+        dungeonId: 'beelzebuth_hall',
+        eventId: 'beelzebuth_hall_cache_91',
+        scope: 'player',
+        flag: 'beelzebuth_hall_cache_91',
+        presentationSteps: [],
+        rewards: [{ type: 'item', itemId: 'orig_late_1005', originalItemId: 1005 }],
+    }));
+    harness.handleMessage(JSON.stringify({
+        type: 'SCENARIO_FIELD_EVENT_RESULT',
+        intentId: 'bad-cache',
+        dungeonId: 'beelzebuth_hall',
+        eventId: 'beelzebuth_hall_cache_92',
+        scope: 'player',
+        flag: 'beelzebuth_hall_cache_92',
+        presentationSteps: [],
+        rewards: [{ type: 'item', originalItemId: '1052' }],
+    }));
+
+    assert.deepEqual(seen, [[{ type: 'item', itemId: 'orig_late_1005', originalItemId: 1005 }]]);
+    assert.deepEqual(errors, ['BAD_MESSAGE']);
+});
+
 test('client dispatches market messages from the shared world socket', () => {
     const seen: string[] = [];
     const client = new NetworkRaidClient({

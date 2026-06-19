@@ -15,6 +15,7 @@ import {
     type RaidResultMessage,
     type ScenarioEnemyDefeatEventMessage,
     type ScenarioFieldEventBroadcastMessage,
+    type ScenarioFieldEventRewardResult,
     type ScenarioFieldEventResultMessage,
     type WorldRealmId,
     type WorldClientMessage,
@@ -606,7 +607,16 @@ function isScenarioFieldEventResultMessage(message: unknown): message is Scenari
         && (message.scope === 'player' || message.scope === 'shared')
         && typeof message.flag === 'string'
         && Array.isArray(message.presentationSteps)
-        && Array.isArray(message.rewards);
+        && Array.isArray(message.rewards)
+        && message.rewards.every(isScenarioFieldEventRewardResult);
+}
+
+function isScenarioFieldEventRewardResult(value: unknown): value is ScenarioFieldEventRewardResult {
+    if (!isRecord(value)) return false;
+    if (value.type === 'gold') return typeof value.amount === 'number';
+    return value.type === 'item'
+        && typeof value.itemId === 'string'
+        && (value.originalItemId === undefined || typeof value.originalItemId === 'number');
 }
 
 function isScenarioFieldEventBroadcastMessage(message: unknown): message is ScenarioFieldEventBroadcastMessage {
