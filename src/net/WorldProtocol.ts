@@ -339,7 +339,7 @@ export type ScenarioFieldEventScope = 'player' | 'shared';
 
 export type ScenarioFieldEventRewardResult =
     | { type: 'gold'; amount: number }
-    | { type: 'item'; itemId: string };
+    | { type: 'item'; itemId: string; originalItemId?: number };
 
 export interface ScenarioFieldEventResultMessage {
     type: 'SCENARIO_FIELD_EVENT_RESULT';

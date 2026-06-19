@@ -1824,7 +1824,11 @@ export class WorldSession {
             this.addCarriedItemQuantity(player.id, item.id, 1);
             this.addCarriedWeight(player.id, getPlacedItemWeight({ item, quantity: 1 }));
             this.markSaveDirty(player.id);
-            results.push({ type: 'item', itemId: item.id });
+            results.push({
+                type: 'item',
+                itemId: item.id,
+                ...(reward.originalItemId !== undefined ? { originalItemId: reward.originalItemId } : {}),
+            });
         }
         return results;
     }

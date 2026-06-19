@@ -1000,8 +1000,18 @@ test('server late story interior cache rewards persist only after survival throu
                 getStoryScenarioPresentationDurationMs(fieldResult.presentationSteps) > 0,
                 `episode ${episode} ${event.id} presentation duration`
             );
-            const eventRewardIds = (event.rewards ?? [])
-                .filter((reward) => reward.type === 'item')
+            const eventNumber = Number(event.originalEventId.match(/\d+/)?.[0]);
+            assert.equal(Number.isInteger(eventNumber), true, `episode ${episode} ${event.id} original event number`);
+            const expectedRewardPayloads = getOriginalLateStoryItemsForSourceEvent(episode, eventNumber)
+                .map((item) => ({ itemId: item.currentItemId, originalItemId: item.originalItemId }));
+            assert.deepEqual(
+                fieldResult.rewards
+                    .filter((reward) => reward.type === 'item')
+                    .map((reward) => ({ itemId: reward.itemId, originalItemId: reward.originalItemId })),
+                expectedRewardPayloads,
+                `episode ${episode} ${event.id} reward payloads`
+            );
+            const eventRewardIds = expectedRewardPayloads
                 .map((reward) => reward.itemId)
                 .sort((left, right) => left.localeCompare(right));
             expectedRewardIds.push(...eventRewardIds);
@@ -1836,7 +1846,7 @@ test('server-authoritative field scenario item rewards reject full save storage 
 
     const fieldResult = retried.replies.find((message) => message.type === 'SCENARIO_FIELD_EVENT_RESULT');
     assert.equal(fieldResult?.type, 'SCENARIO_FIELD_EVENT_RESULT');
-    assert.deepEqual(fieldResult.rewards, [{ type: 'item', itemId: 'orig_story_0300_heal_potion' }]);
+    assert.deepEqual(fieldResult.rewards, [{ type: 'item', itemId: 'orig_story_0300_heal_potion', originalItemId: 300 }]);
     const completedSnapshot = session.createSnapshot(joined.playerId, 1_200);
     assert.deepEqual(completedSnapshot.scenario.playerFieldEventFlagsByDungeonId?.arcadia_plain, ['arcadia_item_chest_05']);
     assert.equal(player.saveSnapshot.inventory.items.some((item: any) => item.itemId === 'orig_story_0300_heal_potion'), true);
