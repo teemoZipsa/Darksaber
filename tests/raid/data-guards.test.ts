@@ -691,7 +691,14 @@ test('original monster ledger stays separate from renderable spawn catalog', () 
     }
     for (const id of FINAL_STORY_MONSTER_IDS) {
         assert.equal(isMonsterId(id), true);
-        assert.ok(getMonsterDefinitionSafe(id));
+        const definition = getMonsterDefinitionSafe(id);
+        assert.ok(definition);
+        assert.equal(definition.sprite, `${id}.png`);
+        assert.equal(
+            existsSync(join(process.cwd(), 'public', 'assets', 'images', 'monsters', definition.sprite)),
+            true,
+            `missing final story monster sprite ${definition.sprite}`
+        );
         assert.equal(authoredSpawnIds.has(id), false);
         assert.ok(getOriginalMonsterRow(id));
     }

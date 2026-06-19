@@ -362,52 +362,52 @@ export const MONSTER_DEFINITIONS: Record<MonsterId, MonsterDefinition> = {
 
     // ── 700 series: original final-scenario demons (authored story only) ──
     '729R': {
-        id: '729R', name: '서큐버스', sprite: '637R.png', role: 'healer',
+        id: '729R', name: '서큐버스', sprite: '729R.png', role: 'healer',
         level: 20, levelBand: [20, 20], family: 'demon', spawnTags: ['special', 'ament'],
         color: '#b04aa0', frameSize: 32, renderScale: 1.28, aggroRange: 8, ...commonFrame,
     },
     '730R': {
-        id: '730R', name: '베라모드', sprite: '638R.png', role: 'bruiser',
+        id: '730R', name: '베라모드', sprite: '730R.png', role: 'bruiser',
         level: 21, levelBand: [21, 21], family: 'demon', spawnTags: ['special', 'ament'],
         color: '#b04040', frameSize: 32, renderScale: 1.3, aggroRange: 8, ...commonFrame,
     },
     '731R': {
-        id: '731R', name: '벨제뷔트', sprite: '636R.png', role: 'support',
+        id: '731R', name: '벨제뷔트', sprite: '731R.png', role: 'support',
         level: 22, levelBand: [22, 22], family: 'demon', spawnTags: ['special', 'ament'],
         color: '#7850b8', frameSize: 32, renderScale: 1.3, aggroRange: 8, ...commonFrame,
     },
     '732R': {
-        id: '732R', name: '아스타로스', sprite: '634R.png', role: 'tank',
+        id: '732R', name: '아스타로스', sprite: '732R.png', role: 'tank',
         level: 23, levelBand: [23, 23], family: 'demon', spawnTags: ['special', 'ament'],
         color: '#6c5f90', frameSize: 32, renderScale: 1.32, aggroRange: 8, ...commonFrame,
     },
     '733R': {
-        id: '733R', name: '네르갈', sprite: '638R.png', role: 'boss',
+        id: '733R', name: '네르갈', sprite: '733R.png', role: 'boss',
         level: 24, levelBand: [24, 24], family: 'demon', spawnTags: ['special', 'ament'],
         color: '#2f2f68', frameSize: 32, renderScale: 1.65, aggroRange: 9, ...commonFrame,
     },
     '748R': {
-        id: '748R', name: '에르기온', sprite: '634R.png', role: 'bruiser',
+        id: '748R', name: '에르기온', sprite: '748R.png', role: 'bruiser',
         level: 26, levelBand: [26, 26], family: 'demon', spawnTags: ['special', 'ament'],
         color: '#7e4ec8', frameSize: 32, renderScale: 1.42, aggroRange: 9, ...commonFrame,
     },
     '749R': {
-        id: '749R', name: '마르타니', sprite: '636R.png', role: 'tank',
+        id: '749R', name: '마르타니', sprite: '749R.png', role: 'tank',
         level: 27, levelBand: [27, 27], family: 'demon', spawnTags: ['special', 'ament'],
         color: '#9a5a48', frameSize: 32, renderScale: 1.44, aggroRange: 9, ...commonFrame,
     },
     '750R': {
-        id: '750R', name: '블린', sprite: '637R.png', role: 'archer',
+        id: '750R', name: '블린', sprite: '750R.png', role: 'archer',
         level: 28, levelBand: [28, 28], family: 'demon', spawnTags: ['special', 'ament'],
         color: '#4f7798', frameSize: 32, renderScale: 1.46, aggroRange: 10, ...commonFrame,
     },
     '751R': {
-        id: '751R', name: '마계 해결사', sprite: '638R.png', role: 'support',
+        id: '751R', name: '마계 해결사', sprite: '751R.png', role: 'support',
         level: 29, levelBand: [29, 29], family: 'demon', spawnTags: ['special', 'ament'],
         color: '#5f4a88', frameSize: 32, renderScale: 1.48, aggroRange: 10, ...commonFrame,
     },
     '752R': {
-        id: '752R', name: '제이드', sprite: '638R.png', role: 'boss',
+        id: '752R', name: '제이드', sprite: '752R.png', role: 'boss',
         level: 30, levelBand: [30, 30], family: 'demon', spawnTags: ['special', 'ament'],
         color: '#263f72', frameSize: 32, renderScale: 1.7, aggroRange: 10, ...commonFrame,
     },
