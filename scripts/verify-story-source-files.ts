@@ -1446,6 +1446,12 @@ function verifyStoryScenarioMonsterContract(episode: number, scenario: StoryScen
     if (scenario.guardCount > 0 && monsterLayout.guardMonsterIds.length === 0) {
         throw new Error(`Episode ${episode} ${scenario.dungeonId} has guards but no guard monster ids`);
     }
+    if (episode >= 23 && episode <= 31 && monsterLayout.guardMonsterIds.length !== scenario.guardCount) {
+        throw new Error(
+            `Episode ${episode} ${scenario.dungeonId} late story guard monster roster mismatch: ` +
+            `${monsterLayout.guardMonsterIds.length} !== ${scenario.guardCount}`
+        );
+    }
     for (const guardMonsterId of monsterLayout.guardMonsterIds) {
         if (!getMonsterDefinitionSafe(guardMonsterId)) {
             throw new Error(`Episode ${episode} ${scenario.dungeonId} unknown guard monster id ${guardMonsterId}`);

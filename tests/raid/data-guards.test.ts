@@ -33,6 +33,7 @@ import { getSkillVisualProfile } from '../../src/data/SkillVisualProfiles';
 import { createBaseStats, getBaseStatsForClass } from '../../src/data/Stats';
 import { STORY_QUESTS, getStoryCompanionRewards, type StoryQuestReward } from '../../src/data/StoryQuestData';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { getStoryScenarioMonsterLayout } from '../../src/data/StoryScenarioMonsterData';
 import {
     STORY_SCENARIO_EVENT_SEQUENCES,
     getStoryScenarioEventStepDurationMs,
@@ -636,6 +637,8 @@ test('late original story source ledgers cover exactly episodes 23 through 31', 
         assert.equal(scenario.dungeonId, fact.dungeonId, `episode ${episode} dungeon id`);
         assert.equal(scenario.missionKind, 'soloInterior', `episode ${episode} mission kind`);
         assert.equal(scenario.guardCount, fact.guardAreas.length, `episode ${episode} guard count`);
+        const monsterLayout = getStoryScenarioMonsterLayout(scenario);
+        assert.equal(monsterLayout.guardMonsterIds.length, fact.guardAreas.length, `episode ${episode} guard monster count`);
         assert.equal(layout.originalAi?.source, `${fact.setArc}:${fact.aiMember}`, `episode ${episode} original AI source`);
         assert.deepEqual(layout.originalAi?.bossArea, fact.bossArea, `episode ${episode} original boss AI area`);
         assert.deepEqual(layout.originalAi?.guardAreas, fact.guardAreas, `episode ${episode} original guard AI areas`);

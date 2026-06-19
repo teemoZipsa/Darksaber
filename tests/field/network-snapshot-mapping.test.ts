@@ -23,7 +23,8 @@ test('network enemy snapshots apply original monster sprites for the episode 31 
     assert.ok(scenario);
     const monsterLayout = getStoryScenarioMonsterLayout(scenario);
     assert.equal(monsterLayout.bossMonsterId, '751R');
-    assert.deepEqual(monsterLayout.guardMonsterIds, ['729R', '750R', '752R']);
+    assert.equal(monsterLayout.guardMonsterIds.length, scenario.guardCount);
+    assert.deepEqual(monsterLayout.guardMonsterIds.slice(0, 3), ['729R', '750R', '752R']);
 
     const snapshots: EnemySnapshot[] = [
         {

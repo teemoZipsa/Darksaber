@@ -17,6 +17,10 @@ export interface StoryScenarioMonsterLayout {
     bossOffset?: TilePoint;
 }
 
+function repeatGuardRoster(ids: readonly MonsterId[], count: number): MonsterId[] {
+    return Array.from({ length: count }, (_, index) => ids[index % ids.length]);
+}
+
 export const STORY_SCENARIO_MONSTER_LAYOUTS = {
     [BURGOS_CASTLE_DUNGEON_ID]: {
         bossMonsterId: BURGOS_BOSS_MONSTER_ID,
@@ -59,15 +63,15 @@ export const STORY_SCENARIO_MONSTER_LAYOUTS = {
     ament_2f: { bossMonsterId: '638R', guardMonsterIds: ['636R', '638R', '639R'] },
     nergal_castle: { bossMonsterId: '733R', guardMonsterIds: ['729R', '730R', '731R', '732R'] },
     flame_castle: { bossMonsterId: '730R', guardMonsterIds: ['215R', '224R', '225R', '307R'] },
-    beelzebuth_hall: { bossMonsterId: '731R', guardMonsterIds: ['729R', '730R', '732R', '733R'] },
-    astaroth_gate: { bossMonsterId: '732R', guardMonsterIds: ['729R', '730R', '731R', '733R'] },
-    nergal_depths: { bossMonsterId: '733R', guardMonsterIds: ['729R', '730R', '731R', '732R'] },
-    beast_mark_shrine: { bossMonsterId: '730R', guardMonsterIds: ['729R', '731R', '732R'] },
-    chosen_mark_shrine: { bossMonsterId: '731R', guardMonsterIds: ['729R', '730R', '732R'] },
-    ergion_keep: { bossMonsterId: '748R', guardMonsterIds: ['729R', '730R', '750R'] },
-    martani_bastion: { bossMonsterId: '749R', guardMonsterIds: ['729R', '731R', '750R'] },
-    blin_watch: { bossMonsterId: '750R', guardMonsterIds: ['729R', '731R', '749R'] },
-    demon_fixers_den: { bossMonsterId: '751R', guardMonsterIds: ['729R', '750R', '752R'] },
+    beelzebuth_hall: { bossMonsterId: '731R', guardMonsterIds: repeatGuardRoster(['729R', '730R', '732R', '733R'], 23) },
+    astaroth_gate: { bossMonsterId: '732R', guardMonsterIds: repeatGuardRoster(['729R', '730R', '731R', '733R'], 16) },
+    nergal_depths: { bossMonsterId: '733R', guardMonsterIds: repeatGuardRoster(['729R', '730R', '731R', '732R'], 29) },
+    beast_mark_shrine: { bossMonsterId: '730R', guardMonsterIds: repeatGuardRoster(['729R', '731R', '732R'], 12) },
+    chosen_mark_shrine: { bossMonsterId: '731R', guardMonsterIds: repeatGuardRoster(['729R', '730R', '732R'], 12) },
+    ergion_keep: { bossMonsterId: '748R', guardMonsterIds: repeatGuardRoster(['729R', '730R', '750R'], 17) },
+    martani_bastion: { bossMonsterId: '749R', guardMonsterIds: repeatGuardRoster(['729R', '731R', '750R'], 13) },
+    blin_watch: { bossMonsterId: '750R', guardMonsterIds: repeatGuardRoster(['729R', '731R', '749R'], 15) },
+    demon_fixers_den: { bossMonsterId: '751R', guardMonsterIds: repeatGuardRoster(['729R', '750R', '752R'], 14) },
 } satisfies Record<string, StoryScenarioMonsterLayout>;
 
 export function getStoryScenarioMonsterLayout(scenario: StoryScenarioDefinition): StoryScenarioMonsterLayout {
