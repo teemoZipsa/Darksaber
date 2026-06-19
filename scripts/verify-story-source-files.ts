@@ -458,6 +458,11 @@ function verifyScenarioImportDocRow(episode: number, sequence: StoryScenarioEven
                     throw new Error(`Episode ${episode} docs notes do not mention late cache EVENT ${eventNumber}`);
                 }
             }
+            for (const tile of event.triggerTiles) {
+                if (!notesMentionTile(row.notes, tile.x, tile.y)) {
+                    throw new Error(`Episode ${episode} docs notes do not mention late cache tile {${tile.x},${tile.y}}`);
+                }
+            }
             for (const reward of event.rewards ?? []) {
                 if (reward.type === 'item' && !new RegExp(`\\bGETITEM ${reward.originalItemId}\\b`).test(row.notes)) {
                     throw new Error(`Episode ${episode} docs notes do not mention late cache GETITEM ${reward.originalItemId}`);
