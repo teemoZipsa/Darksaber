@@ -2372,3 +2372,48 @@ test('local Ament SCENECLEAR inspect events complete the scenario objective', ()
         assert.ok(harness.logs.includes(t(quest.objectiveCompleteLogKey)), `episode ${episode} objective log`);
     }
 });
+
+test('local Ament 2F Dark Sword is recovered through the boss defeat flow, not an early inspect marker', () => {
+    const scenario = STORY_SCENARIOS.find((entry) => entry.episode === 20);
+    assert.ok(scenario);
+    const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+    assert.ok(sequence);
+    assert.equal(sequence.fieldEvents.some((event) => event.id === 'ament_2f_dark_sword'), false);
+    assert.ok(sequence.bossDefeat.some((step) => step.kind === 'objective' && step.labelKey === 'story.event.ep20.darkSword.objective'));
+
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ raidSession });
+    const previousWorldMap = harness.worldMap;
+    const dungeon = previousWorldMap.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+    const quest = getStoryQuestByDungeonId(scenario.dungeonId);
+    assert.ok(dungeon);
+    assert.ok(quest);
+
+    harness.controller.startLocalStoryScenarioDungeon(dungeon, quest);
+    drainStoryPresentation(harness.controller);
+
+    assert.equal(
+        harness.worldMap.getInspectMarkers().some((marker: StoryInteriorInspectMarker) => marker.id.startsWith('ament_2f_dark_sword:')),
+        false
+    );
+
+    const boss = new Enemy(
+        `story_${scenario.dungeonId}_boss`,
+        29,
+        9,
+        scenario.bossName ?? 'Mephistopheles',
+        scenario.bossLevel,
+        scenario.bossColor,
+        'boss'
+    );
+    boss.isBoss = true;
+    harness.controller.completeDungeonIfBossDefeated(boss);
+
+    assert.equal(harness.controller.getLastPresentationDurationMs(), getStoryScenarioPresentationDurationMs(sequence.bossDefeat));
+    assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 29, y: 7 });
+    assert.equal(raidSession.isDungeonCleared(scenario.dungeonId), true);
+    assert.equal(raidSession.hasScenarioFlag(scenario.dungeonId, sequence.objectiveRuntimeFlag ?? ''), true);
+    drainStoryPresentation(harness.controller);
+    assert.ok(harness.logs.includes(t(quest.objectiveCompleteLogKey)));
+});

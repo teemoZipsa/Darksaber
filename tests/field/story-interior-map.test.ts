@@ -1138,7 +1138,7 @@ test('Ament 2F exposes original episode 20 Mephistopheles, lightning trap, cache
     assert.equal(ament.objectiveRuntimeFlag, 'ament_2f_dark_sword_recovered');
     assert.equal(ament.entry.filter((step) => step.kind === 'dialogue').length, 10);
     assert.equal(ament.entry.filter((step) => step.kind === 'combatStart').length, 1);
-    assert.equal(ament.fieldEvents.length, 7);
+    assert.equal(ament.fieldEvents.length, 6);
     assert.equal(ament.fieldEvents[0].originalEventId, 'EVENT 53');
     assert.equal(ament.fieldEvents[0].triggerTiles.length, 30);
     assert.ok(ament.fieldEvents[0].trigger.includes('MAGIC 0905'));
@@ -1156,11 +1156,12 @@ test('Ament 2F exposes original episode 20 Mephistopheles, lightning trap, cache
         { type: 'item', itemId: 'orig_story_0632_flail_saber7', originalItemId: 632 },
         { type: 'item', itemId: 'orig_story_0855_crystal_mail7', originalItemId: 855 },
     ]);
-    assert.ok(ament.fieldEvents.some((event) => event.originalEventId === 'EVENT 90' && event.runtimeFlag === 'ament_2f_dark_sword_recovered'));
+    assert.equal(ament.fieldEvents.some((event) => event.originalEventId === 'EVENT 90'), false);
     assert.ok(ament.fieldEvents.every((event) => event.originalSource === 'MAP/20set.arc:20.evt'));
     assert.ok(ament.fieldEvents.every((event) => event.triggerTiles.every((tile) => map.isWalkable(tile.x, tile.y))));
-    assert.equal(ament.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
-    assert.equal(ament.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
+    assert.ok(ament.bossDefeat.some((step) => step.kind === 'objective' && step.labelKey === 'story.event.ep20.darkSword.objective'));
+    assert.equal(ament.bossDefeat.filter((step) => step.kind === 'dialogue').length, 2);
+    assert.equal(ament.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
 });
 
 test('Nergal Castle exposes original episode 21 summoning, relic, and clear flow', () => {
