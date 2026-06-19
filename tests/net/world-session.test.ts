@@ -1852,6 +1852,56 @@ test('server-authoritative field scenario item rewards reject full save storage 
     assert.equal(player.saveSnapshot.inventory.items.some((item: any) => item.itemId === 'orig_story_0300_heal_potion'), true);
 });
 
+test('server omits zero original item ids from scenario field reward payloads', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const completedQuestIds = STORY_SCENARIOS
+        .filter((scenario) => scenario.episode < 16)
+        .map((scenario) => scenario.questId);
+    const character = authCharacter('oil-can-reward');
+    const save = createDefaultCharacterSave(character);
+    save.questState = { ...save.questState, completedQuestIds };
+    const joined = session.join({
+        ...joinMessage('central_castle', character.id),
+        completedQuestIds,
+    }, 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        completedQuestIds,
+        saveSnapshot: save,
+    });
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === 'valhalla_plain');
+    const sequence = getStoryScenarioEventSequence('valhalla_plain');
+    const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'valhalla_oil_can_cache');
+    assert.ok(serverActor);
+    assert.ok(dungeon);
+    assert.ok(event);
+    serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+    session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-valhalla-oil-can',
+        actorId: serverActor.id,
+        dungeonId: 'valhalla_plain',
+    }, 1_000);
+
+    const [eventTile] = getStoryScenarioFieldEventTiles('valhalla_plain', event, world);
+    serverActor.tile = { x: eventTile.x, y: eventTile.y + 1 };
+    const result = session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'open-valhalla-oil-can',
+        actorId: serverActor.id,
+        dungeonId: 'valhalla_plain',
+        eventId: 'valhalla_oil_can_cache',
+    }, 1_100);
+
+    const fieldResult = result.replies.find((message) => message.type === 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.equal(fieldResult?.type, 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.deepEqual(fieldResult.rewards, [{ type: 'item', itemId: 'orig_story_ep16_oil_can' }]);
+});
+
 test('server-authoritative field scenario events reject invalid actors and distant requests', () => {
     const session = new WorldSession();
     const world = new WorldMap();

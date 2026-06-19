@@ -1827,7 +1827,7 @@ export class WorldSession {
             results.push({
                 type: 'item',
                 itemId: item.id,
-                ...(reward.originalItemId !== undefined ? { originalItemId: reward.originalItemId } : {}),
+                ...(reward.originalItemId !== undefined && reward.originalItemId > 0 ? { originalItemId: reward.originalItemId } : {}),
             });
         }
         return results;
