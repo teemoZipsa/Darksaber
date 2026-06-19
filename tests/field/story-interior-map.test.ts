@@ -531,6 +531,11 @@ test('Etna Volcano exposes original episode 3 entry, chest, and Ganomas event fl
     assert.ok(sequence.fieldEvents.every((event) => event.originalSource === 'MAP/03set.arc:03.evt'));
     assert.ok(sequence.fieldEvents.every((event) => event.markerKind === 'chest'));
     assert.ok(sequence.fieldEvents.every((event) => event.triggerTiles.every((tile) => map.isWalkable(tile.x, tile.y))));
+    assert.equal(sequence.bossDefeatEvent?.originalSource, 'MAP/03set.arc:03.evt');
+    assert.equal(sequence.bossDefeatEvent?.originalEventId, 'EVENT 54/99');
+    assert.match(sequence.bossDefeatEvent?.trigger ?? '', /GETITEM 098/);
+    assert.match(sequence.bossDefeatEvent?.trigger ?? '', /SCENECLEAR/);
+    assert.equal(sequence.bossDefeatEvent?.runtimeFlag, 'etna_ganomas_defeated');
     assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
     assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'objective').length, 2);
 });
@@ -585,6 +590,10 @@ test('episodes 4 through 6 expose original field scenario event flows', () => {
     assert.equal(arcadia.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 300)).length, 2);
     assert.equal(arcadia.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.itemId === 'orig_story_0300_heal_potion')).length, 2);
     assert.ok(arcadia.fieldEvents.some((event) => event.id === 'arcadia_child_rescue'));
+    assert.equal(arcadia.bossDefeatEvent?.originalSource, 'MAP/04set.arc:04.evt');
+    assert.equal(arcadia.bossDefeatEvent?.originalEventId, 'EVENT 24/99');
+    assert.match(arcadia.bossDefeatEvent?.trigger ?? '', /GETGENERAL 101/);
+    assert.match(arcadia.bossDefeatEvent?.trigger ?? '', /SCENECLEAR/);
     assert.equal(arcadia.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
 
     assert.equal(cacaora.originalSources.sceneScript, 'Wlib/scene5.lsc');
@@ -595,6 +604,10 @@ test('episodes 4 through 6 expose original field scenario event flows', () => {
     assert.ok(cacaora.fieldEvents.some((event) => event.id === 'cacaora_rusted_sword'));
     assert.ok(cacaora.fieldEvents.some((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.originalItemId === 305)));
     assert.equal(cacaora.fieldEvents.filter((event) => event.rewards?.some((reward) => reward.type === 'item' && reward.itemId === 'orig_story_0305_magic_potion')).length, 1);
+    assert.equal(cacaora.bossDefeatEvent?.originalSource, 'MAP/05set.arc:05.evt');
+    assert.equal(cacaora.bossDefeatEvent?.originalEventId, 'EVENT 99');
+    assert.match(cacaora.bossDefeatEvent?.trigger ?? '', /GETGENERAL 103/);
+    assert.match(cacaora.bossDefeatEvent?.trigger ?? '', /SCENECLEAR/);
 
     assert.equal(village.originalSources.sceneScript, 'Wlib/scene6.lsc');
     assert.ok(village.originalSources.mapFiles.includes('MAP/06set.arc'));
@@ -603,6 +616,10 @@ test('episodes 4 through 6 expose original field scenario event flows', () => {
     assert.ok(village.fieldEvents.some((event) => event.id === 'remote_village_healer_01'));
     assert.ok(village.fieldEvents.some((event) => event.id === 'remote_village_poison_02'));
     assert.ok(village.fieldEvents.some((event) => event.id === 'remote_village_dark_root'));
+    assert.equal(village.bossDefeatEvent?.originalSource, 'MAP/06set.arc:06.evt');
+    assert.equal(village.bossDefeatEvent?.originalEventId, 'EVENT 99');
+    assert.match(village.bossDefeatEvent?.trigger ?? '', /CHARDEAD 700/);
+    assert.match(village.bossDefeatEvent?.trigger ?? '', /SCENECLEAR/);
     assert.equal(village.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
 });
 

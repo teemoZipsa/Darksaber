@@ -931,6 +931,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.470', focus: { x: 18, y: 6 } }],
             },
         ],
+        bossDefeatEvent: {
+            id: 'etna_ganomas_clear',
+            originalSource: 'MAP/03set.arc:03.evt',
+            originalEventId: 'EVENT 54/99',
+            trigger: 'ALL CHARDEAD 700 GETITEM 098 GETGENERAL 100 / SCENECLEAR',
+            runtimeFlag: 'etna_ganomas_defeated',
+        },
         bossDefeat: [
             {
                 kind: 'dialogue',
@@ -1092,6 +1099,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 ],
             },
         ],
+        bossDefeatEvent: {
+            id: 'arcadia_eurytion_clear',
+            originalSource: 'MAP/04set.arc:04.evt',
+            originalEventId: 'EVENT 24/99',
+            trigger: 'ALL CHARDEAD 700 GETGENERAL 101 / SCENECLEAR',
+            runtimeFlag: 'arcadia_eurytion_defeated',
+        },
         bossDefeat: [
             { kind: 'dialogue', speakerId: 'eurytion', speakerNameKey: 'story.event.speaker.eurytion', textKey: 'story.event.ep04.bossDefeat.01', focus: { x: 19, y: 2 } },
             { kind: 'objective', labelKey: 'story.event.ep04.objective', focus: { x: 11, y: 39 } },
@@ -1167,6 +1181,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep05.field.magicPotion.result', focus: { x: 27, y: 23 } }],
             },
         ],
+        bossDefeatEvent: {
+            id: 'cacaora_minotaur_clear',
+            originalSource: 'MAP/05set.arc:05.evt',
+            originalEventId: 'EVENT 99',
+            trigger: 'ALL CHARDEAD 700 GETGENERAL 103 SCENECLEAR',
+            runtimeFlag: 'cacaora_minotaur_defeated',
+        },
         bossDefeat: [
             { kind: 'objective', labelKey: 'story.event.ep05.objective', focus: { x: 24, y: 39 } },
         ],
@@ -1228,6 +1249,13 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 steps: [{ kind: 'objective', labelKey: 'story.event.ep06.field.root.result', focus: { x: 20, y: 16 } }],
             },
         ],
+        bossDefeatEvent: {
+            id: 'remote_village_pachi_clear',
+            originalSource: 'MAP/06set.arc:06.evt',
+            originalEventId: 'EVENT 99',
+            trigger: 'ALL CHARDEAD 700 SCENECLEAR',
+            runtimeFlag: 'remote_village_pachi_defeated',
+        },
         bossDefeat: [
             { kind: 'dialogue', speakerId: 'pachi', speakerNameKey: 'story.event.speaker.pachi', textKey: 'story.event.ep06.bossDefeat.01', focus: { x: 20, y: 16 } },
             { kind: 'objective', labelKey: 'story.event.ep06.objective', focus: { x: 17, y: 34 } },
