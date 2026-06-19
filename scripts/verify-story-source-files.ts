@@ -13,7 +13,7 @@ import { TileType } from '../src/map/Tile';
 import { WorldMap } from '../src/map/WorldMap';
 import { getStoryInteriorLayout, STORY_INTERIOR_LAYOUTS } from '../src/data/StoryInteriorData';
 import { getMonsterDefinitionSafe } from '../src/data/MonsterCatalog';
-import { getOriginalLateStoryFact } from '../src/data/OriginalLateStoryFacts';
+import { getOriginalLateStoryCacheEvents, getOriginalLateStoryFact } from '../src/data/OriginalLateStoryFacts';
 import { getOriginalLateStoryItemsForSourceEvent } from '../src/data/OriginalLateStoryItems';
 import { getOriginalLateStoryMrcFact, getOriginalLateStoryMrcVisualSymbol } from '../src/data/OriginalLateStoryMapFacts';
 import {
@@ -1071,6 +1071,26 @@ function verifyLateStoryOriginalMapContract(
         'late story entry move target',
         entryMove.target,
         { x: layout.playerStart.x, y: layout.playerStart.y - 1 }
+    );
+
+    const expectedCaches = getOriginalLateStoryCacheEvents(episode);
+    requireJsonEqual(
+        episode,
+        'late story cache event order',
+        sequence.fieldEvents.map((event) => event.originalEventId),
+        expectedCaches.map((event) => `EVENT ${event.eventNumber}`)
+    );
+    requireJsonEqual(
+        episode,
+        'late story cache trigger tiles',
+        sequence.fieldEvents.map((event) => event.triggerTiles),
+        expectedCaches.map((event) => [event.tile])
+    );
+    requireJsonEqual(
+        episode,
+        'late story cache GETITEM rewards',
+        sequence.fieldEvents.map((event) => (event.rewards ?? []).map((reward) => reward.type === 'item' ? reward.originalItemId : null)),
+        expectedCaches.map((event) => [event.originalItemId])
     );
 }
 
