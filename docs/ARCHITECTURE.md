@@ -45,4 +45,5 @@ See `docs/monster-balance.md` for the detailed model and tests.
 ## 6. Network Story Field Events
 - Outdoor story field events use deterministic original-coordinate placement from `src/data/StoryScenarioFieldEventPlacement.ts`; the client and server share the same placement function.
 - Network raids submit only `dungeonId` and `eventId` for outdoor field-event interaction. `server/WorldSession.ts` validates actor ownership, active scenario, distance, completion scope, and rewards from server-side scenario data.
+- Scenario field reward result item payloads preserve original GETITEM ids as optional `originalItemId` when available; `NetworkRaidClient` validates the reward payload shape before dispatch.
 - Field-event completion is tracked as viewer-specific `playerFieldEventFlagsByDungeonId` plus session-wide `sharedFieldEventFlagsByDungeonId` in `ScenarioSnapshot`. True multi-account party progression remains a future party-system migration.

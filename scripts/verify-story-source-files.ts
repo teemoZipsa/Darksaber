@@ -339,6 +339,20 @@ function verifyPlanningDocCurrent(): void {
     }
 }
 
+function verifyArchitectureDocCurrent(): void {
+    const path = 'docs/ARCHITECTURE.md';
+    const content = readFileSync(path, 'utf8');
+    const requiredPhrases = [
+        'original GETITEM ids as optional `originalItemId`',
+        'validates the reward payload shape before dispatch',
+    ];
+    for (const phrase of requiredPhrases) {
+        if (!content.includes(phrase)) {
+            throw new Error(`${path} is missing scenario reward contract phrase: ${phrase}`);
+        }
+    }
+}
+
 function requireArrayEqual(episode: number, label: string, actual: string[], expected: string[]): void {
     if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
         throw new Error(`Episode ${episode} ${label} mismatch.\n  docs: ${actual.join(', ')}\n  data: ${expected.join(', ')}`);
@@ -1607,6 +1621,7 @@ const worldMap = new WorldMap();
 const verified: string[] = [];
 
 verifyPlanningDocCurrent();
+verifyArchitectureDocCurrent();
 verifyStoryCollectionContracts(options.start, options.end, docRows, roadmapRows, contentRows);
 
 for (let episode = options.start; episode <= options.end; episode++) {
