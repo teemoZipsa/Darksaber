@@ -1039,6 +1039,18 @@ function verifyLateStoryOriginalMapContract(
     requireJsonEqual(episode, 'original boss AI area', layout.originalAi?.bossArea, fact.bossArea);
     requireJsonEqual(episode, 'original guard AI areas', layout.originalAi?.guardAreas, fact.guardAreas);
     requireJsonEqual(episode, 'original staging positions', layout.originalAi?.staging, fact.staging);
+    requireJsonEqual(
+        episode,
+        'late story runtime boss tile',
+        layout.bossTile,
+        { x: fact.bossArea.x, y: fact.bossArea.y }
+    );
+    requireJsonEqual(
+        episode,
+        'late story runtime guard tiles',
+        layout.guardTiles,
+        fact.guardAreas.map((area) => ({ x: area.x, y: area.y }))
+    );
 
     if (sequence.originalSources.sceneScript !== `Wlib/scene${episode}.lsc`) {
         throw new Error(`Episode ${episode} scene script mismatch: ${sequence.originalSources.sceneScript}`);
@@ -1061,6 +1073,11 @@ function verifyLateStoryOriginalMapContract(
     }
     if (getOriginalLateStoryMrcVisualSymbol(mrcFact, layout.bossTile.x, layout.bossTile.y) === null) {
         throw new Error(`Episode ${episode} ${scenario.dungeonId} boss tile has no original MRC visual cell`);
+    }
+    for (const [index, tile] of layout.guardTiles.entries()) {
+        if (getOriginalLateStoryMrcVisualSymbol(mrcFact, tile.x, tile.y) === null) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} guard ${index} tile has no original MRC visual cell`);
+        }
     }
 
     for (const [index, position] of fact.staging.entries()) {
