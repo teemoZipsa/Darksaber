@@ -223,6 +223,14 @@ function notesMentionOriginalEvent(notes: string, eventNumber: number): boolean 
     );
 }
 
+function notesMentionTile(notes: string, x: number, y: number): boolean {
+    return new RegExp(`\\{\\s*${x}\\s*,\\s*${y}\\s*\\}`).test(notes);
+}
+
+function notesMentionGuardCount(notes: string, guardCount: number): boolean {
+    return new RegExp(`\\b${guardCount}\\s+guards?\\b|\\b${guardCount}\\s+guard AREA\\b`, 'i').test(notes);
+}
+
 function readScenarioImportDocRows(): Map<number, ScenarioImportDocRow> {
     const path = 'docs/original-scenario-import.md';
     const rows = new Map<number, ScenarioImportDocRow>();
@@ -429,6 +437,21 @@ function verifyScenarioImportDocRow(episode: number, sequence: StoryScenarioEven
         }
     }
     if (episode >= 23 && episode <= 31) {
+        const fact = getOriginalLateStoryFact(episode);
+        if (!row.notes.includes(fact.aiMember)) {
+            throw new Error(`Episode ${episode} docs notes do not mention late AI member ${fact.aiMember}`);
+        }
+        if (!notesMentionTile(row.notes, fact.bossArea.x, fact.bossArea.y)) {
+            throw new Error(`Episode ${episode} docs notes do not mention CHAR 700 boss AREA {${fact.bossArea.x},${fact.bossArea.y}}`);
+        }
+        if (!notesMentionGuardCount(row.notes, fact.guardAreas.length)) {
+            throw new Error(`Episode ${episode} docs notes do not mention ${fact.guardAreas.length} original guard AREA coordinates`);
+        }
+        for (const position of fact.staging) {
+            if (!notesMentionTile(row.notes, position.x, position.y)) {
+                throw new Error(`Episode ${episode} docs notes do not mention DEO/DEE staging tile {${position.x},${position.y}}`);
+            }
+        }
         for (const event of sequence.fieldEvents) {
             for (const eventNumber of originalEventIdNumbers(event.originalEventId)) {
                 if (!notesMentionOriginalEvent(row.notes, eventNumber)) {
