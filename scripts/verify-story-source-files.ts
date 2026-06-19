@@ -365,6 +365,14 @@ function requireStringArrayEqual(label: string, actual: string[], expected: stri
     }
 }
 
+function lateStoryTextKeys(episode: number, group: 'dialogue' | 'bossDefeat', count: number): string[] {
+    const paddedEpisode = String(episode).padStart(2, '0');
+    return Array.from(
+        { length: count },
+        (_, index) => `story.event.ep${paddedEpisode}.${group}.${String(index + 1).padStart(2, '0')}`
+    );
+}
+
 function requireJsonEqual(episode: number, label: string, actual: unknown, expected: unknown): void {
     const actualJson = JSON.stringify(actual);
     const expectedJson = JSON.stringify(expected);
@@ -1067,6 +1075,18 @@ function verifyLateStoryOriginalMapContract(
     if (bossDefeatDialogues.length !== LATE_STORY_BOSS_DEFEAT_DIALOGUE_COUNTS.get(episode)) {
         throw new Error(`Episode ${episode} boss defeat dialogue count mismatch: ${bossDefeatDialogues.length}`);
     }
+    requireJsonEqual(
+        episode,
+        'late story entry dialogue text keys',
+        entryDialogues.map((step) => step.textKey),
+        lateStoryTextKeys(episode, 'dialogue', entryDialogues.length)
+    );
+    requireJsonEqual(
+        episode,
+        'late story boss defeat dialogue text keys',
+        bossDefeatDialogues.map((step) => step.textKey),
+        lateStoryTextKeys(episode, 'bossDefeat', bossDefeatDialogues.length)
+    );
     requireJsonEqual(
         episode,
         'late story entry dialogue focuses',
