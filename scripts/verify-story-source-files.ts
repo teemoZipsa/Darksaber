@@ -1279,6 +1279,15 @@ function verifyLateStoryOriginalMapContract(
     );
     requireJsonEqual(
         episode,
+        'late story cache reward payloads',
+        sequence.fieldEvents.map((event) => (event.rewards ?? []).map((reward) => reward.type === 'item'
+            ? { itemId: reward.itemId, originalItemId: reward.originalItemId }
+            : reward)),
+        expectedCaches.map((event) => getOriginalLateStoryItemsForSourceEvent(episode, event.eventNumber)
+            .map((item) => ({ itemId: item.currentItemId, originalItemId: item.originalItemId })))
+    );
+    requireJsonEqual(
+        episode,
         'late story cache trigger strings',
         sequence.fieldEvents.map((event) => event.trigger),
         expectedCaches.map((event) => `COMMANDER original CHARPOS ${event.tile.x} ${event.tile.y} GETITEM ${event.originalItemId}`)
