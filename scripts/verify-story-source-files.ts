@@ -1092,6 +1092,23 @@ function verifyLateStoryOriginalMapContract(
         sequence.fieldEvents.map((event) => (event.rewards ?? []).map((reward) => reward.type === 'item' ? reward.originalItemId : null)),
         expectedCaches.map((event) => [event.originalItemId])
     );
+
+    if (!sequence.bossDefeatEvent) throw new Error(`Episode ${episode} late story boss defeat event is missing`);
+    if (sequence.bossDefeatEvent.originalSource !== `${fact.setArc}:${fact.eventMember}`) {
+        throw new Error(
+            `Episode ${episode} late story boss source mismatch: ` +
+            `${sequence.bossDefeatEvent.originalSource} !== ${fact.setArc}:${fact.eventMember}`
+        );
+    }
+    if (sequence.bossDefeatEvent.originalEventId !== 'EVENT 99') {
+        throw new Error(`Episode ${episode} late story boss event mismatch: ${sequence.bossDefeatEvent.originalEventId} !== EVENT 99`);
+    }
+    requireJsonEqual(
+        episode,
+        'late story boss EVENT 99 GETITEM rewards',
+        (sequence.bossDefeatEvent.rewards ?? []).map((reward) => reward.type === 'item' ? reward.originalItemId : null),
+        getOriginalLateStoryItemsForSourceEvent(episode, 99).map((item) => item.originalItemId)
+    );
 }
 
 function verifyFieldScenarioWorldProjection(episode: number, scenario: StoryScenarioDefinition, sequence: StoryScenarioEventSequence, worldMap: WorldMap): void {
