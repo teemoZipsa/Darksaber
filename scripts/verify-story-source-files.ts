@@ -353,6 +353,23 @@ function verifyArchitectureDocCurrent(): void {
     }
 }
 
+function verifyOriginalScenarioImportDocCurrent(): void {
+    const path = 'docs/original-scenario-import.md';
+    const content = readFileSync(path, 'utf8');
+    const requiredPhrases = [
+        'Approved item rewards preserve original GETITEM ids as optional `originalItemId` payload metadata.',
+        'Keep it outside the current 1-31 scope until a separate Jade finale pass maps the final flow.',
+    ];
+    for (const phrase of requiredPhrases) {
+        if (!content.includes(phrase)) {
+            throw new Error(`${path} is missing current 1-31 import contract phrase: ${phrase}`);
+        }
+    }
+    if (content.includes('Implementation deferred until 31 is verified')) {
+        throw new Error(`${path} still contains stale episode 32 deferral text`);
+    }
+}
+
 function requireArrayEqual(episode: number, label: string, actual: string[], expected: string[]): void {
     if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
         throw new Error(`Episode ${episode} ${label} mismatch.\n  docs: ${actual.join(', ')}\n  data: ${expected.join(', ')}`);
@@ -1622,6 +1639,7 @@ const verified: string[] = [];
 
 verifyPlanningDocCurrent();
 verifyArchitectureDocCurrent();
+verifyOriginalScenarioImportDocCurrent();
 verifyStoryCollectionContracts(options.start, options.end, docRows, roadmapRows, contentRows);
 
 for (let episode = options.start; episode <= options.end; episode++) {
