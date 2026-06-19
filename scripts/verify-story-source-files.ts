@@ -405,6 +405,21 @@ function verifyScenarioImportDocRow(episode: number, sequence: StoryScenarioEven
             }
         }
     }
+    for (const event of sequence.fieldEvents.filter((candidate) => candidate.completesObjective)) {
+        for (const eventNumber of originalEventIdNumbers(event.originalEventId)) {
+            if (!notesMentionOriginalEvent(row.notes, eventNumber)) {
+                throw new Error(`Episode ${episode} docs notes do not mention objective field EVENT ${eventNumber}`);
+            }
+        }
+        if (/\bSCENECLEAR\b/.test(event.trigger) && !/(scenario clear|SCENECLEAR)/i.test(row.notes)) {
+            throw new Error(`Episode ${episode} docs notes do not mention objective field SCENECLEAR`);
+        }
+        for (const reward of event.rewards ?? []) {
+            if (reward.type === 'item' && !new RegExp(`\\bGETITEM ${reward.originalItemId}\\b`).test(row.notes)) {
+                throw new Error(`Episode ${episode} docs notes do not mention objective field GETITEM ${reward.originalItemId}`);
+            }
+        }
+    }
     if (episode >= 23 && episode <= 31) {
         if (!/\bEVENT 99\b/.test(row.notes)) {
             throw new Error(`Episode ${episode} docs notes do not mention EVENT 99 boss clear`);
