@@ -1159,6 +1159,26 @@ test('Ament 2F exposes original episode 20 Mephistopheles, lightning trap, cache
     assert.equal(ament.fieldEvents.some((event) => event.originalEventId === 'EVENT 90'), false);
     assert.ok(ament.fieldEvents.every((event) => event.originalSource === 'MAP/20set.arc:20.evt'));
     assert.ok(ament.fieldEvents.every((event) => event.triggerTiles.every((tile) => map.isWalkable(tile.x, tile.y))));
+    assert.deepEqual(
+        ament.enemyDefeatEvents?.map((event) => ({
+            eventId: event.originalEventId,
+            charId: event.originalCharId,
+            index: event.scenarioEnemyIndex,
+            textKey: event.steps[0]?.kind === 'dialogue' ? event.steps[0].textKey : '',
+        })),
+        [
+            { eventId: 'EVENT 3', charId: 420, index: 0, textKey: 'story.event.ep20.enemyDefeat.420' },
+            { eventId: 'EVENT 4', charId: 430, index: 1, textKey: 'story.event.ep20.enemyDefeat.430' },
+            { eventId: 'EVENT 5', charId: 440, index: 2, textKey: 'story.event.ep20.enemyDefeat.440' },
+            { eventId: 'EVENT 6', charId: 450, index: 3, textKey: 'story.event.ep20.enemyDefeat.450' },
+            { eventId: 'EVENT 8', charId: 470, index: 4, textKey: 'story.event.ep20.enemyDefeat.470' },
+            { eventId: 'EVENT 9', charId: 480, index: 5, textKey: 'story.event.ep20.enemyDefeat.480' },
+            { eventId: 'EVENT 10', charId: 490, index: 6, textKey: 'story.event.ep20.enemyDefeat.490' },
+            { eventId: 'EVENT 11', charId: 500, index: 7, textKey: 'story.event.ep20.enemyDefeat.500' },
+            { eventId: 'EVENT 12', charId: 510, index: 8, textKey: 'story.event.ep20.enemyDefeat.510' },
+            { eventId: 'EVENT 13', charId: 520, index: 9, textKey: 'story.event.ep20.enemyDefeat.520' },
+        ]
+    );
     assert.ok(ament.bossDefeat.some((step) => step.kind === 'objective' && step.labelKey === 'story.event.ep20.darkSword.objective'));
     assert.equal(ament.bossDefeat.filter((step) => step.kind === 'dialogue').length, 2);
     assert.equal(ament.bossDefeat.filter((step) => step.kind === 'objective').length, 2);

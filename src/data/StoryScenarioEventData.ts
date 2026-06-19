@@ -149,6 +149,38 @@ function ament1fTrapEvent(eventNumber: number, triggerTiles: TilePoint[]): Story
     };
 }
 
+function ament2fEnemyDefeatEvents(): StoryScenarioEnemyDefeatEvent[] {
+    const sources = [
+        { eventNumber: 3, originalCharId: 420, focus: { x: 23, y: 14 } },
+        { eventNumber: 4, originalCharId: 430, focus: { x: 25, y: 14 } },
+        { eventNumber: 5, originalCharId: 440, focus: { x: 27, y: 14 } },
+        { eventNumber: 6, originalCharId: 450, focus: { x: 31, y: 14 } },
+        { eventNumber: 8, originalCharId: 470, focus: { x: 33, y: 14 } },
+        { eventNumber: 9, originalCharId: 480, focus: { x: 35, y: 14 } },
+        { eventNumber: 10, originalCharId: 490, focus: { x: 23, y: 16 } },
+        { eventNumber: 11, originalCharId: 500, focus: { x: 25, y: 16 } },
+        { eventNumber: 12, originalCharId: 510, focus: { x: 33, y: 16 } },
+        { eventNumber: 13, originalCharId: 520, focus: { x: 35, y: 16 } },
+    ];
+
+    return sources.map((source, index) => ({
+        id: `ament_2f_enemy_defeat_${source.originalCharId}`,
+        originalSource: 'MAP/20set.arc:20.evt',
+        originalEventId: `EVENT ${source.eventNumber}`,
+        trigger: `CHARDEAD ${source.originalCharId}`,
+        enemyId: `scenario:ament_2f:guard_${index}`,
+        scenarioEnemyIndex: index,
+        originalCharId: source.originalCharId,
+        steps: [{
+            kind: 'dialogue',
+            speakerId: 'ament2fGuard',
+            speakerNameKey: 'story.event.speaker.ament2fGuard',
+            textKey: `story.event.ep20.enemyDefeat.${source.originalCharId}`,
+            focus: source.focus,
+        }],
+    }));
+}
+
 function lateScenarioCacheEvent(
     dungeonId: string,
     episode: number,
@@ -2725,6 +2757,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { id: 'ament_2f_flail_saber7_cache', originalSource: 'MAP/20set.arc:20.evt', originalEventId: 'EVENT 83', trigger: 'COMMANDER ONLY_CHAR 700 CHARPOS3 1 19 154 GETITEM 632', triggerTiles: [{ x: 1, y: 19 }], runtimeFlag: 'ament_2f_flail_saber7_cache', markerLabelKey: 'story.event.ep20.cache.marker', rewards: [{ type: 'item', itemId: 'orig_story_0632_flail_saber7', originalItemId: 632 }], steps: [{ kind: 'objective', labelKey: 'story.event.ep20.cache.flailSaber7', focus: { x: 1, y: 19 } }] },
             { id: 'ament_2f_crystal_mail7_cache', originalSource: 'MAP/20set.arc:20.evt', originalEventId: 'EVENT 84', trigger: 'COMMANDER ONLY_CHAR 700 CHARPOS 31 60 GETITEM 855', triggerTiles: [{ x: 31, y: 60 }], runtimeFlag: 'ament_2f_crystal_mail7_cache', markerLabelKey: 'story.event.ep20.cache.marker', rewards: [{ type: 'item', itemId: 'orig_story_0855_crystal_mail7', originalItemId: 855 }], steps: [{ kind: 'objective', labelKey: 'story.event.ep20.cache.crystalMail7', focus: { x: 31, y: 60 } }] },
         ],
+        enemyDefeatEvents: ament2fEnemyDefeatEvents(),
         bossDefeat: [
             { kind: 'dialogue', speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep20.darkSword.inspect', focus: { x: 29, y: 7 } },
             { kind: 'objective', labelKey: 'story.event.ep20.darkSword.objective', focus: { x: 29, y: 7 } },

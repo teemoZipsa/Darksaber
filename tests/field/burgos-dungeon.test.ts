@@ -730,7 +730,7 @@ test('local scenario enemy deaths return all original CHARDEAD presentation step
         .filter((entry) => (entry.sequence?.enemyDefeatEvents?.length ?? 0) > 0);
     assert.deepEqual(
         scenariosWithEnemyDefeatEvents.map((entry) => entry.scenario.episode),
-        [3, 12],
+        [3, 12, 20],
         'all local CHARDEAD story events are covered by this test'
     );
 
