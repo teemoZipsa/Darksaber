@@ -205,6 +205,16 @@ function extractBacktickValues(value: string): string[] {
     return [...value.matchAll(/`([^`]+)`/g)].map((match) => match[1]);
 }
 
+function originalEventIdNumbers(originalEventId: string): number[] {
+    return [...originalEventId.matchAll(/\d+/g)].map((match) => Number(match[0]));
+}
+
+function notesMentionOriginalEvent(notes: string, eventNumber: number): boolean {
+    return [...notes.matchAll(/\bEVENT\s+([\d/]+)/g)].some((match) =>
+        match[1].split('/').some((part) => Number(part) === eventNumber)
+    );
+}
+
 function readScenarioImportDocRows(): Map<number, ScenarioImportDocRow> {
     const path = 'docs/original-scenario-import.md';
     const rows = new Map<number, ScenarioImportDocRow>();
@@ -377,6 +387,24 @@ function verifyScenarioImportDocRow(episode: number, sequence: StoryScenarioEven
         throw new Error(`Episode ${episode} docs global mismatch: ${row.globalScript} !== ${sequence.originalSources.globalScript}`);
     }
     requireArrayEqual(episode, 'docs map candidates', row.mapFiles, sequence.originalSources.mapFiles);
+    if (sequence.bossDefeatEvent) {
+        for (const eventNumber of originalEventIdNumbers(sequence.bossDefeatEvent.originalEventId)) {
+            if (!notesMentionOriginalEvent(row.notes, eventNumber)) {
+                throw new Error(`Episode ${episode} docs notes do not mention boss EVENT ${eventNumber}`);
+            }
+        }
+        if (/\bCHARDEAD 700\b/.test(sequence.bossDefeatEvent.trigger) && !/\bCHARDEAD 700\b/.test(row.notes)) {
+            throw new Error(`Episode ${episode} docs notes do not mention boss CHARDEAD 700`);
+        }
+        if (/\bSCENECLEAR\b/.test(sequence.bossDefeatEvent.trigger) && !/(scenario clear|SCENECLEAR)/i.test(row.notes)) {
+            throw new Error(`Episode ${episode} docs notes do not mention boss scenario clear`);
+        }
+        for (const reward of sequence.bossDefeatEvent.rewards ?? []) {
+            if (reward.type === 'item' && !new RegExp(`\\bGETITEM ${reward.originalItemId}\\b`).test(row.notes)) {
+                throw new Error(`Episode ${episode} docs notes do not mention boss GETITEM ${reward.originalItemId}`);
+            }
+        }
+    }
     if (episode >= 23 && episode <= 31) {
         if (!/\bEVENT 99\b/.test(row.notes)) {
             throw new Error(`Episode ${episode} docs notes do not mention EVENT 99 boss clear`);
