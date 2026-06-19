@@ -97,6 +97,11 @@ const LATE_STORY_BOSS_DEFEAT_FOCUSES = new Map<number, string[]>([
     [30, ['19,9', '19,7', '19,7', '19,7', '19,9', '19,7', '19,7', '19,9', '19,7', '19,9']],
     [31, ['19,7', '19,9', '19,7', '19,9', '19,7', '19,9', '19,7', '19,9']],
 ]);
+const LATE_STORY_FOCUS_STEP_DURATION_MS = 650;
+const LATE_STORY_MOVE_ACTOR_STEP_DURATION_MS = 700;
+const LATE_STORY_DIALOGUE_STEP_DURATION_MS = 1600;
+const LATE_STORY_COMBAT_START_STEP_DURATION_MS = 900;
+const LATE_STORY_OBJECTIVE_STEP_DURATION_MS = 900;
 const LATE_STORY_CACHE_STEP_DURATION_MS = 700;
 
 interface Options {
@@ -1060,6 +1065,24 @@ function verifyLateStoryOriginalMapContract(
     if (sequence.bossDefeat.filter((step) => step.kind === 'objective').length !== 1) {
         throw new Error(`Episode ${episode} boss defeat sequence must contain exactly one objective step`);
     }
+    requireJsonEqual(
+        episode,
+        'late story entry focus step',
+        sequence.entry[0],
+        { kind: 'focus', target: layout.bossTile, labelKey: `story.event.ep${paddedEpisode}.focus.boss`, durationMs: LATE_STORY_FOCUS_STEP_DURATION_MS }
+    );
+    requireJsonEqual(
+        episode,
+        'late story entry dialogue durations',
+        entryDialogues.map((step) => getStoryScenarioEventStepDurationMs(step)),
+        entryDialogues.map(() => LATE_STORY_DIALOGUE_STEP_DURATION_MS)
+    );
+    requireJsonEqual(
+        episode,
+        'late story boss defeat dialogue durations',
+        bossDefeatDialogues.map((step) => getStoryScenarioEventStepDurationMs(step)),
+        bossDefeatDialogues.map(() => LATE_STORY_DIALOGUE_STEP_DURATION_MS)
+    );
     const entryMove = sequence.entry.find(
         (step): step is Extract<StoryScenarioEventStep, { kind: 'moveActor' }> => step.kind === 'moveActor'
     );
@@ -1072,6 +1095,48 @@ function verifyLateStoryOriginalMapContract(
         'late story entry move target',
         entryMove.target,
         { x: layout.playerStart.x, y: layout.playerStart.y - 1 }
+    );
+    requireJsonEqual(
+        episode,
+        'late story entry move step',
+        entryMove,
+        {
+            kind: 'moveActor',
+            actorId: 'hero',
+            target: { x: layout.playerStart.x, y: layout.playerStart.y - 1 },
+            focus: { x: layout.playerStart.x, y: layout.playerStart.y - 1 },
+            durationMs: LATE_STORY_MOVE_ACTOR_STEP_DURATION_MS,
+        }
+    );
+    const entryCombatStart = sequence.entry.find(
+        (step): step is Extract<StoryScenarioEventStep, { kind: 'combatStart' }> => step.kind === 'combatStart'
+    );
+    if (!entryCombatStart) throw new Error(`Episode ${episode} entry sequence is missing combatStart step`);
+    requireJsonEqual(
+        episode,
+        'late story entry combatStart step',
+        entryCombatStart,
+        {
+            kind: 'combatStart',
+            labelKey: `story.event.ep${paddedEpisode}.combatStart`,
+            focus: layout.bossTile,
+            durationMs: LATE_STORY_COMBAT_START_STEP_DURATION_MS,
+        }
+    );
+    const bossObjective = sequence.bossDefeat.find(
+        (step): step is Extract<StoryScenarioEventStep, { kind: 'objective' }> => step.kind === 'objective'
+    );
+    if (!bossObjective) throw new Error(`Episode ${episode} boss defeat sequence is missing objective step`);
+    requireJsonEqual(
+        episode,
+        'late story boss objective step',
+        bossObjective,
+        {
+            kind: 'objective',
+            labelKey: `story.event.ep${paddedEpisode}.objective`,
+            focus: layout.bossTile,
+            durationMs: LATE_STORY_OBJECTIVE_STEP_DURATION_MS,
+        }
     );
 
     const expectedCaches = getOriginalLateStoryCacheEvents(episode);
