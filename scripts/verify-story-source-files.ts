@@ -330,6 +330,42 @@ function verifyOriginalScenarioImportDocCurrent(): void {
     }
 }
 
+function verifyDeferredScenarioSourceBoundaries(sourceRoot: string, docRows: Map<number, ScenarioImportDocRow>): void {
+    const episode32 = docRows.get(32);
+    const episode33 = docRows.get(33);
+    if (!episode32) throw new Error('Missing docs/original-scenario-import.md boundary row for episode 32');
+    if (!episode33) throw new Error('Missing docs/original-scenario-import.md boundary row for episode 33');
+    if (STORY_SCENARIOS.some((scenario) => scenario.episode > 31)) {
+        throw new Error('Runtime story scenarios include episodes beyond the verified 1-31 scope');
+    }
+
+    requireSourceFile(sourceRoot, 32, 'Wlib/scene32.lsc');
+    requireAbsentSourceFile(sourceRoot, 32, 'Glib/gscene32.lsc');
+    for (const sourceFile of episode32.mapFiles) {
+        requireSourceFile(sourceRoot, 32, sourceFile);
+    }
+
+    requireSourceFile(sourceRoot, 33, 'Wlib/scene33.lsc');
+    requireAbsentSourceFile(sourceRoot, 33, 'Glib/gscene33.lsc');
+    for (const sourceFile of episode33.mapFiles) {
+        requireAbsentSourceFile(sourceRoot, 33, sourceFile);
+    }
+
+    for (let episode = 34; episode <= 46; episode++) {
+        const paddedEpisode = String(episode).padStart(2, '0');
+        requireSourceFile(sourceRoot, episode, `Wlib/scene${episode}.lsc`);
+        requireAbsentSourceFile(sourceRoot, episode, `Glib/gscene${episode}.lsc`);
+        for (const sourceFile of [
+            `MAP/${paddedEpisode}.mrc`,
+            `MAP/${paddedEpisode}t.mrc`,
+            `MAP/${paddedEpisode}hmap.bmp`,
+            `MAP/${paddedEpisode}set.arc`,
+        ]) {
+            requireAbsentSourceFile(sourceRoot, episode, sourceFile);
+        }
+    }
+}
+
 function requireArrayEqual(episode: number, label: string, actual: string[], expected: string[]): void {
     if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
         throw new Error(`Episode ${episode} ${label} mismatch.\n  docs: ${actual.join(', ')}\n  data: ${expected.join(', ')}`);
@@ -1741,6 +1777,7 @@ const verified: string[] = [];
 verifyPlanningDocCurrent();
 verifyArchitectureDocCurrent();
 verifyOriginalScenarioImportDocCurrent();
+verifyDeferredScenarioSourceBoundaries(sourceRoot, docRows);
 verifyStoryCollectionContracts(options.start, options.end, docRows, roadmapRows, contentRows);
 
 for (let episode = options.start; episode <= options.end; episode++) {
@@ -1798,4 +1835,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, planning docs, collection chains, quests, quest display text, rewards, event references, scenario ledgers, world entrances, hmaps, late-story biomes, interior accessibility, late-story original AI/MRC and conditional DEO/DEE presentations, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, planning docs, deferred source boundaries, collection chains, quests, quest display text, rewards, event references, scenario ledgers, world entrances, hmaps, late-story biomes, interior accessibility, late-story original AI/MRC and conditional DEO/DEE presentations, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
