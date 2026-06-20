@@ -116,12 +116,14 @@ AUTH_JWT_SECRET=<long random>
 AUTH_REFRESH_TOKEN_HASH_SECRET=<different long random>
 AUTH_ALLOWED_ORIGINS=https://<vercel-client-host>
 WORLD_SESSION_SNAPSHOT_MS=5000
+WORLD_SESSION_LEASE_TTL_MS=15000
 ```
 
 When `DATABASE_URL` is present, active world-session snapshots are stored in
-Postgres (`world_session_snapshots`). Set `WORLD_SESSION_SNAPSHOT_STORE=file`
-only for local fallback testing; file mode uses `WORLD_SESSION_SNAPSHOT_PATH`
-and is not shared across processes.
+Postgres (`world_session_snapshots`) and protected by per-session leases
+(`world_session_leases`). Set `WORLD_SESSION_SNAPSHOT_STORE=file` only for local
+fallback testing; file mode uses `WORLD_SESSION_SNAPSHOT_PATH` and is not shared
+across processes.
 
 Render Free Web Services may sleep when there is no traffic. While a player has
 the world WebSocket open, the client sends `CLIENT_HEARTBEAT` about every 45
@@ -155,10 +157,13 @@ Postgres when `DATABASE_URL` is configured, otherwise to the local
 marked as disconnected so they can reclaim the raid with their resume token.
 Empty/completed sessions are removed from the snapshot store.
 
-Postgres snapshot storage is shared durable storage for raid-instance recovery,
-but it is not a distributed lock or authoritative compute layer. Running several
-world server instances against the same raid instance still needs single-owner
-routing or a lease/lock before accepting writes from multiple processes.
+Postgres snapshot storage is shared durable storage for raid-instance recovery.
+Before a server creates, restores, or writes a raid instance it must hold that
+session key's lease; failed lease acquisition returns `SESSION_OWNED_ELSEWHERE`
+for new joins, and lost leases stop local writes. This prevents multiple
+processes from writing the same raid instance at once, but it is still not a
+full authoritative compute placement layer. Multi-instance production should
+route a given raid instance consistently to its current lease owner.
 
 ## Vercel Client
 

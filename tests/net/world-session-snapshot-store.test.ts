@@ -96,11 +96,24 @@ test('world session snapshot store reloads reconnectable active raid snapshots',
 
 test('postgres world session snapshot store persists shared raid snapshots', async () => {
     const rows = new Map<string, { session_key: string; snapshot: unknown; updated_at: Date }>();
+    const leases = new Map<string, { session_key: string; owner_id: string; lease_expires_at: Date; updated_at: Date }>();
     const queries: string[] = [];
     const pool: PostgresWorldSessionSnapshotPool = {
         async query<T>(text: string, values?: readonly unknown[]): Promise<{ rows: T[] }> {
             queries.push(text);
             if (text.includes('CREATE TABLE')) return { rows: [] };
+            if (text.startsWith('INSERT INTO world_session_leases')) {
+                const sessionKey = String(values?.[0]);
+                const ownerId = String(values?.[1]);
+                const expiresAt = new Date(String(values?.[2]));
+                const updatedAt = new Date(String(values?.[3]));
+                const existing = leases.get(sessionKey);
+                if (!existing || existing.owner_id === ownerId || existing.lease_expires_at <= updatedAt) {
+                    leases.set(sessionKey, { session_key: sessionKey, owner_id: ownerId, lease_expires_at: expiresAt, updated_at: updatedAt });
+                    return { rows: [{ session_key: sessionKey }] as T[] };
+                }
+                return { rows: [] };
+            }
             if (text.startsWith('INSERT INTO world_session_snapshots')) {
                 const sessionKey = String(values?.[0]);
                 rows.set(sessionKey, {
@@ -111,8 +124,23 @@ test('postgres world session snapshot store persists shared raid snapshots', asy
                 return { rows: [] };
             }
             if (text.startsWith('SELECT session_key')) return { rows: [...rows.values()] as T[] };
+            if (text.startsWith('UPDATE world_session_leases')) {
+                const sessionKey = String(values?.[0]);
+                const ownerId = String(values?.[1]);
+                const lease = leases.get(sessionKey);
+                if (!lease || lease.owner_id !== ownerId) return { rows: [] };
+                lease.lease_expires_at = new Date(String(values?.[2]));
+                lease.updated_at = new Date(String(values?.[3]));
+                return { rows: [{ session_key: sessionKey }] as T[] };
+            }
             if (text.startsWith('DELETE FROM world_session_snapshots WHERE')) {
                 rows.delete(String(values?.[0]));
+                return { rows: [] };
+            }
+            if (text.startsWith('DELETE FROM world_session_leases')) {
+                const sessionKey = String(values?.[0]);
+                const ownerId = String(values?.[1]);
+                if (leases.get(sessionKey)?.owner_id === ownerId) leases.delete(sessionKey);
                 return { rows: [] };
             }
             if (text.startsWith('DELETE FROM world_session_snapshots')) {
@@ -135,6 +163,10 @@ test('postgres world session snapshot store persists shared raid snapshots', asy
     });
 
     await store.initialize();
+    assert.equal(await store.acquireLease('mortal:raid:party_alpha', 'server-a', 15_000), true);
+    assert.equal(await store.acquireLease('mortal:raid:party_alpha', 'server-b', 15_000), false);
+    assert.equal(await store.renewLease('mortal:raid:party_alpha', 'server-a', 15_000), true);
+    assert.equal(await store.renewLease('mortal:raid:party_alpha', 'server-b', 15_000), false);
     await store.upsert({ sessionKey: 'mortal:raid:party_alpha', snapshot: session.createPersistentSnapshot() });
     const entries = await store.list();
     assert.equal(entries.length, 1);
@@ -144,4 +176,6 @@ test('postgres world session snapshot store persists shared raid snapshots', asy
 
     await store.remove('mortal:raid:party_alpha');
     assert.equal((await store.list()).length, 0);
+    await store.releaseLease('mortal:raid:party_alpha', 'server-a');
+    assert.equal(await store.acquireLease('mortal:raid:party_alpha', 'server-b', 15_000), true);
 });

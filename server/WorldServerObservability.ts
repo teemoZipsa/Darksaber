@@ -14,6 +14,8 @@ export interface WorldServerMetrics {
     sessionSnapshotSaveFailuresTotal: number;
     sessionSnapshotRestoreAppliedTotal: number;
     sessionSnapshotRestoreFailedTotal: number;
+    sessionLeaseAcquireFailuresTotal: number;
+    sessionLeaseLostTotal: number;
     rejectedJoinsDuringShutdownTotal: number;
     shutdownForcedRaidResultsTotal: number;
     shutdownsTotal: number;
@@ -48,6 +50,8 @@ export function createWorldServerMetrics(): WorldServerMetrics {
         sessionSnapshotSaveFailuresTotal: 0,
         sessionSnapshotRestoreAppliedTotal: 0,
         sessionSnapshotRestoreFailedTotal: 0,
+        sessionLeaseAcquireFailuresTotal: 0,
+        sessionLeaseLostTotal: 0,
         rejectedJoinsDuringShutdownTotal: 0,
         shutdownForcedRaidResultsTotal: 0,
         shutdownsTotal: 0,
@@ -130,6 +134,12 @@ export function formatWorldServerMetrics(metrics: WorldServerMetrics, gauges: Wo
         '# HELP darksaber_world_session_snapshot_restore_failed_total Total active raid session snapshots that failed startup restore.',
         '# TYPE darksaber_world_session_snapshot_restore_failed_total counter',
         `darksaber_world_session_snapshot_restore_failed_total ${metrics.sessionSnapshotRestoreFailedTotal}`,
+        '# HELP darksaber_world_session_lease_acquire_failures_total Total failed active raid session lease acquisitions.',
+        '# TYPE darksaber_world_session_lease_acquire_failures_total counter',
+        `darksaber_world_session_lease_acquire_failures_total ${metrics.sessionLeaseAcquireFailuresTotal}`,
+        '# HELP darksaber_world_session_lease_lost_total Total active raid session leases lost by this server.',
+        '# TYPE darksaber_world_session_lease_lost_total counter',
+        `darksaber_world_session_lease_lost_total ${metrics.sessionLeaseLostTotal}`,
         '# HELP darksaber_world_rejected_joins_during_shutdown_total Total world joins rejected during shutdown.',
         '# TYPE darksaber_world_rejected_joins_during_shutdown_total counter',
         `darksaber_world_rejected_joins_during_shutdown_total ${metrics.rejectedJoinsDuringShutdownTotal}`,

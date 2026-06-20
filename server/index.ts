@@ -8,6 +8,7 @@ import 'dotenv/config';
 import { WebSocketServer, WebSocket, type RawData } from 'ws';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
 import { createBaseStats, type CharacterStats } from '../src/data/Stats';
 import { isMarketClientMessage, WORLD_PROTOCOL_VERSION } from '../src/net/WorldProtocol';
@@ -49,6 +50,7 @@ const WS_RATE_LIMIT_MESSAGES = Math.max(1, Math.floor(Number(process.env.WORLD_W
 const WS_IDLE_TIMEOUT_MS = Math.max(10_000, Math.floor(Number(process.env.WORLD_WS_IDLE_TIMEOUT_MS ?? 60_000)));
 export const WORLD_SAVE_AUTOSAVE_MS = clampInt(Number(process.env.WORLD_SAVE_AUTOSAVE_MS ?? 90_000), 60_000, 120_000);
 export const WORLD_SESSION_SNAPSHOT_MS = clampInt(Number(process.env.WORLD_SESSION_SNAPSHOT_MS ?? 5_000), 1_000, 30_000);
+const WORLD_SESSION_LEASE_TTL_MS = clampInt(Number(process.env.WORLD_SESSION_LEASE_TTL_MS ?? 15_000), 5_000, 120_000);
 const WORLD_SAVE_RETRY_LIMIT = Math.max(1, Math.floor(Number(process.env.WORLD_SAVE_RETRY_LIMIT ?? 3)));
 const WORLD_SAVE_RETRY_BASE_MS = Math.max(100, Math.floor(Number(process.env.WORLD_SAVE_RETRY_BASE_MS ?? 750)));
 const WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS = Math.max(1_000, Math.floor(Number(process.env.WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS ?? 8_000)));
@@ -67,6 +69,7 @@ const authStore: AuthStore = process.env.DATABASE_URL
     : new InMemoryAuthStore();
 await authStore.initialize();
 const metrics = createWorldServerMetrics();
+const serverInstanceId = process.env.WORLD_SERVER_INSTANCE_ID?.trim() || randomUUID();
 const worldSaveSpool = new WorldSaveSpool({
     persistPath: resolveServerPersistPath(process.env.WORLD_SAVE_SPOOL_PATH, './.runtime/world-save-spool.json'),
 });
@@ -154,6 +157,7 @@ const playerBySocket = new Map<WebSocket, SocketBinding>();
 const socketByPlayer = new Map<string, WebSocket>();
 const socketRateLimits = new Map<WebSocket, { windowStart: number; count: number; lastMessageAt: number; isAlive: boolean }>();
 const saveTrackers = new Map<string, PlayerSaveTracker>();
+const ownedSessionKeys = new Set<string>();
 const serverStartedAtMs = Date.now();
 let immediateSnapshotFlushScheduled = false;
 
@@ -391,7 +395,12 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
 
     const realm = normalizeRealm(message.requestedRealm);
     const route = resolveWorldSessionRoute({ realm, requestedRaidInstanceId: message.requestedRaidInstanceId });
-    const { sessionKey, session } = getOrCreateSession(route);
+    const routed = await getOrCreateSession(route);
+    if (!routed) {
+        send(ws, { type: 'ERROR', code: 'SESSION_OWNED_ELSEWHERE', message: 'Raid instance is owned by another world server.' });
+        return;
+    }
+    const { sessionKey, session } = routed;
     const serverJoinMessage = buildAuthoritativeJoinMessage(message, character, save, progress);
     let result: ReturnType<WorldSession['join']>;
     try {
@@ -598,8 +607,9 @@ async function closeRevokedSockets(_now: number): Promise<void> {
     }
 }
 
-function getOrCreateSession(route: WorldSessionRoute): { sessionKey: string; session: WorldSession } {
+async function getOrCreateSession(route: WorldSessionRoute): Promise<{ sessionKey: string; session: WorldSession } | null> {
     const sessionKey = createWorldSessionKey(route);
+    if (!await ensureWorldSessionLease(sessionKey)) return null;
     let session = sessions.get(sessionKey);
     if (!session) {
         session = new WorldSession({
@@ -626,6 +636,7 @@ async function restorePersistedWorldSessions(): Promise<{ applied: number; faile
     const now = Date.now();
     for (const entry of await worldSessionSnapshotStore.list()) {
         try {
+            if (!await ensureWorldSessionLease(entry.sessionKey)) continue;
             const session = WorldSession.restorePersistentSnapshot(entry.snapshot, {
                 logger: (message) => console.log(`[WorldSession:${entry.sessionKey}] ${message}`),
             });
@@ -658,9 +669,12 @@ async function persistAllWorldSessionSnapshots(reason: string): Promise<void> {
 
 async function persistWorldSessionSnapshot(sessionKey: string, session: WorldSession, reason: string): Promise<void> {
     try {
+        if (!ownedSessionKeys.has(sessionKey)) return;
+        if (!await renewWorldSessionLease(sessionKey)) return;
         const snapshot = session.createPersistentSnapshot();
         if (!snapshot.players.some((player) => player.active)) {
             await worldSessionSnapshotStore.remove(sessionKey);
+            await releaseWorldSessionLease(sessionKey);
             return;
         }
         await worldSessionSnapshotStore.upsert({ sessionKey, snapshot });
@@ -673,6 +687,37 @@ async function persistWorldSessionSnapshot(sessionKey: string, session: WorldSes
             error: error instanceof Error ? error.message : String(error),
         });
     }
+}
+
+async function ensureWorldSessionLease(sessionKey: string): Promise<boolean> {
+    if (ownedSessionKeys.has(sessionKey)) return renewWorldSessionLease(sessionKey);
+    const acquired = await worldSessionSnapshotStore.acquireLease(sessionKey, serverInstanceId, WORLD_SESSION_LEASE_TTL_MS);
+    if (acquired) ownedSessionKeys.add(sessionKey);
+    else metrics.sessionLeaseAcquireFailuresTotal += 1;
+    return acquired;
+}
+
+async function renewWorldSessionLease(sessionKey: string): Promise<boolean> {
+    const renewed = await worldSessionSnapshotStore.renewLease(sessionKey, serverInstanceId, WORLD_SESSION_LEASE_TTL_MS);
+    if (!renewed) {
+        metrics.sessionLeaseLostTotal += 1;
+        ownedSessionKeys.delete(sessionKey);
+        const session = sessions.get(sessionKey);
+        sessions.delete(sessionKey);
+        if (session) {
+            logServerEvent('warn', 'world_session_lease_lost', { sessionKey, serverInstanceId });
+        }
+    }
+    return renewed;
+}
+
+async function releaseWorldSessionLease(sessionKey: string): Promise<void> {
+    ownedSessionKeys.delete(sessionKey);
+    await worldSessionSnapshotStore.releaseLease(sessionKey, serverInstanceId);
+}
+
+async function releaseAllWorldSessionLeases(): Promise<void> {
+    await Promise.allSettled([...ownedSessionKeys].map((sessionKey) => releaseWorldSessionLease(sessionKey)));
 }
 
 function findReconnectSession(resumeToken: string, accountId: string): {
@@ -913,6 +958,7 @@ async function flushAllCharacterSaves(reason: string): Promise<void> {
 async function closeServers(): Promise<void> {
     await new Promise<void>((resolve) => wss.close(() => resolve()));
     await new Promise<void>((resolve) => server.close(() => resolve()));
+    await releaseAllWorldSessionLeases();
     await worldSessionSnapshotStore.close?.();
 }
 

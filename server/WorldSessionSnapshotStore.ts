@@ -27,6 +27,9 @@ export interface WorldSessionSnapshotStoreBackend {
     upsert(input: Omit<PendingWorldSessionSnapshot, 'updatedAt'> & { updatedAt?: string }): Promise<void>;
     remove(sessionKey: string): Promise<void>;
     clear(): Promise<void>;
+    acquireLease(sessionKey: string, ownerId: string, ttlMs: number): Promise<boolean>;
+    renewLease(sessionKey: string, ownerId: string, ttlMs: number): Promise<boolean>;
+    releaseLease(sessionKey: string, ownerId: string): Promise<void>;
     close?(): Promise<void>;
 }
 
@@ -69,6 +72,18 @@ export class WorldSessionSnapshotStore implements WorldSessionSnapshotStoreBacke
         if (this.entries.size === 0) return;
         this.entries.clear();
         this.flush();
+    }
+
+    public async acquireLease(_sessionKey: string, _ownerId: string, _ttlMs: number): Promise<boolean> {
+        return true;
+    }
+
+    public async renewLease(_sessionKey: string, _ownerId: string, _ttlMs: number): Promise<boolean> {
+        return true;
+    }
+
+    public async releaseLease(_sessionKey: string, _ownerId: string): Promise<void> {
+        return undefined;
     }
 
     private flush(): void {
@@ -115,6 +130,13 @@ export class PostgresWorldSessionSnapshotStore implements WorldSessionSnapshotSt
                 snapshot jsonb NOT NULL,
                 updated_at timestamptz NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS world_session_leases (
+                session_key text PRIMARY KEY,
+                owner_id text NOT NULL,
+                lease_expires_at timestamptz NOT NULL,
+                updated_at timestamptz NOT NULL
+            );
         `);
     }
 
@@ -148,6 +170,41 @@ export class PostgresWorldSessionSnapshotStore implements WorldSessionSnapshotSt
 
     public async clear(): Promise<void> {
         await this.pool.query(`DELETE FROM world_session_snapshots`);
+    }
+
+    public async acquireLease(sessionKey: string, ownerId: string, ttlMs: number): Promise<boolean> {
+        const now = this.now().toISOString();
+        const expiresAt = new Date(Date.parse(now) + ttlMs).toISOString();
+        const result = await this.pool.query<{ session_key: string }>(
+            `INSERT INTO world_session_leases (session_key, owner_id, lease_expires_at, updated_at)
+             VALUES ($1, $2, $3::timestamptz, $4::timestamptz)
+             ON CONFLICT (session_key) DO UPDATE SET
+                owner_id = EXCLUDED.owner_id,
+                lease_expires_at = EXCLUDED.lease_expires_at,
+                updated_at = EXCLUDED.updated_at
+             WHERE world_session_leases.owner_id = EXCLUDED.owner_id
+                OR world_session_leases.lease_expires_at <= $4::timestamptz
+             RETURNING session_key`,
+            [sessionKey, ownerId, expiresAt, now],
+        );
+        return result.rows.length > 0;
+    }
+
+    public async renewLease(sessionKey: string, ownerId: string, ttlMs: number): Promise<boolean> {
+        const now = this.now().toISOString();
+        const expiresAt = new Date(Date.parse(now) + ttlMs).toISOString();
+        const result = await this.pool.query<{ session_key: string }>(
+            `UPDATE world_session_leases
+             SET lease_expires_at = $3::timestamptz, updated_at = $4::timestamptz
+             WHERE session_key = $1 AND owner_id = $2
+             RETURNING session_key`,
+            [sessionKey, ownerId, expiresAt, now],
+        );
+        return result.rows.length > 0;
+    }
+
+    public async releaseLease(sessionKey: string, ownerId: string): Promise<void> {
+        await this.pool.query(`DELETE FROM world_session_leases WHERE session_key = $1 AND owner_id = $2`, [sessionKey, ownerId]);
     }
 
     public async close(): Promise<void> {
