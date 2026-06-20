@@ -97,12 +97,10 @@ import {
 import { WorldMap } from '../src/map/WorldMap';
 import type { TownInfo } from '../src/map/BiomeMask';
 import {
-    type ActorSnapshot,
     type AutoLootGrantMessage,
     type CombatEventMessage,
     type InventoryConsumedMessage,
     type LootGrantMessage,
-    type LootSnapshot,
     type RaidResultMessage,
     type ScenarioEnemyDefeatEventMessage,
     type ScenarioFieldEventResultMessage,
@@ -137,6 +135,10 @@ import {
     sanitizeStringArray,
     sanitizeTier,
 } from './WorldSessionInput';
+import {
+    toActorSnapshot,
+    toLootSnapshot,
+} from './WorldSessionSnapshotViews';
 import {
     chunkOffsetsByDistance,
     cloneStats,
@@ -594,7 +596,7 @@ export class WorldSession {
                 return owner?.active && !owner.ghost;
             })
             .filter((actor) => this.isActorVisibleToViewer(actor, viewerPlayerId))
-            .map((actor) => this.toActorSnapshot(actor));
+            .map((actor) => toActorSnapshot(actor, this.players.get(actor.ownerPlayerId)?.ghost ?? false));
         const enemies = [...this.enemies.values()]
             .filter((entry) => entry.enemy.stats.hp > 0)
             .filter((entry) => this.isEnemyVisibleToViewer(entry, viewerPlayerId))
@@ -617,7 +619,7 @@ export class WorldSession {
         const loot = [...this.loot.values()]
             .filter((lootObject) => !this.lootState.isAutoLootPending(lootObject.id))
             .filter(() => !viewer?.activeDungeonId)
-            .map((lootObject) => this.toLootSnapshot(lootObject));
+            .map((lootObject) => toLootSnapshot(lootObject, this.lootState.getLockPlayerId(lootObject.id)));
         const readyActors = partyActors
             .filter((actor) => !actor.isDead && !actor.isGhost && actor.remainingAp >= MIN_FIELD_ACTION_GAUGE_COST)
             .map((actor) => actor.id);
@@ -2371,43 +2373,6 @@ export class WorldSession {
         const dt = Math.max(0, Math.min(0.5, (now - this.lastTickAt) / 1000));
         this.lastTickAt = now;
         return dt;
-    }
-
-    private toActorSnapshot(actor: ServerActor): ActorSnapshot {
-        const player = this.players.get(actor.ownerPlayerId);
-        return {
-            id: actor.id,
-            ownerPlayerId: actor.ownerPlayerId,
-            localActorId: actor.localActorId,
-            name: actor.name,
-            classLineId: actor.classLineId,
-            currentTier: actor.currentTier,
-            level: actor.level,
-            tile: { ...actor.tile },
-            stats: cloneStats(actor.stats),
-            statuses: cloneStatuses(actor.statuses),
-            actionGauge: actor.actionGauge,
-            remainingAp: actor.remainingAp,
-            majorActionUsed: actor.majorActionUsed,
-            facing: actor.facing,
-            isDead: actor.isDead,
-            isGhost: player?.ghost ?? false,
-            magicLoadout: [...actor.magicLoadout],
-            skillUpgradeLevels: { ...actor.skillUpgradeLevels },
-        };
-    }
-
-    private toLootSnapshot(lootObject: LootObject): LootSnapshot {
-        return {
-            id: lootObject.id,
-            tile: { x: lootObject.x, y: lootObject.y },
-            sourceLabel: lootObject.sourceLabel,
-            kind: lootObject.kind,
-            containerType: lootObject.containerType,
-            opened: lootObject.opened,
-            lockedByPlayerId: this.lootState.getLockPlayerId(lootObject.id),
-            gridSnapshot: gridToSnapshot(lootObject.inventory),
-        };
     }
 
     private releaseLootLocksForPlayer(playerId: string): void {
