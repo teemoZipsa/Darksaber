@@ -26,6 +26,7 @@ import { getStoryScenarioMonsterLayout } from '../src/data/StoryScenarioMonsterD
 import {
     getStoryScenarioEventStepDurationMs,
     getStoryScenarioPresentationDurationMs,
+    LATE_STORY_STEP_DURATION_MS,
     STORY_SCENARIO_EVENT_SEQUENCES,
     type StoryScenarioFieldEventReward,
     type StoryScenarioEventSequence,
@@ -42,22 +43,6 @@ const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Save
 const DEFAULT_START = 1;
 const DEFAULT_END = 31;
 const RESOLVABLE_PRESENTATION_ACTOR_IDS = new Set(['hero', 'player', 'controlled', 'boss']);
-const LATE_STORY_SPEAKER_NAME_KEYS = new Map<string, string>([
-    ['beelzebuth', 'story.event.speaker.beelzebuth'],
-    ['blin', 'story.event.speaker.blin'],
-    ['demonFixer', 'story.event.speaker.demonFixer'],
-    ['ergion', 'story.event.speaker.ergion'],
-    ['hero', 'story.event.speaker.hero'],
-    ['jade', 'story.event.speaker.jade'],
-    ['martani', 'story.event.speaker.martani'],
-    ['nergal', 'story.event.speaker.nergal'],
-]);
-const LATE_STORY_FOCUS_STEP_DURATION_MS = 650;
-const LATE_STORY_MOVE_ACTOR_STEP_DURATION_MS = 700;
-const LATE_STORY_DIALOGUE_STEP_DURATION_MS = 1600;
-const LATE_STORY_COMBAT_START_STEP_DURATION_MS = 900;
-const LATE_STORY_OBJECTIVE_STEP_DURATION_MS = 900;
-const LATE_STORY_CACHE_STEP_DURATION_MS = 700;
 
 interface Options {
     sourceRoot: string;
@@ -1118,7 +1103,7 @@ function verifyLateStoryOriginalMapContract(
         getOriginalLateStoryDialogueSpeakerIds(fact.bossDefeatDialogues)
     );
     for (const step of [...entryDialogues, ...bossDefeatDialogues]) {
-        const expectedSpeakerNameKey = LATE_STORY_SPEAKER_NAME_KEYS.get(step.speakerId);
+        const expectedSpeakerNameKey = `story.event.speaker.${step.speakerId}`;
         if (step.speakerNameKey !== expectedSpeakerNameKey) {
             throw new Error(
                 `Episode ${episode} speaker key mismatch for ${step.textKey}: ${step.speakerNameKey} !== ${expectedSpeakerNameKey}`
@@ -1147,19 +1132,19 @@ function verifyLateStoryOriginalMapContract(
         episode,
         'late story entry focus step',
         sequence.entry[0],
-        { kind: 'focus', target: layout.bossTile, labelKey: `story.event.ep${paddedEpisode}.focus.boss`, durationMs: LATE_STORY_FOCUS_STEP_DURATION_MS }
+        { kind: 'focus', target: layout.bossTile, labelKey: `story.event.ep${paddedEpisode}.focus.boss`, durationMs: LATE_STORY_STEP_DURATION_MS.focus }
     );
     requireJsonEqual(
         episode,
         'late story entry dialogue durations',
         entryDialogues.map((step) => getStoryScenarioEventStepDurationMs(step)),
-        entryDialogues.map(() => LATE_STORY_DIALOGUE_STEP_DURATION_MS)
+        entryDialogues.map(() => LATE_STORY_STEP_DURATION_MS.dialogue)
     );
     requireJsonEqual(
         episode,
         'late story boss defeat dialogue durations',
         bossDefeatDialogues.map((step) => getStoryScenarioEventStepDurationMs(step)),
-        bossDefeatDialogues.map(() => LATE_STORY_DIALOGUE_STEP_DURATION_MS)
+        bossDefeatDialogues.map(() => LATE_STORY_STEP_DURATION_MS.dialogue)
     );
     const entryMove = sequence.entry.find(
         (step): step is Extract<StoryScenarioEventStep, { kind: 'moveActor' }> => step.kind === 'moveActor'
@@ -1183,7 +1168,7 @@ function verifyLateStoryOriginalMapContract(
             actorId: 'hero',
             target: { x: layout.playerStart.x, y: layout.playerStart.y - 1 },
             focus: { x: layout.playerStart.x, y: layout.playerStart.y - 1 },
-            durationMs: LATE_STORY_MOVE_ACTOR_STEP_DURATION_MS,
+            durationMs: LATE_STORY_STEP_DURATION_MS.moveActor,
         }
     );
     const entryCombatStart = sequence.entry.find(
@@ -1198,7 +1183,7 @@ function verifyLateStoryOriginalMapContract(
             kind: 'combatStart',
             labelKey: `story.event.ep${paddedEpisode}.combatStart`,
             focus: layout.bossTile,
-            durationMs: LATE_STORY_COMBAT_START_STEP_DURATION_MS,
+            durationMs: LATE_STORY_STEP_DURATION_MS.combatStart,
         }
     );
     const bossObjective = sequence.bossDefeat.find(
@@ -1213,7 +1198,7 @@ function verifyLateStoryOriginalMapContract(
             kind: 'objective',
             labelKey: `story.event.ep${paddedEpisode}.objective`,
             focus: layout.bossTile,
-            durationMs: LATE_STORY_OBJECTIVE_STEP_DURATION_MS,
+            durationMs: LATE_STORY_STEP_DURATION_MS.objective,
         }
     );
 
@@ -1294,7 +1279,7 @@ function verifyLateStoryOriginalMapContract(
             kind: 'objective',
             labelKey: `story.event.ep${paddedEpisode}.cache.recovered`,
             focus: event.tile,
-            durationMs: LATE_STORY_CACHE_STEP_DURATION_MS,
+            durationMs: LATE_STORY_STEP_DURATION_MS.cache,
         }])
     );
 

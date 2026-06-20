@@ -19,7 +19,7 @@ const DEFAULT_STORY_STEP_DURATION_MS: Record<StoryScenarioEventStep['kind'], num
     objective: 800,
 };
 
-const LATE_STORY_STEP_DURATION_MS = {
+export const LATE_STORY_STEP_DURATION_MS = {
     focus: 650,
     moveActor: 700,
     dialogue: 1600,

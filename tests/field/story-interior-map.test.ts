@@ -4,6 +4,7 @@ import {
     getStoryScenarioEventSequence,
     getStoryScenarioEventStepDurationMs,
     getStoryScenarioPresentationDurationMs,
+    LATE_STORY_STEP_DURATION_MS,
     STORY_SCENARIO_EVENT_SEQUENCES,
 } from '../../src/data/StoryScenarioEventData';
 import type { StoryScenarioEventStep } from '../../src/data/StoryScenarioEventData';
@@ -1407,7 +1408,7 @@ test('episodes 23 through 31 use original late interior routes and events', () =
             assert.equal(bossDefeatDialogueCount, 0, `${fact.dungeonId}:no DEE-backed boss defeat dialogue`);
         }
         assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'objective').length, 1);
-        assert.equal(sequence.entry[0].durationMs, 650);
+        assert.equal(sequence.entry[0].durationMs, LATE_STORY_STEP_DURATION_MS.focus);
         const entryMove = sequence.entry.find((step) => step.kind === 'moveActor');
         assert.ok(entryMove, fact.dungeonId);
         assert.equal(entryMove.actorId, 'hero');
