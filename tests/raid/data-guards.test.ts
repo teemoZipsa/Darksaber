@@ -32,7 +32,7 @@ import { getSkill } from '../../src/data/SkillDB';
 import { getSkillVisualProfile } from '../../src/data/SkillVisualProfiles';
 import { createBaseStats, getBaseStatsForClass } from '../../src/data/Stats';
 import { STORY_QUESTS, getStoryCompanionRewards, type StoryQuestReward } from '../../src/data/StoryQuestData';
-import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { STORY_SCENARIOS, type StoryScenarioDefinition } from '../../src/data/StoryScenarioData';
 import { getStoryScenarioMonsterLayout } from '../../src/data/StoryScenarioMonsterData';
 import {
     STORY_SCENARIO_EVENT_SEQUENCES,
@@ -108,6 +108,26 @@ function assertLateScenarioContentMatchesOriginalFacts(record: StoryScenarioCont
         missionKind: 'soloInterior',
         reward: { type: 'none' },
     }, `episode ${record.episode} content metadata`);
+}
+
+function storyScenarioContentSignature(scenario: StoryScenarioContentRecord | StoryScenarioDefinition): StoryScenarioContentRecord {
+    return {
+        episode: scenario.episode,
+        questId: scenario.questId,
+        dungeonId: scenario.dungeonId,
+        dungeonNameKr: scenario.dungeonNameKr,
+        dungeonNameEn: scenario.dungeonNameEn,
+        chunkX: scenario.chunkX,
+        chunkY: scenario.chunkY,
+        sprite: scenario.sprite,
+        bossName: scenario.bossName,
+        bossLevel: scenario.bossLevel,
+        bossColor: scenario.bossColor,
+        guardLevel: scenario.guardLevel,
+        guardCount: scenario.guardCount,
+        missionKind: scenario.missionKind,
+        reward: scenario.reward,
+    };
 }
 
 function assertStoryRewardData(reward: StoryQuestReward, context: string, ko: Record<string, string>, en: Record<string, string>): void {
@@ -835,20 +855,8 @@ test('story scenario content ledger matches runtime scenario definitions', () =>
         assertLateScenarioContentMatchesOriginalFacts(scenario);
     }
     assert.deepEqual(
-        contentScenarios.map((scenario) => ({
-            episode: scenario.episode,
-            questId: scenario.questId,
-            dungeonId: scenario.dungeonId,
-            guardCount: scenario.guardCount,
-            missionKind: scenario.missionKind,
-        })),
-        STORY_SCENARIOS.map((scenario) => ({
-            episode: scenario.episode,
-            questId: scenario.questId,
-            dungeonId: scenario.dungeonId,
-            guardCount: scenario.guardCount,
-            missionKind: scenario.missionKind,
-        }))
+        contentScenarios.map(storyScenarioContentSignature),
+        STORY_SCENARIOS.map(storyScenarioContentSignature)
     );
 });
 
