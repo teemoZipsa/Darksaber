@@ -237,6 +237,20 @@ function notesMentionGuardCount(notes: string, guardCount: number): boolean {
     return new RegExp(`\\b${guardCount}\\s+guards?\\b|\\b${guardCount}\\s+guard AREA\\b`, 'i').test(notes);
 }
 
+function notesMentionCharDead(notes: string, charId: number): boolean {
+    return [...notes.matchAll(/\bCHARDEAD\s+([\d\s,/-]+)/gi)].some((match) =>
+        match[1].split(/[,/]/).some((part) => {
+            const range = part.trim().match(/^(\d+)\s*-\s*(\d+)$/);
+            if (range) {
+                const start = Number(range[1]);
+                const end = Number(range[2]);
+                return charId >= Math.min(start, end) && charId <= Math.max(start, end);
+            }
+            return Number(part.trim()) === charId;
+        })
+    );
+}
+
 function notesMentionGetItem(notes: string, originalItemId: number | undefined): boolean {
     return originalItemId !== undefined && originalItemId > 0 && new RegExp(`\\bGETITEM 0*${originalItemId}\\b`).test(notes);
 }
@@ -537,6 +551,19 @@ function verifyScenarioImportDocRow(episode: number, sequence: StoryScenarioEven
         for (const reward of event.rewards ?? []) {
             if (reward.type === 'item' && reward.originalItemId !== undefined && reward.originalItemId > 0 && !notesMentionGetItem(row.notes, reward.originalItemId)) {
                 throw new Error(`Episode ${episode} docs notes do not mention objective field GETITEM ${reward.originalItemId}`);
+            }
+        }
+    }
+    for (const event of sequence.enemyDefeatEvents ?? []) {
+        for (const eventNumber of originalEventIdNumbers(event.originalEventId)) {
+            if (!notesMentionOriginalEvent(row.notes, eventNumber)) {
+                throw new Error(`Episode ${episode} docs notes do not mention enemy defeat EVENT ${eventNumber} for ${event.id}`);
+            }
+        }
+        for (const match of event.trigger.matchAll(/\bCHARDEAD\s+(\d+)\b/g)) {
+            const charId = Number(match[1]);
+            if (!notesMentionCharDead(row.notes, charId)) {
+                throw new Error(`Episode ${episode} docs notes do not mention enemy defeat CHARDEAD ${charId} for ${event.id}`);
             }
         }
     }
