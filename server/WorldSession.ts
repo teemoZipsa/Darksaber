@@ -127,6 +127,13 @@ import {
     hasNearbyLiveEnemy,
 } from './WorldSessionSpatialQueries';
 import {
+    canActorTargetEnemy,
+    getTargetableActors,
+    isActorVisibleToViewer,
+    isEnemyVisibleToViewer,
+    isPlayerWiped,
+} from './WorldSessionVisibility';
+import {
     clonePersistentActor,
     clonePersistentNestState,
     clonePersistentScenarioState,
@@ -253,7 +260,7 @@ export class WorldSession {
         this.ghostGraceMs = options.ghostGraceMs ?? DISCONNECT_GRACE_MS;
         this.logger = options.logger ?? (() => undefined);
         this.enemyState = new WorldSessionEnemyState<ServerEnemy, ServerActor>({
-            getTargetableActors: (entry) => this.getTargetableActors(entry),
+            getTargetableActors: (entry) => getTargetableActors(this.players, this.actors.values(), entry),
             hasActiveActorWithin: (tile, distance, ownerPlayerId) =>
                 hasActiveActorWithin(this.players.values(), this.actors, tile, distance, ownerPlayerId),
         });
@@ -591,7 +598,7 @@ export class WorldSession {
         this.releaseExpiredLootLocks(now);
         for (const player of [...this.players.values()]) {
             if (!player.active || player.ghost) continue;
-            if (this.isPlayerWiped(player)) {
+            if (isPlayerWiped(player, this.actors)) {
                 perPlayerMessages.push({ playerId: player.id, message: this.finishPlayer(player.id, 'DEAD') });
             }
         }
@@ -615,11 +622,11 @@ export class WorldSession {
                 const owner = this.players.get(actor.ownerPlayerId);
                 return owner?.active && !owner.ghost;
             })
-            .filter((actor) => this.isActorVisibleToViewer(actor, viewerPlayerId))
+            .filter((actor) => isActorVisibleToViewer(this.players, actor, viewerPlayerId))
             .map((actor) => toActorSnapshot(actor, this.players.get(actor.ownerPlayerId)?.ghost ?? false));
         const enemies = [...this.enemies.values()]
             .filter((entry) => entry.enemy.stats.hp > 0)
-            .filter((entry) => this.isEnemyVisibleToViewer(entry, viewerPlayerId))
+            .filter((entry) => isEnemyVisibleToViewer(this.players, entry, viewerPlayerId))
             .map((entry) => ({
                 id: entry.enemy.id,
                 monsterId: entry.monsterId,
@@ -720,28 +727,6 @@ export class WorldSession {
             enemies,
             lootLocks: this.lootState.lockCount(),
         };
-    }
-
-    private isEnemyVisibleToViewer(entry: ServerEnemy, viewerPlayerId: string | null): boolean {
-        const viewer = viewerPlayerId ? this.players.get(viewerPlayerId) : undefined;
-        if (viewer?.activeDungeonId) return entry.scenarioPlayerId === viewer.id;
-        if (!entry.scenarioPlayerId) return true;
-        if (!viewerPlayerId) return true;
-        return entry.scenarioPlayerId === viewerPlayerId;
-    }
-
-    private isActorVisibleToViewer(actor: ServerActor, viewerPlayerId: string | null): boolean {
-        if (!viewerPlayerId) return true;
-        if (actor.ownerPlayerId === viewerPlayerId) return true;
-        const viewer = this.players.get(viewerPlayerId);
-        const owner = this.players.get(actor.ownerPlayerId);
-        if (viewer?.activeDungeonId) return false;
-        if (owner?.activeDungeonId) return false;
-        return true;
-    }
-
-    private canActorTargetEnemy(actor: ServerActor, entry: ServerEnemy): boolean {
-        return !entry.scenarioPlayerId || entry.scenarioPlayerId === actor.ownerPlayerId;
     }
 
     private handleIntent(
@@ -856,7 +841,7 @@ export class WorldSession {
         if (!targetId) return reject(intentId, 'Attack payload must include targetId.');
         const target = this.enemies.get(targetId);
         if (!target || target.enemy.stats.hp <= 0) return reject(intentId, 'Target is not alive.');
-        if (!this.canActorTargetEnemy(actor, target)) return reject(intentId, 'Target is not visible.');
+        if (!canActorTargetEnemy(actor, target)) return reject(intentId, 'Target is not visible.');
         if (actor.remainingAp < ATTACK_AP_COST) return reject(intentId, 'No action available for attack.');
 
         const range = getClassLine(actor.classLineId)?.attackRange ?? 1;
@@ -933,7 +918,7 @@ export class WorldSession {
         if (requiresTarget) {
             if (!targetId) return reject(intentId, 'Cast skill payload must include targetId.');
             if (!target || target.enemy.stats.hp <= 0) return reject(intentId, 'Target is not alive.');
-            if (!this.canActorTargetEnemy(actor, target)) return reject(intentId, 'Target is not visible.');
+            if (!canActorTargetEnemy(actor, target)) return reject(intentId, 'Target is not visible.');
         }
 
         const targetTile = target ? { x: target.enemy.gridX, y: target.enemy.gridY } : undefined;
@@ -950,7 +935,7 @@ export class WorldSession {
 
         const aliveEnemies = [...this.enemies.values()]
             .filter((entry) => entry.enemy.stats.hp > 0)
-            .filter((entry) => this.canActorTargetEnemy(actor, entry));
+            .filter((entry) => canActorTargetEnemy(actor, entry));
         const targetEnemies = target && targetTile
             ? getSkillCandidateEnemies(aliveEnemies.map((entry) => entry.enemy), profile, this.getSkillPatternContext(actor, targetTile), target.enemy)
             : [];
@@ -1329,7 +1314,7 @@ export class WorldSession {
 
     private resolveEnemyTurn(entry: ServerEnemy, now: number): CombatEventMessage[] {
         const enemy = entry.enemy;
-        const targets = this.getTargetableActors(entry);
+        const targets = getTargetableActors(this.players, this.actors.values(), entry);
         const closest = this.enemyState.findClosestTarget(entry, targets);
         if (!closest) {
             this.wanderEnemy(entry, now);
@@ -1531,29 +1516,6 @@ export class WorldSession {
         const actor = player.actorIds.map((id) => this.actors.get(id)).find(Boolean);
         if (!actor) return false;
         return this.worldMap.getTownAtTile(actor.tile.x, actor.tile.y)?.id === extractionTownId;
-    }
-
-    private getTargetableActors(entry?: ServerEnemy): ServerActor[] {
-        return [...this.actors.values()]
-            .filter((actor) => !actor.isDead && actor.stats.hp > 0)
-            .filter((actor) => {
-                const owner = this.players.get(actor.ownerPlayerId);
-                if (!owner?.active) return false;
-                if (entry?.scenarioPlayerId) return actor.ownerPlayerId === entry.scenarioPlayerId;
-                return !owner.activeDungeonId;
-            })
-            .sort((a, b) => {
-                const ghostA = this.players.get(a.ownerPlayerId)?.ghost ? 1 : 0;
-                const ghostB = this.players.get(b.ownerPlayerId)?.ghost ? 1 : 0;
-                return ghostA - ghostB;
-            });
-    }
-
-    private isPlayerWiped(player: ServerPlayer): boolean {
-        return player.actorIds.every((actorId) => {
-            const actor = this.actors.get(actorId);
-            return !actor || actor.isDead || actor.stats.hp <= 0;
-        });
     }
 
     private canEnemyAttack(enemy: Enemy, actor: ServerActor, range: number): boolean {
