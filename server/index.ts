@@ -29,6 +29,7 @@ import { InMemoryAuthStore, PostgresAuthStore, type AccountProgress, type AuthAc
 import type { JwtOptions } from './AuthCrypto';
 import { replayWorldSaveSpool, WorldSaveSpool } from './WorldSaveSpool';
 import { WorldSessionSnapshotStore } from './WorldSessionSnapshotStore';
+import { createWorldSessionKey, resolveWorldSessionRoute, type WorldSessionRoute } from './WorldSessionRouter';
 import { createWorldServerMetrics, formatWorldServerMetrics, logServerEvent } from './WorldServerObservability';
 
 const PORT = Number(process.env.PORT ?? 8765);
@@ -386,7 +387,8 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
     }
 
     const realm = normalizeRealm(message.requestedRealm);
-    const { sessionKey, session } = getOrCreateSession(realm);
+    const route = resolveWorldSessionRoute({ realm, requestedRaidInstanceId: message.requestedRaidInstanceId });
+    const { sessionKey, session } = getOrCreateSession(route);
     const serverJoinMessage = buildAuthoritativeJoinMessage(message, character, save, progress);
     let result: ReturnType<WorldSession['join']>;
     try {
@@ -593,12 +595,12 @@ async function closeRevokedSockets(_now: number): Promise<void> {
     }
 }
 
-function getOrCreateSession(realm: WorldRealmId): { sessionKey: string; session: WorldSession } {
-    const sessionKey = `${realm}:primary`;
+function getOrCreateSession(route: WorldSessionRoute): { sessionKey: string; session: WorldSession } {
+    const sessionKey = createWorldSessionKey(route);
     let session = sessions.get(sessionKey);
     if (!session) {
         session = new WorldSession({
-            realm,
+            realm: route.realm,
             logger: (message) => console.log(`[WorldSession:${sessionKey}] ${message}`),
         });
         sessions.set(sessionKey, session);
@@ -931,6 +933,7 @@ function buildAuthoritativeJoinMessage(
         completedQuestIds,
         characterId: character.id,
         requestedRealm: clientMessage.requestedRealm,
+        requestedRaidInstanceId: clientMessage.requestedRaidInstanceId,
         carriedItems: createCarriedItemCountsFromSave(save),
     };
 }

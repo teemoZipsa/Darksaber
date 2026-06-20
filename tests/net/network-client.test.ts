@@ -190,7 +190,7 @@ test('client uses stored resume token when joining after refresh', async () => {
     }
 });
 
-test('client includes access token, character id, requested realm, and carried items in join payload', async () => {
+test('client includes access token, character id, requested realm, raid instance, and carried items in join payload', async () => {
     const restoreSocket = installMockWebSocket();
     const storage = new MemoryStorage();
     const restoreStorage = installMemoryStorage(storage);
@@ -200,6 +200,7 @@ test('client includes access token, character id, requested realm, and carried i
         const join = client.connectAndJoin({
             ...joinInput(),
             requestedRealm: 'master',
+            requestedRaidInstanceId: 'party_alpha-01',
             carriedItems: [{ itemId: 'herb_common', quantity: 2 }],
         });
         const socket = MockWebSocket.instances[0];
@@ -208,6 +209,7 @@ test('client includes access token, character id, requested realm, and carried i
         socket.emitOpen();
         const sent = JSON.parse(socket.sent[0]);
         assert.equal(sent.requestedRealm, 'master');
+        assert.equal(sent.requestedRaidInstanceId, 'party_alpha-01');
         assert.deepEqual(sent.carriedItems, [{ itemId: 'herb_common', quantity: 2 }]);
         assert.equal(sent.accessToken, 'access_test');
         assert.equal(sent.characterId, 'character_test');

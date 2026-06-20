@@ -287,12 +287,12 @@ Do not use local-only databases as a production substitute. Do not publish a
 build that points users at a local machine or temporary database. Do not add
 Docker/local Postgres as a production path.
 
-## World Session Sharding
+## World Session Routing
 
-Keep `WORLD_SHARD_COUNT=1` in production until the session key is based on a
-party or raid-instance ID. The current server uses one `realm:primary` live
-session key so different accounts in the same realm are not split by account
-hash. The server intentionally refuses to start with `WORLD_SHARD_COUNT > 1`
-until party or raid-instance routing exists. Multiplayer party rollout should
-create or join an explicit raid instance first, then route all party members by
-that raid instance key.
+Keep `WORLD_SHARD_COUNT=1` in production until session placement uses shared
+durable raid-instance storage. The server no longer hashes account IDs into
+session keys. Default solo joins keep the legacy `realm:primary` key for local
+snapshot/spool compatibility, while explicit party/raid joins can pass
+`requestedRaidInstanceId` and route to `realm:raid:<id>`. The server
+intentionally refuses to start with `WORLD_SHARD_COUNT > 1` until these
+raid-instance keys are backed by shared storage across processes.

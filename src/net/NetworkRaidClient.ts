@@ -38,6 +38,7 @@ export interface NetworkRaidJoinInput {
     resumeToken?: string;
     completedQuestIds?: string[];
     requestedRealm?: WorldRealmId;
+    requestedRaidInstanceId?: string;
 }
 
 export interface NetworkRaidClientOptions {
@@ -213,6 +214,7 @@ export class NetworkRaidClient {
             resumeToken: input.resumeToken,
             completedQuestIds: input.completedQuestIds,
             requestedRealm: input.requestedRealm,
+            requestedRaidInstanceId: input.requestedRaidInstanceId,
         });
     }
 

@@ -156,6 +156,7 @@ export interface WorldJoinMessage {
     accessToken?: string;
     characterId?: string;
     requestedRealm?: WorldRealmId;
+    requestedRaidInstanceId?: string;
     carriedItems?: InventoryItemCountSnapshot[];
 }
 
