@@ -547,6 +547,10 @@ function verifyStoryQuestDisplayTextContract(episode: number, scenario: StorySce
     requireStoryTextIncludes(episode, 'en objective', en[quest.objectiveKey], scenario.dungeonNameEn);
     requireStoryTextIncludes(episode, 'ko enter log', ko[quest.enterLogKey], scenario.dungeonNameKr);
     requireStoryTextIncludes(episode, 'en enter log', en[quest.enterLogKey], scenario.dungeonNameEn);
+    if (scenario.bossName) {
+        requireStoryTextIncludes(episode, 'ko objective', ko[quest.objectiveKey], scenario.bossName);
+        requireStoryTextIncludes(episode, 'ko enter log', ko[quest.enterLogKey], scenario.bossName);
+    }
     requireStoryTextIncludes(episode, 'ko completion log', ko[quest.objectiveCompleteLogKey], scenario.dungeonNameKr);
     requireStoryTextIncludes(episode, 'ko completion log', ko[quest.objectiveCompleteLogKey], episodeKo);
     requireStoryTextIncludes(episode, 'en completion log', en[quest.objectiveCompleteLogKey], scenario.dungeonNameEn);
