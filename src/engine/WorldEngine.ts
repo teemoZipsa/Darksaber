@@ -26,7 +26,6 @@ import {
 import {
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
-    hasStatus,
     removeStatusesFromCarrier,
     resolveTurnStartStatuses,
 } from '../combat/StatusEffects';
@@ -83,6 +82,16 @@ import { WorldCombatFeedbackController } from './world/WorldCombatFeedbackContro
 import { WorldNetworkIntentController } from './world/WorldNetworkIntentController';
 import { WorldTurnStateController } from './world/WorldTurnStateController';
 import type { CombatFeedbackKind } from './world/CombatFeedback';
+import {
+    actorTile,
+    directionFromTo,
+    enemyTile,
+    getActorTerrainMovementBudget,
+    getActorTerrainTraits,
+    isActorAt,
+    isEntityMoving,
+    syncCharacterMovementToClass,
+} from './world/WorldEngineFieldHelpers';
 import { NetworkRaidClient } from '../net/NetworkRaidClient';
 import {
     type ActionRejectedMessage,
@@ -228,14 +237,14 @@ export class WorldEngine {
             getFieldEnemies: () => this.fieldEnemies,
             setFieldEnemies: (fieldEnemies) => { this.fieldEnemies = fieldEnemies; },
             getControlledActor: () => this.getControlledActor(),
-            actorTile: (actor) => this.actorTile(actor),
+            actorTile: (actor) => actorTile(actor),
             placePartyNear: (tile) => this.placePartyNear(tile),
             clearFieldTurnState: () => this.clearFieldTurnState(),
             closeFieldOverlays: () => this.closeFieldOverlays(),
             selectActor: (actorId) => this.selectionController.selectActor(actorId),
             clearSelection: () => this.selectionController.clear(),
             applyMonsterSprite: (enemy, monsterId) => this.applyMonsterSprite(enemy, monsterId),
-            isEntityMoving: (entity) => this.isEntityMoving(entity),
+            isEntityMoving: (entity) => isEntityMoving(entity),
             isNetworkRaid: () => this.isNetworkRaid,
             getNetworkRaidClient: () => this.networkRaidClient,
             isRaidOutcomeVisible: () => this.raidOutcomeController.isVisible(),
@@ -300,7 +309,7 @@ export class WorldEngine {
             getTurnActionStates: (actor) => this.playerActionController.getTurnActionStates(actor),
             openActionMenu: (states) => this.actionMenuUI.open(states),
             getEnemyById: (enemyId) => this.getEnemyById(enemyId),
-            actorTile: (actor) => this.actorTile(actor),
+            actorTile: (actor) => actorTile(actor),
             getActorAttackTargetFailureFromTile: (actor, casterTile, enemy) =>
                 this.getActorAttackTargetFailureFromTile(actor, casterTile, enemy),
             updateEffects: (dt) => this.effectManager.update(dt),
@@ -344,10 +353,10 @@ export class WorldEngine {
             hasExecutableAction: (actor) => this.playerActionController.hasExecutableAction(actor),
             reopenActionMenu: (actor) => this.reopenActionMenu(actor),
             getEnemyById: (enemyId) => this.getEnemyById(enemyId),
-            actorTile: (actor) => this.actorTile(actor),
-            enemyTile: (enemy) => this.enemyTile(enemy),
+            actorTile: (actor) => actorTile(actor),
+            enemyTile: (enemy) => enemyTile(enemy),
             applyMonsterSprite: (enemy, monsterId) => this.applyMonsterSprite(enemy, monsterId),
-            isEntityMoving: (entity) => this.isEntityMoving(entity),
+            isEntityMoving: (entity) => isEntityMoving(entity),
             beginCombatFeedbackGroup: () => this.beginCombatFeedbackGroup(),
             registerCombatFeedback: (kind, feedbackGroupId) => this.registerCombatFeedback(kind, feedbackGroupId),
             flushCombatFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
@@ -415,11 +424,11 @@ export class WorldEngine {
                 getActorById: (actorId) => this.getActorById(actorId),
                 getEnemyById: (enemyId) => this.getEnemyById(enemyId),
                 getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
-                getActorTerrainTraits: (actor) => this.getActorTerrainTraits(actor),
+                getActorTerrainTraits: (actor) => getActorTerrainTraits(actor),
                 canEnemyAttackTarget: (enemy, actor, range) => this.canEnemyAttackTarget(enemy, actor, range),
                 canActorAttackTarget: (actor, enemy) => this.canActorAttackTarget(actor, enemy),
                 hasFieldLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to),
-                directionFromTo: (from, to) => this.directionFromTo(from, to),
+                directionFromTo: (from, to) => directionFromTo(from, to),
             },
             this.movementController,
             this.combatController,
@@ -533,7 +542,7 @@ export class WorldEngine {
                 getRemainingActionPoints: () => this.getSpendableActionGauge(),
                 getReservedAction: () => this.turnStateController.getReservedAction(),
                 getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
-                getActorTerrainMovementBudget: (actor) => this.getActorTerrainMovementBudget(actor),
+                getActorTerrainMovementBudget: (actor) => getActorTerrainMovementBudget(actor),
                 getActorTerrainStepCost: (actor, tile) => this.getActorTerrainStepCost(actor, tile),
                 getActorAttackProfile: (actor) => this.getActorAttackProfile(actor),
                 getPatternContext: (actor) => this.getPatternContext(actor),
@@ -541,8 +550,8 @@ export class WorldEngine {
                 getEnemyById: (enemyId) => this.getEnemyById(enemyId),
                 getLootById: (lootId) => this.worldMap.loot.find((candidate) => candidate.id === lootId) ?? null,
                 getLoot: () => this.worldMap.loot,
-                isActorAt: (actor, tile) => this.isActorAt(actor, tile),
-                isEntityMoving: (entity) => this.isEntityMoving(entity),
+                isActorAt: (actor, tile) => isActorAt(actor, tile),
+                isEntityMoving: (entity) => isEntityMoving(entity),
                 isFieldPassable: (query) => this.movementController.isFieldPassable(query),
                 getBlockedMoveMessage: (tile) => this.storyScenarioController.getLockedDoorMessage(tile),
                 spendAp: (cost) => this.spendAp(cost),
@@ -639,7 +648,7 @@ export class WorldEngine {
             setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
             clearWorldLoot: () => { this.worldMap.loot = []; },
             selectActor: (actorId) => this.selectionController.selectActor(actorId),
-            syncCharacterMovementToClass: (character) => this.syncCharacterMovementToClass(character),
+            syncCharacterMovementToClass: (character) => syncCharacterMovementToClass(character),
             isTurnCombatActive: () => this.isTurnCombatActive(),
             setPhase: (phase) => { this.currentPhase = phase; },
             applyNetworkSnapshot: (snapshot) => this.applyNetworkSnapshot(snapshot),
@@ -689,7 +698,7 @@ export class WorldEngine {
             getPathPreviewTiles: (actor) => this.getPathPreviewTiles(actor),
             getAttackCues: () => this.attackCues,
             getCombatLog: () => this.combatLog,
-            getActorTerrainTraits: (actor) => this.getActorTerrainTraits(actor),
+            getActorTerrainTraits: (actor) => getActorTerrainTraits(actor),
             isTurnCombatActive: () => this.isTurnCombatActive(),
         });
         this.inputController = new WorldInputController({
@@ -709,7 +718,7 @@ export class WorldEngine {
             getPartyActors: () => this.partyActors,
             getHoverTile: () => this.hoverTile,
             setHoverTile: (tile) => { this.hoverTile = tile; },
-            isEntityMoving: (entity) => this.isEntityMoving(entity),
+            isEntityMoving: (entity) => isEntityMoving(entity),
             resolveFieldHitAt: (tile) => this.resolveFieldHitAt(tile),
             switchToNextAliveActor: () => this.switchToNextAliveActor(),
             switchToPartyMember: (index) => this.switchToPartyMember(index),
@@ -896,7 +905,7 @@ export class WorldEngine {
 
     private placePartyNear(anchorTile: TilePoint, overrideMembers?: Character[]): void {
         const members = (overrideMembers ?? this.party.getCharacters()).slice(0, this.party.MAX_ACTIVE_PARTY_SIZE);
-        members.forEach((character) => this.syncCharacterMovementToClass(character));
+        members.forEach((character) => syncCharacterMovementToClass(character));
         this.partyActors = this.fieldSpawnController.createPartyActors(anchorTile, members);
         this.fanfareLeaderActorId = null;
     }
@@ -1126,7 +1135,7 @@ export class WorldEngine {
             targetEnemies,
             profile,
             getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
-            directionFromTo: (from, to) => this.directionFromTo(from, to),
+            directionFromTo: (from, to) => directionFromTo(from, to),
             tryEnemyCounterAttack: (counterEnemy, counterActor) => {
                 const countered = this.tryEnemyCounterAttack(counterEnemy, counterActor);
                 return createCombatResult(countered);
@@ -1143,7 +1152,7 @@ export class WorldEngine {
             enemy,
             actor,
             getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
-            getActorTerrainTraits: (targetActor) => this.getActorTerrainTraits(targetActor),
+            getActorTerrainTraits: (targetActor) => getActorTerrainTraits(targetActor),
         });
         this.applyCombatResult(result);
         this.interruptRestingForDamage(beforeHpByActorId);
@@ -1548,9 +1557,9 @@ export class WorldEngine {
     }
 
     private canEnemyAttackTarget(enemy: Enemy, actor: FieldActor, range: number): boolean {
-        const distance = manhattan(this.enemyTile(enemy), this.actorTile(actor));
+        const distance = manhattan(enemyTile(enemy), actorTile(actor));
         if (distance > range) return false;
-        return range <= 1 || this.hasFieldLineOfSight(this.enemyTile(enemy), this.actorTile(actor));
+        return range <= 1 || this.hasFieldLineOfSight(enemyTile(enemy), actorTile(actor));
     }
 
     private getEnemyById(enemyId: string): Enemy | null {
@@ -1568,7 +1577,7 @@ export class WorldEngine {
     private getAttackPatternTargetEnemies(actor: FieldActor, selectedEnemy: Enemy): Enemy[] {
         const profile = this.getActorAttackProfile(actor);
         const effectTileKeys = new Set(
-            getEffectTiles(profile, this.getPatternContext(actor, this.enemyTile(selectedEnemy)))
+            getEffectTiles(profile, this.getPatternContext(actor, enemyTile(selectedEnemy)))
                 .map((tile) => tileKey(tile.x, tile.y))
         );
         return this.fieldEnemies
@@ -1576,7 +1585,7 @@ export class WorldEngine {
             .filter((enemy) => enemy.stats.hp > 0 && effectTileKeys.has(tileKey(enemy.gridX, enemy.gridY)));
     }
 
-    private getPatternContext(actor: FieldActor, selectedTile?: TilePoint, casterTile: TilePoint = this.actorTile(actor)): PatternContext {
+    private getPatternContext(actor: FieldActor, selectedTile?: TilePoint, casterTile: TilePoint = actorTile(actor)): PatternContext {
         const bounds = this.worldMap.getBoundsTiles();
         return {
             casterTile,
@@ -1587,39 +1596,21 @@ export class WorldEngine {
         };
     }
 
-    private getActorTerrainMovementBudget(actor: FieldActor): number {
-        if (hasStatus(actor.character.statuses, 'immobilize')) return 0;
-        return Math.max(1, getEffectiveStatsForCharacter(actor.character).mov || actor.entity.moveRange);
-    }
-
-    private syncCharacterMovementToClass(character: Character): void {
-        const baseMovRange = getClassLine(character.classLineId)?.baseMovRange;
-        if (baseMovRange !== undefined) character.stats.mov = baseMovRange;
-    }
-
-    private getActorTerrainTraits(actor: FieldActor): TerrainActorTraits {
-        const classLine = getClassLine(actor.character.classLineId);
-        return {
-            ignoresTerrain: classLine?.ignoresTerrain ?? false,
-            waterBonus: classLine?.waterBonus ?? false,
-        };
-    }
-
     private getTerrainTraitsForActorId(actorId?: string): TerrainActorTraits {
         const actor = actorId ? this.partyActors.find((candidate) => candidate.id === actorId) : undefined;
-        return actor ? this.getActorTerrainTraits(actor) : { ignoresTerrain: false, waterBonus: false };
+        return actor ? getActorTerrainTraits(actor) : { ignoresTerrain: false, waterBonus: false };
     }
 
     private getActorTerrainStepCost(actor: FieldActor, tile: TilePoint): number {
-        return getTerrainMoveCost(this.worldMap.getTileAt(tile.x, tile.y), this.getActorTerrainTraits(actor));
+        return getTerrainMoveCost(this.worldMap.getTileAt(tile.x, tile.y), getActorTerrainTraits(actor));
     }
 
     private getPathPreviewTiles(actor: FieldActor | null): TilePoint[] {
         if (!actor) return [];
         const networkPreview = this.networkSyncController.getPathPreviewTiles(actor);
         if (networkPreview) return networkPreview;
-        if (this.isEntityMoving(actor.entity)) {
-            const currentTarget = this.actorTile(actor);
+        if (isEntityMoving(actor.entity)) {
+            const currentTarget = actorTile(actor);
             const [nextStep] = actor.path;
             if (!nextStep || nextStep.x !== currentTarget.x || nextStep.y !== currentTarget.y) {
                 return [currentTarget, ...actor.path];
@@ -1648,41 +1639,18 @@ export class WorldEngine {
     }
 
     private getActorAttackTargetFailure(actor: FieldActor, enemy: Enemy): AttackTargetFailure | null {
-        return this.getActorAttackTargetFailureFromTile(actor, this.actorTile(actor), enemy);
+        return this.getActorAttackTargetFailureFromTile(actor, actorTile(actor), enemy);
     }
 
     private getActorAttackTargetFailureFromTile(actor: FieldActor, casterTile: TilePoint, enemy: Enemy): AttackTargetFailure | null {
         const profile = this.getActorAttackProfile(actor);
-        const target = this.enemyTile(enemy);
+        const target = enemyTile(enemy);
         return resolveActorAttackTargetFailure({
             profile,
             context: this.getPatternContext(actor, undefined, casterTile),
             selectedContext: this.getPatternContext(actor, target, casterTile),
             target,
         });
-    }
-
-    private actorTile(actor: FieldActor): TilePoint {
-        return { x: actor.entity.gridX, y: actor.entity.gridY };
-    }
-
-    private enemyTile(enemy: Enemy): TilePoint {
-        return { x: enemy.gridX, y: enemy.gridY };
-    }
-
-    private isActorAt(actor: FieldActor, tile: TilePoint): boolean {
-        return actor.entity.gridX === tile.x && actor.entity.gridY === tile.y;
-    }
-
-    private isEntityMoving(entity: Player | Enemy): boolean {
-        return Math.abs(entity.pixelX - entity.gridX) > 0.01 || Math.abs(entity.pixelY - entity.gridY) > 0.01;
-    }
-
-    private directionFromTo(from: TilePoint, to: TilePoint): 'up' | 'down' | 'left' | 'right' {
-        const dx = to.x - from.x;
-        const dy = to.y - from.y;
-        if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? 'right' : 'left';
-        return dy >= 0 ? 'down' : 'up';
     }
 
     private clearIntent(): void {
