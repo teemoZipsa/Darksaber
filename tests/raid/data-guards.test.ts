@@ -646,6 +646,7 @@ test('late original story source ledgers cover exactly episodes 23 through 31', 
         assert.equal(mrcFact.source, `MAP/${paddedEpisode}.mrc`, `episode ${episode} source mrc`);
         assert.equal(mrcFact.translatedSource, `MAP/${paddedEpisode}t.mrc`, `episode ${episode} translated mrc`);
         assert.equal(sequence.originalSources.sceneScript, `Wlib/scene${episode}.lsc`, `episode ${episode} sequence script`);
+        assert.equal(sequence.originalSources.globalScript, fact.globalScript, `episode ${episode} global script`);
         for (const sourceFile of [
             mrcFact.source,
             mrcFact.translatedSource,

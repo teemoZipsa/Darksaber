@@ -207,7 +207,6 @@ function lateScenarioCacheEvent(
 
 function lateScenarioSequence(input: {
     episode: number;
-    globalScript: string;
     hasBackground?: boolean;
     sideMapFiles?: string[];
     dialogues?: Array<{ speakerId: string; speakerNameKey: string; textKey: string; focus?: TilePoint }>;
@@ -264,7 +263,7 @@ function lateScenarioSequence(input: {
         dungeonId,
         originalSources: {
             sceneScript: `Wlib/scene${input.episode}.lsc`,
-            globalScript: input.globalScript,
+            globalScript: originalFact.globalScript,
             mapFiles: [
                 originalMrc.source,
                 originalMrc.translatedSource,
@@ -2941,7 +2940,6 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     },
     lateScenarioSequence({
         episode: 23,
-        globalScript: 'missing',
         hasBackground: true,
         sideMapFiles: ['MAP/2300.mrc', 'MAP/2300t.mrc', 'MAP/2300hmap.bmp'],
         dialogues: [
@@ -2956,7 +2954,6 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     }),
     lateScenarioSequence({
         episode: 24,
-        globalScript: 'Glib/gscene24.lsc',
         hasBackground: true,
         sideMapFiles: ['MAP/2400.mrc', 'MAP/2400t.mrc', 'MAP/2400hmap.bmp'],
         dialogues: [
@@ -2968,7 +2965,6 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     }),
     lateScenarioSequence({
         episode: 25,
-        globalScript: 'Glib/gscene25.lsc',
         hasBackground: true,
         sideMapFiles: ['MAP/2500.mrc', 'MAP/2500t.mrc', 'MAP/2500hmap.bmp', 'MAP/2502.mrc', 'MAP/2502t.mrc', 'MAP/2510.mrc', 'MAP/2510t.mrc'],
         dialogues: [
@@ -2988,18 +2984,15 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     }),
     lateScenarioSequence({
         episode: 26,
-        globalScript: 'Glib/gscene26.lsc',
         hasBackground: true,
         sideMapFiles: ['MAP/2600.mrc', 'MAP/2600t.mrc', 'MAP/2600hmap.bmp'],
     }),
     lateScenarioSequence({
         episode: 27,
-        globalScript: 'Glib/gscene27.lsc',
         sideMapFiles: ['MAP/2700.mrc', 'MAP/2700t.mrc', 'MAP/2700hmap.bmp'],
     }),
     lateScenarioSequence({
         episode: 28,
-        globalScript: 'Glib/gscene28.lsc',
         hasBackground: true,
         sideMapFiles: ['MAP/2800.mrc', 'MAP/2800t.mrc', 'MAP/2800hmap.bmp'],
         dialogues: [
@@ -3032,7 +3025,6 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     }),
     lateScenarioSequence({
         episode: 29,
-        globalScript: 'missing',
         hasBackground: true,
         sideMapFiles: ['MAP/2900.mrc', 'MAP/2900t.mrc', 'MAP/2900hmap.bmp'],
         dialogues: [
@@ -3062,7 +3054,6 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     }),
     lateScenarioSequence({
         episode: 30,
-        globalScript: 'missing',
         hasBackground: true,
         sideMapFiles: ['MAP/3000.mrc', 'MAP/3000t.mrc', 'MAP/3000hmap.bmp', 'MAP/3010.mrc', 'MAP/3020.mrc', 'MAP/3030.mrc', 'MAP/3040.mrc', 'MAP/3050.mrc', 'MAP/3060.mrc', 'MAP/3070.mrc', 'MAP/3080.mrc', 'MAP/3090.mrc'],
         dialogues: [
@@ -3096,7 +3087,6 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     }),
     lateScenarioSequence({
         episode: 31,
-        globalScript: 'missing',
         hasBackground: true,
         sideMapFiles: ['MAP/3100.mrc', 'MAP/3100t.mrc', 'MAP/3110.mrc', 'MAP/3120.mrc', 'MAP/3130.mrc', 'MAP/3140.mrc', 'MAP/3150.mrc', 'MAP/3160.mrc', 'MAP/3170.mrc', 'MAP/3180.mrc', 'MAP/3190.mrc'],
         dialogues: [

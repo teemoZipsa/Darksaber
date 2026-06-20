@@ -1,6 +1,7 @@
 {
   "23": {
     "dungeonId": "beelzebuth_hall",
+    "globalScript": "missing",
     "setArc": "MAP/23set.arc",
     "aiMember": "23.ai",
     "eventMember": "23.evt",
@@ -45,6 +46,7 @@
   },
   "24": {
     "dungeonId": "astaroth_gate",
+    "globalScript": "Glib/gscene24.lsc",
     "setArc": "MAP/24set.arc",
     "aiMember": "24.ai",
     "eventMember": "24.evt",
@@ -81,6 +83,7 @@
   },
   "25": {
     "dungeonId": "nergal_depths",
+    "globalScript": "Glib/gscene25.lsc",
     "setArc": "MAP/25set.arc",
     "aiMember": "25.ai",
     "eventMember": "25.evt",
@@ -131,6 +134,7 @@
   },
   "26": {
     "dungeonId": "beast_mark_shrine",
+    "globalScript": "Glib/gscene26.lsc",
     "setArc": "MAP/26set.arc",
     "aiMember": "26.ai",
     "eventMember": "26.evt",
@@ -158,6 +162,7 @@
   },
   "27": {
     "dungeonId": "chosen_mark_shrine",
+    "globalScript": "Glib/gscene27.lsc",
     "setArc": "MAP/27set.arc",
     "aiMember": "27.ai",
     "eventMember": "27.evt",
@@ -186,6 +191,7 @@
   },
   "28": {
     "dungeonId": "ergion_keep",
+    "globalScript": "Glib/gscene28.lsc",
     "setArc": "MAP/28set.arc",
     "aiMember": "28.ai",
     "eventMember": "28.evt",
@@ -224,6 +230,7 @@
   },
   "29": {
     "dungeonId": "martani_bastion",
+    "globalScript": "missing",
     "setArc": "MAP/29set.arc",
     "aiMember": "29.ai",
     "eventMember": "29.evt",
@@ -257,6 +264,7 @@
   },
   "30": {
     "dungeonId": "blin_watch",
+    "globalScript": "missing",
     "setArc": "MAP/30set.arc",
     "aiMember": "30.ai",
     "eventMember": "30.evt",
@@ -293,6 +301,7 @@
   },
   "31": {
     "dungeonId": "demon_fixers_den",
+    "globalScript": "missing",
     "setArc": "MAP/31set.arc",
     "aiMember": "31.ai",
     "eventMember": "31.evt",
