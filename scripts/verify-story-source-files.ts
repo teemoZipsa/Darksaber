@@ -246,6 +246,12 @@ function readRoadmapDocRows(): Map<number, RoadmapDocRow> {
     if (content.includes('`MAP/NNset.arc`/`NN.ai`/`NN.DEO`/`NN.DEE`와 hmap 원장')) {
         throw new Error(`${path} still implies every late-story interior has DEO/DEE sources`);
     }
+    if (!content.includes('23~31화 후반 원본 AI·MRC 및 존재하는 DEO·DEE 발표 포커스')) {
+        throw new Error(`${path} is missing conditional late-story verification wording`);
+    }
+    if (content.includes('23~31화 후반 원본 AI·MRC·DEO·DEE 발표 포커스')) {
+        throw new Error(`${path} still implies every late-story verification has DEO/DEE sources`);
+    }
     for (const line of content.split(/\r?\n/)) {
         if (!line.startsWith('|')) continue;
         const cells = line.slice(1, line.endsWith('|') ? -1 : undefined).split('|').map((cell) => cell.trim());
@@ -1786,4 +1792,4 @@ for (let episode = options.start; episode <= options.end; episode++) {
     verified.push(`${episode}:${scenario.dungeonId}`);
 }
 
-console.log(`verified story source files, import docs, roadmap docs, planning docs, collection chains, quests, quest display text, rewards, event references, scenario ledgers, world entrances, hmaps, late-story biomes, interior accessibility, late-story original AI/MRC/DEO/DEE presentations, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
+console.log(`verified story source files, import docs, roadmap docs, planning docs, collection chains, quests, quest display text, rewards, event references, scenario ledgers, world entrances, hmaps, late-story biomes, interior accessibility, late-story original AI/MRC and conditional DEO/DEE presentations, field placements, monsters, i18n, bgm, and completion contracts: ${verified.join(', ')}`);
