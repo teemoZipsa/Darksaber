@@ -237,6 +237,10 @@ function notesMentionGuardCount(notes: string, guardCount: number): boolean {
     return new RegExp(`\\b${guardCount}\\s+guards?\\b|\\b${guardCount}\\s+guard AREA\\b`, 'i').test(notes);
 }
 
+function notesMentionGetItem(notes: string, originalItemId: number | undefined): boolean {
+    return originalItemId !== undefined && originalItemId > 0 && new RegExp(`\\bGETITEM 0*${originalItemId}\\b`).test(notes);
+}
+
 function readScenarioImportDocRows(): Map<number, ScenarioImportDocRow> {
     const path = 'docs/original-scenario-import.md';
     const rows = new Map<number, ScenarioImportDocRow>();
@@ -516,22 +520,22 @@ function verifyScenarioImportDocRow(episode: number, sequence: StoryScenarioEven
             throw new Error(`Episode ${episode} docs notes do not mention boss scenario clear`);
         }
         for (const reward of sequence.bossDefeatEvent.rewards ?? []) {
-            if (reward.type === 'item' && !new RegExp(`\\bGETITEM ${reward.originalItemId}\\b`).test(row.notes)) {
+            if (reward.type === 'item' && reward.originalItemId !== undefined && reward.originalItemId > 0 && !notesMentionGetItem(row.notes, reward.originalItemId)) {
                 throw new Error(`Episode ${episode} docs notes do not mention boss GETITEM ${reward.originalItemId}`);
             }
         }
     }
-    for (const event of sequence.fieldEvents.filter((candidate) => candidate.completesObjective)) {
+    for (const event of sequence.fieldEvents) {
         for (const eventNumber of originalEventIdNumbers(event.originalEventId)) {
             if (!notesMentionOriginalEvent(row.notes, eventNumber)) {
-                throw new Error(`Episode ${episode} docs notes do not mention objective field EVENT ${eventNumber}`);
+                throw new Error(`Episode ${episode} docs notes do not mention field EVENT ${eventNumber} for ${event.id}`);
             }
         }
         if (/\bSCENECLEAR\b/.test(event.trigger) && !/(scenario clear|SCENECLEAR)/i.test(row.notes)) {
             throw new Error(`Episode ${episode} docs notes do not mention objective field SCENECLEAR`);
         }
         for (const reward of event.rewards ?? []) {
-            if (reward.type === 'item' && !new RegExp(`\\bGETITEM ${reward.originalItemId}\\b`).test(row.notes)) {
+            if (reward.type === 'item' && reward.originalItemId !== undefined && reward.originalItemId > 0 && !notesMentionGetItem(row.notes, reward.originalItemId)) {
                 throw new Error(`Episode ${episode} docs notes do not mention objective field GETITEM ${reward.originalItemId}`);
             }
         }
@@ -570,7 +574,7 @@ function verifyScenarioImportDocRow(episode: number, sequence: StoryScenarioEven
                 }
             }
             for (const reward of event.rewards ?? []) {
-                if (reward.type === 'item' && !new RegExp(`\\bGETITEM ${reward.originalItemId}\\b`).test(row.notes)) {
+                if (reward.type === 'item' && reward.originalItemId !== undefined && reward.originalItemId > 0 && !notesMentionGetItem(row.notes, reward.originalItemId)) {
                     throw new Error(`Episode ${episode} docs notes do not mention late cache GETITEM ${reward.originalItemId}`);
                 }
             }
