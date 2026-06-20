@@ -115,6 +115,11 @@ import { WorldSessionLootState, type WorldSessionLootLock } from './WorldSession
 import { cloneCharacterSave, WorldSessionSaveState, type WorldCharacterSavePatch } from './WorldSessionSaveState';
 import { WorldSessionEnemyState } from './WorldSessionEnemyState';
 import {
+    addCarriedItemQuantity,
+    addCarriedWeight,
+    removeCarriedWeight,
+} from './WorldSessionCarryState';
+import {
     clonePersistentActor,
     clonePersistentNestState,
     clonePersistentScenarioState,
@@ -524,8 +529,8 @@ export class WorldSession {
             if (!player.active) continue;
             if (player.ghost && player.disconnectedAt !== null && now - player.disconnectedAt >= this.ghostGraceMs) {
                 this.log(`despawn player=${player.id} reason=ghost_expired`);
-                this.captureFinalSavePatch(player);
-                this.markSaveDirty(player.id);
+                this.saveState.captureFinalPatch(player);
+                this.saveState.markDirty(player.id);
                 this.removePlayer(player.id);
                 continue;
             }
@@ -676,7 +681,7 @@ export class WorldSession {
     }
 
     public markCharacterSaveDirty(playerId: string): void {
-        this.markSaveDirty(playerId);
+        this.saveState.markDirty(playerId);
     }
 
     public createCharacterSavePatch(playerId: string, hubTownId?: string): WorldCharacterSavePatch | null {
@@ -879,9 +884,9 @@ export class WorldSession {
         this.spendActorGauge(actor, TOOL_ACTION_GAUGE_COST);
         actor.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.stats.hp + effectiveHp));
         actor.stats.mp = Math.max(0, Math.min(effective.maxMp, actor.stats.mp + effectiveMp));
-        this.addCarriedItemQuantity(player.id, itemId, -1);
-        this.removeSaveItemQuantity(player, itemId, 1);
-        this.markSaveDirty(player.id);
+        addCarriedItemQuantity(player, itemId, -1);
+        this.saveState.removeItemQuantity(player, itemId, 1);
+        this.saveState.markDirty(player.id);
         this.finishActorIfSpent(actor);
 
         const consumed: InventoryConsumedMessage = { type: 'INVENTORY_CONSUMED', itemId, quantity: 1 };
@@ -1007,13 +1012,13 @@ export class WorldSession {
 
         const placed = lootObject.inventory.getAt(gridX, gridY);
         if (!placed) return reject(intentId, 'No item at requested loot cell.');
-        lootObject.inventory.remove(placed);
-        this.addCarriedWeight(playerId, getPlacedItemWeight(placed));
-        this.addCarriedItemQuantity(playerId, placed.item.id, placed.quantity);
         const player = this.players.get(playerId);
+        lootObject.inventory.remove(placed);
+        addCarriedWeight(player, getPlacedItemWeight(placed));
+        addCarriedItemQuantity(player, placed.item.id, placed.quantity);
         if (player) {
-            this.addSavePlacedItem(player, placed);
-            this.markSaveDirty(playerId);
+            this.saveState.addPlacedItem(player, placed);
+            this.saveState.markDirty(playerId);
         }
         this.lootState.touch(lootId, now);
         lootObject.opened = lootObject.inventory.items.length === 0;
@@ -1039,18 +1044,18 @@ export class WorldSession {
 
         const removed = new Set<object>();
         let acceptedWeight = 0;
+        const player = this.players.get(playerId);
         for (const cell of acceptedCells) {
             const placed = lootObject.inventory.getAt(cell.gridX, cell.gridY);
             if (!placed || removed.has(placed)) continue;
             lootObject.inventory.remove(placed);
             removed.add(placed);
             acceptedWeight += getPlacedItemWeight(placed);
-            this.addCarriedItemQuantity(playerId, placed.item.id, placed.quantity);
-            const player = this.players.get(playerId);
-            if (player) this.addSavePlacedItem(player, placed);
+            addCarriedItemQuantity(player, placed.item.id, placed.quantity);
+            if (player) this.saveState.addPlacedItem(player, placed);
         }
-        this.addCarriedWeight(playerId, acceptedWeight);
-        if (acceptedWeight > 0 || removed.size > 0) this.markSaveDirty(playerId);
+        addCarriedWeight(player, acceptedWeight);
+        if (acceptedWeight > 0 || removed.size > 0) this.saveState.markDirty(playerId);
 
         lootObject.opened = lootObject.inventory.items.length === 0;
         if (lootObject.opened) {
@@ -1456,8 +1461,8 @@ export class WorldSession {
         this.log(`raid result player=${playerId} result=${finalResult} kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
         if (player) {
             const survived = finalResult === 'SURVIVED';
-            this.captureFinalSavePatch(player, survived ? extractionTownId : undefined, survived);
-            this.markSaveDirty(playerId);
+            this.saveState.captureFinalPatch(player, survived ? extractionTownId : undefined, survived);
+            this.saveState.markDirty(playerId);
         }
         this.removePlayer(playerId);
         return message;
@@ -1478,8 +1483,8 @@ export class WorldSession {
         };
         this.log(`raid result player=${playerId} result=SURVIVED reason=server_shutdown kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
         if (player) {
-            this.captureFinalSavePatch(player, extractionTownId, true);
-            this.markSaveDirty(playerId);
+            this.saveState.captureFinalPatch(player, extractionTownId, true);
+            this.saveState.markDirty(playerId);
         }
         this.removePlayer(playerId);
         return message;
@@ -1857,7 +1862,7 @@ export class WorldSession {
         if (quest) player.completedQuestIds.add(quest.id);
         this.applyScenarioBossDefeatRewards(player, dungeonId);
         if (state?.returnTile) this.returnPlayerActorsFromScenarioInterior(player, state.returnTile);
-        this.markSaveDirty(player.id);
+        this.saveState.markDirty(player.id);
 
         if (state && state.dungeonId === dungeonId) {
             state.completed = true;
@@ -1896,7 +1901,7 @@ export class WorldSession {
             store.set(dungeonId, flags);
         }
         flags.add(flag);
-        this.markSaveDirty(player.id);
+        this.saveState.markDirty(player.id);
     }
 
     private applyScenarioFieldEventRewards(
@@ -1943,10 +1948,10 @@ export class WorldSession {
     private consumeScenarioFieldEventUseItems(player: ServerPlayer, event: StoryScenarioFieldEvent): void {
         for (const item of this.getScenarioFieldEventRequiredItems(event)) {
             if (this.getPlayerItemQuantity(player, item.id) <= 0) continue;
-            this.removeSaveItemQuantity(player, item.id, 1);
-            this.addCarriedItemQuantity(player.id, item.id, -1);
-            this.removeCarriedWeight(player.id, getPlacedItemWeight({ item, quantity: 1 }));
-            this.markSaveDirty(player.id);
+            this.saveState.removeItemQuantity(player, item.id, 1);
+            addCarriedItemQuantity(player, item.id, -1);
+            removeCarriedWeight(player, getPlacedItemWeight({ item, quantity: 1 }));
+            this.saveState.markDirty(player.id);
         }
     }
 
@@ -1980,15 +1985,15 @@ export class WorldSession {
 
             const item = getItemDef(reward.itemId);
             if (!item) continue;
-            const saved = this.addSavePlacedItem(player, {
+            const saved = this.saveState.addPlacedItem(player, {
                 item,
                 durability: item.maxDurability,
                 quantity: 1,
             });
             if (!saved) continue;
-            this.addCarriedItemQuantity(player.id, item.id, 1);
-            this.addCarriedWeight(player.id, getPlacedItemWeight({ item, quantity: 1 }));
-            this.markSaveDirty(player.id);
+            addCarriedItemQuantity(player, item.id, 1);
+            addCarriedWeight(player, getPlacedItemWeight({ item, quantity: 1 }));
+            this.saveState.markDirty(player.id);
             results.push({
                 type: 'item',
                 itemId: item.id,
@@ -2261,42 +2266,6 @@ export class WorldSession {
 
     private log(message: string): void {
         this.logger(message);
-    }
-
-    private addCarriedWeight(playerId: string, weight: number): void {
-        const player = this.players.get(playerId);
-        if (!player || weight <= 0) return;
-        player.carriedWeight = sanitizeCarriedWeight(player.carriedWeight + weight);
-    }
-
-    private removeCarriedWeight(playerId: string, weight: number): void {
-        const player = this.players.get(playerId);
-        if (!player || weight <= 0) return;
-        player.carriedWeight = sanitizeCarriedWeight(player.carriedWeight - weight);
-    }
-
-    private addCarriedItemQuantity(playerId: string, itemId: string, quantity: number): void {
-        const player = this.players.get(playerId);
-        if (!player || !itemId || !Number.isFinite(quantity) || quantity === 0) return;
-        const next = Math.max(0, (player.carriedItems.get(itemId) ?? 0) + Math.floor(quantity));
-        if (next > 0) player.carriedItems.set(itemId, next);
-        else player.carriedItems.delete(itemId);
-    }
-
-    private markSaveDirty(playerId: string): void {
-        this.saveState.markDirty(playerId);
-    }
-
-    private captureFinalSavePatch(player: ServerPlayer, hubTownId?: string, includeRaidRewards: boolean = false): void {
-        this.saveState.captureFinalPatch(player, hubTownId, includeRaidRewards);
-    }
-
-    private removeSaveItemQuantity(player: ServerPlayer, itemId: string, quantity: number): void {
-        this.saveState.removeItemQuantity(player, itemId, quantity);
-    }
-
-    private addSavePlacedItem(player: ServerPlayer, placed: { item: { id: string; maxDurability: number }; durability: number; quantity: number; sockets?: Array<{ id: string }> }): boolean {
-        return this.saveState.addPlacedItem(player, placed);
     }
 
     private updateRestingActor(actor: ServerActor, dt: number): void {
