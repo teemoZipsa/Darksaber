@@ -3,8 +3,8 @@ import { getOriginalLateStoryFact } from './OriginalLateStoryFacts';
 
 export type StoryQuestRewardData =
     | { type: 'none' }
-    | { type: 'questItem'; itemId: string }
-    | { type: 'inventoryItem'; itemId: string }
+    | { type: 'questItem'; itemId: string; originalItemId?: number }
+    | { type: 'inventoryItem'; itemId: string; originalItemId?: number }
     | { type: 'companion'; companionId: string; classId: string; nameKey: string }
     | { type: 'bundle'; rewards: StoryQuestRewardData[] };
 
@@ -107,7 +107,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
             type: 'bundle',
             rewards: [
                 { type: 'companion', companionId: 'story_fighter_ep03', classId: 'infantry', nameKey: 'story.companion.ep03Fighter.name' },
-                { type: 'inventoryItem', itemId: 'quest_sacred_sword' },
+                { type: 'inventoryItem', itemId: 'quest_sacred_sword', originalItemId: 98 },
             ],
         },
     },

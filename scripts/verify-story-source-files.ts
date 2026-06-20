@@ -215,6 +215,16 @@ function originalEventIdNumbers(originalEventId: string): number[] {
     return [...originalEventId.matchAll(/\d+/g)].map((match) => Number(match[0]));
 }
 
+function triggerGetItemIds(trigger: string): number[] {
+    return [...trigger.matchAll(/\bGETITEM\s+0*(\d+)\b/g)].map((match) => Number(match[1]));
+}
+
+function collectStoryRewardOriginalItemIds(reward: StoryQuestRewardData): number[] {
+    if (reward.type === 'none' || reward.type === 'companion') return [];
+    if (reward.type === 'bundle') return reward.rewards.flatMap(collectStoryRewardOriginalItemIds);
+    return reward.originalItemId !== undefined && reward.originalItemId > 0 ? [reward.originalItemId] : [];
+}
+
 function notesMentionOriginalEvent(notes: string, eventNumber: number): boolean {
     return [...notes.matchAll(/\bevents?\s+([\d\s,/-]+)/gi)].some((match) =>
         match[1].split(/[,/]/).some((part) => {
@@ -748,6 +758,12 @@ function verifyStoryRewardContract(
         if (!itemDef) throw new Error(`Episode ${episode} ${context} missing reward item ${reward.itemId}`);
         if (!itemDef.name || !itemDef.nameKr) {
             throw new Error(`Episode ${episode} ${context} reward item ${reward.itemId} has missing display name`);
+        }
+        if (reward.originalItemId !== undefined && reward.originalItemId > 0) {
+            const originalItemPattern = new RegExp(`GETITEM 0*${reward.originalItemId}\\b`);
+            if (!originalItemPattern.test(itemDef.description) || !originalItemPattern.test(itemDef.descriptionKr)) {
+                throw new Error(`Episode ${episode} ${context} reward item ${reward.itemId} is missing original GETITEM ${reward.originalItemId} description`);
+            }
         }
         return;
     }
@@ -1785,6 +1801,19 @@ function verifyStoryCompletionContract(
         }
         if (!sequence.bossDefeatEvent.trigger.includes('SCENECLEAR')) {
             throw new Error(`Episode ${episode} ${scenario.dungeonId} boss defeat event does not declare SCENECLEAR`);
+        }
+        const bossRewardOriginalItemIds = new Set(
+            [
+                ...(sequence.bossDefeatEvent.rewards ?? [])
+                    .map((reward) => reward.type === 'item' ? reward.originalItemId : undefined)
+                    .filter((originalItemId): originalItemId is number => originalItemId !== undefined && originalItemId > 0),
+                ...collectStoryRewardOriginalItemIds(scenario.reward),
+            ]
+        );
+        for (const originalItemId of triggerGetItemIds(sequence.bossDefeatEvent.trigger)) {
+            if (!bossRewardOriginalItemIds.has(originalItemId)) {
+                throw new Error(`Episode ${episode} ${scenario.dungeonId} boss GETITEM ${originalItemId} is missing a reward mapping`);
+            }
         }
         if (sequence.objectiveRuntimeFlag && sequence.bossDefeatEvent.runtimeFlag !== sequence.objectiveRuntimeFlag) {
             throw new Error(

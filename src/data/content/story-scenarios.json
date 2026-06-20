@@ -67,7 +67,8 @@
         },
         {
           "type": "inventoryItem",
-          "itemId": "quest_sacred_sword"
+          "itemId": "quest_sacred_sword",
+          "originalItemId": 98
         }
       ]
     }
