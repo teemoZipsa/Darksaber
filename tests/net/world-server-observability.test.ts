@@ -8,6 +8,9 @@ test('world server metrics render gauges and operational counters', () => {
     metrics.saveConflictsTotal = 2;
     metrics.saveSpoolReplayAppliedTotal = 9;
     metrics.saveSpoolReplayFailedTotal = 1;
+    metrics.sessionSnapshotSaveFailuresTotal = 1;
+    metrics.sessionSnapshotRestoreAppliedTotal = 2;
+    metrics.sessionSnapshotRestoreFailedTotal = 3;
     metrics.shutdownForcedRaidResultsTotal = 1;
     metrics.worldTickDurationMs = 7;
 
@@ -17,6 +20,7 @@ test('world server metrics render gauges and operational counters', () => {
         activePlayers: 5,
         websocketClients: 6,
         pendingSaveSpoolEntries: 7,
+        pendingSessionSnapshotEntries: 2,
         dirtySaveTrackers: 8,
         savingSaveTrackers: 1,
     }, 3_500);
@@ -26,6 +30,7 @@ test('world server metrics render gauges and operational counters', () => {
     assert.match(output, /darksaber_world_active_players 5/);
     assert.match(output, /darksaber_world_websocket_clients 6/);
     assert.match(output, /darksaber_world_pending_save_spool_entries 7/);
+    assert.match(output, /darksaber_world_pending_session_snapshot_entries 2/);
     assert.match(output, /darksaber_world_dirty_save_trackers 8/);
     assert.match(output, /darksaber_world_saving_save_trackers 1/);
     assert.match(output, /darksaber_world_tick_duration_ms 7/);
@@ -33,5 +38,8 @@ test('world server metrics render gauges and operational counters', () => {
     assert.match(output, /darksaber_world_save_conflicts_total 2/);
     assert.match(output, /darksaber_world_save_spool_replay_applied_total 9/);
     assert.match(output, /darksaber_world_save_spool_replay_failed_total 1/);
+    assert.match(output, /darksaber_world_session_snapshot_save_failures_total 1/);
+    assert.match(output, /darksaber_world_session_snapshot_restore_applied_total 2/);
+    assert.match(output, /darksaber_world_session_snapshot_restore_failed_total 3/);
     assert.match(output, /darksaber_world_shutdown_forced_raid_results_total 1/);
 });

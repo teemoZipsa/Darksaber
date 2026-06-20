@@ -103,8 +103,9 @@ https://<render-service-host>/metrics
 
 The metrics include live sessions, active players, WebSocket clients, tick
 duration, rejected actions, save conflicts/failures, pending world-save recovery
-spool entries, dirty/saving save trackers, and startup save-spool replay
-results.
+spool entries, pending active-raid session snapshots, dirty/saving save
+trackers, startup save-spool replay results, and startup active-raid snapshot
+restore results.
 
 Set these Render environment variables:
 
@@ -114,6 +115,8 @@ NODE_ENV=production
 AUTH_JWT_SECRET=<long random>
 AUTH_REFRESH_TOKEN_HASH_SECRET=<different long random>
 AUTH_ALLOWED_ORIGINS=https://<vercel-client-host>
+WORLD_SESSION_SNAPSHOT_PATH=./.runtime/world-session-snapshots.json
+WORLD_SESSION_SNAPSHOT_MS=5000
 ```
 
 Render Free Web Services may sleep when there is no traffic. While a player has
@@ -141,9 +144,15 @@ player to start a new expedition.
 `WorldSession.restorePersistentSnapshot()` provide a JSON-safe snapshot boundary
 for active raid state: players, actors, enemies, nest state, scenario flags,
 loot containers, generated chunks, and dirty save markers round-trip back into a
-reconnectable session. The production server does not yet write these snapshots
-to shared durable storage, so horizontal scale still requires persistent
-raid-instance routing and storage.
+reconnectable session. The server writes these snapshots to
+`WORLD_SESSION_SNAPSHOT_PATH` about every `WORLD_SESSION_SNAPSHOT_MS`, reloads
+them on startup, and marks restored players as disconnected so they can reclaim
+the raid with their resume token. Empty/completed sessions are removed from the
+snapshot store.
+
+This is local-disk durability, not shared durable storage. It covers single
+instance restarts on a persistent disk; horizontal scale still requires
+persistent raid-instance routing and shared storage.
 
 ## Vercel Client
 
@@ -267,6 +276,8 @@ the same status-checking capability as the API helper.
 Account data lives in managed PostgreSQL. Production operation must include:
 
 - scheduled database backups
+- persistent disk or shared storage for `WORLD_SAVE_SPOOL_PATH` and
+  `WORLD_SESSION_SNAPSHOT_PATH`
 - manual restore rehearsal before broad release
 - environment-specific `AUTH_JWT_SECRET` rotation plan
 - environment-specific `AUTH_REFRESH_TOKEN_HASH_SECRET` rotation plan

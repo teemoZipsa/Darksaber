@@ -481,6 +481,20 @@ export class WorldSession {
         this.log(`ghost start player=${playerId} graceMs=${this.ghostGraceMs}`);
     }
 
+    public disconnectActivePlayersForServerRestart(now: number = Date.now()): void {
+        for (const player of this.players.values()) {
+            if (!player.active) continue;
+            player.ghost = true;
+            player.disconnectedAt = now;
+            for (const actorId of player.actorIds) {
+                const actor = this.actors.get(actorId);
+                if (actor) actor.remainingAp = 0;
+            }
+            this.releaseLootLocksForPlayer(player.id);
+            this.log(`ghost start player=${player.id} reason=server_restart graceMs=${this.ghostGraceMs}`);
+        }
+    }
+
     public finishActivePlayersForShutdown(now: number = Date.now()): WorldSessionTickResult {
         const perPlayerMessages: Array<{ playerId: string; message: WorldServerMessage }> = [];
         for (const playerId of this.getActivePlayerIds()) {
@@ -672,6 +686,10 @@ export class WorldSession {
 
     public consumeSaveDirtyPlayerIds(): string[] {
         return this.saveState.consumeDirtyPlayerIds();
+    }
+
+    public markCharacterSaveDirty(playerId: string): void {
+        this.markSaveDirty(playerId);
     }
 
     public createCharacterSavePatch(playerId: string, hubTownId?: string): WorldCharacterSavePatch | null {
