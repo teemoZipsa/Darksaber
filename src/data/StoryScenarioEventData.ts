@@ -891,6 +891,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 trigger: 'CHARDEAD 400',
                 enemyId: 'story_etna_volcano_guard_0',
                 scenarioEnemyIndex: 0,
+                originalCharId: 400,
                 steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.400', focus: { x: 10, y: 24 } }],
             },
             {
@@ -900,6 +901,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 trigger: 'CHARDEAD 410',
                 enemyId: 'story_etna_volcano_guard_1',
                 scenarioEnemyIndex: 1,
+                originalCharId: 410,
                 steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.410', focus: { x: 21, y: 22 } }],
             },
             {
@@ -909,6 +911,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 trigger: 'CHARDEAD 420',
                 enemyId: 'story_etna_volcano_guard_2',
                 scenarioEnemyIndex: 2,
+                originalCharId: 420,
                 steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.420', focus: { x: 14, y: 20 } }],
             },
             {
@@ -918,6 +921,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 trigger: 'CHARDEAD 430',
                 enemyId: 'story_etna_volcano_guard_3',
                 scenarioEnemyIndex: 3,
+                originalCharId: 430,
                 steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.430', focus: { x: 16, y: 18 } }],
             },
             {
@@ -927,6 +931,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 trigger: 'CHARDEAD 440',
                 enemyId: 'story_etna_volcano_guard_4',
                 scenarioEnemyIndex: 4,
+                originalCharId: 440,
                 steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.440', focus: { x: 14, y: 12 } }],
             },
             {
@@ -936,6 +941,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 trigger: 'CHARDEAD 450',
                 enemyId: 'story_etna_volcano_guard_5',
                 scenarioEnemyIndex: 5,
+                originalCharId: 450,
                 steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.450', focus: { x: 16, y: 10 } }],
             },
             {
@@ -945,6 +951,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 trigger: 'CHARDEAD 460',
                 enemyId: 'story_etna_volcano_guard_6',
                 scenarioEnemyIndex: 6,
+                originalCharId: 460,
                 steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.460', focus: { x: 12, y: 6 } }],
             },
             {
@@ -954,6 +961,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 trigger: 'CHARDEAD 470',
                 enemyId: 'story_etna_volcano_guard_7',
                 scenarioEnemyIndex: 7,
+                originalCharId: 470,
                 steps: [{ kind: 'dialogue', speakerId: 'etnaGuard', speakerNameKey: 'story.event.speaker.etnaGuard', textKey: 'story.event.ep03.enemyDefeat.470', focus: { x: 18, y: 6 } }],
             },
         ],

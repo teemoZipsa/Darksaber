@@ -1813,6 +1813,14 @@ function verifyStoryCompletionContract(
                 `${event.scenarioEnemyIndex} is outside guard count ${scenario.guardCount}`
             );
         }
+        if (!Number.isInteger(event.originalCharId) || (event.originalCharId as number) <= 0) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} enemy defeat event ${event.id} is missing original CHARDEAD id`);
+        }
+        if (!new RegExp(`\\bCHARDEAD\\s+${event.originalCharId}\\b`).test(event.trigger)) {
+            throw new Error(
+                `Episode ${episode} ${scenario.dungeonId} enemy defeat event ${event.id} trigger does not match original CHARDEAD ${event.originalCharId}`
+            );
+        }
     }
 
     if (episode >= 23 && episode <= 31) {
