@@ -12,6 +12,8 @@ import {
     getStoryScenarioEventStepDurationMs,
     getStoryScenarioEventSequence,
     getStoryScenarioPresentationDurationMs,
+    getStoryScenarioTrapMagicDamage,
+    getStoryScenarioTriggerMagicCodes,
     type StoryScenarioEventSequence,
     type StoryScenarioEventStep,
     type StoryScenarioFieldEvent,
@@ -81,16 +83,6 @@ export interface WorldStoryScenarioContext {
     autoPlaceRewardItem(itemId: string): boolean;
     spawnDamage?(x: number, y: number, amount: number): void;
     log(message: string): void;
-}
-
-function triggerMagicCodes(trigger: string): number[] {
-    return [...trigger.matchAll(/\bMAGIC\s+0*(\d+)\b/g)].map((match) => Number(match[1]));
-}
-
-function getStoryTrapMagicDamage(magicCode: number, maxHp: number): number {
-    const tierDigit = Number(String(magicCode).slice(-1));
-    const tier = Number.isFinite(tierDigit) && tierDigit > 0 ? tierDigit : 1;
-    return Math.max(1, Math.floor(Math.max(1, maxHp) * 0.08) + tier * 4);
 }
 
 export class WorldStoryScenarioController {
@@ -634,6 +626,7 @@ export class WorldStoryScenarioController {
             ? this.getFieldEventPresentationSteps(result.dungeonId, event, result.presentationSteps)
             : result.presentationSteps);
         for (const reward of result.rewards) this.applyNetworkFieldEventReward(reward);
+        this.applyNetworkTrapMagicDamage(result.trapDamage);
         this.syncActiveInteriorInspectMarkers();
         this.syncActiveWorldScenarioMarkers();
     }
@@ -850,7 +843,7 @@ export class WorldStoryScenarioController {
     }
 
     private applyFieldEventTrapMagic(event: StoryScenarioFieldEvent, actor: FieldActor | null): void {
-        const magicCodes = triggerMagicCodes(event.trigger);
+        const magicCodes = getStoryScenarioTriggerMagicCodes(event.trigger);
         if (magicCodes.length === 0) return;
 
         const targetActor = actor?.character ? actor : this.context.getControlledActor();
@@ -858,7 +851,7 @@ export class WorldStoryScenarioController {
         if (!targetActor || !character || character.isDead || character.stats.hp <= 1) return;
 
         const maxHp = Math.max(character.stats.maxHp, character.stats.hp, 1);
-        const rawDamage = magicCodes.reduce((sum, magicCode) => sum + getStoryTrapMagicDamage(magicCode, maxHp), 0);
+        const rawDamage = magicCodes.reduce((sum, magicCode) => sum + getStoryScenarioTrapMagicDamage(magicCode, maxHp), 0);
         const damage = Math.min(character.stats.hp - 1, rawDamage);
         if (damage <= 0) return;
 
@@ -866,6 +859,16 @@ export class WorldStoryScenarioController {
         const tile = this.context.actorTile(targetActor);
         this.context.spawnDamage?.(tile.x, tile.y, damage);
         this.context.log(formatT('story.event.trap.magicDamage', { target: character.name, damage }));
+    }
+
+    private applyNetworkTrapMagicDamage(trapDamage: ScenarioFieldEventResultMessage['trapDamage']): void {
+        if (!trapDamage) return;
+        const actor = this.context.getControlledActor();
+        if (!actor || actor.id !== trapDamage.actorId || !actor.character || actor.character.isDead) return;
+        actor.character.stats.hp = Math.max(1, actor.character.stats.hp - trapDamage.damage);
+        const tile = this.context.actorTile(actor);
+        this.context.spawnDamage?.(tile.x, tile.y, trapDamage.damage);
+        this.context.log(formatT('story.event.trap.magicDamage', { target: actor.character.name, damage: trapDamage.damage }));
     }
 
     private applyScenarioRewards(rewards: StoryScenarioFieldEvent['rewards']): void {

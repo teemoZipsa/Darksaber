@@ -608,7 +608,17 @@ function isScenarioFieldEventResultMessage(message: unknown): message is Scenari
         && typeof message.flag === 'string'
         && Array.isArray(message.presentationSteps)
         && Array.isArray(message.rewards)
-        && message.rewards.every(isScenarioFieldEventRewardResult);
+        && message.rewards.every(isScenarioFieldEventRewardResult)
+        && (
+            message.trapDamage === undefined
+            || (
+                isRecord(message.trapDamage)
+                && typeof message.trapDamage.actorId === 'string'
+                && typeof message.trapDamage.damage === 'number'
+                && Number.isInteger(message.trapDamage.damage)
+                && message.trapDamage.damage > 0
+            )
+        );
 }
 
 function isScenarioFieldEventRewardResult(value: unknown): value is ScenarioFieldEventRewardResult {

@@ -34,6 +34,8 @@ import { getStoryScenarioByDungeonId, type StoryScenarioDefinition, type StorySc
 import { getStoryScenarioMonsterLayout } from '../src/data/StoryScenarioMonsterData';
 import {
     getStoryScenarioEventSequence,
+    getStoryScenarioTrapMagicDamage,
+    getStoryScenarioTriggerMagicCodes,
     type StoryScenarioEnemyDefeatEvent,
     type StoryScenarioEventStep,
     type StoryScenarioFieldEvent,
@@ -1054,6 +1056,7 @@ export class WorldSession {
 
         this.markScenarioFieldEventFlagComplete(player!, dungeonId, flag, scope);
         const rewards = this.applyScenarioFieldEventRewards(player!, event);
+        const trapDamage = this.applyScenarioFieldEventTrapMagic(actor!, event);
         if (event.completesObjective) this.completeScenarioObjective(player!, dungeonId, { clearEnemies: false });
         const result: ScenarioFieldEventResultMessage = {
             type: 'SCENARIO_FIELD_EVENT_RESULT',
@@ -1064,6 +1067,7 @@ export class WorldSession {
             flag,
             presentationSteps: event.steps.map((step) => ({ ...step })),
             rewards,
+            ...(trapDamage ? { trapDamage } : {}),
         };
         const broadcasts: WorldServerMessage[] = scope === 'shared'
             ? [{
@@ -1791,6 +1795,23 @@ export class WorldSession {
         event: StoryScenarioFieldEvent
     ): ScenarioFieldEventRewardResult[] {
         return this.applyScenarioRewards(player, event.rewards);
+    }
+
+    private applyScenarioFieldEventTrapMagic(
+        actor: ServerActor,
+        event: StoryScenarioFieldEvent
+    ): ScenarioFieldEventResultMessage['trapDamage'] {
+        const magicCodes = getStoryScenarioTriggerMagicCodes(event.trigger);
+        if (magicCodes.length === 0 || actor.isDead || actor.stats.hp <= 1) return undefined;
+
+        const maxHp = Math.max(actor.stats.maxHp, actor.stats.hp, 1);
+        const rawDamage = magicCodes.reduce((sum, magicCode) => sum + getStoryScenarioTrapMagicDamage(magicCode, maxHp), 0);
+        const damage = Math.min(actor.stats.hp - 1, rawDamage);
+        if (damage <= 0) return undefined;
+
+        actor.stats.hp = Math.max(1, actor.stats.hp - damage);
+        removeActionStanceStatusesFromCarrier(actor);
+        return { actorId: actor.id, damage };
     }
 
     private applyScenarioBossDefeatRewards(

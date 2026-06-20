@@ -350,6 +350,7 @@ export interface ScenarioFieldEventResultMessage {
     flag: string;
     presentationSteps: StoryScenarioEventStep[];
     rewards: ScenarioFieldEventRewardResult[];
+    trapDamage?: { actorId: string; damage: number };
 }
 
 export interface ScenarioFieldEventBroadcastMessage {

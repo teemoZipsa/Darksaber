@@ -1655,6 +1655,77 @@ test('server-authoritative field scenario events complete per player without tru
     assert.equal(finalPatch.questState.gold, 600);
 });
 
+test('server-authoritative original MAGIC field traps damage the actor once', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const scenario = STORY_SCENARIOS.find((entry) => entry.episode === 12);
+    assert.ok(scenario);
+    const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+    const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'pyramid_front_trap_50');
+    assert.ok(event);
+    const completedQuestIds = STORY_SCENARIOS
+        .filter((entry) => entry.episode < scenario.episode)
+        .map((entry) => entry.questId);
+    const character = authCharacter('server-trap');
+    const save = createDefaultCharacterSave(character);
+    save.questState = { ...save.questState, completedQuestIds };
+    const joined = session.join({
+        ...joinMessage('central_castle', character.id),
+        completedQuestIds,
+    }, 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        completedQuestIds,
+        saveSnapshot: save,
+    });
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
+    assert.ok(serverActor);
+    assert.ok(dungeon);
+    serverActor.stats.maxHp = 100;
+    serverActor.stats.hp = 100;
+    serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+    session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-pyramid-front',
+        actorId: serverActor.id,
+        dungeonId: scenario.dungeonId,
+    }, 1_000);
+
+    const [eventTile] = getStoryScenarioFieldEventTiles(scenario.dungeonId, event, world);
+    serverActor.tile = { x: eventTile.x, y: eventTile.y + 1 };
+    const result = session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'spring-pyramid-trap',
+        actorId: serverActor.id,
+        dungeonId: scenario.dungeonId,
+        eventId: event.id,
+    }, 1_100);
+
+    const fieldResult = result.replies.find((message) => message.type === 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.equal(fieldResult?.type, 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.deepEqual(fieldResult?.type === 'SCENARIO_FIELD_EVENT_RESULT' ? fieldResult.trapDamage : undefined, {
+        actorId: serverActor.id,
+        damage: 16,
+    });
+    assert.equal(serverActor.stats.hp, 84);
+    const snapshot = session.createSnapshot(joined.playerId, 1_100);
+    const actorSnapshot = snapshot.partyActors.find((entry) => entry.id === serverActor.id);
+    assert.equal(actorSnapshot?.stats.hp, 84);
+
+    const duplicate = session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'spring-pyramid-trap-again',
+        actorId: serverActor.id,
+        dungeonId: scenario.dungeonId,
+        eventId: event.id,
+    }, 1_200);
+    assert.equal(duplicate.replies[0]?.type, 'ACTION_REJECTED');
+    assert.equal(serverActor.stats.hp, 84);
+});
+
 test('server-authoritative SCENECLEAR field events complete scenario objectives', () => {
     const session = new WorldSession();
     const world = new WorldMap();
