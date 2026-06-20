@@ -578,6 +578,8 @@ function verifyStoryQuestDisplayTextContract(episode: number, scenario: StorySce
 
     requireStoryTextIncludes(episode, 'ko objective', ko[quest.objectiveKey], scenario.dungeonNameKr);
     requireStoryTextIncludes(episode, 'en objective', en[quest.objectiveKey], scenario.dungeonNameEn);
+    requireStoryTextIncludes(episode, 'ko objective', ko[quest.objectiveKey], '출발지가 아닌 마을');
+    requireStoryTextIncludes(episode, 'en objective', en[quest.objectiveKey], 'town other than your departure point');
     requireStoryTextIncludes(episode, 'ko enter log', ko[quest.enterLogKey], scenario.dungeonNameKr);
     requireStoryTextIncludes(episode, 'en enter log', en[quest.enterLogKey], scenario.dungeonNameEn);
     if (scenario.bossName) {
