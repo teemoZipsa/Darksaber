@@ -35,6 +35,7 @@ import {
     STORY_QUESTS,
     getStoryCompanionRewards,
     getStoryQuestViews,
+    isStoryRewardOwned,
     type StoryQuestDefinition,
     type StoryQuestReward,
 } from '../../src/data/StoryQuestData';
@@ -172,6 +173,11 @@ function assertStoryRewardData(reward: StoryQuestReward, context: string, ko: Re
     assert.ok(getClassLine(reward.classId), `${context} missing companion class ${reward.classId}`);
     assert.ok(ko[reward.nameKey], `${context} missing ko companion key ${reward.nameKey}`);
     assert.ok(en[reward.nameKey], `${context} missing en companion key ${reward.nameKey}`);
+}
+
+function flattenStoryRewards(reward: StoryQuestReward): StoryQuestReward[] {
+    if (reward.type !== 'bundle') return [reward];
+    return reward.rewards.flatMap(flattenStoryRewards);
 }
 
 function assertStoryTile(tile: { x: number; y: number }, context: string): void {
@@ -877,6 +883,25 @@ test('story quest definitions derive from runtime scenario definitions', () => {
         STORY_QUESTS,
         STORY_SCENARIOS.map(expectedStoryQuestSignature)
     );
+});
+
+test('story quest item rewards are bound and tracked by quest state', () => {
+    for (const quest of STORY_QUESTS) {
+        const itemRewards = flattenStoryRewards(quest.reward)
+            .filter((reward): reward is Extract<StoryQuestReward, { type: 'questItem' | 'inventoryItem' }> =>
+                reward.type === 'questItem' || reward.type === 'inventoryItem'
+            );
+        for (const reward of itemRewards) {
+            const item = getItemDef(reward.itemId);
+            assert.ok(item, `episode ${quest.episode} reward item ${reward.itemId}`);
+            assert.equal(item.sellable, false, `episode ${quest.episode} reward item ${reward.itemId} must stay bound`);
+
+            const playerData = new PlayerData();
+            assert.equal(isStoryRewardOwned(reward, playerData), false, `episode ${quest.episode} reward ${reward.itemId} starts unowned`);
+            playerData.addQuestItem(reward.itemId);
+            assert.equal(isStoryRewardOwned(reward, playerData), true, `episode ${quest.episode} reward ${reward.itemId} quest-state ownership`);
+        }
+    }
 });
 
 test('story quest views unlock exactly one next episode through 31', () => {
