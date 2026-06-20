@@ -2,6 +2,7 @@ import type { TilePoint } from '../field/FieldPathing';
 import { getStoryInteriorLayout } from './StoryInteriorData';
 import { getOriginalLateStoryBossTile, getOriginalLateStoryCacheEvents, getOriginalLateStoryFact } from './OriginalLateStoryFacts';
 import { getOriginalLateStoryItemsForSourceEvent } from './OriginalLateStoryItems';
+import { getOriginalLateStoryMrcFact } from './OriginalLateStoryMapFacts';
 
 export type StoryScenarioEventStep =
     | { kind: 'focus'; target: TilePoint; labelKey: string; durationMs?: number }
@@ -207,12 +208,14 @@ function lateScenarioCacheEvent(
 function lateScenarioSequence(input: {
     episode: number;
     globalScript: string;
-    mapFiles: string[];
+    hasBackground?: boolean;
+    sideMapFiles?: string[];
     dialogues?: Array<{ speakerId: string; speakerNameKey: string; textKey: string; focus?: TilePoint }>;
     bossDefeatDialogues?: Array<{ speakerId: string; speakerNameKey: string; textKey: string; focus?: TilePoint }>;
 }): StoryScenarioEventSequence {
     const ep = String(input.episode).padStart(2, '0');
     const originalFact = getOriginalLateStoryFact(input.episode);
+    const originalMrc = getOriginalLateStoryMrcFact(input.episode);
     const dungeonId = originalFact.dungeonId;
     const originalEventSource = `${originalFact.setArc}:${originalFact.eventMember}`;
     const bossTile = getOriginalLateStoryBossTile(input.episode);
@@ -262,7 +265,14 @@ function lateScenarioSequence(input: {
         originalSources: {
             sceneScript: `Wlib/scene${input.episode}.lsc`,
             globalScript: input.globalScript,
-            mapFiles: input.mapFiles,
+            mapFiles: [
+                originalMrc.source,
+                originalMrc.translatedSource,
+                `MAP/${ep}hmap.bmp`,
+                ...(input.hasBackground ? [`MAP/${ep}bg.bmp`] : []),
+                originalFact.setArc,
+                ...(input.sideMapFiles ?? []),
+            ],
             setArcMembers: [
                 originalFact.aiMember,
                 originalFact.eventMember,
@@ -2932,7 +2942,8 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     lateScenarioSequence({
         episode: 23,
         globalScript: 'missing',
-        mapFiles: ['MAP/23.mrc', 'MAP/23t.mrc', 'MAP/23hmap.bmp', 'MAP/23bg.bmp', 'MAP/23set.arc', 'MAP/2300.mrc', 'MAP/2300t.mrc', 'MAP/2300hmap.bmp'],
+        hasBackground: true,
+        sideMapFiles: ['MAP/2300.mrc', 'MAP/2300t.mrc', 'MAP/2300hmap.bmp'],
         dialogues: [
             { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep23.dialogue.01', focus: { x: 18, y: 15 } },
             { speakerId: 'beelzebuth', speakerNameKey: 'story.event.speaker.beelzebuth', textKey: 'story.event.ep23.dialogue.02', focus: { x: 21, y: 15 } },
@@ -2946,7 +2957,8 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     lateScenarioSequence({
         episode: 24,
         globalScript: 'Glib/gscene24.lsc',
-        mapFiles: ['MAP/24.mrc', 'MAP/24t.mrc', 'MAP/24hmap.bmp', 'MAP/24bg.bmp', 'MAP/24set.arc', 'MAP/2400.mrc', 'MAP/2400t.mrc', 'MAP/2400hmap.bmp'],
+        hasBackground: true,
+        sideMapFiles: ['MAP/2400.mrc', 'MAP/2400t.mrc', 'MAP/2400hmap.bmp'],
         dialogues: [
             { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep24.dialogue.01', focus: { x: 19, y: 7 } },
         ],
@@ -2957,7 +2969,8 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     lateScenarioSequence({
         episode: 25,
         globalScript: 'Glib/gscene25.lsc',
-        mapFiles: ['MAP/25.mrc', 'MAP/25t.mrc', 'MAP/25hmap.bmp', 'MAP/25bg.bmp', 'MAP/25set.arc', 'MAP/2500.mrc', 'MAP/2500t.mrc', 'MAP/2500hmap.bmp', 'MAP/2502.mrc', 'MAP/2502t.mrc', 'MAP/2510.mrc', 'MAP/2510t.mrc'],
+        hasBackground: true,
+        sideMapFiles: ['MAP/2500.mrc', 'MAP/2500t.mrc', 'MAP/2500hmap.bmp', 'MAP/2502.mrc', 'MAP/2502t.mrc', 'MAP/2510.mrc', 'MAP/2510t.mrc'],
         dialogues: [
             { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep25.dialogue.01', focus: { x: 19, y: 7 } },
             { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep25.dialogue.02', focus: { x: 19, y: 23 } },
@@ -2976,17 +2989,19 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     lateScenarioSequence({
         episode: 26,
         globalScript: 'Glib/gscene26.lsc',
-        mapFiles: ['MAP/26.mrc', 'MAP/26t.mrc', 'MAP/26hmap.bmp', 'MAP/26bg.bmp', 'MAP/26set.arc', 'MAP/2600.mrc', 'MAP/2600t.mrc', 'MAP/2600hmap.bmp'],
+        hasBackground: true,
+        sideMapFiles: ['MAP/2600.mrc', 'MAP/2600t.mrc', 'MAP/2600hmap.bmp'],
     }),
     lateScenarioSequence({
         episode: 27,
         globalScript: 'Glib/gscene27.lsc',
-        mapFiles: ['MAP/27.mrc', 'MAP/27t.mrc', 'MAP/27hmap.bmp', 'MAP/27set.arc', 'MAP/2700.mrc', 'MAP/2700t.mrc', 'MAP/2700hmap.bmp'],
+        sideMapFiles: ['MAP/2700.mrc', 'MAP/2700t.mrc', 'MAP/2700hmap.bmp'],
     }),
     lateScenarioSequence({
         episode: 28,
         globalScript: 'Glib/gscene28.lsc',
-        mapFiles: ['MAP/28.mrc', 'MAP/28t.mrc', 'MAP/28hmap.bmp', 'MAP/28bg.bmp', 'MAP/28set.arc', 'MAP/2800.mrc', 'MAP/2800t.mrc', 'MAP/2800hmap.bmp'],
+        hasBackground: true,
+        sideMapFiles: ['MAP/2800.mrc', 'MAP/2800t.mrc', 'MAP/2800hmap.bmp'],
         dialogues: [
             { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep28.dialogue.01', focus: { x: 19, y: 7 } },
             { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep28.dialogue.02', focus: { x: 19, y: 7 } },
@@ -3018,7 +3033,8 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     lateScenarioSequence({
         episode: 29,
         globalScript: 'missing',
-        mapFiles: ['MAP/29.mrc', 'MAP/29t.mrc', 'MAP/29hmap.bmp', 'MAP/29bg.bmp', 'MAP/29set.arc', 'MAP/2900.mrc', 'MAP/2900t.mrc', 'MAP/2900hmap.bmp'],
+        hasBackground: true,
+        sideMapFiles: ['MAP/2900.mrc', 'MAP/2900t.mrc', 'MAP/2900hmap.bmp'],
         dialogues: [
             { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep29.dialogue.01', focus: { x: 19, y: 7 } },
             { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep29.dialogue.02', focus: { x: 19, y: 7 } },
@@ -3047,7 +3063,8 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     lateScenarioSequence({
         episode: 30,
         globalScript: 'missing',
-        mapFiles: ['MAP/30.mrc', 'MAP/30t.mrc', 'MAP/30hmap.bmp', 'MAP/30bg.bmp', 'MAP/30set.arc', 'MAP/3000.mrc', 'MAP/3000t.mrc', 'MAP/3000hmap.bmp', 'MAP/3010.mrc', 'MAP/3020.mrc', 'MAP/3030.mrc', 'MAP/3040.mrc', 'MAP/3050.mrc', 'MAP/3060.mrc', 'MAP/3070.mrc', 'MAP/3080.mrc', 'MAP/3090.mrc'],
+        hasBackground: true,
+        sideMapFiles: ['MAP/3000.mrc', 'MAP/3000t.mrc', 'MAP/3000hmap.bmp', 'MAP/3010.mrc', 'MAP/3020.mrc', 'MAP/3030.mrc', 'MAP/3040.mrc', 'MAP/3050.mrc', 'MAP/3060.mrc', 'MAP/3070.mrc', 'MAP/3080.mrc', 'MAP/3090.mrc'],
         dialogues: [
             { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep30.dialogue.01', focus: { x: 19, y: 7 } },
             { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.dialogue.02', focus: { x: 19, y: 13 } },
@@ -3080,7 +3097,8 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     lateScenarioSequence({
         episode: 31,
         globalScript: 'missing',
-        mapFiles: ['MAP/31.mrc', 'MAP/31t.mrc', 'MAP/31hmap.bmp', 'MAP/31bg.bmp', 'MAP/31set.arc', 'MAP/3100.mrc', 'MAP/3100t.mrc', 'MAP/3110.mrc', 'MAP/3120.mrc', 'MAP/3130.mrc', 'MAP/3140.mrc', 'MAP/3150.mrc', 'MAP/3160.mrc', 'MAP/3170.mrc', 'MAP/3180.mrc', 'MAP/3190.mrc'],
+        hasBackground: true,
+        sideMapFiles: ['MAP/3100.mrc', 'MAP/3100t.mrc', 'MAP/3110.mrc', 'MAP/3120.mrc', 'MAP/3130.mrc', 'MAP/3140.mrc', 'MAP/3150.mrc', 'MAP/3160.mrc', 'MAP/3170.mrc', 'MAP/3180.mrc', 'MAP/3190.mrc'],
         dialogues: [
             { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep31.dialogue.01', focus: { x: 19, y: 7 } },
             { speakerId: 'demonFixer', speakerNameKey: 'story.event.speaker.demonFixer', textKey: 'story.event.ep31.dialogue.02', focus: { x: 19, y: 13 } },
