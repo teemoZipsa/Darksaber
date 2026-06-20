@@ -527,8 +527,11 @@ function verifyScenarioImportDocRow(episode: number, sequence: StoryScenarioEven
                 throw new Error(`Episode ${episode} docs notes do not mention boss EVENT ${eventNumber}`);
             }
         }
-        if (/\bCHARDEAD 700\b/.test(sequence.bossDefeatEvent.trigger) && !/\bCHARDEAD 700\b/.test(row.notes)) {
-            throw new Error(`Episode ${episode} docs notes do not mention boss CHARDEAD 700`);
+        for (const match of sequence.bossDefeatEvent.trigger.matchAll(/\bCHARDEAD\s+(\d+)\b/g)) {
+            const charId = Number(match[1]);
+            if (!notesMentionCharDead(row.notes, charId)) {
+                throw new Error(`Episode ${episode} docs notes do not mention boss CHARDEAD ${charId}`);
+            }
         }
         if (/\bSCENECLEAR\b/.test(sequence.bossDefeatEvent.trigger) && !/(scenario clear|SCENECLEAR)/i.test(row.notes)) {
             throw new Error(`Episode ${episode} docs notes do not mention boss scenario clear`);
