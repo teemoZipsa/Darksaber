@@ -1,4 +1,5 @@
 import type { TilePoint } from '../field/FieldPathing';
+import type { BiomeType } from '../map/BiomeMask';
 import type { MonsterId } from './MonsterCatalog';
 import { requireOriginalLateStoryItem, type OriginalLateStoryItemRecord } from './OriginalLateStoryItems';
 import ORIGINAL_LATE_STORY_FACTS_JSON from './content/original-late-story-facts.json';
@@ -36,6 +37,7 @@ export interface OriginalLateStoryFact {
     sideMapFiles: string[];
     bossMonsterId: MonsterId;
     guardMonsterRoster: MonsterId[];
+    worldBiome: BiomeType;
     entryDialogues: OriginalLateStoryDialogueFact[];
     bossDefeatDialogues: OriginalLateStoryDialogueFact[];
     setArc: string;

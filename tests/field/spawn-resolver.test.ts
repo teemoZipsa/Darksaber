@@ -16,6 +16,7 @@ import {
     RESERVED_RENDERABLE_MONSTER_IDS,
     type MonsterId,
 } from '../../src/data/MonsterCatalog';
+import { getOriginalLateStoryFact } from '../../src/data/OriginalLateStoryFacts';
 import { WorldMap } from '../../src/map/WorldMap';
 
 test('catalog level bands are well-formed and contain the base level', () => {
@@ -90,24 +91,14 @@ test('the eastern stone zone yields only the 600-series human elites', () => {
 
 test('late story sealed continent keeps episodes 23 through 31 on hostile land', () => {
     const world = new WorldMap('mortal', { validateTownSpawns: false });
-    const expectedBiomes = new Map<number, string>([
-        [23, 'stone'],
-        [24, 'stone'],
-        [25, 'snow'],
-        [26, 'snow'],
-        [27, 'snow'],
-        [28, 'lava'],
-        [29, 'lava'],
-        [30, 'special'],
-        [31, 'special'],
-    ]);
 
     for (let episode = 23; episode <= 31; episode++) {
+        const fact = getOriginalLateStoryFact(episode);
         const scenario = STORY_SCENARIOS.find((entry) => entry.episode === episode);
         assert.ok(scenario, `missing episode ${episode}`);
         assert.equal(
             world.getBiomeAtChunk(scenario.chunkX, scenario.chunkY),
-            expectedBiomes.get(episode),
+            fact.worldBiome,
             `episode ${episode} sealed-continent biome`
         );
         assert.equal(getFieldDanger(scenario.chunkX, scenario.chunkY), 20, `episode ${episode} late-story danger`);

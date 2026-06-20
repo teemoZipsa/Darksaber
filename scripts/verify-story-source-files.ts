@@ -42,17 +42,6 @@ const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Save
 const DEFAULT_START = 1;
 const DEFAULT_END = 31;
 const RESOLVABLE_PRESENTATION_ACTOR_IDS = new Set(['hero', 'player', 'controlled', 'boss']);
-const LATE_STORY_WORLD_BIOMES = new Map<number, string>([
-    [23, 'stone'],
-    [24, 'stone'],
-    [25, 'snow'],
-    [26, 'snow'],
-    [27, 'snow'],
-    [28, 'lava'],
-    [29, 'lava'],
-    [30, 'special'],
-    [31, 'special'],
-]);
 const LATE_STORY_SPEAKER_NAME_KEYS = new Map<string, string>([
     ['beelzebuth', 'story.event.speaker.beelzebuth'],
     ['blin', 'story.event.speaker.blin'],
@@ -841,8 +830,8 @@ function verifyStoryHmapContract(episode: number, scenario: StoryScenarioDefinit
 }
 
 function verifyLateStoryWorldBiomeContract(episode: number, scenario: StoryScenarioDefinition, worldMap: WorldMap): void {
-    const expectedBiome = LATE_STORY_WORLD_BIOMES.get(episode);
-    if (!expectedBiome) return;
+    if (episode < 23 || episode > 31) return;
+    const expectedBiome = getOriginalLateStoryFact(episode).worldBiome;
 
     const biome = worldMap.getBiomeAtChunk(scenario.chunkX, scenario.chunkY);
     if (biome !== expectedBiome) {
