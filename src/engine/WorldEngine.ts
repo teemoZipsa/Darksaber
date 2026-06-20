@@ -29,7 +29,7 @@ import {
     removeStatusesFromCarrier,
     resolveTurnStartStatuses,
 } from '../combat/StatusEffects';
-import { ActionMenuUI, type ActionMenuSlotState } from '../ui/ActionMenuUI';
+import { ActionMenuUI } from '../ui/ActionMenuUI';
 import { EntityInfoUI } from '../ui/EntityInfoUI';
 import { EffectManager } from '../ui/EffectManager';
 import { FusionTempleUI } from '../ui/FusionTempleUI';
@@ -40,7 +40,7 @@ import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
 import { TilePoint, manhattan, tileKey } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
-import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST, type FieldApAction } from '../field/FieldActionEconomy';
+import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST } from '../field/FieldActionEconomy';
 import { hasLineOfSight } from '../field/LineOfSight';
 import {
     AttackPatternProfile,
@@ -392,14 +392,14 @@ export class WorldEngine {
             },
             spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
             spawnLoot: (enemy) => {
-                if (!this.isIntroTutorialEnemy(enemy)) this.spawnEnemyLoot(enemy);
+                if (!this.tutorialController.isTutorialEnemy(enemy)) this.spawnEnemyLoot(enemy);
             },
             awardExp: (actor, enemy) => {
-                if (!this.isIntroTutorialEnemy(enemy)) this.awardDefeatExp(actor, enemy);
+                if (!this.tutorialController.isTutorialEnemy(enemy)) this.awardDefeatExp(actor, enemy);
             },
             onEnemyDefeated: (enemy) => {
-                if (this.isIntroTutorialEnemy(enemy)) {
-                    this.completeIntroTutorial();
+                if (this.tutorialController.isTutorialEnemy(enemy)) {
+                    this.tutorialController.complete();
                     return;
                 }
                 this.storyScenarioController.completeDungeonIfBossDefeated(enemy);
@@ -485,7 +485,7 @@ export class WorldEngine {
                 reopenActionMenu: (actor) => this.reopenActionMenu(actor),
                 resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
                 handleEnemyDefeated: (actor, enemy, feedbackGroupId) => this.handleEnemyDefeated(actor, enemy, feedbackGroupId),
-                onActionCompleted: (action) => this.advanceIntroTutorialStep(action),
+                onActionCompleted: (action) => this.tutorialController.advanceStep(action),
             },
             {
                 log: (message) => this.addCombatLog(message),
@@ -584,10 +584,10 @@ export class WorldEngine {
                 setReservedAction: (intent) => this.turnStateController.setReservedAction(intent),
                 selectEnemy: (enemyId) => this.selectionController.selectEnemy(enemyId),
                 selectLoot: (lootId) => this.selectionController.selectLoot(lootId),
-                filterActionTiles: (action, actor, tiles) => this.filterIntroTutorialActionTiles(action, actor, tiles),
+                filterActionTiles: (action, actor, tiles) => this.tutorialController.filterActionTiles(action, actor, tiles),
                 getAdditionalInteractTiles: (actor) => this.storyScenarioController.getInspectableFieldEventTiles(actor),
                 interactAtTile: (actor, tile) => this.storyScenarioController.playFieldEventAt(tile, actor),
-                onActionCompleted: (action) => this.advanceIntroTutorialStep(action),
+                onActionCompleted: (action) => this.tutorialController.advanceStep(action),
             },
             {
                 log: (message) => this.addCombatLog(message),
@@ -639,7 +639,7 @@ export class WorldEngine {
             setNetworkPlayerId: (playerId) => { this.networkPlayerId = playerId; },
             closeFieldOverlays: () => this.closeFieldOverlays(),
             clearFieldTurnState: () => this.clearFieldTurnState(),
-            clearIntroTutorialStateForNetworkRaid: () => this.clearIntroTutorialStateForNetworkRaid(),
+            clearIntroTutorialStateForNetworkRaid: () => this.tutorialController.clearForNetworkRaid(),
             clearRemotePartyActors: () => this.remotePartyActors.clear(),
             placePartyNear: (tile) => this.placePartyNear(tile),
             getControlledActor: () => this.getControlledActor(),
@@ -774,12 +774,12 @@ export class WorldEngine {
         }
 
         if (this.tutorialController.isActive() && this.tutorialController.isCompletePending()) {
-            this.updateIntroTutorialCompletion(input, dt, camera);
+            this.tutorialController.updateCompletion(input, dt, camera);
             return;
         }
 
         if (this.tutorialController.isActive() && input.justPressed('Escape')) {
-            this.finishIntroTutorial(true);
+            this.tutorialController.finish(true);
             camera.followTile(this.player.gridX, this.player.gridY);
             camera.update(dt);
             return;
@@ -793,7 +793,7 @@ export class WorldEngine {
         if (this.updateStoryPresentation(dt, camera)) return;
 
         if (this.tutorialController.isActive() && input.mouseRightJustDown) {
-            this.addIntroTutorialBlockedLog();
+            this.tutorialController.addBlockedLog();
             camera.followTile(this.player.gridX, this.player.gridY);
             camera.update(dt);
             return;
@@ -852,51 +852,11 @@ export class WorldEngine {
 
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
         this.renderController.render(ctx, camera, width, height, { hideWorldHud: this.tutorialController.isActive() });
-        if (this.tutorialController.isActive()) this.renderIntroTutorialHud(ctx, width, height);
+        if (this.tutorialController.isActive()) this.tutorialController.renderHud(ctx, width, height);
     }
 
     public startIntroTutorial(): void {
         this.tutorialController.start();
-    }
-
-    private finishIntroTutorial(skipped: boolean): void {
-        this.tutorialController.finish(skipped);
-    }
-
-    private completeIntroTutorial(): void {
-        this.tutorialController.complete();
-    }
-
-    private updateIntroTutorialCompletion(input: InputManager, dt: number, camera: Camera): void {
-        this.tutorialController.updateCompletion(input, dt, camera);
-    }
-
-    private clearIntroTutorialStateForNetworkRaid(): void {
-        this.tutorialController.clearForNetworkRaid();
-    }
-
-    private advanceIntroTutorialStep(action: FieldApAction): void {
-        this.tutorialController.advanceStep(action);
-    }
-
-    private isIntroTutorialEnemy(enemy: Enemy): boolean {
-        return this.tutorialController.isTutorialEnemy(enemy);
-    }
-
-    private getActionMenuStates(actor: FieldActor): ActionMenuSlotState[] {
-        return this.tutorialController.getActionMenuStates(actor);
-    }
-
-    private filterIntroTutorialActionTiles(action: 'move' | 'attack' | 'interact', actor: FieldActor, tiles: Set<string>): Set<string> {
-        return this.tutorialController.filterActionTiles(action, actor, tiles);
-    }
-
-    private addIntroTutorialBlockedLog(): void {
-        this.tutorialController.addBlockedLog();
-    }
-
-    private renderIntroTutorialHud(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-        this.tutorialController.renderHud(ctx, width, height);
     }
 
     private spawnPartyAtCurrentHub(): void {
@@ -1160,13 +1120,13 @@ export class WorldEngine {
     }
 
     private handleEnemyDefeated(actor: FieldActor, enemy: Enemy, feedbackGroupId?: string): void {
-        if (this.isIntroTutorialEnemy(enemy)) {
+        if (this.tutorialController.isTutorialEnemy(enemy)) {
             this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy);
             this.registerCombatFeedback('kill', feedbackGroupId);
             this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
             enemy.isAggro = false;
             this.selectionController.clearEnemyIfSelected(enemy.id);
-            this.completeIntroTutorial();
+            this.tutorialController.complete();
             return;
         }
 
@@ -1299,7 +1259,7 @@ export class WorldEngine {
         const actor = this.partyActors[index];
         if (!actor || actor.character.isDead) return false;
         if (this.tutorialController.isActive() && actor.id !== this.turnStateController.getActiveTurnActorId()) {
-            this.addIntroTutorialBlockedLog();
+            this.tutorialController.addBlockedLog();
             return false;
         }
         if (!this.party.getCharacters().includes(actor.character)) {
@@ -1337,7 +1297,7 @@ export class WorldEngine {
         }
 
         this.closeTacticalMenu();
-        this.actionMenuUI.open(this.getActionMenuStates(actor));
+        this.actionMenuUI.open(this.tutorialController.getActionMenuStates(actor));
     }
 
     private closeActionMenu(): void {
@@ -1351,14 +1311,14 @@ export class WorldEngine {
             this.closeActionMenu();
             return;
         }
-        this.actionMenuUI.updateStates(this.getActionMenuStates(actor));
+        this.actionMenuUI.updateStates(this.tutorialController.getActionMenuStates(actor));
     }
 
     private dismissActionMenuTurn(): void {
         if (this.tutorialController.isActive()) {
             const actor = this.getActivePartyTurnActor();
             if (actor) this.reopenActionMenu(actor);
-            this.addIntroTutorialBlockedLog();
+            this.tutorialController.addBlockedLog();
             return;
         }
         const actor = this.getActivePartyTurnActor();
@@ -1398,7 +1358,7 @@ export class WorldEngine {
         }
         this.selectionController.selectActor(actor.id);
         this.closeTacticalMenu();
-        this.actionMenuUI.open(this.getActionMenuStates(actor));
+        this.actionMenuUI.open(this.tutorialController.getActionMenuStates(actor));
     }
 
     private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = this.turnStateController.getRemainingActionPoints()): void {
@@ -1526,7 +1486,7 @@ export class WorldEngine {
         if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
         else {
             this.closeTacticalMenu();
-            this.actionMenuUI.open(this.getActionMenuStates(actor));
+            this.actionMenuUI.open(this.tutorialController.getActionMenuStates(actor));
         }
     }
 
