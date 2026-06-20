@@ -133,8 +133,10 @@ During active raids, dirty save events also write a local recovery spool that
 includes raid-acquired inventory but does not commit survival-only rewards such
 as quest completion, raid gold, or story companion grants. If the process
 crashes and restarts on the same disk, the spool replay can recover the latest
-dirty inventory snapshot. This is still not full live-raid snapshot restore:
-enemy state, turn state, positions, and horizontal scale still require
+dirty inventory snapshot. A reconnect attempt with a replayed resume token
+returns `RESUME_RECOVERED`, clears the stale client resume state, and tells the
+player to start a new expedition. This is still not full live-raid snapshot
+restore: enemy state, turn state, positions, and horizontal scale still require
 persistent raid-instance state.
 
 ## Vercel Client

@@ -48,6 +48,8 @@ function getWorldServerErrorCodeMessage(code: string, message: string): string {
         case 'RESUME_FAILED':
         case 'SESSION_NOT_FOUND':
             return t('mp.error.resumeFailed');
+        case 'RESUME_RECOVERED':
+            return t('mp.error.resumeRecovered');
         case 'VERSION_MISMATCH':
             return t('mp.error.versionMismatch');
         case 'ORIGIN_FORBIDDEN':

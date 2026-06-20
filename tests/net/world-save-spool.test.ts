@@ -17,6 +17,7 @@ test('world save spool persists pending patches and removes applied keys', () =>
             playerId: 'player_1',
             accountId: 'account_1',
             characterId: 'character_1',
+            resumeToken: 'resume_1',
             expectedRevision: 7,
             reason: 'dirty',
             patch: { hubLocation: { townId: 'central_castle' } },
@@ -62,8 +63,9 @@ test('world save spool replay retries revision conflicts and clears successful e
             playerId: 'player_1',
             accountId: account.id,
             characterId: character.id,
+            resumeToken: 'resume_recovered',
             expectedRevision: save.revision,
-            reason: 'dirty',
+            reason: 'dirty_recovery',
             patch: {
                 hubLocation: { townId: 'w_forest_village' },
                 questState: { completedQuestIds: ['tutorial_clear'] },
@@ -71,7 +73,7 @@ test('world save spool replay retries revision conflicts and clears successful e
         });
 
         const result = await replayWorldSaveSpool(store, spool, { retryLimit: 3 });
-        assert.deepEqual(result, { applied: 1, failed: 0 });
+        assert.deepEqual(result, { applied: 1, failed: 0, recoveredResumeTokens: ['resume_recovered'] });
         assert.deepEqual(new WorldSaveSpool({ persistPath }).list(), []);
 
         const current = await store.getCharacterSave(account.id, character.id);

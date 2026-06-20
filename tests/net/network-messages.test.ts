@@ -59,6 +59,10 @@ test('world server errors map to player-facing messages', () => {
             '월드 서버 접속 실패: 이전 원정 복구 정보가 만료되었습니다. 새 원정으로 다시 시작해 주세요.'
         );
         assert.equal(
+            formatNetworkDeployFailure(new WorldServerError('RESUME_RECOVERED', 'saved')),
+            '월드 서버 접속 실패: 서버 재시작 후 원정 획득품 복구 저장이 적용되었습니다. 새 원정으로 다시 시작해 주세요.'
+        );
+        assert.equal(
             getWorldServerErrorMessage({ code: 'CUSTOM_CODE', message: 'Custom detail' }),
             'Custom detail (CUSTOM_CODE)'
         );

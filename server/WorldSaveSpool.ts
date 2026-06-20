@@ -10,6 +10,7 @@ export interface PendingWorldSave {
     playerId: string;
     accountId: string;
     characterId: string;
+    resumeToken?: string;
     expectedRevision: number;
     patch: WorldCharacterSavePatch;
     reason: string;
@@ -81,20 +82,22 @@ export async function replayWorldSaveSpool(
     authStore: AuthStore,
     spool: WorldSaveSpool,
     options: ReplayWorldSaveSpoolOptions = {}
-): Promise<{ applied: number; failed: number }> {
+): Promise<{ applied: number; failed: number; recoveredResumeTokens: string[] }> {
     let applied = 0;
     let failed = 0;
+    const recoveredResumeTokens: string[] = [];
     for (const entry of spool.list()) {
         try {
             await applyPendingWorldSave(authStore, entry, options);
             spool.remove(entry.key);
             applied++;
+            if (entry.reason === 'dirty_recovery' && entry.resumeToken) recoveredResumeTokens.push(entry.resumeToken);
         } catch (error) {
             failed++;
             options.logger?.(`Failed to replay pending world save ${entry.key}: ${error instanceof Error ? error.message : error}`);
         }
     }
-    return { applied, failed };
+    return { applied, failed, recoveredResumeTokens };
 }
 
 async function applyPendingWorldSave(
@@ -149,6 +152,7 @@ function isPendingWorldSave(value: unknown): value is PendingWorldSave {
         && typeof entry.playerId === 'string'
         && typeof entry.accountId === 'string'
         && typeof entry.characterId === 'string'
+        && (entry.resumeToken === undefined || typeof entry.resumeToken === 'string')
         && Number.isInteger(entry.expectedRevision)
         && typeof entry.reason === 'string'
         && typeof entry.updatedAt === 'string'

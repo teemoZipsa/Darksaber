@@ -399,7 +399,7 @@ export class NetworkRaidClient {
                 {
                     const hadPendingWelcome = this.pendingWelcome !== null;
                     if (hadPendingWelcome) this.rejectPendingWelcome(new WorldServerError(message.code, message.message));
-                    if (message.code === 'RESUME_FAILED') this.expireGrace();
+                    if (message.code === 'RESUME_FAILED' || message.code === 'RESUME_RECOVERED') this.expireGrace();
                     else if (hadPendingWelcome) this.closeSocketAfterJoinFailure();
                 }
                 this.options.onErrorMessage?.(message);

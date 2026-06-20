@@ -70,6 +70,7 @@ const replayedWorldSaves = await replayWorldSaveSpool(authStore, worldSaveSpool,
 });
 metrics.saveSpoolReplayAppliedTotal = replayedWorldSaves.applied;
 metrics.saveSpoolReplayFailedTotal = replayedWorldSaves.failed;
+const recoveredResumeTokens = new Set(replayedWorldSaves.recoveredResumeTokens);
 if (replayedWorldSaves.applied > 0 || replayedWorldSaves.failed > 0) {
     console.log(`World save spool replay applied=${replayedWorldSaves.applied} failed=${replayedWorldSaves.failed}`);
     logServerEvent('info', 'world_save_spool_replay_completed', replayedWorldSaves);
@@ -117,6 +118,7 @@ interface SocketBinding {
     playerId: string;
     accountId: string;
     characterId: string;
+    resumeToken: string;
     sessionId: string;
 }
 interface PlayerSaveTracker {
@@ -124,6 +126,7 @@ interface PlayerSaveTracker {
     playerId: string;
     accountId: string;
     characterId: string;
+    resumeToken: string;
     expectedRevision: number;
     dirty: boolean;
     saving: boolean;
@@ -376,13 +379,13 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
     } catch (error) {
         if (error instanceof WorldResumeFailedError) {
             metrics.resumeFailuresTotal += 1;
-            send(ws, { type: 'ERROR', code: 'RESUME_FAILED', message: error.message });
+            sendResumeFailure(ws, message.resumeToken, error.message);
             return;
         }
         throw error;
     }
-    bindPlayer(ws, sessionKey, result.playerId, auth.account, character.id, auth.session.id);
-    ensureSaveTracker(sessionKey, result.playerId, auth.account.id, character.id, save.revision);
+    bindPlayer(ws, sessionKey, result.playerId, auth.account, character.id, result.welcome.resumeToken, auth.session.id);
+    ensureSaveTracker(sessionKey, result.playerId, auth.account.id, character.id, result.welcome.resumeToken, save.revision);
     send(ws, result.welcome);
     send(ws, { type: 'WORLD_SNAPSHOT', snapshot: session.createSnapshot(result.playerId) });
 }
@@ -402,15 +405,15 @@ async function handleReconnect(ws: WebSocket, resumeToken: string, accessToken: 
     const resumed = findReconnectSession(resumeToken, auth.account.id);
     if (!resumed) {
         metrics.resumeFailuresTotal += 1;
-        send(ws, { type: 'ERROR', code: 'RESUME_FAILED', message: 'Resume token is expired or unknown.' });
+        sendResumeFailure(ws, resumeToken, 'Resume token is expired or unknown.');
         return;
     }
     const [progress, save] = await Promise.all([
         authStore.getAccountProgress(auth.account.id),
         authStore.getCharacterSave(auth.account.id, resumed.characterId),
     ]);
-    bindPlayer(ws, resumed.sessionKey, resumed.playerId, auth.account, resumed.characterId, auth.session.id);
-    if (save) ensureSaveTracker(resumed.sessionKey, resumed.playerId, auth.account.id, resumed.characterId, save.revision);
+    bindPlayer(ws, resumed.sessionKey, resumed.playerId, auth.account, resumed.characterId, resumed.welcome.resumeToken, auth.session.id);
+    if (save) ensureSaveTracker(resumed.sessionKey, resumed.playerId, auth.account.id, resumed.characterId, resumed.welcome.resumeToken, save.revision);
     send(ws, {
         ...resumed.welcome,
         accountId: auth.account.id,
@@ -420,13 +423,13 @@ async function handleReconnect(ws: WebSocket, resumeToken: string, accessToken: 
     send(ws, { type: 'WORLD_SNAPSHOT', snapshot: resumed.session.createSnapshot(resumed.playerId) });
 }
 
-function bindPlayer(ws: WebSocket, sessionKey: string, playerId: string, account: AuthAccount, characterId: string, sessionId: string): void {
+function bindPlayer(ws: WebSocket, sessionKey: string, playerId: string, account: AuthAccount, characterId: string, resumeToken: string, sessionId: string): void {
     const key = socketPlayerKey(sessionKey, playerId);
     const previous = socketByPlayer.get(key);
     if (previous && previous !== ws && previous.readyState === WebSocket.OPEN) {
         previous.close();
     }
-    playerBySocket.set(ws, { sessionKey, playerId, accountId: account.id, characterId, sessionId });
+    playerBySocket.set(ws, { sessionKey, playerId, accountId: account.id, characterId, resumeToken, sessionId });
     socketByPlayer.set(key, ws);
 }
 
@@ -486,6 +489,18 @@ function rawDataToBuffer(data: RawData): Buffer {
 
 function send(ws: WebSocket, message: WorldServerMessage): void {
     sendSerialized(ws, JSON.stringify(message));
+}
+
+function sendResumeFailure(ws: WebSocket, resumeToken: string | undefined, fallbackMessage: string): void {
+    if (resumeToken && recoveredResumeTokens.delete(resumeToken)) {
+        send(ws, {
+            type: 'ERROR',
+            code: 'RESUME_RECOVERED',
+            message: 'Previous raid recovery was applied to your character save. Start a new raid to continue.',
+        });
+        return;
+    }
+    send(ws, { type: 'ERROR', code: 'RESUME_FAILED', message: fallbackMessage });
 }
 
 function queueImmediateSnapshots(sessionKey?: string): void {
@@ -595,12 +610,13 @@ function persistRaidResult(binding: SocketBinding, message: WorldServerMessage):
     });
 }
 
-function ensureSaveTracker(sessionKey: string, playerId: string, accountId: string, characterId: string, expectedRevision: number): PlayerSaveTracker {
+function ensureSaveTracker(sessionKey: string, playerId: string, accountId: string, characterId: string, resumeToken: string, expectedRevision: number): PlayerSaveTracker {
     const key = socketPlayerKey(sessionKey, playerId);
     const existing = saveTrackers.get(key);
     if (existing) {
         existing.accountId = accountId;
         existing.characterId = characterId;
+        existing.resumeToken = resumeToken;
         existing.expectedRevision = Math.max(existing.expectedRevision, expectedRevision);
         return existing;
     }
@@ -609,6 +625,7 @@ function ensureSaveTracker(sessionKey: string, playerId: string, accountId: stri
         playerId,
         accountId,
         characterId,
+        resumeToken,
         expectedRevision,
         dirty: false,
         saving: false,
@@ -679,6 +696,7 @@ function spoolPendingCharacterSave(tracker: PlayerSaveTracker, patch: WorldChara
             playerId: tracker.playerId,
             accountId: tracker.accountId,
             characterId: tracker.characterId,
+            resumeToken: tracker.resumeToken,
             expectedRevision: tracker.expectedRevision,
             patch,
             reason,

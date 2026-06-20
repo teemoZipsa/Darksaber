@@ -592,6 +592,35 @@ test('resume failure clears stored resume state', async () => {
     }
 });
 
+test('recovered resume failure clears stored resume state', async () => {
+    const restoreSocket = installMockWebSocket();
+    const storage = new MemoryStorage();
+    storage.setItem('darksaber_world_resume_token', 'recovered_resume');
+    const restoreStorage = installMemoryStorage(storage);
+
+    try {
+        const client = new NetworkRaidClient({ url: 'ws://test' });
+        const join = client.connectAndJoin(joinInput());
+        const socket = MockWebSocket.instances[0];
+        assert.ok(socket);
+
+        socket.emitOpen();
+        assert.equal(JSON.parse(socket.sent[0]).resumeToken, 'recovered_resume');
+        socket.emitMessage(JSON.stringify({
+            type: 'ERROR',
+            code: 'RESUME_RECOVERED',
+            message: 'Previous raid recovery was applied.',
+        }));
+
+        await assert.rejects(join, /RESUME_RECOVERED/);
+        assert.equal(client.getResumeToken(), null);
+        assert.equal(storage.getItem('darksaber_world_resume_token'), null);
+    } finally {
+        restoreStorage();
+        restoreSocket();
+    }
+});
+
 test('client reports sends attempted before socket open', () => {
     const errors: string[] = [];
     const client = new NetworkRaidClient({
