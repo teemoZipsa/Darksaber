@@ -184,6 +184,7 @@ function ament2fEnemyDefeatEvents(): StoryScenarioEnemyDefeatEvent[] {
 function lateScenarioCacheEvent(
     dungeonId: string,
     episode: number,
+    originalSource: string,
     eventNumber: number,
     tile: TilePoint,
     originalItemId: number,
@@ -191,7 +192,7 @@ function lateScenarioCacheEvent(
 ): StoryScenarioFieldEvent {
     return {
         id: `${dungeonId}_cache_${eventNumber}`,
-        originalSource: `MAP/${String(episode).padStart(2, '0')}set.arc:${String(episode).padStart(2, '0')}.evt`,
+        originalSource,
         originalEventId: `EVENT ${eventNumber}`,
         trigger: `COMMANDER original CHARPOS ${tile.x} ${tile.y} GETITEM ${originalItemId}`,
         triggerTiles: [{ ...tile }],
@@ -213,6 +214,7 @@ function lateScenarioSequence(input: {
     const ep = String(input.episode).padStart(2, '0');
     const originalFact = getOriginalLateStoryFact(input.episode);
     const dungeonId = originalFact.dungeonId;
+    const originalEventSource = `${originalFact.setArc}:${originalFact.eventMember}`;
     const bossTile = getOriginalLateStoryBossTile(input.episode);
     const caches = getOriginalLateStoryCacheEvents(input.episode);
     const objectiveRuntimeFlag = `${dungeonId}_objective_complete`;
@@ -246,7 +248,7 @@ function lateScenarioSequence(input: {
     ];
     const bossDefeatEvent: StoryScenarioBossDefeatEvent = {
         id: `${dungeonId}_boss_clear_99`,
-        originalSource: `MAP/${ep}set.arc:${ep}.evt`,
+        originalSource: originalEventSource,
         originalEventId: 'EVENT 99',
         trigger: bossClearTriggerParts.join(' '),
         runtimeFlag: objectiveRuntimeFlag,
@@ -273,6 +275,7 @@ function lateScenarioSequence(input: {
         fieldEvents: caches.map((cache) => lateScenarioCacheEvent(
             dungeonId,
             input.episode,
+            originalEventSource,
             cache.eventNumber,
             cache.tile,
             cache.originalItemId,
