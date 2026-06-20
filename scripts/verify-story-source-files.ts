@@ -828,6 +828,21 @@ function verifyStoryEventReferenceContract(episode: number, sequence: StoryScena
 function verifyStoryScenarioContentLedger(episode: number, scenario: StoryScenarioDefinition, contentRows: Map<number, StoryScenarioDefinition>): void {
     const row = contentRows.get(episode);
     if (!row) throw new Error(`Missing src/data/content/story-scenarios.json row for episode ${episode}`);
+    if (episode >= 23 && episode <= 31) {
+        const fact = getOriginalLateStoryFact(episode);
+        if (row.dungeonId !== fact.dungeonId) {
+            throw new Error(`Episode ${episode} story scenario content dungeon id mismatch with original facts`);
+        }
+        if (row.guardCount !== fact.guardAreas.length) {
+            throw new Error(`Episode ${episode} story scenario content guard count mismatch with original facts`);
+        }
+        if (row.missionKind !== 'soloInterior') {
+            throw new Error(`Episode ${episode} story scenario content mission kind mismatch with original facts`);
+        }
+        if (JSON.stringify(row.reward) !== JSON.stringify({ type: 'none' })) {
+            throw new Error(`Episode ${episode} story scenario content reward should be none`);
+        }
+    }
     if (JSON.stringify(scenarioSignature(row)) !== JSON.stringify(scenarioSignature(scenario))) {
         throw new Error(`Episode ${episode} story scenario content ledger mismatch with runtime scenario definition`);
     }

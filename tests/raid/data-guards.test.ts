@@ -62,7 +62,17 @@ type StoryScenarioContentRecord = {
     dungeonId: string;
     guardCount: number;
     missionKind: string;
+    reward: StoryQuestReward;
 };
+
+function assertLateScenarioContentMatchesOriginalFacts(record: StoryScenarioContentRecord): void {
+    if (record.episode < 23 || record.episode > 31) return;
+    const fact = getOriginalLateStoryFact(record.episode);
+    assert.equal(record.dungeonId, fact.dungeonId, `episode ${record.episode} content dungeon id`);
+    assert.equal(record.guardCount, fact.guardAreas.length, `episode ${record.episode} content guard count`);
+    assert.equal(record.missionKind, 'soloInterior', `episode ${record.episode} content mission kind`);
+    assert.deepEqual(record.reward, { type: 'none' }, `episode ${record.episode} content reward`);
+}
 
 function assertStoryRewardData(reward: StoryQuestReward, context: string, ko: Record<string, string>, en: Record<string, string>): void {
     if (reward.type === 'none') return;
@@ -778,6 +788,9 @@ test('story episodes 1 through 31 are chained and fully localized', () => {
 test('story scenario content ledger matches runtime scenario definitions', () => {
     const contentPath = fileURLToPath(new URL('../../src/data/content/story-scenarios.json', import.meta.url));
     const contentScenarios = JSON.parse(readFileSync(contentPath, 'utf8')) as StoryScenarioContentRecord[];
+    for (const scenario of contentScenarios) {
+        assertLateScenarioContentMatchesOriginalFacts(scenario);
+    }
     assert.deepEqual(
         contentScenarios.map((scenario) => ({
             episode: scenario.episode,
