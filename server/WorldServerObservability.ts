@@ -9,6 +9,8 @@ export interface WorldServerMetrics {
     saveConflictsTotal: number;
     saveFailuresTotal: number;
     saveSpoolFailuresTotal: number;
+    saveSpoolReplayAppliedTotal: number;
+    saveSpoolReplayFailedTotal: number;
     rejectedJoinsDuringShutdownTotal: number;
     shutdownForcedRaidResultsTotal: number;
     shutdownsTotal: number;
@@ -20,6 +22,9 @@ export interface WorldServerMetricGauges {
     sessions: number;
     activePlayers: number;
     websocketClients: number;
+    pendingSaveSpoolEntries: number;
+    dirtySaveTrackers: number;
+    savingSaveTrackers: number;
 }
 
 export function createWorldServerMetrics(): WorldServerMetrics {
@@ -34,6 +39,8 @@ export function createWorldServerMetrics(): WorldServerMetrics {
         saveConflictsTotal: 0,
         saveFailuresTotal: 0,
         saveSpoolFailuresTotal: 0,
+        saveSpoolReplayAppliedTotal: 0,
+        saveSpoolReplayFailedTotal: 0,
         rejectedJoinsDuringShutdownTotal: 0,
         shutdownForcedRaidResultsTotal: 0,
         shutdownsTotal: 0,
@@ -56,6 +63,15 @@ export function formatWorldServerMetrics(metrics: WorldServerMetrics, gauges: Wo
         '# HELP darksaber_world_websocket_clients Current WebSocket clients.',
         '# TYPE darksaber_world_websocket_clients gauge',
         `darksaber_world_websocket_clients ${gauges.websocketClients}`,
+        '# HELP darksaber_world_pending_save_spool_entries Pending local world save recovery entries.',
+        '# TYPE darksaber_world_pending_save_spool_entries gauge',
+        `darksaber_world_pending_save_spool_entries ${gauges.pendingSaveSpoolEntries}`,
+        '# HELP darksaber_world_dirty_save_trackers Players with dirty world saves waiting for flush.',
+        '# TYPE darksaber_world_dirty_save_trackers gauge',
+        `darksaber_world_dirty_save_trackers ${gauges.dirtySaveTrackers}`,
+        '# HELP darksaber_world_saving_save_trackers Players currently flushing world saves.',
+        '# TYPE darksaber_world_saving_save_trackers gauge',
+        `darksaber_world_saving_save_trackers ${gauges.savingSaveTrackers}`,
         '# HELP darksaber_world_tick_duration_ms Last world tick duration in milliseconds.',
         '# TYPE darksaber_world_tick_duration_ms gauge',
         `darksaber_world_tick_duration_ms ${metrics.worldTickDurationMs}`,
@@ -89,6 +105,12 @@ export function formatWorldServerMetrics(metrics: WorldServerMetrics, gauges: Wo
         '# HELP darksaber_world_save_spool_failures_total Total pending save spool failures.',
         '# TYPE darksaber_world_save_spool_failures_total counter',
         `darksaber_world_save_spool_failures_total ${metrics.saveSpoolFailuresTotal}`,
+        '# HELP darksaber_world_save_spool_replay_applied_total Total pending world save spool entries applied on startup.',
+        '# TYPE darksaber_world_save_spool_replay_applied_total counter',
+        `darksaber_world_save_spool_replay_applied_total ${metrics.saveSpoolReplayAppliedTotal}`,
+        '# HELP darksaber_world_save_spool_replay_failed_total Total pending world save spool entries that failed startup replay.',
+        '# TYPE darksaber_world_save_spool_replay_failed_total counter',
+        `darksaber_world_save_spool_replay_failed_total ${metrics.saveSpoolReplayFailedTotal}`,
         '# HELP darksaber_world_rejected_joins_during_shutdown_total Total world joins rejected during shutdown.',
         '# TYPE darksaber_world_rejected_joins_during_shutdown_total counter',
         `darksaber_world_rejected_joins_during_shutdown_total ${metrics.rejectedJoinsDuringShutdownTotal}`,

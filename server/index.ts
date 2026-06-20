@@ -59,6 +59,7 @@ const authStore: AuthStore = process.env.DATABASE_URL
     ? new PostgresAuthStore(process.env.DATABASE_URL)
     : new InMemoryAuthStore();
 await authStore.initialize();
+const metrics = createWorldServerMetrics();
 const worldSaveSpool = new WorldSaveSpool({
     persistPath: resolveServerPersistPath(process.env.WORLD_SAVE_SPOOL_PATH, './.runtime/world-save-spool.json'),
 });
@@ -67,8 +68,11 @@ const replayedWorldSaves = await replayWorldSaveSpool(authStore, worldSaveSpool,
     retryBaseMs: WORLD_SAVE_RETRY_BASE_MS,
     logger: (message) => console.error(message),
 });
+metrics.saveSpoolReplayAppliedTotal = replayedWorldSaves.applied;
+metrics.saveSpoolReplayFailedTotal = replayedWorldSaves.failed;
 if (replayedWorldSaves.applied > 0 || replayedWorldSaves.failed > 0) {
     console.log(`World save spool replay applied=${replayedWorldSaves.applied} failed=${replayedWorldSaves.failed}`);
+    logServerEvent('info', 'world_save_spool_replay_completed', replayedWorldSaves);
 }
 const handleAuthHttpRequest = createAuthHttpHandler({
     store: authStore,
@@ -93,6 +97,9 @@ const server = createServer(async (request, response) => {
             sessions: sessions.size,
             activePlayers: countActivePlayers(),
             websocketClients: wss.clients.size,
+            pendingSaveSpoolEntries: worldSaveSpool.list().length,
+            dirtySaveTrackers: countSaveTrackers((tracker) => tracker.dirty),
+            savingSaveTrackers: countSaveTrackers((tracker) => tracker.saving),
         }));
         return;
     }
@@ -128,7 +135,6 @@ const socketByPlayer = new Map<string, WebSocket>();
 const socketRateLimits = new Map<WebSocket, { windowStart: number; count: number; lastMessageAt: number; isAlive: boolean }>();
 const saveTrackers = new Map<string, PlayerSaveTracker>();
 const serverStartedAtMs = Date.now();
-const metrics = createWorldServerMetrics();
 let immediateSnapshotFlushScheduled = false;
 
 server.listen(PORT, HOST, () => {
@@ -969,5 +975,13 @@ function resolveServerPersistPath(envPath: string | undefined, fallbackRelative:
 function countActivePlayers(): number {
     let count = 0;
     for (const session of sessions.values()) count += session.getActivePlayerIds().length;
+    return count;
+}
+
+function countSaveTrackers(predicate: (tracker: PlayerSaveTracker) => boolean): number {
+    let count = 0;
+    for (const tracker of saveTrackers.values()) {
+        if (predicate(tracker)) count++;
+    }
     return count;
 }

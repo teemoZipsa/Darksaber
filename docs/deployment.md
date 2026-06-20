@@ -101,6 +101,11 @@ The server also exposes Prometheus-format process counters at:
 https://<render-service-host>/metrics
 ```
 
+The metrics include live sessions, active players, WebSocket clients, tick
+duration, rejected actions, save conflicts/failures, pending world-save recovery
+spool entries, dirty/saving save trackers, and startup save-spool replay
+results.
+
 Set these Render environment variables:
 
 ```text
