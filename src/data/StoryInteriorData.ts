@@ -566,26 +566,13 @@ const FLAME_CASTLE_TILE_OVERRIDES: StoryInteriorTileOverride[] = [
     ...horizontalOverrides(27, 15, 24, TileType.ROAD),
 ];
 
-const BEELZEBUTH_HALL_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(23);
-const ASTAROTH_GATE_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(24);
-const NERGAL_DEPTHS_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(25);
-const BEAST_MARK_SHRINE_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(26);
-const CHOSEN_MARK_SHRINE_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(27);
-const ERGION_KEEP_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(28);
-const MARTANI_BASTION_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(29);
-const BLIN_WATCH_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(30);
-const DEMON_FIXERS_DEN_GUARDS: TilePoint[] = getOriginalLateStoryGuardTiles(31);
-
 interface LateOriginalInteriorConfig {
     episode: number;
-    dungeonId: string;
     displayNameKey: string;
     objectiveKey: string;
     theme: StoryInteriorTheme;
     entryTile: TilePoint;
     playerStart: TilePoint;
-    bossTile: TilePoint;
-    guardTiles: TilePoint[];
     rooms: StoryInteriorRoom[];
     stagingMarkerLabelKeys?: Array<string | null>;
     characterMarkers?: Array<{ tile: TilePoint; labelKey: string }>;
@@ -607,6 +594,9 @@ function cloneOriginalPosition(position: OriginalLateStoryPosition): OriginalLat
 function buildLateOriginalInterior(config: LateOriginalInteriorConfig): StoryInteriorLayout {
     const originalFact = getOriginalLateStoryFact(config.episode);
     const originalMrc = getOriginalLateStoryMrcFact(config.episode);
+    const dungeonId = originalFact.dungeonId;
+    const bossTile = getOriginalLateStoryBossTile(config.episode);
+    const guardTiles = getOriginalLateStoryGuardTiles(config.episode);
     const episode = String(config.episode).padStart(2, '0');
     const blockedPaths = config.blockedPaths ?? [];
     const stagingMarkers = (config.stagingMarkerLabelKeys ?? []).flatMap((labelKey, index) => {
@@ -614,7 +604,7 @@ function buildLateOriginalInterior(config: LateOriginalInteriorConfig): StoryInt
         return labelKey && position ? [{ kind: 'banner' as const, tile: { x: position.x, y: position.y }, labelKey }] : [];
     });
     return {
-        dungeonId: config.dungeonId,
+        dungeonId,
         displayNameKey: config.displayNameKey,
         width: originalMrc.width,
         height: originalMrc.height,
@@ -628,13 +618,13 @@ function buildLateOriginalInterior(config: LateOriginalInteriorConfig): StoryInt
         },
         entryTile: cloneTile(config.entryTile),
         playerStart: cloneTile(config.playerStart),
-        guardTiles: config.guardTiles.map(cloneTile),
-        bossTile: cloneTile(config.bossTile),
+        guardTiles: guardTiles.map(cloneTile),
+        bossTile: cloneTile(bossTile),
         objectiveKey: config.objectiveKey,
         rooms: [
             { id: 'entry', nameKey: 'story.interior.room.entryHall', x: Math.max(1, config.entryTile.x - 3), y: Math.max(1, config.entryTile.y - 4), width: 7, height: 5 },
             ...config.rooms.map((room) => ({ ...room })),
-            { id: 'bossRoom', nameKey: 'story.interior.room.bossRoom', x: Math.max(1, config.bossTile.x - 4), y: Math.max(1, config.bossTile.y - 3), width: 9, height: 7 },
+            { id: 'bossRoom', nameKey: 'story.interior.room.bossRoom', x: Math.max(1, bossTile.x - 4), y: Math.max(1, bossTile.y - 3), width: 9, height: 7 },
         ],
         props: [
             { kind: 'torch', tile: { x: Math.max(1, config.entryTile.x - 2), y: Math.max(1, config.entryTile.y - 3) } },
@@ -642,21 +632,21 @@ function buildLateOriginalInterior(config: LateOriginalInteriorConfig): StoryInt
             ...originalFact.cacheEvents.map((event) => ({ kind: 'crate' as const, tile: { x: event.x, y: event.y }, labelKey: `story.event.ep${episode}.cache.marker` })),
             ...stagingMarkers,
             ...(config.characterMarkers ?? []).map((marker) => ({ kind: 'banner' as const, tile: cloneTile(marker.tile), labelKey: marker.labelKey })),
-            { kind: 'sealedDoor', tile: { x: config.bossTile.x, y: Math.min(originalMrc.height - 2, config.bossTile.y + 2) }, labelKey: 'story.interior.prop.sealedDoor' },
-            { kind: 'bossSeal', tile: cloneTile(config.bossTile), labelKey: 'story.interior.prop.bossSeal' },
-            { kind: 'throne', tile: { x: config.bossTile.x, y: Math.max(1, config.bossTile.y - 1) } },
+            { kind: 'sealedDoor', tile: { x: bossTile.x, y: Math.min(originalMrc.height - 2, bossTile.y + 2) }, labelKey: 'story.interior.prop.sealedDoor' },
+            { kind: 'bossSeal', tile: cloneTile(bossTile), labelKey: 'story.interior.prop.bossSeal' },
+            { kind: 'throne', tile: { x: bossTile.x, y: Math.max(1, bossTile.y - 1) } },
         ],
         doors: [
-            { id: `${config.dungeonId}_front`, tile: cloneTile(config.entryTile), connects: ['entry'], originalTile: cloneTile(config.entryTile) },
-            { id: `${config.dungeonId}_boss_seal`, tile: { x: config.bossTile.x, y: Math.min(originalMrc.height - 2, config.bossTile.y + 2) }, connects: ['route', 'bossRoom'], originalTile: cloneTile(config.bossTile), sealed: true },
+            { id: `${dungeonId}_front`, tile: cloneTile(config.entryTile), connects: ['entry'], originalTile: cloneTile(config.entryTile) },
+            { id: `${dungeonId}_boss_seal`, tile: { x: bossTile.x, y: Math.min(originalMrc.height - 2, bossTile.y + 2) }, connects: ['route', 'bossRoom'], originalTile: cloneTile(bossTile), sealed: true },
         ],
         blockedPaths: blockedPaths.map((path) => ({ ...path, tile: cloneTile(path.tile), originalTile: path.originalTile ? cloneTile(path.originalTile) : undefined })),
         walkableAreas: config.rooms.map((room) => ({ ...room })),
         tileOverrides: [
             { tile: cloneTile(config.entryTile), type: TileType.DUNGEON_ENTRANCE },
             ...blockedPaths.map((path) => ({ tile: cloneTile(path.tile), type: TileType.WALL })),
-            ...verticalOverrides(config.playerStart.x, Math.min(config.playerStart.y, config.bossTile.y), Math.max(config.playerStart.y, config.bossTile.y), TileType.ROAD),
-            ...horizontalOverrides(config.bossTile.y, Math.min(config.playerStart.x, config.bossTile.x), Math.max(config.playerStart.x, config.bossTile.x), TileType.ROAD),
+            ...verticalOverrides(config.playerStart.x, Math.min(config.playerStart.y, bossTile.y), Math.max(config.playerStart.y, bossTile.y), TileType.ROAD),
+            ...horizontalOverrides(bossTile.y, Math.min(config.playerStart.x, bossTile.x), Math.max(config.playerStart.x, bossTile.x), TileType.ROAD),
         ],
     };
 }
@@ -1126,14 +1116,11 @@ const FLAME_CASTLE_LAYOUT: StoryInteriorLayout = {
 
 const BEELZEBUTH_HALL_LAYOUT = buildLateOriginalInterior({
     episode: 23,
-    dungeonId: 'beelzebuth_hall',
     displayNameKey: 'story.interior.beelzebuth_hall.name',
     objectiveKey: 'story.interior.beelzebuth_hall.objective',
     theme: 'ament',
     entryTile: { x: 19, y: 38 },
     playerStart: { x: 19, y: 31 },
-    bossTile: getOriginalLateStoryBossTile(23),
-    guardTiles: BEELZEBUTH_HALL_GUARDS,
     rooms: [
         { id: 'beelzebuthNorthVault', nameKey: 'story.interior.room.beelzebuthNorthVault', x: 10, y: 5, width: 20, height: 10 },
         { id: 'beelzebuthThroneHall', nameKey: 'story.interior.room.beelzebuthThroneHall', x: 5, y: 14, width: 29, height: 12 },
@@ -1145,14 +1132,11 @@ const BEELZEBUTH_HALL_LAYOUT = buildLateOriginalInterior({
 
 const ASTAROTH_GATE_LAYOUT = buildLateOriginalInterior({
     episode: 24,
-    dungeonId: 'astaroth_gate',
     displayNameKey: 'story.interior.astaroth_gate.name',
     objectiveKey: 'story.interior.astaroth_gate.objective',
     theme: 'ament',
     entryTile: { x: 19, y: 36 },
     playerStart: { x: 19, y: 35 },
-    bossTile: getOriginalLateStoryBossTile(24),
-    guardTiles: ASTAROTH_GATE_GUARDS,
     rooms: [
         { id: 'astarothOuterGate', nameKey: 'story.interior.room.astarothOuterGate', x: 7, y: 29, width: 26, height: 7 },
         { id: 'astarothProcessional', nameKey: 'story.interior.room.astarothProcessional', x: 12, y: 18, width: 16, height: 12 },
@@ -1164,14 +1148,11 @@ const ASTAROTH_GATE_LAYOUT = buildLateOriginalInterior({
 
 const NERGAL_DEPTHS_LAYOUT = buildLateOriginalInterior({
     episode: 25,
-    dungeonId: 'nergal_depths',
     displayNameKey: 'story.interior.nergal_depths.name',
     objectiveKey: 'story.interior.nergal_depths.objective',
     theme: 'ament',
     entryTile: { x: 19, y: 38 },
     playerStart: { x: 19, y: 23 },
-    bossTile: getOriginalLateStoryBossTile(25),
-    guardTiles: NERGAL_DEPTHS_GUARDS,
     rooms: [
         { id: 'nergalDepthsSouth', nameKey: 'story.interior.room.nergalDepthsSouth', x: 1, y: 27, width: 38, height: 12 },
         { id: 'nergalDepthsCrossing', nameKey: 'story.interior.room.nergalDepthsCrossing', x: 1, y: 15, width: 38, height: 13 },
@@ -1184,14 +1165,11 @@ const NERGAL_DEPTHS_LAYOUT = buildLateOriginalInterior({
 
 const BEAST_MARK_SHRINE_LAYOUT = buildLateOriginalInterior({
     episode: 26,
-    dungeonId: 'beast_mark_shrine',
     displayNameKey: 'story.interior.beast_mark_shrine.name',
     objectiveKey: 'story.interior.beast_mark_shrine.objective',
     theme: 'temple',
     entryTile: { x: 15, y: 38 },
     playerStart: { x: 15, y: 37 },
-    bossTile: getOriginalLateStoryBossTile(26),
-    guardTiles: BEAST_MARK_SHRINE_GUARDS,
     rooms: [
         { id: 'beastMarkSouthSeal', nameKey: 'story.interior.room.beastMarkSouthSeal', x: 2, y: 28, width: 34, height: 10 },
         { id: 'beastMarkCentralShrine', nameKey: 'story.interior.room.beastMarkCentralShrine', x: 4, y: 15, width: 34, height: 12 },
@@ -1202,14 +1180,11 @@ const BEAST_MARK_SHRINE_LAYOUT = buildLateOriginalInterior({
 
 const CHOSEN_MARK_SHRINE_LAYOUT = buildLateOriginalInterior({
     episode: 27,
-    dungeonId: 'chosen_mark_shrine',
     displayNameKey: 'story.interior.chosen_mark_shrine.name',
     objectiveKey: 'story.interior.chosen_mark_shrine.objective',
     theme: 'temple',
     entryTile: { x: 20, y: 28 },
     playerStart: { x: 20, y: 25 },
-    bossTile: getOriginalLateStoryBossTile(27),
-    guardTiles: CHOSEN_MARK_SHRINE_GUARDS,
     rooms: [
         { id: 'chosenMarkSouthSeal', nameKey: 'story.interior.room.chosenMarkSouthSeal', x: 3, y: 18, width: 34, height: 9 },
         { id: 'chosenMarkCentralShrine', nameKey: 'story.interior.room.chosenMarkCentralShrine', x: 4, y: 12, width: 33, height: 8 },
@@ -1221,14 +1196,11 @@ const CHOSEN_MARK_SHRINE_LAYOUT = buildLateOriginalInterior({
 
 const ERGION_KEEP_LAYOUT = buildLateOriginalInterior({
     episode: 28,
-    dungeonId: 'ergion_keep',
     displayNameKey: 'story.interior.ergion_keep.name',
     objectiveKey: 'story.interior.ergion_keep.objective',
     theme: 'castle',
     entryTile: { x: 14, y: 34 },
     playerStart: { x: 14, y: 32 },
-    bossTile: getOriginalLateStoryBossTile(28),
-    guardTiles: ERGION_KEEP_GUARDS,
     rooms: [
         { id: 'ergionSouthernKeep', nameKey: 'story.interior.room.ergionSouthernKeep', x: 5, y: 27, width: 30, height: 7 },
         { id: 'ergionProcessional', nameKey: 'story.interior.room.ergionProcessional', x: 10, y: 4, width: 20, height: 29 },
@@ -1240,14 +1212,11 @@ const ERGION_KEEP_LAYOUT = buildLateOriginalInterior({
 
 const MARTANI_BASTION_LAYOUT = buildLateOriginalInterior({
     episode: 29,
-    dungeonId: 'martani_bastion',
     displayNameKey: 'story.interior.martani_bastion.name',
     objectiveKey: 'story.interior.martani_bastion.objective',
     theme: 'castle',
     entryTile: { x: 14, y: 36 },
     playerStart: { x: 14, y: 32 },
-    bossTile: getOriginalLateStoryBossTile(29),
-    guardTiles: MARTANI_BASTION_GUARDS,
     rooms: [
         { id: 'martaniSouthBastion', nameKey: 'story.interior.room.martaniSouthBastion', x: 10, y: 26, width: 20, height: 10 },
         { id: 'martaniCentralBastion', nameKey: 'story.interior.room.martaniCentralBastion', x: 10, y: 6, width: 40, height: 28 },
@@ -1258,14 +1227,11 @@ const MARTANI_BASTION_LAYOUT = buildLateOriginalInterior({
 
 const BLIN_WATCH_LAYOUT = buildLateOriginalInterior({
     episode: 30,
-    dungeonId: 'blin_watch',
     displayNameKey: 'story.interior.blin_watch.name',
     objectiveKey: 'story.interior.blin_watch.objective',
     theme: 'castle',
     entryTile: { x: 14, y: 36 },
     playerStart: { x: 14, y: 32 },
-    bossTile: getOriginalLateStoryBossTile(30),
-    guardTiles: BLIN_WATCH_GUARDS,
     rooms: [
         { id: 'blinLowerWatch', nameKey: 'story.interior.room.blinLowerWatch', x: 6, y: 28, width: 28, height: 9 },
         { id: 'blinMiddleWatch', nameKey: 'story.interior.room.blinMiddleWatch', x: 6, y: 14, width: 28, height: 15 },
@@ -1276,14 +1242,11 @@ const BLIN_WATCH_LAYOUT = buildLateOriginalInterior({
 
 const DEMON_FIXERS_DEN_LAYOUT = buildLateOriginalInterior({
     episode: 31,
-    dungeonId: 'demon_fixers_den',
     displayNameKey: 'story.interior.demon_fixers_den.name',
     objectiveKey: 'story.interior.demon_fixers_den.objective',
     theme: 'ament',
     entryTile: { x: 14, y: 45 },
     playerStart: { x: 14, y: 32 },
-    bossTile: getOriginalLateStoryBossTile(31),
-    guardTiles: DEMON_FIXERS_DEN_GUARDS,
     rooms: [
         { id: 'demonFixerLowerDen', nameKey: 'story.interior.room.demonFixerLowerDen', x: 2, y: 32, width: 36, height: 14 },
         { id: 'demonFixerMiddleDen', nameKey: 'story.interior.room.demonFixerMiddleDen', x: 2, y: 16, width: 36, height: 18 },
