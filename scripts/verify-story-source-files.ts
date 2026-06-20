@@ -240,6 +240,12 @@ function readRoadmapDocRows(): Map<number, RoadmapDocRow> {
     if (content.includes('현재 실내화 대상(1, 2, 3, 7, 13, 18, 19, 20, 21, 22화)')) {
         throw new Error(`${path} still contains stale 18~22 solo interior scope`);
     }
+    if (!content.includes('`NN.DEO`/`NN.DEE`가 있는 화는 해당 발표 포커스까지')) {
+        throw new Error(`${path} is missing conditional late-story DEO/DEE scope`);
+    }
+    if (content.includes('`MAP/NNset.arc`/`NN.ai`/`NN.DEO`/`NN.DEE`와 hmap 원장')) {
+        throw new Error(`${path} still implies every late-story interior has DEO/DEE sources`);
+    }
     for (const line of content.split(/\r?\n/)) {
         if (!line.startsWith('|')) continue;
         const cells = line.slice(1, line.endsWith('|') ? -1 : undefined).split('|').map((cell) => cell.trim());
