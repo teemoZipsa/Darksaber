@@ -197,6 +197,50 @@ test('server shutdown force-extracts active raids and preserves raid loot in the
     assert.equal(savedRaidItem.acquiredInRaid, undefined);
 });
 
+test('persistent world session snapshots restore active raid reconnect state', () => {
+    const session = new WorldSession({ sessionEpoch: 123_456 });
+    const character = authCharacter('hero-persisted');
+    const joined = session.join(joinMessage('central_castle', character.id), 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        saveSnapshot: createDefaultCharacterSave(character),
+    });
+    const raidItem = getItemDef('herb_common');
+    assert.ok(raidItem);
+
+    const internals = session as any;
+    const serverPlayer = internals.players.get(joined.playerId);
+    assert.ok(serverPlayer);
+    serverPlayer.saveSnapshot.inventory.items.push({
+        itemId: raidItem.id,
+        gridX: 4,
+        gridY: 0,
+        quantity: 1,
+        durability: raidItem.maxDurability,
+        acquiredInRaid: true,
+    });
+    internals.saveState.markDirty(joined.playerId);
+
+    const before = session.createSnapshot(joined.playerId, 1_000);
+    session.disconnect(joined.playerId, 1_500);
+    const serialized = JSON.parse(JSON.stringify(session.createPersistentSnapshot()));
+    const restored = WorldSession.restorePersistentSnapshot(serialized);
+    const reconnect = restored.reconnect(joined.welcome.resumeToken, 2_000);
+    assert.ok(reconnect);
+    assert.equal(reconnect.playerId, joined.playerId);
+    assert.equal(reconnect.welcome.sessionEpoch, 123_456);
+
+    const after = restored.createSnapshot(joined.playerId, 2_000);
+    assert.equal(after.partyActors.length, before.partyActors.length);
+    assert.equal(after.enemies.length, before.enemies.length);
+    assert.equal(after.loot.length, before.loot.length);
+    assert.deepEqual(after.players, before.players);
+    assert.deepEqual(restored.consumeSaveDirtyPlayerIds(), [joined.playerId]);
+    const recoveryPatch = restored.createRecoveryCharacterSavePatch(joined.playerId);
+    assert.ok(recoveryPatch);
+    assert.ok(recoveryPatch.inventory?.items.some((item) => item.itemId === raidItem.id));
+});
+
 test('default character saves start with the shared no-shield basic kit', () => {
     const save = createDefaultCharacterSave(authCharacter('starter'));
     const equipment = save.equipment as Record<string, { itemId?: string }>;

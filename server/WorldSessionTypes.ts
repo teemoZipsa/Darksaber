@@ -1,13 +1,17 @@
 import type { StatusEffect } from '../src/combat/StatusEffects';
 import type { CharacterStats } from '../src/data/Stats';
 import type { MonsterId } from '../src/data/MonsterCatalog';
+import type { EnemyRole } from '../src/field/EnemyAI';
 import type { StoryScenarioMissionKind } from '../src/data/StoryScenarioData';
 import type { Enemy } from '../src/entity/Enemy';
 import type { TilePoint } from '../src/field/FieldPathing';
+import type { FieldNestState } from '../src/field/SpawnResolver';
+import type { WorldLootContainerType } from '../src/loot/WorldLootTypes';
 import type { WorldRealm } from '../src/map/BiomeMask';
 import type {
     AutoLootGrantMessage,
     CombatEventMessage,
+    GridSnapshot,
     NetFacing,
     ScenarioEnemyDefeatEventMessage,
     WorldServerMessage,
@@ -104,6 +108,7 @@ export interface WorldSessionDebugCounts {
 export interface WorldSessionOptions {
     realm?: WorldRealm;
     ghostGraceMs?: number;
+    sessionEpoch?: number;
     logger?: (message: string) => void;
 }
 
@@ -113,4 +118,91 @@ export interface WorldJoinContext {
     completedQuestIds?: string[];
     shardId?: string;
     saveSnapshot?: CharacterSave;
+}
+
+export interface WorldSessionPersistentPlayer {
+    id: string;
+    accountId?: string;
+    characterId?: string;
+    resumeToken: string;
+    originHubId: string;
+    departureTownId: string;
+    elapsedSeconds: number;
+    kills: number;
+    carriedWeight: number;
+    carriedItems: Array<[string, number]>;
+    raidGoldReward: number;
+    completedQuestIds: string[];
+    enteredDungeonIds: string[];
+    completedDungeonIds: string[];
+    fieldEventFlagsByDungeonId: Array<[string, string[]]>;
+    activeDungeonId: string | null;
+    active: boolean;
+    ghost: boolean;
+    disconnectedAt: number | null;
+    actorIds: string[];
+    saveSnapshot?: CharacterSave;
+}
+
+export interface WorldSessionPersistentEnemy {
+    id: string;
+    name: string;
+    level: number;
+    color: string;
+    role: EnemyRole;
+    monsterId?: MonsterId;
+    tile: TilePoint;
+    home: TilePoint;
+    stats: CharacterStats;
+    statuses: StatusEffect[];
+    actionGauge: number;
+    facing: NetFacing;
+    aggroRange: number;
+    expReward: number;
+    isAggro: boolean;
+    isBoss: boolean;
+    lootTableId: string;
+    aiMemory: {
+        turnCount: number;
+        cooldowns: Record<string, number>;
+        lastPattern?: string;
+    };
+    nestKey?: string;
+    scenarioPlayerId?: string;
+    scenarioDungeonId?: string;
+    scenarioObjective?: boolean;
+    wanderSeed: number;
+}
+
+export interface WorldSessionPersistentLoot {
+    id: string;
+    tile: TilePoint;
+    sourceLabel: string;
+    kind: 'chest' | 'corpse';
+    containerType?: WorldLootContainerType;
+    opened: boolean;
+    gridSnapshot: GridSnapshot;
+    overflowItemIds: string[];
+}
+
+export interface WorldSessionPersistentSnapshot {
+    version: 1;
+    realm: WorldRealm;
+    shardId: string;
+    sessionEpoch: number;
+    seq: number;
+    nextPlayerId: number;
+    nextEnemyId: number;
+    nextLootId: number;
+    lastTickAt: number | null;
+    lastNestRefreshAt: number;
+    players: WorldSessionPersistentPlayer[];
+    actors: ServerActor[];
+    enemies: WorldSessionPersistentEnemy[];
+    nestStates: FieldNestState[];
+    scenarioStates: ServerScenarioState[];
+    sharedScenarioFieldEventFlags: Array<[string, string[]]>;
+    loot: WorldSessionPersistentLoot[];
+    generatedLootChunks: string[];
+    dirtyPlayerIds: string[];
 }

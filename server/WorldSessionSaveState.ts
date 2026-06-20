@@ -32,6 +32,15 @@ export class WorldSessionSaveState {
         return playerIds;
     }
 
+    public getDirtyPlayerIds(): string[] {
+        return [...this.dirtyPlayerIds];
+    }
+
+    public restoreDirtyPlayerIds(playerIds: readonly string[]): void {
+        this.dirtyPlayerIds.clear();
+        for (const playerId of playerIds) this.dirtyPlayerIds.add(playerId);
+    }
+
     public createPatch(player: WorldSessionSavePlayer | undefined, playerId: string, hubTownId?: string): WorldCharacterSavePatch | null {
         return player
             ? this.buildPatch(player, {

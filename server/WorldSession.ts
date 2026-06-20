@@ -152,6 +152,10 @@ import type {
     ServerPlayer,
     ServerScenarioState,
     WorldJoinContext,
+    WorldSessionPersistentEnemy,
+    WorldSessionPersistentLoot,
+    WorldSessionPersistentPlayer,
+    WorldSessionPersistentSnapshot,
     WorldSessionDebugCounts,
     WorldSessionMessageResult,
     WorldSessionOptions,
@@ -176,6 +180,7 @@ export type { WorldCharacterSavePatch } from './WorldSessionSaveState';
 export { gridToSnapshot } from './WorldSessionHelpers';
 export type {
     WorldJoinContext,
+    WorldSessionPersistentSnapshot,
     WorldSessionDebugCounts,
     WorldSessionMessageResult,
     WorldSessionOptions,
@@ -188,7 +193,7 @@ export class WorldResumeFailedError extends Error {
     }
 }
 export class WorldSession {
-    public readonly sessionEpoch = Date.now();
+    public readonly sessionEpoch: number;
     private readonly worldMap: WorldMap;
     private readonly shardId: string;
     private readonly players = new Map<string, ServerPlayer>();
@@ -213,6 +218,7 @@ export class WorldSession {
     private readonly logger: (message: string) => void;
 
     constructor(options: WorldSessionOptions = {}) {
+        this.sessionEpoch = options.sessionEpoch ?? Date.now();
         this.worldMap = new WorldMap(options.realm ?? 'mortal');
         this.shardId = `${this.worldMap.getRealm()}`;
         this.ghostGraceMs = options.ghostGraceMs ?? DISCONNECT_GRACE_MS;
@@ -221,6 +227,118 @@ export class WorldSession {
             getTargetableActors: (entry) => this.getTargetableActors(entry),
             hasActiveActorWithin: (tile, distance, ownerPlayerId) => this.hasActiveActorWithin(tile, distance, ownerPlayerId),
         });
+    }
+
+    public static restorePersistentSnapshot(snapshot: WorldSessionPersistentSnapshot, options: WorldSessionOptions = {}): WorldSession {
+        if (snapshot.version !== 1) {
+            throw new Error(`Unsupported world session snapshot version: ${snapshot.version}`);
+        }
+        const session = new WorldSession({
+            ...options,
+            realm: snapshot.realm,
+            sessionEpoch: snapshot.sessionEpoch,
+        });
+        session.seq = snapshot.seq;
+        session.nextPlayerId = snapshot.nextPlayerId;
+        session.nextEnemyId = snapshot.nextEnemyId;
+        session.nextLootId = snapshot.nextLootId;
+        session.lastTickAt = snapshot.lastTickAt;
+        session.lastNestRefreshAt = snapshot.lastNestRefreshAt;
+
+        session.players.clear();
+        for (const player of snapshot.players) {
+            session.players.set(player.id, WorldSession.restorePlayer(player));
+        }
+
+        session.actors.clear();
+        for (const actor of snapshot.actors) {
+            session.actors.set(actor.id, {
+                ...actor,
+                tile: { ...actor.tile },
+                stats: cloneStats(actor.stats),
+                statuses: cloneStatuses(actor.statuses),
+                magicLoadout: [...actor.magicLoadout],
+                skillUpgradeLevels: { ...actor.skillUpgradeLevels },
+            });
+        }
+
+        session.enemies.clear();
+        for (const enemy of snapshot.enemies) {
+            session.enemies.set(enemy.id, WorldSession.restoreEnemy(enemy));
+        }
+
+        session.nestStates.clear();
+        for (const nestState of snapshot.nestStates) {
+            session.nestStates.set(nestState.chunkKey, {
+                ...nestState,
+                centerTile: { ...nestState.centerTile },
+                monsterIds: [...nestState.monsterIds],
+            });
+        }
+
+        session.scenarioStates.clear();
+        for (const scenarioState of snapshot.scenarioStates) {
+            session.scenarioStates.set(scenarioState.playerId, {
+                ...scenarioState,
+                returnTile: scenarioState.returnTile ? { ...scenarioState.returnTile } : null,
+                enemyIds: [...scenarioState.enemyIds],
+            });
+        }
+
+        session.sharedScenarioFieldEventFlags.clear();
+        for (const [dungeonId, flags] of snapshot.sharedScenarioFieldEventFlags) {
+            session.sharedScenarioFieldEventFlags.set(dungeonId, new Set(flags));
+        }
+
+        session.loot.clear();
+        for (const loot of snapshot.loot) {
+            session.loot.set(loot.id, WorldSession.restoreLoot(loot));
+        }
+
+        session.generatedLootChunks.clear();
+        for (const chunkKey of snapshot.generatedLootChunks) session.generatedLootChunks.add(chunkKey);
+        session.saveState.restoreDirtyPlayerIds(snapshot.dirtyPlayerIds);
+        return session;
+    }
+
+    public createPersistentSnapshot(): WorldSessionPersistentSnapshot {
+        return {
+            version: 1,
+            realm: this.worldMap.getRealm(),
+            shardId: this.shardId,
+            sessionEpoch: this.sessionEpoch,
+            seq: this.seq,
+            nextPlayerId: this.nextPlayerId,
+            nextEnemyId: this.nextEnemyId,
+            nextLootId: this.nextLootId,
+            lastTickAt: this.lastTickAt,
+            lastNestRefreshAt: this.lastNestRefreshAt,
+            players: [...this.players.values()].map((player) => WorldSession.toPersistentPlayer(player)),
+            actors: [...this.actors.values()].map((actor) => ({
+                ...actor,
+                tile: { ...actor.tile },
+                stats: cloneStats(actor.stats),
+                statuses: cloneStatuses(actor.statuses),
+                magicLoadout: [...actor.magicLoadout],
+                skillUpgradeLevels: { ...actor.skillUpgradeLevels },
+            })),
+            enemies: [...this.enemies.values()].map((entry) => WorldSession.toPersistentEnemy(entry)),
+            nestStates: [...this.nestStates.values()].map((state) => ({
+                ...state,
+                centerTile: { ...state.centerTile },
+                monsterIds: [...state.monsterIds],
+            })),
+            scenarioStates: [...this.scenarioStates.values()].map((state) => ({
+                ...state,
+                returnTile: state.returnTile ? { ...state.returnTile } : null,
+                enemyIds: [...state.enemyIds],
+            })),
+            sharedScenarioFieldEventFlags: [...this.sharedScenarioFieldEventFlags.entries()]
+                .map(([dungeonId, flags]) => [dungeonId, [...flags]]),
+            loot: [...this.loot.values()].map((lootObject) => WorldSession.toPersistentLoot(lootObject)),
+            generatedLootChunks: [...this.generatedLootChunks],
+            dirtyPlayerIds: this.saveState.getDirtyPlayerIds(),
+        };
     }
 
     public join(message: WorldJoinMessage, now: number = Date.now(), context: WorldJoinContext = {}): { playerId: string; welcome: WorldWelcomeMessage } {
@@ -2294,6 +2412,178 @@ export class WorldSession {
             lockedByPlayerId: this.lootState.getLockPlayerId(lootObject.id),
             gridSnapshot: gridToSnapshot(lootObject.inventory),
         };
+    }
+
+    private static toPersistentPlayer(player: ServerPlayer): WorldSessionPersistentPlayer {
+        return {
+            id: player.id,
+            accountId: player.accountId,
+            characterId: player.characterId,
+            resumeToken: player.resumeToken,
+            originHubId: player.originHubId,
+            departureTownId: player.departureTownId,
+            elapsedSeconds: player.elapsedSeconds,
+            kills: player.kills,
+            carriedWeight: player.carriedWeight,
+            carriedItems: [...player.carriedItems.entries()],
+            raidGoldReward: player.raidGoldReward,
+            completedQuestIds: [...player.completedQuestIds],
+            enteredDungeonIds: [...player.enteredDungeonIds],
+            completedDungeonIds: [...player.completedDungeonIds],
+            fieldEventFlagsByDungeonId: [...player.fieldEventFlagsByDungeonId.entries()]
+                .map(([dungeonId, flags]) => [dungeonId, [...flags]]),
+            activeDungeonId: player.activeDungeonId,
+            active: player.active,
+            ghost: player.ghost,
+            disconnectedAt: player.disconnectedAt,
+            actorIds: [...player.actorIds],
+            saveSnapshot: cloneCharacterSave(player.saveSnapshot),
+        };
+    }
+
+    private static restorePlayer(player: WorldSessionPersistentPlayer): ServerPlayer {
+        return {
+            id: player.id,
+            accountId: player.accountId,
+            characterId: player.characterId,
+            resumeToken: player.resumeToken,
+            originHubId: player.originHubId,
+            departureTownId: player.departureTownId,
+            elapsedSeconds: player.elapsedSeconds,
+            kills: player.kills,
+            carriedWeight: player.carriedWeight,
+            carriedItems: new Map(player.carriedItems),
+            raidGoldReward: player.raidGoldReward,
+            completedQuestIds: new Set(player.completedQuestIds),
+            enteredDungeonIds: new Set(player.enteredDungeonIds),
+            completedDungeonIds: new Set(player.completedDungeonIds),
+            fieldEventFlagsByDungeonId: new Map(
+                player.fieldEventFlagsByDungeonId.map(([dungeonId, flags]) => [dungeonId, new Set(flags)])
+            ),
+            activeDungeonId: player.activeDungeonId,
+            active: player.active,
+            ghost: player.ghost,
+            disconnectedAt: player.disconnectedAt,
+            actorIds: [...player.actorIds],
+            saveSnapshot: cloneCharacterSave(player.saveSnapshot),
+        };
+    }
+
+    private static toPersistentEnemy(entry: ServerEnemy): WorldSessionPersistentEnemy {
+        return {
+            id: entry.enemy.id,
+            name: entry.enemy.name,
+            level: entry.enemy.level,
+            color: entry.enemy.color,
+            role: entry.enemy.role,
+            monsterId: entry.monsterId,
+            tile: { x: entry.enemy.gridX, y: entry.enemy.gridY },
+            home: { ...entry.home },
+            stats: cloneStats(entry.enemy.stats),
+            statuses: cloneStatuses(entry.enemy.statuses),
+            actionGauge: entry.enemy.actionGauge,
+            facing: entry.enemy.facing,
+            aggroRange: entry.enemy.aggroRange,
+            expReward: entry.enemy.expReward,
+            isAggro: entry.enemy.isAggro,
+            isBoss: entry.enemy.isBoss,
+            lootTableId: entry.enemy.lootTableId,
+            aiMemory: {
+                turnCount: entry.enemy.aiMemory.turnCount,
+                cooldowns: { ...entry.enemy.aiMemory.cooldowns },
+                lastPattern: entry.enemy.aiMemory.lastPattern,
+            },
+            nestKey: entry.nestKey,
+            scenarioPlayerId: entry.scenarioPlayerId,
+            scenarioDungeonId: entry.scenarioDungeonId,
+            scenarioObjective: entry.scenarioObjective,
+            wanderSeed: entry.wanderSeed,
+        };
+    }
+
+    private static restoreEnemy(snapshot: WorldSessionPersistentEnemy): ServerEnemy {
+        const enemy = new Enemy(
+            snapshot.id,
+            snapshot.tile.x,
+            snapshot.tile.y,
+            snapshot.name,
+            snapshot.level,
+            snapshot.color,
+            snapshot.role,
+            snapshot.monsterId,
+        );
+        enemy.stats = cloneStats(snapshot.stats);
+        enemy.statuses = cloneStatuses(snapshot.statuses);
+        enemy.actionGauge = snapshot.actionGauge;
+        enemy.facing = snapshot.facing;
+        enemy.aggroRange = snapshot.aggroRange;
+        enemy.expReward = snapshot.expReward;
+        enemy.isAggro = snapshot.isAggro;
+        enemy.isBoss = snapshot.isBoss;
+        enemy.lootTableId = snapshot.lootTableId;
+        enemy.aiMemory = {
+            turnCount: snapshot.aiMemory.turnCount,
+            cooldowns: { ...snapshot.aiMemory.cooldowns },
+            lastPattern: snapshot.aiMemory.lastPattern,
+        };
+        return {
+            enemy,
+            monsterId: snapshot.monsterId,
+            nestKey: snapshot.nestKey,
+            scenarioPlayerId: snapshot.scenarioPlayerId,
+            scenarioDungeonId: snapshot.scenarioDungeonId,
+            scenarioObjective: snapshot.scenarioObjective,
+            home: { ...snapshot.home },
+            wanderSeed: snapshot.wanderSeed,
+        };
+    }
+
+    private static toPersistentLoot(lootObject: LootObject): WorldSessionPersistentLoot {
+        return {
+            id: lootObject.id,
+            tile: { x: lootObject.x, y: lootObject.y },
+            sourceLabel: lootObject.sourceLabel,
+            kind: lootObject.kind,
+            containerType: lootObject.containerType,
+            opened: lootObject.opened,
+            gridSnapshot: gridToSnapshot(lootObject.inventory),
+            overflowItemIds: lootObject.overflowItems.map((item) => item.id),
+        };
+    }
+
+    private static restoreLoot(snapshot: WorldSessionPersistentLoot): LootObject {
+        const lootObject = new LootObject(snapshot.id, snapshot.tile.x, snapshot.tile.y, [], {
+            sourceLabel: snapshot.sourceLabel,
+            kind: snapshot.kind,
+            containerType: snapshot.containerType,
+            gridW: snapshot.gridSnapshot.width,
+            gridH: snapshot.gridSnapshot.height,
+        });
+        lootObject.opened = snapshot.opened;
+        for (const placedSnapshot of snapshot.gridSnapshot.items) {
+            const item = getItemDef(placedSnapshot.itemId);
+            if (!item) continue;
+            const sockets = placedSnapshot.sockets
+                ?.map((socketId) => getItemDef(socketId))
+                .filter((socket): socket is ItemDef => Boolean(socket));
+            const placed = {
+                item,
+                gridX: placedSnapshot.gridX,
+                gridY: placedSnapshot.gridY,
+                durability: placedSnapshot.durability,
+                quantity: placedSnapshot.quantity,
+                acquiredInRaid: placedSnapshot.acquiredInRaid,
+                sockets,
+            };
+            if (!lootObject.inventory.placeExisting(placed, placedSnapshot.gridX, placedSnapshot.gridY)) {
+                lootObject.overflowItems.push(item);
+            }
+        }
+        for (const itemId of snapshot.overflowItemIds) {
+            const item = getItemDef(itemId);
+            if (item) lootObject.overflowItems.push(item);
+        }
+        return lootObject;
     }
 
     private releaseLootLocksForPlayer(playerId: string): void {

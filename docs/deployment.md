@@ -135,9 +135,15 @@ as quest completion, raid gold, or story companion grants. If the process
 crashes and restarts on the same disk, the spool replay can recover the latest
 dirty inventory snapshot. A reconnect attempt with a replayed resume token
 returns `RESUME_RECOVERED`, clears the stale client resume state, and tells the
-player to start a new expedition. This is still not full live-raid snapshot
-restore: enemy state, turn state, positions, and horizontal scale still require
-persistent raid-instance state.
+player to start a new expedition.
+
+`WorldSession.createPersistentSnapshot()` and
+`WorldSession.restorePersistentSnapshot()` provide a JSON-safe snapshot boundary
+for active raid state: players, actors, enemies, nest state, scenario flags,
+loot containers, generated chunks, and dirty save markers round-trip back into a
+reconnectable session. The production server does not yet write these snapshots
+to shared durable storage, so horizontal scale still requires persistent
+raid-instance routing and storage.
 
 ## Vercel Client
 
