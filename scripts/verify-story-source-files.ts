@@ -484,6 +484,12 @@ function verifyScenarioImportDocRow(episode: number, sequence: StoryScenarioEven
         if (!notesMentionGuardCount(row.notes, fact.guardAreas.length)) {
             throw new Error(`Episode ${episode} docs notes do not mention ${fact.guardAreas.length} original guard AREA coordinates`);
         }
+        if (!fact.deoMember && !/\bno DEO\b/i.test(row.notes)) {
+            throw new Error(`Episode ${episode} docs notes do not mention missing original DEO member`);
+        }
+        if (!fact.deeMember && !/\bno DEE\b/i.test(row.notes)) {
+            throw new Error(`Episode ${episode} docs notes do not mention missing original DEE member`);
+        }
         for (const position of fact.staging) {
             if (!notesMentionTile(row.notes, position.x, position.y)) {
                 throw new Error(`Episode ${episode} docs notes do not mention DEO/DEE staging tile {${position.x},${position.y}}`);

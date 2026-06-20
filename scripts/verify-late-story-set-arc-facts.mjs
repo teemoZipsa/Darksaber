@@ -59,6 +59,21 @@ const sourceRoot = resolve(options.sourceRoot);
 const facts = JSON.parse(readFileSync(resolve(FACTS_PATH), 'utf8'));
 const verified = [];
 
+function requireOptionalMemberState(episode, names, kind, declaredMember) {
+  if (declaredMember) {
+    if (!names.has(declaredMember)) {
+      throw new Error(`Missing episode ${episode} declared ${kind} member ${declaredMember}; found ${[...names].join(', ')}`);
+    }
+    return;
+  }
+
+  const pattern = new RegExp(`^${episode}\\.${kind}$`, 'i');
+  const unexpected = [...names].find((name) => pattern.test(name));
+  if (unexpected) {
+    throw new Error(`Episode ${episode} declares no ${kind} member but ${unexpected} exists in set.arc`);
+  }
+}
+
 for (const [episode, fact] of Object.entries(facts)) {
   const setArcPath = join(sourceRoot, fact.setArc);
   if (!existsSync(setArcPath)) throw new Error(`Missing episode ${episode} set arc: ${setArcPath}`);
@@ -74,6 +89,8 @@ for (const [episode, fact] of Object.entries(facts)) {
       throw new Error(`Missing episode ${episode} ${fact.setArc} member ${member}; found ${[...names].join(', ')}`);
     }
   }
+  requireOptionalMemberState(episode, names, 'DEO', fact.deoMember);
+  requireOptionalMemberState(episode, names, 'DEE', fact.deeMember);
   verified.push(`${episode}:${fact.setArc}`);
 }
 
