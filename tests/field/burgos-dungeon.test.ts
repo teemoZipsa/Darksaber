@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { Character } from '../../src/character/Character';
 import {
     BURGOS_BOSS_MONSTER_ID,
     BURGOS_CASTLE_DUNGEON_ID,
@@ -98,6 +99,7 @@ function createStoryScenarioHarness(options: {
     let cameraFollowed = false;
     const cameraFocusTiles: Array<{ x: number; y: number }> = [];
     const rewardItemIds: string[] = [];
+    const trapDamageSpawns: Array<{ x: number; y: number; amount: number }> = [];
     const logs: string[] = [];
 
     const controller = new WorldStoryScenarioController({
@@ -134,6 +136,9 @@ function createStoryScenarioHarness(options: {
             rewardItemIds.push(itemId);
             return true;
         },
+        spawnDamage: (x, y, amount) => {
+            trapDamageSpawns.push({ x, y, amount });
+        },
         log: (message) => logs.push(message),
     });
 
@@ -150,6 +155,7 @@ function createStoryScenarioHarness(options: {
         get cameraFollowed() { return cameraFollowed; },
         get cameraFocusTiles() { return cameraFocusTiles; },
         get rewardItemIds() { return rewardItemIds; },
+        get trapDamageSpawns() { return trapDamageSpawns; },
     };
 }
 
@@ -847,6 +853,33 @@ test('Etna chest events grant original episode 3 raid rewards once per chest', (
     assert.deepEqual(harness.rewardItemIds, ['orig_story_0300_heal_potion']);
     assert.equal(raidSession.hasScenarioFlag(ETNA_VOLCANO_DUNGEON_ID, 'etna_item_chest_05'), true);
     assert.equal(harness.controller.playFieldEvent(ETNA_VOLCANO_DUNGEON_ID, 'etna_item_chest_05'), false);
+});
+
+test('local original MAGIC field traps damage the current actor once', () => {
+    const scenario = STORY_SCENARIOS.find((candidate) => candidate.episode === 12);
+    assert.ok(scenario);
+    const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
+    const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'pyramid_front_trap_50');
+    assert.ok(event);
+
+    const player = new Player(28, 30);
+    const character = new Character('trap-hero', 'Hero', 'infantry');
+    character.stats.maxHp = 100;
+    character.stats.hp = 100;
+    const actor = { id: 'hero', character, entity: player, path: [], queuedIntent: null };
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    const harness = createStoryScenarioHarness({ player, raidSession });
+
+    assert.equal(harness.controller.playFieldEvent(scenario.dungeonId, event.id, actor), true);
+    assert.equal(character.stats.hp, 84);
+    assert.deepEqual(harness.trapDamageSpawns, [{ x: 28, y: 30, amount: 16 }]);
+    assert.ok(harness.logs.some((line) => line.includes('원작 함정 마법') && line.includes('16 피해')));
+    assert.equal(raidSession.hasScenarioFlag(scenario.dungeonId, event.runtimeFlag ?? event.id), true);
+
+    assert.equal(harness.controller.playFieldEvent(scenario.dungeonId, event.id, actor), false);
+    assert.equal(character.stats.hp, 84);
+    assert.deepEqual(harness.trapDamageSpawns, [{ x: 28, y: 30, amount: 16 }]);
 });
 
 test('Burgos field events can be inspected once inside the local interior', () => {

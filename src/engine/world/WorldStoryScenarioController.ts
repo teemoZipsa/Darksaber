@@ -79,7 +79,18 @@ export interface WorldStoryScenarioContext {
     followCameraToPlayer(): void;
     focusCameraOnTile(tile: TilePoint): void;
     autoPlaceRewardItem(itemId: string): boolean;
+    spawnDamage?(x: number, y: number, amount: number): void;
     log(message: string): void;
+}
+
+function triggerMagicCodes(trigger: string): number[] {
+    return [...trigger.matchAll(/\bMAGIC\s+0*(\d+)\b/g)].map((match) => Number(match[1]));
+}
+
+function getStoryTrapMagicDamage(magicCode: number, maxHp: number): number {
+    const tierDigit = Number(String(magicCode).slice(-1));
+    const tier = Number.isFinite(tierDigit) && tierDigit > 0 ? tierDigit : 1;
+    return Math.max(1, Math.floor(Math.max(1, maxHp) * 0.08) + tier * 4);
 }
 
 export class WorldStoryScenarioController {
@@ -184,7 +195,7 @@ export class WorldStoryScenarioController {
         return result;
     }
 
-    public playFieldEvent(dungeonId: string, eventId: string): boolean {
+    public playFieldEvent(dungeonId: string, eventId: string, actor: FieldActor | null = this.context.getControlledActor()): boolean {
         const sequence = getStoryScenarioEventSequence(dungeonId);
         const event = sequence?.fieldEvents.find((candidate) => candidate.id === eventId);
         if (!event) return false;
@@ -206,6 +217,7 @@ export class WorldStoryScenarioController {
             this.enqueueStoryScenarioPresentation(presentationSteps);
         }
         this.applyFieldEventRewards(event);
+        this.applyFieldEventTrapMagic(event, actor);
         return true;
     }
 
@@ -234,7 +246,7 @@ export class WorldStoryScenarioController {
             this.pendingNetworkFieldEventIntentIds.add(intentId);
             return true;
         }
-        return this.playFieldEvent(dungeonId, event.id);
+        return this.playFieldEvent(dungeonId, event.id, actor);
     }
 
     public exitActiveInterior(options: { placePartyAtReturn?: boolean } = {}): void {
@@ -835,6 +847,25 @@ export class WorldStoryScenarioController {
 
     private applyFieldEventRewards(event: StoryScenarioFieldEvent): void {
         this.applyScenarioRewards(event.rewards);
+    }
+
+    private applyFieldEventTrapMagic(event: StoryScenarioFieldEvent, actor: FieldActor | null): void {
+        const magicCodes = triggerMagicCodes(event.trigger);
+        if (magicCodes.length === 0) return;
+
+        const targetActor = actor?.character ? actor : this.context.getControlledActor();
+        const character = targetActor?.character;
+        if (!targetActor || !character || character.isDead || character.stats.hp <= 1) return;
+
+        const maxHp = Math.max(character.stats.maxHp, character.stats.hp, 1);
+        const rawDamage = magicCodes.reduce((sum, magicCode) => sum + getStoryTrapMagicDamage(magicCode, maxHp), 0);
+        const damage = Math.min(character.stats.hp - 1, rawDamage);
+        if (damage <= 0) return;
+
+        character.stats.hp = Math.max(1, character.stats.hp - damage);
+        const tile = this.context.actorTile(targetActor);
+        this.context.spawnDamage?.(tile.x, tile.y, damage);
+        this.context.log(formatT('story.event.trap.magicDamage', { target: character.name, damage }));
     }
 
     private applyScenarioRewards(rewards: StoryScenarioFieldEvent['rewards']): void {

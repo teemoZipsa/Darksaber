@@ -256,6 +256,7 @@ export class WorldEngine {
                 if (placed) placed.acquiredInRaid = true;
                 return Boolean(placed);
             },
+            spawnDamage: (x, y, amount) => this.floatingText.spawnDamage(x, y, amount, false, false),
             log: (message) => this.addCombatLog(message),
         });
         this.tutorialController = new WorldTutorialController({
