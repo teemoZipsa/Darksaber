@@ -180,6 +180,33 @@ function getSourcedEvents(sequence: StoryScenarioEventSequence) {
     ];
 }
 
+function verifyPresentationArchiveMembers(
+    episode: number,
+    sequence: StoryScenarioEventSequence,
+    setArcFile: string,
+    setArcMembers: Set<string>
+): void {
+    const paddedEpisode = String(episode).padStart(2, '0');
+    const entryDialogueCount = sequence.entry.filter((step) => step.kind === 'dialogue').length;
+    const bossDialogueCount = sequence.bossDefeat.filter((step) => step.kind === 'dialogue').length;
+    const members = [...setArcMembers];
+
+    if (entryDialogueCount > 0 && !setArcMembers.has(`${paddedEpisode}.deo`)) {
+        throw new Error(
+            `Episode ${episode} ${sequence.dungeonId} entry has ${entryDialogueCount} dialogue steps but ${setArcFile} has no ${paddedEpisode}.DEO member`
+        );
+    }
+
+    if (bossDialogueCount > 0) {
+        const bossDialogueMemberPattern = new RegExp(`^${paddedEpisode}[a-z]*\\.dee$`, 'i');
+        if (!members.some((member) => bossDialogueMemberPattern.test(member))) {
+            throw new Error(
+                `Episode ${episode} ${sequence.dungeonId} boss defeat has ${bossDialogueCount} dialogue steps but ${setArcFile} has no ${paddedEpisode}*.DEE member`
+            );
+        }
+    }
+}
+
 function extractBacktickValues(value: string): string[] {
     return [...value.matchAll(/`([^`]+)`/g)].map((match) => match[1]);
 }
@@ -1831,6 +1858,7 @@ for (let episode = options.start; episode <= options.end; episode++) {
     const setArcFile = [...declaredMapFiles].find((sourceFile) => sourceFile.toLowerCase().endsWith('set.arc'));
     if (!setArcFile) throw new Error(`Missing episode ${episode} declared set.arc source`);
     const setArcMembers = getArcMembers(sourceRoot, setArcFile);
+    verifyPresentationArchiveMembers(episode, sequence, setArcFile, setArcMembers);
 
     for (const declaredMember of sequence.originalSources.setArcMembers ?? []) {
         if (!setArcMembers.has(declaredMember.toLowerCase())) {
