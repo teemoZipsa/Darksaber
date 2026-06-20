@@ -11,13 +11,12 @@ import {
     removeActionStanceStatusesFromCarrier,
     replaceActionStanceStatuses,
 } from '../src/combat/StatusEffects';
-import { resolveSkillEffect, type SkillEffectEnemyInput, type SkillEffectResult } from '../src/combat/SkillEffectResolver';
+import { resolveSkillEffect, type SkillEffectResult } from '../src/combat/SkillEffectResolver';
 import { CombatFormulas } from '../src/combat/CombatFormulas';
-import type { CharacterStats } from '../src/data/Stats';
 import { getClassLine } from '../src/data/ClassTree';
 import { getSkillAttackProfile } from '../src/data/AttackPatternProfiles';
 import { getItemDef, getItemDefByOriginalGetItemId, getCombatRecovery, isCombatRecoveryConsumable, type ItemDef } from '../src/data/ItemDB';
-import { getLearnedSkills, getSkill, type Skill } from '../src/data/SkillDB';
+import { getSkill, type Skill } from '../src/data/SkillDB';
 import {
     getEffectiveSkill,
     getUpgradeLevel,
@@ -139,6 +138,14 @@ import {
     toActorSnapshot,
     toLootSnapshot,
 } from './WorldSessionSnapshotViews';
+import {
+    applyActorResourceDelta,
+    getActorCasterSkillStats,
+    getActorLearnedSkillIds,
+    getAlliedActorsWithin,
+    toSkillEffectEnemyInput,
+    updateRestingActorResources,
+} from './WorldSessionSkillState';
 import {
     chunkOffsetsByDistance,
     cloneStats,
@@ -901,7 +908,7 @@ export class WorldSession {
         if (!skillId) return reject(intentId, 'Cast skill payload must include skillId.');
         const skill = getSkill(skillId);
         if (!skill) return reject(intentId, 'Skill does not exist.');
-        if (!this.getLearnedSkillIds(actor).has(skill.id)) return reject(intentId, 'Skill is not learned by this actor.');
+        if (!getActorLearnedSkillIds(actor).has(skill.id)) return reject(intentId, 'Skill is not learned by this actor.');
         if (!actor.magicLoadout.includes(skill.id)) return reject(intentId, 'Skill is not equipped by this actor.');
         if (hasStatus(actor.statuses, 'silence')) return reject(intentId, 'Actor is silenced.');
         if (actor.remainingAp < MAGIC_ACTION_GAUGE_COST) return reject(intentId, 'No action available to cast skill.');
@@ -938,10 +945,10 @@ export class WorldSession {
         // helper the client uses so results stay in lockstep (no desync).
         const effectiveSkill = getEffectiveSkill(skill, getUpgradeLevel(actor.skillUpgradeLevels, skill.id));
         const effect = resolveSkillEffect({
-            casterStats: this.getCasterSkillStats(actor),
+            casterStats: getActorCasterSkillStats(actor),
             skill: effectiveSkill,
-            targetEnemy: target ? this.toSkillEnemyInput(target.enemy) : undefined,
-            allEnemies: targetEnemies.map((enemy) => this.toSkillEnemyInput(enemy)),
+            targetEnemy: target ? toSkillEffectEnemyInput(target.enemy) : undefined,
+            allEnemies: targetEnemies.map((enemy) => toSkillEffectEnemyInput(enemy)),
             targetsResolvedByPattern: Boolean(target),
             terrainContext: buildSkillTerrainContext({
                 casterTile: actor.tile,
@@ -1181,7 +1188,7 @@ export class WorldSession {
     ): WorldSessionMessageResult {
         const broadcasts: CombatEventMessage[] = [];
         const replies: WorldServerMessage[] = [];
-        this.applyActorResourceDelta(actor, effect.casterHpDelta, effect.casterMpDelta);
+        applyActorResourceDelta(actor, effect.casterHpDelta, effect.casterMpDelta);
         if (effect.casterHpDelta > 0) {
             broadcasts.push(createActorEvent('heal', actor, actor, effect.casterHpDelta));
         } else if (effect.casterHpDelta < 0) {
@@ -1195,7 +1202,7 @@ export class WorldSession {
 
         if (effect.casterStatusEffects && effect.casterStatusEffects.length > 0) {
             const targets = skill.targetScope === 'selfAndNearbyAllies'
-                ? this.getAlliedActorsWithin(player, actor, skill.allyRadius ?? 0)
+                ? getAlliedActorsWithin(this.actors, player, actor.tile, skill.allyRadius ?? 0)
                 : [actor];
             for (const target of targets) {
                 applyStatusesToCarrier(target, effect.casterStatusEffects);
@@ -1221,7 +1228,7 @@ export class WorldSession {
             if (enemyResult.mpDamage !== undefined && enemyResult.mpDamage > 0) {
                 const drainedMp = Math.min(enemy.stats.mp, enemyResult.mpDamage);
                 enemy.stats.mp = Math.max(0, enemy.stats.mp - drainedMp);
-                this.applyActorResourceDelta(actor, 0, drainedMp);
+                applyActorResourceDelta(actor, 0, drainedMp);
                 if (drainedMp > 0) broadcasts.push(createEnemyEvent('status', actor, enemy, drainedMp));
             }
 
@@ -1229,11 +1236,11 @@ export class WorldSession {
             enemy.statuses = guarded.statuses;
             const dead = enemy.takeDamage(guarded.damage);
             if (enemyResult.casterHpRestore !== undefined && enemyResult.casterHpRestore > 0) {
-                this.applyActorResourceDelta(actor, enemyResult.casterHpRestore, 0);
+                applyActorResourceDelta(actor, enemyResult.casterHpRestore, 0);
                 broadcasts.push(createActorEvent('heal', actor, actor, enemyResult.casterHpRestore));
             }
             if (enemyResult.casterMpRestore !== undefined && enemyResult.casterMpRestore > 0) {
-                this.applyActorResourceDelta(actor, 0, enemyResult.casterMpRestore);
+                applyActorResourceDelta(actor, 0, enemyResult.casterMpRestore);
                 broadcasts.push(createActorEvent('status', actor, actor, enemyResult.casterMpRestore));
             }
             if (dead) {
@@ -2292,77 +2299,15 @@ export class WorldSession {
         return this.saveState.addPlacedItem(player, placed);
     }
 
-    private getLearnedSkillIds(actor: ServerActor): Set<string> {
-        const classLine = getClassLine(actor.classLineId);
-        const unlocked: string[] = [];
-        if (classLine) {
-            for (let tier = 1; tier <= actor.currentTier; tier++) {
-                const ids = classLine.skillUnlocks[tier];
-                if (ids) unlocked.push(...ids);
-            }
-        }
-        return new Set(getLearnedSkills(actor.classLineId, actor.currentTier, unlocked).map((skill) => skill.id));
-    }
-
-    private getCasterSkillStats(actor: ServerActor): CharacterStats {
-        const effective = getEffectiveStats(actor.stats, actor.statuses);
-        return {
-            ...effective,
-            hp: actor.stats.hp,
-            mp: actor.stats.mp,
-        };
-    }
-
-    private toSkillEnemyInput(enemy: Enemy): SkillEffectEnemyInput {
-        return {
-            id: enemy.id,
-            name: enemy.name,
-            gridX: enemy.gridX,
-            gridY: enemy.gridY,
-            stats: getEffectiveStatsForEnemy(enemy),
-        };
-    }
-
-    private applyActorResourceDelta(actor: ServerActor, hpDelta: number, mpDelta: number): void {
-        const effective = getEffectiveStats(actor.stats, actor.statuses);
-        actor.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.stats.hp + hpDelta));
-        actor.stats.mp = Math.max(0, Math.min(effective.maxMp, actor.stats.mp + mpDelta));
-        actor.isDead = actor.stats.hp <= 0;
-    }
-
     private updateRestingActor(actor: ServerActor, dt: number): void {
-        if (!hasStatus(actor.statuses, 'resting')) {
+        const timerUpdate = updateRestingActorResources(actor, this.restingRecoveryTimers.get(actor.id), dt);
+        if (timerUpdate.type === 'delete') {
             this.restingRecoveryTimers.delete(actor.id);
             return;
         }
-
-        const effective = getEffectiveStats(actor.stats, actor.statuses);
-        if (actor.stats.hp >= effective.maxHp && actor.stats.mp >= effective.maxMp) return;
-
-        let timer = (this.restingRecoveryTimers.get(actor.id) ?? 0) + dt;
-        const ticks = Math.floor(timer);
-        if (ticks <= 0) {
-            this.restingRecoveryTimers.set(actor.id, timer);
-            return;
+        if (timerUpdate.type === 'set') {
+            this.restingRecoveryTimers.set(actor.id, timerUpdate.timer);
         }
-
-        timer -= ticks;
-        this.restingRecoveryTimers.set(actor.id, timer);
-        const hpPerTick = Math.max(2, Math.floor(effective.maxHp * 0.03));
-        const mpPerTick = effective.maxMp > 0 ? Math.max(1, Math.floor(effective.maxMp * 0.03)) : 0;
-        actor.stats.hp = Math.min(effective.maxHp, actor.stats.hp + hpPerTick * ticks);
-        actor.stats.mp = Math.min(effective.maxMp, actor.stats.mp + mpPerTick * ticks);
-    }
-
-    private getAlliedActorsWithin(player: ServerPlayer, caster: ServerActor, radius: number): ServerActor[] {
-        return player.actorIds
-            .map((actorId) => this.actors.get(actorId))
-            .filter((actor): actor is ServerActor => {
-                if (!actor) return false;
-                return !actor.isDead
-                && actor.stats.hp > 0
-                && manhattan(caster.tile, actor.tile) <= radius;
-            });
     }
 
     private consumeTickDelta(now: number): number {
