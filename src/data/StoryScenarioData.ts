@@ -1,4 +1,5 @@
 import type { LandmarkSpriteId } from '../map/TileAssetManager';
+import { getOriginalLateStoryFact } from './OriginalLateStoryFacts';
 
 export type StoryQuestRewardData =
     | { type: 'none' }
@@ -28,6 +29,10 @@ export interface StoryScenarioDefinition {
 }
 
 const noReward: StoryQuestRewardData = { type: 'none' };
+
+function getOriginalLateStoryGuardCount(episode: number): number {
+    return getOriginalLateStoryFact(episode).guardAreas.length;
+}
 
 export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
     {
@@ -423,7 +428,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 26,
         bossColor: '#7850b8',
         guardLevel: 22,
-        guardCount: 23,
+        guardCount: getOriginalLateStoryGuardCount(23),
         missionKind: 'soloInterior',
         reward: noReward,
     },
@@ -440,7 +445,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 27,
         bossColor: '#6c5f90',
         guardLevel: 23,
-        guardCount: 16,
+        guardCount: getOriginalLateStoryGuardCount(24),
         missionKind: 'soloInterior',
         reward: noReward,
     },
@@ -457,7 +462,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 28,
         bossColor: '#2f2f68',
         guardLevel: 24,
-        guardCount: 29,
+        guardCount: getOriginalLateStoryGuardCount(25),
         missionKind: 'soloInterior',
         reward: noReward,
     },
@@ -474,7 +479,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 28,
         bossColor: '#b04040',
         guardLevel: 24,
-        guardCount: 12,
+        guardCount: getOriginalLateStoryGuardCount(26),
         missionKind: 'soloInterior',
         reward: noReward,
     },
@@ -491,7 +496,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 29,
         bossColor: '#5f4a88',
         guardLevel: 25,
-        guardCount: 12,
+        guardCount: getOriginalLateStoryGuardCount(27),
         missionKind: 'soloInterior',
         reward: noReward,
     },
@@ -508,7 +513,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 30,
         bossColor: '#7e4ec8',
         guardLevel: 26,
-        guardCount: 17,
+        guardCount: getOriginalLateStoryGuardCount(28),
         missionKind: 'soloInterior',
         reward: noReward,
     },
@@ -525,7 +530,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 31,
         bossColor: '#9a5a48',
         guardLevel: 27,
-        guardCount: 13,
+        guardCount: getOriginalLateStoryGuardCount(29),
         missionKind: 'soloInterior',
         reward: noReward,
     },
@@ -542,7 +547,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 32,
         bossColor: '#4f7798',
         guardLevel: 28,
-        guardCount: 15,
+        guardCount: getOriginalLateStoryGuardCount(30),
         missionKind: 'soloInterior',
         reward: noReward,
     },
@@ -559,7 +564,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 33,
         bossColor: '#5f4a88',
         guardLevel: 29,
-        guardCount: 14,
+        guardCount: getOriginalLateStoryGuardCount(31),
         missionKind: 'soloInterior',
         reward: noReward,
     },
