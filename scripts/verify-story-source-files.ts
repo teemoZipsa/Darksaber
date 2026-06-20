@@ -980,6 +980,9 @@ function verifyLateStoryOriginalMapContract(
     if (scenario.dungeonId !== fact.dungeonId) {
         throw new Error(`Episode ${episode} late story dungeon mismatch: ${scenario.dungeonId} !== ${fact.dungeonId}`);
     }
+    if (scenario.questId !== fact.questId) {
+        throw new Error(`Episode ${episode} late story quest mismatch: ${scenario.questId} !== ${fact.questId}`);
+    }
     if (scenario.missionKind !== 'soloInterior') {
         throw new Error(`Episode ${episode} late story mission kind mismatch: ${scenario.missionKind} !== soloInterior`);
     }

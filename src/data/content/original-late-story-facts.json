@@ -1,6 +1,7 @@
 {
   "23": {
     "dungeonId": "beelzebuth_hall",
+    "questId": "main:episode_23_beelzebuth",
     "dungeonNameKr": "벨제뷔트 회랑",
     "dungeonNameEn": "Beelzebuth Hall",
     "globalScript": "missing",
@@ -68,6 +69,7 @@
   },
   "24": {
     "dungeonId": "astaroth_gate",
+    "questId": "main:episode_24_astaroth",
     "dungeonNameKr": "아스타로스 관문",
     "dungeonNameEn": "Astaroth Gate",
     "globalScript": "Glib/gscene24.lsc",
@@ -124,6 +126,7 @@
   },
   "25": {
     "dungeonId": "nergal_depths",
+    "questId": "main:episode_25_nergal_depths",
     "dungeonNameKr": "네르갈 심층",
     "dungeonNameEn": "Nergal Depths",
     "globalScript": "Glib/gscene25.lsc",
@@ -202,6 +205,7 @@
   },
   "26": {
     "dungeonId": "beast_mark_shrine",
+    "questId": "main:episode_26_beast_mark",
     "dungeonNameKr": "배마의 제단",
     "dungeonNameEn": "Beast Mark Shrine",
     "globalScript": "Glib/gscene26.lsc",
@@ -245,6 +249,7 @@
   },
   "27": {
     "dungeonId": "chosen_mark_shrine",
+    "questId": "main:episode_27_chosen_mark",
     "dungeonNameKr": "택마의 제단",
     "dungeonNameEn": "Chosen Mark Shrine",
     "globalScript": "Glib/gscene27.lsc",
@@ -289,6 +294,7 @@
   },
   "28": {
     "dungeonId": "ergion_keep",
+    "questId": "main:episode_28_ergion",
     "dungeonNameKr": "에르기온 성채",
     "dungeonNameEn": "Ergion Keep",
     "globalScript": "Glib/gscene28.lsc",
@@ -368,6 +374,7 @@
   },
   "29": {
     "dungeonId": "martani_bastion",
+    "questId": "main:episode_29_martani",
     "dungeonNameKr": "마르타니 보루",
     "dungeonNameEn": "Martani Bastion",
     "globalScript": "missing",
@@ -439,6 +446,7 @@
   },
   "30": {
     "dungeonId": "blin_watch",
+    "questId": "main:episode_30_blin",
     "dungeonNameKr": "블린 감시탑",
     "dungeonNameEn": "Blin Watch",
     "globalScript": "missing",
@@ -517,6 +525,7 @@
   },
   "31": {
     "dungeonId": "demon_fixers_den",
+    "questId": "main:episode_31_demon_fixers",
     "dungeonNameKr": "마계 해결사의 소굴",
     "dungeonNameEn": "Demon Fixer Den",
     "globalScript": "missing",

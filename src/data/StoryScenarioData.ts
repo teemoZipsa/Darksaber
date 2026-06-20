@@ -30,12 +30,13 @@ export interface StoryScenarioDefinition {
 
 const noReward: StoryQuestRewardData = { type: 'none' };
 
-type LateOriginalScenarioConfig = Pick<StoryScenarioDefinition, 'episode' | 'questId'>;
+type LateOriginalScenarioConfig = Pick<StoryScenarioDefinition, 'episode'>;
 
 function buildLateOriginalScenario(config: LateOriginalScenarioConfig): StoryScenarioDefinition {
     const fact = getOriginalLateStoryFact(config.episode);
     return {
         ...config,
+        questId: fact.questId,
         dungeonId: fact.dungeonId,
         dungeonNameKr: fact.dungeonNameKr,
         dungeonNameEn: fact.dungeonNameEn,
@@ -435,39 +436,30 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
     },
     buildLateOriginalScenario({
         episode: 23,
-        questId: 'main:episode_23_beelzebuth',
     }),
     buildLateOriginalScenario({
         episode: 24,
-        questId: 'main:episode_24_astaroth',
     }),
     buildLateOriginalScenario({
         episode: 25,
-        questId: 'main:episode_25_nergal_depths',
     }),
     buildLateOriginalScenario({
         episode: 26,
-        questId: 'main:episode_26_beast_mark',
     }),
     buildLateOriginalScenario({
         episode: 27,
-        questId: 'main:episode_27_chosen_mark',
     }),
     buildLateOriginalScenario({
         episode: 28,
-        questId: 'main:episode_28_ergion',
     }),
     buildLateOriginalScenario({
         episode: 29,
-        questId: 'main:episode_29_martani',
     }),
     buildLateOriginalScenario({
         episode: 30,
-        questId: 'main:episode_30_blin',
     }),
     buildLateOriginalScenario({
         episode: 31,
-        questId: 'main:episode_31_demon_fixers',
     }),
 ];
 

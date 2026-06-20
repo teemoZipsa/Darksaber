@@ -644,6 +644,7 @@ test('late original story source ledgers cover exactly episodes 23 through 31', 
         assert.ok(scenario, `missing story scenario ${episode}`);
         assert.ok(sequence, `missing story sequence ${episode}`);
         assert.ok(layout, `missing story layout ${episode}`);
+        assert.equal(scenario.questId, fact.questId, `episode ${episode} quest id`);
         assert.equal(scenario.dungeonId, fact.dungeonId, `episode ${episode} dungeon id`);
         assert.equal(scenario.missionKind, 'soloInterior', `episode ${episode} mission kind`);
         assert.equal(scenario.guardCount, fact.guardAreas.length, `episode ${episode} guard count`);

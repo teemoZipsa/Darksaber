@@ -38,6 +38,7 @@ export interface OriginalLateStoryWorldChunk {
 
 export interface OriginalLateStoryFact {
     dungeonId: string;
+    questId: string;
     dungeonNameKr: string;
     dungeonNameEn: string;
     globalScript: string;
