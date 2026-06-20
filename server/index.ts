@@ -356,7 +356,7 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
     }
 
     const realm = normalizeRealm(message.requestedRealm);
-    const { sessionKey, session } = getOrCreateSession(realm, auth.account.id);
+    const { sessionKey, session } = getOrCreateSession(realm);
     const serverJoinMessage = buildAuthoritativeJoinMessage(message, character, save, progress);
     let result: ReturnType<WorldSession['join']>;
     try {
@@ -549,9 +549,8 @@ async function closeRevokedSockets(_now: number): Promise<void> {
     }
 }
 
-function getOrCreateSession(realm: WorldRealmId, accountId: string): { sessionKey: string; session: WorldSession } {
-    const shardIndex = stableHash(accountId) % WORLD_SHARD_COUNT;
-    const sessionKey = `${realm}:${shardIndex}`;
+function getOrCreateSession(realm: WorldRealmId): { sessionKey: string; session: WorldSession } {
+    const sessionKey = `${realm}:primary`;
     let session = sessions.get(sessionKey);
     if (!session) {
         session = new WorldSession({
@@ -971,13 +970,4 @@ function countActivePlayers(): number {
     let count = 0;
     for (const session of sessions.values()) count += session.getActivePlayerIds().length;
     return count;
-}
-
-function stableHash(value: string): number {
-    let h = 2166136261;
-    for (let i = 0; i < value.length; i++) {
-        h ^= value.charCodeAt(i);
-        h = Math.imul(h, 16777619);
-    }
-    return h >>> 0;
 }

@@ -266,10 +266,9 @@ Docker/local Postgres as a production path.
 ## World Session Sharding
 
 Keep `WORLD_SHARD_COUNT=1` in production until the session key is based on a
-party or raid-instance ID. The current implementation derives a session shard
-from the account ID, which is acceptable for a single shard but would split
-different accounts in the same realm across different live sessions when shard
-count increases. The server intentionally refuses to start with
-`WORLD_SHARD_COUNT > 1` until this is fixed. Multiplayer party rollout should
+party or raid-instance ID. The current server uses one `realm:primary` live
+session key so different accounts in the same realm are not split by account
+hash. The server intentionally refuses to start with `WORLD_SHARD_COUNT > 1`
+until party or raid-instance routing exists. Multiplayer party rollout should
 create or join an explicit raid instance first, then route all party members by
 that raid instance key.
