@@ -33,6 +33,9 @@ const PORT = Number(process.env.PORT ?? 8765);
 const HOST = process.env.HOST;
 const ENABLE_DEBUG_COUNTS = process.env.WORLD_DEBUG_COUNTS === '1';
 const WORLD_SHARD_COUNT = Math.max(1, Math.floor(Number(process.env.WORLD_SHARD_COUNT ?? 1)));
+if (WORLD_SHARD_COUNT > 1) {
+    throw new Error('WORLD_SHARD_COUNT > 1 requires party/raid-instance session keys. Keep WORLD_SHARD_COUNT=1 until multiplayer sharding is implemented.');
+}
 const MAX_WS_PAYLOAD_BYTES = Math.max(1024, Math.floor(Number(process.env.WORLD_WS_MAX_PAYLOAD_BYTES ?? 64 * 1024)));
 const WS_RATE_LIMIT_WINDOW_MS = 10_000;
 const WS_RATE_LIMIT_MESSAGES = Math.max(1, Math.floor(Number(process.env.WORLD_WS_RATE_LIMIT ?? 120)));
@@ -82,6 +85,12 @@ const server = createServer(async (request, response) => {
         return;
     }
 
+    if (request.url === '/metrics') {
+        response.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
+        response.end(formatMetrics());
+        return;
+    }
+
     response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     response.end('Darksaber world server is running.\n');
 });
@@ -112,12 +121,29 @@ const playerBySocket = new Map<WebSocket, SocketBinding>();
 const socketByPlayer = new Map<string, WebSocket>();
 const socketRateLimits = new Map<WebSocket, { windowStart: number; count: number; lastMessageAt: number; isAlive: boolean }>();
 const saveTrackers = new Map<string, PlayerSaveTracker>();
+const serverStartedAtMs = Date.now();
+const metrics = {
+    wsConnectionsTotal: 0,
+    malformedMessagesTotal: 0,
+    oversizedPayloadsTotal: 0,
+    rateLimitedSocketsTotal: 0,
+    authFailuresTotal: 0,
+    resumeFailuresTotal: 0,
+    actionRejectedTotal: 0,
+    saveConflictsTotal: 0,
+    saveFailuresTotal: 0,
+    saveSpoolFailuresTotal: 0,
+    rejectedJoinsDuringShutdownTotal: 0,
+    shutdownsTotal: 0,
+    worldTickDurationMs: 0,
+};
 let immediateSnapshotFlushScheduled = false;
 
 server.listen(PORT, HOST, () => {
     const hostLabel = HOST ?? '0.0.0.0';
     console.log(`Darksaber world server started on ws://${hostLabel}:${PORT}`);
     console.log(`Auth store: ${authStoreKind}`);
+    logServerEvent('info', 'server_started', { host: hostLabel, port: PORT, authStore: authStoreKind, shards: WORLD_SHARD_COUNT });
 });
 
 let shutdownStarted = false;
@@ -125,6 +151,12 @@ process.once('SIGINT', () => { void shutdownWorldServer('SIGINT'); });
 process.once('SIGTERM', () => { void shutdownWorldServer('SIGTERM'); });
 
 wss.on('connection', (ws: WebSocket, request) => {
+    metrics.wsConnectionsTotal += 1;
+    if (shutdownStarted) {
+        send(ws, { type: 'ERROR', code: 'SERVER_SHUTTING_DOWN', message: 'World server is shutting down.' });
+        ws.close(1012, 'server shutting down');
+        return;
+    }
     const origin = typeof request.headers.origin === 'string' ? request.headers.origin : null;
     if (!isAllowedWsOrigin(origin)) {
         send(ws, { type: 'ERROR', code: 'ORIGIN_FORBIDDEN', message: 'WebSocket origin is not allowed.' });
@@ -167,6 +199,7 @@ wss.on('connection', (ws: WebSocket, request) => {
 });
 
 setInterval(() => {
+    const tickStartedAt = Date.now();
     const now = Date.now();
     const marketUpdate = marketSession.tick(now);
     if (marketUpdate) broadcastToAll(marketUpdate);
@@ -186,6 +219,7 @@ setInterval(() => {
         consumeSessionSaveDirtyPlayers(sessionKey, session);
     }
     sendSnapshotsToActive(now);
+    metrics.worldTickDurationMs = Date.now() - tickStartedAt;
 }, WORLD_TICK_MS);
 
 setInterval(() => {
@@ -231,7 +265,9 @@ async function handleSocketMessage(ws: WebSocket, data: RawData): Promise<void> 
     if (!acceptSocketPayload(ws, data)) return;
     const message = parseMessage(rawDataToBuffer(data));
     if (!message) {
+        metrics.malformedMessagesTotal += 1;
         console.warn('Malformed WebSocket message rejected.');
+        logServerEvent('warn', 'ws_message_rejected', { reason: 'bad_json' });
         send(ws, { type: 'ERROR', code: 'BAD_JSON', message: 'Invalid JSON message.' });
         return;
     }
@@ -264,6 +300,7 @@ async function handleSocketMessage(ws: WebSocket, data: RawData): Promise<void> 
     }
     const authSession = await authStore.getSession(binding.sessionId);
     if (!authSession || authSession.revokedAt || Date.parse(authSession.expiresAt) <= Date.now()) {
+        metrics.authFailuresTotal += 1;
         send(ws, { type: 'ERROR', code: 'AUTH_REVOKED', message: 'Account session is no longer active.' });
         ws.close(1008, 'auth revoked');
         return;
@@ -279,6 +316,7 @@ async function handleSocketMessage(ws: WebSocket, data: RawData): Promise<void> 
         send(ws, reply);
         persistRaidResult(binding, reply);
     }
+    metrics.actionRejectedTotal += countActionRejected(result.replies);
     for (const broadcast of result.broadcasts) broadcastToSession(binding.sessionKey, broadcast);
     if (shouldSendImmediateSnapshots(message, result.replies)) queueImmediateSnapshots(binding.sessionKey);
     consumeSessionSaveDirtyPlayers(binding.sessionKey, session);
@@ -289,6 +327,11 @@ async function handleSocketMessage(ws: WebSocket, data: RawData): Promise<void> 
 }
 
 async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promise<void> {
+    if (shutdownStarted) {
+        metrics.rejectedJoinsDuringShutdownTotal += 1;
+        send(ws, { type: 'ERROR', code: 'SERVER_SHUTTING_DOWN', message: 'World server is shutting down.' });
+        return;
+    }
     if (playerBySocket.has(ws)) {
         send(ws, { type: 'ERROR', code: 'ALREADY_JOINED', message: 'This connection already joined a raid.' });
         return;
@@ -298,11 +341,13 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
         return;
     }
     if (typeof message.accessToken !== 'string' || typeof message.characterId !== 'string') {
+        metrics.authFailuresTotal += 1;
         send(ws, { type: 'ERROR', code: 'AUTH_FAILED', message: 'WORLD_JOIN requires an access token and characterId.' });
         return;
     }
     const auth = await authenticateAccessToken(authStore, message.accessToken, jwtOptions);
     if (!auth) {
+        metrics.authFailuresTotal += 1;
         send(ws, { type: 'ERROR', code: 'AUTH_FAILED', message: 'Access token is invalid or expired.' });
         return;
     }
@@ -313,6 +358,7 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
     ]);
     if (!character || !save) {
         console.warn(`WORLD_JOIN denied account=${auth.account.id} character=${message.characterId}`);
+        logServerEvent('warn', 'world_join_denied', { accountId: auth.account.id, characterId: message.characterId });
         send(ws, { type: 'ERROR', code: 'CHARACTER_FORBIDDEN', message: 'Selected character does not belong to this account.' });
         return;
     }
@@ -331,6 +377,7 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
         });
     } catch (error) {
         if (error instanceof WorldResumeFailedError) {
+            metrics.resumeFailuresTotal += 1;
             send(ws, { type: 'ERROR', code: 'RESUME_FAILED', message: error.message });
             return;
         }
@@ -344,16 +391,19 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
 
 async function handleReconnect(ws: WebSocket, resumeToken: string, accessToken: unknown): Promise<void> {
     if (typeof accessToken !== 'string') {
+        metrics.authFailuresTotal += 1;
         send(ws, { type: 'ERROR', code: 'AUTH_FAILED', message: 'RECONNECT requires an access token.' });
         return;
     }
     const auth = await authenticateAccessToken(authStore, accessToken, jwtOptions);
     if (!auth) {
+        metrics.authFailuresTotal += 1;
         send(ws, { type: 'ERROR', code: 'AUTH_FAILED', message: 'Access token is invalid or expired.' });
         return;
     }
     const resumed = findReconnectSession(resumeToken, auth.account.id);
     if (!resumed) {
+        metrics.resumeFailuresTotal += 1;
         send(ws, { type: 'ERROR', code: 'RESUME_FAILED', message: 'Resume token is expired or unknown.' });
         return;
     }
@@ -396,7 +446,9 @@ function acceptSocketPayload(ws: WebSocket, data: RawData): boolean {
     const state = socketRateLimits.get(ws);
     const now = Date.now();
     if (rawDataLength(data) > MAX_WS_PAYLOAD_BYTES) {
+        metrics.oversizedPayloadsTotal += 1;
         console.warn('Oversized WebSocket payload rejected.');
+        logServerEvent('warn', 'ws_message_rejected', { reason: 'payload_too_large' });
         send(ws, { type: 'ERROR', code: 'PAYLOAD_TOO_LARGE', message: 'Message payload is too large.' });
         ws.close(1009, 'payload too large');
         return false;
@@ -410,7 +462,9 @@ function acceptSocketPayload(ws: WebSocket, data: RawData): boolean {
         state.lastMessageAt = now;
         state.isAlive = true;
         if (state.count > WS_RATE_LIMIT_MESSAGES) {
+            metrics.rateLimitedSocketsTotal += 1;
             console.warn('WebSocket rate limit exceeded.');
+            logServerEvent('warn', 'ws_message_rejected', { reason: 'rate_limited' });
             send(ws, { type: 'ERROR', code: 'RATE_LIMITED', message: 'Too many messages.' });
             ws.close(1008, 'rate limited');
             return false;
@@ -466,6 +520,10 @@ function shouldSendImmediateSnapshots(message: WorldClientMessage, replies: read
         return false;
     }
     return !replies.some((reply) => reply.type === 'ACTION_REJECTED');
+}
+
+function countActionRejected(replies: readonly WorldServerMessage[]): number {
+    return replies.reduce((count, reply) => count + (reply.type === 'ACTION_REJECTED' ? 1 : 0), 0);
 }
 
 function sendSerialized(ws: WebSocket, payload: string): void {
@@ -605,9 +663,11 @@ async function flushCharacterSave(sessionKey: string, playerId: string, reason: 
             console.log(`character save flush reason=${reason} player=${playerId} revision=${updatedRevision}`);
         }
     } catch (error) {
+        metrics.saveFailuresTotal += 1;
         tracker.dirty = true;
         tracker.lastDirtyAt = Date.now();
         console.error(`Failed to flush character save (${reason}):`, error instanceof Error ? error.message : error);
+        logServerEvent('error', 'character_save_flush_failed', { reason, playerId, error: error instanceof Error ? error.message : String(error) });
     } finally {
         tracker.saving = false;
     }
@@ -626,7 +686,9 @@ function spoolPendingCharacterSave(tracker: PlayerSaveTracker, patch: WorldChara
             reason,
         });
     } catch (error) {
+        metrics.saveSpoolFailuresTotal += 1;
         console.error('Failed to spool pending world save:', error instanceof Error ? error.message : error);
+        logServerEvent('error', 'world_save_spool_failed', { reason, playerId: tracker.playerId, error: error instanceof Error ? error.message : String(error) });
     }
 }
 
@@ -640,6 +702,8 @@ async function updateCharacterSaveWithRetry(tracker: PlayerSaveTracker, patch: W
             });
             if (result.status === 'updated') return result.save.revision;
             if (result.status === 'conflict') {
+                metrics.saveConflictsTotal += 1;
+                logServerEvent('warn', 'character_save_conflict', { playerId: tracker.playerId, accountId: tracker.accountId, characterId: tracker.characterId, currentRevision: result.currentRevision });
                 expectedRevision = result.currentRevision;
                 tracker.expectedRevision = result.currentRevision;
                 continue;
@@ -691,7 +755,12 @@ function cleanupSocket(ws: WebSocket): void {
 async function shutdownWorldServer(signal: NodeJS.Signals): Promise<void> {
     if (shutdownStarted) return;
     shutdownStarted = true;
+    metrics.shutdownsTotal += 1;
     console.log(`Received ${signal}; flushing world saves before shutdown.`);
+    logServerEvent('info', 'server_shutdown_started', { signal, sessions: sessions.size, sockets: wss.clients.size });
+    for (const ws of wss.clients) {
+        send(ws, { type: 'ERROR', code: 'SERVER_SHUTTING_DOWN', message: 'World server is shutting down.' });
+    }
     for (const ws of wss.clients) ws.close(1001, 'server shutting down');
     const flush = flushAllCharacterSaves('shutdown');
     await Promise.race([
@@ -890,6 +959,77 @@ function sleep(ms: number): Promise<void> {
 function resolveServerPersistPath(envPath: string | undefined, fallbackRelative: string): string {
     if (envPath) return isAbsolute(envPath) ? envPath : resolve(process.cwd(), envPath);
     return fileURLToPath(new URL(fallbackRelative, import.meta.url));
+}
+
+function formatMetrics(): string {
+    const uptimeSeconds = Math.max(0, (Date.now() - serverStartedAtMs) / 1000);
+    const lines = [
+        '# HELP darksaber_world_uptime_seconds World server process uptime in seconds.',
+        '# TYPE darksaber_world_uptime_seconds gauge',
+        `darksaber_world_uptime_seconds ${uptimeSeconds.toFixed(3)}`,
+        '# HELP darksaber_world_sessions Active in-memory world sessions.',
+        '# TYPE darksaber_world_sessions gauge',
+        `darksaber_world_sessions ${sessions.size}`,
+        '# HELP darksaber_world_active_players Active players across world sessions.',
+        '# TYPE darksaber_world_active_players gauge',
+        `darksaber_world_active_players ${countActivePlayers()}`,
+        '# HELP darksaber_world_websocket_clients Current WebSocket clients.',
+        '# TYPE darksaber_world_websocket_clients gauge',
+        `darksaber_world_websocket_clients ${wss.clients.size}`,
+        '# HELP darksaber_world_tick_duration_ms Last world tick duration in milliseconds.',
+        '# TYPE darksaber_world_tick_duration_ms gauge',
+        `darksaber_world_tick_duration_ms ${metrics.worldTickDurationMs}`,
+        '# HELP darksaber_world_ws_connections_total Total accepted WebSocket connection attempts.',
+        '# TYPE darksaber_world_ws_connections_total counter',
+        `darksaber_world_ws_connections_total ${metrics.wsConnectionsTotal}`,
+        '# HELP darksaber_world_malformed_messages_total Total malformed WebSocket messages rejected.',
+        '# TYPE darksaber_world_malformed_messages_total counter',
+        `darksaber_world_malformed_messages_total ${metrics.malformedMessagesTotal}`,
+        '# HELP darksaber_world_oversized_payloads_total Total oversized WebSocket payloads rejected.',
+        '# TYPE darksaber_world_oversized_payloads_total counter',
+        `darksaber_world_oversized_payloads_total ${metrics.oversizedPayloadsTotal}`,
+        '# HELP darksaber_world_rate_limited_sockets_total Total sockets closed by WebSocket rate limiting.',
+        '# TYPE darksaber_world_rate_limited_sockets_total counter',
+        `darksaber_world_rate_limited_sockets_total ${metrics.rateLimitedSocketsTotal}`,
+        '# HELP darksaber_world_auth_failures_total Total authentication failures.',
+        '# TYPE darksaber_world_auth_failures_total counter',
+        `darksaber_world_auth_failures_total ${metrics.authFailuresTotal}`,
+        '# HELP darksaber_world_resume_failures_total Total failed reconnect attempts.',
+        '# TYPE darksaber_world_resume_failures_total counter',
+        `darksaber_world_resume_failures_total ${metrics.resumeFailuresTotal}`,
+        '# HELP darksaber_world_action_rejected_total Total authoritative gameplay actions rejected.',
+        '# TYPE darksaber_world_action_rejected_total counter',
+        `darksaber_world_action_rejected_total ${metrics.actionRejectedTotal}`,
+        '# HELP darksaber_world_save_conflicts_total Total character save revision conflicts.',
+        '# TYPE darksaber_world_save_conflicts_total counter',
+        `darksaber_world_save_conflicts_total ${metrics.saveConflictsTotal}`,
+        '# HELP darksaber_world_save_failures_total Total character save flush failures.',
+        '# TYPE darksaber_world_save_failures_total counter',
+        `darksaber_world_save_failures_total ${metrics.saveFailuresTotal}`,
+        '# HELP darksaber_world_save_spool_failures_total Total pending save spool failures.',
+        '# TYPE darksaber_world_save_spool_failures_total counter',
+        `darksaber_world_save_spool_failures_total ${metrics.saveSpoolFailuresTotal}`,
+        '# HELP darksaber_world_rejected_joins_during_shutdown_total Total world joins rejected during shutdown.',
+        '# TYPE darksaber_world_rejected_joins_during_shutdown_total counter',
+        `darksaber_world_rejected_joins_during_shutdown_total ${metrics.rejectedJoinsDuringShutdownTotal}`,
+        '# HELP darksaber_world_shutdowns_total Total graceful shutdowns started.',
+        '# TYPE darksaber_world_shutdowns_total counter',
+        `darksaber_world_shutdowns_total ${metrics.shutdownsTotal}`,
+    ];
+    return `${lines.join('\n')}\n`;
+}
+
+function countActivePlayers(): number {
+    let count = 0;
+    for (const session of sessions.values()) count += session.getActivePlayerIds().length;
+    return count;
+}
+
+function logServerEvent(level: 'info' | 'warn' | 'error', event: string, fields: Record<string, unknown> = {}): void {
+    const payload = JSON.stringify({ level, event, time: new Date().toISOString(), ...fields });
+    if (level === 'error') console.error(payload);
+    else if (level === 'warn') console.warn(payload);
+    else console.log(payload);
 }
 
 function stableHash(value: string): number {

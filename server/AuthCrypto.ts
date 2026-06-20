@@ -25,6 +25,7 @@ interface JwtPayload {
 }
 
 const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
+const DEV_REFRESH_TOKEN_HASH_SECRET = 'darksaber-refresh-token-v1';
 
 export async function hashPassword(password: string): Promise<string> {
     return argon2.hash(password, {
@@ -48,7 +49,7 @@ export function createRefreshToken(): string {
 }
 
 export function hashRefreshToken(refreshToken: string): string {
-    return createHmac('sha256', 'darksaber-refresh-token-v1')
+    return createHmac('sha256', getRefreshTokenHashSecret())
         .update(refreshToken)
         .digest('base64url');
 }
@@ -109,6 +110,15 @@ function decodeBase64UrlJson(value: string): unknown {
 
 function signJwt(payload: string, secret: string): string {
     return createHmac('sha256', secret).update(payload).digest('base64url');
+}
+
+function getRefreshTokenHashSecret(): string {
+    const secret = process.env.AUTH_REFRESH_TOKEN_HASH_SECRET;
+    if (secret) return secret;
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('AUTH_REFRESH_TOKEN_HASH_SECRET is required when NODE_ENV=production.');
+    }
+    return DEV_REFRESH_TOKEN_HASH_SECRET;
 }
 
 function safeEqual(a: string, b: string): boolean {

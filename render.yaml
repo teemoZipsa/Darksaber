@@ -13,6 +13,8 @@ services:
         sync: false
       - key: AUTH_JWT_SECRET
         generateValue: true
+      - key: AUTH_REFRESH_TOKEN_HASH_SECRET
+        generateValue: true
       - key: AUTH_JWT_ISSUER
         value: darksaber-world
       - key: AUTH_JWT_AUDIENCE
