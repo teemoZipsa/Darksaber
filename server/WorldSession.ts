@@ -10,7 +10,6 @@ import {
     hasStatus,
     removeActionStanceStatusesFromCarrier,
     replaceActionStanceStatuses,
-    type StatusEffect,
 } from '../src/combat/StatusEffects';
 import { resolveSkillEffect, type SkillEffectEnemyInput, type SkillEffectResult } from '../src/combat/SkillEffectResolver';
 import { CombatFormulas } from '../src/combat/CombatFormulas';
@@ -74,7 +73,7 @@ import {
     FIELD_ATB_SCALE,
     ENEMY_LEASH_RANGE,
 } from '../src/field/FieldConfig';
-import { decideEnemyAction, type EnemyAIDecision, type EnemyAIUnit } from '../src/field/EnemyAI';
+import { decideEnemyAction, type EnemyAIDecision } from '../src/field/EnemyAI';
 import { advanceAtb } from '../src/field/FieldCombat';
 import {
     findPathToAny,
@@ -99,14 +98,11 @@ import { WorldMap } from '../src/map/WorldMap';
 import type { TownInfo } from '../src/map/BiomeMask';
 import {
     type ActorSnapshot,
-    type ActionRejectedMessage,
     type AutoLootGrantMessage,
     type CombatEventMessage,
-    type GridSnapshot,
     type InventoryConsumedMessage,
     type LootGrantMessage,
     type LootSnapshot,
-    type NetFacing,
     type RaidResultMessage,
     type ScenarioEnemyDefeatEventMessage,
     type ScenarioFieldEventResultMessage,
@@ -130,6 +126,25 @@ import {
     sanitizeStringArray,
     sanitizeTier,
 } from './WorldSessionInput';
+import {
+    chunkOffsetsByDistance,
+    cloneStats,
+    cloneStatuses,
+    createActorEvent,
+    createEnemyEvent,
+    createToken,
+    directionFromTo,
+    formationOffset,
+    gridToSnapshot,
+    hashInt,
+    nestStateKey,
+    reject,
+    scenarioFlagSnapshot,
+    storyScenarioGuardOffsets,
+    syncStatsMovementToClass,
+    toActorAIUnit,
+    toEnemyAIUnit,
+} from './WorldSessionHelpers';
 import type {
     CompleteEnemyKillResult,
     ServerActor,
@@ -158,6 +173,7 @@ const FIELD_NEST_SPAWN_SAFE_DISTANCE = ENEMY_AGGRO_RANGE;
 const FIELD_NEST_REFRESH_INTERVAL_MS = 1_000;
 
 export type { WorldCharacterSavePatch } from './WorldSessionSaveState';
+export { gridToSnapshot } from './WorldSessionHelpers';
 export type {
     WorldJoinContext,
     WorldSessionDebugCounts,
@@ -171,7 +187,6 @@ export class WorldResumeFailedError extends Error {
         super(message);
     }
 }
-
 export class WorldSession {
     public readonly sessionEpoch = Date.now();
     private readonly worldMap: WorldMap;
@@ -2306,177 +2321,4 @@ export class WorldSession {
         const tooFar = actor && lootObject && manhattan(actor.tile, { x: lootObject.x, y: lootObject.y }) > 2;
         return Boolean(tooFar || !actor || !lootObject);
     }
-}
-
-export function gridToSnapshot(grid: { width: number; height: number; items: Array<{ item: { id: string }; gridX: number; gridY: number; durability: number; quantity: number; acquiredInRaid?: boolean; sockets?: Array<{ id: string }> }> }): GridSnapshot {
-    return {
-        width: grid.width,
-        height: grid.height,
-        items: grid.items.map((placed) => ({
-            itemId: placed.item.id,
-            gridX: placed.gridX,
-            gridY: placed.gridY,
-            durability: placed.durability,
-            quantity: placed.quantity,
-            acquiredInRaid: placed.acquiredInRaid,
-            sockets: placed.sockets?.map((item) => item.id),
-        })),
-    };
-}
-
-function reject(intentId: string, reason: string): WorldSessionMessageResult {
-    return {
-        replies: [{ type: 'ACTION_REJECTED', intentId, reason } satisfies ActionRejectedMessage],
-        broadcasts: [],
-    };
-}
-
-function scenarioFlagSnapshot(flagsByDungeonId: Map<string, Set<string>>): Record<string, string[]> {
-    const snapshot: Record<string, string[]> = {};
-    for (const [dungeonId, flags] of flagsByDungeonId) {
-        snapshot[dungeonId] = [...flags].sort();
-    }
-    return snapshot;
-}
-
-function createActorEvent(
-    kind: string,
-    source: ServerActor,
-    target: ServerActor,
-    value?: number,
-    statusEffect?: StatusEffect
-): CombatEventMessage {
-    return {
-        type: 'COMBAT_EVENT',
-        kind,
-        sourceId: source.id,
-        targetId: target.id,
-        sourceName: source.name,
-        targetName: target.name,
-        value,
-        statusEffect,
-    };
-}
-
-function createEnemyEvent(
-    kind: string,
-    source: ServerActor,
-    target: Enemy,
-    value?: number,
-    statusEffect?: StatusEffect
-): CombatEventMessage {
-    return {
-        type: 'COMBAT_EVENT',
-        kind,
-        sourceId: source.id,
-        targetId: target.id,
-        sourceName: source.name,
-        targetName: target.name,
-        value,
-        statusEffect,
-    };
-}
-
-function cloneStats(stats: CharacterStats): CharacterStats {
-    return { ...stats };
-}
-
-function syncStatsMovementToClass(stats: CharacterStats, classLineId: string): CharacterStats {
-    const synced = cloneStats(stats);
-    const baseMovRange = getClassLine(classLineId)?.baseMovRange;
-    if (baseMovRange !== undefined) synced.mov = baseMovRange;
-    return synced;
-}
-
-function cloneStatuses(statuses: StatusEffect[] | undefined): StatusEffect[] {
-    return (statuses ?? []).map((status) => ({ ...status }));
-}
-
-function createToken(prefix: string): string {
-    return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
-}
-
-function formationOffset(index: number): TilePoint {
-    const offsets: TilePoint[] = [
-        { x: 0, y: 0 },
-        { x: 0, y: 1 },
-        { x: 1, y: 0 },
-    ];
-    return offsets[index % offsets.length] ?? { x: 0, y: 0 };
-}
-
-function nestStateKey(realm: ReturnType<WorldMap['getRealm']>, chunkX: number, chunkY: number): string {
-    return `${realm}:${chunkX}:${chunkY}`;
-}
-
-function chunkOffsetsByDistance(radiusChunks: number): { dx: number; dy: number }[] {
-    const offsets: { dx: number; dy: number }[] = [];
-    for (let dy = -radiusChunks; dy <= radiusChunks; dy++) {
-        for (let dx = -radiusChunks; dx <= radiusChunks; dx++) {
-            offsets.push({ dx, dy });
-        }
-    }
-    return offsets.sort((a, b) => {
-        const da = a.dx * a.dx + a.dy * a.dy;
-        const db = b.dx * b.dx + b.dy * b.dy;
-        if (da !== db) return da - db;
-        if (a.dy !== b.dy) return a.dy - b.dy;
-        return a.dx - b.dx;
-    });
-}
-
-function storyScenarioGuardOffsets(count: number, hasBoss: boolean): TilePoint[] {
-    const offsets: TilePoint[] = hasBoss
-        ? [
-            { x: 2, y: -1 }, { x: 2, y: 1 }, { x: 3, y: -2 }, { x: 3, y: 2 },
-            { x: 1, y: -2 }, { x: 1, y: 2 }, { x: 4, y: -2 }, { x: 4, y: 2 },
-            { x: 5, y: -1 }, { x: 5, y: 1 },
-        ]
-        : [
-            { x: 2, y: 0 }, { x: 3, y: -1 }, { x: 3, y: 1 }, { x: 4, y: 0 },
-            { x: 2, y: -2 }, { x: 2, y: 2 }, { x: 5, y: -1 }, { x: 5, y: 1 },
-            { x: 4, y: -2 }, { x: 4, y: 2 },
-        ];
-    return offsets.slice(0, Math.max(0, count));
-}
-
-function directionFromTo(from: TilePoint, to: TilePoint): NetFacing {
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? 'right' : 'left';
-    return dy >= 0 ? 'down' : 'up';
-}
-
-function toEnemyAIUnit(enemy: Enemy): EnemyAIUnit {
-    return {
-        id: enemy.id,
-        name: enemy.name,
-        tile: { x: enemy.gridX, y: enemy.gridY },
-        hp: enemy.stats.hp,
-        maxHp: enemy.stats.maxHp,
-        role: enemy.role,
-        isBoss: enemy.isBoss,
-        isAggro: enemy.isAggro,
-        statusKinds: enemy.statuses.map((status) => status.kind),
-    };
-}
-
-function toActorAIUnit(actor: ServerActor): EnemyAIUnit {
-    return {
-        id: actor.id,
-        name: actor.name,
-        tile: actor.tile,
-        hp: actor.stats.hp,
-        maxHp: actor.stats.maxHp,
-        role: 'bruiser',
-        statusKinds: actor.statuses.map((status) => status.kind),
-    };
-}
-
-function hashInt(value: number): number {
-    let h = value | 0;
-    h ^= h << 13;
-    h ^= h >> 17;
-    h ^= h << 5;
-    return h;
 }
