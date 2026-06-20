@@ -1037,6 +1037,14 @@ function verifyLateStoryOriginalMapContract(
     const expectedMrcSource = `MAP/${paddedEpisode}.mrc`;
     const expectedTranslatedMrcSource = `MAP/${paddedEpisode}t.mrc`;
     const expectedHmapSource = `MAP/${paddedEpisode}hmap.bmp`;
+    const expectedMapFiles = [
+        mrcFact.source,
+        mrcFact.translatedSource,
+        expectedHmapSource,
+        ...(fact.backgroundMapFile ? [fact.backgroundMapFile] : []),
+        fact.setArc,
+        ...fact.sideMapFiles,
+    ];
 
     if (scenario.dungeonId !== fact.dungeonId) {
         throw new Error(`Episode ${episode} late story dungeon mismatch: ${scenario.dungeonId} !== ${fact.dungeonId}`);
@@ -1086,6 +1094,10 @@ function verifyLateStoryOriginalMapContract(
     if (sequence.originalSources.sceneScript !== `Wlib/scene${episode}.lsc`) {
         throw new Error(`Episode ${episode} scene script mismatch: ${sequence.originalSources.sceneScript}`);
     }
+    if (sequence.originalSources.globalScript !== fact.globalScript) {
+        throw new Error(`Episode ${episode} global script mismatch: ${sequence.originalSources.globalScript} !== ${fact.globalScript}`);
+    }
+    requireJsonEqual(episode, 'late story map source declaration', sequence.originalSources.mapFiles, expectedMapFiles);
     requireJsonEqual(
         episode,
         'late story set.arc member declaration',
@@ -1097,7 +1109,7 @@ function verifyLateStoryOriginalMapContract(
             ...(fact.deeMember ? [fact.deeMember] : []),
         ]
     );
-    for (const sourceFile of [mrcFact.source, mrcFact.translatedSource, expectedHmapSource, fact.setArc]) {
+    for (const sourceFile of expectedMapFiles) {
         if (!declaredMapFiles.has(sourceFile)) {
             throw new Error(`Episode ${episode} late story source file not declared: ${sourceFile}`);
         }

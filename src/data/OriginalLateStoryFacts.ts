@@ -26,6 +26,8 @@ export interface OriginalLateStoryCacheEvent {
 export interface OriginalLateStoryFact {
     dungeonId: string;
     globalScript: string;
+    backgroundMapFile: string | null;
+    sideMapFiles: string[];
     setArc: string;
     aiMember: string;
     eventMember: string;

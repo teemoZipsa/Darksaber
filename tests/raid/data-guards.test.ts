@@ -647,14 +647,14 @@ test('late original story source ledgers cover exactly episodes 23 through 31', 
         assert.equal(mrcFact.translatedSource, `MAP/${paddedEpisode}t.mrc`, `episode ${episode} translated mrc`);
         assert.equal(sequence.originalSources.sceneScript, `Wlib/scene${episode}.lsc`, `episode ${episode} sequence script`);
         assert.equal(sequence.originalSources.globalScript, fact.globalScript, `episode ${episode} global script`);
-        for (const sourceFile of [
+        assert.deepEqual(sequence.originalSources.mapFiles, [
             mrcFact.source,
             mrcFact.translatedSource,
             `MAP/${paddedEpisode}hmap.bmp`,
+            ...(fact.backgroundMapFile ? [fact.backgroundMapFile] : []),
             fact.setArc,
-        ]) {
-            assert.equal(sequence.originalSources.mapFiles.includes(sourceFile), true, `episode ${episode} sequence source ${sourceFile}`);
-        }
+            ...fact.sideMapFiles,
+        ], `episode ${episode} sequence map files`);
     }
 });
 

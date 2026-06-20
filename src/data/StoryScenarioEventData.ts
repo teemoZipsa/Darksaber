@@ -207,8 +207,6 @@ function lateScenarioCacheEvent(
 
 function lateScenarioSequence(input: {
     episode: number;
-    hasBackground?: boolean;
-    sideMapFiles?: string[];
     dialogues?: Array<{ speakerId: string; speakerNameKey: string; textKey: string; focus?: TilePoint }>;
     bossDefeatDialogues?: Array<{ speakerId: string; speakerNameKey: string; textKey: string; focus?: TilePoint }>;
 }): StoryScenarioEventSequence {
@@ -268,9 +266,9 @@ function lateScenarioSequence(input: {
                 originalMrc.source,
                 originalMrc.translatedSource,
                 `MAP/${ep}hmap.bmp`,
-                ...(input.hasBackground ? [`MAP/${ep}bg.bmp`] : []),
+                ...(originalFact.backgroundMapFile ? [originalFact.backgroundMapFile] : []),
                 originalFact.setArc,
-                ...(input.sideMapFiles ?? []),
+                ...originalFact.sideMapFiles,
             ],
             setArcMembers: [
                 originalFact.aiMember,
@@ -2940,8 +2938,6 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     },
     lateScenarioSequence({
         episode: 23,
-        hasBackground: true,
-        sideMapFiles: ['MAP/2300.mrc', 'MAP/2300t.mrc', 'MAP/2300hmap.bmp'],
         dialogues: [
             { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep23.dialogue.01', focus: { x: 18, y: 15 } },
             { speakerId: 'beelzebuth', speakerNameKey: 'story.event.speaker.beelzebuth', textKey: 'story.event.ep23.dialogue.02', focus: { x: 21, y: 15 } },
@@ -2954,8 +2950,6 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     }),
     lateScenarioSequence({
         episode: 24,
-        hasBackground: true,
-        sideMapFiles: ['MAP/2400.mrc', 'MAP/2400t.mrc', 'MAP/2400hmap.bmp'],
         dialogues: [
             { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep24.dialogue.01', focus: { x: 19, y: 7 } },
         ],
@@ -2965,8 +2959,6 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     }),
     lateScenarioSequence({
         episode: 25,
-        hasBackground: true,
-        sideMapFiles: ['MAP/2500.mrc', 'MAP/2500t.mrc', 'MAP/2500hmap.bmp', 'MAP/2502.mrc', 'MAP/2502t.mrc', 'MAP/2510.mrc', 'MAP/2510t.mrc'],
         dialogues: [
             { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep25.dialogue.01', focus: { x: 19, y: 7 } },
             { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep25.dialogue.02', focus: { x: 19, y: 23 } },
@@ -2984,17 +2976,12 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     }),
     lateScenarioSequence({
         episode: 26,
-        hasBackground: true,
-        sideMapFiles: ['MAP/2600.mrc', 'MAP/2600t.mrc', 'MAP/2600hmap.bmp'],
     }),
     lateScenarioSequence({
         episode: 27,
-        sideMapFiles: ['MAP/2700.mrc', 'MAP/2700t.mrc', 'MAP/2700hmap.bmp'],
     }),
     lateScenarioSequence({
         episode: 28,
-        hasBackground: true,
-        sideMapFiles: ['MAP/2800.mrc', 'MAP/2800t.mrc', 'MAP/2800hmap.bmp'],
         dialogues: [
             { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep28.dialogue.01', focus: { x: 19, y: 7 } },
             { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep28.dialogue.02', focus: { x: 19, y: 7 } },
@@ -3025,8 +3012,6 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     }),
     lateScenarioSequence({
         episode: 29,
-        hasBackground: true,
-        sideMapFiles: ['MAP/2900.mrc', 'MAP/2900t.mrc', 'MAP/2900hmap.bmp'],
         dialogues: [
             { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep29.dialogue.01', focus: { x: 19, y: 7 } },
             { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep29.dialogue.02', focus: { x: 19, y: 7 } },
@@ -3054,8 +3039,6 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     }),
     lateScenarioSequence({
         episode: 30,
-        hasBackground: true,
-        sideMapFiles: ['MAP/3000.mrc', 'MAP/3000t.mrc', 'MAP/3000hmap.bmp', 'MAP/3010.mrc', 'MAP/3020.mrc', 'MAP/3030.mrc', 'MAP/3040.mrc', 'MAP/3050.mrc', 'MAP/3060.mrc', 'MAP/3070.mrc', 'MAP/3080.mrc', 'MAP/3090.mrc'],
         dialogues: [
             { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep30.dialogue.01', focus: { x: 19, y: 7 } },
             { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.dialogue.02', focus: { x: 19, y: 13 } },
@@ -3087,8 +3070,6 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     }),
     lateScenarioSequence({
         episode: 31,
-        hasBackground: true,
-        sideMapFiles: ['MAP/3100.mrc', 'MAP/3100t.mrc', 'MAP/3110.mrc', 'MAP/3120.mrc', 'MAP/3130.mrc', 'MAP/3140.mrc', 'MAP/3150.mrc', 'MAP/3160.mrc', 'MAP/3170.mrc', 'MAP/3180.mrc', 'MAP/3190.mrc'],
         dialogues: [
             { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep31.dialogue.01', focus: { x: 19, y: 7 } },
             { speakerId: 'demonFixer', speakerNameKey: 'story.event.speaker.demonFixer', textKey: 'story.event.ep31.dialogue.02', focus: { x: 19, y: 13 } },
