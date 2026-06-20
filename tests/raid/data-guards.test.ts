@@ -31,7 +31,7 @@ import { rollBossRune, rollChestGem } from '../../src/data/SocketLoot';
 import { getSkill } from '../../src/data/SkillDB';
 import { getSkillVisualProfile } from '../../src/data/SkillVisualProfiles';
 import { createBaseStats, getBaseStatsForClass } from '../../src/data/Stats';
-import { STORY_QUESTS, getStoryCompanionRewards, type StoryQuestReward } from '../../src/data/StoryQuestData';
+import { STORY_QUESTS, getStoryCompanionRewards, type StoryQuestDefinition, type StoryQuestReward } from '../../src/data/StoryQuestData';
 import { STORY_SCENARIOS, type StoryScenarioDefinition } from '../../src/data/StoryScenarioData';
 import { getStoryScenarioMonsterLayout } from '../../src/data/StoryScenarioMonsterData';
 import {
@@ -126,6 +126,24 @@ function storyScenarioContentSignature(scenario: StoryScenarioContentRecord | St
         guardLevel: scenario.guardLevel,
         guardCount: scenario.guardCount,
         missionKind: scenario.missionKind,
+        reward: scenario.reward,
+    };
+}
+
+function expectedStoryQuestSignature(scenario: StoryScenarioDefinition, index: number): StoryQuestDefinition {
+    const paddedEpisode = String(scenario.episode).padStart(2, '0');
+    return {
+        id: scenario.questId,
+        episode: scenario.episode,
+        titleKey: `story.ep${paddedEpisode}.title`,
+        summaryKey: `story.ep${paddedEpisode}.summary`,
+        objectiveKey: `story.ep${paddedEpisode}.objective`,
+        recommendedLevelKey: `story.ep${paddedEpisode}.recommendedLevel`,
+        enterLogKey: `story.ep${paddedEpisode}.enterDungeonLog`,
+        objectiveCompleteLogKey: `story.ep${paddedEpisode}.objectiveCompleteLog`,
+        dungeonId: scenario.dungeonId,
+        bgmKey: `bgm.story.episode${paddedEpisode}`,
+        prerequisiteQuestId: index > 0 ? STORY_SCENARIOS[index - 1].questId : undefined,
         reward: scenario.reward,
     };
 }
@@ -846,6 +864,13 @@ test('story episodes 1 through 31 are chained and fully localized', () => {
     }
     assert.ok(ko['story.ep01.sideObjective.cainNecklace']);
     assert.ok(en['story.ep01.sideObjective.cainNecklace']);
+});
+
+test('story quest definitions derive from runtime scenario definitions', () => {
+    assert.deepEqual(
+        STORY_QUESTS,
+        STORY_SCENARIOS.map(expectedStoryQuestSignature)
+    );
 });
 
 test('story scenario content ledger matches runtime scenario definitions', () => {
