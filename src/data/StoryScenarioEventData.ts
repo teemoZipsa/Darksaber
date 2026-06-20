@@ -41,6 +41,12 @@ export function getStoryScenarioTriggerMagicCodes(trigger: string): number[] {
     return [...trigger.matchAll(/\bMAGIC\s+0*(\d+)\b/g)].map((match) => Number(match[1]));
 }
 
+export function getStoryScenarioTriggerRandomChance(trigger: string): number | null {
+    const match = trigger.match(/\bRANDOM\s+0*(\d+)\b/);
+    if (!match) return null;
+    return Math.max(0, Math.min(100, Number(match[1])));
+}
+
 export function getStoryScenarioTriggerUseItemIds(trigger: string): number[] {
     return [...trigger.matchAll(/\bUSEITEM\s+0*(\d+)\b/g)].map((match) => Number(match[1]));
 }

@@ -87,6 +87,7 @@ function createStoryScenarioHarness(options: {
     worldMap?: WorldMap;
     isNetworkRaid?: boolean;
     networkClient?: { sendScenarioEnter(actorId: string, dungeonId: string): string; sendScenarioFieldEventInteract(actorId: string, dungeonId: string, eventId: string): string };
+    scenarioRandomRoll?: () => number;
 } = {}) {
     const player = options.player ?? new Player(0, 0);
     const raidSession = options.raidSession ?? new WorldRaidSession('central_castle');
@@ -146,6 +147,7 @@ function createStoryScenarioHarness(options: {
             scenarioItemIds.splice(index, 1);
             return true;
         },
+        rollScenarioRandom: () => options.scenarioRandomRoll?.() ?? 0,
         spawnDamage: (x, y, amount) => {
             trapDamageSpawns.push({ x, y, amount });
         },
@@ -1327,6 +1329,32 @@ test('local field scenario event presentation focuses the placed world event til
     assert.equal(playerData.gold, 500);
     assert.equal(raidSession.raidGoldReward, 100);
     assert.equal(raidSession.hasScenarioFlag(ARCADIA_PLAIN_DUNGEON_ID, 'arcadia_gold_chest_01'), true);
+});
+
+test('local RANDOM field event failure leaves the original event retryable', () => {
+    const sequence = getStoryScenarioEventSequence('oasis');
+    const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'oasis_gold_chest_01');
+    assert.ok(event);
+    assert.match(event.trigger, /RANDOM 50/);
+
+    let randomRoll = 0.99;
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    raidSession.startDungeonEncounter('oasis');
+    const harness = createStoryScenarioHarness({
+        raidSession,
+        scenarioRandomRoll: () => randomRoll,
+    });
+
+    assert.equal(harness.controller.playFieldEvent('oasis', event.id), false);
+    assert.equal(raidSession.hasScenarioFlag('oasis', 'oasis_gold_chest_01'), false);
+    assert.equal(raidSession.raidGoldReward, 0);
+    assert.equal(harness.logs.includes('아무 일도 일어나지 않았습니다.'), true);
+
+    randomRoll = 0;
+    assert.equal(harness.controller.playFieldEvent('oasis', event.id), true);
+    assert.equal(raidSession.hasScenarioFlag('oasis', 'oasis_gold_chest_01'), true);
+    assert.equal(raidSession.raidGoldReward, 500);
 });
 
 test('local Skeria shaman exchange requires and consumes the original yellow flower', () => {

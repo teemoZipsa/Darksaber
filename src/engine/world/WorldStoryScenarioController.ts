@@ -14,6 +14,7 @@ import {
     getStoryScenarioPresentationDurationMs,
     getStoryScenarioTrapMagicDamage,
     getStoryScenarioTriggerMagicCodes,
+    getStoryScenarioTriggerRandomChance,
     getStoryScenarioTriggerUseItemIds,
     type StoryScenarioEventSequence,
     type StoryScenarioEventStep,
@@ -84,6 +85,7 @@ export interface WorldStoryScenarioContext {
     autoPlaceRewardItem(itemId: string): boolean;
     hasScenarioItem(itemId: string): boolean;
     consumeScenarioItem(itemId: string): boolean;
+    rollScenarioRandom(): number;
     spawnDamage?(x: number, y: number, amount: number): void;
     log(message: string): void;
 }
@@ -201,6 +203,10 @@ export class WorldStoryScenarioController {
                 this.context.log(formatT('story.event.useItem.missing', { item: item.nameKr ?? item.name }));
                 return false;
             }
+        }
+        if (!this.rollFieldEventRandom(event)) {
+            this.context.log(t('story.event.random.none'));
+            return false;
         }
         this.completedFieldEventKeys.add(this.fieldEventKey(dungeonId, event.id));
         this.context.raidSession.setScenarioFlag(dungeonId, getStoryScenarioFieldEventFlag(event));
@@ -700,6 +706,13 @@ export class WorldStoryScenarioController {
         return getStoryScenarioTriggerUseItemIds(event.trigger)
             .map((originalItemId) => getItemDefByOriginalGetItemId(originalItemId))
             .filter((item): item is NonNullable<ReturnType<typeof getItemDef>> => Boolean(item));
+    }
+
+    private rollFieldEventRandom(event: StoryScenarioFieldEvent): boolean {
+        const chance = getStoryScenarioTriggerRandomChance(event.trigger);
+        if (chance === null || chance >= 100) return true;
+        if (chance <= 0) return false;
+        return this.context.rollScenarioRandom() * 100 < chance;
     }
 
     private getFieldEventDungeonId(): string | null {

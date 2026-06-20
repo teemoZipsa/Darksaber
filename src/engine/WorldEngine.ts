@@ -267,6 +267,7 @@ export class WorldEngine {
                 this.gameManager.inventory.remove(placed);
                 return true;
             },
+            rollScenarioRandom: () => Math.random(),
             spawnDamage: (x, y, amount) => this.floatingText.spawnDamage(x, y, amount, false, false),
             log: (message) => this.addCombatLog(message),
         });

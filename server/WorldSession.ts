@@ -36,6 +36,7 @@ import {
     getStoryScenarioEventSequence,
     getStoryScenarioTrapMagicDamage,
     getStoryScenarioTriggerMagicCodes,
+    getStoryScenarioTriggerRandomChance,
     getStoryScenarioTriggerUseItemIds,
     type StoryScenarioEnemyDefeatEvent,
     type StoryScenarioEventStep,
@@ -1054,6 +1055,9 @@ export class WorldSession {
         if (!this.canConsumeScenarioFieldEventUseItems(player!, event)) {
             return reject(message.intentId, 'Scenario field event requires a missing item.');
         }
+        if (!this.rollScenarioFieldEventRandom(event)) {
+            return reject(message.intentId, 'Scenario field event random condition failed.');
+        }
         if (!this.canApplyScenarioRewards(player!, event.rewards)) {
             return reject(message.intentId, 'Scenario field event reward storage is full.');
         }
@@ -1823,6 +1827,13 @@ export class WorldSession {
         return getStoryScenarioTriggerUseItemIds(event.trigger)
             .map((originalItemId) => getItemDefByOriginalGetItemId(originalItemId))
             .filter((item): item is ItemDef => Boolean(item));
+    }
+
+    private rollScenarioFieldEventRandom(event: StoryScenarioFieldEvent): boolean {
+        const chance = getStoryScenarioTriggerRandomChance(event.trigger);
+        if (chance === null || chance >= 100) return true;
+        if (chance <= 0) return false;
+        return Math.random() * 100 < chance;
     }
 
     private canConsumeScenarioFieldEventUseItems(player: ServerPlayer, event: StoryScenarioFieldEvent): boolean {

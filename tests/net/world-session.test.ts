@@ -1696,13 +1696,13 @@ test('server-authoritative original MAGIC field traps damage the actor once', ()
 
     const [eventTile] = getStoryScenarioFieldEventTiles(scenario.dungeonId, event, world);
     serverActor.tile = { x: eventTile.x, y: eventTile.y + 1 };
-    const result = session.handleMessage(joined.playerId, {
+    const result = withFixedRandom(0, () => session.handleMessage(joined.playerId, {
         type: 'SCENARIO_FIELD_EVENT_INTERACT',
         intentId: 'spring-pyramid-trap',
         actorId: serverActor.id,
         dungeonId: scenario.dungeonId,
         eventId: event.id,
-    }, 1_100);
+    }, 1_100));
 
     const fieldResult = result.replies.find((message) => message.type === 'SCENARIO_FIELD_EVENT_RESULT');
     assert.equal(fieldResult?.type, 'SCENARIO_FIELD_EVENT_RESULT');
@@ -1724,6 +1724,70 @@ test('server-authoritative original MAGIC field traps damage the actor once', ()
     }, 1_200);
     assert.equal(duplicate.replies[0]?.type, 'ACTION_REJECTED');
     assert.equal(serverActor.stats.hp, 84);
+});
+
+test('server-authoritative RANDOM field events reject without completing until the roll succeeds', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const completedQuestIds = STORY_SCENARIOS
+        .filter((scenario) => scenario.episode < 11)
+        .map((scenario) => scenario.questId);
+    const character = authCharacter('server-random-field');
+    const save = createDefaultCharacterSave(character);
+    save.questState = { ...save.questState, completedQuestIds };
+    const joined = session.join({
+        ...joinMessage('central_castle', character.id),
+        completedQuestIds,
+    }, 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        completedQuestIds,
+        saveSnapshot: save,
+    });
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === 'oasis');
+    const sequence = getStoryScenarioEventSequence('oasis');
+    const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'oasis_gold_chest_01');
+    assert.ok(serverActor);
+    assert.ok(dungeon);
+    assert.ok(event);
+    assert.match(event.trigger, /RANDOM 50/);
+    serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+    session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-oasis-random',
+        actorId: serverActor.id,
+        dungeonId: 'oasis',
+    }, 1_000);
+
+    const [eventTile] = getStoryScenarioFieldEventTiles('oasis', event, world);
+    serverActor.tile = { x: eventTile.x, y: eventTile.y + 1 };
+    const failed = withFixedRandom(0.99, () => session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'open-oasis-random-fail',
+        actorId: serverActor.id,
+        dungeonId: 'oasis',
+        eventId: event.id,
+    }, 1_100));
+    assert.equal(failed.replies[0]?.type, 'ACTION_REJECTED');
+    assert.match(failed.replies[0]?.type === 'ACTION_REJECTED' ? failed.replies[0].reason : '', /random condition failed/);
+    assert.equal(session.createSnapshot(joined.playerId, 1_100).scenario.playerFieldEventFlagsByDungeonId?.oasis, undefined);
+    assert.equal((internals.players.get(joined.playerId)?.raidGoldReward ?? 0), 0);
+
+    const succeeded = withFixedRandom(0, () => session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'open-oasis-random-success',
+        actorId: serverActor.id,
+        dungeonId: 'oasis',
+        eventId: event.id,
+    }, 1_200));
+    const fieldResult = succeeded.replies.find((message) => message.type === 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.equal(fieldResult?.type, 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.deepEqual(fieldResult?.type === 'SCENARIO_FIELD_EVENT_RESULT' ? fieldResult.rewards : [], [{ type: 'gold', amount: 500 }]);
+    assert.deepEqual(session.createSnapshot(joined.playerId, 1_200).scenario.playerFieldEventFlagsByDungeonId?.oasis, ['oasis_gold_chest_01']);
+    assert.equal((internals.players.get(joined.playerId)?.raidGoldReward ?? 0), 500);
 });
 
 test('server-authoritative SCENECLEAR field events complete scenario objectives', () => {
@@ -2033,13 +2097,13 @@ test('server-authoritative USEITEM scenario field events require and consume the
 
     const [flowerTile] = getStoryScenarioFieldEventTiles('skeria_2', flowerEvent, world);
     serverActor.tile = { x: flowerTile.x, y: flowerTile.y + 1 };
-    const flower = session.handleMessage(joined.playerId, {
+    const flower = withFixedRandom(0, () => session.handleMessage(joined.playerId, {
         type: 'SCENARIO_FIELD_EVENT_INTERACT',
         intentId: 'skeria-yellow-flower',
         actorId: serverActor.id,
         dungeonId: 'skeria_2',
         eventId: flowerEvent.id,
-    }, 1_200);
+    }, 1_200));
     const flowerResult = flower.replies.find((message) => message.type === 'SCENARIO_FIELD_EVENT_RESULT');
     assert.equal(flowerResult?.type, 'SCENARIO_FIELD_EVENT_RESULT');
     assert.deepEqual(flowerResult?.type === 'SCENARIO_FIELD_EVENT_RESULT' ? flowerResult.rewards : [], [{
