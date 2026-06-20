@@ -738,17 +738,40 @@ function verifyStoryScenarioContentLedger(episode: number, scenario: StoryScenar
     if (!row) throw new Error(`Missing src/data/content/story-scenarios.json row for episode ${episode}`);
     if (episode >= 23 && episode <= 31) {
         const fact = getOriginalLateStoryFact(episode);
-        if (row.dungeonId !== fact.dungeonId) {
-            throw new Error(`Episode ${episode} story scenario content dungeon id mismatch with original facts`);
-        }
-        if (row.guardCount !== fact.guardAreas.length) {
-            throw new Error(`Episode ${episode} story scenario content guard count mismatch with original facts`);
-        }
-        if (row.missionKind !== 'soloInterior') {
-            throw new Error(`Episode ${episode} story scenario content mission kind mismatch with original facts`);
-        }
-        if (JSON.stringify(row.reward) !== JSON.stringify({ type: 'none' })) {
-            throw new Error(`Episode ${episode} story scenario content reward should be none`);
+        const expectedLateStoryContent = {
+            questId: fact.questId,
+            dungeonId: fact.dungeonId,
+            dungeonNameKr: fact.dungeonNameKr,
+            dungeonNameEn: fact.dungeonNameEn,
+            chunkX: fact.worldChunk.x,
+            chunkY: fact.worldChunk.y,
+            sprite: fact.worldSprite,
+            bossName: fact.bossName,
+            bossLevel: fact.bossLevel,
+            bossColor: fact.bossColor,
+            guardLevel: fact.guardLevel,
+            guardCount: fact.guardAreas.length,
+            missionKind: 'soloInterior',
+            reward: { type: 'none' },
+        };
+        const actualLateStoryContent = {
+            questId: row.questId,
+            dungeonId: row.dungeonId,
+            dungeonNameKr: row.dungeonNameKr,
+            dungeonNameEn: row.dungeonNameEn,
+            chunkX: row.chunkX,
+            chunkY: row.chunkY,
+            sprite: row.sprite,
+            bossName: row.bossName,
+            bossLevel: row.bossLevel,
+            bossColor: row.bossColor,
+            guardLevel: row.guardLevel,
+            guardCount: row.guardCount,
+            missionKind: row.missionKind,
+            reward: row.reward,
+        };
+        if (JSON.stringify(actualLateStoryContent) !== JSON.stringify(expectedLateStoryContent)) {
+            throw new Error(`Episode ${episode} story scenario content metadata mismatch with original facts`);
         }
     }
     if (JSON.stringify(scenarioSignature(row)) !== JSON.stringify(scenarioSignature(scenario))) {

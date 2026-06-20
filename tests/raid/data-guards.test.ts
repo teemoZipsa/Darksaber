@@ -60,6 +60,15 @@ type StoryScenarioContentRecord = {
     episode: number;
     questId: string;
     dungeonId: string;
+    dungeonNameKr: string;
+    dungeonNameEn: string;
+    chunkX: number;
+    chunkY: number;
+    sprite: string;
+    bossName: string | null;
+    bossLevel: number;
+    bossColor: string;
+    guardLevel: number;
     guardCount: number;
     missionKind: string;
     reward: StoryQuestReward;
@@ -68,10 +77,37 @@ type StoryScenarioContentRecord = {
 function assertLateScenarioContentMatchesOriginalFacts(record: StoryScenarioContentRecord): void {
     if (record.episode < 23 || record.episode > 31) return;
     const fact = getOriginalLateStoryFact(record.episode);
-    assert.equal(record.dungeonId, fact.dungeonId, `episode ${record.episode} content dungeon id`);
-    assert.equal(record.guardCount, fact.guardAreas.length, `episode ${record.episode} content guard count`);
-    assert.equal(record.missionKind, 'soloInterior', `episode ${record.episode} content mission kind`);
-    assert.deepEqual(record.reward, { type: 'none' }, `episode ${record.episode} content reward`);
+    assert.deepEqual({
+        questId: record.questId,
+        dungeonId: record.dungeonId,
+        dungeonNameKr: record.dungeonNameKr,
+        dungeonNameEn: record.dungeonNameEn,
+        chunkX: record.chunkX,
+        chunkY: record.chunkY,
+        sprite: record.sprite,
+        bossName: record.bossName,
+        bossLevel: record.bossLevel,
+        bossColor: record.bossColor,
+        guardLevel: record.guardLevel,
+        guardCount: record.guardCount,
+        missionKind: record.missionKind,
+        reward: record.reward,
+    }, {
+        questId: fact.questId,
+        dungeonId: fact.dungeonId,
+        dungeonNameKr: fact.dungeonNameKr,
+        dungeonNameEn: fact.dungeonNameEn,
+        chunkX: fact.worldChunk.x,
+        chunkY: fact.worldChunk.y,
+        sprite: fact.worldSprite,
+        bossName: fact.bossName,
+        bossLevel: fact.bossLevel,
+        bossColor: fact.bossColor,
+        guardLevel: fact.guardLevel,
+        guardCount: fact.guardAreas.length,
+        missionKind: 'soloInterior',
+        reward: { type: 'none' },
+    }, `episode ${record.episode} content metadata`);
 }
 
 function assertStoryRewardData(reward: StoryQuestReward, context: string, ko: Record<string, string>, en: Record<string, string>): void {
