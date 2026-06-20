@@ -658,7 +658,7 @@ export const i18n = {
             'story.event.ep05.dialogue.05': '여기에는 철이 무한정 매장된 곳이지. |전쟁을 할 무기를 여기서 만들고 있는 것이다. |이 애송이 녀석아, 이제는 좀 알겠느냐?',
             'story.event.ep05.dialogue.06': '지금 항복을 하면 목숨만은 살려주도록 하지.. | 충분한 보수도 주겠다.. 어떠냐..',
             'story.event.ep05.dialogue.07': '용사가 칼을 뽑아든 이상 항복이란 것은 있을| 수 없는 것. 소문처럼 실력이 대단한지 솜씨나| 보자.',
-            'story.event.ep05.combatStart': '승리조건 : 미노타우로스의 처치',
+            'story.event.ep05.combatStart': '승리조건 : 미노타우르스의 처치',
             'story.event.ep05.objective': '시나리오 클리어',
             'story.event.ep05.chest.marker': '상자',
             'story.event.ep05.chest.opened': '%s가(이) 상자를 열었습니다.',

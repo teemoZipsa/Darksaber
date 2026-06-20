@@ -1579,6 +1579,15 @@ function verifyStoryI18nKeys(episode: number, scenario: StoryScenarioDefinition,
         if (!ko[key]) throw new Error(`Missing ko i18n key ${key}: ${context}`);
         if (!en[key]) throw new Error(`Missing en i18n key ${key}: ${context}`);
     }
+    const combatStart = sequence.entry.find(
+        (step): step is Extract<StoryScenarioEventStep, { kind: 'combatStart' }> => step.kind === 'combatStart'
+    );
+    if (scenario.bossName && combatStart) {
+        const bossNameEn = STORY_BOSS_NAME_EN_BY_EPISODE[episode];
+        if (!bossNameEn) throw new Error(`Episode ${episode} missing English combat objective boss name contract`);
+        requireStoryTextIncludes(episode, 'ko combat start', ko[combatStart.labelKey], scenario.bossName);
+        requireStoryTextIncludes(episode, 'en combat start', en[combatStart.labelKey], bossNameEn);
+    }
 }
 
 function requireUniqueCompletionFlag(flags: Map<string, string>, flag: string, context: string): void {
