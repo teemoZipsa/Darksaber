@@ -30,7 +30,7 @@ import {
     type MonsterId,
 } from '../src/data/MonsterCatalog';
 import { getStoryQuestByDungeonId } from '../src/data/StoryQuestData';
-import { getStoryScenarioByDungeonId, type StoryScenarioDefinition, type StoryScenarioMissionKind } from '../src/data/StoryScenarioData';
+import { getStoryScenarioByDungeonId, type StoryScenarioDefinition } from '../src/data/StoryScenarioData';
 import { getStoryScenarioMonsterLayout } from '../src/data/StoryScenarioMonsterData';
 import {
     getStoryScenarioEventSequence,
@@ -97,7 +97,6 @@ import {
 } from '../src/field/TerrainRules';
 import { WorldMap } from '../src/map/WorldMap';
 import type { TownInfo } from '../src/map/BiomeMask';
-import type { WorldRealm } from '../src/map/BiomeMask';
 import {
     type ActorSnapshot,
     type ActionRejectedMessage,
@@ -119,7 +118,6 @@ import {
     type WorldSnapshot,
     type WorldWelcomeMessage,
 } from '../src/net/WorldProtocol';
-import type { CharacterSave } from './AuthStore';
 import { WorldSessionLootState, type WorldSessionLootLock } from './WorldSessionLootState';
 import { cloneCharacterSave, WorldSessionSaveState, type WorldCharacterSavePatch } from './WorldSessionSaveState';
 import { WorldSessionEnemyState } from './WorldSessionEnemyState';
@@ -132,6 +130,18 @@ import {
     sanitizeStringArray,
     sanitizeTier,
 } from './WorldSessionInput';
+import type {
+    CompleteEnemyKillResult,
+    ServerActor,
+    ServerEnemy,
+    ServerPlayer,
+    ServerScenarioState,
+    WorldJoinContext,
+    WorldSessionDebugCounts,
+    WorldSessionMessageResult,
+    WorldSessionOptions,
+    WorldSessionTickResult,
+} from './WorldSessionTypes';
 
 export const WORLD_TICK_MS = 100;
 export const DISCONNECT_GRACE_MS = 30_000;
@@ -147,108 +157,14 @@ const FIELD_NEST_NEARBY_ENEMY_DISTANCE = 24;
 const FIELD_NEST_SPAWN_SAFE_DISTANCE = ENEMY_AGGRO_RANGE;
 const FIELD_NEST_REFRESH_INTERVAL_MS = 1_000;
 
-interface ServerActor {
-    id: string;
-    ownerPlayerId: string;
-    localActorId: string;
-    name: string;
-    classLineId: string;
-    currentTier: number;
-    level: number;
-    tile: TilePoint;
-    stats: CharacterStats;
-    statuses: StatusEffect[];
-    actionGauge: number;
-    remainingAp: number;
-    majorActionUsed: boolean;
-    facing: NetFacing;
-    isDead: boolean;
-    magicLoadout: string[];
-    skillUpgradeLevels: Record<string, number>;
-}
-
-interface ServerPlayer {
-    id: string;
-    accountId?: string;
-    characterId?: string;
-    resumeToken: string;
-    originHubId: string;
-    departureTownId: string;
-    elapsedSeconds: number;
-    kills: number;
-    carriedWeight: number;
-    carriedItems: Map<string, number>;
-    raidGoldReward: number;
-    completedQuestIds: Set<string>;
-    enteredDungeonIds: Set<string>;
-    completedDungeonIds: Set<string>;
-    fieldEventFlagsByDungeonId: Map<string, Set<string>>;
-    activeDungeonId: string | null;
-    active: boolean;
-    ghost: boolean;
-    disconnectedAt: number | null;
-    actorIds: string[];
-    saveSnapshot?: CharacterSave;
-}
-
-interface ServerEnemy {
-    enemy: Enemy;
-    monsterId?: MonsterId;
-    nestKey?: string;
-    scenarioPlayerId?: string;
-    scenarioDungeonId?: string;
-    scenarioObjective?: boolean;
-    home: TilePoint;
-    wanderSeed: number;
-}
-
-interface ServerScenarioState {
-    playerId: string;
-    dungeonId: string;
-    missionKind: StoryScenarioMissionKind;
-    returnTile: TilePoint | null;
-    enemyIds: string[];
-    objectiveEnemyId: string | null;
-    completed: boolean;
-}
-
-interface CompleteEnemyKillResult {
-    autoLootGrant?: AutoLootGrantMessage;
-    scenarioEnemyDefeatEvent?: ScenarioEnemyDefeatEventMessage;
-}
-
-export interface WorldSessionTickResult {
-    events: CombatEventMessage[];
-    perPlayerMessages: Array<{ playerId: string; message: WorldServerMessage }>;
-}
-
-export interface WorldSessionMessageResult {
-    replies: WorldServerMessage[];
-    broadcasts: WorldServerMessage[];
-}
-
-export interface WorldSessionDebugCounts {
-    activePlayers: number;
-    ghostPlayers: number;
-    enemies: number;
-    lootLocks: number;
-}
-
-export interface WorldSessionOptions {
-    realm?: WorldRealm;
-    ghostGraceMs?: number;
-    logger?: (message: string) => void;
-}
-
-export interface WorldJoinContext {
-    accountId?: string;
-    characterId?: string;
-    completedQuestIds?: string[];
-    shardId?: string;
-    saveSnapshot?: CharacterSave;
-}
-
 export type { WorldCharacterSavePatch } from './WorldSessionSaveState';
+export type {
+    WorldJoinContext,
+    WorldSessionDebugCounts,
+    WorldSessionMessageResult,
+    WorldSessionOptions,
+    WorldSessionTickResult,
+} from './WorldSessionTypes';
 
 export class WorldResumeFailedError extends Error {
     public constructor(message = 'Resume token is expired or unknown.') {
