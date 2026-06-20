@@ -1590,6 +1590,14 @@ function verifyStoryI18nKeys(episode: number, scenario: StoryScenarioDefinition,
         requireStoryTextIncludes(episode, 'ko combat start', ko[combatStart.labelKey], scenario.bossName);
         requireStoryTextIncludes(episode, 'en combat start', en[combatStart.labelKey], bossNameEn);
     }
+    if (scenario.bossName && scenario.missionKind === 'soloInterior') {
+        const layout = getStoryInteriorLayout(scenario.dungeonId);
+        if (!layout) throw new Error(`Episode ${episode} ${scenario.dungeonId} missing story interior layout`);
+        const bossNameEn = STORY_BOSS_NAME_EN_BY_EPISODE[episode];
+        if (!bossNameEn) throw new Error(`Episode ${episode} missing English interior objective boss name contract`);
+        requireStoryTextIncludes(episode, 'ko interior objective', ko[layout.objectiveKey], scenario.bossName);
+        requireStoryTextIncludes(episode, 'en interior objective', en[layout.objectiveKey], bossNameEn);
+    }
 }
 
 function requireUniqueCompletionFlag(flags: Map<string, string>, flag: string, context: string): void {
