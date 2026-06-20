@@ -9,6 +9,7 @@ import {
 } from './MonsterCatalog';
 import type { StoryScenarioDefinition } from './StoryScenarioData';
 import type { TilePoint } from '../field/FieldPathing';
+import { getOriginalLateStoryFact } from './OriginalLateStoryFacts';
 
 export interface StoryScenarioMonsterLayout {
     bossMonsterId?: MonsterId;
@@ -19,6 +20,14 @@ export interface StoryScenarioMonsterLayout {
 
 function repeatGuardRoster(ids: readonly MonsterId[], count: number): MonsterId[] {
     return Array.from({ length: count }, (_, index) => ids[index % ids.length]);
+}
+
+function getOriginalLateStoryDungeonId(episode: number): string {
+    return getOriginalLateStoryFact(episode).dungeonId;
+}
+
+function repeatOriginalLateStoryGuardRoster(episode: number, ids: readonly MonsterId[]): MonsterId[] {
+    return repeatGuardRoster(ids, getOriginalLateStoryFact(episode).guardAreas.length);
 }
 
 export const STORY_SCENARIO_MONSTER_LAYOUTS = {
@@ -63,15 +72,15 @@ export const STORY_SCENARIO_MONSTER_LAYOUTS = {
     ament_2f: { bossMonsterId: '638R', guardMonsterIds: ['636R', '638R', '639R'] },
     nergal_castle: { bossMonsterId: '733R', guardMonsterIds: ['729R', '730R', '731R', '732R'] },
     flame_castle: { bossMonsterId: '730R', guardMonsterIds: ['215R', '224R', '225R', '307R'] },
-    beelzebuth_hall: { bossMonsterId: '731R', guardMonsterIds: repeatGuardRoster(['729R', '730R', '732R', '733R'], 23) },
-    astaroth_gate: { bossMonsterId: '732R', guardMonsterIds: repeatGuardRoster(['729R', '730R', '731R', '733R'], 16) },
-    nergal_depths: { bossMonsterId: '733R', guardMonsterIds: repeatGuardRoster(['729R', '730R', '731R', '732R'], 29) },
-    beast_mark_shrine: { bossMonsterId: '730R', guardMonsterIds: repeatGuardRoster(['729R', '731R', '732R'], 12) },
-    chosen_mark_shrine: { bossMonsterId: '731R', guardMonsterIds: repeatGuardRoster(['729R', '730R', '732R'], 12) },
-    ergion_keep: { bossMonsterId: '748R', guardMonsterIds: repeatGuardRoster(['729R', '730R', '750R'], 17) },
-    martani_bastion: { bossMonsterId: '749R', guardMonsterIds: repeatGuardRoster(['729R', '731R', '750R'], 13) },
-    blin_watch: { bossMonsterId: '750R', guardMonsterIds: repeatGuardRoster(['729R', '731R', '749R'], 15) },
-    demon_fixers_den: { bossMonsterId: '751R', guardMonsterIds: repeatGuardRoster(['729R', '750R', '752R'], 14) },
+    [getOriginalLateStoryDungeonId(23)]: { bossMonsterId: '731R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(23, ['729R', '730R', '732R', '733R']) },
+    [getOriginalLateStoryDungeonId(24)]: { bossMonsterId: '732R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(24, ['729R', '730R', '731R', '733R']) },
+    [getOriginalLateStoryDungeonId(25)]: { bossMonsterId: '733R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(25, ['729R', '730R', '731R', '732R']) },
+    [getOriginalLateStoryDungeonId(26)]: { bossMonsterId: '730R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(26, ['729R', '731R', '732R']) },
+    [getOriginalLateStoryDungeonId(27)]: { bossMonsterId: '731R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(27, ['729R', '730R', '732R']) },
+    [getOriginalLateStoryDungeonId(28)]: { bossMonsterId: '748R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(28, ['729R', '730R', '750R']) },
+    [getOriginalLateStoryDungeonId(29)]: { bossMonsterId: '749R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(29, ['729R', '731R', '750R']) },
+    [getOriginalLateStoryDungeonId(30)]: { bossMonsterId: '750R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(30, ['729R', '731R', '749R']) },
+    [getOriginalLateStoryDungeonId(31)]: { bossMonsterId: '751R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(31, ['729R', '750R', '752R']) },
 } satisfies Record<string, StoryScenarioMonsterLayout>;
 
 export function getStoryScenarioMonsterLayout(scenario: StoryScenarioDefinition): StoryScenarioMonsterLayout {
