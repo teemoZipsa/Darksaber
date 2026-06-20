@@ -156,6 +156,30 @@ test('server town leave only survives at a non-departure town', () => {
     }
 });
 
+test('server shutdown finishes active raids as left and captures a final save patch', () => {
+    const session = new WorldSession();
+    const character = authCharacter('hero-shutdown');
+    const joined = session.join(joinMessage('central_castle', character.id), 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        saveSnapshot: createDefaultCharacterSave(character),
+    });
+
+    const result = session.finishActivePlayersForShutdown(1_000);
+    assert.equal(result.events.length, 0);
+    assert.equal(result.perPlayerMessages.length, 1);
+    assert.equal(result.perPlayerMessages[0]?.playerId, joined.playerId);
+    const message = result.perPlayerMessages[0]?.message;
+    assert.equal(message?.type, 'RAID_RESULT');
+    if (message?.type === 'RAID_RESULT') {
+        assert.equal(message.result, 'LEFT');
+        assert.equal(message.extractionTownId, 'central_castle');
+    }
+    assert.deepEqual(session.getActivePlayerIds(), []);
+    assert.ok(session.hasFinalCharacterSavePatch(joined.playerId));
+    assert.ok(session.createCharacterSavePatch(joined.playerId));
+});
+
 test('default character saves start with the shared no-shield basic kit', () => {
     const save = createDefaultCharacterSave(authCharacter('starter'));
     const equipment = save.equipment as Record<string, { itemId?: string }>;

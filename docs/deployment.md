@@ -118,6 +118,13 @@ written to the database and is accepted before or after `WORLD_JOIN`. WebSocket
 close/reconnect clears and recreates the client timer so duplicate heartbeats do
 not accumulate.
 
+During graceful shutdown, the world server rejects new joins, converts active
+raids to `LEFT`, emits a final `RAID_RESULT`, and flushes the resulting
+character save patches before closing sockets. This prevents deploy shutdowns
+from silently dropping dirty character state, but it is not full live-raid
+snapshot restore; crash recovery and horizontal scale still require persistent
+raid-instance state.
+
 ## Vercel Client
 
 Import this repository in Vercel and set:

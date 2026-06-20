@@ -134,6 +134,7 @@ const metrics = {
     saveFailuresTotal: 0,
     saveSpoolFailuresTotal: 0,
     rejectedJoinsDuringShutdownTotal: 0,
+    shutdownForcedRaidResultsTotal: 0,
     shutdownsTotal: 0,
     worldTickDurationMs: 0,
 };
@@ -758,9 +759,8 @@ async function shutdownWorldServer(signal: NodeJS.Signals): Promise<void> {
     metrics.shutdownsTotal += 1;
     console.log(`Received ${signal}; flushing world saves before shutdown.`);
     logServerEvent('info', 'server_shutdown_started', { signal, sessions: sessions.size, sockets: wss.clients.size });
-    for (const ws of wss.clients) {
-        send(ws, { type: 'ERROR', code: 'SERVER_SHUTTING_DOWN', message: 'World server is shutting down.' });
-    }
+    finishActiveRaidsForShutdown();
+    for (const ws of wss.clients) send(ws, { type: 'ERROR', code: 'SERVER_SHUTTING_DOWN', message: 'World server is shutting down.' });
     for (const ws of wss.clients) ws.close(1001, 'server shutting down');
     const flush = flushAllCharacterSaves('shutdown');
     await Promise.race([
@@ -771,6 +771,20 @@ async function shutdownWorldServer(signal: NodeJS.Signals): Promise<void> {
     ]);
     await closeServers();
     process.exit(0);
+}
+
+function finishActiveRaidsForShutdown(): void {
+    for (const [sessionKey, session] of sessions) {
+        const result = session.finishActivePlayersForShutdown(Date.now());
+        for (const entry of result.perPlayerMessages) {
+            metrics.shutdownForcedRaidResultsTotal += 1;
+            const ws = socketByPlayer.get(socketPlayerKey(sessionKey, entry.playerId));
+            if (ws) send(ws, entry.message);
+            const binding = findBinding(sessionKey, entry.playerId);
+            if (binding) persistRaidResult(binding, entry.message);
+        }
+        consumeSessionSaveDirtyPlayers(sessionKey, session);
+    }
 }
 
 async function flushAllCharacterSaves(reason: string): Promise<void> {
@@ -1012,6 +1026,9 @@ function formatMetrics(): string {
         '# HELP darksaber_world_rejected_joins_during_shutdown_total Total world joins rejected during shutdown.',
         '# TYPE darksaber_world_rejected_joins_during_shutdown_total counter',
         `darksaber_world_rejected_joins_during_shutdown_total ${metrics.rejectedJoinsDuringShutdownTotal}`,
+        '# HELP darksaber_world_shutdown_forced_raid_results_total Total active raids converted to LEFT during shutdown.',
+        '# TYPE darksaber_world_shutdown_forced_raid_results_total counter',
+        `darksaber_world_shutdown_forced_raid_results_total ${metrics.shutdownForcedRaidResultsTotal}`,
         '# HELP darksaber_world_shutdowns_total Total graceful shutdowns started.',
         '# TYPE darksaber_world_shutdowns_total counter',
         `darksaber_world_shutdowns_total ${metrics.shutdownsTotal}`,

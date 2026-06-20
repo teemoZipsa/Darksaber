@@ -423,6 +423,16 @@ export class WorldSession {
         this.log(`ghost start player=${playerId} graceMs=${this.ghostGraceMs}`);
     }
 
+    public finishActivePlayersForShutdown(now: number = Date.now()): WorldSessionTickResult {
+        const perPlayerMessages: Array<{ playerId: string; message: WorldServerMessage }> = [];
+        for (const playerId of this.getActivePlayerIds()) {
+            this.log(`leave player=${playerId} reason=server_shutdown`);
+            perPlayerMessages.push({ playerId, message: this.finishPlayer(playerId, 'LEFT') });
+        }
+        this.lastTickAt = now;
+        return { events: [], perPlayerMessages };
+    }
+
     public handleMessage(playerId: string, message: WorldClientMessage, now: number = Date.now()): WorldSessionMessageResult {
         switch (message.type) {
             case 'PLAYER_INTENT':
