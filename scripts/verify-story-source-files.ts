@@ -224,6 +224,10 @@ function triggerGetGeneralIds(trigger: string): number[] {
     return [...trigger.matchAll(/\bGETGENERAL\s+0*(\d+)\b/g)].map((match) => Number(match[1]));
 }
 
+function triggerItemConditionIds(trigger: string): number[] {
+    return [...trigger.matchAll(/\bITEM\s+0*(\d+)\b/g)].map((match) => Number(match[1]));
+}
+
 function collectStoryRewardOriginalItemIds(reward: StoryQuestRewardData): number[] {
     if (reward.type === 'none' || reward.type === 'companion') return [];
     if (reward.type === 'bundle') return reward.rewards.flatMap(collectStoryRewardOriginalItemIds);
@@ -234,6 +238,26 @@ function collectStoryRewardOriginalGeneralIds(reward: StoryQuestRewardData): num
     if (reward.type === 'none' || reward.type === 'questItem' || reward.type === 'inventoryItem') return [];
     if (reward.type === 'bundle') return reward.rewards.flatMap(collectStoryRewardOriginalGeneralIds);
     return reward.originalGeneralId !== undefined && reward.originalGeneralId > 0 ? [reward.originalGeneralId] : [];
+}
+
+function collectScenarioEventRewardOriginalItemIds(sequence: StoryScenarioEventSequence): number[] {
+    return [
+        ...sequence.fieldEvents,
+        ...(sequence.bossDefeatEvent ? [sequence.bossDefeatEvent] : []),
+    ].flatMap((event) => (event.rewards ?? [])
+        .map((reward) => reward.type === 'item' ? reward.originalItemId : undefined)
+        .filter((originalItemId): originalItemId is number => originalItemId !== undefined && originalItemId > 0));
+}
+
+function collectAvailableOriginalItemIdsThroughEpisode(episode: number): Set<number> {
+    const itemIds = new Set<number>();
+    for (const scenario of STORY_SCENARIOS.filter((candidate) => candidate.episode <= episode)) {
+        for (const originalItemId of collectStoryRewardOriginalItemIds(scenario.reward)) itemIds.add(originalItemId);
+        const sequence = STORY_SCENARIO_EVENT_SEQUENCES.find((candidate) => candidate.dungeonId === scenario.dungeonId);
+        if (!sequence) continue;
+        for (const originalItemId of collectScenarioEventRewardOriginalItemIds(sequence)) itemIds.add(originalItemId);
+    }
+    return itemIds;
 }
 
 function notesMentionOriginalEvent(notes: string, eventNumber: number): boolean {
@@ -1837,6 +1861,12 @@ function verifyStoryCompletionContract(
         for (const originalGeneralId of triggerGetGeneralIds(sequence.bossDefeatEvent.trigger)) {
             if (!storyRewardOriginalGeneralIds.has(originalGeneralId)) {
                 throw new Error(`Episode ${episode} ${scenario.dungeonId} boss GETGENERAL ${originalGeneralId} is missing a companion reward mapping`);
+            }
+        }
+        const availableOriginalItemIds = collectAvailableOriginalItemIdsThroughEpisode(episode);
+        for (const originalItemId of triggerItemConditionIds(sequence.bossDefeatEvent.trigger)) {
+            if (!availableOriginalItemIds.has(originalItemId)) {
+                throw new Error(`Episode ${episode} ${scenario.dungeonId} boss ITEM ${originalItemId} condition is missing a prior reward mapping`);
             }
         }
         if (sequence.objectiveRuntimeFlag && sequence.bossDefeatEvent.runtimeFlag !== sequence.objectiveRuntimeFlag) {
