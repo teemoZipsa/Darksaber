@@ -722,6 +722,20 @@ function verifyStoryPresentationStepReference(
         if (!step.speakerNameKey.startsWith('story.event.speaker.')) {
             throw new Error(`Episode ${episode} ${dungeonId} ${context} speaker key is not a story speaker: ${step.speakerNameKey}`);
         }
+        const ko = i18n.strings.ko as Record<string, string>;
+        const en = i18n.strings.en as Record<string, string>;
+        if (!ko[step.speakerNameKey]) {
+            throw new Error(`Episode ${episode} ${dungeonId} ${context} missing ko speaker key ${step.speakerNameKey}`);
+        }
+        if (!en[step.speakerNameKey]) {
+            throw new Error(`Episode ${episode} ${dungeonId} ${context} missing en speaker key ${step.speakerNameKey}`);
+        }
+        if (!ko[step.textKey]) {
+            throw new Error(`Episode ${episode} ${dungeonId} ${context} missing ko dialogue key ${step.textKey}`);
+        }
+        if (!en[step.textKey]) {
+            throw new Error(`Episode ${episode} ${dungeonId} ${context} missing en dialogue key ${step.textKey}`);
+        }
     }
 }
 
