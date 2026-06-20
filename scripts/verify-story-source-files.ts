@@ -1479,6 +1479,15 @@ function verifyStoryScenarioMonsterContract(episode: number, scenario: StoryScen
             `${monsterLayout.guardMonsterIds.length} !== ${scenario.guardCount}`
         );
     }
+    if (episode >= 23 && episode <= 31) {
+        const fact = getOriginalLateStoryFact(episode);
+        if (monsterLayout.bossMonsterId !== fact.bossMonsterId) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} late story boss monster mismatch`);
+        }
+        if (JSON.stringify(monsterLayout.guardMonsterIds.slice(0, fact.guardMonsterRoster.length)) !== JSON.stringify(fact.guardMonsterRoster)) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} late story guard monster seed roster mismatch`);
+        }
+    }
     for (const guardMonsterId of monsterLayout.guardMonsterIds) {
         if (!getMonsterDefinitionSafe(guardMonsterId)) {
             throw new Error(`Episode ${episode} ${scenario.dungeonId} unknown guard monster id ${guardMonsterId}`);

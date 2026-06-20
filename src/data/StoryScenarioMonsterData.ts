@@ -26,8 +26,12 @@ function getOriginalLateStoryDungeonId(episode: number): string {
     return getOriginalLateStoryFact(episode).dungeonId;
 }
 
-function repeatOriginalLateStoryGuardRoster(episode: number, ids: readonly MonsterId[]): MonsterId[] {
-    return repeatGuardRoster(ids, getOriginalLateStoryFact(episode).guardAreas.length);
+function originalLateStoryMonsterLayout(episode: number): StoryScenarioMonsterLayout {
+    const fact = getOriginalLateStoryFact(episode);
+    return {
+        bossMonsterId: fact.bossMonsterId,
+        guardMonsterIds: repeatGuardRoster(fact.guardMonsterRoster, fact.guardAreas.length),
+    };
 }
 
 export const STORY_SCENARIO_MONSTER_LAYOUTS = {
@@ -72,15 +76,15 @@ export const STORY_SCENARIO_MONSTER_LAYOUTS = {
     ament_2f: { bossMonsterId: '638R', guardMonsterIds: ['636R', '638R', '639R'] },
     nergal_castle: { bossMonsterId: '733R', guardMonsterIds: ['729R', '730R', '731R', '732R'] },
     flame_castle: { bossMonsterId: '730R', guardMonsterIds: ['215R', '224R', '225R', '307R'] },
-    [getOriginalLateStoryDungeonId(23)]: { bossMonsterId: '731R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(23, ['729R', '730R', '732R', '733R']) },
-    [getOriginalLateStoryDungeonId(24)]: { bossMonsterId: '732R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(24, ['729R', '730R', '731R', '733R']) },
-    [getOriginalLateStoryDungeonId(25)]: { bossMonsterId: '733R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(25, ['729R', '730R', '731R', '732R']) },
-    [getOriginalLateStoryDungeonId(26)]: { bossMonsterId: '730R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(26, ['729R', '731R', '732R']) },
-    [getOriginalLateStoryDungeonId(27)]: { bossMonsterId: '731R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(27, ['729R', '730R', '732R']) },
-    [getOriginalLateStoryDungeonId(28)]: { bossMonsterId: '748R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(28, ['729R', '730R', '750R']) },
-    [getOriginalLateStoryDungeonId(29)]: { bossMonsterId: '749R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(29, ['729R', '731R', '750R']) },
-    [getOriginalLateStoryDungeonId(30)]: { bossMonsterId: '750R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(30, ['729R', '731R', '749R']) },
-    [getOriginalLateStoryDungeonId(31)]: { bossMonsterId: '751R', guardMonsterIds: repeatOriginalLateStoryGuardRoster(31, ['729R', '750R', '752R']) },
+    [getOriginalLateStoryDungeonId(23)]: originalLateStoryMonsterLayout(23),
+    [getOriginalLateStoryDungeonId(24)]: originalLateStoryMonsterLayout(24),
+    [getOriginalLateStoryDungeonId(25)]: originalLateStoryMonsterLayout(25),
+    [getOriginalLateStoryDungeonId(26)]: originalLateStoryMonsterLayout(26),
+    [getOriginalLateStoryDungeonId(27)]: originalLateStoryMonsterLayout(27),
+    [getOriginalLateStoryDungeonId(28)]: originalLateStoryMonsterLayout(28),
+    [getOriginalLateStoryDungeonId(29)]: originalLateStoryMonsterLayout(29),
+    [getOriginalLateStoryDungeonId(30)]: originalLateStoryMonsterLayout(30),
+    [getOriginalLateStoryDungeonId(31)]: originalLateStoryMonsterLayout(31),
 } satisfies Record<string, StoryScenarioMonsterLayout>;
 
 export function getStoryScenarioMonsterLayout(scenario: StoryScenarioDefinition): StoryScenarioMonsterLayout {

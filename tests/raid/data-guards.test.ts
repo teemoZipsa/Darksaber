@@ -648,6 +648,12 @@ test('late original story source ledgers cover exactly episodes 23 through 31', 
         assert.equal(scenario.missionKind, 'soloInterior', `episode ${episode} mission kind`);
         assert.equal(scenario.guardCount, fact.guardAreas.length, `episode ${episode} guard count`);
         const monsterLayout = getStoryScenarioMonsterLayout(scenario);
+        assert.equal(monsterLayout.bossMonsterId, fact.bossMonsterId, `episode ${episode} boss monster`);
+        assert.deepEqual(
+            monsterLayout.guardMonsterIds.slice(0, fact.guardMonsterRoster.length),
+            fact.guardMonsterRoster,
+            `episode ${episode} guard monster roster`
+        );
         assert.equal(monsterLayout.guardMonsterIds.length, fact.guardAreas.length, `episode ${episode} guard monster count`);
         assert.equal(layout.originalAi?.source, `${fact.setArc}:${fact.aiMember}`, `episode ${episode} original AI source`);
         assert.deepEqual(layout.originalAi?.bossArea, fact.bossArea, `episode ${episode} original boss AI area`);

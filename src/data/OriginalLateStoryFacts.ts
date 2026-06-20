@@ -1,4 +1,5 @@
 import type { TilePoint } from '../field/FieldPathing';
+import type { MonsterId } from './MonsterCatalog';
 import { requireOriginalLateStoryItem, type OriginalLateStoryItemRecord } from './OriginalLateStoryItems';
 import ORIGINAL_LATE_STORY_FACTS_JSON from './content/original-late-story-facts.json';
 
@@ -28,6 +29,8 @@ export interface OriginalLateStoryFact {
     globalScript: string;
     backgroundMapFile: string | null;
     sideMapFiles: string[];
+    bossMonsterId: MonsterId;
+    guardMonsterRoster: MonsterId[];
     setArc: string;
     aiMember: string;
     eventMember: string;
