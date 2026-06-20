@@ -156,13 +156,26 @@ test('server town leave only survives at a non-departure town', () => {
     }
 });
 
-test('server shutdown finishes active raids as left and captures a final save patch', () => {
+test('server shutdown force-extracts active raids and preserves raid loot in the final patch', () => {
     const session = new WorldSession();
     const character = authCharacter('hero-shutdown');
     const joined = session.join(joinMessage('central_castle', character.id), 0, {
         accountId: character.accountId,
         characterId: character.id,
         saveSnapshot: createDefaultCharacterSave(character),
+    });
+    const raidItem = getItemDef('herb_common');
+    assert.ok(raidItem);
+    const internals = session as any;
+    const serverPlayer = internals.players.get(joined.playerId);
+    assert.ok(serverPlayer);
+    serverPlayer.saveSnapshot.inventory.items.push({
+        itemId: raidItem.id,
+        gridX: 4,
+        gridY: 0,
+        quantity: 1,
+        durability: raidItem.maxDurability,
+        acquiredInRaid: true,
     });
 
     const result = session.finishActivePlayersForShutdown(1_000);
@@ -172,12 +185,16 @@ test('server shutdown finishes active raids as left and captures a final save pa
     const message = result.perPlayerMessages[0]?.message;
     assert.equal(message?.type, 'RAID_RESULT');
     if (message?.type === 'RAID_RESULT') {
-        assert.equal(message.result, 'LEFT');
+        assert.equal(message.result, 'SURVIVED');
         assert.equal(message.extractionTownId, 'central_castle');
     }
     assert.deepEqual(session.getActivePlayerIds(), []);
     assert.ok(session.hasFinalCharacterSavePatch(joined.playerId));
-    assert.ok(session.createCharacterSavePatch(joined.playerId));
+    const patch = session.createCharacterSavePatch(joined.playerId);
+    assert.ok(patch);
+    const savedRaidItem = patch.inventory?.items.find((item) => item.itemId === raidItem.id);
+    assert.ok(savedRaidItem);
+    assert.equal(savedRaidItem.acquiredInRaid, undefined);
 });
 
 test('default character saves start with the shared no-shield basic kit', () => {

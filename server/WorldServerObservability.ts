@@ -92,7 +92,7 @@ export function formatWorldServerMetrics(metrics: WorldServerMetrics, gauges: Wo
         '# HELP darksaber_world_rejected_joins_during_shutdown_total Total world joins rejected during shutdown.',
         '# TYPE darksaber_world_rejected_joins_during_shutdown_total counter',
         `darksaber_world_rejected_joins_during_shutdown_total ${metrics.rejectedJoinsDuringShutdownTotal}`,
-        '# HELP darksaber_world_shutdown_forced_raid_results_total Total active raids converted to LEFT during shutdown.',
+        '# HELP darksaber_world_shutdown_forced_raid_results_total Total active raids force-extracted during shutdown.',
         '# TYPE darksaber_world_shutdown_forced_raid_results_total counter',
         `darksaber_world_shutdown_forced_raid_results_total ${metrics.shutdownForcedRaidResultsTotal}`,
         '# HELP darksaber_world_shutdowns_total Total graceful shutdowns started.',

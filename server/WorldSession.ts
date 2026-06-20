@@ -435,8 +435,8 @@ export class WorldSession {
     public finishActivePlayersForShutdown(now: number = Date.now()): WorldSessionTickResult {
         const perPlayerMessages: Array<{ playerId: string; message: WorldServerMessage }> = [];
         for (const playerId of this.getActivePlayerIds()) {
-            this.log(`leave player=${playerId} reason=server_shutdown`);
-            perPlayerMessages.push({ playerId, message: this.finishPlayer(playerId, 'LEFT') });
+            this.log(`force extract player=${playerId} reason=server_shutdown`);
+            perPlayerMessages.push({ playerId, message: this.finishPlayerForShutdown(playerId) });
         }
         this.lastTickAt = now;
         return { events: [], perPlayerMessages };
@@ -1398,6 +1398,28 @@ export class WorldSession {
         if (player) {
             const survived = finalResult === 'SURVIVED';
             this.captureFinalSavePatch(player, survived ? extractionTownId : undefined, survived);
+            this.markSaveDirty(playerId);
+        }
+        this.removePlayer(playerId);
+        return message;
+    }
+
+    private finishPlayerForShutdown(playerId: string): RaidResultMessage {
+        const player = this.players.get(playerId);
+        const extractionTownId = player?.departureTownId ?? this.resolveExtractionTownId(player);
+        const message: RaidResultMessage = {
+            type: 'RAID_RESULT',
+            playerId,
+            result: 'SURVIVED',
+            elapsedSeconds: player?.elapsedSeconds ?? 0,
+            kills: player?.kills ?? 0,
+            departureTownId: player?.departureTownId ?? 'central_castle',
+            extractionTownId,
+            completedDungeonIds: player ? [...player.completedDungeonIds] : [],
+        };
+        this.log(`raid result player=${playerId} result=SURVIVED reason=server_shutdown kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
+        if (player) {
+            this.captureFinalSavePatch(player, extractionTownId, true);
             this.markSaveDirty(playerId);
         }
         this.removePlayer(playerId);
