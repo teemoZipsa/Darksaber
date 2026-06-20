@@ -77,6 +77,39 @@ const ROADMAP_TREATMENT_BY_MISSION_KIND: Record<StoryScenarioMissionKind, string
     vehicle: '비공정',
 };
 
+const STORY_BOSS_NAME_EN_BY_EPISODE: Record<number, string> = {
+    1: 'Kisra',
+    2: 'Fenris',
+    3: 'Ganomas',
+    4: 'Eurytion',
+    5: 'Minotaur',
+    6: 'Pachi',
+    7: 'Amphisbaena',
+    8: 'Shut',
+    9: 'Dangu',
+    10: 'Naiad',
+    11: 'Charon',
+    12: 'Mantagoras',
+    13: 'Myant',
+    14: 'Shut',
+    15: 'Magi',
+    16: 'Barbatu',
+    18: 'Amphit',
+    19: 'Uraeus',
+    20: 'Mephistopheles',
+    21: 'Nergal',
+    22: 'Beramode',
+    23: 'Beelzebuth',
+    24: 'Astaroth',
+    25: 'Nergal',
+    26: 'Beast Mark guardian',
+    27: 'Chosen Mark guardian',
+    28: 'Ergion',
+    29: 'Martani',
+    30: 'Blin',
+    31: 'demon fixer',
+};
+
 function scenarioSignature(scenario: StoryScenarioDefinition): StoryScenarioDefinition {
     return {
         episode: scenario.episode,
@@ -548,8 +581,12 @@ function verifyStoryQuestDisplayTextContract(episode: number, scenario: StorySce
     requireStoryTextIncludes(episode, 'ko enter log', ko[quest.enterLogKey], scenario.dungeonNameKr);
     requireStoryTextIncludes(episode, 'en enter log', en[quest.enterLogKey], scenario.dungeonNameEn);
     if (scenario.bossName) {
+        const bossNameEn = STORY_BOSS_NAME_EN_BY_EPISODE[episode];
+        if (!bossNameEn) throw new Error(`Episode ${episode} missing English boss name contract`);
         requireStoryTextIncludes(episode, 'ko objective', ko[quest.objectiveKey], scenario.bossName);
         requireStoryTextIncludes(episode, 'ko enter log', ko[quest.enterLogKey], scenario.bossName);
+        requireStoryTextIncludes(episode, 'en objective', en[quest.objectiveKey], bossNameEn);
+        requireStoryTextIncludes(episode, 'en enter log', en[quest.enterLogKey], bossNameEn);
     }
     requireStoryTextIncludes(episode, 'ko completion log', ko[quest.objectiveCompleteLogKey], scenario.dungeonNameKr);
     requireStoryTextIncludes(episode, 'ko completion log', ko[quest.objectiveCompleteLogKey], episodeKo);
