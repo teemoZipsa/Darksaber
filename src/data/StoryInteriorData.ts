@@ -587,7 +587,6 @@ interface LateOriginalInteriorConfig {
     bossTile: TilePoint;
     guardTiles: TilePoint[];
     rooms: StoryInteriorRoom[];
-    cacheTiles: TilePoint[];
     characterMarkers?: Array<{ tile: TilePoint; labelKey: string }>;
     blockedPaths?: StoryInteriorBlockedPath[];
 }
@@ -635,7 +634,7 @@ function buildLateOriginalInterior(config: LateOriginalInteriorConfig): StoryInt
         props: [
             { kind: 'torch', tile: { x: Math.max(1, config.entryTile.x - 2), y: Math.max(1, config.entryTile.y - 3) } },
             { kind: 'torch', tile: { x: Math.min(originalMrc.width - 2, config.entryTile.x + 2), y: Math.max(1, config.entryTile.y - 3) } },
-            ...config.cacheTiles.map((tile) => ({ kind: 'crate' as const, tile: cloneTile(tile), labelKey: `story.event.ep${episode}.cache.marker` })),
+            ...originalFact.cacheEvents.map((event) => ({ kind: 'crate' as const, tile: { x: event.x, y: event.y }, labelKey: `story.event.ep${episode}.cache.marker` })),
             ...(config.characterMarkers ?? []).map((marker) => ({ kind: 'banner' as const, tile: cloneTile(marker.tile), labelKey: marker.labelKey })),
             { kind: 'sealedDoor', tile: { x: config.bossTile.x, y: Math.min(originalMrc.height - 2, config.bossTile.y + 2) }, labelKey: 'story.interior.prop.sealedDoor' },
             { kind: 'bossSeal', tile: cloneTile(config.bossTile), labelKey: 'story.interior.prop.bossSeal' },
@@ -1135,7 +1134,6 @@ const BEELZEBUTH_HALL_LAYOUT = buildLateOriginalInterior({
         { id: 'beelzebuthRelicHall', nameKey: 'story.interior.room.beelzebuthRelicHall', x: 5, y: 24, width: 25, height: 8 },
         { id: 'beelzebuthEntry', nameKey: 'story.interior.room.entryHall', x: 10, y: 31, width: 20, height: 8 },
     ],
-    cacheTiles: [{ x: 19, y: 19 }, { x: 15, y: 27 }],
     characterMarkers: [
         { tile: { x: 18, y: 15 }, labelKey: 'story.event.speaker.nergal' },
         { tile: { x: 21, y: 15 }, labelKey: 'story.event.speaker.beelzebuth' },
@@ -1158,7 +1156,6 @@ const ASTAROTH_GATE_LAYOUT = buildLateOriginalInterior({
         { id: 'astarothTwinReliquary', nameKey: 'story.interior.room.astarothTwinReliquary', x: 7, y: 10, width: 26, height: 9 },
         { id: 'astarothFinalGate', nameKey: 'story.interior.room.astarothFinalGate', x: 15, y: 5, width: 9, height: 7 },
     ],
-    cacheTiles: [{ x: 16, y: 26 }, { x: 27, y: 11 }],
     characterMarkers: [{ tile: { x: 19, y: 7 }, labelKey: 'story.event.speaker.astaroth' }],
 });
 
@@ -1179,7 +1176,6 @@ const NERGAL_DEPTHS_LAYOUT = buildLateOriginalInterior({
         { id: 'nergalDepthsEastCells', nameKey: 'story.interior.room.nergalDepthsCells', x: 31, y: 8, width: 8, height: 13 },
         { id: 'nergalDepthsTrialHall', nameKey: 'story.interior.room.nergalDepthsTrialHall', x: 14, y: 5, width: 12, height: 11 },
     ],
-    cacheTiles: [{ x: 12, y: 18 }, { x: 12, y: 32 }],
     characterMarkers: [{ tile: { x: 19, y: 7 }, labelKey: 'story.event.speaker.nergal' }],
 });
 
@@ -1198,7 +1194,6 @@ const BEAST_MARK_SHRINE_LAYOUT = buildLateOriginalInterior({
         { id: 'beastMarkCentralShrine', nameKey: 'story.interior.room.beastMarkCentralShrine', x: 4, y: 15, width: 34, height: 12 },
         { id: 'beastMarkNorthShrine', nameKey: 'story.interior.room.beastMarkNorthShrine', x: 3, y: 1, width: 35, height: 9 },
     ],
-    cacheTiles: [{ x: 15, y: 21 }],
     characterMarkers: [{ tile: { x: 36, y: 3 }, labelKey: 'story.event.speaker.markGuardian' }],
 });
 
@@ -1218,7 +1213,6 @@ const CHOSEN_MARK_SHRINE_LAYOUT = buildLateOriginalInterior({
         { id: 'chosenMarkSealBridge', nameKey: 'story.interior.room.chosenMarkCentralShrine', x: 16, y: 8, width: 9, height: 6 },
         { id: 'chosenMarkNorthShrine', nameKey: 'story.interior.room.chosenMarkNorthShrine', x: 4, y: 1, width: 33, height: 9 },
     ],
-    cacheTiles: [{ x: 16, y: 6 }, { x: 31, y: 17 }],
     characterMarkers: [{ tile: { x: 20, y: 16 }, labelKey: 'story.event.speaker.markGuardian' }],
 });
 
@@ -1238,7 +1232,6 @@ const ERGION_KEEP_LAYOUT = buildLateOriginalInterior({
         { id: 'ergionWestReliquary', nameKey: 'story.interior.room.ergionCrossHall', x: 2, y: 5, width: 12, height: 7 },
         { id: 'ergionCrossHall', nameKey: 'story.interior.room.ergionCrossHall', x: 2, y: 10, width: 35, height: 9 },
     ],
-    cacheTiles: [{ x: 6, y: 16 }, { x: 35, y: 17 }, { x: 14, y: 31 }, { x: 2, y: 7 }],
     characterMarkers: [
         { tile: { x: 19, y: 7 }, labelKey: 'story.event.speaker.ergion' },
         { tile: { x: 19, y: 13 }, labelKey: 'story.event.speaker.blin' },
@@ -1260,7 +1253,6 @@ const MARTANI_BASTION_LAYOUT = buildLateOriginalInterior({
         { id: 'martaniCentralBastion', nameKey: 'story.interior.room.martaniCentralBastion', x: 10, y: 6, width: 40, height: 28 },
         { id: 'martaniEastReliquary', nameKey: 'story.interior.room.martaniEastReliquary', x: 35, y: 10, width: 22, height: 18 },
     ],
-    cacheTiles: [{ x: 35, y: 13 }, { x: 40, y: 20 }, { x: 55, y: 24 }],
     characterMarkers: [
         { tile: { x: 19, y: 7 }, labelKey: 'story.event.speaker.martani' },
         { tile: { x: 19, y: 13 }, labelKey: 'story.event.speaker.blin' },
@@ -1282,7 +1274,6 @@ const BLIN_WATCH_LAYOUT = buildLateOriginalInterior({
         { id: 'blinMiddleWatch', nameKey: 'story.interior.room.blinMiddleWatch', x: 6, y: 14, width: 28, height: 15 },
         { id: 'blinUpperWatch', nameKey: 'story.interior.room.blinUpperWatch', x: 6, y: 3, width: 28, height: 12 },
     ],
-    cacheTiles: [{ x: 15, y: 21 }, { x: 33, y: 25 }, { x: 6, y: 25 }, { x: 23, y: 12 }],
     characterMarkers: [
         { tile: { x: 19, y: 7 }, labelKey: 'story.event.speaker.blin' },
         { tile: { x: 19, y: 13 }, labelKey: 'story.event.speaker.jade' },
@@ -1305,7 +1296,6 @@ const DEMON_FIXERS_DEN_LAYOUT = buildLateOriginalInterior({
         { id: 'demonFixerUpperDen', nameKey: 'story.interior.room.demonFixerUpperDen', x: 2, y: 8, width: 36, height: 10 },
         { id: 'demonFixerSummoningDen', nameKey: 'story.interior.room.demonFixerSummoningDen', x: 14, y: 1, width: 16, height: 9 },
     ],
-    cacheTiles: [{ x: 33, y: 17 }, { x: 8, y: 21 }, { x: 21, y: 17 }],
     characterMarkers: [
         { tile: { x: 19, y: 7 }, labelKey: 'story.event.speaker.demonFixer' },
         { tile: { x: 19, y: 13 }, labelKey: 'story.event.speaker.jade' },

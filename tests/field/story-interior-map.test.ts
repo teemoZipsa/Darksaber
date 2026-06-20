@@ -1456,6 +1456,13 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         assert.ok(sequence.entry.every((step) => getStoryScenarioEventStepDurationMs(step) > 0), fact.dungeonId);
         assert.ok(sequence.bossDefeat.every((step) => getStoryScenarioEventStepDurationMs(step) > 0), fact.dungeonId);
         assert.ok(getStoryScenarioPresentationDurationMs(sequence.entry) >= (fact.deoMember ? 3150 : 2250), fact.dungeonId);
+        assert.deepEqual(
+            layout.props
+                .filter((prop) => prop.kind === 'crate' && prop.labelKey === `story.event.ep${String(episode).padStart(2, '0')}.cache.marker`)
+                .map((prop) => prop.tile),
+            expectedCaches.map((event) => event.tile),
+            `${fact.dungeonId}:cache prop tiles`
+        );
         assert.deepEqual(sequence.fieldEvents.map((event) => event.originalEventId), expectedCaches.map((event) => `EVENT ${event.eventNumber}`));
         assert.deepEqual(sequence.fieldEvents.map((event) => event.triggerTiles[0]), expectedCaches.map((event) => event.tile));
         assert.ok(sequence.fieldEvents.every((event) => event.steps.every((step) => getStoryScenarioEventStepDurationMs(step) === 700)), fact.dungeonId);
