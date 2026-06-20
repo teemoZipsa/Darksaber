@@ -592,8 +592,10 @@ function verifyStoryQuestDisplayTextContract(episode: number, scenario: StorySce
     }
     requireStoryTextIncludes(episode, 'ko completion log', ko[quest.objectiveCompleteLogKey], scenario.dungeonNameKr);
     requireStoryTextIncludes(episode, 'ko completion log', ko[quest.objectiveCompleteLogKey], episodeKo);
+    requireStoryTextIncludes(episode, 'ko completion log', ko[quest.objectiveCompleteLogKey], '다른 마을');
     requireStoryTextIncludes(episode, 'en completion log', en[quest.objectiveCompleteLogKey], scenario.dungeonNameEn);
     requireStoryTextIncludes(episode, 'en completion log', en[quest.objectiveCompleteLogKey], episodeEn);
+    requireStoryTextIncludes(episode, 'en completion log', en[quest.objectiveCompleteLogKey], 'another town');
 
     if (quest.recommendedLevelKey) {
         requireStoryTextIncludes(episode, 'ko recommended level', ko[quest.recommendedLevelKey], '단');
