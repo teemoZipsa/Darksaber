@@ -43,6 +43,11 @@ const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Save
 const DEFAULT_START = 1;
 const DEFAULT_END = 31;
 const RESOLVABLE_PRESENTATION_ACTOR_IDS = new Set(['hero', 'player', 'controlled', 'boss']);
+const ORIGINAL_GOLD_GETITEM_AMOUNT_BY_ID = new Map<number, number>([
+    [351, 200],
+    [352, 500],
+    [353, 1000],
+]);
 
 interface Options {
     sourceRoot: string;
@@ -885,6 +890,25 @@ function verifyStoryEventRewardContract(
     }
 }
 
+function verifyStoryEventTriggerGetItemMappings(
+    episode: number,
+    dungeonId: string,
+    eventId: string,
+    trigger: string,
+    rewards: StoryScenarioFieldEventReward[] | undefined
+): void {
+    for (const originalItemId of triggerGetItemIds(trigger)) {
+        if ((rewards ?? []).some((reward) => reward.type === 'item' && reward.originalItemId === originalItemId)) continue;
+
+        const goldAmount = ORIGINAL_GOLD_GETITEM_AMOUNT_BY_ID.get(originalItemId);
+        if (goldAmount !== undefined && (rewards ?? []).some((reward) => reward.type === 'gold' && reward.amount === goldAmount)) {
+            continue;
+        }
+
+        throw new Error(`Episode ${episode} ${dungeonId} ${eventId} GETITEM ${originalItemId} is missing a reward mapping`);
+    }
+}
+
 function verifyStoryEventReferenceContract(episode: number, sequence: StoryScenarioEventSequence): void {
     const runtimeFlags = new Set<string>();
     if (sequence.objectiveRuntimeFlag) runtimeFlags.add(sequence.objectiveRuntimeFlag);
@@ -925,6 +949,7 @@ function verifyStoryEventReferenceContract(episode: number, sequence: StoryScena
         for (const reward of event.rewards ?? []) {
             verifyStoryEventRewardContract(episode, sequence.dungeonId, event.id, event.trigger, reward);
         }
+        verifyStoryEventTriggerGetItemMappings(episode, sequence.dungeonId, event.id, event.trigger, event.rewards);
     }
 
     const enemyEventIds = new Set<string>();
