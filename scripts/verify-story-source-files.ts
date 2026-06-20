@@ -233,7 +233,14 @@ function readScenarioImportDocRows(): Map<number, ScenarioImportDocRow> {
 function readRoadmapDocRows(): Map<number, RoadmapDocRow> {
     const path = 'docs/main-quest-roadmap.md';
     const rows = new Map<number, RoadmapDocRow>();
-    for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+    const content = readFileSync(path, 'utf8');
+    if (!content.includes('현재 실내화 대상(1, 2, 3, 7, 13, 18~31화)')) {
+        throw new Error(`${path} is missing current 1~31 solo interior scope`);
+    }
+    if (content.includes('현재 실내화 대상(1, 2, 3, 7, 13, 18, 19, 20, 21, 22화)')) {
+        throw new Error(`${path} still contains stale 18~22 solo interior scope`);
+    }
+    for (const line of content.split(/\r?\n/)) {
         if (!line.startsWith('|')) continue;
         const cells = line.slice(1, line.endsWith('|') ? -1 : undefined).split('|').map((cell) => cell.trim());
         const episode = Number(cells[0]);
