@@ -17,7 +17,7 @@ import { CombatFormulas } from '../src/combat/CombatFormulas';
 import type { CharacterStats } from '../src/data/Stats';
 import { getClassLine } from '../src/data/ClassTree';
 import { getSkillAttackProfile } from '../src/data/AttackPatternProfiles';
-import { getItemDef, getCombatRecovery, isCombatRecoveryConsumable } from '../src/data/ItemDB';
+import { getItemDef, getItemDefByOriginalGetItemId, getCombatRecovery, isCombatRecoveryConsumable, type ItemDef } from '../src/data/ItemDB';
 import { getLearnedSkills, getSkill, type Skill } from '../src/data/SkillDB';
 import {
     getEffectiveSkill,
@@ -36,6 +36,7 @@ import {
     getStoryScenarioEventSequence,
     getStoryScenarioTrapMagicDamage,
     getStoryScenarioTriggerMagicCodes,
+    getStoryScenarioTriggerUseItemIds,
     type StoryScenarioEnemyDefeatEvent,
     type StoryScenarioEventStep,
     type StoryScenarioFieldEvent,
@@ -1050,11 +1051,15 @@ export class WorldSession {
         if (!triggerTiles.some((tile) => manhattan(actor!.tile, tile) <= 1)) {
             return reject(message.intentId, 'Scenario field event is too far away.');
         }
+        if (!this.canConsumeScenarioFieldEventUseItems(player!, event)) {
+            return reject(message.intentId, 'Scenario field event requires a missing item.');
+        }
         if (!this.canApplyScenarioRewards(player!, event.rewards)) {
             return reject(message.intentId, 'Scenario field event reward storage is full.');
         }
 
         this.markScenarioFieldEventFlagComplete(player!, dungeonId, flag, scope);
+        this.consumeScenarioFieldEventUseItems(player!, event);
         const rewards = this.applyScenarioFieldEventRewards(player!, event);
         const trapDamage = this.applyScenarioFieldEventTrapMagic(actor!, event);
         if (event.completesObjective) this.completeScenarioObjective(player!, dungeonId, { clearEnemies: false });
@@ -1814,6 +1819,34 @@ export class WorldSession {
         return { actorId: actor.id, damage };
     }
 
+    private getScenarioFieldEventRequiredItems(event: StoryScenarioFieldEvent): ItemDef[] {
+        return getStoryScenarioTriggerUseItemIds(event.trigger)
+            .map((originalItemId) => getItemDefByOriginalGetItemId(originalItemId))
+            .filter((item): item is ItemDef => Boolean(item));
+    }
+
+    private canConsumeScenarioFieldEventUseItems(player: ServerPlayer, event: StoryScenarioFieldEvent): boolean {
+        return this.getScenarioFieldEventRequiredItems(event).every((item) => this.getPlayerItemQuantity(player, item.id) > 0);
+    }
+
+    private consumeScenarioFieldEventUseItems(player: ServerPlayer, event: StoryScenarioFieldEvent): void {
+        for (const item of this.getScenarioFieldEventRequiredItems(event)) {
+            if (this.getPlayerItemQuantity(player, item.id) <= 0) continue;
+            this.removeSaveItemQuantity(player, item.id, 1);
+            this.addCarriedItemQuantity(player.id, item.id, -1);
+            this.removeCarriedWeight(player.id, getPlacedItemWeight({ item, quantity: 1 }));
+            this.markSaveDirty(player.id);
+        }
+    }
+
+    private getPlayerItemQuantity(player: ServerPlayer, itemId: string): number {
+        const carriedQuantity = player.carriedItems.get(itemId) ?? 0;
+        const savedQuantity = (player.saveSnapshot?.inventory.items ?? [])
+            .filter((entry) => entry.itemId === itemId)
+            .reduce((sum, entry) => sum + Math.max(1, Math.floor(entry.quantity ?? 1)), 0);
+        return Math.max(carriedQuantity, savedQuantity);
+    }
+
     private applyScenarioBossDefeatRewards(
         player: ServerPlayer,
         dungeonId: string
@@ -2123,6 +2156,12 @@ export class WorldSession {
         const player = this.players.get(playerId);
         if (!player || weight <= 0) return;
         player.carriedWeight = sanitizeCarriedWeight(player.carriedWeight + weight);
+    }
+
+    private removeCarriedWeight(playerId: string, weight: number): void {
+        const player = this.players.get(playerId);
+        if (!player || weight <= 0) return;
+        player.carriedWeight = sanitizeCarriedWeight(player.carriedWeight - weight);
     }
 
     private addCarriedItemQuantity(playerId: string, itemId: string, quantity: number): void {

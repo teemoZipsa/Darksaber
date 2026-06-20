@@ -1978,6 +1978,103 @@ test('server omits zero original item ids from scenario field reward payloads', 
     assert.deepEqual(fieldResult.rewards, [{ type: 'item', itemId: 'orig_story_ep16_oil_can' }]);
 });
 
+test('server-authoritative USEITEM scenario field events require and consume the original item', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const completedQuestIds = STORY_SCENARIOS
+        .filter((scenario) => scenario.episode < 15)
+        .map((scenario) => scenario.questId);
+    const character = authCharacter('server-useitem');
+    const save = createDefaultCharacterSave(character);
+    save.questState = { ...save.questState, completedQuestIds };
+    const joined = session.join({
+        ...joinMessage('central_castle', character.id),
+        completedQuestIds,
+    }, 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        completedQuestIds,
+        saveSnapshot: save,
+    });
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const serverPlayer = internals.players.get(joined.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === 'skeria_2');
+    const sequence = getStoryScenarioEventSequence('skeria_2');
+    const shamanEvent = sequence?.fieldEvents.find((event) => event.id === 'skeria_2_shaman_exchange');
+    const flowerEvent = sequence?.fieldEvents.find((event) => event.id === 'skeria_2_yellow_flower_10');
+    assert.ok(serverActor);
+    assert.ok(serverPlayer);
+    assert.ok(dungeon);
+    assert.ok(shamanEvent);
+    assert.ok(flowerEvent);
+    serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+    session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-skeria-useitem',
+        actorId: serverActor.id,
+        dungeonId: 'skeria_2',
+    }, 1_000);
+
+    const [shamanTile] = getStoryScenarioFieldEventTiles('skeria_2', shamanEvent, world);
+    serverActor.tile = { x: shamanTile.x, y: shamanTile.y + 1 };
+    const missing = session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'skeria-shaman-without-flower',
+        actorId: serverActor.id,
+        dungeonId: 'skeria_2',
+        eventId: shamanEvent.id,
+    }, 1_100);
+    assert.equal(missing.replies[0]?.type, 'ACTION_REJECTED');
+    assert.match(missing.replies[0]?.type === 'ACTION_REJECTED' ? missing.replies[0].reason : '', /requires a missing item/);
+    assert.equal(serverPlayer.saveSnapshot.inventory.items.some((item: any) => item.itemId === 'orig_story_0315_stone_snake'), false);
+    assert.equal(session.createSnapshot(joined.playerId, 1_100).scenario.playerFieldEventFlagsByDungeonId?.skeria_2, undefined);
+
+    const [flowerTile] = getStoryScenarioFieldEventTiles('skeria_2', flowerEvent, world);
+    serverActor.tile = { x: flowerTile.x, y: flowerTile.y + 1 };
+    const flower = session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'skeria-yellow-flower',
+        actorId: serverActor.id,
+        dungeonId: 'skeria_2',
+        eventId: flowerEvent.id,
+    }, 1_200);
+    const flowerResult = flower.replies.find((message) => message.type === 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.equal(flowerResult?.type, 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.deepEqual(flowerResult?.type === 'SCENARIO_FIELD_EVENT_RESULT' ? flowerResult.rewards : [], [{
+        type: 'item',
+        itemId: 'orig_story_0397_yellow_flower',
+        originalItemId: 397,
+    }]);
+    assert.equal(serverPlayer.carriedItems.get('orig_story_0397_yellow_flower'), 1);
+    assert.equal(serverPlayer.saveSnapshot.inventory.items.some((item: any) => item.itemId === 'orig_story_0397_yellow_flower'), true);
+
+    serverActor.tile = { x: shamanTile.x, y: shamanTile.y + 1 };
+    const exchange = session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'skeria-shaman-with-flower',
+        actorId: serverActor.id,
+        dungeonId: 'skeria_2',
+        eventId: shamanEvent.id,
+    }, 1_300);
+    const exchangeResult = exchange.replies.find((message) => message.type === 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.equal(exchangeResult?.type, 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.deepEqual(exchangeResult?.type === 'SCENARIO_FIELD_EVENT_RESULT' ? exchangeResult.rewards : [], [{
+        type: 'item',
+        itemId: 'orig_story_0315_stone_snake',
+        originalItemId: 315,
+    }]);
+    assert.equal(serverPlayer.carriedItems.has('orig_story_0397_yellow_flower'), false);
+    assert.equal(serverPlayer.saveSnapshot.inventory.items.some((item: any) => item.itemId === 'orig_story_0397_yellow_flower'), false);
+    assert.equal(serverPlayer.carriedItems.get('orig_story_0315_stone_snake'), 1);
+    assert.equal(serverPlayer.saveSnapshot.inventory.items.some((item: any) => item.itemId === 'orig_story_0315_stone_snake'), true);
+    assert.deepEqual(
+        [...(session.createSnapshot(joined.playerId, 1_300).scenario.playerFieldEventFlagsByDungeonId?.skeria_2 ?? [])].sort(),
+        ['skeria_2_shaman_exchange', 'skeria_2_yellow_flower_10']
+    );
+});
+
 test('server-authoritative field scenario events reject invalid actors and distant requests', () => {
     const session = new WorldSession();
     const world = new WorldMap();

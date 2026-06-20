@@ -24,6 +24,7 @@ import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import {
     getStoryScenarioEventSequence,
     getStoryScenarioPresentationDurationMs,
+    getStoryScenarioTriggerUseItemIds,
     type StoryScenarioFieldEvent,
     type StoryScenarioEventStep,
 } from '../../src/data/StoryScenarioEventData';
@@ -99,6 +100,7 @@ function createStoryScenarioHarness(options: {
     let cameraFollowed = false;
     const cameraFocusTiles: Array<{ x: number; y: number }> = [];
     const rewardItemIds: string[] = [];
+    const scenarioItemIds: string[] = [];
     const trapDamageSpawns: Array<{ x: number; y: number; amount: number }> = [];
     const logs: string[] = [];
 
@@ -134,6 +136,14 @@ function createStoryScenarioHarness(options: {
         focusCameraOnTile: (tile) => { cameraFocusTiles.push({ ...tile }); },
         autoPlaceRewardItem: (itemId) => {
             rewardItemIds.push(itemId);
+            scenarioItemIds.push(itemId);
+            return true;
+        },
+        hasScenarioItem: (itemId) => scenarioItemIds.includes(itemId),
+        consumeScenarioItem: (itemId) => {
+            const index = scenarioItemIds.indexOf(itemId);
+            if (index < 0) return false;
+            scenarioItemIds.splice(index, 1);
             return true;
         },
         spawnDamage: (x, y, amount) => {
@@ -155,6 +165,7 @@ function createStoryScenarioHarness(options: {
         get cameraFollowed() { return cameraFollowed; },
         get cameraFocusTiles() { return cameraFocusTiles; },
         get rewardItemIds() { return rewardItemIds; },
+        get scenarioItemIds() { return scenarioItemIds; },
         get trapDamageSpawns() { return trapDamageSpawns; },
     };
 }
@@ -1136,7 +1147,11 @@ test('network field and vehicle story scenarios expose every projected inspect m
         const playerFlags: string[] = [];
         const sharedFlags: string[] = [];
 
-        for (const event of sequence.fieldEvents) {
+        const orderedFieldEvents = [
+            ...sequence.fieldEvents.filter((event) => getStoryScenarioTriggerUseItemIds(event.trigger).length === 0),
+            ...sequence.fieldEvents.filter((event) => getStoryScenarioTriggerUseItemIds(event.trigger).length > 0),
+        ];
+        for (const event of orderedFieldEvents) {
             const eventTiles = getStoryScenarioFieldEventTiles(scenario.dungeonId, event, worldMap);
             assert.equal(eventTiles.length, event.triggerTiles.length, `episode ${scenario.episode} ${event.id} projected tile count`);
             for (const tile of eventTiles) {
@@ -1161,7 +1176,7 @@ test('network field and vehicle story scenarios expose every projected inspect m
             sharedFieldEventFlagsByDungeonId: sharedFlags.length > 0 ? { [scenario.dungeonId]: sharedFlags } : undefined,
         });
         const hiddenMarkers = harness.worldMap.getInspectMarkers();
-        for (const event of sequence.fieldEvents) {
+        for (const event of orderedFieldEvents) {
             for (const tile of getStoryScenarioFieldEventTiles(scenario.dungeonId, event, worldMap)) {
                 const markerId = `${event.id}:${tile.x},${tile.y}`;
                 assert.equal(
@@ -1314,6 +1329,34 @@ test('local field scenario event presentation focuses the placed world event til
     assert.equal(raidSession.hasScenarioFlag(ARCADIA_PLAIN_DUNGEON_ID, 'arcadia_gold_chest_01'), true);
 });
 
+test('local Skeria shaman exchange requires and consumes the original yellow flower', () => {
+    const sequence = getStoryScenarioEventSequence('skeria_2');
+    const shamanEvent = sequence?.fieldEvents.find((event) => event.id === 'skeria_2_shaman_exchange');
+    const flowerEvent = sequence?.fieldEvents.find((event) => event.id === 'skeria_2_yellow_flower_10');
+    assert.ok(shamanEvent);
+    assert.ok(flowerEvent);
+
+    const raidSession = new WorldRaidSession('central_castle');
+    raidSession.beginRaidFromTown('central_castle');
+    raidSession.startDungeonEncounter('skeria_2');
+    const harness = createStoryScenarioHarness({ raidSession });
+
+    assert.equal(harness.controller.playFieldEvent('skeria_2', shamanEvent.id), false);
+    assert.equal(raidSession.hasScenarioFlag('skeria_2', 'skeria_2_shaman_exchange'), false);
+    assert.deepEqual(harness.rewardItemIds, []);
+    assert.equal(harness.logs.includes('노란 꽃이(가) 필요합니다.'), true);
+
+    assert.equal(harness.controller.playFieldEvent('skeria_2', flowerEvent.id), true);
+    assert.deepEqual(harness.rewardItemIds, ['orig_story_0397_yellow_flower']);
+    assert.deepEqual(harness.scenarioItemIds, ['orig_story_0397_yellow_flower']);
+
+    assert.equal(harness.controller.playFieldEvent('skeria_2', shamanEvent.id), true);
+    assert.equal(raidSession.hasScenarioFlag('skeria_2', 'skeria_2_shaman_exchange'), true);
+    assert.deepEqual(harness.rewardItemIds, ['orig_story_0397_yellow_flower', 'orig_story_0315_stone_snake']);
+    assert.deepEqual(harness.scenarioItemIds, ['orig_story_0315_stone_snake']);
+    assert.equal(harness.logs.includes('노란 꽃을(를) 사용했습니다.'), true);
+});
+
 test('local field and vehicle story inspect events complete once with projected markers through episode 17', () => {
     for (const scenario of STORY_SCENARIOS.filter((entry) => entry.missionKind !== 'soloInterior' && entry.episode <= 17)) {
         const sequence = getStoryScenarioEventSequence(scenario.dungeonId);
@@ -1334,7 +1377,11 @@ test('local field and vehicle story inspect events complete once with projected 
 
         let expectedGold = 0;
         const expectedItemIds: string[] = [];
-        for (const event of sequence.fieldEvents) {
+        const orderedFieldEvents = [
+            ...sequence.fieldEvents.filter((event) => getStoryScenarioTriggerUseItemIds(event.trigger).length === 0),
+            ...sequence.fieldEvents.filter((event) => getStoryScenarioTriggerUseItemIds(event.trigger).length > 0),
+        ];
+        for (const event of orderedFieldEvents) {
             const projectedTiles = getStoryScenarioFieldEventTiles(scenario.dungeonId, event, worldMap);
             assert.equal(projectedTiles.length, event.triggerTiles.length, `episode ${scenario.episode} ${event.id} projected tile count`);
             for (const tile of projectedTiles) {

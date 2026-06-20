@@ -1600,6 +1600,13 @@ export function getItemDef(id: string): ItemDef | undefined {
     return ITEMS.find(item => item.id === id);
 }
 
+/** Lookup a preserved scenario item by its original GETITEM id. */
+export function getItemDefByOriginalGetItemId(originalItemId: number): ItemDef | undefined {
+    if (!Number.isFinite(originalItemId) || originalItemId <= 0) return undefined;
+    const pattern = new RegExp(`\\bGETITEM\\s+0*${Math.floor(originalItemId)}\\b`);
+    return ITEMS.find((item) => pattern.test(item.description) || (item.descriptionKr ? pattern.test(item.descriptionKr) : false));
+}
+
 /** Get all armor for a specific branch and tier */
 export function getArmorForBranchTier(branch: MasterBranch, tier: number): ItemDef[] {
     return ITEMS.filter(item => item.branch === branch && item.requiredTier === tier);

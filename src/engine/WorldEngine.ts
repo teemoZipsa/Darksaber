@@ -256,6 +256,17 @@ export class WorldEngine {
                 if (placed) placed.acquiredInRaid = true;
                 return Boolean(placed);
             },
+            hasScenarioItem: (itemId) => this.gameManager.inventory.items.some((placed) => placed.item.id === itemId && placed.quantity > 0),
+            consumeScenarioItem: (itemId) => {
+                const placed = this.gameManager.inventory.items.find((entry) => entry.item.id === itemId && entry.quantity > 0);
+                if (!placed) return false;
+                if (placed.quantity > 1) {
+                    placed.quantity -= 1;
+                    return true;
+                }
+                this.gameManager.inventory.remove(placed);
+                return true;
+            },
             spawnDamage: (x, y, amount) => this.floatingText.spawnDamage(x, y, amount, false, false),
             log: (message) => this.addCombatLog(message),
         });

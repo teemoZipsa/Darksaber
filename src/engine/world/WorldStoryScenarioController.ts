@@ -1,5 +1,5 @@
 import type { PlayerData } from '../../data/PlayerData';
-import { getItemDef } from '../../data/ItemDB';
+import { getItemDef, getItemDefByOriginalGetItemId } from '../../data/ItemDB';
 import { getStoryQuestByDungeonId, isStoryQuestAvailable, type StoryQuestDefinition } from '../../data/StoryQuestData';
 import { getStoryScenarioByDungeonId, type StoryScenarioDefinition } from '../../data/StoryScenarioData';
 import {
@@ -14,6 +14,7 @@ import {
     getStoryScenarioPresentationDurationMs,
     getStoryScenarioTrapMagicDamage,
     getStoryScenarioTriggerMagicCodes,
+    getStoryScenarioTriggerUseItemIds,
     type StoryScenarioEventSequence,
     type StoryScenarioEventStep,
     type StoryScenarioFieldEvent,
@@ -81,6 +82,8 @@ export interface WorldStoryScenarioContext {
     followCameraToPlayer(): void;
     focusCameraOnTile(tile: TilePoint): void;
     autoPlaceRewardItem(itemId: string): boolean;
+    hasScenarioItem(itemId: string): boolean;
+    consumeScenarioItem(itemId: string): boolean;
     spawnDamage?(x: number, y: number, amount: number): void;
     log(message: string): void;
 }
@@ -192,6 +195,13 @@ export class WorldStoryScenarioController {
         const event = sequence?.fieldEvents.find((candidate) => candidate.id === eventId);
         if (!event) return false;
         if (this.isFieldEventCompleted(dungeonId, event)) return false;
+        const requiredItems = this.getFieldEventRequiredItems(event);
+        for (const item of requiredItems) {
+            if (!this.context.hasScenarioItem(item.id)) {
+                this.context.log(formatT('story.event.useItem.missing', { item: item.nameKr ?? item.name }));
+                return false;
+            }
+        }
         this.completedFieldEventKeys.add(this.fieldEventKey(dungeonId, event.id));
         this.context.raidSession.setScenarioFlag(dungeonId, getStoryScenarioFieldEventFlag(event));
         this.syncActiveInteriorDoorLocks();
@@ -207,6 +217,11 @@ export class WorldStoryScenarioController {
             else this.enqueueStoryScenarioPresentation(presentationSteps);
         } else {
             this.enqueueStoryScenarioPresentation(presentationSteps);
+        }
+        for (const item of requiredItems) {
+            if (this.context.consumeScenarioItem(item.id)) {
+                this.context.log(formatT('story.event.useItem.consumed', { item: item.nameKr ?? item.name }));
+            }
         }
         this.applyFieldEventRewards(event);
         this.applyFieldEventTrapMagic(event, actor);
@@ -679,6 +694,12 @@ export class WorldStoryScenarioController {
 
     private fieldEventKey(dungeonId: string, eventId: string): string {
         return `${dungeonId}:${eventId}`;
+    }
+
+    private getFieldEventRequiredItems(event: StoryScenarioFieldEvent): NonNullable<ReturnType<typeof getItemDef>>[] {
+        return getStoryScenarioTriggerUseItemIds(event.trigger)
+            .map((originalItemId) => getItemDefByOriginalGetItemId(originalItemId))
+            .filter((item): item is NonNullable<ReturnType<typeof getItemDef>> => Boolean(item));
     }
 
     private getFieldEventDungeonId(): string | null {

@@ -41,6 +41,10 @@ export function getStoryScenarioTriggerMagicCodes(trigger: string): number[] {
     return [...trigger.matchAll(/\bMAGIC\s+0*(\d+)\b/g)].map((match) => Number(match[1]));
 }
 
+export function getStoryScenarioTriggerUseItemIds(trigger: string): number[] {
+    return [...trigger.matchAll(/\bUSEITEM\s+0*(\d+)\b/g)].map((match) => Number(match[1]));
+}
+
 export function getStoryScenarioTrapMagicDamage(magicCode: number, maxHp: number): number {
     const tierDigit = Number(String(magicCode).slice(-1));
     const tier = Number.isFinite(tierDigit) && tierDigit > 0 ? tierDigit : 1;
