@@ -630,6 +630,11 @@ export class WorldSession {
         return this.saveState.createPatch(player, playerId, hubTownId);
     }
 
+    public createRecoveryCharacterSavePatch(playerId: string, hubTownId?: string): WorldCharacterSavePatch | null {
+        const player = this.players.get(playerId);
+        return this.saveState.createRecoveryPatch(player, playerId, hubTownId);
+    }
+
     public hasFinalCharacterSavePatch(playerId: string): boolean {
         return this.saveState.hasFinalPatch(playerId);
     }

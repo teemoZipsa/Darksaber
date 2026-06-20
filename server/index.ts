@@ -618,8 +618,8 @@ function consumeSessionSaveDirtyPlayers(sessionKey: string, session: WorldSessio
     for (const playerId of session.consumeSaveDirtyPlayerIds()) {
         const tracker = saveTrackers.get(socketPlayerKey(sessionKey, playerId));
         if (!tracker) continue;
-        const patch = session.createCharacterSavePatch(playerId);
-        if (patch) spoolPendingCharacterSave(tracker, patch, 'dirty');
+        const patch = session.createRecoveryCharacterSavePatch(playerId);
+        if (patch) spoolPendingCharacterSave(tracker, patch, 'dirty_recovery');
         tracker.dirty = true;
         tracker.lastDirtyAt = Date.now();
     }
@@ -631,23 +631,24 @@ async function flushCharacterSave(sessionKey: string, playerId: string, reason: 
     if (!tracker || tracker.saving) return;
     if (!force && !tracker.dirty) return;
     const session = sessions.get(sessionKey);
+    const isFinalPatch = Boolean(session?.hasFinalCharacterSavePatch(playerId));
     const patch = session?.createCharacterSavePatch(playerId);
     if (!patch) {
         tracker.dirty = false;
-        worldSaveSpool.remove(key);
+        if (isFinalPatch) worldSaveSpool.remove(key);
         return;
     }
 
-    spoolPendingCharacterSave(tracker, patch, reason);
+    // Non-final recovery patches stay in the spool; DB autosaves keep raid rewards uncommitted.
+    if (isFinalPatch) spoolPendingCharacterSave(tracker, patch, reason);
     tracker.saving = true;
     tracker.dirty = false;
-    const isFinalPatch = Boolean(session?.hasFinalCharacterSavePatch(playerId));
     try {
         const updatedRevision = await updateCharacterSaveWithRetry(tracker, patch);
         tracker.expectedRevision = updatedRevision;
         tracker.lastSavedAt = Date.now();
-        worldSaveSpool.remove(key);
         if (isFinalPatch) {
+            worldSaveSpool.remove(key);
             session?.consumeFinalCharacterSavePatch(playerId);
             saveTrackers.delete(key);
         }

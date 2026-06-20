@@ -33,11 +33,31 @@ export class WorldSessionSaveState {
     }
 
     public createPatch(player: WorldSessionSavePlayer | undefined, playerId: string, hubTownId?: string): WorldCharacterSavePatch | null {
-        return player ? this.buildPatch(player, { hubTownId, includeRaidRewards: false }) : this.finalPatches.get(playerId) ?? null;
+        return player
+            ? this.buildPatch(player, {
+                hubTownId,
+                includeAcquiredRaidItems: false,
+                includeSurvivalRewards: false,
+            })
+            : this.finalPatches.get(playerId) ?? null;
+    }
+
+    public createRecoveryPatch(player: WorldSessionSavePlayer | undefined, playerId: string, hubTownId?: string): WorldCharacterSavePatch | null {
+        return player
+            ? this.buildPatch(player, {
+                hubTownId,
+                includeAcquiredRaidItems: true,
+                includeSurvivalRewards: false,
+            })
+            : this.finalPatches.get(playerId) ?? null;
     }
 
     public captureFinalPatch(player: WorldSessionSavePlayer, hubTownId?: string, includeRaidRewards: boolean = false): void {
-        const patch = this.buildPatch(player, { hubTownId, includeRaidRewards });
+        const patch = this.buildPatch(player, {
+            hubTownId,
+            includeAcquiredRaidItems: includeRaidRewards,
+            includeSurvivalRewards: includeRaidRewards,
+        });
         if (patch) this.finalPatches.set(player.id, patch);
     }
 
@@ -69,7 +89,7 @@ export class WorldSessionSaveState {
     public canAddPlacedItems(player: WorldSessionSavePlayer, placedItems: readonly WorldSessionPlacedSaveItem[]): boolean {
         const inventory = player.saveSnapshot?.inventory;
         if (!inventory) return true;
-        const draft = cloneInventorySnapshot(inventory, { includeRaidRewards: true });
+        const draft = cloneInventorySnapshot(inventory, { includeAcquiredRaidItems: true });
         for (const placed of placedItems) {
             if (!tryAddPlacedItemToInventory(draft, placed, false)) return false;
         }
@@ -84,22 +104,22 @@ export class WorldSessionSaveState {
 
     private buildPatch(
         player: WorldSessionSavePlayer,
-        options: { hubTownId?: string; includeRaidRewards: boolean }
+        options: { hubTownId?: string; includeAcquiredRaidItems: boolean; includeSurvivalRewards: boolean }
     ): WorldCharacterSavePatch | null {
         const save = player.saveSnapshot;
         if (!save) return null;
         const questState: Record<string, unknown> = {
             ...cloneRecord(save.questState),
-            completedQuestIds: options.includeRaidRewards
+            completedQuestIds: options.includeSurvivalRewards
                 ? [...player.completedQuestIds]
                 : normalizeStringArray(save.questState.completedQuestIds),
         };
-        if (options.includeRaidRewards && player.raidGoldReward > 0) {
+        if (options.includeSurvivalRewards && player.raidGoldReward > 0) {
             questState.gold = normalizeGoldValue(questState.gold) + Math.floor(player.raidGoldReward);
         }
         const inventory = cloneInventorySnapshot(save.inventory, options);
         const rosterSnapshot = cloneRecord(save.rosterSnapshot);
-        if (options.includeRaidRewards) {
+        if (options.includeSurvivalRewards) {
             const previousQuestIds = new Set(normalizeStringArray(save.questState.completedQuestIds));
             const blockableQuestIds = new Set([...player.completedQuestIds].filter((questId) => !previousQuestIds.has(questId)));
             applyStoryQuestRewardsToSaveState(player.completedQuestIds, questState, inventory, rosterSnapshot, blockableQuestIds);
@@ -147,7 +167,7 @@ export function cloneCharacterSave(save: CharacterSave | undefined): CharacterSa
         ...save,
         hubLocation: cloneRecord(save.hubLocation),
         questState: cloneRecord(save.questState),
-        inventory: cloneInventorySnapshot(save.inventory, { includeRaidRewards: true }),
+        inventory: cloneInventorySnapshot(save.inventory, { includeAcquiredRaidItems: true }),
         equipment: cloneRecord(save.equipment),
         partySnapshot: cloneRecord(save.partySnapshot),
         rosterSnapshot: cloneRecord(save.rosterSnapshot),
@@ -156,16 +176,16 @@ export function cloneCharacterSave(save: CharacterSave | undefined): CharacterSa
 
 function cloneInventorySnapshot(
     inventory: InventorySaveSnapshot,
-    options: { includeRaidRewards: boolean }
+    options: { includeAcquiredRaidItems: boolean }
 ): InventorySaveSnapshot {
     return {
         width: inventory.width,
         height: inventory.height,
         items: inventory.items
-            .filter((item) => options.includeRaidRewards || item.acquiredInRaid !== true)
+            .filter((item) => options.includeAcquiredRaidItems || item.acquiredInRaid !== true)
             .map((item) => {
                 const clone = { ...item };
-                if (options.includeRaidRewards) delete clone.acquiredInRaid;
+                if (options.includeAcquiredRaidItems) delete clone.acquiredInRaid;
                 return clone;
             }),
     };

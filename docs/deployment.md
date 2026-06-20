@@ -122,8 +122,15 @@ During graceful shutdown, the world server rejects new joins, force-extracts
 active raids as `SURVIVED` to the departure town, emits a final `RAID_RESULT`,
 and flushes the resulting character save patches before closing sockets. This
 prevents deploy shutdowns from silently dropping raid loot and dirty character
-state, but it is not full live-raid snapshot restore; crash recovery and
-horizontal scale still require persistent raid-instance state.
+state.
+
+During active raids, dirty save events also write a local recovery spool that
+includes raid-acquired inventory but does not commit survival-only rewards such
+as quest completion, raid gold, or story companion grants. If the process
+crashes and restarts on the same disk, the spool replay can recover the latest
+dirty inventory snapshot. This is still not full live-raid snapshot restore:
+enemy state, turn state, positions, and horizontal scale still require
+persistent raid-instance state.
 
 ## Vercel Client
 

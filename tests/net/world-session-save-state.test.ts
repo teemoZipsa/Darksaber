@@ -59,6 +59,71 @@ test('final world save patch persists story quest inventory and companion reward
     assert.equal(companion?.level, 1);
 });
 
+test('active raid recovery patch keeps raid inventory without completing survival rewards', () => {
+    const scenario = STORY_SCENARIOS.find((entry) => entry.episode === 3);
+    assert.ok(scenario);
+    const save = createDefaultCharacterSave(authCharacter('hero-recovery'));
+    save.questState = { ...save.questState, completedQuestIds: [], gold: 500 };
+    save.inventory.items.push({
+        itemId: 'herb_cheap',
+        gridX: 4,
+        gridY: 4,
+        quantity: 1,
+        durability: getItemDef('herb_cheap')?.maxDurability ?? 1,
+        acquiredInRaid: true,
+    });
+    const player: WorldSessionSavePlayer = {
+        id: 'hero-recovery',
+        completedQuestIds: new Set([scenario.questId]),
+        raidGoldReward: 250,
+        saveSnapshot: save,
+    };
+    const saveState = new WorldSessionSaveState();
+
+    const interimPatch = saveState.createPatch(player, player.id, 'central_castle');
+    assert.ok(interimPatch);
+    assert.equal(interimPatch.inventory?.items.some((item) => item.itemId === 'herb_cheap' && item.gridX === 4), false);
+    assert.equal(interimPatch.questState?.gold, 500);
+    assert.deepEqual(interimPatch.questState?.completedQuestIds, []);
+
+    const recoveryPatch = saveState.createRecoveryPatch(player, player.id, 'central_castle');
+    assert.ok(recoveryPatch);
+    const recoveredRaidItem = recoveryPatch.inventory?.items.find((item) => item.itemId === 'herb_cheap' && item.gridX === 4);
+    assert.ok(recoveredRaidItem);
+    assert.equal(recoveredRaidItem.acquiredInRaid, undefined);
+    assert.equal(recoveryPatch.questState?.gold, 500);
+    assert.deepEqual(recoveryPatch.questState?.completedQuestIds, []);
+    assert.equal(Array.isArray(recoveryPatch.questState?.questItemIds), false);
+    assert.equal(Array.isArray(recoveryPatch.questState?.storyCompanionIds), false);
+});
+
+test('failed final world save patch still drops raid inventory after recovery snapshots', () => {
+    const save = createDefaultCharacterSave(authCharacter('hero-failed-recovery'));
+    save.inventory.items.push({
+        itemId: 'herb_cheap',
+        gridX: 4,
+        gridY: 4,
+        quantity: 1,
+        durability: getItemDef('herb_cheap')?.maxDurability ?? 1,
+        acquiredInRaid: true,
+    });
+    const player: WorldSessionSavePlayer = {
+        id: 'hero-failed-recovery',
+        completedQuestIds: new Set<string>(),
+        raidGoldReward: 0,
+        saveSnapshot: save,
+    };
+    const saveState = new WorldSessionSaveState();
+
+    const recoveryPatch = saveState.createRecoveryPatch(player, player.id, 'central_castle');
+    assert.ok(recoveryPatch?.inventory?.items.some((item) => item.itemId === 'herb_cheap' && item.gridX === 4));
+
+    saveState.captureFinalPatch(player, 'central_castle', false);
+    const finalPatch = saveState.consumeFinalPatch(player.id);
+    assert.ok(finalPatch);
+    assert.equal(finalPatch.inventory?.items.some((item) => item.itemId === 'herb_cheap' && item.gridX === 4), false);
+});
+
 test('final world save patch with full inventory does not persist incomplete story completion', () => {
     const scenario = STORY_SCENARIOS.find((entry) => entry.episode === 3);
     assert.ok(scenario);
