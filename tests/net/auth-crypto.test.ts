@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { hashRefreshToken } from '../../server/AuthCrypto';
 
-test('refresh token hash uses an environment secret in production paths', () => {
+test('refresh token hash uses configured secrets and never requires a source secret', () => {
     const originalSecret = process.env.AUTH_REFRESH_TOKEN_HASH_SECRET;
     const originalNodeEnv = process.env.NODE_ENV;
 
@@ -10,6 +10,7 @@ test('refresh token hash uses an environment secret in production paths', () => 
         delete process.env.AUTH_REFRESH_TOKEN_HASH_SECRET;
         process.env.NODE_ENV = 'test';
         const devHash = hashRefreshToken('refresh-token');
+        assert.equal(devHash, hashRefreshToken('refresh-token'));
 
         process.env.AUTH_REFRESH_TOKEN_HASH_SECRET = 'test-refresh-secret';
         const configuredHash = hashRefreshToken('refresh-token');
