@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createWorldServerMetrics, formatWorldServerMetrics } from '../../server/WorldServerObservability';
+import { createWorldServerMetrics, formatServerLogEvent, formatWorldServerMetrics } from '../../server/WorldServerObservability';
 
 test('world server metrics render gauges and operational counters', () => {
     const metrics = createWorldServerMetrics();
@@ -46,4 +46,28 @@ test('world server metrics render gauges and operational counters', () => {
     assert.match(output, /darksaber_world_session_lease_acquire_failures_total 4/);
     assert.match(output, /darksaber_world_session_lease_lost_total 5/);
     assert.match(output, /darksaber_world_shutdown_forced_raid_results_total 1/);
+});
+
+test('world server structured logs include level, event, time, fields, and errors', () => {
+    const output = formatServerLogEvent('error', 'world_session_snapshot_save_failed', {
+        sessionKey: 'mortal:raid:party-1',
+        reason: 'tick',
+        error: new Error('disk full'),
+    }, new Date('2026-01-02T03:04:05.000Z'));
+    const parsed = JSON.parse(output) as {
+        level: string;
+        event: string;
+        time: string;
+        sessionKey: string;
+        reason: string;
+        error: { name: string; message: string };
+    };
+
+    assert.equal(parsed.level, 'error');
+    assert.equal(parsed.event, 'world_session_snapshot_save_failed');
+    assert.equal(parsed.time, '2026-01-02T03:04:05.000Z');
+    assert.equal(parsed.sessionKey, 'mortal:raid:party-1');
+    assert.equal(parsed.reason, 'tick');
+    assert.equal(parsed.error.name, 'Error');
+    assert.equal(parsed.error.message, 'disk full');
 });

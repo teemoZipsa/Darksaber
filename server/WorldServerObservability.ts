@@ -153,9 +153,37 @@ export function formatWorldServerMetrics(metrics: WorldServerMetrics, gauges: Wo
     return `${lines.join('\n')}\n`;
 }
 
-export function logServerEvent(level: 'info' | 'warn' | 'error', event: string, fields: Record<string, unknown> = {}): void {
-    const payload = JSON.stringify({ level, event, time: new Date().toISOString(), ...fields });
+export type WorldServerLogLevel = 'info' | 'warn' | 'error';
+
+export function formatServerLogEvent(
+    level: WorldServerLogLevel,
+    event: string,
+    fields: Record<string, unknown> = {},
+    now: Date = new Date()
+): string {
+    return JSON.stringify({ level, event, time: now.toISOString(), ...sanitizeLogFields(fields) });
+}
+
+export function errorToLogValue(error: unknown): unknown {
+    if (!(error instanceof Error)) return String(error);
+    return {
+        name: error.name,
+        message: error.message,
+        ...(error.stack ? { stack: error.stack } : {}),
+    };
+}
+
+export function logServerEvent(level: WorldServerLogLevel, event: string, fields: Record<string, unknown> = {}): void {
+    const payload = formatServerLogEvent(level, event, fields);
     if (level === 'error') console.error(payload);
     else if (level === 'warn') console.warn(payload);
     else console.log(payload);
+}
+
+function sanitizeLogFields(fields: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(fields)) {
+        sanitized[key] = value instanceof Error ? errorToLogValue(value) : value;
+    }
+    return sanitized;
 }

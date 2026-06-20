@@ -22,6 +22,7 @@ import {
     type CharacterSave,
     type SaveUpdateInput,
 } from './AuthStore';
+import { errorToLogValue, logServerEvent } from './WorldServerObservability';
 import { normalizeLoadout } from '../src/magic/MagicLoadout';
 
 export interface AuthHttpOptions {
@@ -86,7 +87,7 @@ export function createAuthHttpHandler(options: AuthHttpOptions): (request: Incom
             if (error instanceof HttpError) {
                 writeJson(response, error.status, { error: error.code, message: error.message }, origin, options);
             } else {
-                console.error('Auth HTTP error:', error instanceof Error ? error.message : error);
+                logServerEvent('error', 'auth_http_error', { path: url.pathname, method: request.method, error: errorToLogValue(error) });
                 writeJson(response, 500, { error: 'server_error' }, origin, options);
             }
         }

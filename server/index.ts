@@ -35,7 +35,7 @@ import {
     type WorldSessionSnapshotStoreBackend,
 } from './WorldSessionSnapshotStore';
 import { createWorldSessionKey, resolveWorldSessionRoute, type WorldSessionRoute } from './WorldSessionRouter';
-import { createWorldServerMetrics, formatWorldServerMetrics, logServerEvent } from './WorldServerObservability';
+import { createWorldServerMetrics, errorToLogValue, formatWorldServerMetrics, logServerEvent } from './WorldServerObservability';
 
 const PORT = Number(process.env.PORT ?? 8765);
 const HOST = process.env.HOST;
@@ -79,20 +79,18 @@ const sessions = new Map<string, WorldSession>();
 const replayedWorldSaves = await replayWorldSaveSpool(authStore, worldSaveSpool, {
     retryLimit: WORLD_SAVE_RETRY_LIMIT,
     retryBaseMs: WORLD_SAVE_RETRY_BASE_MS,
-    logger: (message) => console.error(message),
+    logger: (message) => logServerEvent('error', 'world_save_spool_replay_error', { message }),
 });
 metrics.saveSpoolReplayAppliedTotal = replayedWorldSaves.applied;
 metrics.saveSpoolReplayFailedTotal = replayedWorldSaves.failed;
 const recoveredResumeTokens = new Set(replayedWorldSaves.recoveredResumeTokens);
 if (replayedWorldSaves.applied > 0 || replayedWorldSaves.failed > 0) {
-    console.log(`World save spool replay applied=${replayedWorldSaves.applied} failed=${replayedWorldSaves.failed}`);
     logServerEvent('info', 'world_save_spool_replay_completed', replayedWorldSaves);
 }
 const restoredWorldSessions = await restorePersistedWorldSessions();
 metrics.sessionSnapshotRestoreAppliedTotal = restoredWorldSessions.applied;
 metrics.sessionSnapshotRestoreFailedTotal = restoredWorldSessions.failed;
 if (restoredWorldSessions.applied > 0 || restoredWorldSessions.failed > 0) {
-    console.log(`World session snapshot restore applied=${restoredWorldSessions.applied} failed=${restoredWorldSessions.failed}`);
     logServerEvent('info', 'world_session_snapshot_restore_completed', restoredWorldSessions);
 }
 const handleAuthHttpRequest = createAuthHttpHandler({
@@ -163,8 +161,6 @@ let immediateSnapshotFlushScheduled = false;
 
 server.listen(PORT, HOST, () => {
     const hostLabel = HOST ?? '0.0.0.0';
-    console.log(`Darksaber world server started on ws://${hostLabel}:${PORT}`);
-    console.log(`Auth store: ${authStoreKind}`);
     logServerEvent('info', 'server_started', { host: hostLabel, port: PORT, authStore: authStoreKind, shards: WORLD_SHARD_COUNT });
 });
 
@@ -208,7 +204,7 @@ wss.on('connection', (ws: WebSocket, request) => {
 
     ws.on('message', (data: RawData) => {
         void handleSocketMessage(ws, data).catch((error) => {
-            console.error('World socket message error:', error instanceof Error ? error.message : error);
+            logServerEvent('error', 'ws_message_handler_failed', { error: errorToLogValue(error) });
             send(ws, { type: 'ERROR', code: 'SERVER_ERROR', message: 'World server error.' });
         });
     });
@@ -216,7 +212,7 @@ wss.on('connection', (ws: WebSocket, request) => {
     ws.on('close', () => cleanupSocket(ws));
 
     ws.on('error', (error) => {
-        console.error('World socket error:', error.message);
+        logServerEvent('error', 'ws_socket_error', { error: errorToLogValue(error) });
     });
 });
 
@@ -264,9 +260,7 @@ if (ENABLE_DEBUG_COUNTS) {
     setInterval(() => {
         for (const [sessionKey, session] of sessions) {
             const counts = session.getDebugCounts();
-            console.log(
-                `[WorldSession:${sessionKey}] counts activePlayers=${counts.activePlayers} ghosts=${counts.ghostPlayers} enemies=${counts.enemies} lootLocks=${counts.lootLocks}`
-            );
+            logServerEvent('info', 'world_session_debug_counts', { sessionKey, ...counts });
         }
     }, 5_000);
 }
@@ -295,7 +289,6 @@ async function handleSocketMessage(ws: WebSocket, data: RawData): Promise<void> 
     const message = parseMessage(rawDataToBuffer(data));
     if (!message) {
         metrics.malformedMessagesTotal += 1;
-        console.warn('Malformed WebSocket message rejected.');
         logServerEvent('warn', 'ws_message_rejected', { reason: 'bad_json' });
         send(ws, { type: 'ERROR', code: 'BAD_JSON', message: 'Invalid JSON message.' });
         return;
@@ -387,7 +380,6 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
         authStore.getAccountProgress(auth.account.id),
     ]);
     if (!character || !save) {
-        console.warn(`WORLD_JOIN denied account=${auth.account.id} character=${message.characterId}`);
         logServerEvent('warn', 'world_join_denied', { accountId: auth.account.id, characterId: message.characterId });
         send(ws, { type: 'ERROR', code: 'CHARACTER_FORBIDDEN', message: 'Selected character does not belong to this account.' });
         return;
@@ -485,7 +477,6 @@ function acceptSocketPayload(ws: WebSocket, data: RawData): boolean {
     const now = Date.now();
     if (rawDataLength(data) > MAX_WS_PAYLOAD_BYTES) {
         metrics.oversizedPayloadsTotal += 1;
-        console.warn('Oversized WebSocket payload rejected.');
         logServerEvent('warn', 'ws_message_rejected', { reason: 'payload_too_large' });
         send(ws, { type: 'ERROR', code: 'PAYLOAD_TOO_LARGE', message: 'Message payload is too large.' });
         ws.close(1009, 'payload too large');
@@ -501,8 +492,7 @@ function acceptSocketPayload(ws: WebSocket, data: RawData): boolean {
         state.isAlive = true;
         if (state.count > WS_RATE_LIMIT_MESSAGES) {
             metrics.rateLimitedSocketsTotal += 1;
-            console.warn('WebSocket rate limit exceeded.');
-            logServerEvent('warn', 'ws_message_rejected', { reason: 'rate_limited' });
+            logServerEvent('warn', 'ws_message_rejected', { reason: 'rate_limited', count: state.count, windowMs: WS_RATE_LIMIT_WINDOW_MS });
             send(ws, { type: 'ERROR', code: 'RATE_LIMITED', message: 'Too many messages.' });
             ws.close(1008, 'rate limited');
             return false;
@@ -614,7 +604,7 @@ async function getOrCreateSession(route: WorldSessionRoute): Promise<{ sessionKe
     if (!session) {
         session = new WorldSession({
             realm: route.realm,
-            logger: (message) => console.log(`[WorldSession:${sessionKey}] ${message}`),
+            logger: (message) => logServerEvent('info', 'world_session_event', { sessionKey, message }),
         });
         sessions.set(sessionKey, session);
     }
@@ -638,7 +628,7 @@ async function restorePersistedWorldSessions(): Promise<{ applied: number; faile
         try {
             if (!await ensureWorldSessionLease(entry.sessionKey)) continue;
             const session = WorldSession.restorePersistentSnapshot(entry.snapshot, {
-                logger: (message) => console.log(`[WorldSession:${entry.sessionKey}] ${message}`),
+                logger: (message) => logServerEvent('info', 'world_session_event', { sessionKey: entry.sessionKey, message }),
             });
             session.disconnectActivePlayersForServerRestart(now);
             sessions.set(entry.sessionKey, session);
@@ -651,10 +641,9 @@ async function restorePersistedWorldSessions(): Promise<{ applied: number; faile
         } catch (error) {
             failed++;
             await worldSessionSnapshotStore.remove(entry.sessionKey);
-            console.error(`Failed to restore world session snapshot ${entry.sessionKey}:`, error instanceof Error ? error.message : error);
             logServerEvent('error', 'world_session_snapshot_restore_failed', {
                 sessionKey: entry.sessionKey,
-                error: error instanceof Error ? error.message : String(error),
+                error: errorToLogValue(error),
             });
         }
     }
@@ -680,11 +669,10 @@ async function persistWorldSessionSnapshot(sessionKey: string, session: WorldSes
         await worldSessionSnapshotStore.upsert({ sessionKey, snapshot });
     } catch (error) {
         metrics.sessionSnapshotSaveFailuresTotal += 1;
-        console.error('Failed to persist world session snapshot:', error instanceof Error ? error.message : error);
         logServerEvent('error', 'world_session_snapshot_save_failed', {
             reason,
             sessionKey,
-            error: error instanceof Error ? error.message : String(error),
+            error: errorToLogValue(error),
         });
     }
 }
@@ -743,7 +731,13 @@ function persistRaidResult(binding: SocketBinding, message: WorldServerMessage):
     if (message.result !== 'SURVIVED') return;
     const questIds = completedDungeonIdsToQuestIds(message);
     void withRetry(() => authStore.recordRaidSurvival(binding.accountId, binding.characterId, questIds, message.extractionTownId)).catch((error) => {
-        console.error('Failed to persist raid result:', error instanceof Error ? error.message : error);
+        logServerEvent('error', 'raid_result_persist_failed', {
+            accountId: binding.accountId,
+            characterId: binding.characterId,
+            extractionTownId: message.extractionTownId,
+            completedQuestIds: questIds,
+            error: errorToLogValue(error),
+        });
     });
 }
 
@@ -815,14 +809,13 @@ async function flushCharacterSave(sessionKey: string, playerId: string, reason: 
             saveTrackers.delete(key);
         }
         if (ENABLE_DEBUG_COUNTS) {
-            console.log(`character save flush reason=${reason} player=${playerId} revision=${updatedRevision}`);
+            logServerEvent('info', 'character_save_flushed', { reason, sessionKey, playerId, revision: updatedRevision });
         }
     } catch (error) {
         metrics.saveFailuresTotal += 1;
         tracker.dirty = true;
         tracker.lastDirtyAt = Date.now();
-        console.error(`Failed to flush character save (${reason}):`, error instanceof Error ? error.message : error);
-        logServerEvent('error', 'character_save_flush_failed', { reason, playerId, error: error instanceof Error ? error.message : String(error) });
+        logServerEvent('error', 'character_save_flush_failed', { reason, sessionKey, playerId, error: errorToLogValue(error) });
     } finally {
         tracker.saving = false;
     }
@@ -843,8 +836,7 @@ function spoolPendingCharacterSave(tracker: PlayerSaveTracker, patch: WorldChara
         });
     } catch (error) {
         metrics.saveSpoolFailuresTotal += 1;
-        console.error('Failed to spool pending world save:', error instanceof Error ? error.message : error);
-        logServerEvent('error', 'world_save_spool_failed', { reason, playerId: tracker.playerId, error: error instanceof Error ? error.message : String(error) });
+        logServerEvent('error', 'world_save_spool_failed', { reason, sessionKey: tracker.sessionKey, playerId: tracker.playerId, error: errorToLogValue(error) });
     }
 }
 
@@ -914,7 +906,6 @@ async function shutdownWorldServer(signal: NodeJS.Signals): Promise<void> {
     if (shutdownStarted) return;
     shutdownStarted = true;
     metrics.shutdownsTotal += 1;
-    console.log(`Received ${signal}; flushing world saves before shutdown.`);
     logServerEvent('info', 'server_shutdown_started', { signal, sessions: sessions.size, sockets: wss.clients.size });
     finishActiveRaidsForShutdown();
     await persistAllWorldSessionSnapshots('shutdown');
@@ -924,7 +915,7 @@ async function shutdownWorldServer(signal: NodeJS.Signals): Promise<void> {
     await Promise.race([
         flush,
         sleep(WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS).then(() => {
-            console.error(`World save shutdown flush exceeded ${WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS}ms.`);
+            logServerEvent('error', 'server_shutdown_flush_timeout', { timeoutMs: WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS });
         }),
     ]);
     await closeServers();
