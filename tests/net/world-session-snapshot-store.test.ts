@@ -7,7 +7,11 @@ import { createBaseStats } from '../../src/data/Stats';
 import type { ActorSnapshot, WorldJoinMessage } from '../../src/net/WorldProtocol';
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
 import { WorldSession } from '../../server/WorldSession';
-import { WorldSessionSnapshotStore } from '../../server/WorldSessionSnapshotStore';
+import {
+    PostgresWorldSessionSnapshotStore,
+    WorldSessionSnapshotStore,
+    type PostgresWorldSessionSnapshotPool,
+} from '../../server/WorldSessionSnapshotStore';
 
 function actor(id: string): ActorSnapshot {
     return {
@@ -53,7 +57,7 @@ function authCharacter(id: string): AuthCharacter {
     };
 }
 
-test('world session snapshot store reloads reconnectable active raid snapshots', () => {
+test('world session snapshot store reloads reconnectable active raid snapshots', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'darksaber-session-snapshot-'));
     try {
         const persistPath = join(dir, 'world-session-snapshots.json');
@@ -70,9 +74,9 @@ test('world session snapshot store reloads reconnectable active raid snapshots',
             now: () => new Date('2026-01-01T00:00:00.000Z'),
         });
 
-        store.upsert({ sessionKey, snapshot: session.createPersistentSnapshot() });
+        await store.upsert({ sessionKey, snapshot: session.createPersistentSnapshot() });
         const reloadedStore = new WorldSessionSnapshotStore({ persistPath });
-        const entries = reloadedStore.list();
+        const entries = await reloadedStore.list();
         assert.equal(entries.length, 1);
         assert.equal(entries[0]?.sessionKey, sessionKey);
 
@@ -83,9 +87,61 @@ test('world session snapshot store reloads reconnectable active raid snapshots',
         assert.equal(reconnect.playerId, joined.playerId);
         assert.equal(reconnect.welcome.sessionEpoch, 77_777);
 
-        reloadedStore.remove(sessionKey);
-        assert.equal(new WorldSessionSnapshotStore({ persistPath }).list().length, 0);
+        await reloadedStore.remove(sessionKey);
+        assert.equal((await new WorldSessionSnapshotStore({ persistPath }).list()).length, 0);
     } finally {
         rmSync(dir, { recursive: true, force: true });
     }
+});
+
+test('postgres world session snapshot store persists shared raid snapshots', async () => {
+    const rows = new Map<string, { session_key: string; snapshot: unknown; updated_at: Date }>();
+    const queries: string[] = [];
+    const pool: PostgresWorldSessionSnapshotPool = {
+        async query<T>(text: string, values?: readonly unknown[]): Promise<{ rows: T[] }> {
+            queries.push(text);
+            if (text.includes('CREATE TABLE')) return { rows: [] };
+            if (text.startsWith('INSERT INTO world_session_snapshots')) {
+                const sessionKey = String(values?.[0]);
+                rows.set(sessionKey, {
+                    session_key: sessionKey,
+                    snapshot: JSON.parse(String(values?.[1])),
+                    updated_at: new Date(String(values?.[2])),
+                });
+                return { rows: [] };
+            }
+            if (text.startsWith('SELECT session_key')) return { rows: [...rows.values()] as T[] };
+            if (text.startsWith('DELETE FROM world_session_snapshots WHERE')) {
+                rows.delete(String(values?.[0]));
+                return { rows: [] };
+            }
+            if (text.startsWith('DELETE FROM world_session_snapshots')) {
+                rows.clear();
+                return { rows: [] };
+            }
+            throw new Error(`Unexpected query: ${text}`);
+        },
+    };
+    const store = new PostgresWorldSessionSnapshotStore({
+        pool,
+        now: () => new Date('2026-01-01T00:00:00.000Z'),
+    });
+    const character = authCharacter('hero-postgres-snapshot');
+    const session = new WorldSession({ sessionEpoch: 88_888 });
+    session.join(joinMessage('central_castle', character.id), 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        saveSnapshot: createDefaultCharacterSave(character),
+    });
+
+    await store.initialize();
+    await store.upsert({ sessionKey: 'mortal:raid:party_alpha', snapshot: session.createPersistentSnapshot() });
+    const entries = await store.list();
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0]?.sessionKey, 'mortal:raid:party_alpha');
+    assert.equal(entries[0]?.snapshot.sessionEpoch, 88_888);
+    assert.ok(queries.some((query) => query.includes('CREATE TABLE IF NOT EXISTS world_session_snapshots')));
+
+    await store.remove('mortal:raid:party_alpha');
+    assert.equal((await store.list()).length, 0);
 });

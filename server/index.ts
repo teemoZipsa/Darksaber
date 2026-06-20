@@ -28,7 +28,11 @@ import { authenticateAccessToken, createAuthHttpHandler } from './AuthHttp';
 import { InMemoryAuthStore, PostgresAuthStore, type AccountProgress, type AuthAccount, type AuthCharacter, type AuthStore, type CharacterSave } from './AuthStore';
 import type { JwtOptions } from './AuthCrypto';
 import { replayWorldSaveSpool, WorldSaveSpool } from './WorldSaveSpool';
-import { WorldSessionSnapshotStore } from './WorldSessionSnapshotStore';
+import {
+    PostgresWorldSessionSnapshotStore,
+    WorldSessionSnapshotStore,
+    type WorldSessionSnapshotStoreBackend,
+} from './WorldSessionSnapshotStore';
 import { createWorldSessionKey, resolveWorldSessionRoute, type WorldSessionRoute } from './WorldSessionRouter';
 import { createWorldServerMetrics, formatWorldServerMetrics, logServerEvent } from './WorldServerObservability';
 
@@ -66,9 +70,8 @@ const metrics = createWorldServerMetrics();
 const worldSaveSpool = new WorldSaveSpool({
     persistPath: resolveServerPersistPath(process.env.WORLD_SAVE_SPOOL_PATH, './.runtime/world-save-spool.json'),
 });
-const worldSessionSnapshotStore = new WorldSessionSnapshotStore({
-    persistPath: resolveServerPersistPath(process.env.WORLD_SESSION_SNAPSHOT_PATH, './.runtime/world-session-snapshots.json'),
-});
+const worldSessionSnapshotStore = createWorldSessionSnapshotStore();
+await worldSessionSnapshotStore.initialize();
 const sessions = new Map<string, WorldSession>();
 const replayedWorldSaves = await replayWorldSaveSpool(authStore, worldSaveSpool, {
     retryLimit: WORLD_SAVE_RETRY_LIMIT,
@@ -82,7 +85,7 @@ if (replayedWorldSaves.applied > 0 || replayedWorldSaves.failed > 0) {
     console.log(`World save spool replay applied=${replayedWorldSaves.applied} failed=${replayedWorldSaves.failed}`);
     logServerEvent('info', 'world_save_spool_replay_completed', replayedWorldSaves);
 }
-const restoredWorldSessions = restorePersistedWorldSessions();
+const restoredWorldSessions = await restorePersistedWorldSessions();
 metrics.sessionSnapshotRestoreAppliedTotal = restoredWorldSessions.applied;
 metrics.sessionSnapshotRestoreFailedTotal = restoredWorldSessions.failed;
 if (restoredWorldSessions.applied > 0 || restoredWorldSessions.failed > 0) {
@@ -113,7 +116,7 @@ const server = createServer(async (request, response) => {
             activePlayers: countActivePlayers(),
             websocketClients: wss.clients.size,
             pendingSaveSpoolEntries: worldSaveSpool.list().length,
-            pendingSessionSnapshotEntries: worldSessionSnapshotStore.list().length,
+            pendingSessionSnapshotEntries: (await worldSessionSnapshotStore.list()).length,
             dirtySaveTrackers: countSaveTrackers((tracker) => tracker.dirty),
             savingSaveTrackers: countSaveTrackers((tracker) => tracker.saving),
         }));
@@ -233,7 +236,7 @@ setInterval(() => {
         }
         consumeSessionSaveDirtyPlayers(sessionKey, session);
         if (result.events.length > 0 || result.perPlayerMessages.length > 0) {
-            persistWorldSessionSnapshot(sessionKey, session, 'tick');
+            void persistWorldSessionSnapshot(sessionKey, session, 'tick');
         }
     }
     sendSnapshotsToActive(now);
@@ -241,7 +244,7 @@ setInterval(() => {
 }, WORLD_TICK_MS);
 
 setInterval(() => {
-    persistAllWorldSessionSnapshots('interval');
+    void persistAllWorldSessionSnapshots('interval');
 }, WORLD_SESSION_SNAPSHOT_MS);
 
 setInterval(() => {
@@ -342,7 +345,7 @@ async function handleSocketMessage(ws: WebSocket, data: RawData): Promise<void> 
     for (const broadcast of result.broadcasts) broadcastToSession(binding.sessionKey, broadcast);
     if (shouldSendImmediateSnapshots(message, result.replies)) queueImmediateSnapshots(binding.sessionKey);
     consumeSessionSaveDirtyPlayers(binding.sessionKey, session);
-    persistWorldSessionSnapshot(binding.sessionKey, session, message.type);
+    void persistWorldSessionSnapshot(binding.sessionKey, session, message.type);
     if (message.type === 'WORLD_LEAVE') {
         await flushCharacterSave(binding.sessionKey, binding.playerId, 'world_leave', true);
         cleanupJoinedSocket(ws, binding);
@@ -409,7 +412,7 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
     }
     bindPlayer(ws, sessionKey, result.playerId, auth.account, character.id, result.welcome.resumeToken, auth.session.id);
     ensureSaveTracker(sessionKey, result.playerId, auth.account.id, character.id, result.welcome.resumeToken, save.revision);
-    persistWorldSessionSnapshot(sessionKey, session, 'join');
+    void persistWorldSessionSnapshot(sessionKey, session, 'join');
     send(ws, result.welcome);
     send(ws, { type: 'WORLD_SNAPSHOT', snapshot: session.createSnapshot(result.playerId) });
 }
@@ -438,7 +441,7 @@ async function handleReconnect(ws: WebSocket, resumeToken: string, accessToken: 
     ]);
     bindPlayer(ws, resumed.sessionKey, resumed.playerId, auth.account, resumed.characterId, resumed.welcome.resumeToken, auth.session.id);
     if (save) ensureSaveTracker(resumed.sessionKey, resumed.playerId, auth.account.id, resumed.characterId, resumed.welcome.resumeToken, save.revision);
-    persistWorldSessionSnapshot(resumed.sessionKey, resumed.session, 'reconnect');
+    void persistWorldSessionSnapshot(resumed.sessionKey, resumed.session, 'reconnect');
     send(ws, {
         ...resumed.welcome,
         accountId: auth.account.id,
@@ -608,18 +611,27 @@ function getOrCreateSession(route: WorldSessionRoute): { sessionKey: string; ses
     return { sessionKey, session };
 }
 
-function restorePersistedWorldSessions(): { applied: number; failed: number } {
+function createWorldSessionSnapshotStore(): WorldSessionSnapshotStoreBackend {
+    if (process.env.DATABASE_URL && process.env.WORLD_SESSION_SNAPSHOT_STORE !== 'file') {
+        return new PostgresWorldSessionSnapshotStore({ connectionString: process.env.DATABASE_URL });
+    }
+    return new WorldSessionSnapshotStore({
+        persistPath: resolveServerPersistPath(process.env.WORLD_SESSION_SNAPSHOT_PATH, './.runtime/world-session-snapshots.json'),
+    });
+}
+
+async function restorePersistedWorldSessions(): Promise<{ applied: number; failed: number }> {
     let applied = 0;
     let failed = 0;
     const now = Date.now();
-    for (const entry of worldSessionSnapshotStore.list()) {
+    for (const entry of await worldSessionSnapshotStore.list()) {
         try {
             const session = WorldSession.restorePersistentSnapshot(entry.snapshot, {
                 logger: (message) => console.log(`[WorldSession:${entry.sessionKey}] ${message}`),
             });
             session.disconnectActivePlayersForServerRestart(now);
             sessions.set(entry.sessionKey, session);
-            worldSessionSnapshotStore.upsert({
+            await worldSessionSnapshotStore.upsert({
                 sessionKey: entry.sessionKey,
                 snapshot: session.createPersistentSnapshot(),
                 updatedAt: entry.updatedAt,
@@ -627,7 +639,7 @@ function restorePersistedWorldSessions(): { applied: number; failed: number } {
             applied++;
         } catch (error) {
             failed++;
-            worldSessionSnapshotStore.remove(entry.sessionKey);
+            await worldSessionSnapshotStore.remove(entry.sessionKey);
             console.error(`Failed to restore world session snapshot ${entry.sessionKey}:`, error instanceof Error ? error.message : error);
             logServerEvent('error', 'world_session_snapshot_restore_failed', {
                 sessionKey: entry.sessionKey,
@@ -638,20 +650,20 @@ function restorePersistedWorldSessions(): { applied: number; failed: number } {
     return { applied, failed };
 }
 
-function persistAllWorldSessionSnapshots(reason: string): void {
+async function persistAllWorldSessionSnapshots(reason: string): Promise<void> {
     for (const [sessionKey, session] of sessions) {
-        persistWorldSessionSnapshot(sessionKey, session, reason);
+        await persistWorldSessionSnapshot(sessionKey, session, reason);
     }
 }
 
-function persistWorldSessionSnapshot(sessionKey: string, session: WorldSession, reason: string): void {
+async function persistWorldSessionSnapshot(sessionKey: string, session: WorldSession, reason: string): Promise<void> {
     try {
         const snapshot = session.createPersistentSnapshot();
         if (!snapshot.players.some((player) => player.active)) {
-            worldSessionSnapshotStore.remove(sessionKey);
+            await worldSessionSnapshotStore.remove(sessionKey);
             return;
         }
-        worldSessionSnapshotStore.upsert({ sessionKey, snapshot });
+        await worldSessionSnapshotStore.upsert({ sessionKey, snapshot });
     } catch (error) {
         metrics.sessionSnapshotSaveFailuresTotal += 1;
         console.error('Failed to persist world session snapshot:', error instanceof Error ? error.message : error);
@@ -850,7 +862,7 @@ function cleanupSocket(ws: WebSocket): void {
     cleanupJoinedSocket(ws, binding);
     const session = sessions.get(binding.sessionKey);
     session?.disconnect(binding.playerId);
-    if (session) persistWorldSessionSnapshot(binding.sessionKey, session, 'socket_close');
+    if (session) void persistWorldSessionSnapshot(binding.sessionKey, session, 'socket_close');
 }
 
 async function shutdownWorldServer(signal: NodeJS.Signals): Promise<void> {
@@ -860,7 +872,7 @@ async function shutdownWorldServer(signal: NodeJS.Signals): Promise<void> {
     console.log(`Received ${signal}; flushing world saves before shutdown.`);
     logServerEvent('info', 'server_shutdown_started', { signal, sessions: sessions.size, sockets: wss.clients.size });
     finishActiveRaidsForShutdown();
-    persistAllWorldSessionSnapshots('shutdown');
+    await persistAllWorldSessionSnapshots('shutdown');
     for (const ws of wss.clients) send(ws, { type: 'ERROR', code: 'SERVER_SHUTTING_DOWN', message: 'World server is shutting down.' });
     for (const ws of wss.clients) ws.close(1001, 'server shutting down');
     const flush = flushAllCharacterSaves('shutdown');
@@ -886,7 +898,7 @@ function finishActiveRaidsForShutdown(): void {
         }
         consumeSessionSaveDirtyPlayers(sessionKey, session);
         if (result.events.length > 0 || result.perPlayerMessages.length > 0) {
-            persistWorldSessionSnapshot(sessionKey, session, 'shutdown_force_extract');
+            void persistWorldSessionSnapshot(sessionKey, session, 'shutdown_force_extract');
         }
     }
 }
@@ -901,6 +913,7 @@ async function flushAllCharacterSaves(reason: string): Promise<void> {
 async function closeServers(): Promise<void> {
     await new Promise<void>((resolve) => wss.close(() => resolve()));
     await new Promise<void>((resolve) => server.close(() => resolve()));
+    await worldSessionSnapshotStore.close?.();
 }
 
 function cleanupJoinedSocket(ws: WebSocket, binding: SocketBinding): void {

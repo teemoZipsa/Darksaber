@@ -115,9 +115,13 @@ NODE_ENV=production
 AUTH_JWT_SECRET=<long random>
 AUTH_REFRESH_TOKEN_HASH_SECRET=<different long random>
 AUTH_ALLOWED_ORIGINS=https://<vercel-client-host>
-WORLD_SESSION_SNAPSHOT_PATH=./.runtime/world-session-snapshots.json
 WORLD_SESSION_SNAPSHOT_MS=5000
 ```
+
+When `DATABASE_URL` is present, active world-session snapshots are stored in
+Postgres (`world_session_snapshots`). Set `WORLD_SESSION_SNAPSHOT_STORE=file`
+only for local fallback testing; file mode uses `WORLD_SESSION_SNAPSHOT_PATH`
+and is not shared across processes.
 
 Render Free Web Services may sleep when there is no traffic. While a player has
 the world WebSocket open, the client sends `CLIENT_HEARTBEAT` about every 45
@@ -145,14 +149,16 @@ player to start a new expedition.
 for active raid state: players, actors, enemies, nest state, scenario flags,
 loot containers, generated chunks, and dirty save markers round-trip back into a
 reconnectable session. The server writes these snapshots to
-`WORLD_SESSION_SNAPSHOT_PATH` about every `WORLD_SESSION_SNAPSHOT_MS`, reloads
-them on startup, and marks restored players as disconnected so they can reclaim
-the raid with their resume token. Empty/completed sessions are removed from the
-snapshot store.
+Postgres when `DATABASE_URL` is configured, otherwise to the local
+`WORLD_SESSION_SNAPSHOT_PATH` file fallback. Snapshots are written about every
+`WORLD_SESSION_SNAPSHOT_MS`, reloaded on startup, and restored players are
+marked as disconnected so they can reclaim the raid with their resume token.
+Empty/completed sessions are removed from the snapshot store.
 
-This is local-disk durability, not shared durable storage. It covers single
-instance restarts on a persistent disk; horizontal scale still requires
-persistent raid-instance routing and shared storage.
+Postgres snapshot storage is shared durable storage for raid-instance recovery,
+but it is not a distributed lock or authoritative compute layer. Running several
+world server instances against the same raid instance still needs single-owner
+routing or a lease/lock before accepting writes from multiple processes.
 
 ## Vercel Client
 
@@ -276,8 +282,8 @@ the same status-checking capability as the API helper.
 Account data lives in managed PostgreSQL. Production operation must include:
 
 - scheduled database backups
-- persistent disk or shared storage for `WORLD_SAVE_SPOOL_PATH` and
-  `WORLD_SESSION_SNAPSHOT_PATH`
+- persistent disk for `WORLD_SAVE_SPOOL_PATH`; active world-session snapshots
+  use Postgres when `DATABASE_URL` is configured
 - manual restore rehearsal before broad release
 - environment-specific `AUTH_JWT_SECRET` rotation plan
 - environment-specific `AUTH_REFRESH_TOKEN_HASH_SECRET` rotation plan

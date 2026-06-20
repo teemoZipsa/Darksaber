@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { Pool } from 'pg';
 import { writeFileAtomically } from './AtomicFile';
 import type { WorldSessionPersistentSnapshot } from './WorldSession';
 
@@ -19,7 +20,18 @@ interface WorldSessionSnapshotStoreFile {
     entries: PendingWorldSessionSnapshot[];
 }
 
-export class WorldSessionSnapshotStore {
+export interface WorldSessionSnapshotStoreBackend {
+    readonly kind: 'file' | 'postgres';
+    initialize(): Promise<void>;
+    list(): Promise<PendingWorldSessionSnapshot[]>;
+    upsert(input: Omit<PendingWorldSessionSnapshot, 'updatedAt'> & { updatedAt?: string }): Promise<void>;
+    remove(sessionKey: string): Promise<void>;
+    clear(): Promise<void>;
+    close?(): Promise<void>;
+}
+
+export class WorldSessionSnapshotStore implements WorldSessionSnapshotStoreBackend {
+    public readonly kind = 'file';
     private readonly persistPath: string;
     private readonly now: () => Date;
     private entries = new Map<string, PendingWorldSessionSnapshot>();
@@ -32,11 +44,15 @@ export class WorldSessionSnapshotStore {
         }
     }
 
-    public list(): PendingWorldSessionSnapshot[] {
-        return [...this.entries.values()].map(cloneSnapshotEntry);
+    public async initialize(): Promise<void> {
+        return undefined;
     }
 
-    public upsert(input: Omit<PendingWorldSessionSnapshot, 'updatedAt'> & { updatedAt?: string }): void {
+    public async list(): Promise<PendingWorldSessionSnapshot[]> {
+        return this.listSync();
+    }
+
+    public async upsert(input: Omit<PendingWorldSessionSnapshot, 'updatedAt'> & { updatedAt?: string }): Promise<void> {
         this.entries.set(input.sessionKey, cloneSnapshotEntry({
             ...input,
             updatedAt: input.updatedAt ?? this.now().toISOString(),
@@ -44,12 +60,12 @@ export class WorldSessionSnapshotStore {
         this.flush();
     }
 
-    public remove(sessionKey: string): void {
+    public async remove(sessionKey: string): Promise<void> {
         if (!this.entries.delete(sessionKey)) return;
         this.flush();
     }
 
-    public clear(): void {
+    public async clear(): Promise<void> {
         if (this.entries.size === 0) return;
         this.entries.clear();
         this.flush();
@@ -58,9 +74,84 @@ export class WorldSessionSnapshotStore {
     private flush(): void {
         const file: WorldSessionSnapshotStoreFile = {
             version: 1,
-            entries: this.list(),
+            entries: this.listSync(),
         };
         atomicWriteJson(this.persistPath, file);
+    }
+
+    private listSync(): PendingWorldSessionSnapshot[] {
+        return [...this.entries.values()].map(cloneSnapshotEntry);
+    }
+}
+
+export interface PostgresWorldSessionSnapshotStoreOptions {
+    connectionString?: string;
+    pool?: PostgresWorldSessionSnapshotPool;
+    now?: () => Date;
+}
+
+export interface PostgresWorldSessionSnapshotPool {
+    query<T = Record<string, unknown>>(text: string, values?: readonly unknown[]): Promise<{ rows: T[] }>;
+    end?(): Promise<void>;
+}
+
+export class PostgresWorldSessionSnapshotStore implements WorldSessionSnapshotStoreBackend {
+    public readonly kind = 'postgres';
+    private readonly pool: PostgresWorldSessionSnapshotPool;
+    private readonly now: () => Date;
+
+    public constructor(options: PostgresWorldSessionSnapshotStoreOptions) {
+        if (!options.pool && !options.connectionString) {
+            throw new Error('PostgresWorldSessionSnapshotStore requires a connectionString or pool.');
+        }
+        this.pool = options.pool ?? new Pool({ connectionString: options.connectionString });
+        this.now = options.now ?? (() => new Date());
+    }
+
+    public async initialize(): Promise<void> {
+        await this.pool.query(`
+            CREATE TABLE IF NOT EXISTS world_session_snapshots (
+                session_key text PRIMARY KEY,
+                snapshot jsonb NOT NULL,
+                updated_at timestamptz NOT NULL
+            );
+        `);
+    }
+
+    public async list(): Promise<PendingWorldSessionSnapshot[]> {
+        const result = await this.pool.query<{ session_key: string; snapshot: unknown; updated_at: Date | string }>(
+            `SELECT session_key, snapshot, updated_at FROM world_session_snapshots ORDER BY session_key ASC`
+        );
+        return result.rows
+            .map((row) => rowToSnapshotEntry(row))
+            .filter((entry): entry is PendingWorldSessionSnapshot => Boolean(entry));
+    }
+
+    public async upsert(input: Omit<PendingWorldSessionSnapshot, 'updatedAt'> & { updatedAt?: string }): Promise<void> {
+        const entry = cloneSnapshotEntry({
+            ...input,
+            updatedAt: input.updatedAt ?? this.now().toISOString(),
+        });
+        await this.pool.query(
+            `INSERT INTO world_session_snapshots (session_key, snapshot, updated_at)
+             VALUES ($1, $2::jsonb, $3::timestamptz)
+             ON CONFLICT (session_key) DO UPDATE SET
+                snapshot = EXCLUDED.snapshot,
+                updated_at = EXCLUDED.updated_at`,
+            [entry.sessionKey, JSON.stringify(entry.snapshot), entry.updatedAt],
+        );
+    }
+
+    public async remove(sessionKey: string): Promise<void> {
+        await this.pool.query(`DELETE FROM world_session_snapshots WHERE session_key = $1`, [sessionKey]);
+    }
+
+    public async clear(): Promise<void> {
+        await this.pool.query(`DELETE FROM world_session_snapshots`);
+    }
+
+    public async close(): Promise<void> {
+        await this.pool.end?.();
     }
 }
 
@@ -98,6 +189,16 @@ function isPendingWorldSessionSnapshot(value: unknown): value is PendingWorldSes
 
 function cloneSnapshotEntry(entry: PendingWorldSessionSnapshot): PendingWorldSessionSnapshot {
     return JSON.parse(JSON.stringify(entry)) as PendingWorldSessionSnapshot;
+}
+
+function rowToSnapshotEntry(row: { session_key: string; snapshot: unknown; updated_at: Date | string }): PendingWorldSessionSnapshot | null {
+    const updatedAt = row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at);
+    const entry = {
+        sessionKey: row.session_key,
+        snapshot: row.snapshot,
+        updatedAt,
+    };
+    return isPendingWorldSessionSnapshot(entry) ? cloneSnapshotEntry(entry) : null;
 }
 
 function atomicWriteJson(persistPath: string, value: WorldSessionSnapshotStoreFile): void {
