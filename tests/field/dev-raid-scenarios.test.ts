@@ -161,7 +161,9 @@ function createManagerHarness() {
 }
 
 test('dev raid scenario parser accepts implemented story episodes through episode 31 only', () => {
-    assert.deepEqual([...DEV_STORY_EPISODES], Array.from({ length: 31 }, (_, index) => index + 1));
+    const runtimeStoryEpisodes = STORY_SCENARIOS.map((scenario) => scenario.episode);
+    assert.deepEqual([...DEV_STORY_EPISODES], runtimeStoryEpisodes);
+    assert.deepEqual(runtimeStoryEpisodes, Array.from({ length: 31 }, (_, index) => index + 1));
     assert.deepEqual([...DEV_STORY_INTERIOR_EPISODES], [1, 2, 3, 7, 13, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]);
     assert.deepEqual([...DEV_LATE_STORY_EPISODES], [23, 24, 25, 26, 27, 28, 29, 30, 31]);
     assert.equal(parseDevRaidScenario('aggro'), 'aggro');
@@ -182,6 +184,7 @@ test('package scripts expose each story dev entry through episode 31', () => {
             `episode ${episode} dev script`
         );
     }
+    assert.equal(packageJson.scripts['dev:raid:story32'], undefined);
 });
 
 test('dev town launcher forwards each implemented story scenario to the open URL', async () => {
