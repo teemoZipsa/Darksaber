@@ -1780,6 +1780,9 @@ function verifyStoryCompletionContract(
 
     if (sequence.bossDefeatEvent) {
         requireUniqueCompletionFlag(completionFlags, sequence.bossDefeatEvent.runtimeFlag, context);
+        if (!originalEventIdNumbers(sequence.bossDefeatEvent.originalEventId).includes(99)) {
+            throw new Error(`Episode ${episode} ${scenario.dungeonId} boss defeat event does not include original EVENT 99`);
+        }
         if (!sequence.bossDefeatEvent.trigger.includes('SCENECLEAR')) {
             throw new Error(`Episode ${episode} ${scenario.dungeonId} boss defeat event does not declare SCENECLEAR`);
         }
