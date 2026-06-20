@@ -31,7 +31,13 @@ import { rollBossRune, rollChestGem } from '../../src/data/SocketLoot';
 import { getSkill } from '../../src/data/SkillDB';
 import { getSkillVisualProfile } from '../../src/data/SkillVisualProfiles';
 import { createBaseStats, getBaseStatsForClass } from '../../src/data/Stats';
-import { STORY_QUESTS, getStoryCompanionRewards, type StoryQuestDefinition, type StoryQuestReward } from '../../src/data/StoryQuestData';
+import {
+    STORY_QUESTS,
+    getStoryCompanionRewards,
+    getStoryQuestViews,
+    type StoryQuestDefinition,
+    type StoryQuestReward,
+} from '../../src/data/StoryQuestData';
 import { STORY_SCENARIOS, type StoryScenarioDefinition } from '../../src/data/StoryScenarioData';
 import { getStoryScenarioMonsterLayout } from '../../src/data/StoryScenarioMonsterData';
 import {
@@ -871,6 +877,30 @@ test('story quest definitions derive from runtime scenario definitions', () => {
         STORY_QUESTS,
         STORY_SCENARIOS.map(expectedStoryQuestSignature)
     );
+});
+
+test('story quest views unlock exactly one next episode through 31', () => {
+    for (let completedCount = 0; completedCount <= STORY_QUESTS.length; completedCount++) {
+        const playerData = new PlayerData();
+        for (const quest of STORY_QUESTS.slice(0, completedCount)) {
+            playerData.markCleared(quest.id);
+        }
+
+        const views = getStoryQuestViews(playerData, null);
+        assert.deepEqual(
+            views.map((view) => view.quest.episode),
+            STORY_QUESTS.slice(0, Math.min(completedCount + 1, STORY_QUESTS.length)).map((quest) => quest.episode),
+            `completed prefix ${completedCount} visible episodes`
+        );
+        assert.deepEqual(
+            views.map((view) => view.status),
+            [
+                ...Array.from({ length: Math.min(completedCount, STORY_QUESTS.length) }, () => 'completed'),
+                ...(completedCount < STORY_QUESTS.length ? ['active'] : []),
+            ],
+            `completed prefix ${completedCount} visible statuses`
+        );
+    }
 });
 
 test('story scenario content ledger matches runtime scenario definitions', () => {
