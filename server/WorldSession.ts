@@ -120,6 +120,13 @@ import {
     removeCarriedWeight,
 } from './WorldSessionCarryState';
 import {
+    firstActorTile,
+    firstLivingActorTile,
+    hasActiveActorWithin,
+    hasNearbyAggroEnemy,
+    hasNearbyLiveEnemy,
+} from './WorldSessionSpatialQueries';
+import {
     clonePersistentActor,
     clonePersistentNestState,
     clonePersistentScenarioState,
@@ -247,7 +254,8 @@ export class WorldSession {
         this.logger = options.logger ?? (() => undefined);
         this.enemyState = new WorldSessionEnemyState<ServerEnemy, ServerActor>({
             getTargetableActors: (entry) => this.getTargetableActors(entry),
-            hasActiveActorWithin: (tile, distance, ownerPlayerId) => this.hasActiveActorWithin(tile, distance, ownerPlayerId),
+            hasActiveActorWithin: (tile, distance, ownerPlayerId) =>
+                hasActiveActorWithin(this.players.values(), this.actors, tile, distance, ownerPlayerId),
         });
     }
 
@@ -339,7 +347,7 @@ export class WorldSession {
             resumed.ghost = false;
             resumed.disconnectedAt = null;
             resumed.saveSnapshot ??= cloneCharacterSave(context.saveSnapshot);
-            const spawnTile = this.firstActorTile(resumed) ?? this.getOriginExitTile(resumed.originHubId);
+            const spawnTile = firstActorTile(resumed, this.actors) ?? this.getOriginExitTile(resumed.originHubId);
             this.log(`reconnect player=${resumed.id} origin=${resumed.originHubId}`);
             return {
                 playerId: resumed.id,
@@ -444,7 +452,7 @@ export class WorldSession {
         if (!player) return null;
         player.ghost = false;
         player.disconnectedAt = null;
-        const spawnTile = this.firstActorTile(player) ?? this.getOriginExitTile(player.originHubId);
+        const spawnTile = firstActorTile(player, this.actors) ?? this.getOriginExitTile(player.originHubId);
         this.log(`reconnect player=${player.id} origin=${player.originHubId}`);
         return {
             playerId: player.id,
@@ -1087,7 +1095,7 @@ export class WorldSession {
 
         const dungeon = this.worldMap.getDungeonAtTile(actor!.tile.x, actor!.tile.y);
         if (!dungeon || dungeon.id !== dungeonId) return reject(message.intentId, 'Actor is not at the requested scenario entrance.');
-        if (this.hasNearbyAggroEnemy(actor!.tile, 18, playerId)) return reject(message.intentId, 'Nearby combat must be resolved before entering a scenario.');
+        if (hasNearbyAggroEnemy(this.enemies.values(), actor!.tile, 18, playerId)) return reject(message.intentId, 'Nearby combat must be resolved before entering a scenario.');
 
         const interiorLayout = getStoryInteriorLayout(dungeonId);
         const returnTile = interiorLayout ? { ...actor!.tile } : null;
@@ -2013,7 +2021,7 @@ export class WorldSession {
     }
 
     private ensureContentNear(spawnTile: TilePoint, departureTownId: string | null | undefined, now: number): void {
-        if (!this.hasNearbyLiveEnemy(spawnTile, FIELD_NEST_NEARBY_ENEMY_DISTANCE)) {
+        if (!hasNearbyLiveEnemy(this.enemies.values(), spawnTile, FIELD_NEST_NEARBY_ENEMY_DISTANCE)) {
             this.spawnEnemiesNear(
                 spawnTile,
                 now,
@@ -2032,9 +2040,9 @@ export class WorldSession {
         for (const player of this.players.values()) {
             if (!player.active || player.ghost) continue;
             if (player.activeDungeonId) continue;
-            const anchor = this.firstLivingActorTile(player);
+            const anchor = firstLivingActorTile(player, this.actors);
             if (!anchor) continue;
-            const forceCenter = !this.hasNearbyLiveEnemy(anchor, FIELD_NEST_NEARBY_ENEMY_DISTANCE);
+            const forceCenter = !hasNearbyLiveEnemy(this.enemies.values(), anchor, FIELD_NEST_NEARBY_ENEMY_DISTANCE);
             this.spawnEnemiesNear(anchor, now, forceCenter, visited, FIELD_NEST_ROAM_RADIUS_CHUNKS, FIELD_NEST_REFRESH_MAX_ENEMIES);
         }
     }
@@ -2081,14 +2089,14 @@ export class WorldSession {
     ): number {
         const nest = pickNestForChunk({ realm, chunkX, chunkY, biome, seed }, force);
         if (!nest) return 0;
-        if (this.hasActiveActorWithin(nest.centerTile, FIELD_NEST_SPAWN_SAFE_DISTANCE)) return 0;
+        if (hasActiveActorWithin(this.players.values(), this.actors, nest.centerTile, FIELD_NEST_SPAWN_SAFE_DISTANCE)) return 0;
         const stateKey = nestStateKey(realm, chunkX, chunkY);
         const state = this.getOrCreateNestState(stateKey, nest);
         this.retainLiveNestEnemies(state);
         if (state.monsterIds.length > 0) return 0;
         if (state.cleared) {
             if (now < state.respawnAt) return 0;
-            if (this.hasActiveActorWithin(state.centerTile, FIELD_NEST_RESPAWN_SAFE_DISTANCE)) return 0;
+            if (hasActiveActorWithin(this.players.values(), this.actors, state.centerTile, FIELD_NEST_RESPAWN_SAFE_DISTANCE)) return 0;
         }
 
         const offsets = nestMemberOffsets(nest.monsters.length);
@@ -2142,35 +2150,6 @@ export class WorldSession {
         if (state.monsterIds.length > 0) return;
         state.cleared = true;
         state.respawnAt = now + FIELD_NEST_RESPAWN_MS;
-    }
-
-    private hasNearbyLiveEnemy(tile: TilePoint, distance: number): boolean {
-        return [...this.enemies.values()].some((entry) =>
-            !entry.scenarioPlayerId
-            && entry.enemy.stats.hp > 0
-            && manhattan({ x: entry.enemy.gridX, y: entry.enemy.gridY }, tile) <= distance
-        );
-    }
-
-    private hasNearbyAggroEnemy(tile: TilePoint, distance: number, viewerPlayerId?: string): boolean {
-        return [...this.enemies.values()].some((entry) =>
-            entry.enemy.stats.hp > 0
-            && entry.enemy.isAggro
-            && (!entry.scenarioPlayerId || entry.scenarioPlayerId === viewerPlayerId)
-            && manhattan({ x: entry.enemy.gridX, y: entry.enemy.gridY }, tile) <= distance
-        );
-    }
-
-    private hasActiveActorWithin(tile: TilePoint, distance: number, ownerPlayerId?: string): boolean {
-        return [...this.players.values()].some((player) => {
-            if (!player.active || player.ghost) return false;
-            if (ownerPlayerId && player.id !== ownerPlayerId) return false;
-            if (!ownerPlayerId && player.activeDungeonId) return false;
-            return player.actorIds.some((actorId) => {
-                const actor = this.actors.get(actorId);
-                return Boolean(actor && !actor.isDead && actor.stats.hp > 0 && manhattan(actor.tile, tile) <= distance);
-            });
-        });
     }
 
     private spawnLootNear(anchor: TilePoint, departureTownId?: string | null): void {
@@ -2239,18 +2218,6 @@ export class WorldSession {
 
     private getTownById(townId: string): TownInfo | null {
         return this.worldMap.getTowns().find((town) => town.id === townId) ?? null;
-    }
-
-    private firstActorTile(player: ServerPlayer): TilePoint | null {
-        const actor = player.actorIds.map((id) => this.actors.get(id)).find(Boolean);
-        return actor ? { ...actor.tile } : null;
-    }
-
-    private firstLivingActorTile(player: ServerPlayer): TilePoint | null {
-        const actor = player.actorIds
-            .map((id) => this.actors.get(id))
-            .find((entry) => entry && !entry.isDead && entry.stats.hp > 0);
-        return actor ? { ...actor.tile } : null;
     }
 
     private findResumablePlayer(resumeToken: string, now: number): ServerPlayer | null {
