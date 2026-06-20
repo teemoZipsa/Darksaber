@@ -206,15 +206,15 @@ function lateScenarioCacheEvent(
 function lateScenarioSequence(input: {
     dungeonId: string;
     episode: number;
-    bossTile: TilePoint;
     globalScript: string;
     mapFiles: string[];
     dialogues?: Array<{ speakerId: string; speakerNameKey: string; textKey: string; focus?: TilePoint }>;
     bossDefeatDialogues?: Array<{ speakerId: string; speakerNameKey: string; textKey: string; focus?: TilePoint }>;
-    caches: Array<{ eventNumber: number; tile: TilePoint; originalItemId: number; itemId: string }>;
 }): StoryScenarioEventSequence {
     const ep = String(input.episode).padStart(2, '0');
     const originalFact = getOriginalLateStoryFact(input.episode);
+    const bossTile = getOriginalLateStoryBossTile(input.episode);
+    const caches = getOriginalLateStoryCacheEvents(input.episode);
     const objectiveRuntimeFlag = `${input.dungeonId}_objective_complete`;
     const layout = getStoryInteriorLayout(input.dungeonId);
     const entryAdvanceTile = layout ? { x: layout.playerStart.x, y: layout.playerStart.y - 1 } : null;
@@ -223,11 +223,11 @@ function lateScenarioSequence(input: {
         speakerId: dialogue.speakerId,
         speakerNameKey: dialogue.speakerNameKey,
         textKey: dialogue.textKey,
-        focus: dialogue.focus ?? input.bossTile,
+        focus: dialogue.focus ?? bossTile,
         durationMs: LATE_STORY_STEP_DURATION_MS.dialogue,
     })) ?? [];
     const entry: StoryScenarioEventStep[] = [
-        { kind: 'focus', target: input.bossTile, labelKey: `story.event.ep${ep}.focus.boss`, durationMs: LATE_STORY_STEP_DURATION_MS.focus },
+        { kind: 'focus', target: bossTile, labelKey: `story.event.ep${ep}.focus.boss`, durationMs: LATE_STORY_STEP_DURATION_MS.focus },
         ...(entryAdvanceTile ? [{
             kind: 'moveActor' as const,
             actorId: 'hero',
@@ -236,7 +236,7 @@ function lateScenarioSequence(input: {
             durationMs: LATE_STORY_STEP_DURATION_MS.moveActor,
         }] : []),
         ...dialogueSteps,
-        { kind: 'combatStart', labelKey: `story.event.ep${ep}.combatStart`, focus: input.bossTile, durationMs: LATE_STORY_STEP_DURATION_MS.combatStart },
+        { kind: 'combatStart', labelKey: `story.event.ep${ep}.combatStart`, focus: bossTile, durationMs: LATE_STORY_STEP_DURATION_MS.combatStart },
     ];
     const bossClearItems = getOriginalLateStoryItemsForSourceEvent(input.episode, 99);
     const bossClearTriggerParts = [
@@ -270,7 +270,7 @@ function lateScenarioSequence(input: {
         },
         objectiveRuntimeFlag,
         entry,
-        fieldEvents: input.caches.map((cache) => lateScenarioCacheEvent(
+        fieldEvents: caches.map((cache) => lateScenarioCacheEvent(
             input.dungeonId,
             input.episode,
             cache.eventNumber,
@@ -285,10 +285,10 @@ function lateScenarioSequence(input: {
                 speakerId: dialogue.speakerId,
                 speakerNameKey: dialogue.speakerNameKey,
                 textKey: dialogue.textKey,
-                focus: dialogue.focus ?? input.bossTile,
+                focus: dialogue.focus ?? bossTile,
                 durationMs: LATE_STORY_STEP_DURATION_MS.dialogue,
             })) ?? []),
-            { kind: 'objective', labelKey: `story.event.ep${ep}.objective`, focus: input.bossTile, durationMs: LATE_STORY_STEP_DURATION_MS.objective },
+            { kind: 'objective', labelKey: `story.event.ep${ep}.objective`, focus: bossTile, durationMs: LATE_STORY_STEP_DURATION_MS.objective },
         ],
     };
 }
@@ -2929,7 +2929,6 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
     lateScenarioSequence({
         dungeonId: 'beelzebuth_hall',
         episode: 23,
-        bossTile: getOriginalLateStoryBossTile(23),
         globalScript: 'missing',
         mapFiles: ['MAP/23.mrc', 'MAP/23t.mrc', 'MAP/23hmap.bmp', 'MAP/23bg.bmp', 'MAP/23set.arc', 'MAP/2300.mrc', 'MAP/2300t.mrc', 'MAP/2300hmap.bmp'],
         dialogues: [
@@ -2941,12 +2940,10 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
         bossDefeatDialogues: [
             { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep23.bossDefeat.01', focus: { x: 19, y: 7 } },
         ],
-        caches: getOriginalLateStoryCacheEvents(23),
     }),
     lateScenarioSequence({
         dungeonId: 'astaroth_gate',
         episode: 24,
-        bossTile: getOriginalLateStoryBossTile(24),
         globalScript: 'Glib/gscene24.lsc',
         mapFiles: ['MAP/24.mrc', 'MAP/24t.mrc', 'MAP/24hmap.bmp', 'MAP/24bg.bmp', 'MAP/24set.arc', 'MAP/2400.mrc', 'MAP/2400t.mrc', 'MAP/2400hmap.bmp'],
         dialogues: [
@@ -2955,12 +2952,10 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
         bossDefeatDialogues: [
             { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep24.bossDefeat.01', focus: { x: 19, y: 7 } },
         ],
-        caches: getOriginalLateStoryCacheEvents(24),
     }),
     lateScenarioSequence({
         dungeonId: 'nergal_depths',
         episode: 25,
-        bossTile: getOriginalLateStoryBossTile(25),
         globalScript: 'Glib/gscene25.lsc',
         mapFiles: ['MAP/25.mrc', 'MAP/25t.mrc', 'MAP/25hmap.bmp', 'MAP/25bg.bmp', 'MAP/25set.arc', 'MAP/2500.mrc', 'MAP/2500t.mrc', 'MAP/2500hmap.bmp', 'MAP/2502.mrc', 'MAP/2502t.mrc', 'MAP/2510.mrc', 'MAP/2510t.mrc'],
         dialogues: [
@@ -2977,28 +2972,22 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep25.bossDefeat.03', focus: { x: 19, y: 7 } },
             { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep25.bossDefeat.04', focus: { x: 19, y: 9 } },
         ],
-        caches: getOriginalLateStoryCacheEvents(25),
     }),
     lateScenarioSequence({
         dungeonId: 'beast_mark_shrine',
         episode: 26,
-        bossTile: getOriginalLateStoryBossTile(26),
         globalScript: 'Glib/gscene26.lsc',
         mapFiles: ['MAP/26.mrc', 'MAP/26t.mrc', 'MAP/26hmap.bmp', 'MAP/26bg.bmp', 'MAP/26set.arc', 'MAP/2600.mrc', 'MAP/2600t.mrc', 'MAP/2600hmap.bmp'],
-        caches: getOriginalLateStoryCacheEvents(26),
     }),
     lateScenarioSequence({
         dungeonId: 'chosen_mark_shrine',
         episode: 27,
-        bossTile: getOriginalLateStoryBossTile(27),
         globalScript: 'Glib/gscene27.lsc',
         mapFiles: ['MAP/27.mrc', 'MAP/27t.mrc', 'MAP/27hmap.bmp', 'MAP/27set.arc', 'MAP/2700.mrc', 'MAP/2700t.mrc', 'MAP/2700hmap.bmp'],
-        caches: getOriginalLateStoryCacheEvents(27),
     }),
     lateScenarioSequence({
         dungeonId: 'ergion_keep',
         episode: 28,
-        bossTile: getOriginalLateStoryBossTile(28),
         globalScript: 'Glib/gscene28.lsc',
         mapFiles: ['MAP/28.mrc', 'MAP/28t.mrc', 'MAP/28hmap.bmp', 'MAP/28bg.bmp', 'MAP/28set.arc', 'MAP/2800.mrc', 'MAP/2800t.mrc', 'MAP/2800hmap.bmp'],
         dialogues: [
@@ -3028,12 +3017,10 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { speakerId: 'ergion', speakerNameKey: 'story.event.speaker.ergion', textKey: 'story.event.ep28.bossDefeat.01', focus: { x: 19, y: 7 } },
             { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep28.bossDefeat.02', focus: { x: 19, y: 9 } },
         ],
-        caches: getOriginalLateStoryCacheEvents(28),
     }),
     lateScenarioSequence({
         dungeonId: 'martani_bastion',
         episode: 29,
-        bossTile: getOriginalLateStoryBossTile(29),
         globalScript: 'missing',
         mapFiles: ['MAP/29.mrc', 'MAP/29t.mrc', 'MAP/29hmap.bmp', 'MAP/29bg.bmp', 'MAP/29set.arc', 'MAP/2900.mrc', 'MAP/2900t.mrc', 'MAP/2900hmap.bmp'],
         dialogues: [
@@ -3060,12 +3047,10 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { speakerId: 'martani', speakerNameKey: 'story.event.speaker.martani', textKey: 'story.event.ep29.bossDefeat.02', focus: { x: 19, y: 7 } },
             { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep29.bossDefeat.03', focus: { x: 19, y: 9 } },
         ],
-        caches: getOriginalLateStoryCacheEvents(29),
     }),
     lateScenarioSequence({
         dungeonId: 'blin_watch',
         episode: 30,
-        bossTile: getOriginalLateStoryBossTile(30),
         globalScript: 'missing',
         mapFiles: ['MAP/30.mrc', 'MAP/30t.mrc', 'MAP/30hmap.bmp', 'MAP/30bg.bmp', 'MAP/30set.arc', 'MAP/3000.mrc', 'MAP/3000t.mrc', 'MAP/3000hmap.bmp', 'MAP/3010.mrc', 'MAP/3020.mrc', 'MAP/3030.mrc', 'MAP/3040.mrc', 'MAP/3050.mrc', 'MAP/3060.mrc', 'MAP/3070.mrc', 'MAP/3080.mrc', 'MAP/3090.mrc'],
         dialogues: [
@@ -3096,12 +3081,10 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.bossDefeat.09', focus: { x: 19, y: 7 } },
             { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep30.bossDefeat.10', focus: { x: 19, y: 9 } },
         ],
-        caches: getOriginalLateStoryCacheEvents(30),
     }),
     lateScenarioSequence({
         dungeonId: 'demon_fixers_den',
         episode: 31,
-        bossTile: getOriginalLateStoryBossTile(31),
         globalScript: 'missing',
         mapFiles: ['MAP/31.mrc', 'MAP/31t.mrc', 'MAP/31hmap.bmp', 'MAP/31bg.bmp', 'MAP/31set.arc', 'MAP/3100.mrc', 'MAP/3100t.mrc', 'MAP/3110.mrc', 'MAP/3120.mrc', 'MAP/3130.mrc', 'MAP/3140.mrc', 'MAP/3150.mrc', 'MAP/3160.mrc', 'MAP/3170.mrc', 'MAP/3180.mrc', 'MAP/3190.mrc'],
         dialogues: [
@@ -3130,7 +3113,6 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { speakerId: 'demonFixer', speakerNameKey: 'story.event.speaker.demonFixer', textKey: 'story.event.ep31.bossDefeat.07', focus: { x: 19, y: 7 } },
             { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep31.bossDefeat.08', focus: { x: 19, y: 9 } },
         ],
-        caches: getOriginalLateStoryCacheEvents(31),
     }),
 ];
 
