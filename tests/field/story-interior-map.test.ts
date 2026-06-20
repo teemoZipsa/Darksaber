@@ -62,6 +62,14 @@ function getPresentationStepTiles(step: StoryScenarioEventStep): Array<{ label: 
     return step.focus ? [{ label: 'focus', tile: step.focus }] : [];
 }
 
+function getDialogueFocusKeys(dialogues: readonly { focus?: { x: number; y: number } }[]): string[] {
+    return dialogues.map((step) => step.focus ? `${step.focus.x},${step.focus.y}` : 'none');
+}
+
+function getOriginalDialogueFocusKeys(dialogues: readonly { focus: { x: number; y: number } }[]): string[] {
+    return dialogues.map((dialogue) => `${dialogue.focus.x},${dialogue.focus.y}`);
+}
+
 test('solo interior layouts expose walkable entry, player, guard, and boss tiles', () => {
     assert.ok(STORY_INTERIOR_LAYOUTS.length > 0);
     for (const layout of STORY_INTERIOR_LAYOUTS) {
@@ -1309,51 +1317,6 @@ test('Flame Castle exposes original episode 22 Beramode, relic, and clear flow',
 });
 
 test('episodes 23 through 31 use original late interior routes and events', () => {
-    const expectedEntryDialogueCounts: Record<number, number> = {
-        23: 4,
-        24: 1,
-        25: 6,
-        26: 0,
-        27: 0,
-        28: 21,
-        29: 17,
-        30: 14,
-        31: 14,
-    };
-    const expectedBossDefeatDialogueCounts: Record<number, number> = {
-        23: 1,
-        24: 1,
-        25: 4,
-        26: 0,
-        27: 0,
-        28: 2,
-        29: 3,
-        30: 10,
-        31: 8,
-    };
-    const expectedEntryDialogueFocuses: Record<number, string[]> = {
-        23: ['18,15', '21,15', '18,15', '21,15'],
-        24: ['19,7'],
-        25: ['19,7', '19,23', '19,7', '19,23', '19,7', '19,23'],
-        26: [],
-        27: [],
-        28: ['19,7', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7'],
-        29: ['19,7', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7', '14,32', '19,7'],
-        30: ['19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7', '14,32', '19,7'],
-        31: ['19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7', '14,32', '19,7'],
-    };
-    const expectedBossDefeatDialogueFocuses: Record<number, string[]> = {
-        23: ['19,7'],
-        24: ['19,7'],
-        25: ['19,7', '19,9', '19,7', '19,9'],
-        26: [],
-        27: [],
-        28: ['19,7', '19,9'],
-        29: ['19,9', '19,7', '19,9'],
-        30: ['19,9', '19,7', '19,7', '19,7', '19,9', '19,7', '19,7', '19,9', '19,7', '19,9'],
-        31: ['19,7', '19,9', '19,7', '19,9', '19,7', '19,9', '19,7', '19,9'],
-    };
-
     for (const episode of [23, 24, 25, 26, 27, 28, 29, 30, 31]) {
         const fact = getOriginalLateStoryFact(episode);
         const mrcFact = getOriginalLateStoryMrcFact(episode);
@@ -1419,10 +1382,10 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         assert.equal(sequence.entry.filter((step) => step.kind === 'combatStart').length, 1);
         const entryDialogues = sequence.entry.filter((step) => step.kind === 'dialogue');
         const entryDialogueCount = entryDialogues.length;
-        assert.equal(entryDialogueCount, expectedEntryDialogueCounts[episode], `${fact.dungeonId}:entry dialogue count`);
+        assert.equal(entryDialogueCount, fact.entryDialogues.length, `${fact.dungeonId}:entry dialogue count`);
         assert.deepEqual(
-            entryDialogues.map((step) => step.focus ? `${step.focus.x},${step.focus.y}` : 'none'),
-            expectedEntryDialogueFocuses[episode],
+            getDialogueFocusKeys(entryDialogues),
+            getOriginalDialogueFocusKeys(fact.entryDialogues),
             `${fact.dungeonId}:entry dialogue focuses`
         );
         if (fact.deoMember) {
@@ -1432,10 +1395,10 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         }
         const bossDefeatDialogues = sequence.bossDefeat.filter((step) => step.kind === 'dialogue');
         const bossDefeatDialogueCount = bossDefeatDialogues.length;
-        assert.equal(bossDefeatDialogueCount, expectedBossDefeatDialogueCounts[episode], `${fact.dungeonId}:boss defeat dialogue count`);
+        assert.equal(bossDefeatDialogueCount, fact.bossDefeatDialogues.length, `${fact.dungeonId}:boss defeat dialogue count`);
         assert.deepEqual(
-            bossDefeatDialogues.map((step) => step.focus ? `${step.focus.x},${step.focus.y}` : 'none'),
-            expectedBossDefeatDialogueFocuses[episode],
+            getDialogueFocusKeys(bossDefeatDialogues),
+            getOriginalDialogueFocusKeys(fact.bossDefeatDialogues),
             `${fact.dungeonId}:boss defeat dialogue focuses`
         );
         if (fact.deeMember) {

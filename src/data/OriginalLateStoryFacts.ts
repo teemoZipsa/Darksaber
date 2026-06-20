@@ -24,6 +24,11 @@ export interface OriginalLateStoryCacheEvent {
     currentItemId: string;
 }
 
+export interface OriginalLateStoryDialogueFact {
+    speakerId: string;
+    focus: TilePoint;
+}
+
 export interface OriginalLateStoryFact {
     dungeonId: string;
     globalScript: string;
@@ -31,6 +36,8 @@ export interface OriginalLateStoryFact {
     sideMapFiles: string[];
     bossMonsterId: MonsterId;
     guardMonsterRoster: MonsterId[];
+    entryDialogues: OriginalLateStoryDialogueFact[];
+    bossDefeatDialogues: OriginalLateStoryDialogueFact[];
     setArc: string;
     aiMember: string;
     eventMember: string;

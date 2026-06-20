@@ -53,72 +53,6 @@ const LATE_STORY_WORLD_BIOMES = new Map<number, string>([
     [30, 'special'],
     [31, 'special'],
 ]);
-const LATE_STORY_ENTRY_DIALOGUE_COUNTS = new Map<number, number>([
-    [23, 4],
-    [24, 1],
-    [25, 6],
-    [26, 0],
-    [27, 0],
-    [28, 21],
-    [29, 17],
-    [30, 14],
-    [31, 14],
-]);
-const LATE_STORY_BOSS_DEFEAT_DIALOGUE_COUNTS = new Map<number, number>([
-    [23, 1],
-    [24, 1],
-    [25, 4],
-    [26, 0],
-    [27, 0],
-    [28, 2],
-    [29, 3],
-    [30, 10],
-    [31, 8],
-]);
-const LATE_STORY_ENTRY_FOCUSES = new Map<number, string[]>([
-    [23, ['18,15', '21,15', '18,15', '21,15']],
-    [24, ['19,7']],
-    [25, ['19,7', '19,23', '19,7', '19,23', '19,7', '19,23']],
-    [26, []],
-    [27, []],
-    [28, ['19,7', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7']],
-    [29, ['19,7', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7', '14,32', '19,7']],
-    [30, ['19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7', '14,32', '19,7']],
-    [31, ['19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,13', '19,7', '19,7', '14,32', '19,7', '14,32', '19,7']],
-]);
-const LATE_STORY_BOSS_DEFEAT_FOCUSES = new Map<number, string[]>([
-    [23, ['19,7']],
-    [24, ['19,7']],
-    [25, ['19,7', '19,9', '19,7', '19,9']],
-    [26, []],
-    [27, []],
-    [28, ['19,7', '19,9']],
-    [29, ['19,9', '19,7', '19,9']],
-    [30, ['19,9', '19,7', '19,7', '19,7', '19,9', '19,7', '19,7', '19,9', '19,7', '19,9']],
-    [31, ['19,7', '19,9', '19,7', '19,9', '19,7', '19,9', '19,7', '19,9']],
-]);
-const LATE_STORY_ENTRY_SPEAKERS = new Map<number, string[]>([
-    [23, ['nergal', 'beelzebuth', 'nergal', 'beelzebuth']],
-    [24, ['nergal']],
-    [25, ['nergal', 'hero', 'nergal', 'hero', 'nergal', 'hero']],
-    [26, []],
-    [27, []],
-    [28, ['jade', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'ergion', 'hero', 'ergion']],
-    [29, ['jade', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'martani', 'hero', 'martani', 'hero', 'martani']],
-    [30, ['jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'jade', 'blin', 'hero', 'blin', 'hero', 'blin']],
-    [31, ['jade', 'demonFixer', 'jade', 'demonFixer', 'jade', 'demonFixer', 'jade', 'demonFixer', 'jade', 'demonFixer', 'hero', 'demonFixer', 'hero', 'demonFixer']],
-]);
-const LATE_STORY_BOSS_DEFEAT_SPEAKERS = new Map<number, string[]>([
-    [23, ['nergal']],
-    [24, ['nergal']],
-    [25, ['nergal', 'hero', 'nergal', 'hero']],
-    [26, []],
-    [27, []],
-    [28, ['ergion', 'hero']],
-    [29, ['hero', 'martani', 'hero']],
-    [30, ['hero', 'blin', 'blin', 'blin', 'hero', 'blin', 'blin', 'hero', 'blin', 'hero']],
-    [31, ['demonFixer', 'hero', 'demonFixer', 'hero', 'demonFixer', 'hero', 'demonFixer', 'hero']],
-]);
 const LATE_STORY_SPEAKER_NAME_KEYS = new Map<string, string>([
     ['beelzebuth', 'story.event.speaker.beelzebuth'],
     ['blin', 'story.event.speaker.blin'],
@@ -937,6 +871,14 @@ function getPresentationStepFocusKey(step: StoryScenarioEventStep): string | nul
     return tile ? `${tile.x},${tile.y}` : null;
 }
 
+function getOriginalLateStoryDialogueFocusKeys(dialogues: readonly { focus: { x: number; y: number } }[]): string[] {
+    return dialogues.map((dialogue) => `${dialogue.focus.x},${dialogue.focus.y}`);
+}
+
+function getOriginalLateStoryDialogueSpeakerIds(dialogues: readonly { speakerId: string }[]): string[] {
+    return dialogues.map((dialogue) => dialogue.speakerId);
+}
+
 function hasWalkableInteriorPath(map: StoryInteriorMap, from: { x: number; y: number }, to: { x: number; y: number }): boolean {
     const bounds = map.getBoundsTiles();
     const queue = [{ ...from }];
@@ -1144,11 +1086,11 @@ function verifyLateStoryOriginalMapContract(
 
     const entryDialogues = sequence.entry.filter((step) => step.kind === 'dialogue');
     const bossDefeatDialogues = sequence.bossDefeat.filter((step) => step.kind === 'dialogue');
-    if (entryDialogues.length !== LATE_STORY_ENTRY_DIALOGUE_COUNTS.get(episode)) {
-        throw new Error(`Episode ${episode} entry dialogue count mismatch: ${entryDialogues.length}`);
+    if (entryDialogues.length !== fact.entryDialogues.length) {
+        throw new Error(`Episode ${episode} entry dialogue count mismatch: ${entryDialogues.length} !== ${fact.entryDialogues.length}`);
     }
-    if (bossDefeatDialogues.length !== LATE_STORY_BOSS_DEFEAT_DIALOGUE_COUNTS.get(episode)) {
-        throw new Error(`Episode ${episode} boss defeat dialogue count mismatch: ${bossDefeatDialogues.length}`);
+    if (bossDefeatDialogues.length !== fact.bossDefeatDialogues.length) {
+        throw new Error(`Episode ${episode} boss defeat dialogue count mismatch: ${bossDefeatDialogues.length} !== ${fact.bossDefeatDialogues.length}`);
     }
     requireJsonEqual(
         episode,
@@ -1166,25 +1108,25 @@ function verifyLateStoryOriginalMapContract(
         episode,
         'late story entry dialogue focuses',
         entryDialogues.map((step) => getPresentationStepFocusKey(step) ?? 'none'),
-        LATE_STORY_ENTRY_FOCUSES.get(episode)
+        getOriginalLateStoryDialogueFocusKeys(fact.entryDialogues)
     );
     requireJsonEqual(
         episode,
         'late story boss defeat dialogue focuses',
         bossDefeatDialogues.map((step) => getPresentationStepFocusKey(step) ?? 'none'),
-        LATE_STORY_BOSS_DEFEAT_FOCUSES.get(episode)
+        getOriginalLateStoryDialogueFocusKeys(fact.bossDefeatDialogues)
     );
     requireJsonEqual(
         episode,
         'late story entry dialogue speakers',
         entryDialogues.map((step) => step.speakerId),
-        LATE_STORY_ENTRY_SPEAKERS.get(episode)
+        getOriginalLateStoryDialogueSpeakerIds(fact.entryDialogues)
     );
     requireJsonEqual(
         episode,
         'late story boss defeat dialogue speakers',
         bossDefeatDialogues.map((step) => step.speakerId),
-        LATE_STORY_BOSS_DEFEAT_SPEAKERS.get(episode)
+        getOriginalLateStoryDialogueSpeakerIds(fact.bossDefeatDialogues)
     );
     for (const step of [...entryDialogues, ...bossDefeatDialogues]) {
         const expectedSpeakerNameKey = LATE_STORY_SPEAKER_NAME_KEYS.get(step.speakerId);
