@@ -1393,6 +1393,10 @@ test('episodes 23 through 31 use original late interior routes and events', () =
         for (const tile of [...layout.guardTiles, ...stagingTiles, layout.entryTile, layout.playerStart, layout.bossTile]) {
             assert.equal(map.isWalkable(tile.x, tile.y), true, `${fact.dungeonId}:${tile.x},${tile.y}`);
         }
+        const stagingTileKeys = new Set(stagingTiles.map((tile) => `${tile.x},${tile.y}`));
+        for (const prop of layout.props.filter((candidate) => candidate.kind === 'banner' && candidate.labelKey !== 'story.event.speaker.markGuardian')) {
+            assert.equal(stagingTileKeys.has(`${prop.tile.x},${prop.tile.y}`), true, `${fact.dungeonId}:staging banner:${prop.tile.x},${prop.tile.y}`);
+        }
         for (const tile of stagingTiles) {
             assert.equal(hasWalkablePath(map, layout.playerStart, tile), true, `${fact.dungeonId}:staging:${tile.x},${tile.y}`);
         }
