@@ -119,8 +119,8 @@ function collectDataDrivenUiKeys(): Set<string> {
 }
 
 function collectLanguageKeys(lang: 'ko' | 'en'): Set<string> {
-    const text = readFileSync(join(process.cwd(), 'src/i18n/LanguageManager.ts'), 'utf8');
-    const stringsBlock = objectBlockAfter(text, 'strings:');
+    const text = readFileSync(join(process.cwd(), 'src/i18n/translations.ts'), 'utf8');
+    const stringsBlock = objectBlockAfter(text, 'I18N_STRINGS');
     const langBlock = objectBlockAfter(stringsBlock, `${lang}:`);
     return new Set([...langBlock.matchAll(/['"]([^'"]+)['"]\s*:/g)].map((match) => match[1]));
 }
