@@ -205,11 +205,23 @@ function lateScenarioCacheEvent(
     };
 }
 
-function lateScenarioSequence(input: {
-    episode: number;
-    dialogues?: Array<{ speakerId: string; speakerNameKey: string; textKey: string; focus?: TilePoint }>;
-    bossDefeatDialogues?: Array<{ speakerId: string; speakerNameKey: string; textKey: string; focus?: TilePoint }>;
-}): StoryScenarioEventSequence {
+function lateStoryDialogueStep(
+    episode: number,
+    group: 'dialogue' | 'bossDefeat',
+    index: number,
+    dialogue: { speakerId: string; focus: TilePoint }
+): StoryScenarioEventStep {
+    return {
+        kind: 'dialogue',
+        speakerId: dialogue.speakerId,
+        speakerNameKey: `story.event.speaker.${dialogue.speakerId}`,
+        textKey: `story.event.ep${String(episode).padStart(2, '0')}.${group}.${String(index + 1).padStart(2, '0')}`,
+        focus: { ...dialogue.focus },
+        durationMs: LATE_STORY_STEP_DURATION_MS.dialogue,
+    };
+}
+
+function lateScenarioSequence(input: { episode: number }): StoryScenarioEventSequence {
     const ep = String(input.episode).padStart(2, '0');
     const originalFact = getOriginalLateStoryFact(input.episode);
     const originalMrc = getOriginalLateStoryMrcFact(input.episode);
@@ -220,14 +232,9 @@ function lateScenarioSequence(input: {
     const objectiveRuntimeFlag = `${dungeonId}_objective_complete`;
     const layout = getStoryInteriorLayout(dungeonId);
     const entryAdvanceTile = layout ? { x: layout.playerStart.x, y: layout.playerStart.y - 1 } : null;
-    const dialogueSteps = input.dialogues?.map((dialogue) => ({
-        kind: 'dialogue' as const,
-        speakerId: dialogue.speakerId,
-        speakerNameKey: dialogue.speakerNameKey,
-        textKey: dialogue.textKey,
-        focus: dialogue.focus ?? bossTile,
-        durationMs: LATE_STORY_STEP_DURATION_MS.dialogue,
-    })) ?? [];
+    const dialogueSteps = originalFact.entryDialogues.map((dialogue, index) => (
+        lateStoryDialogueStep(input.episode, 'dialogue', index, dialogue)
+    ));
     const entry: StoryScenarioEventStep[] = [
         { kind: 'focus', target: bossTile, labelKey: `story.event.ep${ep}.focus.boss`, durationMs: LATE_STORY_STEP_DURATION_MS.focus },
         ...(entryAdvanceTile ? [{
@@ -290,14 +297,9 @@ function lateScenarioSequence(input: {
         )),
         bossDefeatEvent,
         bossDefeat: [
-            ...(input.bossDefeatDialogues?.map((dialogue) => ({
-                kind: 'dialogue' as const,
-                speakerId: dialogue.speakerId,
-                speakerNameKey: dialogue.speakerNameKey,
-                textKey: dialogue.textKey,
-                focus: dialogue.focus ?? bossTile,
-                durationMs: LATE_STORY_STEP_DURATION_MS.dialogue,
-            })) ?? []),
+            ...originalFact.bossDefeatDialogues.map((dialogue, index) => (
+                lateStoryDialogueStep(input.episode, 'bossDefeat', index, dialogue)
+            )),
             { kind: 'objective', labelKey: `story.event.ep${ep}.objective`, focus: bossTile, durationMs: LATE_STORY_STEP_DURATION_MS.objective },
         ],
     };
@@ -2936,167 +2938,15 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
             { kind: 'objective', labelKey: 'story.event.ep22.objective', focus: { x: 19, y: 12 } },
         ],
     },
-    lateScenarioSequence({
-        episode: 23,
-        dialogues: [
-            { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep23.dialogue.01', focus: { x: 18, y: 15 } },
-            { speakerId: 'beelzebuth', speakerNameKey: 'story.event.speaker.beelzebuth', textKey: 'story.event.ep23.dialogue.02', focus: { x: 21, y: 15 } },
-            { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep23.dialogue.03', focus: { x: 18, y: 15 } },
-            { speakerId: 'beelzebuth', speakerNameKey: 'story.event.speaker.beelzebuth', textKey: 'story.event.ep23.dialogue.04', focus: { x: 21, y: 15 } },
-        ],
-        bossDefeatDialogues: [
-            { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep23.bossDefeat.01', focus: { x: 19, y: 7 } },
-        ],
-    }),
-    lateScenarioSequence({
-        episode: 24,
-        dialogues: [
-            { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep24.dialogue.01', focus: { x: 19, y: 7 } },
-        ],
-        bossDefeatDialogues: [
-            { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep24.bossDefeat.01', focus: { x: 19, y: 7 } },
-        ],
-    }),
-    lateScenarioSequence({
-        episode: 25,
-        dialogues: [
-            { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep25.dialogue.01', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep25.dialogue.02', focus: { x: 19, y: 23 } },
-            { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep25.dialogue.03', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep25.dialogue.04', focus: { x: 19, y: 23 } },
-            { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep25.dialogue.05', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep25.dialogue.06', focus: { x: 19, y: 23 } },
-        ],
-        bossDefeatDialogues: [
-            { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep25.bossDefeat.01', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep25.bossDefeat.02', focus: { x: 19, y: 9 } },
-            { speakerId: 'nergal', speakerNameKey: 'story.event.speaker.nergal', textKey: 'story.event.ep25.bossDefeat.03', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep25.bossDefeat.04', focus: { x: 19, y: 9 } },
-        ],
-    }),
-    lateScenarioSequence({
-        episode: 26,
-    }),
-    lateScenarioSequence({
-        episode: 27,
-    }),
-    lateScenarioSequence({
-        episode: 28,
-        dialogues: [
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep28.dialogue.01', focus: { x: 19, y: 7 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep28.dialogue.02', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep28.dialogue.03', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep28.dialogue.04', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep28.dialogue.05', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep28.dialogue.06', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep28.dialogue.07', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep28.dialogue.08', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep28.dialogue.09', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep28.dialogue.10', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep28.dialogue.11', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep28.dialogue.12', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep28.dialogue.13', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep28.dialogue.14', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep28.dialogue.15', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep28.dialogue.16', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep28.dialogue.17', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep28.dialogue.18', focus: { x: 19, y: 7 } },
-            { speakerId: 'ergion', speakerNameKey: 'story.event.speaker.ergion', textKey: 'story.event.ep28.dialogue.19', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep28.dialogue.20', focus: { x: 14, y: 32 } },
-            { speakerId: 'ergion', speakerNameKey: 'story.event.speaker.ergion', textKey: 'story.event.ep28.dialogue.21', focus: { x: 19, y: 7 } },
-        ],
-        bossDefeatDialogues: [
-            { speakerId: 'ergion', speakerNameKey: 'story.event.speaker.ergion', textKey: 'story.event.ep28.bossDefeat.01', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep28.bossDefeat.02', focus: { x: 19, y: 9 } },
-        ],
-    }),
-    lateScenarioSequence({
-        episode: 29,
-        dialogues: [
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep29.dialogue.01', focus: { x: 19, y: 7 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep29.dialogue.02', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep29.dialogue.03', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep29.dialogue.04', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep29.dialogue.05', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep29.dialogue.06', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep29.dialogue.07', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep29.dialogue.08', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep29.dialogue.09', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep29.dialogue.10', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep29.dialogue.11', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep29.dialogue.12', focus: { x: 19, y: 7 } },
-            { speakerId: 'martani', speakerNameKey: 'story.event.speaker.martani', textKey: 'story.event.ep29.dialogue.13', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep29.dialogue.14', focus: { x: 14, y: 32 } },
-            { speakerId: 'martani', speakerNameKey: 'story.event.speaker.martani', textKey: 'story.event.ep29.dialogue.15', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep29.dialogue.16', focus: { x: 14, y: 32 } },
-            { speakerId: 'martani', speakerNameKey: 'story.event.speaker.martani', textKey: 'story.event.ep29.dialogue.17', focus: { x: 19, y: 7 } },
-        ],
-        bossDefeatDialogues: [
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep29.bossDefeat.01', focus: { x: 19, y: 9 } },
-            { speakerId: 'martani', speakerNameKey: 'story.event.speaker.martani', textKey: 'story.event.ep29.bossDefeat.02', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep29.bossDefeat.03', focus: { x: 19, y: 9 } },
-        ],
-    }),
-    lateScenarioSequence({
-        episode: 30,
-        dialogues: [
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep30.dialogue.01', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.dialogue.02', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep30.dialogue.03', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.dialogue.04', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep30.dialogue.05', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.dialogue.06', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep30.dialogue.07', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.dialogue.08', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep30.dialogue.09', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.dialogue.10', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep30.dialogue.11', focus: { x: 14, y: 32 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.dialogue.12', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep30.dialogue.13', focus: { x: 14, y: 32 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.dialogue.14', focus: { x: 19, y: 7 } },
-        ],
-        bossDefeatDialogues: [
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep30.bossDefeat.01', focus: { x: 19, y: 9 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.bossDefeat.02', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.bossDefeat.03', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.bossDefeat.04', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep30.bossDefeat.05', focus: { x: 19, y: 9 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.bossDefeat.06', focus: { x: 19, y: 7 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.bossDefeat.07', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep30.bossDefeat.08', focus: { x: 19, y: 9 } },
-            { speakerId: 'blin', speakerNameKey: 'story.event.speaker.blin', textKey: 'story.event.ep30.bossDefeat.09', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep30.bossDefeat.10', focus: { x: 19, y: 9 } },
-        ],
-    }),
-    lateScenarioSequence({
-        episode: 31,
-        dialogues: [
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep31.dialogue.01', focus: { x: 19, y: 7 } },
-            { speakerId: 'demonFixer', speakerNameKey: 'story.event.speaker.demonFixer', textKey: 'story.event.ep31.dialogue.02', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep31.dialogue.03', focus: { x: 19, y: 7 } },
-            { speakerId: 'demonFixer', speakerNameKey: 'story.event.speaker.demonFixer', textKey: 'story.event.ep31.dialogue.04', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep31.dialogue.05', focus: { x: 19, y: 7 } },
-            { speakerId: 'demonFixer', speakerNameKey: 'story.event.speaker.demonFixer', textKey: 'story.event.ep31.dialogue.06', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep31.dialogue.07', focus: { x: 19, y: 7 } },
-            { speakerId: 'demonFixer', speakerNameKey: 'story.event.speaker.demonFixer', textKey: 'story.event.ep31.dialogue.08', focus: { x: 19, y: 13 } },
-            { speakerId: 'jade', speakerNameKey: 'story.event.speaker.jade', textKey: 'story.event.ep31.dialogue.09', focus: { x: 19, y: 7 } },
-            { speakerId: 'demonFixer', speakerNameKey: 'story.event.speaker.demonFixer', textKey: 'story.event.ep31.dialogue.10', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep31.dialogue.11', focus: { x: 14, y: 32 } },
-            { speakerId: 'demonFixer', speakerNameKey: 'story.event.speaker.demonFixer', textKey: 'story.event.ep31.dialogue.12', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep31.dialogue.13', focus: { x: 14, y: 32 } },
-            { speakerId: 'demonFixer', speakerNameKey: 'story.event.speaker.demonFixer', textKey: 'story.event.ep31.dialogue.14', focus: { x: 19, y: 7 } },
-        ],
-        bossDefeatDialogues: [
-            { speakerId: 'demonFixer', speakerNameKey: 'story.event.speaker.demonFixer', textKey: 'story.event.ep31.bossDefeat.01', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep31.bossDefeat.02', focus: { x: 19, y: 9 } },
-            { speakerId: 'demonFixer', speakerNameKey: 'story.event.speaker.demonFixer', textKey: 'story.event.ep31.bossDefeat.03', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep31.bossDefeat.04', focus: { x: 19, y: 9 } },
-            { speakerId: 'demonFixer', speakerNameKey: 'story.event.speaker.demonFixer', textKey: 'story.event.ep31.bossDefeat.05', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep31.bossDefeat.06', focus: { x: 19, y: 9 } },
-            { speakerId: 'demonFixer', speakerNameKey: 'story.event.speaker.demonFixer', textKey: 'story.event.ep31.bossDefeat.07', focus: { x: 19, y: 7 } },
-            { speakerId: 'hero', speakerNameKey: 'story.event.speaker.hero', textKey: 'story.event.ep31.bossDefeat.08', focus: { x: 19, y: 9 } },
-        ],
-    }),
+    lateScenarioSequence({ episode: 23 }),
+    lateScenarioSequence({ episode: 24 }),
+    lateScenarioSequence({ episode: 25 }),
+    lateScenarioSequence({ episode: 26 }),
+    lateScenarioSequence({ episode: 27 }),
+    lateScenarioSequence({ episode: 28 }),
+    lateScenarioSequence({ episode: 29 }),
+    lateScenarioSequence({ episode: 30 }),
+    lateScenarioSequence({ episode: 31 }),
 ];
 
 export function getStoryScenarioEventSequence(dungeonId: string): StoryScenarioEventSequence | null {
