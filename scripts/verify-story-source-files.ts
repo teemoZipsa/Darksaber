@@ -1595,8 +1595,12 @@ function verifyStoryI18nKeys(episode: number, scenario: StoryScenarioDefinition,
         if (!layout) throw new Error(`Episode ${episode} ${scenario.dungeonId} missing story interior layout`);
         const bossNameEn = STORY_BOSS_NAME_EN_BY_EPISODE[episode];
         if (!bossNameEn) throw new Error(`Episode ${episode} missing English interior objective boss name contract`);
+        requireStoryTextIncludes(episode, 'ko interior display name', ko[layout.displayNameKey], '내부');
+        requireStoryTextIncludes(episode, 'en interior display name', en[layout.displayNameKey], 'Interior');
         requireStoryTextIncludes(episode, 'ko interior objective', ko[layout.objectiveKey], scenario.bossName);
         requireStoryTextIncludes(episode, 'en interior objective', en[layout.objectiveKey], bossNameEn);
+        requireStoryTextIncludes(episode, 'ko interior objective', ko[layout.objectiveKey], '입구 복귀');
+        requireStoryTextIncludes(episode, 'en interior objective', en[layout.objectiveKey], 'return to the entrance');
     }
 }
 
