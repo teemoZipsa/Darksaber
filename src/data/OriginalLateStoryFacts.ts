@@ -1,5 +1,6 @@
 import type { TilePoint } from '../field/FieldPathing';
 import type { BiomeType } from '../map/BiomeMask';
+import type { LandmarkSpriteId } from '../map/TileAssetManager';
 import type { MonsterId } from './MonsterCatalog';
 import { requireOriginalLateStoryItem, type OriginalLateStoryItemRecord } from './OriginalLateStoryItems';
 import ORIGINAL_LATE_STORY_FACTS_JSON from './content/original-late-story-facts.json';
@@ -30,14 +31,27 @@ export interface OriginalLateStoryDialogueFact {
     focus: TilePoint;
 }
 
+export interface OriginalLateStoryWorldChunk {
+    x: number;
+    y: number;
+}
+
 export interface OriginalLateStoryFact {
     dungeonId: string;
+    dungeonNameKr: string;
+    dungeonNameEn: string;
     globalScript: string;
     backgroundMapFile: string | null;
     sideMapFiles: string[];
     bossMonsterId: MonsterId;
+    bossName: string;
+    bossLevel: number;
+    bossColor: string;
     guardMonsterRoster: MonsterId[];
+    guardLevel: number;
+    worldChunk: OriginalLateStoryWorldChunk;
     worldBiome: BiomeType;
+    worldSprite: LandmarkSpriteId;
     entryDialogues: OriginalLateStoryDialogueFact[];
     bossDefeatDialogues: OriginalLateStoryDialogueFact[];
     setArc: string;

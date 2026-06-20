@@ -983,6 +983,32 @@ function verifyLateStoryOriginalMapContract(
     if (scenario.missionKind !== 'soloInterior') {
         throw new Error(`Episode ${episode} late story mission kind mismatch: ${scenario.missionKind} !== soloInterior`);
     }
+    requireJsonEqual(
+        episode,
+        'late story scenario metadata',
+        {
+            dungeonNameKr: scenario.dungeonNameKr,
+            dungeonNameEn: scenario.dungeonNameEn,
+            chunkX: scenario.chunkX,
+            chunkY: scenario.chunkY,
+            sprite: scenario.sprite,
+            bossName: scenario.bossName,
+            bossLevel: scenario.bossLevel,
+            bossColor: scenario.bossColor,
+            guardLevel: scenario.guardLevel,
+        },
+        {
+            dungeonNameKr: fact.dungeonNameKr,
+            dungeonNameEn: fact.dungeonNameEn,
+            chunkX: fact.worldChunk.x,
+            chunkY: fact.worldChunk.y,
+            sprite: fact.worldSprite,
+            bossName: fact.bossName,
+            bossLevel: fact.bossLevel,
+            bossColor: fact.bossColor,
+            guardLevel: fact.guardLevel,
+        }
+    );
     if (scenario.guardCount !== fact.guardAreas.length) {
         throw new Error(`Episode ${episode} late story guard count mismatch: ${scenario.guardCount} !== ${fact.guardAreas.length}`);
     }
