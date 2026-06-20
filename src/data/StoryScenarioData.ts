@@ -5,7 +5,7 @@ export type StoryQuestRewardData =
     | { type: 'none' }
     | { type: 'questItem'; itemId: string; originalItemId?: number }
     | { type: 'inventoryItem'; itemId: string; originalItemId?: number }
-    | { type: 'companion'; companionId: string; classId: string; nameKey: string }
+    | { type: 'companion'; companionId: string; classId: string; nameKey: string; originalGeneralId?: number }
     | { type: 'bundle'; rewards: StoryQuestRewardData[] };
 
 export type StoryScenarioMissionKind = 'field' | 'soloInterior' | 'vehicle';
@@ -106,7 +106,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         reward: {
             type: 'bundle',
             rewards: [
-                { type: 'companion', companionId: 'story_fighter_ep03', classId: 'infantry', nameKey: 'story.companion.ep03Fighter.name' },
+                { type: 'companion', companionId: 'story_fighter_ep03', classId: 'infantry', nameKey: 'story.companion.ep03Fighter.name', originalGeneralId: 100 },
                 { type: 'inventoryItem', itemId: 'quest_sacred_sword', originalItemId: 98 },
             ],
         },
@@ -126,7 +126,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         guardLevel: 3,
         guardCount: 5,
         missionKind: 'field',
-        reward: { type: 'companion', companionId: 'story_knight_ep04', classId: 'cavalry', nameKey: 'story.companion.ep04Knight.name' },
+        reward: { type: 'companion', companionId: 'story_knight_ep04', classId: 'cavalry', nameKey: 'story.companion.ep04Knight.name', originalGeneralId: 101 },
     },
     {
         episode: 5,
@@ -143,7 +143,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         guardLevel: 3,
         guardCount: 6,
         missionKind: 'field',
-        reward: { type: 'companion', companionId: 'story_magician_ep05', classId: 'mage', nameKey: 'story.companion.ep05Magician.name' },
+        reward: { type: 'companion', companionId: 'story_magician_ep05', classId: 'mage', nameKey: 'story.companion.ep05Magician.name', originalGeneralId: 103 },
     },
     {
         episode: 6,
@@ -177,7 +177,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         guardLevel: 4,
         guardCount: 6,
         missionKind: 'soloInterior',
-        reward: { type: 'companion', companionId: 'story_monk_ep07', classId: 'priest', nameKey: 'story.companion.ep07Monk.name' },
+        reward: { type: 'companion', companionId: 'story_monk_ep07', classId: 'priest', nameKey: 'story.companion.ep07Monk.name', originalGeneralId: 111 },
     },
     {
         episode: 8,

@@ -69,6 +69,7 @@ interface RoadmapDocRow {
 
 interface RewardContractState {
     companionIds: Map<string, string>;
+    originalGeneralIds: Map<number, string>;
 }
 
 const ROADMAP_TREATMENT_BY_MISSION_KIND: Record<StoryScenarioMissionKind, string> = {
@@ -219,10 +220,20 @@ function triggerGetItemIds(trigger: string): number[] {
     return [...trigger.matchAll(/\bGETITEM\s+0*(\d+)\b/g)].map((match) => Number(match[1]));
 }
 
+function triggerGetGeneralIds(trigger: string): number[] {
+    return [...trigger.matchAll(/\bGETGENERAL\s+0*(\d+)\b/g)].map((match) => Number(match[1]));
+}
+
 function collectStoryRewardOriginalItemIds(reward: StoryQuestRewardData): number[] {
     if (reward.type === 'none' || reward.type === 'companion') return [];
     if (reward.type === 'bundle') return reward.rewards.flatMap(collectStoryRewardOriginalItemIds);
     return reward.originalItemId !== undefined && reward.originalItemId > 0 ? [reward.originalItemId] : [];
+}
+
+function collectStoryRewardOriginalGeneralIds(reward: StoryQuestRewardData): number[] {
+    if (reward.type === 'none' || reward.type === 'questItem' || reward.type === 'inventoryItem') return [];
+    if (reward.type === 'bundle') return reward.rewards.flatMap(collectStoryRewardOriginalGeneralIds);
+    return reward.originalGeneralId !== undefined && reward.originalGeneralId > 0 ? [reward.originalGeneralId] : [];
 }
 
 function notesMentionOriginalEvent(notes: string, eventNumber: number): boolean {
@@ -773,6 +784,13 @@ function verifyStoryRewardContract(
         throw new Error(`Duplicate story companion reward ${reward.companionId}: ${existingCompanionContext} and ${context}`);
     }
     state.companionIds.set(reward.companionId, context);
+    if (reward.originalGeneralId !== undefined && reward.originalGeneralId > 0) {
+        const existingGeneralContext = state.originalGeneralIds.get(reward.originalGeneralId);
+        if (existingGeneralContext) {
+            throw new Error(`Duplicate original GETGENERAL ${reward.originalGeneralId}: ${existingGeneralContext} and ${context}`);
+        }
+        state.originalGeneralIds.set(reward.originalGeneralId, context);
+    }
 
     if (!getClassLine(reward.classId)) {
         throw new Error(`Episode ${episode} ${context} missing reward companion class ${reward.classId}`);
@@ -1815,6 +1833,12 @@ function verifyStoryCompletionContract(
                 throw new Error(`Episode ${episode} ${scenario.dungeonId} boss GETITEM ${originalItemId} is missing a reward mapping`);
             }
         }
+        const storyRewardOriginalGeneralIds = new Set(collectStoryRewardOriginalGeneralIds(scenario.reward));
+        for (const originalGeneralId of triggerGetGeneralIds(sequence.bossDefeatEvent.trigger)) {
+            if (!storyRewardOriginalGeneralIds.has(originalGeneralId)) {
+                throw new Error(`Episode ${episode} ${scenario.dungeonId} boss GETGENERAL ${originalGeneralId} is missing a companion reward mapping`);
+            }
+        }
         if (sequence.objectiveRuntimeFlag && sequence.bossDefeatEvent.runtimeFlag !== sequence.objectiveRuntimeFlag) {
             throw new Error(
                 `Episode ${episode} ${scenario.dungeonId} boss defeat flag mismatch: ` +
@@ -1885,7 +1909,7 @@ const docRows = readScenarioImportDocRows();
 const roadmapRows = readRoadmapDocRows();
 const contentRows = readStoryScenarioContentRows();
 const completionFlags = new Map<string, string>();
-const rewardContractState: RewardContractState = { companionIds: new Map() };
+const rewardContractState: RewardContractState = { companionIds: new Map(), originalGeneralIds: new Map() };
 const worldMap = new WorldMap();
 const verified: string[] = [];
 

@@ -63,7 +63,8 @@
           "type": "companion",
           "companionId": "story_fighter_ep03",
           "classId": "infantry",
-          "nameKey": "story.companion.ep03Fighter.name"
+          "nameKey": "story.companion.ep03Fighter.name",
+          "originalGeneralId": 100
         },
         {
           "type": "inventoryItem",
@@ -92,7 +93,8 @@
       "type": "companion",
       "companionId": "story_knight_ep04",
       "classId": "cavalry",
-      "nameKey": "story.companion.ep04Knight.name"
+      "nameKey": "story.companion.ep04Knight.name",
+      "originalGeneralId": 101
     }
   },
   {
@@ -114,7 +116,8 @@
       "type": "companion",
       "companionId": "story_magician_ep05",
       "classId": "mage",
-      "nameKey": "story.companion.ep05Magician.name"
+      "nameKey": "story.companion.ep05Magician.name",
+      "originalGeneralId": 103
     }
   },
   {
@@ -158,7 +161,8 @@
       "type": "companion",
       "companionId": "story_monk_ep07",
       "classId": "priest",
-      "nameKey": "story.companion.ep07Monk.name"
+      "nameKey": "story.companion.ep07Monk.name",
+      "originalGeneralId": 111
     }
   },
   {
