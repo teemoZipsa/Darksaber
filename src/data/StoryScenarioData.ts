@@ -30,8 +30,17 @@ export interface StoryScenarioDefinition {
 
 const noReward: StoryQuestRewardData = { type: 'none' };
 
-function getOriginalLateStoryGuardCount(episode: number): number {
-    return getOriginalLateStoryFact(episode).guardAreas.length;
+type LateOriginalScenarioConfig = Omit<StoryScenarioDefinition, 'dungeonId' | 'guardCount' | 'missionKind' | 'reward'>;
+
+function buildLateOriginalScenario(config: LateOriginalScenarioConfig): StoryScenarioDefinition {
+    const fact = getOriginalLateStoryFact(config.episode);
+    return {
+        ...config,
+        dungeonId: fact.dungeonId,
+        guardCount: fact.guardAreas.length,
+        missionKind: 'soloInterior',
+        reward: noReward,
+    };
 }
 
 export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
@@ -415,10 +424,9 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         missionKind: 'soloInterior',
         reward: noReward,
     },
-    {
+    buildLateOriginalScenario({
         episode: 23,
         questId: 'main:episode_23_beelzebuth',
-        dungeonId: 'beelzebuth_hall',
         dungeonNameKr: '벨제뷔트 회랑',
         dungeonNameEn: 'Beelzebuth Hall',
         chunkX: 75,
@@ -428,14 +436,10 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 26,
         bossColor: '#7850b8',
         guardLevel: 22,
-        guardCount: getOriginalLateStoryGuardCount(23),
-        missionKind: 'soloInterior',
-        reward: noReward,
-    },
-    {
+    }),
+    buildLateOriginalScenario({
         episode: 24,
         questId: 'main:episode_24_astaroth',
-        dungeonId: 'astaroth_gate',
         dungeonNameKr: '아스타로스 관문',
         dungeonNameEn: 'Astaroth Gate',
         chunkX: 76,
@@ -445,14 +449,10 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 27,
         bossColor: '#6c5f90',
         guardLevel: 23,
-        guardCount: getOriginalLateStoryGuardCount(24),
-        missionKind: 'soloInterior',
-        reward: noReward,
-    },
-    {
+    }),
+    buildLateOriginalScenario({
         episode: 25,
         questId: 'main:episode_25_nergal_depths',
-        dungeonId: 'nergal_depths',
         dungeonNameKr: '네르갈 심층',
         dungeonNameEn: 'Nergal Depths',
         chunkX: 73,
@@ -462,14 +462,10 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 28,
         bossColor: '#2f2f68',
         guardLevel: 24,
-        guardCount: getOriginalLateStoryGuardCount(25),
-        missionKind: 'soloInterior',
-        reward: noReward,
-    },
-    {
+    }),
+    buildLateOriginalScenario({
         episode: 26,
         questId: 'main:episode_26_beast_mark',
-        dungeonId: 'beast_mark_shrine',
         dungeonNameKr: '배마의 제단',
         dungeonNameEn: 'Beast Mark Shrine',
         chunkX: 70,
@@ -479,14 +475,10 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 28,
         bossColor: '#b04040',
         guardLevel: 24,
-        guardCount: getOriginalLateStoryGuardCount(26),
-        missionKind: 'soloInterior',
-        reward: noReward,
-    },
-    {
+    }),
+    buildLateOriginalScenario({
         episode: 27,
         questId: 'main:episode_27_chosen_mark',
-        dungeonId: 'chosen_mark_shrine',
         dungeonNameKr: '택마의 제단',
         dungeonNameEn: 'Chosen Mark Shrine',
         chunkX: 67,
@@ -496,14 +488,10 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 29,
         bossColor: '#5f4a88',
         guardLevel: 25,
-        guardCount: getOriginalLateStoryGuardCount(27),
-        missionKind: 'soloInterior',
-        reward: noReward,
-    },
-    {
+    }),
+    buildLateOriginalScenario({
         episode: 28,
         questId: 'main:episode_28_ergion',
-        dungeonId: 'ergion_keep',
         dungeonNameKr: '에르기온 성채',
         dungeonNameEn: 'Ergion Keep',
         chunkX: 70,
@@ -513,14 +501,10 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 30,
         bossColor: '#7e4ec8',
         guardLevel: 26,
-        guardCount: getOriginalLateStoryGuardCount(28),
-        missionKind: 'soloInterior',
-        reward: noReward,
-    },
-    {
+    }),
+    buildLateOriginalScenario({
         episode: 29,
         questId: 'main:episode_29_martani',
-        dungeonId: 'martani_bastion',
         dungeonNameKr: '마르타니 보루',
         dungeonNameEn: 'Martani Bastion',
         chunkX: 72,
@@ -530,14 +514,10 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 31,
         bossColor: '#9a5a48',
         guardLevel: 27,
-        guardCount: getOriginalLateStoryGuardCount(29),
-        missionKind: 'soloInterior',
-        reward: noReward,
-    },
-    {
+    }),
+    buildLateOriginalScenario({
         episode: 30,
         questId: 'main:episode_30_blin',
-        dungeonId: 'blin_watch',
         dungeonNameKr: '블린 감시탑',
         dungeonNameEn: 'Blin Watch',
         chunkX: 74,
@@ -547,14 +527,10 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 32,
         bossColor: '#4f7798',
         guardLevel: 28,
-        guardCount: getOriginalLateStoryGuardCount(30),
-        missionKind: 'soloInterior',
-        reward: noReward,
-    },
-    {
+    }),
+    buildLateOriginalScenario({
         episode: 31,
         questId: 'main:episode_31_demon_fixers',
-        dungeonId: 'demon_fixers_den',
         dungeonNameKr: '마계 해결사의 소굴',
         dungeonNameEn: 'Demon Fixer Den',
         chunkX: 76,
@@ -564,10 +540,7 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         bossLevel: 33,
         bossColor: '#5f4a88',
         guardLevel: 29,
-        guardCount: getOriginalLateStoryGuardCount(31),
-        missionKind: 'soloInterior',
-        reward: noReward,
-    },
+    }),
 ];
 
 export function getStoryScenarioByDungeonId(dungeonId: string): StoryScenarioDefinition | null {
