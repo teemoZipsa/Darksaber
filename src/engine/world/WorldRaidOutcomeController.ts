@@ -11,7 +11,7 @@ import {
     STORY_QUESTS,
     type StoryQuestReward,
 } from '../../data/StoryQuestData';
-import { t } from '../../i18n/LanguageManager';
+import { t, formatT } from '../../i18n/LanguageManager';
 import type { TownInfo } from '../../map/BiomeMask';
 import {
     computeRaidFailureLoss,
@@ -82,7 +82,7 @@ export class WorldRaidOutcomeController {
             this.context.playerData.markCleared('quest:first_survival');
             this.context.playerData.addGold(200);
             goldReward += 200;
-            questRewards.push('퀘스트 완료: 첫 생환');
+            questRewards.push(formatT('raid.outcome.firstSurvivalQuest', { completed: t('quest.completed') }));
         }
         questRewards.push(...this.completeScenarioRuntimeQuestItems());
         questRewards.push(...this.completeStoryQuestRewards());
@@ -110,10 +110,10 @@ export class WorldRaidOutcomeController {
             equipmentLost: [],
             goldReward,
             questRewards,
-            notes: ['전리품과 창고는 현재 세션에서만 유지됩니다.'],
+            notes: [t('raid.outcome.sessionOnlyNote')],
         };
         this.showRaidResult(outcome, destination);
-        this.context.log(`${destination.nameKr} 생환 성공.`);
+        this.context.log(formatT('raid.outcome.survivedLog', { town: destination.nameKr }));
     }
 
     public completeFailure(result: Exclude<RaidResultType, 'SURVIVED'>): void {
@@ -152,13 +152,13 @@ export class WorldRaidOutcomeController {
             lost: mergeSnapshots(loss.backpackLost),
             equipmentLost: loss.equipmentLost,
             notes: [
-                result === 'MIA' ? '시간 초과로 실종 처리되었습니다.' : '출격조가 전멸했습니다.',
+                result === 'MIA' ? t('raid.outcome.miaNote') : t('raid.outcome.deadNote'),
                 ...recoveryNotes,
             ],
         };
         this.showRaidResult(outcome, returnTown);
-        this.context.log(result === 'MIA' ? '시간 초과. 손실이 적용되었습니다.' : '전멸. 손실이 적용되었습니다.');
-        if (recoveryNotes.length > 0) this.context.log('기본 보급품을 지급했습니다.');
+        this.context.log(result === 'MIA' ? t('raid.outcome.miaLog') : t('raid.outcome.deadLog'));
+        if (recoveryNotes.length > 0) this.context.log(t('raid.outcome.recoveryGranted'));
     }
 
     private applyRaidFailureRecoveryKit(): string[] {
@@ -175,7 +175,7 @@ export class WorldRaidOutcomeController {
         }
 
         if (equippedCount === 0 && backpackCount === 0) return [];
-        return [`기본 보급품 지급: 장비 ${equippedCount}개, 소모품 ${backpackCount}개`];
+        return [formatT('raid.outcome.recoveryKit', { equipped: equippedCount, backpack: backpackCount })];
     }
 
     private equipRecoveryItemIfEmpty(character: Character, itemId: string): boolean {

@@ -1891,6 +1891,8 @@ export const I18N_STRINGS: TranslationTable = {
         'raid.outcome.deadNote': '출격조가 전멸했습니다.',
         'raid.outcome.miaLog': '시간 초과. 손실이 적용되었습니다.',
         'raid.outcome.deadLog': '전멸. 손실이 적용되었습니다.',
+        'raid.outcome.recoveryGranted': '기본 보급품을 지급했습니다.',
+        'raid.outcome.recoveryKit': '기본 보급품 지급: 장비 {equipped}개, 소모품 {backpack}개',
         'raid.banner.extractOtherTown': '{town}  →  다른 마을 생환',
         'raid.result.survived': '생환 성공',
         'raid.result.mia': '시간 초과',
@@ -1957,6 +1959,7 @@ export const I18N_STRINGS: TranslationTable = {
         'mp.lootRejected': '전리품 획득 실패: {reason}',
         'mp.actionRejected': '서버 거부: {reason}',
         'mp.lootPending': '전리품 획득 응답 지연: 서버 응답을 기다리는 중입니다.',
+        'mp.lootGridTitle': '전리품 {lootId}',
     },
 
     en: {
@@ -3847,6 +3850,8 @@ export const I18N_STRINGS: TranslationTable = {
         'raid.outcome.deadNote': 'The deployed party was wiped out.',
         'raid.outcome.miaLog': 'Time expired. Losses have been applied.',
         'raid.outcome.deadLog': 'Party wiped. Losses have been applied.',
+        'raid.outcome.recoveryGranted': 'A basic recovery kit was issued.',
+        'raid.outcome.recoveryKit': 'Recovery kit issued: {equipped} equipped items, {backpack} consumables',
         'raid.banner.extractOtherTown': '{town}  →  extract to another town',
         'raid.result.survived': 'Extraction Successful',
         'raid.result.mia': 'Time Expired',
@@ -3913,5 +3918,6 @@ export const I18N_STRINGS: TranslationTable = {
         'mp.lootRejected': 'Loot pickup failed: {reason}',
         'mp.actionRejected': 'Server rejected action: {reason}',
         'mp.lootPending': 'Loot pickup delayed: waiting for server response.',
+        'mp.lootGridTitle': 'Loot {lootId}',
     }
 };

@@ -9,7 +9,7 @@ import { MIN_FIELD_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
 import type { TilePoint } from '../../field/FieldPathing';
 import { GridInventory, type PlacedItem } from '../../inventory/GridInventory';
-import { t } from '../../i18n/LanguageManager';
+import { formatT, t } from '../../i18n/LanguageManager';
 import type { WorldMap } from '../../map/WorldMap';
 import type {
     ActionRejectedMessage,
@@ -280,7 +280,11 @@ export class WorldNetworkSyncController {
 
     public openLoot(grant: LootGrantMessage): void {
         const grid = this.gridFromSnapshot(grant.gridSnapshot);
-        this.context.gameManager.inventoryUI.setExternalGrid(grid, `전리품 ${grant.lootId}`, { isRaidLoot: true });
+        this.context.gameManager.inventoryUI.setExternalGrid(
+            grid,
+            formatT('mp.lootGridTitle', { lootId: grant.lootId }),
+            { isRaidLoot: true },
+        );
         if (!this.context.gameManager.inventoryUI.isVisible()) this.context.gameManager.inventoryUI.toggle();
         this.context.selectLoot(grant.lootId);
     }
@@ -340,10 +344,10 @@ export class WorldNetworkSyncController {
         if (pending) {
             this.pendingLootPicks.delete(rejection.intentId);
             this.context.gameManager.inventoryUI.revertRaidLoot(pending.placed, pending.source);
-            this.context.log(`전리품 획득 실패: ${rejection.reason}`);
+            this.context.log(formatT('mp.lootRejected', { reason: rejection.reason }));
             return;
         }
-        this.context.log(`서버 거부: ${rejection.reason}`);
+        this.context.log(formatT('mp.actionRejected', { reason: rejection.reason }));
         if (!rejectedMoveActorId) return;
         const actor = this.context.getPartyActors().find((entry) => entry.id === rejectedMoveActorId);
         if (!actor || actor.id !== this.context.getActiveTurnActorId()) return;
@@ -358,7 +362,7 @@ export class WorldNetworkSyncController {
         for (const pick of this.pendingLootPicks.values()) {
             if (now - pick.at > 10_000 && !pick.timedOut) {
                 pick.timedOut = true;
-                this.context.log('전리품 획득 응답 지연: 서버 응답을 기다리는 중입니다.');
+                this.context.log(t('mp.lootPending'));
             }
         }
     }
@@ -491,12 +495,13 @@ export class WorldNetworkSyncController {
     private formatCombatEvent(event: CombatEventMessage): string {
         const sourceName = event.sourceName ?? this.getNetworkEntityName(event.sourceId);
         const targetName = event.targetName ?? this.getNetworkEntityName(event.targetId);
-        if (event.kind === 'miss') return `${sourceName} → ${targetName} 빗나감`;
-        if (event.kind === 'kill') return `${sourceName} → ${targetName} 처치`;
-        if (event.kind === 'heal') return `${sourceName} → ${targetName} HP +${event.value ?? 0}`;
-        if (event.kind === 'down') return `${sourceName} → ${targetName} 행동 불능`;
-        if (event.kind === 'status') return `${sourceName} → ${targetName} 상태 변화`;
-        return `${sourceName} → ${targetName} ${event.value ?? 0} 피해`;
+        const vars = { source: sourceName, target: targetName, value: event.value ?? 0 };
+        if (event.kind === 'miss') return formatT('field.log.combat.miss', vars);
+        if (event.kind === 'kill') return formatT('field.log.combat.kill', vars);
+        if (event.kind === 'heal') return formatT('field.log.combat.heal', vars);
+        if (event.kind === 'down') return formatT('field.log.combat.down', vars);
+        if (event.kind === 'status') return formatT('field.log.combat.status', vars);
+        return formatT('field.log.combat.damage', vars);
     }
 
     private getNetworkEntityName(entityId: string): string {

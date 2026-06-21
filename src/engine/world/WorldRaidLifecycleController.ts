@@ -161,8 +161,8 @@ export class WorldRaidLifecycleController {
             this.context.clearWorldLoot();
             this.context.clearFieldTurnState();
             this.context.log(isResumeJoin
-                ? `${worldMap.getDisplayName()} 서버 원정에 재접속했습니다.`
-                : `${town.nameKr}에서 ${worldMap.getDisplayName()} 서버로 출격.`);
+                ? formatT('mp.deployResumed', { world: worldMap.getDisplayName() })
+                : formatT('mp.deployStarted', { town: town.nameKr, world: worldMap.getDisplayName() }));
         } catch (error) {
             if (this.shouldReloadDevAutoStartAuth(error)) {
                 console.warn('[Darksaber] Dev auth expired after server restart; reloading to issue a fresh dev session.');
@@ -266,7 +266,7 @@ export class WorldRaidLifecycleController {
         }
         if (arrival.kind === 'departureBlocked') {
             if (this.context.raidSession.shouldReportDepartureBlock(arrival.townId)) {
-                this.context.log('출발한 마을로는 생환할 수 없습니다. 다른 마을로 이동하세요.');
+                this.context.log(t('field.log.departureTownBlocked'));
             }
             return;
         }
@@ -312,7 +312,7 @@ export class WorldRaidLifecycleController {
                 credentials: 'include',
             });
             if (!response.ok) {
-                if (logFailure) this.context.log(`인증 토큰 갱신 실패: HTTP ${response.status}`);
+                if (logFailure) this.context.log(formatT('mp.authRefreshFailedHttp', { status: response.status }));
                 return null;
             }
             const parsed = await response.json() as unknown;
@@ -324,7 +324,11 @@ export class WorldRaidLifecycleController {
             this.context.gameManager.updateNetworkAccessToken(accessToken);
             return { ...authContext, accessToken };
         } catch (error) {
-            if (logFailure) this.context.log(`인증 토큰 갱신 실패: ${error instanceof Error ? error.message : 'unknown error'}`);
+            if (logFailure) {
+                this.context.log(formatT('mp.authRefreshFailed', {
+                    message: error instanceof Error ? error.message : t('mp.error.unknown'),
+                }));
+            }
             return null;
         }
     }
