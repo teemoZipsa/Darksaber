@@ -23,6 +23,7 @@ import {
     getStoryQuestViews,
     isStoryRewardOwned,
 } from '../../src/data/StoryQuestData';
+import { i18n, type Language } from '../../src/i18n/LanguageManager';
 
 class ImageStub {
     public src = '';
@@ -64,6 +65,7 @@ function createController() {
     const raidSession = new WorldRaidSession('central_castle');
     const party = new PartyManager();
     const calls: string[] = [];
+    const logs: string[] = [];
     const townSession = {
         clearRestStatusesFromParty: () => undefined,
         applyRaidInjuries: (_downedCharacterIds: Set<string>) => undefined,
@@ -85,13 +87,13 @@ function createController() {
         placePartyAtTown: (_town: TownInfo) => { calls.push('placePartyAtTown'); },
         openTown: (_town: TownInfo) => undefined,
         setPhase: () => undefined,
-        log: () => undefined,
+        log: (message: string) => { logs.push(message); },
     };
     const controller = new WorldRaidOutcomeController(context);
     const getOutcome = (): RaidOutcome | null =>
         (controller as unknown as { raidResultUI: { outcome: RaidOutcome | null } }).raidResultUI.outcome;
 
-    return { controller, playerData, raidSession, party, gameManager, getOutcome, calls };
+    return { controller, playerData, raidSession, party, gameManager, getOutcome, calls, logs };
 }
 
 test('Burgos objective grants episode 1 completion and bomb only after survival', () => {
@@ -105,6 +107,25 @@ test('Burgos objective grants episode 1 completion and bomb only after survival'
     assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), true);
     assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('1화')));
     assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('폭탄')));
+});
+
+test('raid outcome logs use localized dynamic town and reward item names', () => {
+    const previousLang: Language = i18n.lang;
+    try {
+        i18n.lang = 'en';
+        const { controller, playerData, raidSession, getOutcome, logs } = createController();
+        playerData.clearedStages.delete('quest:first_survival');
+        raidSession.beginRaidFromTown('central_castle');
+        markBurgosObjectiveComplete(raidSession);
+
+        controller.completeSuccess(DESTINATION_TOWN);
+
+        assert.ok(logs.some((line) => line === 'Extracted safely to Forest Village.'));
+        assert.ok(getOutcome()?.questRewards?.some((line) => line === 'Item gained: Bomb'));
+        assert.equal(getOutcome()?.questRewards?.some((line) => line.includes('폭탄')), false);
+    } finally {
+        i18n.lang = previousLang;
+    }
 });
 
 test('completed episode 1 does not grant duplicate story rewards', () => {

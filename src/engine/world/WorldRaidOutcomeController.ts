@@ -11,7 +11,7 @@ import {
     STORY_QUESTS,
     type StoryQuestReward,
 } from '../../data/StoryQuestData';
-import { t, formatT } from '../../i18n/LanguageManager';
+import { t, formatT, i18n } from '../../i18n/LanguageManager';
 import type { TownInfo } from '../../map/BiomeMask';
 import {
     computeRaidFailureLoss,
@@ -26,6 +26,14 @@ import type { GameManager } from '../GameManager';
 import type { InputManager } from '../InputManager';
 import type { WorldPhase, WorldRaidSession } from './WorldRaidSession';
 import type { WorldTownSession } from './WorldTownSession';
+
+function displayTownName(town: TownInfo): string {
+    return i18n.lang === 'ko' ? town.nameKr : town.name;
+}
+
+function displayItemName(item: ItemDef | undefined, fallback: string): string {
+    return item ? (i18n.lang === 'ko' ? item.nameKr : item.name) : fallback;
+}
 
 export interface WorldRaidOutcomeContext {
     party: PartyManager;
@@ -113,7 +121,7 @@ export class WorldRaidOutcomeController {
             notes: [t('raid.outcome.sessionOnlyNote')],
         };
         this.showRaidResult(outcome, destination);
-        this.context.log(formatT('raid.outcome.survivedLog', { town: destination.nameKr }));
+        this.context.log(formatT('raid.outcome.survivedLog', { town: displayTownName(destination) }));
     }
 
     public completeFailure(result: Exclude<RaidResultType, 'SURVIVED'>): void {
@@ -234,7 +242,7 @@ export class WorldRaidOutcomeController {
 
                 this.context.playerData.addQuestItem(event.questItemId);
                 const item = getItemDef(event.questItemId);
-                rewards.push(`${t('quest.rewardItem')}: ${item?.nameKr ?? event.questItemId}`);
+                rewards.push(`${t('quest.rewardItem')}: ${displayItemName(item, event.questItemId)}`);
             }
         }
         return rewards;
@@ -254,7 +262,7 @@ export class WorldRaidOutcomeController {
                 this.context.playerData.addQuestItem(reward.itemId);
             }
             const rewardItem = getItemDef(reward.itemId);
-            return `${t('quest.rewardItem')}: ${rewardItem?.nameKr ?? reward.itemId}`;
+            return `${t('quest.rewardItem')}: ${displayItemName(rewardItem, reward.itemId)}`;
         }
 
         if (reward.type === 'inventoryItem') {
@@ -266,7 +274,7 @@ export class WorldRaidOutcomeController {
                 }
             }
             const rewardItem = getItemDef(reward.itemId);
-            return `${t('quest.rewardItem')}: ${rewardItem?.nameKr ?? reward.itemId}`;
+            return `${t('quest.rewardItem')}: ${displayItemName(rewardItem, reward.itemId)}`;
         }
 
         if (!this.context.playerData.hasStoryCompanion(reward.companionId)) {

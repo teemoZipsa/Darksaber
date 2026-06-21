@@ -11,7 +11,8 @@ import { WorldNetworkIntentController } from '../../src/engine/world/WorldNetwor
 import { WorldRestingController } from '../../src/engine/world/WorldRestingController';
 import { WorldTurnStateController } from '../../src/engine/world/WorldTurnStateController';
 import { WorldTutorialController } from '../../src/engine/world/WorldTutorialController';
-import type { ActorSnapshot, GridSnapshot, WorldSnapshot } from '../../src/net/WorldProtocol';
+import { i18n, type Language } from '../../src/i18n/LanguageManager';
+import type { ActorSnapshot, AutoLootGrantMessage, GridSnapshot, WorldSnapshot } from '../../src/net/WorldProtocol';
 
 class ImageStub {
     public src = '';
@@ -552,6 +553,37 @@ test('grid snapshot without sockets restores placed items with an empty socket l
 
     assert.equal(grid.items.length, 1);
     assert.deepEqual(grid.items[0].sockets, []);
+});
+
+test('network auto-loot log uses localized item names', () => {
+    const previousLang: Language = i18n.lang;
+    try {
+        i18n.lang = 'en';
+        const actor = makeActor('hero');
+        const { engine } = makeEngineHarness(actor);
+        const grant: AutoLootGrantMessage = {
+            type: 'AUTO_LOOT_GRANT',
+            lootId: 'loot-1',
+            sourceName: 'Training Dummy',
+            gridSnapshot: {
+                width: 4,
+                height: 4,
+                items: [{
+                    itemId: 'short_sword',
+                    gridX: 0,
+                    gridY: 0,
+                    durability: 12,
+                    quantity: 1,
+                }],
+            },
+        };
+
+        engine.networkSyncController.handleAutoLootGrant(grant);
+
+        assert.deepEqual(engine.combatLog, ['Training Dummy Loot auto-collected: Short Sword']);
+    } finally {
+        i18n.lang = previousLang;
+    }
 });
 
 test('resting status recovers over time and clears at full resources', () => {

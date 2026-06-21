@@ -3,7 +3,7 @@ import type { PartyManager } from '../../character/PartyManager';
 import { getPartyCarriedWeight } from '../../inventory/CarryWeight';
 import type { PlayerData } from '../../data/PlayerData';
 import { normalizeLoadout } from '../../magic/MagicLoadout';
-import { formatT, t } from '../../i18n/LanguageManager';
+import { formatT, i18n, t } from '../../i18n/LanguageManager';
 import type { TownInfo } from '../../map/BiomeMask';
 import type { WorldMap } from '../../map/WorldMap';
 import { resolveTownArrival } from '../../raid/RaidRules';
@@ -38,6 +38,10 @@ import type { WorldRaidSession, WorldPhase } from './WorldRaidSession';
 import type { WorldTownSession } from './WorldTownSession';
 import type { WorldStoryScenarioController } from './WorldStoryScenarioController';
 import type { WorldNetworkSyncController } from './WorldNetworkSyncController';
+
+function displayTownName(town: TownInfo): string {
+    return i18n.lang === 'ko' ? town.nameKr : town.name;
+}
 
 export interface WorldRaidLifecycleContext {
     party: PartyManager;
@@ -162,7 +166,7 @@ export class WorldRaidLifecycleController {
             this.context.clearFieldTurnState();
             this.context.log(isResumeJoin
                 ? formatT('mp.deployResumed', { world: worldMap.getDisplayName() })
-                : formatT('mp.deployStarted', { town: town.nameKr, world: worldMap.getDisplayName() }));
+                : formatT('mp.deployStarted', { town: displayTownName(town), world: worldMap.getDisplayName() }));
         } catch (error) {
             if (this.shouldReloadDevAutoStartAuth(error)) {
                 console.warn('[Darksaber] Dev auth expired after server restart; reloading to issue a fresh dev session.');

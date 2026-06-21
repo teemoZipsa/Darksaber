@@ -9,7 +9,7 @@ import { MIN_FIELD_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
 import type { TilePoint } from '../../field/FieldPathing';
 import { GridInventory, type PlacedItem } from '../../inventory/GridInventory';
-import { formatT, t } from '../../i18n/LanguageManager';
+import { formatT, i18n, t } from '../../i18n/LanguageManager';
 import type { WorldMap } from '../../map/WorldMap';
 import type {
     ActionRejectedMessage,
@@ -30,6 +30,10 @@ interface PendingNetworkMoveReopen {
     intentId: string;
     actorId: string;
     tile: TilePoint;
+}
+
+function displayItemName(item: { name: string; nameKr: string }): string {
+    return i18n.lang === 'ko' ? item.nameKr : item.name;
 }
 
 interface NetworkMovePathPreview {
@@ -302,7 +306,7 @@ export class WorldNetworkSyncController {
             if (bag.autoPlaceExisting(placed)) {
                 placed.acquiredInRaid = true;
                 acceptedCells.push(source);
-                acquiredNames.push(placed.item.nameKr);
+                acquiredNames.push(displayItemName(placed.item));
             } else {
                 grid.placeExisting(placed, source.gridX, source.gridY);
                 blocked = true;
