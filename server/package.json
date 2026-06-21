@@ -4,7 +4,7 @@
   "description": "Sin Eater Multiplayer WebSocket Server",
   "type": "module",
   "scripts": {
-    "start": "npx tsx index.ts"
+    "start": "node ../server-dist/server/index.js"
   },
   "dependencies": {
     "ws": "^8.18.0"

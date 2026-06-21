@@ -6,7 +6,7 @@ import {
     type MarketWriteClientMessage,
 } from '../src/net/WorldProtocol';
 
-export function requiresJoinedWorldForMarketMessage(message: MarketClientMessage): boolean {
+export function requiresJoinedWorldForMarketMessage(message: MarketClientMessage): message is MarketWriteClientMessage {
     return isMarketWriteClientMessage(message);
 }
 
