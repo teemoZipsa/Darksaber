@@ -24,6 +24,12 @@ import {
 } from './AuthStore';
 import { errorToLogValue, logServerEvent } from './WorldServerObservability';
 import { normalizeLoadout } from '../src/magic/MagicLoadout';
+import {
+    MemoryRateLimiter,
+    RateLimitExceededError,
+    resolveClientIp,
+    resolveTrustProxy,
+} from './AuthRateLimit';
 
 export interface AuthHttpOptions {
     store: AuthStore;
@@ -32,6 +38,11 @@ export interface AuthHttpOptions {
     refreshTtlMs?: number;
     refreshCookieSecure?: boolean;
     sameSite?: 'Lax' | 'Strict' | 'None';
+    trustProxy?: boolean;
+    registerRateLimiter?: MemoryRateLimiter;
+    loginIpRateLimiter?: MemoryRateLimiter;
+    loginFailureRateLimiter?: MemoryRateLimiter;
+    refreshRateLimiter?: MemoryRateLimiter;
 }
 
 export interface AuthenticatedSession {
@@ -51,21 +62,27 @@ interface HandlerContext {
     url: URL;
 }
 
-interface RateLimitEntry {
-    count: number;
-    resetAt: number;
+interface AuthHttpRuntime {
+    trustProxy: boolean;
+    registerLimiter: MemoryRateLimiter;
+    loginIpLimiter: MemoryRateLimiter;
+    loginFailureLimiter: MemoryRateLimiter;
+    refreshLimiter: MemoryRateLimiter;
 }
 
 const REFRESH_COOKIE = 'ds_refresh';
 const DEFAULT_REFRESH_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const JSON_LIMIT_BYTES = 1024 * 256;
+const AUTH_RATE_LIMIT_WINDOW_MS = 1000 * 60 * 10;
+const REGISTER_IP_LIMIT = 8;
+const LOGIN_IP_LIMIT = 30;
 const LOGIN_FAILURE_WINDOW_MS = 1000 * 60 * 10;
 const LOGIN_FAILURE_LIMIT = 5;
+const REFRESH_IP_LIMIT = 60;
 const CLIENT_SAVE_PATCH_FIELDS = new Set(['rosterSnapshot']);
 
-const loginFailures = new Map<string, RateLimitEntry>();
-
 export function createAuthHttpHandler(options: AuthHttpOptions): (request: IncomingMessage, response: ServerResponse) => Promise<boolean> {
+    const runtime = createAuthHttpRuntime(options);
     return async (request, response) => {
         const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
         if (!isAuthPath(url.pathname)) return false;
@@ -82,7 +99,7 @@ export function createAuthHttpHandler(options: AuthHttpOptions): (request: Incom
 
         const context: HandlerContext = { request, response, origin, url };
         try {
-            await routeAuthRequest(context, options);
+            await routeAuthRequest(context, options, runtime);
         } catch (error) {
             if (error instanceof HttpError) {
                 writeJson(response, error.status, { error: error.code, message: error.message }, origin, options);
@@ -125,9 +142,10 @@ function isAuthPath(pathname: string): boolean {
         || /^\/characters\/[^/]+(?:\/select|\/save)?$/.test(pathname);
 }
 
-async function routeAuthRequest(context: HandlerContext, options: AuthHttpOptions): Promise<void> {
+async function routeAuthRequest(context: HandlerContext, options: AuthHttpOptions, runtime: AuthHttpRuntime): Promise<void> {
     const { request, response, origin, url } = context;
     if (request.method === 'POST' && url.pathname === '/auth/register') {
+        consumeAuthRateLimit(runtime.registerLimiter, `register:${ipHash(context, runtime.trustProxy)}`, 'register_rate_limited', 'Too many registration attempts.');
         const body = await readJsonObject(request);
         const loginName = readString(body.loginName, 'loginName').trim();
         const password = readString(body.password, 'password');
@@ -142,7 +160,7 @@ async function routeAuthRequest(context: HandlerContext, options: AuthHttpOption
             if (error instanceof AuthStoreConflict && error.code === 'login_name') throw new HttpError(409, 'login_name_taken', 'Login name is already registered.');
             throw error;
         }
-        const payload = await createLoginPayload(account, context, options);
+        const payload = await createLoginPayload(account, context, options, runtime.trustProxy);
         writeJson(response, 201, payload, origin, options);
         return;
     }
@@ -152,20 +170,23 @@ async function routeAuthRequest(context: HandlerContext, options: AuthHttpOption
         const loginName = readString(body.loginName, 'loginName').trim();
         const password = readString(body.password, 'password');
         const normalized = normalizeLoginName(loginName);
-        const failureKey = `${ipHash(context)}:${normalized}`;
-        assertLoginRateLimit(failureKey);
+        const ip = ipHash(context, runtime.trustProxy);
+        consumeAuthRateLimit(runtime.loginIpLimiter, `login:ip:${ip}`, 'login_rate_limited', 'Too many login attempts.');
+        const failureKey = `login-fail:${ip}:${normalized}`;
+        assertAuthRateLimit(runtime.loginFailureLimiter, failureKey, 'login_rate_limited', 'Too many login attempts.');
         const account = await options.store.findAccountByLoginNameNormalized(normalized);
         if (!account || account.disabledAt || !(await verifyPassword(account.passwordHash, password))) {
-            recordLoginFailure(failureKey);
+            runtime.loginFailureLimiter.record(failureKey);
             throw new HttpError(401, 'invalid_credentials', 'Invalid login name or password.');
         }
-        loginFailures.delete(failureKey);
-        const payload = await createLoginPayload(account, context, options);
+        runtime.loginFailureLimiter.clear(failureKey);
+        const payload = await createLoginPayload(account, context, options, runtime.trustProxy);
         writeJson(response, 200, payload, origin, options);
         return;
     }
 
     if (request.method === 'POST' && url.pathname === '/auth/refresh') {
+        consumeAuthRateLimit(runtime.refreshLimiter, `refresh:${ipHash(context, runtime.trustProxy)}`, 'refresh_rate_limited', 'Too many refresh attempts.');
         const refreshToken = getCookie(request, REFRESH_COOKIE);
         if (!refreshToken) throw new HttpError(401, 'refresh_missing', 'Refresh token cookie is missing.');
         const session = await options.store.findSessionByRefreshTokenHash(hashRefreshToken(refreshToken));
@@ -191,7 +212,7 @@ async function routeAuthRequest(context: HandlerContext, options: AuthHttpOption
             tokenFamilyId: session.tokenFamilyId,
             expiresAt: new Date(Date.now() + getRefreshTtlMs(options)).toISOString(),
             userAgent: userAgent(context),
-            ipHash: ipHash(context),
+            ipHash: ipHash(context, runtime.trustProxy),
         });
         if (!nextSession) throw new HttpError(401, 'session_missing', 'Session is unavailable.');
         setRefreshCookie(response, nextRefreshToken, options);
@@ -317,7 +338,12 @@ async function routeAuthRequest(context: HandlerContext, options: AuthHttpOption
     throw new HttpError(404, 'not_found', 'Route not found.');
 }
 
-async function createLoginPayload(account: AuthAccount, context: HandlerContext, options: AuthHttpOptions): Promise<Record<string, unknown>> {
+async function createLoginPayload(
+    account: AuthAccount,
+    context: HandlerContext,
+    options: AuthHttpOptions,
+    trustProxy: boolean,
+): Promise<Record<string, unknown>> {
     const refreshToken = createRefreshToken();
     const session = await options.store.createSession({
         accountId: account.id,
@@ -325,7 +351,7 @@ async function createLoginPayload(account: AuthAccount, context: HandlerContext,
         tokenFamilyId: randomUUID(),
         expiresAt: new Date(Date.now() + getRefreshTtlMs(options)).toISOString(),
         userAgent: userAgent(context),
-        ipHash: ipHash(context),
+        ipHash: ipHash(context, trustProxy),
     });
     setRefreshCookie(context.response, refreshToken, options);
     return buildSessionResponse(account, session, options);
@@ -389,21 +415,32 @@ function validatePassword(password: string): void {
     if (password.length < 8 || password.length > 128) throw new HttpError(400, 'invalid_password', 'Password must be 8-128 characters.');
 }
 
-function assertLoginRateLimit(key: string): void {
-    const now = Date.now();
-    const entry = loginFailures.get(key);
-    if (!entry || entry.resetAt <= now) return;
-    if (entry.count >= LOGIN_FAILURE_LIMIT) throw new HttpError(429, 'login_rate_limited', 'Too many login attempts.');
+function createAuthHttpRuntime(options: AuthHttpOptions): AuthHttpRuntime {
+    return {
+        trustProxy: resolveTrustProxy(options.trustProxy),
+        registerLimiter: options.registerRateLimiter ?? new MemoryRateLimiter(REGISTER_IP_LIMIT, AUTH_RATE_LIMIT_WINDOW_MS),
+        loginIpLimiter: options.loginIpRateLimiter ?? new MemoryRateLimiter(LOGIN_IP_LIMIT, AUTH_RATE_LIMIT_WINDOW_MS),
+        loginFailureLimiter: options.loginFailureRateLimiter ?? new MemoryRateLimiter(LOGIN_FAILURE_LIMIT, LOGIN_FAILURE_WINDOW_MS),
+        refreshLimiter: options.refreshRateLimiter ?? new MemoryRateLimiter(REFRESH_IP_LIMIT, AUTH_RATE_LIMIT_WINDOW_MS),
+    };
 }
 
-function recordLoginFailure(key: string): void {
-    const now = Date.now();
-    const entry = loginFailures.get(key);
-    if (!entry || entry.resetAt <= now) {
-        loginFailures.set(key, { count: 1, resetAt: now + LOGIN_FAILURE_WINDOW_MS });
-        return;
+function consumeAuthRateLimit(limiter: MemoryRateLimiter, key: string, code: string, message: string): void {
+    try {
+        limiter.consume(key);
+    } catch (error) {
+        if (error instanceof RateLimitExceededError) throw new HttpError(429, code, message);
+        throw error;
     }
-    entry.count += 1;
+}
+
+function assertAuthRateLimit(limiter: MemoryRateLimiter, key: string, code: string, message: string): void {
+    try {
+        limiter.assertAllowed(key);
+    } catch (error) {
+        if (error instanceof RateLimitExceededError) throw new HttpError(429, code, message);
+        throw error;
+    }
 }
 
 async function readJsonObject(request: IncomingMessage): Promise<Record<string, unknown>> {
@@ -585,12 +622,9 @@ function userAgent(context: HandlerContext): string | null {
     return typeof value === 'string' ? value.slice(0, 500) : null;
 }
 
-function ipHash(context: HandlerContext): string {
-    const forwarded = context.request.headers['x-forwarded-for'];
-    const ip = typeof forwarded === 'string'
-        ? forwarded.split(',')[0]?.trim()
-        : context.request.socket.remoteAddress ?? 'unknown';
-    return createHash('sha256').update(ip ?? 'unknown').digest('base64url');
+function ipHash(context: HandlerContext, trustProxy: boolean): string {
+    const ip = resolveClientIp(context.request, trustProxy);
+    return createHash('sha256').update(ip).digest('base64url');
 }
 
 function getRefreshTtlMs(options: AuthHttpOptions): number {

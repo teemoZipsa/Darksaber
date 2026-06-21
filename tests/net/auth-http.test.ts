@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
 import { once } from 'node:events';
 import { createAuthHttpHandler } from '../../server/AuthHttp';
+import { MemoryRateLimiter } from '../../server/AuthRateLimit';
 import { verifyAccessToken } from '../../server/AuthCrypto';
 import { InMemoryAuthStore, normalizeLoginName } from '../../server/AuthStore';
 import type { JwtOptions } from '../../server/AuthCrypto';
@@ -247,9 +248,108 @@ test('character save HTTP preserves authoritative roster fields', async () => {
     }
 });
 
-async function createHarness(): Promise<{
+test('register requests are rate limited per client IP', async () => {
+    const harness = await createHarness({
+        registerRateLimiter: new MemoryRateLimiter(2, 60_000),
+    });
+    try {
+        const first = await harness.request('/auth/register', {
+            method: 'POST',
+            body: { loginName: 'rate01', password: 'password-1234' },
+        });
+        const second = await harness.request('/auth/register', {
+            method: 'POST',
+            body: { loginName: 'rate02', password: 'password-1234' },
+        });
+        const third = await harness.request('/auth/register', {
+            method: 'POST',
+            body: { loginName: 'rate03', password: 'password-1234' },
+        });
+
+        assert.equal(first.status, 201);
+        assert.equal(second.status, 201);
+        assert.equal(third.status, 429);
+        assert.equal(third.body.error, 'register_rate_limited');
+    } finally {
+        await harness.close();
+    }
+});
+
+test('login IP rate limit ignores spoofed x-forwarded-for when trust proxy is disabled', async () => {
+    const harness = await createHarness({
+        trustProxy: false,
+        loginIpRateLimiter: new MemoryRateLimiter(2, 60_000),
+    });
+    try {
+        const first = await harness.request('/auth/login', {
+            method: 'POST',
+            headers: { 'x-forwarded-for': '203.0.113.10' },
+            body: { loginName: 'missing01', password: 'password-1234' },
+        });
+        const second = await harness.request('/auth/login', {
+            method: 'POST',
+            headers: { 'x-forwarded-for': '203.0.113.20' },
+            body: { loginName: 'missing02', password: 'password-1234' },
+        });
+        const third = await harness.request('/auth/login', {
+            method: 'POST',
+            headers: { 'x-forwarded-for': '203.0.113.30' },
+            body: { loginName: 'missing03', password: 'password-1234' },
+        });
+
+        assert.equal(first.status, 401);
+        assert.equal(second.status, 401);
+        assert.equal(third.status, 429);
+        assert.equal(third.body.error, 'login_rate_limited');
+    } finally {
+        await harness.close();
+    }
+});
+
+test('login IP rate limit uses x-forwarded-for when trust proxy is enabled', async () => {
+    const harness = await createHarness({
+        trustProxy: true,
+        loginIpRateLimiter: new MemoryRateLimiter(2, 60_000),
+    });
+    try {
+        const first = await harness.request('/auth/login', {
+            method: 'POST',
+            headers: { 'x-forwarded-for': '203.0.113.50' },
+            body: { loginName: 'missing01', password: 'password-1234' },
+        });
+        const second = await harness.request('/auth/login', {
+            method: 'POST',
+            headers: { 'x-forwarded-for': '203.0.113.50' },
+            body: { loginName: 'missing02', password: 'password-1234' },
+        });
+        const third = await harness.request('/auth/login', {
+            method: 'POST',
+            headers: { 'x-forwarded-for': '203.0.113.50' },
+            body: { loginName: 'missing03', password: 'password-1234' },
+        });
+
+        assert.equal(first.status, 401);
+        assert.equal(second.status, 401);
+        assert.equal(third.status, 429);
+        assert.equal(third.body.error, 'login_rate_limited');
+    } finally {
+        await harness.close();
+    }
+});
+
+async function createHarness(options: {
+    trustProxy?: boolean;
+    registerRateLimiter?: MemoryRateLimiter;
+    loginIpRateLimiter?: MemoryRateLimiter;
+} = {}): Promise<{
     store: InMemoryAuthStore;
-    request(path: string, options: { method: string; body?: unknown; accessToken?: string; cookie?: string }): Promise<{ status: number; body: Record<string, unknown>; setCookie: string }>;
+    request(path: string, options: {
+        method: string;
+        body?: unknown;
+        accessToken?: string;
+        cookie?: string;
+        headers?: Record<string, string>;
+    }): Promise<{ status: number; body: Record<string, unknown>; setCookie: string }>;
     close(): Promise<void>;
 }> {
     const store = new InMemoryAuthStore();
@@ -260,6 +360,9 @@ async function createHarness(): Promise<{
         allowedOrigins: ['http://client.test'],
         refreshCookieSecure: true,
         sameSite: 'Lax',
+        trustProxy: options.trustProxy,
+        registerRateLimiter: options.registerRateLimiter,
+        loginIpRateLimiter: options.loginIpRateLimiter,
     });
     const server = createServer((request, response) => {
         void handler(request, response).then((handled) => {
@@ -278,7 +381,10 @@ async function createHarness(): Promise<{
     return {
         store,
         request: async (path, options) => {
-            const headers: Record<string, string> = { Origin: 'http://client.test' };
+            const headers: Record<string, string> = {
+                Origin: 'http://client.test',
+                ...options.headers,
+            };
             if (options.body !== undefined) headers['Content-Type'] = 'application/json';
             if (options.accessToken) headers.Authorization = `Bearer ${options.accessToken}`;
             if (options.cookie) headers.Cookie = options.cookie;
