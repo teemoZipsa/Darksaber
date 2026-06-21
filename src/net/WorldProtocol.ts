@@ -428,3 +428,14 @@ export function isMarketClientMessage(message: WorldClientMessage): message is M
         || message.type === 'MARKET_RECORD_SELL'
         || message.type === 'MARKET_TOUCH_TOWN';
 }
+
+export type MarketWriteClientMessage =
+    | MarketRecordBuyMessage
+    | MarketRecordSellMessage
+    | MarketTouchTownMessage;
+
+export function isMarketWriteClientMessage(message: MarketClientMessage): message is MarketWriteClientMessage {
+    return message.type === 'MARKET_RECORD_BUY'
+        || message.type === 'MARKET_RECORD_SELL'
+        || message.type === 'MARKET_TOUCH_TOWN';
+}

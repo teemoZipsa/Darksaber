@@ -12,6 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
 import { createBaseStats, type CharacterStats } from '../src/data/Stats';
 import { isMarketClientMessage, WORLD_PROTOCOL_VERSION } from '../src/net/WorldProtocol';
+import { createRejectedMarketWriteAck, requiresJoinedWorldForMarketMessage } from './MarketSocketPolicy';
 import type {
     ActorSnapshot,
     RaidResultMessage,
@@ -295,6 +296,10 @@ async function handleSocketMessage(ws: WebSocket, data: RawData): Promise<void> 
     }
 
     if (isMarketClientMessage(message)) {
+        if (requiresJoinedWorldForMarketMessage(message) && !playerBySocket.has(ws)) {
+            send(ws, createRejectedMarketWriteAck(message, marketSession.getSnapshot()));
+            return;
+        }
         const replies = marketSession.handleMessage(message);
         for (const reply of replies) send(ws, reply);
         return;

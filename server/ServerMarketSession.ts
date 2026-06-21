@@ -13,9 +13,10 @@ import {
 } from '../src/data/MarketData';
 import {
     getTradeGoodSellMultiplier,
-    isTradeGoodItemId,
+    isDefinedTradeGoodItemId,
     TRADE_GOOD_SELL_MULTIPLIERS,
 } from '../src/data/ShopData';
+import { isTownId } from '../src/data/TownFacilityData';
 import type {
     MarketClientMessage,
     MarketRecordAckMessage,
@@ -25,6 +26,7 @@ import type {
 import { writeFileAtomically } from './AtomicFile';
 
 export const MARKET_SERVER_CYCLE_MS = 5 * 60 * 1000;
+export const MARKET_MAX_TRADE_QUANTITY = 99;
 const CLIENT_RECOVERY_TOUCH_MS = 60 * 1000;
 const DRIFT_ROLL_CHANCE = 0.28;
 
@@ -62,8 +64,7 @@ export class ServerMarketSession {
             case 'MARKET_RECORD_SELL':
                 return [this.recordSell(message.townId, message.itemId, message.quantity)];
             case 'MARKET_TOUCH_TOWN':
-                this.touchTown(message.clientId, message.townId, now);
-                return [this.ack('touch', true)];
+                return [this.touchTownMessage(message.clientId, message.townId, now)];
         }
     }
 
@@ -88,21 +89,32 @@ export class ServerMarketSession {
     }
 
     private recordBuy(townId: string, itemId: string, quantity: number): MarketRecordAckMessage {
-        if (!isTradeGoodItemId(itemId)) return this.ack('buy', false);
+        const safe = parseMarketQuantity(quantity);
+        if (!isTownId(townId) || !isDefinedTradeGoodItemId(itemId) || safe === null) {
+            return this.ack('buy', false);
+        }
         const entry = getOrCreateMarketEntry(this.snapshot, townId, itemId);
-        entry.buyPressure = Math.max(0, entry.buyPressure + safeQuantity(quantity));
+        entry.buyPressure = Math.max(0, entry.buyPressure + safe);
         this.scheduleSave();
         return this.ack('buy', true);
     }
 
     private recordSell(townId: string, itemId: string, quantity: number): MarketRecordAckMessage {
-        if (!isTradeGoodItemId(itemId)) return this.ack('sell', false);
-        const safe = safeQuantity(quantity);
+        const safe = parseMarketQuantity(quantity);
+        if (!isTownId(townId) || !isDefinedTradeGoodItemId(itemId) || safe === null) {
+            return this.ack('sell', false);
+        }
         const entry = getOrCreateMarketEntry(this.snapshot, townId, itemId);
         entry.sellPressure = Math.max(0, entry.sellPressure + safe);
         applyMarketContractSale(this.snapshot, townId, itemId, safe);
         this.scheduleSave();
         return this.ack('sell', true);
+    }
+
+    private touchTownMessage(clientId: string, townId: string, now: number): MarketRecordAckMessage {
+        if (!isTownId(townId)) return this.ack('touch', false);
+        this.touchTown(clientId, townId, now);
+        return this.ack('touch', true);
     }
 
     private touchTown(clientId: string, townId: string, now: number): void {
@@ -192,8 +204,11 @@ function tradeGoodIds(): string[] {
     return Object.keys(TRADE_GOOD_SELL_MULTIPLIERS);
 }
 
-function safeQuantity(quantity: number): number {
-    return Math.max(1, Math.floor(Number.isFinite(quantity) ? quantity : 1));
+function parseMarketQuantity(quantity: number): number | null {
+    if (!Number.isFinite(quantity)) return null;
+    const floored = Math.floor(quantity);
+    if (floored < 1 || floored > MARKET_MAX_TRADE_QUANTITY) return null;
+    return floored;
 }
 
 function clamp(value: number, min: number, max: number): number {

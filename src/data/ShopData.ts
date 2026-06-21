@@ -288,6 +288,10 @@ export function isTradeGoodItemId(itemId: string): boolean {
     return itemId.startsWith('trade_');
 }
 
+export function isDefinedTradeGoodItemId(itemId: string): boolean {
+    return Object.prototype.hasOwnProperty.call(TRADE_GOOD_SELL_MULTIPLIERS, itemId);
+}
+
 /** Items available for purchase, grouped by town and facility. */
 export const SHOP_INVENTORY_BY_TOWN_FACILITY: Record<TownId, FacilityInventory> = Object.fromEntries(
     TOWN_IDS.map((townId) => [townId, buildTownFacilityInventory(townId)])
