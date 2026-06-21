@@ -25,6 +25,8 @@ export interface FieldActor {
     queuedIntent: FieldIntent | null;
 }
 
+export type FieldTurnEndReason = 'wait' | 'incapacitated' | 'gaugeLow' | 'statusBlocked' | 'noExecutableAction';
+
 export interface FieldEnemy {
     enemy: Enemy;
     home: TilePoint;

@@ -52,7 +52,7 @@ import {
     isTerrainLineOfSightBlocking,
     TerrainActorTraits,
 } from '../field/TerrainRules';
-import type { AttackCue, FieldActor, FieldEnemy, FieldHitParty } from '../field/FieldTypes';
+import type { AttackCue, FieldActor, FieldEnemy, FieldHitParty, FieldTurnEndReason } from '../field/FieldTypes';
 import {
     getActorAttackTargetFailure as resolveActorAttackTargetFailure,
     type AttackTargetFailure,
@@ -737,11 +737,11 @@ export class WorldEngine {
         if (options.startIntroTutorial) {
             this.startIntroTutorial();
         } else if (NetworkRaidClient.hasStoredResumeToken()) {
-            this.addCombatLog('월드 세션 재접속 중...');
+            this.addCombatLog(t('mp.resumeAttempt'));
             void this.beginRaidFromCurrentHub();
         } else {
             this.openTown(this.getCurrentHubTown());
-            this.addCombatLog('마을에 도착했습니다. 출격 준비를 마치세요.');
+            this.addCombatLog(t('field.log.townReady'));
         }
 
         camera.followTile(this.player.gridX, this.player.gridY);
@@ -1082,7 +1082,7 @@ export class WorldEngine {
             return this.networkIntentController.submitAttack(actor, enemy);
         }
         if (!this.tutorialController.isActive()) {
-            this.addCombatLog('서버 세션 밖에서는 전투 행동을 실행할 수 없습니다.');
+            this.addCombatLog(t('field.log.serverCombatOnly'));
             return false;
         }
         if (!this.canActorAttackTarget(actor, enemy)) return false;
@@ -1145,17 +1145,19 @@ export class WorldEngine {
 
     private awardDefeatExp(actor: FieldActor, enemy: Enemy): void {
         const canGainExp = this.canCharacterGainExpInCurrentRealm(actor.character);
-        this.addCombatLog(canGainExp ? `${enemy.name} 처치! +${enemy.expReward} EXP` : `${enemy.name} 처치!`);
+        this.addCombatLog(canGainExp
+            ? formatT('field.log.enemyDefeatedExp', { enemy: enemy.name, exp: enemy.expReward })
+            : formatT('field.log.enemyDefeated', { enemy: enemy.name }));
         if (canGainExp) {
             const expResult = actor.character.gainExp(enemy.expReward);
             if (expResult.promoted && expResult.newTierName) {
-                this.addCombatLog(`${actor.character.name} 승급: ${expResult.newTierName}`);
+                this.addCombatLog(formatT('field.log.actorPromoted', { name: actor.character.name, tier: expResult.newTierName }));
             }
             if (expResult.emblemUnlocked) {
-                this.addCombatLog(`${actor.character.name}: 융합 문장 각성`);
+                this.addCombatLog(formatT('field.log.emblemUnlocked', { name: actor.character.name }));
             }
         } else {
-            this.addCombatLog('이 월드에서는 해당 티어가 성장하지 않습니다.');
+            this.addCombatLog(t('field.log.noGrowthRealm'));
         }
     }
 
@@ -1169,20 +1171,20 @@ export class WorldEngine {
         const index = this.partyActors.indexOf(actor);
         if (index === this.party.getActiveIndex()) {
             const next = this.party.markActiveDead();
-            this.addCombatLog(`${actor.character.name} 쓰러짐`);
+            this.addCombatLog(formatT('field.log.actorDown', { name: actor.character.name }));
             this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'DOWN');
             if (next) {
                 const nextIndex = this.partyActors.findIndex((candidate) => candidate.character === next);
                 if (nextIndex >= 0) this.switchToPartyMember(nextIndex);
             } else {
-                this.addCombatLog('출격조 전원 행동 불능');
+                this.addCombatLog(t('field.log.partyAllDown'));
             }
             return;
         }
 
         actor.character.isDead = true;
         actor.character.exp = 0;
-        this.addCombatLog(`${actor.character.name} 쓰러짐`);
+        this.addCombatLog(formatT('field.log.actorDown', { name: actor.character.name }));
         this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'DOWN');
     }
 
@@ -1192,7 +1194,7 @@ export class WorldEngine {
 
     private openFieldMagic(actor: FieldActor): void {
         if (!this.isNetworkRaid && !this.tutorialController.isActive()) {
-            this.addCombatLog('서버 세션 밖에서는 마법을 사용할 수 없습니다.');
+            this.addCombatLog(t('field.log.serverMagicOnly'));
             this.reopenActionMenu(actor);
             return;
         }
@@ -1201,7 +1203,7 @@ export class WorldEngine {
 
     private openFieldTool(actor: FieldActor): void {
         if (!this.isNetworkRaid && !this.tutorialController.isActive()) {
-            this.addCombatLog('서버 세션 밖에서는 도구를 사용할 수 없습니다.');
+            this.addCombatLog(t('field.log.serverToolOnly'));
             this.reopenActionMenu(actor);
             return;
         }
@@ -1264,7 +1266,7 @@ export class WorldEngine {
         }
         if (!this.party.getCharacters().includes(actor.character)) {
             this.selectionController.selectActor(actor.id);
-            this.addCombatLog(`${actor.character.name}: 원격 플레이어는 표시 전용입니다.`);
+            this.addCombatLog(formatT('field.log.remoteDisplayOnly', { name: actor.character.name }));
             return false;
         }
         if (!this.party.switchTo(index)) return false;
@@ -1273,7 +1275,7 @@ export class WorldEngine {
         this.playerActionController.clearTargeting();
         this.closeActionMenu();
         this.closeTacticalMenu();
-        this.addCombatLog(`${actor.character.name} 조작`);
+        this.addCombatLog(formatT('field.log.actorControl', { name: actor.character.name }));
         return true;
     }
 
@@ -1287,7 +1289,7 @@ export class WorldEngine {
         }
 
         if (actor.id !== this.turnStateController.getActiveTurnActorId()) {
-            this.addCombatLog('아직 행동 순서가 아닙니다.');
+            this.addCombatLog(t('field.log.notTurn'));
             return;
         }
 
@@ -1327,7 +1329,7 @@ export class WorldEngine {
             return;
         }
         const carryover = this.turnStateController.getDismissCarryover();
-        this.endActorTurn(actor, '대기', carryover);
+        this.endActorTurn(actor, 'wait', carryover);
     }
 
     private spendAp(cost: number): boolean {
@@ -1340,14 +1342,14 @@ export class WorldEngine {
     private resumeOrEndActiveTurn(actor: FieldActor): void {
         if (actor.id !== this.turnStateController.getActiveTurnActorId()) return;
         if (actor.character.isDead || actor.character.stats.hp <= 0) {
-            this.endActorTurn(actor, '행동 불능', 0);
+            this.endActorTurn(actor, 'incapacitated', 0);
             return;
         }
         if (this.playerActionController.hasExecutableAction(actor)) {
             this.reopenActionMenu(actor);
             return;
         }
-        this.endActorTurn(actor, '행동 게이지 부족', this.turnStateController.getRemainingActionPoints());
+        this.endActorTurn(actor, 'gaugeLow', this.turnStateController.getRemainingActionPoints());
     }
 
     private reopenActionMenu(actor: FieldActor): void {
@@ -1361,7 +1363,7 @@ export class WorldEngine {
         this.actionMenuUI.open(this.tutorialController.getActionMenuStates(actor));
     }
 
-    private endActorTurn(actor: FieldActor, reason: string, atbCarryover: number = this.turnStateController.getRemainingActionPoints()): void {
+    private endActorTurn(actor: FieldActor, reason: FieldTurnEndReason, atbCarryover: number = this.turnStateController.getRemainingActionPoints()): void {
         if (actor.id === this.turnStateController.getActiveTurnActorId()) this.networkIntentController.submitEndTurn(actor, reason);
         actor.entity.actionGauge = Math.max(0, Math.min(FIELD_MAX_ACTION_GAUGE, atbCarryover));
         this.turnStateController.endActiveTurn();
@@ -1371,7 +1373,10 @@ export class WorldEngine {
         this.playerActionController.clearTargeting();
         this.magicController.reset();
         this.toolController?.reset();
-        this.addCombatLog(`${actor.character.name} 턴 종료: ${reason}`);
+        this.addCombatLog(formatT('field.log.turnEnd', {
+            name: actor.character.name,
+            reason: t(`field.log.reason.${reason}`),
+        }));
     }
 
     private endEnemyTurn(enemy: Enemy): void {
@@ -1420,17 +1425,17 @@ export class WorldEngine {
     private processActorTurnStartStatuses(actor: FieldActor): boolean {
         const result = resolveTurnStartStatuses(getEffectiveStatsForCharacter(actor.character), actor.character.statuses);
         actor.character.statuses = result.statuses;
-        if (result.expiredReaction) this.addCombatLog(`${actor.character.name}: 방어/반격 태세 해제`);
+        if (result.expiredReaction) this.addCombatLog(formatT('field.log.statusReactionExpired', { name: actor.character.name }));
         if (result.poisonDamage > 0) {
             this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, result.poisonDamage, false, false);
             this.effectManager.spawnDebuffEffect(actor.entity.gridX, actor.entity.gridY);
-            this.addCombatLog(`${actor.character.name}: 독 ${result.poisonDamage} 피해`);
-            this.stopResting(actor, `${actor.character.name}: 피해로 휴식 중단`);
+            this.addCombatLog(formatT('field.log.statusPoisonDamage', { name: actor.character.name, value: result.poisonDamage }));
+            this.stopResting(actor, formatT('field.log.restInterruptedDamage', { name: actor.character.name }));
         }
         if (result.regenHealing > 0) {
             this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, result.regenHealing);
             this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
-            this.addCombatLog(`${actor.character.name}: 재생 ${result.regenHealing} 회복`);
+            this.addCombatLog(formatT('field.log.statusRegenHealing', { name: actor.character.name, value: result.regenHealing }));
         }
         const effective = getEffectiveStatsForCharacter(actor.character);
         actor.character.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.character.stats.hp + result.hpDelta));
@@ -1446,16 +1451,16 @@ export class WorldEngine {
         const enemy = entry.enemy;
         const result = resolveTurnStartStatuses(getEffectiveStatsForEnemy(enemy), enemy.statuses);
         enemy.statuses = result.statuses;
-        if (result.expiredReaction) this.addCombatLog(`${enemy.name}: 방어/반격 태세 해제`);
+        if (result.expiredReaction) this.addCombatLog(formatT('field.log.statusReactionExpired', { name: enemy.name }));
         if (result.poisonDamage > 0) {
             this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, result.poisonDamage, false, false);
             this.effectManager.spawnDebuffEffect(enemy.gridX, enemy.gridY);
-            this.addCombatLog(`${enemy.name}: 독 ${result.poisonDamage} 피해`);
+            this.addCombatLog(formatT('field.log.statusPoisonDamage', { name: enemy.name, value: result.poisonDamage }));
         }
         if (result.regenHealing > 0) {
             this.floatingText.spawnHeal(enemy.gridX, enemy.gridY, result.regenHealing);
             this.effectManager.spawnHealEffect(enemy.gridX, enemy.gridY);
-            this.addCombatLog(`${enemy.name}: 재생 ${result.regenHealing} 회복`);
+            this.addCombatLog(formatT('field.log.statusRegenHealing', { name: enemy.name, value: result.regenHealing }));
         }
         enemy.stats.hp = Math.max(0, Math.min(enemy.stats.maxHp, enemy.stats.hp + result.hpDelta));
 
@@ -1474,7 +1479,7 @@ export class WorldEngine {
         actor.entity.actionGauge = this.turnStateController.beginActorTurn(actor.id);
         this.selectionController.selectActor(actor.id);
         if (!this.processActorTurnStartStatuses(actor)) {
-            this.endActorTurn(actor, '상태이상');
+            this.endActorTurn(actor, 'statusBlocked');
             return;
         }
         this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'READY');
@@ -1483,7 +1488,7 @@ export class WorldEngine {
             gauge: t('ui.actionGauge'),
             value: this.turnStateController.getRemainingActionPoints(),
         }));
-        if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, '가능한 행동 없음');
+        if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, 'noExecutableAction');
         else {
             this.closeTacticalMenu();
             this.actionMenuUI.open(this.tutorialController.getActionMenuStates(actor));

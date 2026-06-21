@@ -13,7 +13,7 @@ import {
     tileKey,
     tilesInRange,
 } from '../../field/FieldPathing';
-import type { FieldActor, FieldEnemy, FieldIntent } from '../../field/FieldTypes';
+import type { FieldActor, FieldEnemy, FieldIntent, FieldTurnEndReason } from '../../field/FieldTypes';
 import { getAttackFailureMessage, type AttackTargetFailure } from '../../field/FieldTargeting';
 import {
     ATTACK_ACTION_GAUGE_COST,
@@ -78,7 +78,7 @@ export interface WorldPlayerActionContext {
     closeActionMenu: () => void;
     closeTacticalMenu: () => void;
     resumeOrEndActiveTurn: (actor: FieldActor) => void;
-    endActorTurn: (actor: FieldActor, reason: string, atbCarryover?: number) => void;
+    endActorTurn: (actor: FieldActor, reason: FieldTurnEndReason, atbCarryover?: number) => void;
     clearActorIntent: (actor: FieldActor) => void;
     setReservedAction: (intent: FieldIntent | null) => void;
     selectEnemy: (enemyId: string) => void;
