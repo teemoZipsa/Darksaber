@@ -1,5 +1,5 @@
 import { InputManager } from '../engine/InputManager';
-import { RaidOutcome } from '../raid/RaidOutcome';
+import { RaidOutcome, type RaidOutcomeMissionLineKind } from '../raid/RaidOutcome';
 import { formatT, i18n, t } from '../i18n/LanguageManager';
 import { UI, Parchment, drawParchmentPanel, drawParchmentButton, renderGameTitle } from './UITheme';
 
@@ -18,6 +18,13 @@ function resultTitle(result: RaidOutcome['result']): string {
 
 function outcomeItemName(item: { name: string; nameKr: string }): string {
     return i18n.lang === 'en' ? item.name : item.nameKr;
+}
+
+function missionLineColor(kind: RaidOutcomeMissionLineKind): string {
+    if (kind === 'success') return '#2d6a3d';
+    if (kind === 'missed') return '#8a1818';
+    if (kind === 'next') return '#7a5410';
+    return Parchment.textDark;
 }
 
 export class RaidResultUI {
@@ -70,7 +77,7 @@ export class RaidResultUI {
         renderGameTitle(ctx, 16, 12, { scale: 0.75, subtitle: '' });
 
         const panelW = Math.min(860, w - 48);
-        const panelH = Math.min(560, h - 72);
+        const panelH = Math.min(620, h - 72);
         const px = Math.floor((w - panelW) / 2);
         const py = Math.floor((h - panelH) / 2);
         drawParchmentPanel(ctx, px, py, panelW, panelH, { radius: 8, headerH: 88 });
@@ -104,12 +111,18 @@ export class RaidResultUI {
             py + 64
         );
 
+        const report = this.outcome.missionReport;
+        const reportH = report ? Math.min(104, 40 + report.lines.length * 18) : 0;
+        if (report) {
+            this.renderMissionReport(ctx, px + 24, py + 104, panelW - 48, reportH);
+        }
+
         const colGap = 24;
         const colW = Math.floor((panelW - 72 - colGap) / 2);
         const leftX = px + 24;
         const rightX = leftX + colW + colGap;
-        const contentY = py + 104;
-        const contentH = panelH - 184;
+        const contentY = py + 104 + (report ? reportH + 12 : 0);
+        const contentH = panelH - 184 - (report ? reportH + 12 : 0);
 
         this.renderHeroes(ctx, leftX, contentY, colW, contentH);
         this.renderRewardsAndLosses(ctx, rightX, contentY, colW, contentH);
@@ -149,6 +162,24 @@ export class RaidResultUI {
             ctx.fillStyle = hero.isDead ? '#8a1818' : '#2d6a3d';
             ctx.fillText(hero.isDead ? 'DOWN' : `HP ${hero.hp}/${hero.maxHp}`, x + w - 16, rowY);
             ctx.textAlign = 'left';
+        }
+    }
+
+    private renderMissionReport(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
+        const report = this.outcome?.missionReport;
+        if (!report) return;
+
+        drawParchmentPanel(ctx, x, y, w, h, { radius: 6, shadow: false, compact: true });
+        this.renderSectionTitle(ctx, report.title, x + 16, y + 14);
+
+        ctx.font = `13px ${UI.fontPrimary}`;
+        ctx.textAlign = 'left';
+        let rowY = y + 42;
+        for (const line of report.lines) {
+            if (rowY > y + h - 14) break;
+            ctx.fillStyle = missionLineColor(line.kind);
+            ctx.fillText(line.text, x + 16, rowY);
+            rowY += 18;
         }
     }
 

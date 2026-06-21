@@ -6,11 +6,15 @@ import { GridInventory, type PlacedItem } from '../../inventory/GridInventory';
 import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../../data/StarterKitData';
 import { STORY_SCENARIO_EVENT_SEQUENCES } from '../../data/StoryScenarioEventData';
 import {
+    CAIN_NECKLACE_ITEM_ID,
     isStoryQuestAvailable,
     isStoryRewardOwned,
+    MAIN_QUEST_EPISODE_01_ID,
+    MAIN_QUEST_EPISODE_02_ID,
     STORY_QUESTS,
     type StoryQuestReward,
 } from '../../data/StoryQuestData';
+import { BURGOS_CASTLE_DUNGEON_ID } from '../../data/MonsterCatalog';
 import { t, formatT, i18n } from '../../i18n/LanguageManager';
 import type { TownInfo } from '../../map/BiomeMask';
 import {
@@ -18,6 +22,7 @@ import {
     mergeSnapshots,
     type HeroRaidStatus,
     type RaidOutcome,
+    type RaidOutcomeMissionReport,
     type RaidResultType,
     snapshotPlacedItem,
 } from '../../raid/RaidOutcome';
@@ -82,6 +87,8 @@ export class WorldRaidOutcomeController {
         const heroStatuses = this.createHeroStatuses();
         const secured = this.secureRaidLoot();
         const questRewards: string[] = [];
+        const episode1WasCleared = this.context.playerData.isCleared(MAIN_QUEST_EPISODE_01_ID);
+        const burgosObjectiveCleared = raidSession.isDungeonCleared(BURGOS_CASTLE_DUNGEON_ID);
         const raidGoldReward = raidSession.consumeRaidGoldReward();
         if (raidGoldReward > 0) this.context.playerData.addGold(raidGoldReward);
         let goldReward = raidGoldReward;
@@ -94,6 +101,10 @@ export class WorldRaidOutcomeController {
         }
         questRewards.push(...this.completeScenarioRuntimeQuestItems());
         questRewards.push(...this.completeStoryQuestRewards());
+        const missionReport = this.createMissionReport({
+            episode1WasCleared,
+            burgosObjectiveCleared,
+        });
 
         raidSession.completeAtTown(destination.id);
         this.context.playerData.currentHubTownId = destination.id;
@@ -118,6 +129,7 @@ export class WorldRaidOutcomeController {
             equipmentLost: [],
             goldReward,
             questRewards,
+            missionReport,
             notes: [t('raid.outcome.sessionOnlyNote')],
         };
         this.showRaidResult(outcome, destination);
@@ -246,6 +258,36 @@ export class WorldRaidOutcomeController {
             }
         }
         return rewards;
+    }
+
+    private createMissionReport(options: {
+        episode1WasCleared: boolean;
+        burgosObjectiveCleared: boolean;
+    }): RaidOutcomeMissionReport | undefined {
+        if (options.episode1WasCleared || !options.burgosObjectiveCleared) return undefined;
+        if (!this.context.playerData.isCleared(MAIN_QUEST_EPISODE_01_ID)) return undefined;
+
+        const cainRecovered = this.context.playerData.hasQuestItem(CAIN_NECKLACE_ITEM_ID)
+            || this.context.raidSession.hasScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'cain_necklace');
+        const nextQuest = STORY_QUESTS.find((quest) => quest.id === MAIN_QUEST_EPISODE_02_ID);
+        const nextQuestTitle = nextQuest ? t(nextQuest.titleKey) : t('quest.journal');
+
+        return {
+            title: t('raid.result.operationReport'),
+            lines: [
+                { text: t('raid.result.ep01.mainObjectiveComplete'), kind: 'success' },
+                {
+                    text: cainRecovered
+                        ? t('raid.result.ep01.sideObjectiveComplete')
+                        : t('raid.result.ep01.sideObjectiveMissed'),
+                    kind: cainRecovered ? 'success' : 'missed',
+                },
+                {
+                    text: formatT('raid.result.ep01.nextAction', { quest: nextQuestTitle }),
+                    kind: 'next',
+                },
+            ],
+        };
     }
 
     private grantStoryQuestReward(reward: StoryQuestReward): string {

@@ -107,6 +107,10 @@ test('Burgos objective grants episode 1 completion and bomb only after survival'
     assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), true);
     assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('1화')));
     assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('폭탄')));
+    assert.deepEqual(getOutcome()?.missionReport?.lines.map((line) => line.kind), ['success', 'missed', 'next']);
+    assert.ok(getOutcome()?.missionReport?.lines.some((line) => line.text.includes('키스라')));
+    assert.ok(getOutcome()?.missionReport?.lines.some((line) => line.text.includes('확보하지 못했습니다')));
+    assert.ok(getOutcome()?.missionReport?.lines.some((line) => line.text.includes('2화')));
 });
 
 test('raid outcome logs use localized dynamic town and reward item names', () => {
@@ -223,6 +227,20 @@ test('Burgos field event items are preserved as quest items only after survival'
     assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), false);
     assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('부르고스성 열쇠')));
     assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('케인의 목걸이')));
+});
+
+test('Burgos result report marks Cain side objective complete when recovered', () => {
+    const { controller, playerData, raidSession, getOutcome } = createController();
+    raidSession.beginRaidFromTown('central_castle');
+    markBurgosObjectiveComplete(raidSession);
+    raidSession.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'cain_necklace');
+
+    controller.completeSuccess(DESTINATION_TOWN);
+
+    assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_01_ID), true);
+    assert.equal(playerData.hasQuestItem(CAIN_NECKLACE_ITEM_ID), true);
+    assert.deepEqual(getOutcome()?.missionReport?.lines.map((line) => line.kind), ['success', 'success', 'next']);
+    assert.ok(getOutcome()?.missionReport?.lines.some((line) => line.text.includes('선택 목표 완료')));
 });
 
 test('Burgos field event items are not preserved on raid failure', () => {

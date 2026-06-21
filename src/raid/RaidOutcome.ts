@@ -28,6 +28,18 @@ export interface HeroRaidStatus {
     isDead: boolean;
 }
 
+export type RaidOutcomeMissionLineKind = 'success' | 'missed' | 'next' | 'info';
+
+export interface RaidOutcomeMissionLine {
+    text: string;
+    kind: RaidOutcomeMissionLineKind;
+}
+
+export interface RaidOutcomeMissionReport {
+    title: string;
+    lines: RaidOutcomeMissionLine[];
+}
+
 export interface RaidOutcome {
     result: RaidResultType;
     elapsedSeconds: number;
@@ -41,6 +53,7 @@ export interface RaidOutcome {
     equipmentLost: EquipmentLoss[];
     goldReward?: number;
     questRewards?: string[];
+    missionReport?: RaidOutcomeMissionReport;
     notes?: string[];
 }
 
