@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { Pool } from 'pg';
 import { PostgresAuthStore } from './AuthStore';
+import { createPostgresPool } from './PostgresConnection';
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -10,7 +10,7 @@ if (!connectionString) {
 }
 
 const store = new PostgresAuthStore(connectionString);
-const pool = new Pool({ connectionString });
+const pool = createPostgresPool(connectionString);
 
 try {
     await store.initialize();

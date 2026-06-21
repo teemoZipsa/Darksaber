@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { Pool } from 'pg';
 import { writeFileAtomically } from './AtomicFile';
+import { createPostgresPool } from './PostgresConnection';
 import type { WorldSessionPersistentSnapshot } from './WorldSession';
 
 export interface PendingWorldSessionSnapshot {
@@ -116,10 +116,15 @@ export class PostgresWorldSessionSnapshotStore implements WorldSessionSnapshotSt
     private readonly now: () => Date;
 
     public constructor(options: PostgresWorldSessionSnapshotStoreOptions) {
-        if (!options.pool && !options.connectionString) {
-            throw new Error('PostgresWorldSessionSnapshotStore requires a connectionString or pool.');
+        if (options.pool) {
+            this.pool = options.pool;
+        } else {
+            const connectionString = options.connectionString;
+            if (!connectionString) {
+                throw new Error('PostgresWorldSessionSnapshotStore requires a connectionString or pool.');
+            }
+            this.pool = createPostgresPool(connectionString);
         }
-        this.pool = options.pool ?? new Pool({ connectionString: options.connectionString });
         this.now = options.now ?? (() => new Date());
     }
 

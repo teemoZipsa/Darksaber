@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { Pool, type PoolClient } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { CHAR_CLASSES, type StartingClassId } from '../src/data/characterClasses';
 import { getClassLine } from '../src/data/ClassTree';
 import { ITEMS } from '../src/data/ItemDB';
 import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../src/data/StarterKitData';
 import { createBaseStats, getBaseStatsForClass, type CharacterStats } from '../src/data/Stats';
 import type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
+import { createPostgresPool } from './PostgresConnection';
 import { applyStoryQuestRewardsToSaveState } from './StoryRewardSave';
 export type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
 
@@ -369,7 +370,7 @@ export class PostgresAuthStore implements AuthStore {
     private readonly pool: Pool;
 
     public constructor(connectionString: string) {
-        this.pool = new Pool({ connectionString });
+        this.pool = createPostgresPool(connectionString);
     }
 
     public async close(): Promise<void> {
