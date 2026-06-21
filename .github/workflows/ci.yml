@@ -21,5 +21,7 @@ jobs:
         run: npm run typecheck:test
       - name: Test
         run: npm test
-      - name: Runtime Asset Check
-        run: npm run verify:assets
+      - name: Build
+        run: npm run build
+      - name: Story Verify
+        run: npm run verify:story
