@@ -330,6 +330,7 @@ export const STORY_SCENARIO_EVENT_SEQUENCES: StoryScenarioEventSequence[] = [
                 triggerTiles: [{ x: 9, y: 12 }],
                 runtimeFlag: 'cain_necklace',
                 questItemId: 'quest_cain_necklace',
+                rewards: [{ type: 'gold', amount: 50 }],
                 markerLabelKey: 'story.event.ep01.field.cain.marker',
                 steps: [
                     {

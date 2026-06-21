@@ -179,6 +179,9 @@ test('Burgos interior uses a dedicated original-inspired route and event sequenc
     assert.equal(sequence.bossDefeat.filter((step) => step.kind === 'dialogue').length, 1);
     assert.equal(sequence.fieldEvents.length, 2);
     assert.ok(sequence.fieldEvents.some((event) => event.id === 'cain_son_relic'));
+    const cainEvent = sequence.fieldEvents.find((event) => event.id === 'cain_son_relic');
+    assert.ok(cainEvent);
+    assert.deepEqual(cainEvent.rewards, [{ type: 'gold', amount: 50 }]);
     assert.ok(sequence.fieldEvents.every((event) => event.originalSource === 'MAP/01set.arc:01.evt'));
     assert.ok(sequence.fieldEvents.every((event) => event.steps.length > 0));
     assert.ok(sequence.fieldEvents.every((event) => event.triggerTiles.length > 0));

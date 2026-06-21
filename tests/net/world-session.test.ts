@@ -756,6 +756,59 @@ test('server-owned scenario entry spawns objective enemies and records completio
     assert.deepEqual(result?.completedDungeonIds, ['burgos_castle']);
 });
 
+test('server burgos cain side event records raid flag and gold without persisting before survival', () => {
+    const session = new WorldSession();
+    const world = new WorldMap();
+    const joined = session.join({
+        ...joinMessage('central_castle', 'hero-a'),
+        partyComposition: [actor('hero-a', {
+            stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
+    const dungeon = world.getDungeons().find((entry) => entry.id === 'burgos_castle');
+    const sequence = getStoryScenarioEventSequence('burgos_castle');
+    const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'cain_son_relic');
+    assert.ok(serverActor);
+    assert.ok(dungeon);
+    assert.ok(event);
+    serverActor.tile = world.getDungeonEntranceTile(dungeon);
+
+    session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_ENTER',
+        intentId: 'enter-burgos-cain',
+        actorId: serverActor.id,
+        dungeonId: 'burgos_castle',
+    }, 1_000);
+
+    serverActor.tile = { x: 9, y: 11 };
+    const result = session.handleMessage(joined.playerId, {
+        type: 'SCENARIO_FIELD_EVENT_INTERACT',
+        intentId: 'burgos-cain-relic',
+        actorId: serverActor.id,
+        dungeonId: 'burgos_castle',
+        eventId: 'cain_son_relic',
+    }, 1_100);
+
+    const fieldResult = result.replies.find((message) => message.type === 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.equal(fieldResult?.type, 'SCENARIO_FIELD_EVENT_RESULT');
+    assert.equal(fieldResult.flag, 'cain_necklace');
+    assert.deepEqual(fieldResult.rewards, [{ type: 'gold', amount: 50 }]);
+
+    const snapshot = session.createSnapshot(joined.playerId, 1_100);
+    assert.deepEqual(snapshot.scenario.playerFieldEventFlagsByDungeonId?.burgos_castle, ['cain_necklace']);
+
+    const serverPlayer = internals.players.get(joined.playerId);
+    assert.ok(serverPlayer);
+    assert.equal(serverPlayer.raidGoldReward, 50);
+
+    const dirtyPatch = session.createCharacterSavePatch(joined.playerId);
+    if (dirtyPatch?.questState?.gold !== undefined) {
+        assert.equal(dirtyPatch.questState.gold, 500);
+    }
+});
+
 test('solo interior scenario enemies stay private to the entering player', () => {
     const session = new WorldSession();
     const world = new WorldMap();

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
 import { MASTER_CLASSES } from '../../src/data/ClassTree';
 import { REST_FACILITIES } from '../../src/data/RestFacilityData';
+import { STORY_INTERIOR_BRIEFING_LINE_KEYS } from '../../src/data/StoryInteriorBriefingData';
 import { STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
 import { STORY_QUESTS, getStoryCompanionRewards } from '../../src/data/StoryQuestData';
 import { STORY_SCENARIO_EVENT_SEQUENCES, type StoryScenarioEventStep } from '../../src/data/StoryScenarioEventData';
@@ -93,6 +94,9 @@ function collectDataDrivenUiKeys(): Set<string> {
         for (const room of layout.rooms) add(room.nameKey);
         for (const prop of layout.props) add(prop.labelKey);
         for (const door of layout.doors ?? []) add(door.lockedLogKey);
+    }
+    for (const lines of Object.values(STORY_INTERIOR_BRIEFING_LINE_KEYS)) {
+        for (const lineKey of lines) add(lineKey);
     }
     for (const reward of getStoryCompanionRewards()) add(reward.nameKey);
     for (const sequence of STORY_SCENARIO_EVENT_SEQUENCES) {

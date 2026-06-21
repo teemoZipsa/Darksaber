@@ -19,7 +19,7 @@ import {
 import { getNormalizedMonsterBalance } from '../../src/data/original/originalMonsterBalance';
 import { getItemDef } from '../../src/data/ItemDB';
 import { PlayerData } from '../../src/data/PlayerData';
-import { getStoryQuestByDungeonId } from '../../src/data/StoryQuestData';
+import { getStoryQuestByDungeonId, CAIN_NECKLACE_ITEM_ID } from '../../src/data/StoryQuestData';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import {
     getStoryScenarioEventSequence,
@@ -999,9 +999,10 @@ test('Burgos Cain field event records a raid-scoped relic flag before survival r
     assert.ok(quest);
 
     const player = new Player(8, 12);
+    const playerData = new PlayerData();
     const raidSession = new WorldRaidSession('central_castle');
     raidSession.beginRaidFromTown('central_castle');
-    const harness = createStoryScenarioHarness({ player, raidSession });
+    const harness = createStoryScenarioHarness({ player, playerData, raidSession });
 
     harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
     drainStoryPresentation(harness.controller);
@@ -1010,7 +1011,11 @@ test('Burgos Cain field event records a raid-scoped relic flag before survival r
     assert.equal(harness.controller.playFieldEventAt({ x: 9, y: 12 }, { id: 'hero', entity: player } as any), true);
     drainStoryPresentation(harness.controller);
     assert.equal(raidSession.hasScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'cain_necklace'), true);
+    assert.equal(raidSession.raidGoldReward, 50);
+    assert.equal(playerData.gold, 500);
+    assert.equal(playerData.hasQuestItem(CAIN_NECKLACE_ITEM_ID), false);
     assert.ok(harness.logs.some((entry) => entry.includes('케인의 목걸이를 얻었습니다.')));
+    assert.ok(harness.logs.some((entry) => entry.includes('50 GOLD')));
     assert.equal(harness.controller.playFieldEventAt({ x: 9, y: 12 }, { id: 'hero', entity: player } as any), false);
 });
 

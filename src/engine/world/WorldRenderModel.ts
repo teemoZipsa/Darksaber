@@ -21,6 +21,7 @@ export interface WorldStoryInteriorRenderModel {
     dungeonId: string | null;
     title: string;
     objectiveKey: string;
+    briefingLines?: string[];
     enemiesLeft: number;
 }
 

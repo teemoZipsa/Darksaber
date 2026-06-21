@@ -25,6 +25,7 @@ import type { WorldPlayerActionController } from './WorldPlayerActionController'
 import type { WorldRaidOutcomeController } from './WorldRaidOutcomeController';
 import type { WorldSelectionController } from './WorldSelectionController';
 import type { WorldTacticalController } from './WorldTacticalController';
+import { getStoryInteriorBriefingLineKeys } from '../../data/StoryInteriorBriefingData';
 import { MIN_FIELD_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
 import { formatT, t } from '../../i18n/LanguageManager';
 
@@ -158,6 +159,9 @@ export class WorldRenderController {
             ? worldMap.getLayout().objectiveKey ?? 'story.interior.objective'
             : 'story.interior.objective';
 
+        const storyInteriorDungeonId = storyInteriorActive ? activeDungeonId : null;
+        const briefingLines = getStoryInteriorBriefingLineKeys(storyInteriorDungeonId);
+
         return {
             worldTime: this.context.getWorldTime(),
             phase: this.context.getPhase(),
@@ -204,9 +208,10 @@ export class WorldRenderController {
             },
             storyInterior: {
                 active: storyInteriorActive,
-                dungeonId: storyInteriorActive ? activeDungeonId : null,
+                dungeonId: storyInteriorDungeonId,
                 title: storyInteriorActive ? worldMap.getDisplayName() : '',
                 objectiveKey: storyInteriorObjectiveKey,
+                briefingLines,
                 enemiesLeft: storyInteriorActive
                     ? this.context.getFieldEnemies().filter((entry) => entry.enemy.stats.hp > 0).length
                     : 0,
@@ -215,10 +220,14 @@ export class WorldRenderController {
     }
 
     private renderStoryInteriorBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel, uiW: number): void {
-        const bannerW = Math.min(440, Math.max(300, uiW - 40));
+        const briefingLines = model.storyInterior.briefingLines;
+        const bannerW = Math.min(520, Math.max(300, uiW - 40));
         const x = Math.floor((uiW - bannerW) / 2);
         const y = 14;
-        const h = 56;
+        const briefingLineHeight = 14;
+        const h = briefingLines
+            ? 24 + briefingLines.length * briefingLineHeight + 20
+            : 56;
 
         ctx.save();
         ctx.fillStyle = 'rgba(14, 12, 12, 0.88)';
@@ -232,10 +241,27 @@ export class WorldRenderController {
         ctx.textBaseline = 'top';
         ctx.fillText(model.storyInterior.title, x + bannerW / 2, y + 8);
         ctx.font = '12px sans-serif';
-        ctx.fillStyle = '#cdbb92';
-        ctx.fillText(t(model.storyInterior.objectiveKey), x + bannerW / 2, y + 27);
-        ctx.fillStyle = '#9fb4c8';
-        ctx.fillText(formatT('story.interior.enemyCount', { count: model.storyInterior.enemiesLeft }), x + bannerW / 2, y + 42);
+
+        if (briefingLines) {
+            const briefingColors = ['#cdbb92', '#c8a8a0', '#d4b878'];
+            let lineY = y + 26;
+            briefingLines.forEach((lineKey, index) => {
+                ctx.fillStyle = briefingColors[index] ?? '#b8a888';
+                ctx.fillText(t(lineKey), x + bannerW / 2, lineY);
+                lineY += briefingLineHeight;
+            });
+            ctx.fillStyle = '#9fb4c8';
+            ctx.fillText(
+                formatT('story.interior.enemyCount', { count: model.storyInterior.enemiesLeft }),
+                x + bannerW / 2,
+                lineY + 2
+            );
+        } else {
+            ctx.fillStyle = '#cdbb92';
+            ctx.fillText(t(model.storyInterior.objectiveKey), x + bannerW / 2, y + 27);
+            ctx.fillStyle = '#9fb4c8';
+            ctx.fillText(formatT('story.interior.enemyCount', { count: model.storyInterior.enemiesLeft }), x + bannerW / 2, y + 42);
+        }
         ctx.restore();
     }
 

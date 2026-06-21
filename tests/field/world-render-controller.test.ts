@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PlayerData } from '../../src/data/PlayerData';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { BURGOS_CASTLE_DUNGEON_ID } from '../../src/data/MonsterCatalog';
+import { STORY_INTERIOR_BRIEFING_LINE_KEYS } from '../../src/data/StoryInteriorBriefingData';
 import { getStoryInteriorLayout } from '../../src/data/StoryInteriorData';
 import { Player } from '../../src/entity/Player';
 import { StoryInteriorMap } from '../../src/map/StoryInteriorMap';
@@ -84,5 +86,14 @@ test('story interiors expose dedicated objective HUD models through episode 31',
         assert.notEqual(t(model.storyInterior.objectiveKey), model.storyInterior.objectiveKey, `episode ${scenario.episode} localized objective`);
         assert.equal(model.storyInterior.title, new StoryInteriorMap(layout).getDisplayName(), `episode ${scenario.episode} title`);
         assert.equal(model.storyInterior.enemiesLeft, 1, `episode ${scenario.episode} live enemy count`);
+
+        if (scenario.dungeonId === BURGOS_CASTLE_DUNGEON_ID) {
+            assert.deepEqual(model.storyInterior.briefingLines, [...STORY_INTERIOR_BRIEFING_LINE_KEYS[BURGOS_CASTLE_DUNGEON_ID]]);
+            for (const lineKey of model.storyInterior.briefingLines ?? []) {
+                assert.notEqual(t(lineKey), lineKey, `episode ${scenario.episode} localized briefing ${lineKey}`);
+            }
+        } else {
+            assert.equal(model.storyInterior.briefingLines, undefined, `episode ${scenario.episode} no briefing lines`);
+        }
     }
 });
