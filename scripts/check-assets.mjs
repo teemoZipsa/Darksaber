@@ -1,7 +1,9 @@
 import fs from 'fs';
 import path from 'path';
+import { buildRequiredSoundPaths, isOptionalSoundAsset } from './sound-asset-policy.mjs';
 
 const rootDir = process.cwd();
+const soundPolicy = buildRequiredSoundPaths(rootDir);
 const publicDir = path.join(rootDir, 'public');
 const srcDir = path.join(rootDir, 'src');
 const quiet = process.argv.includes('--quiet');
@@ -53,7 +55,7 @@ function existsAsset(assetString) {
 }
 
 function isOptionalAsset(assetString) {
-  return assetString.startsWith('/assets/sounds/');
+  return isOptionalSoundAsset(assetString, soundPolicy);
 }
 
 function isBareSpriteName(assetString) {
