@@ -167,6 +167,19 @@ test('raid gold rewards are secured only after survival', () => {
     assert.equal(failed.getOutcome()?.goldReward, undefined);
 });
 
+test('server-authoritative success does not double-apply raid gold after sync', () => {
+    const { controller, playerData, raidSession, getOutcome } = createController();
+    raidSession.beginRaidFromTown('central_castle');
+    raidSession.addRaidGoldReward(300);
+    playerData.gold = 800;
+
+    controller.completeSuccess(DESTINATION_TOWN, { serverAuthoritativeRewards: true });
+
+    assert.equal(playerData.gold, 800);
+    assert.equal(raidSession.raidGoldReward, 0);
+    assert.equal(getOutcome()?.goldReward, 300);
+});
+
 test('raid result clears story scenario runtime state before town placement', () => {
     const survived = createController();
     survived.raidSession.beginRaidFromTown('central_castle');

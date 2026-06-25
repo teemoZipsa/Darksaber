@@ -251,7 +251,7 @@ export class WorldRaidLifecycleController {
         }
         if (result.result === 'SURVIVED') {
             const town = this.context.getTownById(result.extractionTownId) ?? this.context.getCurrentHubTown();
-            this.context.raidOutcomeController.completeSuccess(town);
+            this.context.raidOutcomeController.completeSuccess(town, { serverAuthoritativeRewards: true });
         } else if (result.result === 'DEAD' || result.result === 'MIA') {
             this.context.raidOutcomeController.completeFailure(result.result);
         } else {

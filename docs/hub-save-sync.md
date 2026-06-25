@@ -17,3 +17,5 @@ Server-authoritative hub state (gold, backpack, stash, equipment, market) for au
 - [x] combat-parity / hub-save / stash preserve tests
 
 Manual smoke: town shop buy → refresh → gold/stash persist → deploy → raid survive → hub matches server.
+
+Network raid smoke: scenario gold field event → survive → gold must not double after result screen → redeploy.

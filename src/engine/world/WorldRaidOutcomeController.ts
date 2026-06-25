@@ -55,6 +55,11 @@ export interface WorldRaidOutcomeContext {
     log(message: string): void;
 }
 
+export interface CompleteSuccessOptions {
+    /** Server survival flush already applied gold, story rewards, and raid inventory. */
+    serverAuthoritativeRewards?: boolean;
+}
+
 export class WorldRaidOutcomeController {
     private readonly context: WorldRaidOutcomeContext;
     private readonly raidResultUI = new RaidResultUI();
@@ -80,27 +85,32 @@ export class WorldRaidOutcomeController {
         this.raidResultUI.hide();
     }
 
-    public completeSuccess(destination: TownInfo): void {
+    public completeSuccess(destination: TownInfo, options: CompleteSuccessOptions = {}): void {
         const raidSession = this.context.raidSession;
         if (!raidSession.active) return;
 
+        const serverRewards = options.serverAuthoritativeRewards === true;
         const heroStatuses = this.createHeroStatuses();
-        const secured = this.secureRaidLoot();
+        const secured = serverRewards ? this.snapshotRaidLootForDisplay() : this.secureRaidLoot();
         const questRewards: string[] = [];
         const episode1WasCleared = this.context.playerData.isCleared(MAIN_QUEST_EPISODE_01_ID);
         const burgosObjectiveCleared = raidSession.isDungeonCleared(BURGOS_CASTLE_DUNGEON_ID);
         const raidGoldReward = raidSession.consumeRaidGoldReward();
-        if (raidGoldReward > 0) this.context.playerData.addGold(raidGoldReward);
+        if (!serverRewards && raidGoldReward > 0) {
+            this.context.playerData.addGold(raidGoldReward);
+        }
         let goldReward = raidGoldReward;
 
-        if (!this.context.playerData.isCleared('quest:first_survival')) {
+        if (!serverRewards && !this.context.playerData.isCleared('quest:first_survival')) {
             this.context.playerData.markCleared('quest:first_survival');
             this.context.playerData.addGold(200);
             goldReward += 200;
             questRewards.push(formatT('raid.outcome.firstSurvivalQuest', { completed: t('quest.completed') }));
         }
-        questRewards.push(...this.completeScenarioRuntimeQuestItems());
-        questRewards.push(...this.completeStoryQuestRewards());
+        if (!serverRewards) {
+            questRewards.push(...this.completeScenarioRuntimeQuestItems());
+            questRewards.push(...this.completeStoryQuestRewards());
+        }
         const missionReport = this.createMissionReport({
             episode1WasCleared,
             burgosObjectiveCleared,
@@ -130,7 +140,6 @@ export class WorldRaidOutcomeController {
             goldReward,
             questRewards,
             missionReport,
-            notes: [t('raid.outcome.sessionOnlyNote')],
         };
         this.showRaidResult(outcome, destination);
         this.context.log(formatT('raid.outcome.survivedLog', { town: displayTownName(destination) }));
@@ -401,6 +410,15 @@ export class WorldRaidOutcomeController {
         }
 
         return secured;
+    }
+
+    /** Display-only loot snapshot after server sync; do not move items locally. */
+    private snapshotRaidLootForDisplay() {
+        const backpackSecured = [...this.context.gameManager.inventory.items].filter((placed) => placed.acquiredInRaid);
+        const equippedSecured = this.context.party.getCharacters().flatMap((character) =>
+            [...character.equipment.values()].filter((placed) => placed.acquiredInRaid)
+        );
+        return mergeSnapshots([...backpackSecured, ...equippedSecured].map(snapshotPlacedItem));
     }
 }
 
