@@ -1669,4 +1669,8 @@ export class WorldEngine {
         }
     }
 
+    public isNetworkRaidActive(): boolean {
+        return this.isNetworkRaid;
+    }
+
 }

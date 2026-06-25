@@ -22,6 +22,8 @@ export interface CharacterSave {
     hubLocation: Record<string, unknown>;
     questState: Record<string, unknown>;
     inventory: InventorySaveSnapshot;
+    /** Town stash grid (15×10); persisted separately from raid backpack inventory. */
+    stashSnapshot: InventorySaveSnapshot;
     equipment: Record<string, unknown>;
     partySnapshot: Record<string, unknown>;
     rosterSnapshot: Record<string, unknown>;

@@ -152,12 +152,20 @@ export class AuthClient {
      */
     public async updateCharacterSave(
         characterId: string,
-        patch: Pick<CharacterSavePatch, 'rosterSnapshot'>,
+        patch: CharacterSavePatch,
         expectedRevision: number
     ): Promise<CharacterSave> {
         const response = await this.request<{ save: CharacterSave }>(
             `/characters/${encodeURIComponent(characterId)}/save`,
             { method: 'PATCH', auth: true, body: { expectedRevision, save: patch } }
+        );
+        return response.save;
+    }
+
+    public async getCharacterSave(characterId: string): Promise<CharacterSave> {
+        const response = await this.request<{ save: CharacterSave }>(
+            `/characters/${encodeURIComponent(characterId)}/save`,
+            { method: 'GET', auth: true }
         );
         return response.save;
     }

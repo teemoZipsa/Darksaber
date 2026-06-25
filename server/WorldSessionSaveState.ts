@@ -177,6 +177,7 @@ export function cloneCharacterSave(save: CharacterSave | undefined): CharacterSa
         hubLocation: cloneRecord(save.hubLocation),
         questState: cloneRecord(save.questState),
         inventory: cloneInventorySnapshot(save.inventory, { includeAcquiredRaidItems: true }),
+        stashSnapshot: cloneInventorySnapshot(save.stashSnapshot, { includeAcquiredRaidItems: true }),
         equipment: cloneRecord(save.equipment),
         partySnapshot: cloneRecord(save.partySnapshot),
         rosterSnapshot: cloneRecord(save.rosterSnapshot),

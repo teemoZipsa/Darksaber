@@ -129,6 +129,19 @@ export class WorldRaidLifecycleController {
         const isResumeJoin = NetworkRaidClient.hasStoredResumeToken();
 
         try {
+            if (!isResumeJoin) {
+                const flushResult = await this.context.gameManager.flushHubSaveToServer();
+                if (!flushResult.ok) {
+                    this.context.log(t('mp.deployUnavailable'));
+                    this.context.setPhase('town');
+                    this.context.townSession.show(town);
+                    this.context.townSession.setDeployError(
+                        formatT('mp.hubSaveFailed', { message: flushResult.message ?? flushResult.code ?? 'unknown' })
+                    );
+                    return;
+                }
+            }
+
             let joinAuthContext = await this.refreshNetworkAuthContext(authContext) ?? authContext;
             let welcome;
             try {
@@ -147,6 +160,7 @@ export class WorldRaidLifecycleController {
             this.context.closeFieldOverlays();
             this.context.setNetworkPlayerId(welcome.playerId);
             this.context.setIsNetworkRaid(true);
+            this.context.gameManager.setHubFlushEnabled(false);
             this.context.setPhase('raid');
             this.context.raidSession.beginRaidFromTown(town.id);
             this.context.storyScenarioController.resetVisitState();
@@ -226,6 +240,15 @@ export class WorldRaidLifecycleController {
         this.context.raidSession.elapsedSeconds = result.elapsedSeconds;
         this.context.raidSession.kills = result.kills;
         this.context.storyScenarioController.applyNetworkScenarioResult(result.completedDungeonIds);
+        void this.finishNetworkRaidResult(result);
+    }
+
+    private async finishNetworkRaidResult(result: RaidResultMessage): Promise<void> {
+        const syncResult = await this.context.gameManager.syncHubSaveFromServer();
+        this.context.gameManager.setHubFlushEnabled(true);
+        if (!syncResult.ok) {
+            this.context.log(formatT('mp.hubSaveSyncFailed', { message: syncResult.message ?? syncResult.code ?? 'unknown' }));
+        }
         if (result.result === 'SURVIVED') {
             const town = this.context.getTownById(result.extractionTownId) ?? this.context.getCurrentHubTown();
             this.context.raidOutcomeController.completeSuccess(town);
@@ -243,6 +266,15 @@ export class WorldRaidLifecycleController {
         this.closeNetworkRaidClient(false);
         this.context.setIsNetworkRaid(false);
         this.context.setNetworkPlayerId(null);
+        void this.finishGraceExpiredRaid();
+    }
+
+    private async finishGraceExpiredRaid(): Promise<void> {
+        const syncResult = await this.context.gameManager.syncHubSaveFromServer();
+        this.context.gameManager.setHubFlushEnabled(true);
+        if (!syncResult.ok) {
+            this.context.log(formatT('mp.hubSaveSyncFailed', { message: syncResult.message ?? syncResult.code ?? 'unknown' }));
+        }
         this.context.raidOutcomeController.completeFailure('MIA');
     }
 

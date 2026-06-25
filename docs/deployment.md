@@ -101,6 +101,11 @@ The server also exposes Prometheus-format process counters at:
 https://<render-service-host>/metrics
 ```
 
+When `WORLD_METRICS_TOKEN` is set, `/metrics` requires `Authorization: Bearer <WORLD_METRICS_TOKEN>`.
+In production without a token configured, `/metrics` returns `401 Unauthorized`.
+For local development, leave `WORLD_METRICS_TOKEN` unset so metrics remain open unless
+`NODE_ENV=production`.
+
 The metrics include live sessions, active players, WebSocket clients, tick
 duration, rejected actions, save conflicts/failures, pending world-save recovery
 spool entries, pending active-raid session snapshots, dirty/saving save
@@ -115,6 +120,7 @@ NODE_ENV=production
 AUTH_JWT_SECRET=<long random>
 AUTH_REFRESH_TOKEN_HASH_SECRET=<different long random>
 AUTH_ALLOWED_ORIGINS=https://<vercel-client-host>
+WORLD_METRICS_TOKEN=<optional bearer token for /metrics>
 WORLD_SESSION_SNAPSHOT_MS=5000
 WORLD_SESSION_LEASE_TTL_MS=15000
 ```

@@ -154,7 +154,7 @@ test('character APIs enforce ownership and save revision conflicts', async () =>
     }
 });
 
-test('character save HTTP rejects client-authoritative save fields', async () => {
+test('character save HTTP rejects forbidden questState and unknown fields', async () => {
     const harness = await createHarness();
     try {
         const registered = await harness.request('/auth/register', {
@@ -169,22 +169,103 @@ test('character save HTTP rejects client-authoritative save fields', async () =>
         assert.equal(created.status, 201);
         const characterId = String(asRecord(created.body.character).id);
 
-        for (const forbidden of ['inventory', 'equipment', 'questState']) {
-            const attempted = await harness.request(`/characters/${characterId}/save`, {
-                method: 'PATCH',
-                accessToken: String(registered.body.accessToken),
-                body: {
-                    expectedRevision: 1,
-                    save: {
-                        [forbidden]: forbidden === 'inventory'
-                            ? { width: 10, height: 6, items: [{ itemId: 'void_crystal', gridX: 0, gridY: 0, quantity: 999, durability: 1 }] }
-                            : { forged: true },
+        const questStateAttempt = await harness.request(`/characters/${characterId}/save`, {
+            method: 'PATCH',
+            accessToken: String(registered.body.accessToken),
+            body: {
+                expectedRevision: 1,
+                save: {
+                    questState: { completedQuestIds: ['quest:fake'] },
+                },
+            },
+        });
+        assert.equal(questStateAttempt.status, 400);
+        assert.equal(questStateAttempt.body.error, 'forbidden_save_field');
+
+        const unknownField = await harness.request(`/characters/${characterId}/save`, {
+            method: 'PATCH',
+            accessToken: String(registered.body.accessToken),
+            body: {
+                expectedRevision: 1,
+                save: { forged: true },
+            },
+        });
+        assert.equal(unknownField.status, 400);
+        assert.equal(unknownField.body.error, 'forbidden_save_field');
+    } finally {
+        await harness.close();
+    }
+});
+
+test('character save HTTP allows hub inventory patch and strips acquiredInRaid', async () => {
+    const harness = await createHarness();
+    try {
+        const registered = await harness.request('/auth/register', {
+            method: 'POST',
+            body: { loginName: 'hubpatch01', password: 'password-1234' },
+        });
+        const created = await harness.request('/characters', {
+            method: 'POST',
+            accessToken: String(registered.body.accessToken),
+            body: { name: 'Merchant', classKey: 'infantry', gender: 'M' },
+        });
+        const characterId = String(asRecord(created.body.character).id);
+        const updated = await harness.request(`/characters/${characterId}/save`, {
+            method: 'PATCH',
+            accessToken: String(registered.body.accessToken),
+            body: {
+                expectedRevision: 1,
+                save: {
+                    questState: { gold: 750 },
+                    inventory: {
+                        width: 10,
+                        height: 6,
+                        items: [{
+                            itemId: 'herb_cheap',
+                            gridX: 0,
+                            gridY: 0,
+                            quantity: 1,
+                            durability: 1,
+                            acquiredInRaid: true,
+                        }],
                     },
                 },
-            });
-            assert.equal(attempted.status, 400);
-            assert.equal(attempted.body.error, 'forbidden_save_field');
-        }
+            },
+        });
+        assert.equal(updated.status, 200);
+        const save = asRecord(updated.body.save);
+        assert.equal((asRecord(save.questState).gold), 750);
+        const items = asRecord(save.inventory).items as Array<Record<string, unknown>>;
+        assert.equal(items.length, 1);
+        assert.equal(items[0]?.acquiredInRaid, undefined);
+    } finally {
+        await harness.close();
+    }
+});
+
+test('character save HTTP blocks hub patch during active raid session', async () => {
+    const harness = await createHarness({ isHubPatchBlocked: () => true });
+    try {
+        const registered = await harness.request('/auth/register', {
+            method: 'POST',
+            body: { loginName: 'raidblock01', password: 'password-1234' },
+        });
+        const created = await harness.request('/characters', {
+            method: 'POST',
+            accessToken: String(registered.body.accessToken),
+            body: { name: 'Raider', classKey: 'infantry', gender: 'M' },
+        });
+        const characterId = String(asRecord(created.body.character).id);
+        const blocked = await harness.request(`/characters/${characterId}/save`, {
+            method: 'PATCH',
+            accessToken: String(registered.body.accessToken),
+            body: {
+                expectedRevision: 1,
+                save: { questState: { gold: 100 } },
+            },
+        });
+        assert.equal(blocked.status, 409);
+        assert.equal(blocked.body.error, 'hub_flush_blocked_during_raid');
     } finally {
         await harness.close();
     }
@@ -341,6 +422,7 @@ async function createHarness(options: {
     trustProxy?: boolean;
     registerRateLimiter?: MemoryRateLimiter;
     loginIpRateLimiter?: MemoryRateLimiter;
+    isHubPatchBlocked?: (accountId: string, characterId: string) => boolean;
 } = {}): Promise<{
     store: InMemoryAuthStore;
     request(path: string, options: {
@@ -363,6 +445,7 @@ async function createHarness(options: {
         trustProxy: options.trustProxy,
         registerRateLimiter: options.registerRateLimiter,
         loginIpRateLimiter: options.loginIpRateLimiter,
+        isHubPatchBlocked: options.isHubPatchBlocked,
     });
     const server = createServer((request, response) => {
         void handler(request, response).then((handled) => {

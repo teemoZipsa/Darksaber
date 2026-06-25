@@ -73,10 +73,10 @@ import {
     ENEMY_LEASH_RANGE,
 } from '../src/field/FieldConfig';
 import { decideEnemyAction, type EnemyAIDecision } from '../src/field/EnemyAI';
+import { planMoveIntentPath } from './WorldSessionMoveIntent';
 import { advanceAtb } from '../src/field/FieldCombat';
 import {
     findPathToAny,
-    findPathWithCost,
     manhattan,
     tilesInRange,
     type FieldPassableQuery,
@@ -777,27 +777,20 @@ export class WorldSession {
         const tile = readTilePayload(payload);
         if (!tile) return reject(intentId, 'Move payload must include a tile.');
 
-        const movementBudget = Math.max(1, getEffectiveStats(actor.stats, actor.statuses).mov || 1);
-        const pathResult = findPathWithCost(
-            actor.tile,
-            tile,
-            (query) => this.isFieldPassableForOwner(query, actor.ownerPlayerId),
-            (step) => getTerrainMoveCost(this.getServerTileAt(step, actor.ownerPlayerId)),
-            {
-                actorId: actor.id,
-                intent: 'move',
-                maxNodes: 8000,
-                maxCost: movementBudget,
-            }
-        );
-        if (pathResult.path.length === 0 && manhattan(actor.tile, tile) > 0) return reject(intentId, 'No valid path.');
+        const path = planMoveIntentPath({
+            actor,
+            targetTile: tile,
+            isPassable: (query) => this.isFieldPassableForOwner(query, actor.ownerPlayerId),
+            terrainCost: (step) => getTerrainMoveCost(this.getServerTileAt(step, actor.ownerPlayerId)),
+        });
+        if (path.length === 0 && manhattan(actor.tile, tile) > 0) return reject(intentId, 'No valid path.');
 
         if (actor.remainingAp < MOVE_ACTION_GAUGE_COST) return reject(intentId, 'No action available for movement.');
 
         this.spendActorGauge(actor, MOVE_ACTION_GAUGE_COST);
         removeActionStanceStatusesFromCarrier(actor);
-        if (pathResult.path.length > 0) {
-            const next = pathResult.path[pathResult.path.length - 1];
+        if (path.length > 0) {
+            const next = path[path.length - 1];
             actor.facing = directionFromTo(actor.tile, next);
             actor.tile = { ...next };
         }

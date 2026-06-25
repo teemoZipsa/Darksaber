@@ -100,6 +100,7 @@ const handleAuthHttpRequest = createAuthHttpHandler({
     allowedOrigins,
     refreshCookieSecure: process.env.AUTH_REFRESH_COOKIE_SECURE !== '0',
     sameSite: parseSameSite(process.env.AUTH_REFRESH_COOKIE_SAMESITE),
+    isHubPatchBlocked: (accountId, characterId) => isCharacterInActiveWorldSession(accountId, characterId),
 });
 const server = createServer(async (request, response) => {
     if (await handleAuthHttpRequest(request, response)) return;
@@ -111,6 +112,11 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.url === '/metrics') {
+        if (!isMetricsRequestAuthorized(request)) {
+            response.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' });
+            response.end('Unauthorized');
+            return;
+        }
         response.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
         response.end(formatWorldServerMetrics(metrics, {
             serverStartedAtMs,
@@ -1139,6 +1145,22 @@ function countActivePlayers(): number {
     let count = 0;
     for (const session of sessions.values()) count += session.getActivePlayerIds().length;
     return count;
+}
+
+function isCharacterInActiveWorldSession(accountId: string, characterId: string): boolean {
+    for (const tracker of saveTrackers.values()) {
+        if (tracker.accountId === accountId && tracker.characterId === characterId) return true;
+    }
+    return false;
+}
+
+function isMetricsRequestAuthorized(request: import('node:http').IncomingMessage): boolean {
+    const requiredToken = process.env.WORLD_METRICS_TOKEN?.trim();
+    if (!requiredToken) return process.env.NODE_ENV !== 'production';
+    const authorization = request.headers.authorization;
+    if (typeof authorization !== 'string') return false;
+    const match = /^Bearer\s+(.+)$/i.exec(authorization);
+    return match?.[1] === requiredToken;
 }
 
 function countSaveTrackers(predicate: (tracker: PlayerSaveTracker) => boolean): number {

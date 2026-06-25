@@ -31,8 +31,18 @@ import type { UiStore } from '../ui/react/UiStore';
 import type { WorldTownSession } from './world/WorldTownSession';
 import type { WorldRaidSession } from './world/WorldRaidSession';
 import type { AccountProgress, AuthCharacter, AuthClient, CharacterSave, InventorySaveItem } from '../net/AuthClient';
+import { AuthApiError } from '../net/AuthClient';
+import { buildHubSavePatch as serializeHubSavePatch } from '../shared/HubSaveSerializer';
 import { normalizeLoadout, normalizeUpgradeLevels } from '../magic/MagicLoadout';
 import { getExpToNext as originalExpToNext } from '../data/original/originalProgression';
+
+export interface HubFlushResult {
+    ok: boolean;
+    code?: string;
+    message?: string;
+}
+
+const HUB_SAVE_DEBOUNCE_MS = 2000;
 
 export interface AuthenticatedCharacterSession {
     accessToken: string;
@@ -82,6 +92,9 @@ export class GameManager {
     private networkAuthContext: { accessToken: string; characterId: string } | null = null;
     private authClient: AuthClient | null = null;
     private networkSaveRevision = 0;
+    private hubFlushEnabled = true;
+    private hubSaveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    private hubSaveInflight: Promise<HubFlushResult> | null = null;
 
     // React DOM UI overlay bridge (attached after construction in main.ts)
     private uiStore?: UiStore;
@@ -238,39 +251,119 @@ export class GameManager {
 
     /** Persist the active character's magic loadout + upgrade levels (local + network). */
     public saveActiveCharacterMagic(): void {
-        this.playerData.save();
-        this.persistActiveCharacterSaveToServer();
+        this.persistHubSaveToServer({ force: true });
     }
 
-    /** Push the roster save (incl. magic loadout/upgrades) to the server, if authed. */
-    private persistActiveCharacterSaveToServer(): void {
+    public isHubFlushEnabled(): boolean {
+        return this.hubFlushEnabled;
+    }
+
+    public setHubFlushEnabled(enabled: boolean): void {
+        this.hubFlushEnabled = enabled;
+    }
+
+    public isNetworkRaidActive(): boolean {
+        return this.worldEngine?.isNetworkRaidActive() ?? false;
+    }
+
+    public applyServerSave(save: CharacterSave, selectedCharacterId?: string): void {
+        this.playerData.applyCharacterSave(save);
+        this.networkSaveRevision = save.revision;
+        this.loadInventoryFromSave(save);
+        this.loadStashFromSave(save);
+        const characterId = selectedCharacterId ?? this.networkAuthContext?.characterId;
+        const character = characterId
+            ? this.party.getRoster().find((entry) => entry.id === characterId) ?? this.party.getActive()
+            : this.party.getActive();
+        if (character) {
+            character.equipment.clear();
+            this.loadEquipmentFromSave(save, character);
+        }
+    }
+
+    public persistHubSaveToServer(options: { force?: boolean } = {}): void {
+        if (!this.hubFlushEnabled || !this.networkAuthContext || !this.authClient) return;
+        if (this.isNetworkRaidActive()) return;
+        if (options.force) {
+            if (this.hubSaveDebounceTimer !== null) {
+                clearTimeout(this.hubSaveDebounceTimer);
+                this.hubSaveDebounceTimer = null;
+            }
+            void this.flushHubSaveToServer();
+            return;
+        }
+        if (this.hubSaveDebounceTimer !== null) clearTimeout(this.hubSaveDebounceTimer);
+        this.hubSaveDebounceTimer = setTimeout(() => {
+            this.hubSaveDebounceTimer = null;
+            void this.flushHubSaveToServer();
+        }, HUB_SAVE_DEBOUNCE_MS);
+    }
+
+    public async flushHubSaveToServer(): Promise<HubFlushResult> {
+        if (!this.hubFlushEnabled || !this.networkAuthContext || !this.authClient) {
+            return { ok: true };
+        }
+        if (this.isNetworkRaidActive()) {
+            return { ok: false, code: 'hub_flush_blocked_during_raid', message: 'Hub save is blocked during an active raid.' };
+        }
+        if (this.hubSaveInflight) return this.hubSaveInflight;
+        this.hubSaveInflight = this.pushHubSaveToServer(true).finally(() => {
+            this.hubSaveInflight = null;
+        });
+        return this.hubSaveInflight;
+    }
+
+    public async syncHubSaveFromServer(): Promise<HubFlushResult> {
         const client = this.authClient;
         const ctx = this.networkAuthContext;
-        if (!client || !ctx) return;
-        const rosterSnapshot = this.buildRosterSnapshot();
-        void client
-            .updateCharacterSave(ctx.characterId, { rosterSnapshot }, this.networkSaveRevision)
-            .then((save) => { this.networkSaveRevision = save.revision; })
-            .catch(() => { /* best-effort; local save already applied, retried on next change */ });
+        if (!client || !ctx) return { ok: true };
+        try {
+            const save = await client.getCharacterSave(ctx.characterId);
+            this.applyServerSave(save, ctx.characterId);
+            return { ok: true };
+        } catch (error) {
+            if (error instanceof AuthApiError) {
+                return { ok: false, code: error.code, message: error.message };
+            }
+            return { ok: false, code: 'sync_failed', message: 'Failed to reload character save from server.' };
+        }
     }
 
-    /** Serialize the current roster into the persisted rosterSnapshot shape. */
-    private buildRosterSnapshot(): Record<string, unknown> {
-        return {
-            characters: this.party.getRoster().map((character) => ({
-                id: character.id,
-                name: character.name,
-                classKey: character.classLineId,
-                classLineId: character.classLineId,
-                gender: character.gender,
-                tier: character.currentTier,
-                level: character.level,
-                exp: character.exp,
-                baseStats: character.stats,
-                magicLoadout: normalizeLoadout(character.magicLoadout, character),
-                skillUpgradeLevels: { ...character.skillUpgradeLevels },
-            })),
-        };
+    private async pushHubSaveToServer(retryOnConflict: boolean): Promise<HubFlushResult> {
+        const client = this.authClient;
+        const ctx = this.networkAuthContext;
+        if (!client || !ctx) return { ok: true };
+        const patch = serializeHubSavePatch({
+            playerData: this.playerData,
+            inventory: this.inventory,
+            stash: this.stash,
+            party: this.party,
+            hubTownId: this.playerData.currentHubTownId,
+        });
+        try {
+            const save = await client.updateCharacterSave(ctx.characterId, patch, this.networkSaveRevision);
+            this.networkSaveRevision = save.revision;
+            return { ok: true };
+        } catch (error) {
+            if (retryOnConflict && error instanceof AuthApiError && error.code === 'revision_conflict') {
+                try {
+                    const current = await client.getCharacterSave(ctx.characterId);
+                    this.applyServerSave(current, ctx.characterId);
+                    const save = await client.updateCharacterSave(ctx.characterId, patch, this.networkSaveRevision);
+                    this.networkSaveRevision = save.revision;
+                    return { ok: true };
+                } catch (retryError) {
+                    if (retryError instanceof AuthApiError) {
+                        return { ok: false, code: retryError.code, message: retryError.message };
+                    }
+                    return { ok: false, code: 'hub_flush_failed', message: 'Hub save retry failed.' };
+                }
+            }
+            if (error instanceof AuthApiError) {
+                return { ok: false, code: error.code, message: error.message };
+            }
+            return { ok: false, code: 'hub_flush_failed', message: 'Hub save failed.' };
+        }
     }
 
     private toggleMagicLoadout(): void {
@@ -319,12 +412,16 @@ export class GameManager {
             characterId: session.character.id,
         };
         this.authClient = session.authClient ?? null;
-        this.networkSaveRevision = session.save.revision;
+        this.playerData.setAuthenticatedSession(true);
+        this.playerData.setHubPersistCallback(() => this.persistHubSaveToServer());
         this.party.clear();
         this.inventory.clear();
         this.stash.clear();
+        this.playerData.applyCharacterSave(session.save);
+        this.networkSaveRevision = session.save.revision;
         this.loadRosterFromSave(session.character, session.save);
         this.loadInventoryFromSave(session.save);
+        this.loadStashFromSave(session.save);
         this.playerData.currentHubTownId = readTownId(session.save);
         this.playerData.clearedStages = new Set(session.accountProgress.completedQuests);
         this.syncStoryCompanionsToRoster();
@@ -388,7 +485,12 @@ export class GameManager {
 
     private loadInventoryFromSave(save: CharacterSave): void {
         this.inventory.clear();
-        for (const entry of save.inventory.items) this.placeSavedInventoryItem(entry);
+        for (const entry of save.inventory.items) this.placeSavedInventoryItemOnGrid(this.inventory, entry);
+    }
+
+    private loadStashFromSave(save: CharacterSave): void {
+        this.stash.clear();
+        for (const entry of save.stashSnapshot.items) this.placeSavedInventoryItemOnGrid(this.stash, entry);
     }
 
     private loadEquipmentFromSave(save: CharacterSave, character: Character): void {
@@ -416,10 +518,10 @@ export class GameManager {
         }
     }
 
-    private placeSavedInventoryItem(entry: InventorySaveItem): void {
+    private placeSavedInventoryItemOnGrid(grid: GridInventory, entry: InventorySaveItem): void {
         const item = ITEMS.find((candidate) => candidate.id === entry.itemId);
         if (!item) return;
-        const placed = this.inventory.place(item, entry.gridX, entry.gridY) ?? this.inventory.autoPlace(item);
+        const placed = grid.place(item, entry.gridX, entry.gridY) ?? grid.autoPlace(item);
         if (!placed) return;
         placed.quantity = Math.max(1, Math.floor(entry.quantity));
         placed.durability = Math.max(0, Math.min(item.maxDurability, Math.floor(entry.durability)));

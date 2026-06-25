@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
@@ -8,7 +8,6 @@ import {
     isOptionalSoundAsset,
     parseAudioCatalog,
 } from '../../scripts/sound-asset-policy.mjs';
-import { readFileSync } from 'node:fs';
 
 const rootDir = process.cwd();
 const policy = buildRequiredSoundPaths(rootDir);

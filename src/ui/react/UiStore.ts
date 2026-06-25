@@ -241,7 +241,10 @@ export class UiStore {
     getTownInventory = (): InventoryUI | null => this.townUi()?.getInventoryUI() ?? null;
     closeInventory = (): void => { this.gm.closeWorldInventory(); this.tick(); };
     /** Re-render after a direct InventoryUI mutation (drag/drop, equip, sort…). */
-    refresh = (): void => { this.tick(); };
+    refresh = (): void => {
+        if (this.townUi()?.isVisible()) this.gm.persistHubSaveToServer();
+        this.tick();
+    };
 
     private pushGridBlacksmithEntries(
         entries: BlacksmithEntry[],

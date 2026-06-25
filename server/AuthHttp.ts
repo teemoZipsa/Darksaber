@@ -19,11 +19,10 @@ import {
     type AuthCharacter,
     type AuthSession,
     type AuthStore,
-    type CharacterSave,
-    type SaveUpdateInput,
 } from './AuthStore';
+import { buildHubSavePatch } from './HubSavePatch';
+import { HttpError } from './HttpError';
 import { errorToLogValue, logServerEvent } from './WorldServerObservability';
-import { normalizeLoadout } from '../src/magic/MagicLoadout';
 import {
     MemoryRateLimiter,
     RateLimitExceededError,
@@ -43,6 +42,8 @@ export interface AuthHttpOptions {
     loginIpRateLimiter?: MemoryRateLimiter;
     loginFailureRateLimiter?: MemoryRateLimiter;
     refreshRateLimiter?: MemoryRateLimiter;
+    /** When true, client hub save PATCH is rejected (active world raid session). */
+    isHubPatchBlocked?: (accountId: string, characterId: string) => boolean;
 }
 
 export interface AuthenticatedSession {
@@ -79,7 +80,6 @@ const LOGIN_IP_LIMIT = 30;
 const LOGIN_FAILURE_WINDOW_MS = 1000 * 60 * 10;
 const LOGIN_FAILURE_LIMIT = 5;
 const REFRESH_IP_LIMIT = 60;
-const CLIENT_SAVE_PATCH_FIELDS = new Set(['rosterSnapshot']);
 
 export function createAuthHttpHandler(options: AuthHttpOptions): (request: IncomingMessage, response: ServerResponse) => Promise<boolean> {
     const runtime = createAuthHttpRuntime(options);
@@ -320,7 +320,10 @@ async function routeAuthRequest(context: HandlerContext, options: AuthHttpOption
             const patch = isRecord(body.save) ? body.save : isRecord(body.patch) ? body.patch : {};
             const save = await options.store.getCharacterSave(auth.account.id, characterId);
             if (!save) throw new HttpError(404, 'character_not_found', 'Character save was not found.');
-            const clientPatch = buildClientSavePatch(patch, save);
+            if (options.isHubPatchBlocked?.(auth.account.id, characterId)) {
+                throw new HttpError(409, 'hub_flush_blocked_during_raid', 'Character save cannot be patched during an active raid session.');
+            }
+            const clientPatch = buildHubSavePatch(patch, save);
             const result = await options.store.updateCharacterSave(auth.account.id, characterId, {
                 expectedRevision,
                 patch: clientPatch,
@@ -472,69 +475,6 @@ function readNumber(value: unknown, field: string): number {
     return Math.floor(value);
 }
 
-function buildClientSavePatch(patch: Record<string, unknown>, currentSave: CharacterSave): SaveUpdateInput['patch'] {
-    for (const field of Object.keys(patch)) {
-        if (!CLIENT_SAVE_PATCH_FIELDS.has(field)) {
-            throw new HttpError(400, 'forbidden_save_field', `${field} cannot be patched by the client.`);
-        }
-    }
-
-    const next: SaveUpdateInput['patch'] = {};
-    if (isRecord(patch.rosterSnapshot)) {
-        next.rosterSnapshot = mergeClientRosterSnapshot(currentSave.rosterSnapshot, patch.rosterSnapshot);
-    }
-    return next;
-}
-
-function mergeClientRosterSnapshot(current: Record<string, unknown>, incoming: Record<string, unknown>): Record<string, unknown> {
-    const currentCharacters = Array.isArray(current.characters) ? current.characters : [];
-    const incomingById = new Map<string, Record<string, unknown>>();
-    if (Array.isArray(incoming.characters)) {
-        for (const raw of incoming.characters) {
-            if (!isRecord(raw) || typeof raw.id !== 'string') continue;
-            incomingById.set(raw.id, raw);
-        }
-    }
-
-    return {
-        ...current,
-        characters: currentCharacters.map((raw) => {
-            if (!isRecord(raw) || typeof raw.id !== 'string') return raw;
-            const incomingCharacter = incomingById.get(raw.id);
-            if (!incomingCharacter) return raw;
-            return mergeClientRosterCharacter(raw, incomingCharacter);
-        }),
-    };
-}
-
-function mergeClientRosterCharacter(current: Record<string, unknown>, incoming: Record<string, unknown>): Record<string, unknown> {
-    const owner = readLoadoutOwner(current);
-    if (!owner || !Array.isArray(incoming.magicLoadout)) return current;
-    return {
-        ...current,
-        magicLoadout: normalizeLoadout(readStringArray(incoming.magicLoadout), owner),
-    };
-}
-
-function readLoadoutOwner(character: Record<string, unknown>): { classLineId: string; currentTier: number } | null {
-    const classLineId = typeof character.classKey === 'string'
-        ? character.classKey
-        : typeof character.classLineId === 'string'
-            ? character.classLineId
-            : null;
-    const tier = typeof character.tier === 'number' && Number.isFinite(character.tier)
-        ? character.tier
-        : typeof character.currentTier === 'number' && Number.isFinite(character.currentTier)
-            ? character.currentTier
-            : null;
-    if (!classLineId || tier === null) return null;
-    return { classLineId, currentTier: Math.max(1, Math.floor(tier)) };
-}
-
-function readStringArray(value: unknown[]): string[] {
-    return value.filter((entry): entry is string => typeof entry === 'string');
-}
-
 function bearerToken(request: IncomingMessage): string | null {
     const authorization = request.headers.authorization;
     if (typeof authorization !== 'string') return null;
@@ -633,10 +573,4 @@ function getRefreshTtlMs(options: AuthHttpOptions): number {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null;
-}
-
-class HttpError extends Error {
-    public constructor(public readonly status: number, public readonly code: string, message: string) {
-        super(message);
-    }
 }

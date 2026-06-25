@@ -13,6 +13,7 @@ import {
 } from './MarketData';
 import { getItemDef } from './ItemDB';
 import type { CharacterSave, CharacterSavePatch, InventorySaveItem } from '../net/AuthClient';
+import { createDefaultStashSnapshot } from '../shared/CharacterSaveDefaults';
 
 export interface InventoryItem {
     uid: string;         // Unique ID for this specific instance
@@ -68,6 +69,16 @@ export class PlayerData {
     public equipped: Record<string, InventoryItem | null> = { ...DEFAULT_EQUIPPED };
     private localSaveRevision: number = 0;
     private characterSaveProvider: CharacterSaveProvider | null = null;
+    private authenticatedSession = false;
+    private hubPersistCallback: (() => void) | null = null;
+
+    public setAuthenticatedSession(active: boolean): void {
+        this.authenticatedSession = active;
+    }
+
+    public setHubPersistCallback(callback: (() => void) | null): void {
+        this.hubPersistCallback = callback;
+    }
 
     public setCharacterSaveProvider(provider: CharacterSaveProvider | null): void {
         this.characterSaveProvider = provider;
@@ -120,6 +131,10 @@ export class PlayerData {
     // ═══════════════════════════════════════════════════════════
 
     public save(): void {
+        if (this.authenticatedSession) {
+            this.hubPersistCallback?.();
+            return;
+        }
         const lastSaved = new Date().toISOString();
         const characterSave = this.toCharacterSave(lastSaved, Math.max(1, this.localSaveRevision + 1));
         const runtimePatch = this.characterSaveProvider?.();
@@ -139,6 +154,7 @@ export class PlayerData {
     }
 
     public load(): void {
+        if (this.authenticatedSession) return;
         try {
             const raw = localStorage.getItem(SAVE_KEY);
             if (!raw) return;
@@ -188,6 +204,7 @@ export class PlayerData {
                 height: 6,
                 items: this.inventory.map(toInventorySaveItem),
             },
+            stashSnapshot: createDefaultStashSnapshot(),
             equipment: { ...this.equipped },
             partySnapshot: {
                 activeCharacterIds: [LOCAL_CHARACTER_ID],

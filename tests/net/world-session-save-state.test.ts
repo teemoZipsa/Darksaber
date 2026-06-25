@@ -165,6 +165,27 @@ test('final world save patch cannot persist episode 31 without prior story clear
     assert.notEqual((finalPatch.questState?.completedQuestIds as string[] | undefined)?.includes(scenario.questId), true);
 });
 
+test('world session save patch omits stashSnapshot so DB stash is preserved', () => {
+    const save = createDefaultCharacterSave(authCharacter('hero-stash'));
+    save.stashSnapshot.items.push({
+        itemId: 'herb_cheap',
+        gridX: 0,
+        gridY: 0,
+        quantity: 2,
+        durability: 1,
+    });
+    const player: WorldSessionSavePlayer = {
+        id: 'hero-stash',
+        completedQuestIds: new Set(),
+        raidGoldReward: 0,
+        saveSnapshot: save,
+    };
+    const saveState = new WorldSessionSaveState();
+    const patch = saveState.createPatch(player, player.id, 'central_castle');
+    assert.ok(patch);
+    assert.equal(patch.stashSnapshot, undefined);
+});
+
 function fullInventory(width: number, height: number) {
     const filler = getItemDef('herb_cheap');
     assert.ok(filler);

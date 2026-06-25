@@ -6,11 +6,14 @@ import { ITEMS } from '../src/data/ItemDB';
 import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../src/data/StarterKitData';
 import { createBaseStats, getBaseStatsForClass, type CharacterStats } from '../src/data/Stats';
 import type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
+import { createDefaultStashSnapshot } from '../src/shared/CharacterSaveDefaults';
 import { createPostgresPool } from './PostgresConnection';
 import { applyStoryQuestRewardsToSaveState } from './StoryRewardSave';
 export type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
 
-export const CURRENT_SAVE_VERSION = 1;
+export const CURRENT_SAVE_VERSION = 2;
+
+export { createDefaultStashSnapshot, DEFAULT_STASH_HEIGHT, DEFAULT_STASH_WIDTH } from '../src/shared/CharacterSaveDefaults';
 export const MAX_CHARACTER_SLOTS = 3;
 
 export interface AuthAccount {
@@ -146,6 +149,7 @@ export function createDefaultCharacterSave(character: AuthCharacter, gender: str
             height: 6,
             items: createStarterInventoryItems(),
         },
+        stashSnapshot: createDefaultStashSnapshot(),
         equipment: createStarterEquipment(character.classKey),
         partySnapshot: {
             activeCharacterIds: [character.id],
@@ -167,12 +171,19 @@ export function createDefaultCharacterSave(character: AuthCharacter, gender: str
 }
 
 export function migrateCharacterSave(save: CharacterSave): CharacterSave {
-    if (save.saveVersion >= CURRENT_SAVE_VERSION) return save;
-    return {
-        ...save,
-        saveVersion: CURRENT_SAVE_VERSION,
-        inventory: normalizeInventorySnapshot(save.inventory),
-    };
+    let next: CharacterSave = save.saveVersion >= CURRENT_SAVE_VERSION
+        ? save
+        : {
+            ...save,
+            saveVersion: CURRENT_SAVE_VERSION,
+            inventory: normalizeInventorySnapshot(save.inventory),
+        };
+    if (!next.stashSnapshot) {
+        next = { ...next, stashSnapshot: createDefaultStashSnapshot() };
+    } else {
+        next = { ...next, stashSnapshot: normalizeInventorySnapshot(next.stashSnapshot) };
+    }
+    return next;
 }
 
 export class InMemoryAuthStore implements AuthStore {
@@ -331,6 +342,9 @@ export class InMemoryAuthStore implements AuthStore {
             revision: current.revision + 1,
             updatedAt: new Date().toISOString(),
             inventory: input.patch.inventory ? normalizeInventorySnapshot(input.patch.inventory) : current.inventory,
+            stashSnapshot: input.patch.stashSnapshot
+                ? normalizeInventorySnapshot(input.patch.stashSnapshot)
+                : current.stashSnapshot,
         };
         this.saves.set(characterId, updated);
         return { status: 'updated', save: clone(updated) };
@@ -445,6 +459,11 @@ export class PostgresAuthStore implements AuthStore {
                 flags jsonb NOT NULL,
                 updated_at timestamptz NOT NULL
             );
+        `);
+        await this.pool.query(`
+            ALTER TABLE character_saves
+            ADD COLUMN IF NOT EXISTS stash_snapshot jsonb NOT NULL
+            DEFAULT '{"width":15,"height":10,"items":[]}'::jsonb
         `);
     }
 
@@ -704,6 +723,9 @@ export class PostgresAuthStore implements AuthStore {
                 revision: current.revision + 1,
                 updatedAt: new Date().toISOString(),
                 inventory: input.patch.inventory ? normalizeInventorySnapshot(input.patch.inventory) : current.inventory,
+                stashSnapshot: input.patch.stashSnapshot
+                    ? normalizeInventorySnapshot(input.patch.stashSnapshot)
+                    : current.stashSnapshot,
             };
             await client.query(
                 `UPDATE character_saves
@@ -715,8 +737,9 @@ export class PostgresAuthStore implements AuthStore {
                      equipment = $6::jsonb,
                      party_snapshot = $7::jsonb,
                      roster_snapshot = $8::jsonb,
-                     updated_at = $9
-                 WHERE character_id = $10`,
+                     stash_snapshot = $9::jsonb,
+                     updated_at = $10
+                 WHERE character_id = $11`,
                 [
                     updated.saveVersion,
                     updated.revision,
@@ -726,6 +749,7 @@ export class PostgresAuthStore implements AuthStore {
                     JSON.stringify(updated.equipment),
                     JSON.stringify(updated.partySnapshot),
                     JSON.stringify(updated.rosterSnapshot),
+                    JSON.stringify(updated.stashSnapshot),
                     updated.updatedAt,
                     characterId,
                 ]
@@ -812,8 +836,9 @@ export class PostgresAuthStore implements AuthStore {
                      equipment = $6::jsonb,
                      party_snapshot = $7::jsonb,
                      roster_snapshot = $8::jsonb,
-                     updated_at = $9
-                 WHERE character_id = $10`,
+                     stash_snapshot = $9::jsonb,
+                     updated_at = $10
+                 WHERE character_id = $11`,
                 [
                     result.save.saveVersion,
                     result.save.revision,
@@ -823,6 +848,7 @@ export class PostgresAuthStore implements AuthStore {
                     JSON.stringify(result.save.equipment),
                     JSON.stringify(result.save.partySnapshot),
                     JSON.stringify(result.save.rosterSnapshot),
+                    JSON.stringify(result.save.stashSnapshot),
                     result.save.updatedAt,
                     characterId,
                 ]
@@ -992,7 +1018,7 @@ function buildRaidSurvivalSave(
     };
 }
 
-function normalizeInventorySnapshot(snapshot: InventorySaveSnapshot): InventorySaveSnapshot {
+export function normalizeInventorySnapshot(snapshot: InventorySaveSnapshot): InventorySaveSnapshot {
     const width = clampInt(snapshot.width, 1, 20, 10);
     const height = clampInt(snapshot.height, 1, 20, 6);
     const items = Array.isArray(snapshot.items) ? snapshot.items : [];
@@ -1100,6 +1126,9 @@ function saveFromRow(row: Record<string, unknown>): CharacterSave {
         hubLocation: toRecord(row.hub_location),
         questState: toRecord(row.quest_state),
         inventory: normalizeInventorySnapshot(row.inventory as InventorySaveSnapshot),
+        stashSnapshot: normalizeInventorySnapshot(
+            (row.stash_snapshot as InventorySaveSnapshot | undefined) ?? createDefaultStashSnapshot()
+        ),
         equipment: toRecord(row.equipment),
         partySnapshot: toRecord(row.party_snapshot),
         rosterSnapshot: toRecord(row.roster_snapshot),
@@ -1131,8 +1160,8 @@ function toIso(value: unknown): string {
 
 async function insertSave(client: PoolClient, save: CharacterSave): Promise<void> {
     await client.query(
-        `INSERT INTO character_saves (character_id, save_version, revision, hub_location, quest_state, inventory, equipment, party_snapshot, roster_snapshot, updated_at)
-         VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10)`,
+        `INSERT INTO character_saves (character_id, save_version, revision, hub_location, quest_state, inventory, equipment, party_snapshot, roster_snapshot, stash_snapshot, updated_at)
+         VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb, $11)`,
         [
             save.characterId,
             save.saveVersion,
@@ -1143,6 +1172,7 @@ async function insertSave(client: PoolClient, save: CharacterSave): Promise<void
             JSON.stringify(save.equipment),
             JSON.stringify(save.partySnapshot),
             JSON.stringify(save.rosterSnapshot),
+            JSON.stringify(save.stashSnapshot),
             save.updatedAt,
         ]
     );
