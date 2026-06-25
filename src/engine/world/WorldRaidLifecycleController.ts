@@ -244,6 +244,7 @@ export class WorldRaidLifecycleController {
     }
 
     private async finishNetworkRaidResult(result: RaidResultMessage): Promise<void> {
+        const goldBeforeSync = this.context.playerData.gold;
         const syncResult = await this.context.gameManager.syncHubSaveFromServer();
         this.context.gameManager.setHubFlushEnabled(true);
         if (!syncResult.ok) {
@@ -251,7 +252,14 @@ export class WorldRaidLifecycleController {
         }
         if (result.result === 'SURVIVED') {
             const town = this.context.getTownById(result.extractionTownId) ?? this.context.getCurrentHubTown();
-            this.context.raidOutcomeController.completeSuccess(town, { serverAuthoritativeRewards: true });
+            const displayGoldReward = syncResult.ok
+                ? Math.max(0, this.context.playerData.gold - goldBeforeSync)
+                : undefined;
+            this.context.raidOutcomeController.completeSuccess(town, {
+                serverAuthoritativeRewards: true,
+                displayGoldReward,
+                firstSurvivalBonus: result.firstSurvivalBonusGranted === true,
+            });
         } else if (result.result === 'DEAD' || result.result === 'MIA') {
             this.context.raidOutcomeController.completeFailure(result.result);
         } else {

@@ -5,6 +5,7 @@ import { createDefaultCharacterSave, type AuthCharacter } from '../../server/Aut
 import { createBaseStats } from '../../src/data/Stats';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import { getItemDef } from '../../src/data/ItemDB';
+import { FIRST_SURVIVAL_GOLD_REWARD, FIRST_SURVIVAL_QUEST_ID } from '../../src/shared/FirstSurvivalReward';
 
 function authCharacter(id: string): AuthCharacter {
     return {
@@ -184,6 +185,73 @@ test('world session save patch omits stashSnapshot so DB stash is preserved', ()
     const patch = saveState.createPatch(player, player.id, 'central_castle');
     assert.ok(patch);
     assert.equal(patch.stashSnapshot, undefined);
+});
+
+test('final world save patch grants the first-survival bonus exactly once', () => {
+    const firstSave = createDefaultCharacterSave(authCharacter('hero-first'));
+    const firstPlayer: WorldSessionSavePlayer = {
+        id: 'hero-first',
+        completedQuestIds: new Set<string>(),
+        raidGoldReward: 0,
+        saveSnapshot: firstSave,
+    };
+    const saveState = new WorldSessionSaveState();
+    saveState.captureFinalPatch(firstPlayer, 'central_castle', true);
+    const firstPatch = saveState.consumeFinalPatch(firstPlayer.id);
+    assert.ok(firstPatch);
+    assert.equal(firstPatch.questState?.gold, FIRST_SURVIVAL_GOLD_REWARD);
+    assert.ok((firstPatch.questState?.completedQuestIds as string[]).includes(FIRST_SURVIVAL_QUEST_ID));
+
+    // A character that already holds the marker must not be re-credited.
+    const repeatSave = createDefaultCharacterSave(authCharacter('hero-repeat'));
+    repeatSave.questState = { ...repeatSave.questState, completedQuestIds: [FIRST_SURVIVAL_QUEST_ID], gold: 500 };
+    const repeatPlayer: WorldSessionSavePlayer = {
+        id: 'hero-repeat',
+        completedQuestIds: new Set([FIRST_SURVIVAL_QUEST_ID]),
+        raidGoldReward: 0,
+        saveSnapshot: repeatSave,
+    };
+    saveState.captureFinalPatch(repeatPlayer, 'central_castle', true);
+    const repeatPatch = saveState.consumeFinalPatch(repeatPlayer.id);
+    assert.ok(repeatPatch);
+    assert.equal(repeatPatch.questState?.gold, 500);
+});
+
+test('save state reports first-survival bonus eligibility once per character', () => {
+    const saveState = new WorldSessionSaveState();
+    const fresh: WorldSessionSavePlayer = {
+        id: 'hero-fresh',
+        completedQuestIds: new Set<string>(),
+        raidGoldReward: 0,
+        saveSnapshot: createDefaultCharacterSave(authCharacter('hero-fresh')),
+    };
+    assert.equal(saveState.grantsFirstSurvivalBonus(fresh), true);
+
+    const veteranSave = createDefaultCharacterSave(authCharacter('hero-veteran'));
+    veteranSave.questState = { ...veteranSave.questState, completedQuestIds: [FIRST_SURVIVAL_QUEST_ID] };
+    const veteran: WorldSessionSavePlayer = {
+        id: 'hero-veteran',
+        completedQuestIds: new Set([FIRST_SURVIVAL_QUEST_ID]),
+        raidGoldReward: 0,
+        saveSnapshot: veteranSave,
+    };
+    assert.equal(saveState.grantsFirstSurvivalBonus(veteran), false);
+});
+
+test('first-survival bonus stacks on top of raid gold reward', () => {
+    const save = createDefaultCharacterSave(authCharacter('hero-gold'));
+    save.questState = { ...save.questState, completedQuestIds: [], gold: 100 };
+    const player: WorldSessionSavePlayer = {
+        id: 'hero-gold',
+        completedQuestIds: new Set<string>(),
+        raidGoldReward: 250,
+        saveSnapshot: save,
+    };
+    const saveState = new WorldSessionSaveState();
+    saveState.captureFinalPatch(player, 'central_castle', true);
+    const patch = saveState.consumeFinalPatch(player.id);
+    assert.ok(patch);
+    assert.equal(patch.questState?.gold, 100 + 250 + FIRST_SURVIVAL_GOLD_REWARD);
 });
 
 function fullInventory(width: number, height: number) {

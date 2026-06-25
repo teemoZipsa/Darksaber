@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { InMemoryAuthStore, normalizeLoginName } from '../../server/AuthStore';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import { getItemDef } from '../../src/data/ItemDB';
+import { FIRST_SURVIVAL_QUEST_ID } from '../../src/shared/FirstSurvivalReward';
 
 test('auth store raid survival persists story inventory and companion rewards', async () => {
     const store = new InMemoryAuthStore();
@@ -104,6 +105,38 @@ test('auth store raid survival cannot persist episode 31 without prior story cle
     assert.ok(updatedSave);
     assert.notEqual((updatedSave.questState.completedQuestIds as string[] | undefined)?.includes(scenario.questId), true);
     assert.equal(progress.completedQuests.includes(scenario.questId), false);
+});
+
+test('auth store raid survival preserves the per-character first-survival marker', async () => {
+    const store = new InMemoryAuthStore();
+    await store.initialize();
+    const account = await store.createAccount({
+        loginName: 'FirstSurvivalUser',
+        loginNameNormalized: normalizeLoginName('FirstSurvivalUser'),
+        passwordHash: 'hash',
+    });
+    const { character } = await store.createCharacter(account.id, {
+        name: 'Hero',
+        classKey: 'infantry',
+        gender: 'M',
+    });
+    const save = await store.getCharacterSave(account.id, character.id);
+    assert.ok(save);
+
+    // Simulate the survival flush having already recorded the first-survival marker.
+    await store.updateCharacterSave(account.id, character.id, {
+        expectedRevision: save.revision,
+        patch: {
+            questState: { ...save.questState, completedQuestIds: [FIRST_SURVIVAL_QUEST_ID] },
+        },
+    });
+
+    // Account-progress reconciliation (Path 2) must not strip it on the next survival.
+    await store.recordRaidSurvival(account.id, character.id, [], 'w_forest_village');
+
+    const updatedSave = await store.getCharacterSave(account.id, character.id);
+    assert.ok(updatedSave);
+    assert.ok((updatedSave.questState.completedQuestIds as string[]).includes(FIRST_SURVIVAL_QUEST_ID));
 });
 
 function fullInventory(width: number, height: number) {

@@ -1,4 +1,5 @@
 import { getItemDef } from '../src/data/ItemDB';
+import { FIRST_SURVIVAL_GOLD_REWARD, FIRST_SURVIVAL_QUEST_ID } from '../src/shared/FirstSurvivalReward';
 import type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from './AuthStore';
 import { applyStoryQuestRewardsToSaveState } from './StoryRewardSave';
 
@@ -74,6 +75,11 @@ export class WorldSessionSaveState {
         return this.finalPatches.has(playerId);
     }
 
+    /** Whether a survival flush for this player would grant the first-survival bonus. */
+    public grantsFirstSurvivalBonus(player: WorldSessionSavePlayer): boolean {
+        return !hasClaimedFirstSurvival(player);
+    }
+
     public consumeFinalPatch(playerId: string): WorldCharacterSavePatch | null {
         const patch = this.finalPatches.get(playerId) ?? null;
         this.finalPatches.delete(playerId);
@@ -132,6 +138,7 @@ export class WorldSessionSaveState {
             const previousQuestIds = new Set(normalizeStringArray(save.questState.completedQuestIds));
             const blockableQuestIds = new Set([...player.completedQuestIds].filter((questId) => !previousQuestIds.has(questId)));
             applyStoryQuestRewardsToSaveState(player.completedQuestIds, questState, inventory, rosterSnapshot, blockableQuestIds);
+            grantFirstSurvivalReward(player, questState);
         }
         const hubLocation = {
             ...cloneRecord(save.hubLocation),
@@ -147,6 +154,23 @@ export class WorldSessionSaveState {
             rosterSnapshot,
         };
     }
+}
+
+function hasClaimedFirstSurvival(player: WorldSessionSavePlayer): boolean {
+    if (player.completedQuestIds.has(FIRST_SURVIVAL_QUEST_ID)) return true;
+    const save = player.saveSnapshot;
+    return save ? normalizeStringArray(save.questState.completedQuestIds).includes(FIRST_SURVIVAL_QUEST_ID) : false;
+}
+
+function grantFirstSurvivalReward(
+    player: WorldSessionSavePlayer,
+    questState: Record<string, unknown>
+): void {
+    if (hasClaimedFirstSurvival(player)) return;
+    questState.gold = normalizeGoldValue(questState.gold) + FIRST_SURVIVAL_GOLD_REWARD;
+    const completed = new Set(normalizeStringArray(questState.completedQuestIds));
+    completed.add(FIRST_SURVIVAL_QUEST_ID);
+    questState.completedQuestIds = [...completed];
 }
 
 function tryAddPlacedItemToInventory(

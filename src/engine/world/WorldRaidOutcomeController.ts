@@ -27,6 +27,7 @@ import {
     snapshotPlacedItem,
 } from '../../raid/RaidOutcome';
 import { RaidResultUI } from '../../ui/RaidResultUI';
+import { FIRST_SURVIVAL_GOLD_REWARD, FIRST_SURVIVAL_QUEST_ID } from '../../shared/FirstSurvivalReward';
 import type { GameManager } from '../GameManager';
 import type { InputManager } from '../InputManager';
 import type { WorldPhase, WorldRaidSession } from './WorldRaidSession';
@@ -58,6 +59,19 @@ export interface WorldRaidOutcomeContext {
 export interface CompleteSuccessOptions {
     /** Server survival flush already applied gold, story rewards, and raid inventory. */
     serverAuthoritativeRewards?: boolean;
+    /**
+     * Gold actually granted by the server this raid (measured as the hub-save
+     * sync delta). Used only with {@link serverAuthoritativeRewards} so the
+     * result screen reports the authoritative total, including the server-side
+     * first-survival bonus the client no longer credits.
+     */
+    displayGoldReward?: number;
+    /**
+     * Whether the server granted the one-time first-survival bonus this raid.
+     * Used only with {@link serverAuthoritativeRewards} to itemize the bonus on
+     * the result screen (the client no longer decides this for network raids).
+     */
+    firstSurvivalBonus?: boolean;
 }
 
 export class WorldRaidOutcomeController {
@@ -99,12 +113,17 @@ export class WorldRaidOutcomeController {
         if (!serverRewards && raidGoldReward > 0) {
             this.context.playerData.addGold(raidGoldReward);
         }
-        let goldReward = raidGoldReward;
+        let goldReward = serverRewards && options.displayGoldReward !== undefined
+            ? options.displayGoldReward
+            : raidGoldReward;
 
-        if (!serverRewards && !this.context.playerData.isCleared('quest:first_survival')) {
-            this.context.playerData.markCleared('quest:first_survival');
-            this.context.playerData.addGold(200);
-            goldReward += 200;
+        if (!serverRewards && !this.context.playerData.isCleared(FIRST_SURVIVAL_QUEST_ID)) {
+            this.context.playerData.markCleared(FIRST_SURVIVAL_QUEST_ID);
+            this.context.playerData.addGold(FIRST_SURVIVAL_GOLD_REWARD);
+            goldReward += FIRST_SURVIVAL_GOLD_REWARD;
+            questRewards.push(formatT('raid.outcome.firstSurvivalQuest', { completed: t('quest.completed') }));
+        }
+        if (serverRewards && options.firstSurvivalBonus) {
             questRewards.push(formatT('raid.outcome.firstSurvivalQuest', { completed: t('quest.completed') }));
         }
         if (!serverRewards) {

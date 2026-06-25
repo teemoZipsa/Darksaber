@@ -10,6 +10,7 @@ import { WorldResumeFailedError, WorldSession } from '../../server/WorldSession'
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
 import { getItemDef } from '../../src/data/ItemDB';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
+import { FIRST_SURVIVAL_QUEST_ID } from '../../src/shared/FirstSurvivalReward';
 import { getStoryScenarioMonsterLayout } from '../../src/data/StoryScenarioMonsterData';
 import { getStoryScenarioEventSequence, getStoryScenarioPresentationDurationMs } from '../../src/data/StoryScenarioEventData';
 import { getStoryScenarioFieldEventFlag, getStoryScenarioFieldEventTiles } from '../../src/data/StoryScenarioFieldEventPlacement';
@@ -1072,7 +1073,7 @@ test('server late story boss clears secure original EVENT 99 rewards only after 
         );
         assert.deepEqual(
             finalQuestState.completedQuestIds,
-            [...completedQuestIds, scenario.questId],
+            [...completedQuestIds, scenario.questId, FIRST_SURVIVAL_QUEST_ID],
             `episode ${episode} survived final patch includes raid quest completion`
         );
     }
@@ -1693,7 +1694,7 @@ test('server story objectives through episode 31 persist only after valid surviv
         assert.ok(finalPatch?.questState, `episode ${scenario.episode} final quest patch`);
         assert.deepEqual(
             finalPatch.questState.completedQuestIds,
-            [...completedQuestIds, scenario.questId],
+            [...completedQuestIds, scenario.questId, FIRST_SURVIVAL_QUEST_ID],
             `episode ${scenario.episode} survived final patch includes raid quest completion`
         );
     }
@@ -1790,7 +1791,8 @@ test('server-authoritative field scenario events complete per player without tru
     assert.equal(leave.replies[0]?.type === 'RAID_RESULT' ? leave.replies[0].result : '', 'SURVIVED');
     const finalPatch = session.createCharacterSavePatch(joinedA.playerId);
     assert.ok(finalPatch?.questState);
-    assert.equal(finalPatch.questState.gold, 600);
+    // 500 base + 100 scenario gold + 200 first-survival bonus.
+    assert.equal(finalPatch.questState.gold, 800);
 });
 
 test('server-authoritative original MAGIC field traps damage the actor once', () => {
@@ -1997,9 +1999,10 @@ test('server-authoritative SCENECLEAR field events complete scenario objectives'
     const leave = session.handleMessage(joined.playerId, { type: 'WORLD_LEAVE', reason: 'town' }, 1_300);
     assert.equal(leave.replies[0]?.type, 'RAID_RESULT');
     assert.equal(leave.replies[0]?.type === 'RAID_RESULT' ? leave.replies[0].result : '', 'SURVIVED');
+    assert.equal(leave.replies[0]?.type === 'RAID_RESULT' ? leave.replies[0].firstSurvivalBonusGranted : undefined, true);
     const finalPatch = session.createCharacterSavePatch(joined.playerId);
     assert.ok(finalPatch?.questState);
-    assert.deepEqual(finalPatch.questState.completedQuestIds, [...completedQuestIds, scenario.questId]);
+    assert.deepEqual(finalPatch.questState.completedQuestIds, [...completedQuestIds, scenario.questId, FIRST_SURVIVAL_QUEST_ID]);
 });
 
 test('server-authoritative field scenario gold rewards are lost on failed raids', () => {

@@ -7,6 +7,7 @@ import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM
 import { createBaseStats, getBaseStatsForClass, type CharacterStats } from '../src/data/Stats';
 import type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
 import { createDefaultStashSnapshot } from '../src/shared/CharacterSaveDefaults';
+import { FIRST_SURVIVAL_QUEST_ID } from '../src/shared/FirstSurvivalReward';
 import { createPostgresPool } from './PostgresConnection';
 import { applyStoryQuestRewardsToSaveState } from './StoryRewardSave';
 export type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
@@ -991,9 +992,19 @@ function buildRaidSurvivalSave(
     updatedAt: string,
     blockableQuestIds: ReadonlySet<string>
 ): { save: CharacterSave; blockedQuestIds: string[] } {
+    // The first-survival marker is a per-character completion that does not
+    // flow through account progress or the raid message, so preserve it here;
+    // otherwise this account-progress reconciliation would strip it and the
+    // bonus would be re-granted on the next survival.
+    const existingQuestIds = Array.isArray(save.questState.completedQuestIds)
+        ? (save.questState.completedQuestIds as unknown[]).filter((entry): entry is string => typeof entry === 'string')
+        : [];
+    const preservedQuestIds = existingQuestIds.includes(FIRST_SURVIVAL_QUEST_ID)
+        ? [...mergedQuestIds, FIRST_SURVIVAL_QUEST_ID]
+        : mergedQuestIds;
     const questState = {
         ...clone(save.questState),
-        completedQuestIds: uniqueStrings(mergedQuestIds),
+        completedQuestIds: uniqueStrings(preservedQuestIds),
     };
     const inventory = normalizeInventorySnapshot(save.inventory);
     const rosterSnapshot = clone(save.rosterSnapshot);

@@ -334,6 +334,8 @@ export interface RaidResultMessage {
     departureTownId: string;
     extractionTownId: string;
     completedDungeonIds: string[];
+    /** Set when this survival granted the one-time first-survival gold bonus. */
+    firstSurvivalBonusGranted?: boolean;
 }
 
 export type ScenarioFieldEventScope = 'player' | 'shared';

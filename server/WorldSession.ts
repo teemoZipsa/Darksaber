@@ -1447,6 +1447,9 @@ export class WorldSession {
         this.log(`raid result player=${playerId} result=${finalResult} kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
         if (player) {
             const survived = finalResult === 'SURVIVED';
+            if (survived) {
+                message.firstSurvivalBonusGranted = this.saveState.grantsFirstSurvivalBonus(player);
+            }
             this.saveState.captureFinalPatch(player, survived ? extractionTownId : undefined, survived);
             this.saveState.markDirty(playerId);
         }
@@ -1469,6 +1472,7 @@ export class WorldSession {
         };
         this.log(`raid result player=${playerId} result=SURVIVED reason=server_shutdown kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
         if (player) {
+            message.firstSurvivalBonusGranted = this.saveState.grantsFirstSurvivalBonus(player);
             this.saveState.captureFinalPatch(player, extractionTownId, true);
             this.saveState.markDirty(playerId);
         }
