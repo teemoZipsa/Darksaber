@@ -138,6 +138,15 @@ written to the database and is accepted before or after `WORLD_JOIN`. WebSocket
 close/reconnect clears and recreates the client timer so duplicate heartbeats do
 not accumulate.
 
+Do not attach external uptime monitors, scheduled pings, deploy hooks, or other
+cron jobs to `/`, `/healthz`, or `/metrics` on the Render host while using a Free
+Web Service. Those requests keep the instance awake and can exhaust the free
+runtime quota even when nobody is playing. Render's `healthCheckPath` is still
+safe to keep in `render.yaml`; it is for Render's own service health check and is
+not a public keepalive policy. The server's internal world tick, snapshot, save,
+and WebSocket maintenance timers also return immediately when there are no
+sessions, pending saves, or clients.
+
 During graceful shutdown, the world server rejects new joins, force-extracts
 active raids as `SURVIVED` to the departure town, emits a final `RAID_RESULT`,
 and flushes the resulting character save patches before closing sockets. This

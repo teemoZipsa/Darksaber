@@ -223,7 +223,8 @@ wss.on('connection', (ws: WebSocket, request) => {
     });
 });
 
-setInterval(() => {
+startServerInterval(() => {
+    if (sessions.size === 0 && wss.clients.size === 0) return;
     const tickStartedAt = Date.now();
     const now = Date.now();
     const marketUpdate = marketSession.tick(now);
@@ -250,11 +251,13 @@ setInterval(() => {
     metrics.worldTickDurationMs = Date.now() - tickStartedAt;
 }, WORLD_TICK_MS);
 
-setInterval(() => {
+startServerInterval(() => {
+    if (sessions.size === 0) return;
     void persistAllWorldSessionSnapshots('interval');
 }, WORLD_SESSION_SNAPSHOT_MS);
 
-setInterval(() => {
+startServerInterval(() => {
+    if (saveTrackers.size === 0) return;
     const now = Date.now();
     for (const tracker of saveTrackers.values()) {
         if (!tracker.dirty || tracker.saving) continue;
@@ -264,7 +267,8 @@ setInterval(() => {
 }, Math.min(30_000, WORLD_SAVE_AUTOSAVE_MS));
 
 if (ENABLE_DEBUG_COUNTS) {
-    setInterval(() => {
+    startServerInterval(() => {
+        if (sessions.size === 0) return;
         for (const [sessionKey, session] of sessions) {
             const counts = session.getDebugCounts();
             logServerEvent('info', 'world_session_debug_counts', { sessionKey, ...counts });
@@ -272,7 +276,8 @@ if (ENABLE_DEBUG_COUNTS) {
     }, 5_000);
 }
 
-setInterval(() => {
+startServerInterval(() => {
+    if (wss.clients.size === 0) return;
     const now = Date.now();
     for (const ws of wss.clients) {
         const state = socketRateLimits.get(ws);
@@ -1134,6 +1139,11 @@ function clampInt(value: number, min: number, max: number): number {
 
 function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function startServerInterval(callback: () => void, ms: number): void {
+    const interval = setInterval(callback, ms);
+    interval.unref();
 }
 
 function resolveServerPersistPath(envPath: string | undefined, fallbackRelative: string): string {
