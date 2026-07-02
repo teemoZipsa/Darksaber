@@ -1,7 +1,8 @@
-import { formatT, t } from '../../i18n/LanguageManager';
+import { formatT, i18n, t } from '../../i18n/LanguageManager';
 import type { PartyManager } from '../../character/PartyManager';
 import type { PlayerData } from '../../data/PlayerData';
 import { HybridMarketService } from '../../data/HybridMarketService';
+import { getItemDef, type ItemDef } from '../../data/ItemDB';
 import type { MarketService } from '../../data/MarketService';
 import { getRestMenu, INJURY_TREATMENT_PRICE, type RestMenu } from '../../data/RestFacilityData';
 import {
@@ -41,6 +42,20 @@ export interface WorldTownSessionOptions {
     useServerMarket?: boolean;
     onDeploy: () => void;
     log: (message: string) => void;
+}
+
+export interface MerchantContractView {
+    id: string;
+    targetTownId: string;
+    item: ItemDef;
+    requiredQuantity: number;
+    ownedQuantity: number;
+    bonusPerUnit: number;
+    baseReward: number;
+    bonusReward: number;
+    totalReward: number;
+    expiresInCycles: number;
+    canComplete: boolean;
 }
 
 export class WorldTownSession {
@@ -176,6 +191,57 @@ export class WorldTownSession {
 
     public countFacilityCostItem(itemId: string): number {
         return this.countTownItem(itemId);
+    }
+
+    public getMerchantContractViews(): MerchantContractView[] {
+        const townId = this.ui.getCurrentTown()?.id;
+        if (!townId) return [];
+        return this.marketService.getActiveContracts(townId).flatMap((contract) => {
+            const item = getItemDef(contract.itemId);
+            if (!item) return [];
+            const requiredQuantity = Math.max(1, Math.floor(contract.remainingQuantity));
+            const ownedQuantity = this.countTownItem(item.id);
+            const baseUnit = getBaseSellPrice(item, townId);
+            const quote = this.marketService.getSellQuote(item, baseUnit, townId, requiredQuantity);
+            const bonusReward = Math.max(0, quote.bonusPrice || requiredQuantity * contract.bonusPerUnit);
+            return [{
+                id: contract.id,
+                targetTownId: contract.targetTownId,
+                item,
+                requiredQuantity,
+                ownedQuantity,
+                bonusPerUnit: contract.bonusPerUnit,
+                baseReward: baseUnit * requiredQuantity,
+                bonusReward,
+                totalReward: quote.totalPrice || baseUnit * requiredQuantity + bonusReward,
+                expiresInCycles: Math.max(0, contract.expiresCycle - this.playerData.marketCycle),
+                canComplete: ownedQuantity >= requiredQuantity,
+            }];
+        });
+    }
+
+    public completeMerchantContract(contractId: string): boolean {
+        const townId = this.ui.getCurrentTown()?.id;
+        if (!townId) return false;
+        const contract = this.marketService.getActiveContracts(townId).find((candidate) => candidate.id === contractId);
+        if (!contract) return false;
+        const item = getItemDef(contract.itemId);
+        if (!item) return false;
+
+        const quantity = Math.max(1, Math.floor(contract.remainingQuantity));
+        if (this.countTownItem(item.id) < quantity) {
+            this.log(t('merchantContract.notEnough'));
+            return false;
+        }
+
+        const baseUnit = getBaseSellPrice(item, townId);
+        const quote = this.marketService.getSellQuote(item, baseUnit, townId, quantity);
+        this.consumeTownItem(item.id, quantity);
+        this.playerData.addGold(quote.totalPrice);
+        this.marketService.recordSell(townId, item.id, quantity);
+        this.playerData.save();
+        this.log(formatT('merchantContract.completedLog', { item: i18n.lang === 'ko' ? item.nameKr : item.name, gold: quote.totalPrice }));
+        return true;
     }
 
     public applyPendingRestPreview(): void {

@@ -5,6 +5,7 @@ import { PartyManager } from '../../src/character/PartyManager';
 import { createStatus, hasStatus } from '../../src/combat/StatusEffects';
 import { PlayerData } from '../../src/data/PlayerData';
 import { getItemDef } from '../../src/data/ItemDB';
+import { getSellPrice } from '../../src/data/ShopData';
 import { GridInventory } from '../../src/inventory/GridInventory';
 import { WorldTownSession } from '../../src/engine/world/WorldTownSession';
 import { TownUI, TOWN_DEPLOY_CLICK_GUARD_MS } from '../../src/ui/TownUI';
@@ -25,6 +26,15 @@ const KAOSIA: TownInfo = {
     nameKr: '카오시아',
     chunkX: 37,
     chunkY: 44,
+    radius: 3,
+};
+
+const COAST: TownInfo = {
+    id: 's_coast_town',
+    name: 'South Coast',
+    nameKr: '남부 해안',
+    chunkX: 37,
+    chunkY: 48,
     radius: 3,
 };
 
@@ -107,6 +117,55 @@ test('world town session upgrades facilities with delivered loot and applies dis
     assert.equal(playerData.facilityUpgrades.workshop, 1);
     assert.equal(playerData.gold, 50);
     assert.equal(stash.items.some((placed) => placed.item.id === 'repair_kit'), false);
+});
+
+test('world town session completes repeat merchant contracts from backpack and stash', () => {
+    const party = new PartyManager();
+    const character = new Character('hero-1', 'Hero', 'infantry');
+    party.addToRoster(character);
+    party.deployCharacter(character);
+
+    const playerData = new PlayerData();
+    playerData.gold = 100;
+    playerData.marketCycle = 1;
+    const resin = getItemDef('trade_forest_resin');
+    assert.ok(resin);
+    playerData.marketContracts = [{
+        id: 'coast-resin-contract',
+        targetTownId: COAST.id,
+        itemId: resin.id,
+        remainingQuantity: 3,
+        bonusPerUnit: 11,
+        expiresCycle: 5,
+    }];
+
+    const inventory = new GridInventory(10, 6);
+    const stash = new GridInventory(10, 6);
+    inventory.autoPlace(resin)!.quantity = 1;
+    stash.autoPlace(resin)!.quantity = 2;
+    const logs: string[] = [];
+    const session = new WorldTownSession({
+        party,
+        playerData,
+        gameManager: { inventory, stash },
+        onDeploy: () => undefined,
+        log: (message) => logs.push(message),
+    });
+    session.ui.show(COAST);
+
+    const view = session.getMerchantContractViews().find((contract) => contract.id === 'coast-resin-contract');
+    assert.ok(view);
+    assert.equal(view.ownedQuantity, 3);
+    assert.equal(view.canComplete, true);
+
+    const expectedReward = getSellPrice(resin, COAST.id) * 3 + 33;
+    assert.equal(session.completeMerchantContract('coast-resin-contract'), true);
+
+    assert.equal(playerData.gold, 100 + expectedReward);
+    assert.equal(inventory.items.some((placed) => placed.item.id === resin.id), false);
+    assert.equal(stash.items.some((placed) => placed.item.id === resin.id), false);
+    assert.equal(playerData.marketContracts.some((contract) => contract.id === 'coast-resin-contract'), false);
+    assert.ok(logs.some((message) => message.includes('납품 의뢰 완료')));
 });
 
 test('town deploy ignores click-through immediately after opening', () => {

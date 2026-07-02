@@ -953,7 +953,7 @@
 
 /* ─── Quest board ───────────────────────────────────────────── */
 #ui-overlay .ds-quest { display: flex; flex-direction: column; max-height: 80vh; }
-#ui-overlay .ds-quest__body { display: flex; flex-direction: column; gap: 10px; padding: 16px 22px 12px; overflow-y: auto; }
+#ui-overlay .ds-quest__body { display: flex; flex-direction: column; gap: 10px; padding: 16px 22px 12px; overflow-y: auto; flex: 1; min-height: 0; }
 #ui-overlay .ds-quest__row {
     display: flex; align-items: center; gap: 12px;
     background: var(--ds-panel-inset); border: 1px solid var(--ds-border-shadow);
@@ -972,6 +972,87 @@
 #ui-overlay .ds-quest__state { font-size: 11px; color: var(--ds-accent-bright); white-space: nowrap; }
 #ui-overlay .ds-quest__reward { font-size: 12px; color: var(--ds-accent); flex: none; }
 #ui-overlay .ds-quest__note { text-align: center; font-size: 11px; color: var(--ds-text-dim); padding-top: 6px; }
+#ui-overlay .ds-contracts {
+    border-top: 1px solid var(--ds-border-shadow);
+    padding: 12px 22px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+#ui-overlay .ds-contracts__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--ds-accent);
+    font-size: 13px;
+    font-weight: 600;
+}
+#ui-overlay .ds-contracts__head span:last-child {
+    color: var(--ds-text-dim);
+    font-size: 11px;
+    font-weight: 400;
+}
+#ui-overlay .ds-contracts__list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+#ui-overlay .ds-contracts__empty {
+    color: var(--ds-text-dim);
+    font-size: 12px;
+    text-align: center;
+    padding: 10px 0;
+}
+#ui-overlay .ds-contracts__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+    background: var(--ds-panel-inset);
+}
+#ui-overlay .ds-contracts__row.is-ready {
+    border-color: var(--ds-accent);
+    background: var(--ds-accent-soft);
+}
+#ui-overlay .ds-contracts__main {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    flex: 1;
+}
+#ui-overlay .ds-contracts__name {
+    color: var(--ds-text);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#ui-overlay .ds-contracts__meta {
+    color: var(--ds-text-dim);
+    font-size: 11px;
+}
+#ui-overlay .ds-contracts__reward {
+    color: var(--ds-accent-bright);
+    font-size: 11px;
+}
+#ui-overlay .ds-contracts__row .ds-btn {
+    min-width: 72px;
+    padding: 7px 10px;
+    font-size: 11px;
+}
+#ui-overlay .ds-contracts__feedback {
+    min-height: 16px;
+    color: var(--ds-accent);
+    font-size: 12px;
+    text-align: center;
+}
 #ui-overlay .ds-journal { display: flex; flex-direction: column; max-height: 82vh; }
 #ui-overlay .ds-journal__footer {
     border-top: 1px solid var(--ds-border-shadow);

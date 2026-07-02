@@ -1250,6 +1250,16 @@ export const I18N_STRINGS: TranslationTable = {
         'market.rumor.export': '{origin}의 {item}은 {town}에서 값을 더 쳐준다고 합니다.',
         'market.rumor.hot': '{town} 상인들이 요즘 {item}을 더 찾는다고 합니다.',
         'market.rumor.cooling': '{town}에는 {item} 물량이 풀려 값이 식었다고 합니다.',
+        'merchantContract.title': '상인 반복 의뢰',
+        'merchantContract.repeatable': '시장 사이클마다 갱신',
+        'merchantContract.empty': '현재 이 마을에서 받는 납품 의뢰가 없습니다.',
+        'merchantContract.deliverItem': '{item} x{quantity} 납품',
+        'merchantContract.owned': '보유 {owned}/{required}',
+        'merchantContract.expires': '{cycles}사이클 후 만료',
+        'merchantContract.turnIn': '납품',
+        'merchantContract.completed': '의뢰를 완료했습니다.',
+        'merchantContract.notEnough': '납품할 물품이 부족합니다.',
+        'merchantContract.completedLog': '{item} 납품 의뢰 완료 +{gold}G',
 
         // Rest facilities
         'tab.rest': '휴식',
@@ -3243,6 +3253,16 @@ export const I18N_STRINGS: TranslationTable = {
         'market.rumor.export': '{item} from {origin} fetches a better price in {town}.',
         'market.rumor.hot': 'Merchants in {town} are looking for more {item}.',
         'market.rumor.cooling': '{item} has flooded {town}, cooling its price.',
+        'merchantContract.title': 'Repeat Merchant Contracts',
+        'merchantContract.repeatable': 'Refreshes with market cycles',
+        'merchantContract.empty': 'No delivery contracts are active in this town.',
+        'merchantContract.deliverItem': 'Deliver {item} x{quantity}',
+        'merchantContract.owned': 'Owned {owned}/{required}',
+        'merchantContract.expires': 'Expires in {cycles} cycles',
+        'merchantContract.turnIn': 'Deliver',
+        'merchantContract.completed': 'Contract completed.',
+        'merchantContract.notEnough': 'Not enough goods to deliver.',
+        'merchantContract.completedLog': 'Completed {item} delivery contract +{gold}G',
 
         // Rest facilities
         'tab.rest': 'Rest',

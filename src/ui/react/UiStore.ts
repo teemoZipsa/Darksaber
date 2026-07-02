@@ -13,7 +13,7 @@
 
 import type { GameManager } from '../../engine/GameManager';
 import type { Character } from '../../character/Character';
-import type { WorldTownSession } from '../../engine/world/WorldTownSession';
+import type { MerchantContractView, WorldTownSession } from '../../engine/world/WorldTownSession';
 import type { TownTab } from '../../ui/TownUI';
 import type { ShopEntry, SellEntry } from '../../ui/ShopUI';
 import type { ShopKind } from '../../data/ShopData';
@@ -197,6 +197,7 @@ export class UiStore {
     getInjuredCount = (): number => this.townUi()?.getInjuredCount?.() ?? 0;
     getInjuryTreatmentPrice = (): number => this.town()?.getInjuryTreatmentPrice() ?? 0;
     isQuestDone = (questId: string): boolean => this.townUi()?.getQuestDone?.(questId) ?? false;
+    getMerchantContractViews = (): MerchantContractView[] => this.town()?.getMerchantContractViews() ?? [];
 
     getShopKind = (): ShopKind => this.shop()?.getActiveKind() ?? 'weapon';
     getShopGold = (): number => this.shop()?.getGoldValue() ?? this.gm.playerData.gold;
@@ -248,6 +249,11 @@ export class UiStore {
     shopSell = (entry: SellEntry): boolean => { const ok = this.shop()?.sell(entry) ?? false; this.tick(); return ok; };
     facilityUpgrade = (id: FacilityUpgradeId): boolean => {
         const ok = this.town()?.upgradeFacility(id) ?? false;
+        this.tick();
+        return ok;
+    };
+    completeMerchantContract = (id: string): boolean => {
+        const ok = this.town()?.completeMerchantContract(id) ?? false;
         this.tick();
         return ok;
     };
