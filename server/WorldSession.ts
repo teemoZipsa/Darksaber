@@ -59,6 +59,11 @@ import {
     getCursedArtifactAtbMultiplier,
     getCursedArtifactTurnDamage,
 } from '../src/raid/CursedArtifact';
+import {
+    getRaidModifierEffects,
+    getRaidModifierSupplyItems,
+    rollRaidModifier,
+} from '../src/raid/RaidModifiers';
 import { getEnemyLootSourceLabel } from '../src/loot/LootLabels';
 import { generateWorldLootNear } from '../src/loot/WorldLootGenerator';
 import {
@@ -373,6 +378,7 @@ export class WorldSession {
                     shardId: context.shardId ?? this.shardId,
                     realm: this.worldMap.getRealm(),
                     completedQuestIds: [...resumed.completedQuestIds],
+                    raidModifier: resumed.raidModifier,
                 },
             };
         }
@@ -385,6 +391,7 @@ export class WorldSession {
         const resumeToken = createToken('resume');
         const originHubId = this.getTownById(message.originHubId)?.id ?? 'central_castle';
         const spawnTile = this.getOriginExitTile(originHubId);
+        const raidModifier = rollRaidModifier(`${this.sessionEpoch}:${this.shardId}:${originHubId}:${playerId}`);
         const player: ServerPlayer = {
             id: playerId,
             accountId: context.accountId,
@@ -397,6 +404,7 @@ export class WorldSession {
             carriedWeight: sanitizeCarriedWeight(message.carriedWeight),
             carriedItems: sanitizeCarriedItems(message.carriedItems),
             raidGoldReward: 0,
+            raidModifier,
             completedQuestIds: new Set(sanitizeStringArray(context.completedQuestIds ?? message.completedQuestIds)),
             enteredDungeonIds: new Set(),
             completedDungeonIds: new Set(),
@@ -442,6 +450,7 @@ export class WorldSession {
         });
 
         this.ensureContentNear(spawnTile, player.departureTownId, now);
+        this.spawnRaidModifierSupplyDrop(player, spawnTile);
         this.log(`join player=${playerId} origin=${originHubId} actors=${player.actorIds.length}`);
         return {
             playerId,
@@ -455,6 +464,7 @@ export class WorldSession {
                 shardId: context.shardId ?? this.shardId,
                 realm: this.worldMap.getRealm(),
                 completedQuestIds: [...player.completedQuestIds],
+                raidModifier: player.raidModifier,
             },
         };
     }
@@ -476,6 +486,7 @@ export class WorldSession {
                 spawnTile,
                 realm: this.worldMap.getRealm(),
                 completedQuestIds: [...player.completedQuestIds],
+                raidModifier: player.raidModifier,
             },
         };
     }
@@ -581,6 +592,7 @@ export class WorldSession {
                         FIELD_ATB_SCALE
                         * getCarryAtbMultiplier(player.carriedWeight)
                         * getCursedArtifactAtbMultiplier(this.getPlayerCursedArtifactCount(player))
+                        * getRaidModifierEffects(player.raidModifier).partyAtbMultiplier
                     );
                     if (actor.actionGauge >= FIELD_MAX_ACTION_GAUGE) {
                         actor.actionGauge = FIELD_MAX_ACTION_GAUGE;
@@ -683,6 +695,7 @@ export class WorldSession {
                 elapsedSeconds: fallbackPlayer?.elapsedSeconds ?? 0,
                 limitSeconds: RAID_LIMIT_SECONDS,
                 departureTownId: fallbackPlayer?.departureTownId ?? 'central_castle',
+                modifier: fallbackPlayer?.raidModifier ?? null,
             },
             scenario: {
                 enteredDungeonIds: fallbackPlayer ? [...fallbackPlayer.enteredDungeonIds] : [],
@@ -2162,6 +2175,25 @@ export class WorldSession {
         for (const lootObject of loot) {
             this.loot.set(lootObject.id, lootObject);
         }
+    }
+
+    private spawnRaidModifierSupplyDrop(player: ServerPlayer, spawnTile: TilePoint): void {
+        if (!getRaidModifierEffects(player.raidModifier).supplyDrop) return;
+        const items = getRaidModifierSupplyItems();
+        if (items.length === 0) return;
+
+        const tile = this.findNearbyWalkableTile({
+            x: spawnTile.x + 6,
+            y: spawnTile.y + 3,
+        }, `${player.id}:supply_drop`, player.id);
+        const id = `loot_supply_drop_${player.id}`;
+        this.loot.set(id, new LootObject(id, tile.x, tile.y, items, {
+            sourceLabel: 'Supply Drop',
+            kind: 'chest',
+            containerType: 'supply_cache',
+            gridW: 5,
+            gridH: 4,
+        }));
     }
 
     private spawnEnemyLoot(enemy: Enemy, tile: TilePoint = { x: enemy.gridX, y: enemy.gridY }): void {

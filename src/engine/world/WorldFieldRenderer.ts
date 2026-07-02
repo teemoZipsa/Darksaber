@@ -9,6 +9,7 @@ import type { TacticalMarker } from '../../field/TacticalMarkers';
 import type { EnemyAIDecision } from '../../field/EnemyAI';
 import type { FieldIntent } from '../../field/FieldTypes';
 import type { WorldRenderModel } from './WorldRenderModel';
+import { formatRaidModifierName } from '../../raid/RaidModifierMessages';
 import { tileKey } from '../../field/FieldPathing';
 import { getSkillIconCell } from '../../ui/DarksaberIconRegistry';
 import { DarksaberSpriteAtlas } from '../../ui/DarksaberSpriteAtlas';
@@ -675,7 +676,7 @@ function renderHpBar(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
 function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number): void {
     if (!model.raid.active) return;
 
-    const bannerW = 340;
+    const bannerW = model.raid.modifier ? 430 : 340;
     const bannerH = 58;
     const x = Math.floor((vw - bannerW) / 2);
     const y = 16;
@@ -702,7 +703,10 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
     // Route subtitle
     ctx.fillStyle = Parchment.textMid;
     ctx.font = `12px ${UI.fontPrimary}`;
-    ctx.fillText(`${model.raid.departureTownId}  →  다른 마을 생환`, x + bannerW / 2, y + bannerH - 14);
+    const subtitle = model.raid.modifier
+        ? `${formatRaidModifierName(model.raid.modifier)}  |  ${model.raid.departureTownId}  →  다른 마을 생환`
+        : `${model.raid.departureTownId}  →  다른 마을 생환`;
+    ctx.fillText(subtitle, x + bannerW / 2, y + bannerH - 14);
 
     ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';

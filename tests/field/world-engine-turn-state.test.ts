@@ -46,7 +46,13 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
         applyNetworkScenarioSnapshot: () => undefined,
         handleNetworkActionRejected: () => false,
     };
-    engine.raidSession = { elapsedSeconds: 0 };
+    engine.raidSession = {
+        elapsedSeconds: 0,
+        raidModifier: null,
+        setRaidModifier: (modifier: unknown) => {
+            engine.raidSession.raidModifier = modifier;
+        },
+    };
     engine.party = {
         getCharacters: () => [actor.character],
         getActiveIndex: () => 0,
@@ -422,6 +428,7 @@ test('network snapshot treats local player actorIds as owned and prefers actor r
             elapsedSeconds: 12,
             limitSeconds: 900,
             departureTownId: 'central_castle',
+            modifier: null,
         },
         scenario: {
             enteredDungeonIds: [],

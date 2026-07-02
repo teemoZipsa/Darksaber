@@ -1671,6 +1671,13 @@ export const I18N_STRINGS: TranslationTable = {
         'raid.autoLootFull': '배낭 공간 부족. 남은 전리품이 바닥에 떨어졌습니다.',
         'raid.bossSpawn': '강력한 적이 근처에 출현했습니다!',
         'raid.extraction': '🚁 탈출 지점 (30분 내 도달)',
+        'raid.modifier.log': '레이드 변수: {name} — {desc}',
+        'raid.modifier.night_raid.name': '야간 출격',
+        'raid.modifier.night_raid.desc': '어둠 속 이동으로 행동력 회복이 6% 느려집니다.',
+        'raid.modifier.dense_fog.name': '짙은 안개',
+        'raid.modifier.dense_fog.desc': '시야 확보에 시간을 써 행동력 회복이 12% 느려집니다.',
+        'raid.modifier.supply_drop.name': '보급 투하',
+        'raid.modifier.supply_drop.desc': '출발 지점 근처에 보급 상자가 떨어졌습니다.',
 
         // Tactical markers
         'tactical.ping.position': '위치 핑',
@@ -3642,6 +3649,13 @@ export const I18N_STRINGS: TranslationTable = {
         'raid.autoLootFull': 'Backpack full. Remaining loot dropped on the ground.',
         'raid.bossSpawn': 'A powerful enemy has appeared nearby!',
         'raid.extraction': '🚁 Extraction Point (reach within 30 min)',
+        'raid.modifier.log': 'Raid modifier: {name} — {desc}',
+        'raid.modifier.night_raid.name': 'Night Raid',
+        'raid.modifier.night_raid.desc': 'Moving in the dark slows ATB recovery by 6%.',
+        'raid.modifier.dense_fog.name': 'Dense Fog',
+        'raid.modifier.dense_fog.desc': 'Finding your footing slows ATB recovery by 12%.',
+        'raid.modifier.supply_drop.name': 'Supply Drop',
+        'raid.modifier.supply_drop.desc': 'A supply cache landed near the starting area.',
 
         // Tactical markers
         'tactical.ping.position': 'Ping Location',

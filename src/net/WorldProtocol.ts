@@ -4,6 +4,7 @@ import type { CharacterStats } from '../data/Stats';
 import type { StoryScenarioEventStep } from '../data/StoryScenarioEventData';
 import type { EnemyRole } from '../field/EnemyAI';
 import type { WorldLootContainerType } from '../loot/WorldLootTypes';
+import type { RaidModifier } from '../raid/RaidModifiers';
 
 const configuredWorldServerUrl = import.meta.env?.VITE_WORLD_SERVER_URL?.trim();
 const configuredAuthServerUrl = import.meta.env?.VITE_AUTH_SERVER_URL?.trim();
@@ -122,6 +123,7 @@ export interface RaidTimerSnapshot {
     elapsedSeconds: number;
     limitSeconds: number;
     departureTownId: string;
+    modifier?: RaidModifier | null;
 }
 
 export interface ScenarioSnapshot {
@@ -282,6 +284,7 @@ export interface WorldWelcomeMessage {
     shardId?: string;
     realm?: WorldRealmId;
     completedQuestIds?: string[];
+    raidModifier?: RaidModifier | null;
 }
 
 export interface WorldSnapshotMessage {

@@ -2,6 +2,7 @@ import { getItemDef, type ItemDef } from '../src/data/ItemDB';
 import { Enemy } from '../src/entity/Enemy';
 import { LootObject } from '../src/entity/LootObject';
 import type { FieldNestState } from '../src/field/SpawnResolver';
+import { rollRaidModifier } from '../src/raid/RaidModifiers';
 import { cloneCharacterSave } from './WorldSessionSaveState';
 import { cloneStats, cloneStatuses, gridToSnapshot } from './WorldSessionHelpers';
 import type {
@@ -27,6 +28,7 @@ export function toPersistentPlayer(player: ServerPlayer): WorldSessionPersistent
         carriedWeight: player.carriedWeight,
         carriedItems: [...player.carriedItems.entries()],
         raidGoldReward: player.raidGoldReward,
+        raidModifier: player.raidModifier,
         completedQuestIds: [...player.completedQuestIds],
         enteredDungeonIds: [...player.enteredDungeonIds],
         completedDungeonIds: [...player.completedDungeonIds],
@@ -54,6 +56,7 @@ export function restorePersistentPlayer(player: WorldSessionPersistentPlayer): S
         carriedWeight: player.carriedWeight,
         carriedItems: new Map(player.carriedItems),
         raidGoldReward: player.raidGoldReward,
+        raidModifier: player.raidModifier ?? rollRaidModifier(`restore:${player.id}`),
         completedQuestIds: new Set(player.completedQuestIds),
         enteredDungeonIds: new Set(player.enteredDungeonIds),
         completedDungeonIds: new Set(player.completedDungeonIds),

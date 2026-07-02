@@ -19,6 +19,7 @@ function snapshot(seq: number): WorldSnapshot {
             elapsedSeconds: 0,
             limitSeconds: 1800,
             departureTownId: 'central_castle',
+            modifier: null,
         },
         scenario: {
             enteredDungeonIds: [],

@@ -269,6 +269,56 @@ test('default character saves use class-branch body armor', () => {
     assert.equal(Object.prototype.hasOwnProperty.call(equipment, 'shield'), false);
 });
 
+test('server raid modifiers are announced in welcome, snapshot, and supply drops', () => {
+    const session = new WorldSession({ sessionEpoch: 1 });
+    const joined = session.join(joinMessage('central_castle', 'supply'), 0);
+
+    assert.equal(joined.welcome.raidModifier?.id, 'supply_drop');
+    const snapshot = session.createSnapshot(joined.playerId, 0);
+    assert.equal(snapshot.raidTimer.modifier?.id, 'supply_drop');
+    const supplyDrop = snapshot.loot.find((loot) => loot.id.startsWith('loot_supply_drop_'));
+    assert.ok(supplyDrop);
+    assert.deepEqual(
+        supplyDrop.gridSnapshot.items.map((item) => item.itemId).sort(),
+        ['herb_rare', 'mp_potion', 'repair_kit'].sort()
+    );
+});
+
+test('server raid modifier changes party ATB recovery', () => {
+    const supplySession = new WorldSession({ sessionEpoch: 1 });
+    const supply = supplySession.join({
+        ...joinMessage('central_castle', 'supply-speed'),
+        partyComposition: [actor('supply-speed', {
+            stats: createBaseStats({ spd: 10, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+
+    const fogSession = new WorldSession({ sessionEpoch: 2 });
+    const fog = fogSession.join({
+        ...joinMessage('central_castle', 'fog-speed'),
+        partyComposition: [actor('fog-speed', {
+            stats: createBaseStats({ spd: 10, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+
+    assert.equal(supply.welcome.raidModifier?.id, 'supply_drop');
+    assert.equal(fog.welcome.raidModifier?.id, 'dense_fog');
+
+    supplySession.tick(0);
+    fogSession.tick(0);
+    supplySession.tick(250);
+    fogSession.tick(250);
+
+    const supplyActor = supplySession.createSnapshot(supply.playerId, 250).partyActors
+        .find((entry) => entry.ownerPlayerId === supply.playerId);
+    const fogActor = fogSession.createSnapshot(fog.playerId, 250).partyActors
+        .find((entry) => entry.ownerPlayerId === fog.playerId);
+
+    assert.ok(supplyActor);
+    assert.ok(fogActor);
+    assert.ok(fogActor.actionGauge < supplyActor.actionGauge);
+});
+
 test('server cursed artifact slows actor ATB and damages on ready turn', () => {
     const normalSession = new WorldSession();
     const normal = normalSession.join({

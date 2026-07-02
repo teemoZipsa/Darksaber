@@ -2,13 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BURGOS_CASTLE_DUNGEON_ID } from '../../src/data/MonsterCatalog';
 import { WorldRaidSession } from '../../src/engine/world/WorldRaidSession';
+import { getRaidModifierEffects, rollRaidModifier } from '../../src/raid/RaidModifiers';
 
 test('world raid session advances, expires, and records raid events without combat dependencies', () => {
     const raid = new WorldRaidSession('central_castle', 10);
+    const modifier = rollRaidModifier('test-raid');
 
-    raid.beginRaidFromTown('central_castle');
+    raid.beginRaidFromTown('central_castle', modifier);
     assert.equal(raid.active, true);
     assert.equal(raid.departureTownId, 'central_castle');
+    assert.deepEqual(raid.raidModifier, modifier);
+    assert.ok(getRaidModifierEffects(raid.raidModifier).partyAtbMultiplier <= 1);
 
     const paused = raid.advanceTimer(5, { townVisible: false, resultVisible: false, turnCombatActive: true });
     assert.deepEqual(paused, { advanced: false, expired: false });
@@ -26,6 +30,9 @@ test('world raid session advances, expires, and records raid events without comb
     const expired = raid.advanceTimer(10, { townVisible: false, resultVisible: false, turnCombatActive: false });
     assert.deepEqual(expired, { advanced: true, expired: true });
     assert.equal(raid.elapsedSeconds, 10);
+
+    raid.completeAtTown('w_forest_village');
+    assert.equal(raid.raidModifier, null);
 });
 
 test('world raid session tracks town transition and pending result town', () => {

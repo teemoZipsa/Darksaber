@@ -4,6 +4,7 @@ import type { EntityDisplayInfo } from '../../ui/EntityInfoUI';
 import type { AttackCue, FieldActor, FieldEnemy, FieldMagicState } from '../../field/FieldTypes';
 import type { TilePoint } from '../../field/FieldPathing';
 import type { TacticalMarker } from '../../field/TacticalMarkers';
+import type { RaidModifier } from '../../raid/RaidModifiers';
 import type { WorldPhase } from './WorldRaidSession';
 
 export type WorldActionMode = 'move' | 'attack' | 'interact';
@@ -14,6 +15,7 @@ export interface WorldRaidRenderModel {
     limitSeconds: number;
     departureTownId: string;
     timerAdvancing: boolean;
+    modifier: RaidModifier | null;
 }
 
 export interface WorldStoryInteriorRenderModel {

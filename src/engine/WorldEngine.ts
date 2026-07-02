@@ -17,6 +17,7 @@ import {
     getCursedArtifactAtbMultiplier,
     getCursedArtifactTurnDamage,
 } from '../raid/CursedArtifact';
+import { getRaidModifierEffects } from '../raid/RaidModifiers';
 import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
 import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
@@ -421,6 +422,7 @@ export class WorldEngine {
                 getPartyCarriedWeight(this.gameManager.inventory.items, this.party.getCharacters())
             ),
             getPartyCursedAtbMultiplier: () => getCursedArtifactAtbMultiplier(this.getBackpackCursedArtifactCount()),
+            getPartyRaidAtbMultiplier: () => getRaidModifierEffects(this.raidSession.raidModifier).partyAtbMultiplier,
         });
         this.fieldSpawnController = new WorldFieldSpawnController(this.movementController);
         this.enemyTurnController = new WorldEnemyTurnController(
@@ -967,6 +969,7 @@ export class WorldEngine {
 
     private applyNetworkSnapshot(snapshot: WorldSnapshot): void {
         this.raidSession.elapsedSeconds = snapshot.raidTimer.elapsedSeconds;
+        this.raidSession.setRaidModifier(snapshot.raidTimer.modifier ?? null);
         this.networkSyncController.applySnapshot(snapshot);
     }
 

@@ -38,6 +38,7 @@ import type { WorldRaidSession, WorldPhase } from './WorldRaidSession';
 import type { WorldTownSession } from './WorldTownSession';
 import type { WorldStoryScenarioController } from './WorldStoryScenarioController';
 import type { WorldNetworkSyncController } from './WorldNetworkSyncController';
+import { formatRaidModifierLog } from '../../raid/RaidModifierMessages';
 
 function displayTownName(town: TownInfo): string {
     return i18n.lang === 'ko' ? town.nameKr : town.name;
@@ -163,6 +164,7 @@ export class WorldRaidLifecycleController {
             this.context.gameManager.setHubFlushEnabled(false);
             this.context.setPhase('raid');
             this.context.raidSession.beginRaidFromTown(town.id);
+            if (welcome.raidModifier !== undefined) this.context.raidSession.setRaidModifier(welcome.raidModifier);
             this.context.storyScenarioController.resetVisitState();
             if (!isResumeJoin) {
                 this.context.party.resetForNewRaid();
@@ -181,6 +183,7 @@ export class WorldRaidLifecycleController {
             this.context.log(isResumeJoin
                 ? formatT('mp.deployResumed', { world: worldMap.getDisplayName() })
                 : formatT('mp.deployStarted', { town: displayTownName(town), world: worldMap.getDisplayName() }));
+            if (this.context.raidSession.raidModifier) this.context.log(formatRaidModifierLog(this.context.raidSession.raidModifier));
         } catch (error) {
             if (this.shouldReloadDevAutoStartAuth(error)) {
                 console.warn('[Darksaber] Dev auth expired after server restart; reloading to issue a fresh dev session.');

@@ -1,4 +1,5 @@
 import { shouldAdvanceRaidTimer } from '../../raid/RaidRules';
+import { rollRaidModifier, type RaidModifier } from '../../raid/RaidModifiers';
 
 export type WorldPhase = 'town' | 'raid' | 'lobby' | 'master';
 
@@ -21,6 +22,7 @@ export class WorldRaidSession {
     public active = false;
     public kills = 0;
     public raidGoldReward = 0;
+    public raidModifier: RaidModifier | null = null;
     public activeDungeonId: string | null = null;
     public readonly downedCharacterIds: Set<string> = new Set();
     public readonly clearedDungeonIds: Set<string> = new Set();
@@ -40,15 +42,17 @@ export class WorldRaidSession {
         this.clearedDungeonIds.clear();
         this.clearScenarioFlags();
         this.raidGoldReward = 0;
+        this.raidModifier = null;
         this.currentHubTownId = townId;
     }
 
-    public beginRaidFromTown(townId: string): void {
+    public beginRaidFromTown(townId: string, modifier: RaidModifier = rollRaidModifier(`${townId}:${Date.now()}:${Math.random()}`)): void {
         this.departureTownId = townId;
         this.elapsedSeconds = 0;
         this.active = true;
         this.kills = 0;
         this.raidGoldReward = 0;
+        this.raidModifier = modifier;
         this.activeDungeonId = null;
         this.downedCharacterIds.clear();
         this.clearedDungeonIds.clear();
@@ -82,6 +86,7 @@ export class WorldRaidSession {
         this.clearedDungeonIds.clear();
         this.clearScenarioFlags();
         this.raidGoldReward = 0;
+        this.raidModifier = null;
         this.currentHubTownId = townId;
     }
 
@@ -91,7 +96,12 @@ export class WorldRaidSession {
         this.clearedDungeonIds.clear();
         this.clearScenarioFlags();
         this.raidGoldReward = 0;
+        this.raidModifier = null;
         this.currentHubTownId = townId;
+    }
+
+    public setRaidModifier(modifier: RaidModifier | null): void {
+        this.raidModifier = modifier;
     }
 
     public addRaidGoldReward(amount: number): void {

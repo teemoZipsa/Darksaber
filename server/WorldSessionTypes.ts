@@ -8,6 +8,7 @@ import type { TilePoint } from '../src/field/FieldPathing';
 import type { FieldNestState } from '../src/field/SpawnResolver';
 import type { WorldLootContainerType } from '../src/loot/WorldLootTypes';
 import type { WorldRealm } from '../src/map/BiomeMask';
+import type { RaidModifier } from '../src/raid/RaidModifiers';
 import type {
     AutoLootGrantMessage,
     CombatEventMessage,
@@ -50,6 +51,7 @@ export interface ServerPlayer {
     carriedWeight: number;
     carriedItems: Map<string, number>;
     raidGoldReward: number;
+    raidModifier: RaidModifier;
     completedQuestIds: Set<string>;
     enteredDungeonIds: Set<string>;
     completedDungeonIds: Set<string>;
@@ -132,6 +134,7 @@ export interface WorldSessionPersistentPlayer {
     carriedWeight: number;
     carriedItems: Array<[string, number]>;
     raidGoldReward: number;
+    raidModifier?: RaidModifier;
     completedQuestIds: string[];
     enteredDungeonIds: string[];
     completedDungeonIds: string[];

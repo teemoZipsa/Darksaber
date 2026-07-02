@@ -200,6 +200,7 @@ export class WorldRenderController {
                 elapsedSeconds: this.context.raidSession.elapsedSeconds,
                 limitSeconds: this.context.raidSession.limitSeconds,
                 departureTownId: this.context.raidSession.departureTownId,
+                modifier: this.context.raidSession.raidModifier,
                 timerAdvancing: this.context.raidSession.shouldAdvanceTimer({
                     townVisible: this.context.townSession.isVisible(),
                     resultVisible: this.context.raidOutcomeController.isVisible(),
