@@ -23,6 +23,9 @@ import { marketStateKey } from '../../src/data/MarketData';
 import { PlayerData } from '../../src/data/PlayerData';
 import { REST_FACILITIES, getRestFacility, getRestMenu } from '../../src/data/RestFacilityData';
 import { TOWN_FACILITIES, getTownFacilities, hasTownFacility } from '../../src/data/TownFacilityData';
+import { LEGENDARY_LOOT_ITEM_IDS } from '../../src/loot/LegendaryLootData';
+import { generateWorldLootNear } from '../../src/loot/WorldLootGenerator';
+import { getMarkedCacheItems } from '../../src/raid/MarkedCache';
 import { RUMOR_KEYS, TownUI } from '../../src/ui/TownUI';
 import { ShopUI } from '../../src/ui/ShopUI';
 import { i18n } from '../../src/i18n/LanguageManager';
@@ -119,6 +122,50 @@ test('cursed artifact helpers count stacks and scale ATB and turn-start risk', (
     assert.ok(getCursedArtifactAtbMultiplier(2) < getCursedArtifactAtbMultiplier(1));
     assert.equal(getCursedArtifactTurnDamage(createBaseStats({ hp: 100, maxHp: 100 }), 1), 6);
     assert.equal(getCursedArtifactTurnDamage(createBaseStats({ hp: 20, maxHp: 20 }), 1), 4);
+});
+
+test('legendary loot pool uses late original relics and powers marked caches', () => {
+    assert.ok(LEGENDARY_LOOT_ITEM_IDS.length >= 20);
+    assert.equal(LEGENDARY_LOOT_ITEM_IDS.includes('orig_late_1168'), false);
+
+    for (const itemId of LEGENDARY_LOOT_ITEM_IDS) {
+        const item = getItemDef(itemId);
+        assert.ok(item, `missing legendary loot ${itemId}`);
+        assert.equal(itemId.startsWith('orig_late_'), true);
+        assert.equal(item?.rarity, 'unique');
+        assert.notEqual(item?.sellable, false);
+    }
+
+    const marked = getMarkedCacheItems('legendary-cache-test');
+    assert.ok(marked.some((item) => LEGENDARY_LOOT_ITEM_IDS.includes(item.id)));
+});
+
+test('sealed reliquaries can roll a legendary relic jackpot', () => {
+    const world = new WorldMap();
+    const dungeon = world.getDungeons()[0];
+    assert.ok(dungeon);
+    const anchor = world.getDungeonEntranceTile(dungeon);
+    let foundLegendary = false;
+
+    for (let seed = 0; seed < 2_000 && !foundLegendary; seed++) {
+        const loot = generateWorldLootNear({
+            worldMap: world,
+            playerTile: anchor,
+            seed: `legendary-reliquary-${seed}`,
+            generatedChunks: new Set<string>(),
+            existingLoot: [],
+            findNearbyWalkableTile: (tile) => tile,
+            createId: (type, chunkX, chunkY) => `loot_${type}_${chunkX}_${chunkY}`,
+            maxNew: 4,
+            minNew: 4,
+        });
+        foundLegendary = loot.some((container) =>
+            container.containerType === 'sealed_reliquary'
+            && container.inventory.items.some((placed) => LEGENDARY_LOOT_ITEM_IDS.includes(placed.item.id))
+        );
+    }
+
+    assert.equal(foundLegendary, true);
 });
 
 test('town facilities cover mortal and master towns', () => {
