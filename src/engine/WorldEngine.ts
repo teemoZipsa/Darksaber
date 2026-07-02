@@ -423,6 +423,10 @@ export class WorldEngine {
             ),
             getPartyCursedAtbMultiplier: () => getCursedArtifactAtbMultiplier(this.getBackpackCursedArtifactCount()),
             getPartyRaidAtbMultiplier: () => getRaidModifierEffects(this.raidSession.raidModifier).partyAtbMultiplier,
+            onPartyTerrainHazard: ({ actorName, point, hazard }) => {
+                this.addCombatLog(formatT(hazard.logKey, { actor: actorName }));
+                this.floatingText.spawnStatus(point.x, point.y, t(hazard.statusTextKey));
+            },
         });
         this.fieldSpawnController = new WorldFieldSpawnController(this.movementController);
         this.enemyTurnController = new WorldEnemyTurnController(

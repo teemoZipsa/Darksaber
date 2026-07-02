@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Character } from '../../src/character/Character';
-import { createStatus } from '../../src/combat/StatusEffects';
+import { createStatus, hasStatus } from '../../src/combat/StatusEffects';
 import { Enemy } from '../../src/entity/Enemy';
 import { Player } from '../../src/entity/Player';
 import type { FieldActor, FieldEnemy } from '../../src/field/FieldTypes';
@@ -132,6 +132,45 @@ test('movement honors world ground blockers on walkable terrain', () => {
 
     assert.equal(controller.isFieldPassable({ x: 1, y: 0, actorId: actor.id, intent: 'move' }), false);
     assert.equal(controller.isFieldPassable({ x: 0, y: 1, actorId: actor.id, intent: 'move' }), true);
+});
+
+test('party actors entering poison swamp gain terrain hazard statuses', () => {
+    const actor = makeActor('hero', 0, 0);
+    actor.path = [{ x: 1, y: 0 }];
+    const hazardEvents: string[] = [];
+    const controller = new WorldMovementController({
+        getPartyActors: () => [actor],
+        getFieldEnemies: () => [],
+        getTileAt: (x, y) => x === 1 && y === 0 ? TileType.POISON_SWAMP : TileType.GRASS,
+        getTerrainTraitsForActorId: () => ({}),
+        onPartyTerrainHazard: (event) => hazardEvents.push(event.hazard.kind),
+    });
+
+    controller.stepActorAlongPath(actor);
+
+    assert.deepEqual({ x: actor.entity.gridX, y: actor.entity.gridY }, { x: 1, y: 0 });
+    assert.equal(hasStatus(actor.character.statuses, 'poison'), true);
+    assert.equal(hasStatus(actor.character.statuses, 'slow'), true);
+    assert.deepEqual(hazardEvents, ['poisonSwamp']);
+});
+
+test('terrain ignoring actors bypass poison swamp entry hazards', () => {
+    const actor = makeActor('hero', 0, 0);
+    actor.path = [{ x: 1, y: 0 }];
+    const hazardEvents: string[] = [];
+    const controller = new WorldMovementController({
+        getPartyActors: () => [actor],
+        getFieldEnemies: () => [],
+        getTileAt: (x, y) => x === 1 && y === 0 ? TileType.POISON_SWAMP : TileType.GRASS,
+        getTerrainTraitsForActorId: () => ({ ignoresTerrain: true }),
+        onPartyTerrainHazard: (event) => hazardEvents.push(event.hazard.kind),
+    });
+
+    controller.stepActorAlongPath(actor);
+
+    assert.equal(hasStatus(actor.character.statuses, 'poison'), false);
+    assert.equal(hasStatus(actor.character.statuses, 'slow'), false);
+    assert.deepEqual(hazardEvents, []);
 });
 
 test('passive enemies do not charge turns until aggro starts', () => {

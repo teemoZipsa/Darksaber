@@ -1,4 +1,11 @@
-import { getEffectiveStatsForCharacter, getEffectiveStatsForEnemy, hasStatus, removeActionStanceStatusesFromCarrier } from '../../combat/StatusEffects';
+import {
+    applyStatus,
+    getEffectiveStatsForCharacter,
+    getEffectiveStatsForEnemy,
+    hasStatus,
+    removeActionStanceStatusesFromCarrier,
+    type StatusEffect,
+} from '../../combat/StatusEffects';
 import type { Enemy } from '../../entity/Enemy';
 import type { Player } from '../../entity/Player';
 import { TILE_PROPERTIES, type TileType } from '../../map/Tile';
@@ -21,7 +28,21 @@ import {
     tilesInRange,
 } from '../../field/FieldPathing';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
-import { isTerrainPassable, type TerrainActorTraits } from '../../field/TerrainRules';
+import {
+    getTerrainEntryHazards,
+    isTerrainPassable,
+    type TerrainActorTraits,
+    type TerrainEntryHazard,
+} from '../../field/TerrainRules';
+
+export interface PartyTerrainHazardEvent {
+    actorId: string;
+    actorName: string;
+    point: TilePoint;
+    tile: TileType;
+    hazard: TerrainEntryHazard;
+    statuses: StatusEffect[];
+}
 
 export interface WorldMovementContext {
     getPartyActors: () => FieldActor[];
@@ -32,6 +53,7 @@ export interface WorldMovementContext {
     getPartyCarryAtbMultiplier?: () => number;
     getPartyCursedAtbMultiplier?: () => number;
     getPartyRaidAtbMultiplier?: () => number;
+    onPartyTerrainHazard?: (event: PartyTerrainHazardEvent) => void;
 }
 
 export interface PartyMovementInput {
@@ -185,6 +207,7 @@ export class WorldMovementController {
         actor.entity.facing = directionFromTo(this.actorTile(actor), next);
         actor.entity.gridX = next.x;
         actor.entity.gridY = next.y;
+        this.applyTerrainEntryHazardsToActor(actor, next);
     }
 
     public enemyStepToward(entry: FieldEnemy, actor: FieldActor, desiredRange: number = 1): void {
@@ -294,6 +317,26 @@ export class WorldMovementController {
     private isEnemySimulationActive(entry: FieldEnemy, closest: FieldActor): boolean {
         const range = entry.enemy.isAggro ? ENEMY_COMBAT_SIMULATION_RANGE : ENEMY_SIMULATION_ACTIVE_RANGE;
         return manhattan(this.enemyTile(entry.enemy), this.actorTile(closest)) <= range;
+    }
+
+    private applyTerrainEntryHazardsToActor(actor: FieldActor, point: TilePoint): void {
+        const tile = this.context.getTileAt(point.x, point.y);
+        const traits = this.context.getTerrainTraitsForActorId(actor.id);
+        for (const hazard of getTerrainEntryHazards(tile, traits)) {
+            const statuses: StatusEffect[] = [];
+            for (const status of hazard.statuses) {
+                actor.character.statuses = applyStatus(actor.character.statuses, status);
+                statuses.push(status);
+            }
+            this.context.onPartyTerrainHazard?.({
+                actorId: actor.id,
+                actorName: actor.character.name,
+                point,
+                tile,
+                hazard,
+                statuses,
+            });
+        }
     }
 
     public hasAggroAllyNear(entry: FieldEnemy, range: number): boolean {

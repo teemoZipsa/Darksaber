@@ -1,4 +1,5 @@
 import type { SkillElement } from '../data/SkillDB';
+import { createStatus, type StatusEffect } from '../combat/StatusEffects';
 import { formatT, t } from '../i18n/LanguageManager';
 import { TileType, TILE_PROPERTIES } from '../map/Tile';
 import { MOVE_AP_PER_TILE } from './FieldActionEconomy';
@@ -28,6 +29,17 @@ export interface MagicTerrainResult {
     multiplier: number;
     casterMultiplier: number;
     targetMultiplier: number;
+}
+
+export type TerrainEntryHazardKind = 'poisonSwamp';
+
+export interface TerrainEntryHazard {
+    kind: TerrainEntryHazardKind;
+    tile: TileType;
+    statuses: StatusEffect[];
+    hoverKey: string;
+    logKey: string;
+    statusTextKey: string;
 }
 
 const NEUTRAL_MAGIC: Partial<Record<SkillElement, number>> = {};
@@ -226,6 +238,23 @@ export function isTerrainLineOfSightBlocking(tile: TileType): boolean {
     return getTerrainProfile(tile).blocksLineOfSight;
 }
 
+export function getTerrainEntryHazards(tile: TileType, traits: TerrainActorTraits = {}): TerrainEntryHazard[] {
+    if (traits.ignoresTerrain) return [];
+    if (tile !== TileType.POISON_SWAMP) return [];
+
+    return [{
+        kind: 'poisonSwamp',
+        tile,
+        statuses: [
+            createStatus('poison', { durationTurns: 4, magnitude: 0.08 }),
+            createStatus('slow', { durationTurns: 1, magnitude: 0.75 }),
+        ],
+        hoverKey: 'terrain.hazard.poisonSwamp',
+        logKey: 'terrain.hazard.poisonSwampLog',
+        statusTextKey: 'terrain.hazard.poisonSwampStatus',
+    }];
+}
+
 export function battleStageTileToTerrainTile(stageTile: number): TileType {
     return stageTile === 1 ? TileType.WALL : TileType.GRASS;
 }
@@ -242,6 +271,7 @@ export function describeTerrainForHover(tile: TileType, traits: TerrainActorTrai
     if (defenseReduction > 0) lines.push(formatT('terrain.defenseDamage', { percent: defenseReduction }));
     if (profile.rangedHitPenalty < 0) lines.push(formatT('terrain.rangedHit', { value: profile.rangedHitPenalty }));
     if (profile.blocksLineOfSight) lines.push(t('terrain.blocksSight'));
+    for (const hazard of getTerrainEntryHazards(tile, traits)) lines.push(t(hazard.hoverKey));
 
     const magicHints = Object.entries(profile.targetMagic)
         .filter(([, value]) => value !== undefined && value !== 1)

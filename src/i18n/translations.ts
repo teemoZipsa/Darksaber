@@ -1785,6 +1785,9 @@ export const I18N_STRINGS: TranslationTable = {
         'terrain.rangedHit': '원거리 명중 {value}',
         'terrain.blocksSight': '시야 차단',
         'terrain.magic': '마법',
+        'terrain.hazard.poisonSwamp': '위험: 진입 시 중독 4턴 + 둔화 1턴',
+        'terrain.hazard.poisonSwampLog': '{actor}이(가) 독 늪에 발이 묶였습니다.',
+        'terrain.hazard.poisonSwampStatus': '독 늪',
 
         // Combat Log
         'log.deployed': '레이드에 배치되었습니다!',
@@ -3795,6 +3798,9 @@ export const I18N_STRINGS: TranslationTable = {
         'terrain.rangedHit': 'Ranged hit {value}',
         'terrain.blocksSight': 'Blocks sight',
         'terrain.magic': 'Magic',
+        'terrain.hazard.poisonSwamp': 'Hazard: entering applies Poison 4 turns + Slow 1 turn',
+        'terrain.hazard.poisonSwampLog': '{actor} is bogged down by the poison swamp.',
+        'terrain.hazard.poisonSwampStatus': 'Poison swamp',
 
         // Combat Log
         'log.deployed': 'Deployed into the Raid!',

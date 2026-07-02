@@ -59,10 +59,16 @@ test('terrain hover labels follow the active language', () => {
         assert.match(forestKo, /마법 불꽃 \+20% 바람 \+10% 땅 \+10%/);
         assert.doesNotMatch(forestKo, /fire|wind|earth/);
 
+        const swampKo = describeTerrainForHover(TileType.POISON_SWAMP).join(' ');
+        assert.match(swampKo, /위험: 진입 시 중독 4턴 \+ 둔화 1턴/);
+
         i18n.lang = 'en';
         const forestEn = describeTerrainForHover(TileType.FOREST).join(' ');
         assert.match(forestEn, /Forest/);
         assert.match(forestEn, /Magic Fir \+20% Wnd \+10% Ear \+10%/);
+
+        const swampEn = describeTerrainForHover(TileType.POISON_SWAMP).join(' ');
+        assert.match(swampEn, /Hazard: entering applies Poison 4 turns \+ Slow 1 turn/);
     } finally {
         i18n.lang = previousLang;
     }
