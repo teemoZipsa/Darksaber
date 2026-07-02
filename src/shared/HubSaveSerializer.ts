@@ -28,6 +28,7 @@ export function buildHubSavePatch(input: HubSaveSerializerInput): CharacterSaveP
             marketState: input.playerData.marketState,
             marketCycle: input.playerData.marketCycle,
             marketContracts: input.playerData.marketContracts,
+            facilityUpgrades: input.playerData.facilityUpgrades,
         },
         inventory: serializeGridInventory(input.inventory),
         stashSnapshot: serializeGridInventory(input.stash),

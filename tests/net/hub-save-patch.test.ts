@@ -54,3 +54,20 @@ test('buildHubSavePatch floors negative gold to zero', () => {
     const patch = buildHubSavePatch({ questState: { gold: -50 } }, current);
     assert.equal((patch.questState as Record<string, unknown>).gold, 0);
 });
+
+test('buildHubSavePatch accepts normalized facility upgrades', () => {
+    const current = createDefaultCharacterSave(authCharacter());
+    const patch = buildHubSavePatch({
+        questState: {
+            facilityUpgrades: {
+                infirmary: 1,
+                workshop: 99,
+                unknown: 3,
+            },
+        },
+    }, current);
+    assert.deepEqual((patch.questState as Record<string, unknown>).facilityUpgrades, {
+        infirmary: 1,
+        workshop: 2,
+    });
+});

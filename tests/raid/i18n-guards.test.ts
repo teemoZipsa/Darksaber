@@ -4,6 +4,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
 import { MASTER_CLASSES } from '../../src/data/ClassTree';
+import { getFacilityUpgradeDefinitions } from '../../src/data/FacilityUpgradeData';
 import { REST_FACILITIES } from '../../src/data/RestFacilityData';
 import { STORY_INTERIOR_BRIEFING_LINE_KEYS } from '../../src/data/StoryInteriorBriefingData';
 import { STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
@@ -71,6 +72,11 @@ function collectDataDrivenUiKeys(): Set<string> {
     for (const entry of EQUIP_SLOT_LIST) add(entry.labelKey);
     for (const tab of SHOP_KIND_TABS) add(tab.labelKey);
     for (const meta of Object.values(TOWN_FACILITY_META)) add(meta.labelKey);
+    for (const facility of getFacilityUpgradeDefinitions()) {
+        add(facility.nameKey);
+        add(facility.descKey);
+        add(facility.effectKey);
+    }
 
     for (const facility of Object.values(REST_FACILITIES)) {
         add(facility?.nameKey);

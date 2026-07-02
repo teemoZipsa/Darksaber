@@ -4,6 +4,7 @@ import { Character } from '../../src/character/Character';
 import { PartyManager } from '../../src/character/PartyManager';
 import { createStatus, hasStatus } from '../../src/combat/StatusEffects';
 import { PlayerData } from '../../src/data/PlayerData';
+import { getItemDef } from '../../src/data/ItemDB';
 import { GridInventory } from '../../src/inventory/GridInventory';
 import { WorldTownSession } from '../../src/engine/world/WorldTownSession';
 import { TownUI, TOWN_DEPLOY_CLICK_GUARD_MS } from '../../src/ui/TownUI';
@@ -68,6 +69,44 @@ test('world town session purchases pending rest and treats active party injuries
     } finally {
         i18n.lang = previousLang;
     }
+});
+
+test('world town session upgrades facilities with delivered loot and applies discounts', () => {
+    const party = new PartyManager();
+    const character = new Character('hero-1', 'Hero', 'infantry');
+    party.addToRoster(character);
+    party.deployCharacter(character);
+
+    const playerData = new PlayerData();
+    playerData.gold = 1000;
+    const inventory = new GridInventory(10, 6);
+    const stash = new GridInventory(10, 6);
+    const herb = getItemDef('herb_common');
+    const repairKit = getItemDef('repair_kit');
+    assert.ok(herb);
+    assert.ok(repairKit);
+    inventory.autoPlace(herb)!.quantity = 2;
+    stash.autoPlace(repairKit);
+
+    const session = new WorldTownSession({
+        party,
+        playerData,
+        gameManager: { inventory, stash },
+        onDeploy: () => undefined,
+        log: () => undefined,
+    });
+
+    assert.equal(session.getInjuryTreatmentPrice(), 50);
+    assert.equal(session.upgradeFacility('infirmary'), true);
+    assert.equal(playerData.facilityUpgrades.infirmary, 1);
+    assert.equal(playerData.gold, 550);
+    assert.equal(inventory.items.some((placed) => placed.item.id === 'herb_common'), false);
+    assert.equal(session.getInjuryTreatmentPrice(), 40);
+
+    assert.equal(session.upgradeFacility('workshop'), true);
+    assert.equal(playerData.facilityUpgrades.workshop, 1);
+    assert.equal(playerData.gold, 50);
+    assert.equal(stash.items.some((placed) => placed.item.id === 'repair_kit'), false);
 });
 
 test('town deploy ignores click-through immediately after opening', () => {

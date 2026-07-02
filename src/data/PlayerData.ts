@@ -11,6 +11,10 @@ import {
     type MarketContract,
     type MarketState,
 } from './MarketData';
+import {
+    normalizeFacilityUpgradeState,
+    type FacilityUpgradeState,
+} from './FacilityUpgradeData';
 import { getItemDef } from './ItemDB';
 import type { CharacterSave, CharacterSavePatch, InventorySaveItem } from '../net/AuthClient';
 import { createDefaultStashSnapshot } from '../shared/CharacterSaveDefaults';
@@ -34,6 +38,7 @@ export interface SaveData {
     marketState?: MarketState;
     marketCycle?: number;
     marketContracts?: MarketContract[];
+    facilityUpgrades?: FacilityUpgradeState;
     currentHubTownId?: string;
     pendingRestMenuId?: string | null;
     inventory?: InventoryItem[];
@@ -63,6 +68,7 @@ export class PlayerData {
     public marketState: MarketState = createDefaultMarketState();
     public marketCycle: number = 0;
     public marketContracts: MarketContract[] = [];
+    public facilityUpgrades: FacilityUpgradeState = {};
     public currentHubTownId: string = 'central_castle';
     public pendingRestMenuId: string | null = null;
     public inventory: InventoryItem[] = [];
@@ -172,6 +178,7 @@ export class PlayerData {
             this.marketState = normalizeMarketState(data.marketState);
             this.marketCycle = normalizeMarketCycle(data.marketCycle);
             this.marketContracts = normalizeMarketContracts(data.marketContracts, this.marketCycle);
+            this.facilityUpgrades = normalizeFacilityUpgradeState(data.facilityUpgrades);
             this.currentHubTownId = typeof data.currentHubTownId === 'string' ? data.currentHubTownId : 'central_castle';
             this.pendingRestMenuId = typeof data.pendingRestMenuId === 'string' ? data.pendingRestMenuId : null;
             this.inventory = normalizeInventory(data.inventory);
@@ -198,6 +205,7 @@ export class PlayerData {
                 marketState: this.marketState,
                 marketCycle: this.marketCycle,
                 marketContracts: this.marketContracts,
+                facilityUpgrades: this.facilityUpgrades,
             },
             inventory: {
                 width: 10,
@@ -235,6 +243,7 @@ export class PlayerData {
         this.marketState = normalizeMarketState(questState.marketState);
         this.marketCycle = normalizeMarketCycle(questState.marketCycle);
         this.marketContracts = normalizeMarketContracts(questState.marketContracts, this.marketCycle);
+        this.facilityUpgrades = normalizeFacilityUpgradeState(questState.facilityUpgrades);
         this.currentHubTownId = typeof hubLocation.townId === 'string' ? hubLocation.townId : 'central_castle';
         this.pendingRestMenuId = typeof hubLocation.pendingRestMenuId === 'string' ? hubLocation.pendingRestMenuId : null;
         this.inventory = normalizeInventorySnapshot(save.inventory);

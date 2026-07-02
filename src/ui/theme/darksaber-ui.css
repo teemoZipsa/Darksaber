@@ -736,6 +736,65 @@
 #ui-overlay .ds-town__deploy:hover { filter: brightness(1.18); }
 #ui-overlay .ds-town__deploy:active { transform: translateY(1px); }
 
+/* ─── Town storage + facility upgrades ─────────────────────── */
+#ui-overlay .ds-town__storage {
+    width: min(1180px, 96vw);
+    max-height: 100%;
+    display: grid;
+    grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+}
+#ui-overlay .ds-facility { display: flex; flex-direction: column; max-height: 78vh; }
+#ui-overlay .ds-facility__gold {
+    position: absolute; right: 18px; top: 50%; transform: translateY(-50%);
+    font-size: 14px; font-weight: 600; color: var(--ds-accent-bright);
+    font-variant-numeric: tabular-nums;
+}
+#ui-overlay .ds-facility__body {
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 14px 16px 10px;
+    overflow-y: auto;
+}
+#ui-overlay .ds-facility__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    background: var(--ds-panel-inset);
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+    padding: 10px;
+}
+#ui-overlay .ds-facility__main { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+#ui-overlay .ds-facility__name {
+    display: flex; justify-content: space-between; gap: 8px;
+    color: var(--ds-text); font-size: 13px; font-weight: 600;
+}
+#ui-overlay .ds-facility__name span { color: var(--ds-accent); font-size: 11px; white-space: nowrap; }
+#ui-overlay .ds-facility__desc,
+#ui-overlay .ds-facility__effect { color: var(--ds-text-dim); font-size: 11px; line-height: 1.35; }
+#ui-overlay .ds-facility__effect { color: var(--ds-text-muted); }
+#ui-overlay .ds-facility__costs { display: flex; flex-wrap: wrap; gap: 5px; }
+#ui-overlay .ds-facility__costs span {
+    color: var(--ds-accent-bright);
+    border: 1px solid var(--ds-border-shadow);
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: var(--ds-radius-sm);
+    padding: 2px 6px;
+    font-size: 11px;
+}
+#ui-overlay .ds-facility__costs span.is-missing { color: var(--ds-danger); }
+#ui-overlay .ds-facility__row .ds-btn { min-width: 76px; padding: 7px 10px; font-size: 11px; }
+#ui-overlay .ds-facility__feedback { min-height: 16px; text-align: center; color: var(--ds-accent); font-size: 12px; }
+
+@media (max-width: 980px) {
+    #ui-overlay .ds-town__storage {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+    }
+}
+
 /* ─── Shop panel ────────────────────────────────────────────── */
 #ui-overlay .ds-shop { display: flex; flex-direction: column; max-height: 82vh; }
 #ui-overlay .ds-shop__gold {

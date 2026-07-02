@@ -713,6 +713,8 @@ test('pending rest menu id persists through PlayerData save and load', () => {
         player.gold = 321;
         player.currentHubTownId = 'w_forest_village';
         player.pendingRestMenuId = 'hearty_breakfast';
+        player.facilityUpgrades.infirmary = 1;
+        player.facilityUpgrades.workshop = 2;
         player.addQuestItem('quest_bomb');
         player.addStoryCompanion('story_cleric_ep02');
         player.save();
@@ -723,6 +725,8 @@ test('pending rest menu id persists through PlayerData save and load', () => {
         assert.equal(loaded.gold, 321);
         assert.equal(loaded.currentHubTownId, 'w_forest_village');
         assert.equal(loaded.pendingRestMenuId, 'hearty_breakfast');
+        assert.equal(loaded.facilityUpgrades.infirmary, 1);
+        assert.equal(loaded.facilityUpgrades.workshop, 2);
         assert.equal(loaded.hasQuestItem('quest_bomb'), true);
         assert.equal(loaded.hasStoryCompanion('story_cleric_ep02'), true);
     } finally {

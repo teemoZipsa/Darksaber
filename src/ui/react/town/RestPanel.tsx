@@ -11,7 +11,7 @@ import type { CSSProperties } from 'react';
 import { t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
-import { getRestMenu, INJURY_TREATMENT_PRICE } from '../../../data/RestFacilityData';
+import { getRestMenu } from '../../../data/RestFacilityData';
 import { useStore, useUiVersion } from '../UiContext';
 import { restIcon } from './restIcon';
 
@@ -26,6 +26,7 @@ export function RestPanel({ showMenus = true, showTreatment = true }: RestPanelP
     const facility = store.getRestFacility();
     const pendingId = store.getPendingRestMenuId();
     const injured = store.getInjuredCount();
+    const treatmentPrice = store.getInjuryTreatmentPrice();
 
     const [confirmId, setConfirmId] = useState<string | null>(null);
     const [feedback, setFeedback] = useState('');
@@ -98,7 +99,7 @@ export function RestPanel({ showMenus = true, showTreatment = true }: RestPanelP
                             <div className="ds-rest__injurytitle">{t('rest.injuryTitle')}</div>
                             <div className={`ds-rest__injurycount${injured > 0 ? ' is-injured' : ''}`}>
                                 {injured > 0
-                                    ? `${t('rest.injuryCount')}: ${injured} (${injured * INJURY_TREATMENT_PRICE}G)`
+                                    ? `${t('rest.injuryCount')}: ${injured} (${injured * treatmentPrice}G)`
                                     : t('rest.injuryNone')}
                             </div>
                         </div>

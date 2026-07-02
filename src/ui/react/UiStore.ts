@@ -25,6 +25,14 @@ import { getRepairCost, getUnsocketCost, repairItem, unsocketAll } from '../../i
 import { getStoryQuestViews as buildStoryQuestViews, type StoryQuestView } from '../../data/StoryQuestData';
 import { getSkill, type Skill } from '../../data/SkillDB';
 import {
+    applyFacilityCostMultiplier,
+    getNextFacilityUpgradeTier,
+    getWorkshopCostMultiplier,
+    type FacilityUpgradeCostItem,
+    type FacilityUpgradeDefinition,
+    type FacilityUpgradeId,
+} from '../../data/FacilityUpgradeData';
+import {
     checkUpgrade,
     getLearnedSkillIdSet,
     getOrderedLearnedSkills,
@@ -40,6 +48,16 @@ export interface BlacksmithEntry {
     slot?: ItemSlot;
     repairCost: number;
     unsocketCost: number;
+}
+
+export interface FacilityUpgradeView {
+    definition: FacilityUpgradeDefinition;
+    level: number;
+    nextLevel: number | null;
+    goldCost: number;
+    items: Array<FacilityUpgradeCostItem & { owned: number }>;
+    canUpgrade: boolean;
+    maxed: boolean;
 }
 
 export class UiStore {
@@ -177,6 +195,7 @@ export class UiStore {
     getTownDeployError = (): string | null => this.townUi()?.getDeployError() ?? null;
     getPendingRestMenuId = (): string | null => this.townUi()?.getPendingRestMenuId?.() ?? null;
     getInjuredCount = (): number => this.townUi()?.getInjuredCount?.() ?? 0;
+    getInjuryTreatmentPrice = (): number => this.town()?.getInjuryTreatmentPrice() ?? 0;
     isQuestDone = (questId: string): boolean => this.townUi()?.getQuestDone?.(questId) ?? false;
 
     getShopKind = (): ShopKind => this.shop()?.getActiveKind() ?? 'weapon';
@@ -184,6 +203,26 @@ export class UiStore {
     getShopBuyEntries = (): ShopEntry[] => this.shop()?.listBuyEntries() ?? [];
     getShopSellEntries = (): SellEntry[] => this.shop()?.listSellEntries() ?? [];
     getBlacksmithGold = (): number => this.gm.playerData.gold;
+    getFacilityUpgradeViews = (): FacilityUpgradeView[] => {
+        const town = this.town();
+        if (!town) return [];
+        return town.getFacilityUpgradeDefinitions().map((definition) => {
+            const level = town.getFacilityUpgradeLevel(definition.id);
+            const tier = getNextFacilityUpgradeTier(this.gm.playerData.facilityUpgrades, definition.id);
+            return {
+                definition,
+                level,
+                nextLevel: tier?.level ?? null,
+                goldCost: tier?.gold ?? 0,
+                items: (tier?.items ?? []).map((item) => ({
+                    ...item,
+                    owned: town.countFacilityCostItem(item.itemId),
+                })),
+                canUpgrade: town.canUpgradeFacility(definition.id),
+                maxed: level >= definition.maxLevel,
+            };
+        });
+    };
     getBlacksmithEntries = (): BlacksmithEntry[] => {
         const entries: BlacksmithEntry[] = [];
         for (const character of this.gm.party.getCharacters()) {
@@ -207,18 +246,25 @@ export class UiStore {
     shopSetKind = (kind: ShopKind): void => { this.shop()?.setActiveKind(kind); this.tick(); };
     shopBuy = (entry: ShopEntry): boolean => { const ok = this.shop()?.buy(entry) ?? false; this.tick(); return ok; };
     shopSell = (entry: SellEntry): boolean => { const ok = this.shop()?.sell(entry) ?? false; this.tick(); return ok; };
+    facilityUpgrade = (id: FacilityUpgradeId): boolean => {
+        const ok = this.town()?.upgradeFacility(id) ?? false;
+        this.tick();
+        return ok;
+    };
     blacksmithRepair = (entry: BlacksmithEntry): boolean => {
-        const result = repairItem(entry.placed, this.gm.playerData.gold);
+        if (this.gm.playerData.gold < entry.repairCost) { this.tick(); return false; }
+        const result = repairItem(entry.placed, Number.POSITIVE_INFINITY);
         if (!result.ok) { this.tick(); return false; }
-        if (result.cost > 0) this.gm.playerData.spendGold(result.cost);
+        if (entry.repairCost > 0) this.gm.playerData.spendGold(entry.repairCost);
         this.gm.playerData.save();
         this.tick();
         return true;
     };
     blacksmithUnsocket = (entry: BlacksmithEntry): boolean => {
-        const result = unsocketAll(entry.placed, this.gm.inventory, this.gm.playerData.gold);
+        if (this.gm.playerData.gold < entry.unsocketCost) { this.tick(); return false; }
+        const result = unsocketAll(entry.placed, this.gm.inventory, Number.POSITIVE_INFINITY);
         if (!result.ok) { this.tick(); return false; }
-        if (result.cost > 0) this.gm.playerData.spendGold(result.cost);
+        if (entry.unsocketCost > 0) this.gm.playerData.spendGold(entry.unsocketCost);
         this.gm.playerData.save();
         this.tick();
         return true;
@@ -264,8 +310,9 @@ export class UiStore {
         sourceLabel: string,
         slot?: ItemSlot
     ): void {
-        const repairCost = getRepairCost(placed);
-        const unsocketCost = getUnsocketCost(placed);
+        const workshopMultiplier = getWorkshopCostMultiplier(this.gm.playerData.facilityUpgrades);
+        const repairCost = applyFacilityCostMultiplier(getRepairCost(placed), workshopMultiplier);
+        const unsocketCost = applyFacilityCostMultiplier(getUnsocketCost(placed), workshopMultiplier);
         if (repairCost <= 0 && unsocketCost <= 0) return;
         entries.push({
             id: `${source}:${sourceLabel}:${slot ?? 'grid'}:${placed.item.id}:${entries.length}`,

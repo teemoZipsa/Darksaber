@@ -1,4 +1,5 @@
 import { ITEMS } from '../src/data/ItemDB';
+import { normalizeFacilityUpgradeState } from '../src/data/FacilityUpgradeData';
 import {
     normalizeMarketContracts,
     normalizeMarketCycle,
@@ -27,6 +28,7 @@ const CLIENT_QUEST_STATE_FIELDS = new Set([
     'marketState',
     'marketCycle',
     'marketContracts',
+    'facilityUpgrades',
 ]);
 
 const EQUIPMENT_SLOTS = ['weapon', 'shield', 'head', 'body', 'boots', 'accessory', 'accessory2'] as const;
@@ -122,6 +124,9 @@ function sanitizeClientQuestState(
             incoming.marketContracts,
             normalizeMarketCycle(next.marketCycle),
         );
+    }
+    if (isRecord(incoming.facilityUpgrades)) {
+        next.facilityUpgrades = normalizeFacilityUpgradeState(incoming.facilityUpgrades);
     }
     return next;
 }

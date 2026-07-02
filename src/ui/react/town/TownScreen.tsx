@@ -20,6 +20,7 @@ import { QuestPanel } from './QuestPanel';
 import { RumorsPanel } from './RumorsPanel';
 import { restIcon } from './restIcon';
 import { InventoryPanel } from '../inventory/InventoryPanel';
+import { FacilityUpgradePanel } from './FacilityUpgradePanel';
 
 export function TownScreen() {
     useUiVersion();
@@ -73,7 +74,12 @@ export function TownScreen() {
             </div>
 
             <div className="ds-town__content">
-                {tab === 'storage' && townInv && <InventoryPanel inv={townInv} embedded />}
+                {tab === 'storage' && townInv && (
+                    <div className="ds-town__storage">
+                        <FacilityUpgradePanel />
+                        <InventoryPanel inv={townInv} embedded />
+                    </div>
+                )}
                 {isShopFacilityId(tab) && <ShopPanel />}
                 {tab === 'blacksmith' && <BlacksmithPanel />}
                 {tab === 'rest' && <RestPanel showMenus showTreatment={!facilities.includes('healer')} />}

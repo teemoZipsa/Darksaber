@@ -4,9 +4,19 @@ import type { PlayerData } from '../../data/PlayerData';
 import { HybridMarketService } from '../../data/HybridMarketService';
 import type { MarketService } from '../../data/MarketService';
 import { getRestMenu, INJURY_TREATMENT_PRICE, type RestMenu } from '../../data/RestFacilityData';
+import {
+    FACILITY_UPGRADES,
+    applyFacilityCostMultiplier,
+    getFacilityUpgradeLevel,
+    getInjuryTreatmentCostMultiplier,
+    getNextFacilityUpgradeTier,
+    type FacilityUpgradeDefinition,
+    type FacilityUpgradeId,
+} from '../../data/FacilityUpgradeData';
 import { getSellPrice as getBaseSellPrice } from '../../data/ShopData';
 import type { GameManager } from '../GameManager';
 import type { InputManager } from '../InputManager';
+import type { PlacedItem } from '../../inventory/GridInventory';
 import type { TownInfo } from '../../map/BiomeMask';
 import { TownUI } from '../../ui/TownUI';
 import {
@@ -22,6 +32,7 @@ import {
 } from '../../combat/StatusEffects';
 
 type WorldTownSessionGameManager = Pick<GameManager, 'inventory' | 'stash'>;
+type FacilityInventoryGrid = { items: PlacedItem[]; remove: (placed: PlacedItem) => void };
 
 export interface WorldTownSessionOptions {
     party: PartyManager;
@@ -104,7 +115,7 @@ export class WorldTownSession {
         const injured = this.party.getCharacters().filter((character) => hasStatus(character.statuses, 'injury'));
         if (injured.length === 0) return false;
 
-        const price = injured.length * INJURY_TREATMENT_PRICE;
+        const price = injured.length * this.getInjuryTreatmentPrice();
         if (!this.playerData.spendGold(price)) {
             this.log(t('rest.noGold'));
             return false;
@@ -120,6 +131,51 @@ export class WorldTownSession {
 
     public getActivePartyInjuryCount(): number {
         return this.party.getCharacters().filter((character) => hasStatus(character.statuses, 'injury')).length;
+    }
+
+    public getInjuryTreatmentPrice(): number {
+        return applyFacilityCostMultiplier(
+            INJURY_TREATMENT_PRICE,
+            getInjuryTreatmentCostMultiplier(this.playerData.facilityUpgrades)
+        );
+    }
+
+    public getFacilityUpgradeDefinitions(): FacilityUpgradeDefinition[] {
+        return Object.values(FACILITY_UPGRADES);
+    }
+
+    public getFacilityUpgradeLevel(id: FacilityUpgradeId): number {
+        return getFacilityUpgradeLevel(this.playerData.facilityUpgrades, id);
+    }
+
+    public canUpgradeFacility(id: FacilityUpgradeId): boolean {
+        const tier = getNextFacilityUpgradeTier(this.playerData.facilityUpgrades, id);
+        if (!tier) return false;
+        if (this.playerData.gold < tier.gold) return false;
+        return tier.items.every((cost) => this.countTownItem(cost.itemId) >= cost.quantity);
+    }
+
+    public upgradeFacility(id: FacilityUpgradeId): boolean {
+        const tier = getNextFacilityUpgradeTier(this.playerData.facilityUpgrades, id);
+        if (!tier) return false;
+        if (!this.canUpgradeFacility(id)) {
+            this.log(t('facility.noMaterials'));
+            return false;
+        }
+
+        if (!this.playerData.spendGold(tier.gold)) {
+            this.log(t('town.log.noGold'));
+            return false;
+        }
+        for (const cost of tier.items) this.consumeTownItem(cost.itemId, cost.quantity);
+        this.playerData.facilityUpgrades[id] = tier.level;
+        this.playerData.save();
+        this.log(formatT('facility.upgradedLog', { facility: t(FACILITY_UPGRADES[id].nameKey), level: tier.level }));
+        return true;
+    }
+
+    public countFacilityCostItem(itemId: string): number {
+        return this.countTownItem(itemId);
     }
 
     public applyPendingRestPreview(): void {
@@ -232,4 +288,38 @@ export class WorldTownSession {
                 sourceRestMenuId: menu.id,
             }));
     }
+
+    private countTownItem(itemId: string): number {
+        return countItemInGrid(this.gameManager.inventory, itemId) + countItemInGrid(this.gameManager.stash, itemId);
+    }
+
+    private consumeTownItem(itemId: string, quantity: number): void {
+        let remaining = Math.max(0, Math.floor(quantity));
+        remaining = consumeItemFromGrid(this.gameManager.inventory, itemId, remaining);
+        consumeItemFromGrid(this.gameManager.stash, itemId, remaining);
+    }
+}
+
+function countItemInGrid(grid: FacilityInventoryGrid, itemId: string): number {
+    return grid.items
+        .filter((placed) => placed.item.id === itemId)
+        .reduce((sum, placed) => sum + Math.max(1, Math.floor(placed.quantity)), 0);
+}
+
+function consumeItemFromGrid(
+    grid: FacilityInventoryGrid,
+    itemId: string,
+    quantity: number
+): number {
+    let remaining = Math.max(0, Math.floor(quantity));
+    for (const placed of [...grid.items]) {
+        if (remaining <= 0) break;
+        if (placed.item.id !== itemId) continue;
+        const stack = Math.max(1, Math.floor(placed.quantity));
+        const take = Math.min(stack, remaining);
+        placed.quantity = stack - take;
+        remaining -= take;
+        if (placed.quantity <= 0) grid.remove(placed);
+    }
+    return remaining;
 }
