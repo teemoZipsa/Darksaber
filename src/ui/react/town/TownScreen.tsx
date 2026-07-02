@@ -30,6 +30,8 @@ export function TownScreen() {
     const restFacility = store.getRestFacility();
     const deployPending = store.isTownDeployPending();
     const deployError = store.getTownDeployError();
+    const insurancePrice = store.getRaidInsurancePrice();
+    const insured = store.hasRaidInsurance();
     if (!town) return null;
 
     const facilities = getTownFacilities(town.id);
@@ -50,6 +52,11 @@ export function TownScreen() {
     const deploy = () => {
         if (deployPending) return;
         if (store.townDeploy()) AudioManager.playSfx('sfx.deploy');
+    };
+    const buyInsurance = () => {
+        if (insured || deployPending) return;
+        const ok = store.buyRaidInsurance();
+        AudioManager.playUi(ok ? 'ui.confirm' : 'ui.cancel');
     };
 
     return (
@@ -90,6 +97,17 @@ export function TownScreen() {
 
             <div className="ds-town__footer" style={scaleVar}>
                 {deployError && <div className="ds-town__deploy-error">{deployError}</div>}
+                <button
+                    type="button"
+                    className={`ds-town__insurance${insured ? ' is-active' : ''}`}
+                    disabled={insured || deployPending}
+                    onClick={buyInsurance}
+                    title={t('insurance.tooltip')}
+                >
+                    ◈ {insured
+                        ? t('insurance.active')
+                        : `${t('insurance.buy')} ${insurancePrice}G`}
+                </button>
                 <button
                     type="button"
                     className="ds-town__deploy"

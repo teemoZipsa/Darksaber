@@ -39,6 +39,7 @@ export interface SaveData {
     marketCycle?: number;
     marketContracts?: MarketContract[];
     facilityUpgrades?: FacilityUpgradeState;
+    raidInsuranceActive?: boolean;
     currentHubTownId?: string;
     pendingRestMenuId?: string | null;
     inventory?: InventoryItem[];
@@ -69,6 +70,7 @@ export class PlayerData {
     public marketCycle: number = 0;
     public marketContracts: MarketContract[] = [];
     public facilityUpgrades: FacilityUpgradeState = {};
+    public raidInsuranceActive: boolean = false;
     public currentHubTownId: string = 'central_castle';
     public pendingRestMenuId: string | null = null;
     public inventory: InventoryItem[] = [];
@@ -179,6 +181,7 @@ export class PlayerData {
             this.marketCycle = normalizeMarketCycle(data.marketCycle);
             this.marketContracts = normalizeMarketContracts(data.marketContracts, this.marketCycle);
             this.facilityUpgrades = normalizeFacilityUpgradeState(data.facilityUpgrades);
+            this.raidInsuranceActive = data.raidInsuranceActive === true;
             this.currentHubTownId = typeof data.currentHubTownId === 'string' ? data.currentHubTownId : 'central_castle';
             this.pendingRestMenuId = typeof data.pendingRestMenuId === 'string' ? data.pendingRestMenuId : null;
             this.inventory = normalizeInventory(data.inventory);
@@ -206,6 +209,7 @@ export class PlayerData {
                 marketCycle: this.marketCycle,
                 marketContracts: this.marketContracts,
                 facilityUpgrades: this.facilityUpgrades,
+                raidInsuranceActive: this.raidInsuranceActive,
             },
             inventory: {
                 width: 10,
@@ -244,6 +248,7 @@ export class PlayerData {
         this.marketCycle = normalizeMarketCycle(questState.marketCycle);
         this.marketContracts = normalizeMarketContracts(questState.marketContracts, this.marketCycle);
         this.facilityUpgrades = normalizeFacilityUpgradeState(questState.facilityUpgrades);
+        this.raidInsuranceActive = questState.raidInsuranceActive === true;
         this.currentHubTownId = typeof hubLocation.townId === 'string' ? hubLocation.townId : 'central_castle';
         this.pendingRestMenuId = typeof hubLocation.pendingRestMenuId === 'string' ? hubLocation.pendingRestMenuId : null;
         this.inventory = normalizeInventorySnapshot(save.inventory);

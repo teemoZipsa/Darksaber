@@ -29,6 +29,7 @@ const CLIENT_QUEST_STATE_FIELDS = new Set([
     'marketCycle',
     'marketContracts',
     'facilityUpgrades',
+    'raidInsuranceActive',
 ]);
 
 const EQUIPMENT_SLOTS = ['weapon', 'shield', 'head', 'body', 'boots', 'accessory', 'accessory2'] as const;
@@ -127,6 +128,9 @@ function sanitizeClientQuestState(
     }
     if (isRecord(incoming.facilityUpgrades)) {
         next.facilityUpgrades = normalizeFacilityUpgradeState(incoming.facilityUpgrades);
+    }
+    if (typeof incoming.raidInsuranceActive === 'boolean') {
+        next.raidInsuranceActive = incoming.raidInsuranceActive;
     }
     return next;
 }

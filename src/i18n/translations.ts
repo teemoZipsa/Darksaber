@@ -1260,6 +1260,13 @@ export const I18N_STRINGS: TranslationTable = {
         'merchantContract.completed': '의뢰를 완료했습니다.',
         'merchantContract.notEnough': '납품할 물품이 부족합니다.',
         'merchantContract.completedLog': '{item} 납품 의뢰 완료 +{gold}G',
+        'insurance.buy': '장비 보험',
+        'insurance.active': '보험 적용 중',
+        'insurance.tooltip': '다음 레이드 실패 시 잃을 장비 1개를 보호합니다.',
+        'insurance.noGold': '보험료가 부족합니다.',
+        'insurance.purchasedLog': '장비 보험 가입 -{price}G',
+        'insurance.protectedNote': '보험 적용: {character}의 {item} 보호',
+        'insurance.noEquipmentProtected': '보험 적용: 잃을 장비가 없어 보호 대상이 없었습니다.',
 
         // Rest facilities
         'tab.rest': '휴식',
@@ -3263,6 +3270,13 @@ export const I18N_STRINGS: TranslationTable = {
         'merchantContract.completed': 'Contract completed.',
         'merchantContract.notEnough': 'Not enough goods to deliver.',
         'merchantContract.completedLog': 'Completed {item} delivery contract +{gold}G',
+        'insurance.buy': 'Gear Insurance',
+        'insurance.active': 'Insurance Active',
+        'insurance.tooltip': 'Protects one equipment loss if the next raid fails.',
+        'insurance.noGold': 'Not enough gold for insurance.',
+        'insurance.purchasedLog': 'Gear insurance purchased -{price}G',
+        'insurance.protectedNote': "Insurance protected {character}'s {item}",
+        'insurance.noEquipmentProtected': 'Insurance applied, but there was no equipment loss to protect.',
 
         // Rest facilities
         'tab.rest': 'Rest',

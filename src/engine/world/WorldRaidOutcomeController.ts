@@ -26,6 +26,7 @@ import {
     type RaidResultType,
     snapshotPlacedItem,
 } from '../../raid/RaidOutcome';
+import { applyRaidInsurance } from '../../raid/RaidInsurance';
 import { RaidResultUI } from '../../ui/RaidResultUI';
 import { FIRST_SURVIVAL_GOLD_REWARD, FIRST_SURVIVAL_QUEST_ID } from '../../shared/FirstSurvivalReward';
 import type { GameManager } from '../GameManager';
@@ -126,6 +127,9 @@ export class WorldRaidOutcomeController {
         if (serverRewards && options.firstSurvivalBonus) {
             questRewards.push(formatT('raid.outcome.firstSurvivalQuest', { completed: t('quest.completed') }));
         }
+        if (this.context.playerData.raidInsuranceActive) {
+            this.context.playerData.raidInsuranceActive = false;
+        }
         if (!serverRewards) {
             questRewards.push(...this.completeScenarioRuntimeQuestItems());
             questRewards.push(...this.completeStoryQuestRewards());
@@ -169,7 +173,13 @@ export class WorldRaidOutcomeController {
         if (!raidSession.active) return;
 
         const heroStatuses = this.createHeroStatuses();
-        const loss = computeRaidFailureLoss(this.context.gameManager.inventory.items, this.context.party.getCharacters());
+        const insuranceActive = this.context.playerData.raidInsuranceActive;
+        const insurance = applyRaidInsurance(
+            computeRaidFailureLoss(this.context.gameManager.inventory.items, this.context.party.getCharacters()),
+            insuranceActive
+        );
+        const loss = insurance.loss;
+        if (insuranceActive) this.context.playerData.raidInsuranceActive = false;
         this.context.gameManager.inventory.clear();
         for (const lost of loss.equipmentLost) {
             const character = this.context.party.getCharacters().find((candidate) => candidate.id === lost.characterId);
@@ -201,6 +211,12 @@ export class WorldRaidOutcomeController {
             equipmentLost: loss.equipmentLost,
             notes: [
                 result === 'MIA' ? t('raid.outcome.miaNote') : t('raid.outcome.deadNote'),
+                ...(insurance.protectedEquipment
+                    ? [formatT('insurance.protectedNote', {
+                        character: insurance.protectedEquipment.characterName,
+                        item: displayItemName(getItemDef(insurance.protectedEquipment.item.id), insurance.protectedEquipment.item.id),
+                    })]
+                    : insuranceActive ? [t('insurance.noEquipmentProtected')] : []),
                 ...recoveryNotes,
             ],
         };

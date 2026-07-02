@@ -226,6 +226,31 @@ test('raid failure grants a basic recovery set instead of leaving the party empt
     assert.ok(getOutcome()?.notes?.some((note) => note.includes('기본 보급품 지급')));
 });
 
+test('raid insurance protects one equipment loss and is consumed on failure', () => {
+    const { controller, playerData, raidSession, party, getOutcome } = createController();
+    const hero = new Character('hero', 'Hero', 'infantry');
+    const ally = new Character('ally', 'Ally', 'infantry');
+    const sword = getItemDef('short_sword');
+    const armor = getItemDef('battle_t1_body');
+    assert.ok(sword);
+    assert.ok(armor);
+    hero.equip({ item: sword, gridX: 0, gridY: 0, durability: sword.maxDurability, quantity: 1 });
+    ally.equip({ item: armor, gridX: 0, gridY: 0, durability: armor.maxDurability, quantity: 1 });
+    party.addToRoster(hero);
+    party.addToRoster(ally);
+    party.deployCharacter(hero);
+    party.deployCharacter(ally);
+    playerData.raidInsuranceActive = true;
+    raidSession.beginRaidFromTown('central_castle');
+
+    controller.completeFailure('DEAD');
+
+    const outcome = getOutcome();
+    assert.equal(playerData.raidInsuranceActive, false);
+    assert.equal(outcome?.equipmentLost.length, 1);
+    assert.ok(outcome?.notes?.some((note) => note.includes('보험 적용')));
+});
+
 test('Burgos field event items are preserved as quest items only after survival', () => {
     const { controller, playerData, raidSession, getOutcome } = createController();
     raidSession.beginRaidFromTown('central_castle');

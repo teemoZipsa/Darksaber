@@ -5,6 +5,7 @@ import { HybridMarketService } from '../../data/HybridMarketService';
 import { getItemDef, type ItemDef } from '../../data/ItemDB';
 import type { MarketService } from '../../data/MarketService';
 import { getRestMenu, INJURY_TREATMENT_PRICE, type RestMenu } from '../../data/RestFacilityData';
+import { RAID_INSURANCE_PRICE } from '../../raid/RaidInsurance';
 import {
     FACILITY_UPGRADES,
     applyFacilityCostMultiplier,
@@ -191,6 +192,26 @@ export class WorldTownSession {
 
     public countFacilityCostItem(itemId: string): number {
         return this.countTownItem(itemId);
+    }
+
+    public getRaidInsurancePrice(): number {
+        return RAID_INSURANCE_PRICE;
+    }
+
+    public hasRaidInsurance(): boolean {
+        return this.playerData.raidInsuranceActive;
+    }
+
+    public buyRaidInsurance(): boolean {
+        if (this.playerData.raidInsuranceActive) return true;
+        if (!this.playerData.spendGold(RAID_INSURANCE_PRICE)) {
+            this.log(t('insurance.noGold'));
+            return false;
+        }
+        this.playerData.raidInsuranceActive = true;
+        this.playerData.save();
+        this.log(formatT('insurance.purchasedLog', { price: RAID_INSURANCE_PRICE }));
+        return true;
     }
 
     public getMerchantContractViews(): MerchantContractView[] {

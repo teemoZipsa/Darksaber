@@ -711,6 +711,32 @@
     align-items: center;
     gap: 8px;
 }
+#ui-overlay .ds-town__insurance {
+    pointer-events: auto;
+    font-family: inherit;
+    font-size: 12px;
+    min-width: 178px;
+    padding: 7px 14px;
+    color: var(--ds-text-muted);
+    background: var(--ds-panel-inset);
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+    cursor: pointer;
+}
+#ui-overlay .ds-town__insurance:hover:not(:disabled) {
+    color: var(--ds-accent-bright);
+    border-color: var(--ds-accent);
+    background: var(--ds-accent-soft);
+}
+#ui-overlay .ds-town__insurance.is-active {
+    color: var(--ds-accent-bright);
+    border-color: var(--ds-accent);
+    cursor: default;
+}
+#ui-overlay .ds-town__insurance:disabled:not(.is-active) {
+    opacity: 0.55;
+    cursor: default;
+}
 #ui-overlay .ds-town__deploy-error {
     max-width: min(720px, 90vw);
     color: #ffb0a8;

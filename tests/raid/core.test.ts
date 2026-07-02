@@ -13,6 +13,7 @@ import {
 } from '../../src/raid/CursedArtifact';
 import { getRepairCost, repairItem, unsocketAll } from '../../src/inventory/Socketing';
 import { computeRaidFailureLoss } from '../../src/raid/RaidOutcome';
+import { applyRaidInsurance } from '../../src/raid/RaidInsurance';
 import { resolveTownArrival, shouldAdvanceRaidTimer } from '../../src/raid/RaidRules';
 import { WorldMap } from '../../src/map/WorldMap';
 import { CHUNK_SIZE } from '../../src/map/Chunk';
@@ -665,6 +666,27 @@ test('raid failure loss chooses one equipped item per character', () => {
     assert.equal(loss.equipmentLost.length, 2);
     assert.equal(loss.equipmentLost[0].slot, 'weapon');
     assert.equal(loss.equipmentLost[1].slot, 'body');
+});
+
+test('raid insurance protects the highest value equipment loss only', () => {
+    const weapon = placed('short_sword');
+    const body = placed('battle_t1_body');
+    const loss = computeRaidFailureLoss(
+        [],
+        [
+            { id: 'c1', name: 'One', equipment: new Map([['weapon', weapon]]) },
+            { id: 'c2', name: 'Two', equipment: new Map([['body', body]]) },
+        ],
+        () => 0
+    );
+
+    const insured = applyRaidInsurance(loss, true);
+    const expectedProtected = [...loss.equipmentLost]
+        .sort((a, b) => b.item.baseValue - a.item.baseValue)[0];
+
+    assert.equal(insured.protectedEquipment?.characterId, expectedProtected.characterId);
+    assert.equal(insured.loss.equipmentLost.length, 1);
+    assert.equal(insured.loss.equipmentLost.some((entry) => entry.characterId === expectedProtected.characterId), false);
 });
 
 test('WorldMap exposes consistent town tile helpers', () => {

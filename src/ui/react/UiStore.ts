@@ -196,6 +196,8 @@ export class UiStore {
     getPendingRestMenuId = (): string | null => this.townUi()?.getPendingRestMenuId?.() ?? null;
     getInjuredCount = (): number => this.townUi()?.getInjuredCount?.() ?? 0;
     getInjuryTreatmentPrice = (): number => this.town()?.getInjuryTreatmentPrice() ?? 0;
+    getRaidInsurancePrice = (): number => this.town()?.getRaidInsurancePrice() ?? 0;
+    hasRaidInsurance = (): boolean => this.town()?.hasRaidInsurance() ?? false;
     isQuestDone = (questId: string): boolean => this.townUi()?.getQuestDone?.(questId) ?? false;
     getMerchantContractViews = (): MerchantContractView[] => this.town()?.getMerchantContractViews() ?? [];
 
@@ -278,6 +280,11 @@ export class UiStore {
 
     restPurchase = (menuId: string): boolean => { const ok = this.town()?.purchaseRestMenu(menuId) ?? false; this.tick(); return ok; };
     restTreat = (): boolean => { const ok = this.town()?.treatActivePartyInjuries() ?? false; this.tick(); return ok; };
+    buyRaidInsurance = (): boolean => {
+        const ok = this.town()?.buyRaidInsurance() ?? false;
+        this.tick();
+        return ok;
+    };
 
     // ─── Character creation (DOM overlay) ─────────────────────────
     isCharCreateOpen = (): boolean => this.gm.isCharCreationState();
