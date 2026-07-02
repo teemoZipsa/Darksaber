@@ -692,6 +692,18 @@ const RAW_ITEMS: RawItemDef[] = [
         buyPrice: 50
     },
     {
+        id: 'master_key', name: 'Master Key', nameKr: '마스터키',
+        slot: 'material', gridW: 1, gridH: 1, color: '#f0c050', icon: '⚿',
+        maxDurability: 1,
+        description: 'A rare raid key that opens a marked cache. Valuable even if extracted unused.',
+        descriptionKr: '마크드 상자를 여는 희귀 레이드 열쇠입니다. 사용하지 않고 생환해도 비싸게 팔립니다.',
+        rarity: 'epic',
+        weight: 0.1,
+        baseValue: 2500,
+        sellable: true,
+        itemCategory: 'material'
+    },
+    {
         id: 'antidote', name: 'Antidote', nameKr: '해독제',
         slot: 'consumable', gridW: 1, gridH: 1, color: '#7bdc65', icon: '⚗',
         maxDurability: 1,

@@ -184,6 +184,7 @@ export interface WorldSessionPersistentLoot {
     kind: 'chest' | 'corpse';
     containerType?: WorldLootContainerType;
     opened: boolean;
+    unlocked?: boolean;
     gridSnapshot: GridSnapshot;
     overflowItemIds: string[];
 }

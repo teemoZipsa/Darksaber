@@ -24,6 +24,7 @@ export class LootObject {
     public kind: 'chest' | 'corpse';
     public containerType?: WorldLootContainerType;
     public overflowItems: ItemDef[] = [];
+    public unlocked: boolean = false;
 
     constructor(id: string, x: number, y: number, items: ItemDef[], options: LootObjectOptions = {}) {
         this.id = id;
@@ -74,6 +75,7 @@ export class LootObject {
 function getLootFillColor(kind: 'chest' | 'corpse', containerType?: WorldLootContainerType): string {
     if (kind === 'corpse') return '#7d6b5a';
     switch (containerType) {
+        case 'marked_cache': return '#352548';
         case 'sealed_reliquary': return '#5e487d';
         case 'regional_goods_crate': return '#8a7650';
         case 'traveler_pack': return '#6b5a4b';
@@ -84,11 +86,13 @@ function getLootFillColor(kind: 'chest' | 'corpse', containerType?: WorldLootCon
 
 function getLootStrokeColor(kind: 'chest' | 'corpse', containerType?: WorldLootContainerType): string {
     if (kind === 'corpse') return '#d8c29a';
+    if (containerType === 'marked_cache') return '#ffcf6b';
     return containerType === 'sealed_reliquary' ? '#cda4ff' : '#ffff00';
 }
 
 function getLootGlyph(kind: 'chest' | 'corpse', containerType?: WorldLootContainerType): string {
     if (kind === 'corpse') return '☠';
+    if (containerType === 'marked_cache') return '✦';
     if (containerType === 'sealed_reliquary') return '◆';
     if (containerType === 'regional_goods_crate') return '◇';
     return '▣';

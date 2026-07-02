@@ -18,6 +18,7 @@ test('loot source labels are localized at creation time', () => {
         assert.equal(getWorldLootSourceLabel('traveler_pack'), 'Fallen traveler pack');
         assert.equal(getWorldLootSourceLabel('regional_goods_crate'), 'Regional goods crate');
         assert.equal(getWorldLootSourceLabel('sealed_reliquary'), 'Sealed reliquary');
+        assert.equal(getWorldLootSourceLabel('marked_cache'), 'Marked cache');
         assert.equal(getEnemyLootSourceLabel('Ash Guard'), 'Ash Guard loot');
 
         const loot = new LootObject('loot-test', 0, 0, [getItemDef('herb_cheap')!]);

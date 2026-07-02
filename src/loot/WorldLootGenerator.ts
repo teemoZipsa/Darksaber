@@ -6,6 +6,7 @@ import { CHUNK_SIZE } from '../map/Chunk';
 import { TileType } from '../map/Tile';
 import type { WorldMap } from '../map/WorldMap';
 import type { TownInfo } from '../map/BiomeMask';
+import { MASTER_KEY_ITEM_ID } from '../raid/MarkedCache';
 import { getWorldLootSourceLabel } from './LootLabels';
 import type { WorldLootContainerType } from './WorldLootTypes';
 
@@ -246,6 +247,8 @@ function chooseItems(
             return chooseRegionalItems(options, tile, chunkX, chunkY);
         case 'sealed_reliquary':
             return chooseReliquaryItems(options, chunkX, chunkY);
+        case 'marked_cache':
+            return [];
     }
 }
 
@@ -289,6 +292,7 @@ function chooseReliquaryItems(options: ResolvedGenerateWorldLootOptions, chunkX:
     const realm = options.worldMap.getRealm();
     const roll = roll01(options.seed, realm, chunkX, chunkY, 'reliquary:roll');
     if (roll < 0.12) return [itemFromPool(['cursed_blood_reliquary'], options.seed, realm, chunkX, chunkY, 'reliquary:cursed')].filter((item): item is ItemDef => Boolean(item));
+    if (roll < 0.2) return [itemFromPool([MASTER_KEY_ITEM_ID], options.seed, realm, chunkX, chunkY, 'reliquary:key')].filter((item): item is ItemDef => Boolean(item));
     if (roll < 0.5) return [itemFromPool(GEM_ITEM_IDS.filter((id) => id.startsWith('gem_chipped_') || id.startsWith('gem_flawed_') || id.startsWith('gem_normal_')), options.seed, realm, chunkX, chunkY, 'reliquary:gem')].filter((item): item is ItemDef => Boolean(item));
     if (roll < 0.8) return [pickFrom(RARE_EQUIPMENT, options.seed, realm, chunkX, chunkY, 'reliquary:eq')].filter((item): item is ItemDef => Boolean(item));
     if (roll < 0.95) return [itemFromPool(['trade_tide_pearl', 'trade_sun_ore', 'trade_shadow_amber', 'trade_astral_sigil', 'trade_ember_core'], options.seed, realm, chunkX, chunkY, 'reliquary:trade')].filter((item): item is ItemDef => Boolean(item));

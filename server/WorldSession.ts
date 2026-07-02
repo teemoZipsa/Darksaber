@@ -64,7 +64,8 @@ import {
     getRaidModifierSupplyItems,
     rollRaidModifier,
 } from '../src/raid/RaidModifiers';
-import { getEnemyLootSourceLabel } from '../src/loot/LootLabels';
+import { getMarkedCacheItems, MASTER_KEY_ITEM_ID } from '../src/raid/MarkedCache';
+import { getEnemyLootSourceLabel, getWorldLootSourceLabel } from '../src/loot/LootLabels';
 import { generateWorldLootNear } from '../src/loot/WorldLootGenerator';
 import {
     ATTACK_AP_COST,
@@ -451,6 +452,7 @@ export class WorldSession {
 
         this.ensureContentNear(spawnTile, player.departureTownId, now);
         this.spawnRaidModifierSupplyDrop(player, spawnTile);
+        this.spawnMarkedCache(player, spawnTile);
         this.log(`join player=${playerId} origin=${originHubId} actors=${player.actorIds.length}`);
         return {
             playerId,
@@ -992,22 +994,41 @@ export class WorldSession {
     ): WorldSessionMessageResult {
         const lootId = readStringPayload(payload, 'lootId');
         if (!lootId) return reject(intentId, 'Interact payload must include lootId.');
-        if (this.players.get(playerId)?.activeDungeonId) return reject(intentId, 'Loot is not visible.');
+        const player = this.players.get(playerId);
+        if (player?.activeDungeonId) return reject(intentId, 'Loot is not visible.');
         const lootObject = this.loot.get(lootId);
         if (!lootObject || lootObject.opened || this.lootState.isAutoLootPending(lootId)) return reject(intentId, 'Loot is not available.');
         if (actor.remainingAp < INTERACT_AP_COST) return reject(intentId, 'No action available to inspect loot.');
         if (manhattan(actor.tile, { x: lootObject.x, y: lootObject.y }) > 1) return reject(intentId, 'Loot is too far away.');
+        if (lootObject.containerType === 'marked_cache' && !lootObject.unlocked) {
+            if ((player?.carriedItems.get(MASTER_KEY_ITEM_ID) ?? 0) <= 0) {
+                return reject(intentId, 'Master key is required to open this marked cache.');
+            }
+        }
 
         if (this.lootState.occupy(lootId, playerId, now) === 'occupied_by_other') return reject(intentId, 'Loot is already occupied.');
 
         this.spendActorGauge(actor, INTERACT_AP_COST);
+        const replies: WorldServerMessage[] = [];
+        if (lootObject.containerType === 'marked_cache' && !lootObject.unlocked && player) {
+            addCarriedItemQuantity(player, MASTER_KEY_ITEM_ID, -1);
+            this.saveState.removeItemQuantity(player, MASTER_KEY_ITEM_ID, 1);
+            this.saveState.markDirty(player.id);
+            lootObject.unlocked = true;
+            replies.push({
+                type: 'INVENTORY_CONSUMED',
+                itemId: MASTER_KEY_ITEM_ID,
+                quantity: 1,
+            } satisfies InventoryConsumedMessage);
+        }
         this.finishActorIfSpent(actor);
+        replies.push({
+            type: 'LOOT_GRANT',
+            lootId,
+            gridSnapshot: gridToSnapshot(lootObject.inventory),
+        } satisfies LootGrantMessage);
         return {
-            replies: [{
-                type: 'LOOT_GRANT',
-                lootId,
-                gridSnapshot: gridToSnapshot(lootObject.inventory),
-            } satisfies LootGrantMessage],
+            replies,
             broadcasts: [],
         };
     }
@@ -2193,6 +2214,24 @@ export class WorldSession {
             containerType: 'supply_cache',
             gridW: 5,
             gridH: 4,
+        }));
+    }
+
+    private spawnMarkedCache(player: ServerPlayer, spawnTile: TilePoint): void {
+        const items = getMarkedCacheItems(`${this.sessionEpoch}:${this.shardId}:${player.id}:marked_cache`);
+        if (items.length === 0) return;
+
+        const tile = this.findNearbyWalkableTile({
+            x: spawnTile.x + 34,
+            y: spawnTile.y + 18,
+        }, `${player.id}:marked_cache`, player.id);
+        const id = `loot_marked_cache_${player.id}`;
+        this.loot.set(id, new LootObject(id, tile.x, tile.y, items, {
+            sourceLabel: getWorldLootSourceLabel('marked_cache'),
+            kind: 'chest',
+            containerType: 'marked_cache',
+            gridW: 5,
+            gridH: 5,
         }));
     }
 

@@ -176,6 +176,7 @@ export function toPersistentLoot(lootObject: LootObject): WorldSessionPersistent
         kind: lootObject.kind,
         containerType: lootObject.containerType,
         opened: lootObject.opened,
+        unlocked: lootObject.unlocked || undefined,
         gridSnapshot: gridToSnapshot(lootObject.inventory),
         overflowItemIds: lootObject.overflowItems.map((item) => item.id),
     };
@@ -190,6 +191,7 @@ export function restorePersistentLoot(snapshot: WorldSessionPersistentLoot): Loo
         gridH: snapshot.gridSnapshot.height,
     });
     lootObject.opened = snapshot.opened;
+    lootObject.unlocked = snapshot.unlocked ?? false;
     for (const placedSnapshot of snapshot.gridSnapshot.items) {
         const item = getItemDef(placedSnapshot.itemId);
         if (!item) continue;

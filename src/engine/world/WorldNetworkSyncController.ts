@@ -467,6 +467,7 @@ export class WorldNetworkSyncController {
         });
         loot.inventory = this.gridFromSnapshot(snapshot.gridSnapshot);
         loot.opened = snapshot.opened;
+        loot.unlocked = snapshot.unlocked ?? false;
         return loot;
     }
 

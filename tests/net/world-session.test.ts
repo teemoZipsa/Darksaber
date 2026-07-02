@@ -20,6 +20,7 @@ import {
     getOriginalLateStoryGuardTiles,
 } from '../../src/data/OriginalLateStoryFacts';
 import { getOriginalLateStoryItemsForSourceEvent } from '../../src/data/OriginalLateStoryItems';
+import { MASTER_KEY_ITEM_ID } from '../../src/raid/MarkedCache';
 import { ENEMY_AGGRO_RANGE, ENEMY_SIMULATION_ACTIVE_RANGE } from '../../src/field/FieldConfig';
 import type { InventorySaveSnapshot } from '../../src/shared/CharacterSave';
 
@@ -67,6 +68,19 @@ function withFixedRandom<T>(value: number, callback: () => T): T {
     } finally {
         Math.random = previousRandom;
     }
+}
+
+function readyActorNextToLoot(session: WorldSession, playerId: string, lootId: string): string {
+    const snapshot = session.createSnapshot(playerId, 1_000);
+    const loot = snapshot.loot.find((entry) => entry.id === lootId);
+    assert.ok(loot);
+    const internals = session as any;
+    const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === playerId);
+    assert.ok(serverActor);
+    serverActor.tile = { ...loot.tile };
+    serverActor.remainingAp = 80;
+    serverActor.actionGauge = 80;
+    return serverActor.id;
 }
 
 function authCharacter(id: string): AuthCharacter {
@@ -317,6 +331,67 @@ test('server raid modifier changes party ATB recovery', () => {
     assert.ok(supplyActor);
     assert.ok(fogActor);
     assert.ok(fogActor.actionGauge < supplyActor.actionGauge);
+});
+
+test('marked cache requires a master key before it grants raid loot', () => {
+    const session = new WorldSession();
+    const joined = session.join(joinMessage('central_castle', 'marked-no-key'), 0);
+    const marked = session.createSnapshot(joined.playerId, 0).loot
+        .find((loot) => loot.containerType === 'marked_cache');
+    assert.ok(marked);
+
+    const actorId = readyActorNextToLoot(session, joined.playerId, marked.id);
+    const result = session.handleMessage(joined.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'open-marked-no-key',
+        actorId,
+        kind: 'interact',
+        payload: { lootId: marked.id },
+    }, 1_100);
+
+    assert.equal(result.replies[0]?.type, 'ACTION_REJECTED');
+    assert.match(result.replies[0]?.reason ?? '', /Master key/);
+    assert.equal(session.createSnapshot(joined.playerId, 1_100).loot
+        .find((loot) => loot.id === marked.id)?.unlocked, undefined);
+});
+
+test('marked cache consumes one master key and stays unlocked after persistence restore', () => {
+    const session = new WorldSession({ sessionEpoch: 11 });
+    const joined = session.join(joinWithCarriedItem('central_castle', 'marked-key', MASTER_KEY_ITEM_ID), 0);
+    const marked = session.createSnapshot(joined.playerId, 0).loot
+        .find((loot) => loot.containerType === 'marked_cache');
+    assert.ok(marked);
+
+    const actorId = readyActorNextToLoot(session, joined.playerId, marked.id);
+    const opened = session.handleMessage(joined.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'open-marked-with-key',
+        actorId,
+        kind: 'interact',
+        payload: { lootId: marked.id },
+    }, 1_100);
+
+    assert.deepEqual(opened.replies.map((reply) => reply.type), ['INVENTORY_CONSUMED', 'LOOT_GRANT']);
+    const internals = session as any;
+    const player = internals.players.get(joined.playerId);
+    assert.equal(player.carriedItems.has(MASTER_KEY_ITEM_ID), false);
+    const unlocked = session.createSnapshot(joined.playerId, 1_100).loot.find((loot) => loot.id === marked.id);
+    assert.equal(unlocked?.unlocked, true);
+    assert.ok(unlocked?.gridSnapshot.items.some((item) => item.itemId.startsWith('orig_late_')));
+
+    const restored = WorldSession.restorePersistentSnapshot(session.createPersistentSnapshot());
+    const restoredMarked = restored.createSnapshot(joined.playerId, 1_200).loot.find((loot) => loot.id === marked.id);
+    assert.equal(restoredMarked?.unlocked, true);
+
+    const restoredActorId = readyActorNextToLoot(restored, joined.playerId, marked.id);
+    const reopened = restored.handleMessage(joined.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'open-marked-restored',
+        actorId: restoredActorId,
+        kind: 'interact',
+        payload: { lootId: marked.id },
+    }, 1_300);
+    assert.equal(reopened.replies[0]?.type, 'LOOT_GRANT');
 });
 
 test('server cursed artifact slows actor ATB and damages on ready turn', () => {

@@ -34,6 +34,7 @@ export function toLootSnapshot(lootObject: LootObject, lockedByPlayerId: string 
         kind: lootObject.kind,
         containerType: lootObject.containerType,
         opened: lootObject.opened,
+        unlocked: lootObject.unlocked || undefined,
         lockedByPlayerId,
         gridSnapshot: gridToSnapshot(lootObject.inventory),
     };

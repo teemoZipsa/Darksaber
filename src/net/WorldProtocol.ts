@@ -107,6 +107,7 @@ export interface LootSnapshot {
     kind: 'chest' | 'corpse';
     containerType?: WorldLootContainerType;
     opened: boolean;
+    unlocked?: boolean;
     lockedByPlayerId?: string;
     gridSnapshot: GridSnapshot;
 }
