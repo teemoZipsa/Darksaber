@@ -28,6 +28,7 @@
   - 진행: `tests/field/world-enemy-turn-controller.test.ts`에 어그로 상태 적이 사거리 밖에서는 추격하고 인접 후 1회 공격하는 회귀 테스트를 추가.
   - 진행: Browser에서 `devStart=raid` 레이드 자동 진입과 월드 인벤토리 오버레이를 확인.
   - 완료: `devStart=raid&devScenario=aggro` 실제 레이드 화면에서 어그로 적의 추격 후 강제 인접 공격 로그/상태 배지 확인.
+- [x] 저주받은 유물 구현: 봉인된 유물함에서 낮은 확률로 고가치 저주 유물이 나오고, 레이드 배낭에 든 동안 행동력 회복 저하와 턴 시작 HP 피해를 적용한다.
 
 ---
 

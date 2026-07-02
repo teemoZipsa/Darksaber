@@ -92,6 +92,34 @@ test('party followers only repath when a fanfare leader is supplied', () => {
     assert.equal((follower.queuedIntent as NonNullable<FieldActor['queuedIntent']>).kind, 'move');
 });
 
+test('party ATB charge combines carry and cursed artifact multipliers', () => {
+    const actor = makeActor('hero', 0, 0);
+    const baseController = new WorldMovementController({
+        getPartyActors: () => [actor],
+        getFieldEnemies: () => [],
+        getTileAt: () => TileType.GRASS,
+        getTerrainTraitsForActorId: () => ({}),
+        getPartyCarryAtbMultiplier: () => 1,
+        getPartyCursedAtbMultiplier: () => 1,
+    });
+    baseController.updatePartyActors({ dt: 0.1, controlled: null, activeTurnActorId: null, followRepathTimer: 0 });
+    const normalGauge = actor.entity.actionGauge;
+
+    actor.entity.actionGauge = 0;
+    const cursedController = new WorldMovementController({
+        getPartyActors: () => [actor],
+        getFieldEnemies: () => [],
+        getTileAt: () => TileType.GRASS,
+        getTerrainTraitsForActorId: () => ({}),
+        getPartyCarryAtbMultiplier: () => 0.5,
+        getPartyCursedAtbMultiplier: () => 0.5,
+    });
+    cursedController.updatePartyActors({ dt: 0.1, controlled: null, activeTurnActorId: null, followRepathTimer: 0 });
+
+    assert.ok(normalGauge > 0);
+    assert.equal(actor.entity.actionGauge, normalGauge * 0.25);
+});
+
 test('movement honors world ground blockers on walkable terrain', () => {
     const actor = makeActor('hero', 0, 0);
     const controller = new WorldMovementController({

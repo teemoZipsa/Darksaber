@@ -6,6 +6,11 @@ import { getEffectiveStatsForCharacter } from '../../src/combat/StatusEffects';
 import { GridInventory, PlacedItem } from '../../src/inventory/GridInventory';
 import { InventoryUI } from '../../src/inventory/InventoryUI';
 import { CARRY_MIN_ATB_MULTIPLIER, getCarryAtbMultiplier, getPartyCarriedWeight, getPlacedItemsWeight } from '../../src/inventory/CarryWeight';
+import {
+    countCursedArtifactsInPlacedItems,
+    getCursedArtifactAtbMultiplier,
+    getCursedArtifactTurnDamage,
+} from '../../src/raid/CursedArtifact';
 import { getRepairCost, repairItem, unsocketAll } from '../../src/inventory/Socketing';
 import { computeRaidFailureLoss } from '../../src/raid/RaidOutcome';
 import { resolveTownArrival, shouldAdvanceRaidTimer } from '../../src/raid/RaidRules';
@@ -99,6 +104,21 @@ test('carry weight totals backpack, sockets, and equipment for ATB penalty', () 
     assert.equal(getCarryAtbMultiplier(0), 1);
     assert.ok(getCarryAtbMultiplier(total) <= 1);
     assert.equal(getCarryAtbMultiplier(999), CARRY_MIN_ATB_MULTIPLIER);
+});
+
+test('cursed artifact helpers count stacks and scale ATB and turn-start risk', () => {
+    const cursed = placed('cursed_blood_reliquary');
+    const herb = placed('herb_cheap');
+
+    assert.equal(getItemDef('cursed_blood_reliquary')?.cursedArtifact, true);
+    assert.equal(countCursedArtifactsInPlacedItems([herb]), 0);
+    assert.equal(countCursedArtifactsInPlacedItems([cursed]), 1);
+    assert.equal(countCursedArtifactsInPlacedItems([herb, cursed]), 1);
+    assert.equal(getCursedArtifactAtbMultiplier(0), 1);
+    assert.ok(getCursedArtifactAtbMultiplier(1) < 1);
+    assert.ok(getCursedArtifactAtbMultiplier(2) < getCursedArtifactAtbMultiplier(1));
+    assert.equal(getCursedArtifactTurnDamage(createBaseStats({ hp: 100, maxHp: 100 }), 1), 6);
+    assert.equal(getCursedArtifactTurnDamage(createBaseStats({ hp: 20, maxHp: 20 }), 1), 4);
 });
 
 test('town facilities cover mortal and master towns', () => {

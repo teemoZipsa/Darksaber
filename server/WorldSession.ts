@@ -54,6 +54,11 @@ import { CHUNK_TILES, nestMemberOffsets, pickNestForChunk, type FieldNest, type 
 import { Enemy } from '../src/entity/Enemy';
 import { LootObject } from '../src/entity/LootObject';
 import { getCarryAtbMultiplier, getPlacedItemWeight } from '../src/inventory/CarryWeight';
+import {
+    countCursedArtifactsInItemCounts,
+    getCursedArtifactAtbMultiplier,
+    getCursedArtifactTurnDamage,
+} from '../src/raid/CursedArtifact';
 import { getEnemyLootSourceLabel } from '../src/loot/LootLabels';
 import { generateWorldLootNear } from '../src/loot/WorldLootGenerator';
 import {
@@ -562,19 +567,29 @@ export class WorldSession {
                 if (!actor || actor.isDead) continue;
                 this.updateRestingActor(actor, dt);
                 if (actor.actionGauge >= FIELD_MAX_ACTION_GAUGE && actor.remainingAp <= 0) {
-                    actor.remainingAp = FIELD_MAX_ACTION_GAUGE;
-                    actor.majorActionUsed = false;
+                    const event = this.applyCursedArtifactTurnDamage(player, actor);
+                    if (event) events.push(event);
+                    if (!actor.isDead && actor.stats.hp > 0) {
+                        actor.remainingAp = FIELD_MAX_ACTION_GAUGE;
+                        actor.majorActionUsed = false;
+                    }
                 } else if (actor.actionGauge < FIELD_MAX_ACTION_GAUGE) {
                     actor.actionGauge = advanceAtb(
                         actor.actionGauge,
                         getEffectiveStats(actor.stats, actor.statuses).spd,
                         dt,
-                        FIELD_ATB_SCALE * getCarryAtbMultiplier(player.carriedWeight)
+                        FIELD_ATB_SCALE
+                        * getCarryAtbMultiplier(player.carriedWeight)
+                        * getCursedArtifactAtbMultiplier(this.getPlayerCursedArtifactCount(player))
                     );
                     if (actor.actionGauge >= FIELD_MAX_ACTION_GAUGE) {
                         actor.actionGauge = FIELD_MAX_ACTION_GAUGE;
-                        actor.remainingAp = FIELD_MAX_ACTION_GAUGE;
-                        actor.majorActionUsed = false;
+                        const event = this.applyCursedArtifactTurnDamage(player, actor);
+                        if (event) events.push(event);
+                        if (!actor.isDead && actor.stats.hp > 0) {
+                            actor.remainingAp = FIELD_MAX_ACTION_GAUGE;
+                            actor.majorActionUsed = false;
+                        }
                     }
                 }
             }
@@ -1641,6 +1656,28 @@ export class WorldSession {
     private finishActorIfSpent(actor: ServerActor): void {
         if (actor.remainingAp >= MIN_FIELD_ACTION_GAUGE_COST) return;
         this.endActorTurn(actor);
+    }
+
+    private applyCursedArtifactTurnDamage(player: ServerPlayer, actor: ServerActor): CombatEventMessage | null {
+        const damage = Math.min(
+            actor.stats.hp,
+            getCursedArtifactTurnDamage(actor.stats, this.getPlayerCursedArtifactCount(player))
+        );
+        if (damage <= 0) return null;
+
+        actor.stats.hp = Math.max(0, actor.stats.hp - damage);
+        removeActionStanceStatusesFromCarrier(actor);
+        if (actor.stats.hp <= 0) {
+            actor.isDead = true;
+            actor.remainingAp = 0;
+            actor.actionGauge = 0;
+            actor.majorActionUsed = false;
+        }
+        return createActorEvent(actor.isDead ? 'down' : 'curse', actor, actor, damage);
+    }
+
+    private getPlayerCursedArtifactCount(player: ServerPlayer): number {
+        return countCursedArtifactsInItemCounts(player.carriedItems, (itemId) => getItemDef(itemId));
     }
 
     private endActorTurn(actor: ServerActor): void {

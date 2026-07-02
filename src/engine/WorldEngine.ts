@@ -12,6 +12,11 @@ import { PartyManager } from '../character/PartyManager';
 import { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { getCarryAtbMultiplier, getPartyCarriedWeight } from '../inventory/CarryWeight';
+import {
+    countCursedArtifactsInPlacedItems,
+    getCursedArtifactAtbMultiplier,
+    getCursedArtifactTurnDamage,
+} from '../raid/CursedArtifact';
 import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
 import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
@@ -415,6 +420,7 @@ export class WorldEngine {
             getPartyCarryAtbMultiplier: () => getCarryAtbMultiplier(
                 getPartyCarriedWeight(this.gameManager.inventory.items, this.party.getCharacters())
             ),
+            getPartyCursedAtbMultiplier: () => getCursedArtifactAtbMultiplier(this.getBackpackCursedArtifactCount()),
         });
         this.fieldSpawnController = new WorldFieldSpawnController(this.movementController);
         this.enemyTurnController = new WorldEnemyTurnController(
@@ -1439,12 +1445,31 @@ export class WorldEngine {
         }
         const effective = getEffectiveStatsForCharacter(actor.character);
         actor.character.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.character.stats.hp + result.hpDelta));
+        this.applyCursedArtifactTurnDamage(actor, effective);
 
         if (actor.character.stats.hp <= 0 && !actor.character.isDead) {
             this.handleActorDown(actor);
             return false;
         }
         return true;
+    }
+
+    private applyCursedArtifactTurnDamage(actor: FieldActor, effective: ReturnType<typeof getEffectiveStatsForCharacter>): void {
+        const cursedCount = this.getBackpackCursedArtifactCount();
+        const damage = Math.min(
+            actor.character.stats.hp,
+            getCursedArtifactTurnDamage(effective, cursedCount)
+        );
+        if (damage <= 0) return;
+
+        actor.character.stats.hp = Math.max(0, actor.character.stats.hp - damage);
+        this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, damage, false, false);
+        this.effectManager.spawnDarkEffect(actor.entity.gridX, actor.entity.gridY);
+        this.addCombatLog(formatT('field.log.cursedArtifactDamage', {
+            name: actor.character.name,
+            value: damage,
+        }));
+        this.stopResting(actor, formatT('field.log.restInterruptedDamage', { name: actor.character.name }));
     }
 
     private processEnemyTurnStartStatuses(entry: FieldEnemy): boolean {
@@ -1591,6 +1616,10 @@ export class WorldEngine {
         const actor = this.getActivePartyTurnActor();
         if (!actor) return this.turnStateController.getRemainingActionPoints();
         return Math.max(this.turnStateController.getRemainingActionPoints(), Math.floor(actor.entity.actionGauge));
+    }
+
+    private getBackpackCursedArtifactCount(): number {
+        return countCursedArtifactsInPlacedItems(this.gameManager.inventory.items);
     }
 
     private hasFieldLineOfSight(from: TilePoint, to: TilePoint): boolean {

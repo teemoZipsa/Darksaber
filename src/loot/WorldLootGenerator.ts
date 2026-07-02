@@ -288,6 +288,7 @@ function chooseRegionalItems(options: ResolvedGenerateWorldLootOptions, tile: Ti
 function chooseReliquaryItems(options: ResolvedGenerateWorldLootOptions, chunkX: number, chunkY: number): ItemDef[] {
     const realm = options.worldMap.getRealm();
     const roll = roll01(options.seed, realm, chunkX, chunkY, 'reliquary:roll');
+    if (roll < 0.12) return [itemFromPool(['cursed_blood_reliquary'], options.seed, realm, chunkX, chunkY, 'reliquary:cursed')].filter((item): item is ItemDef => Boolean(item));
     if (roll < 0.5) return [itemFromPool(GEM_ITEM_IDS.filter((id) => id.startsWith('gem_chipped_') || id.startsWith('gem_flawed_') || id.startsWith('gem_normal_')), options.seed, realm, chunkX, chunkY, 'reliquary:gem')].filter((item): item is ItemDef => Boolean(item));
     if (roll < 0.8) return [pickFrom(RARE_EQUIPMENT, options.seed, realm, chunkX, chunkY, 'reliquary:eq')].filter((item): item is ItemDef => Boolean(item));
     if (roll < 0.95) return [itemFromPool(['trade_tide_pearl', 'trade_sun_ore', 'trade_shadow_amber', 'trade_astral_sigil', 'trade_ember_core'], options.seed, realm, chunkX, chunkY, 'reliquary:trade')].filter((item): item is ItemDef => Boolean(item));

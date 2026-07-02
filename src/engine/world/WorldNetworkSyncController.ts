@@ -505,6 +505,7 @@ export class WorldNetworkSyncController {
         if (event.kind === 'heal') return formatT('field.log.combat.heal', vars);
         if (event.kind === 'down') return formatT('field.log.combat.down', vars);
         if (event.kind === 'status') return formatT('field.log.combat.status', vars);
+        if (event.kind === 'curse') return formatT('field.log.combat.curse', vars);
         return formatT('field.log.combat.damage', vars);
     }
 

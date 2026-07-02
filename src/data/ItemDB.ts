@@ -39,6 +39,7 @@ export interface ItemDef {
     baseValue: number;
     buyPrice?: number;     // gold cost to buy from shop
     sellable?: boolean;    // false for quest/bound items that cannot be sold
+    cursedArtifact?: boolean; // raid loot that hurts carriers until extraction
     requiredTier?: number; // minimum tier to equip (1-7)
     requiredLevel?: number; // original Darksaber equipment level requirement
     branch?: MasterBranch; // which branch can equip (battle/tactics/healer/magic)
@@ -795,6 +796,19 @@ const RAW_ITEMS: RawItemDef[] = [
         description: 'A black-market relic from the southern hideout.',
         descriptionKr: '남부 은신처 암시장에서 유통되는 비정규 유물입니다.',
         buyPrice: 220,
+        itemCategory: 'material'
+    },
+    {
+        id: 'cursed_blood_reliquary', name: 'Cursed Blood Reliquary', nameKr: '저주받은 피의 성물함',
+        slot: 'material', gridW: 1, gridH: 2, color: '#b0123b', icon: '◆',
+        maxDurability: 1,
+        description: 'A sealed relic that sells for a fortune. While carried in a raid backpack, each ready turn drains HP and heavily slows ATB recovery.',
+        descriptionKr: '비싸게 팔리는 봉인 유물입니다. 레이드 배낭에 넣고 있는 동안 턴 시작마다 HP가 줄고 행동력 회복이 크게 느려집니다.',
+        rarity: 'unique',
+        weight: 1.2,
+        baseValue: 12000,
+        sellable: true,
+        cursedArtifact: true,
         itemCategory: 'material'
     },
     {

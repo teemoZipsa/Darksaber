@@ -30,6 +30,7 @@ export interface WorldMovementContext {
     isGroundWalkable?: (x: number, y: number) => boolean;
     getTerrainTraitsForActorId: (actorId?: string) => TerrainActorTraits;
     getPartyCarryAtbMultiplier?: () => number;
+    getPartyCursedAtbMultiplier?: () => number;
 }
 
 export interface PartyMovementInput {
@@ -64,6 +65,7 @@ export class WorldMovementController {
         const readyActorIds: string[] = [];
         let followRepathTimer = input.followRepathTimer - input.dt;
         const carryAtbMultiplier = this.context.getPartyCarryAtbMultiplier?.() ?? 1;
+        const cursedAtbMultiplier = this.context.getPartyCursedAtbMultiplier?.() ?? 1;
 
         for (const actor of this.context.getPartyActors()) {
             if (actor.character.isDead) continue;
@@ -72,7 +74,7 @@ export class WorldMovementController {
                     actor.entity.actionGauge,
                     getEffectiveStatsForCharacter(actor.character).spd,
                     input.dt,
-                    FIELD_ATB_SCALE * carryAtbMultiplier
+                    FIELD_ATB_SCALE * carryAtbMultiplier * cursedAtbMultiplier
                 );
                 if (actor.entity.actionGauge >= 100) {
                     actor.entity.actionGauge = 100;

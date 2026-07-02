@@ -52,6 +52,13 @@ function joinMessage(originHubId: string, id: string, resumeToken?: string): Wor
     };
 }
 
+function joinWithCarriedItem(originHubId: string, id: string, itemId: string): WorldJoinMessage {
+    return {
+        ...joinMessage(originHubId, id),
+        carriedItems: [{ itemId, quantity: 1 }],
+    };
+}
+
 function withFixedRandom<T>(value: number, callback: () => T): T {
     const previousRandom = Math.random;
     Math.random = () => value;
@@ -260,6 +267,54 @@ test('default character saves use class-branch body armor', () => {
     assert.equal(equipment.weapon?.itemId, 'short_sword');
     assert.equal(equipment.body?.itemId, 'magic_t1_body');
     assert.equal(Object.prototype.hasOwnProperty.call(equipment, 'shield'), false);
+});
+
+test('server cursed artifact slows actor ATB and damages on ready turn', () => {
+    const normalSession = new WorldSession();
+    const normal = normalSession.join({
+        ...joinMessage('central_castle', 'normal'),
+        partyComposition: [actor('normal', {
+            stats: createBaseStats({ spd: 10, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    normalSession.tick(0);
+    normalSession.tick(250);
+    const normalActor = normalSession.createSnapshot(normal.playerId, 250).partyActors
+        .find((entry) => entry.ownerPlayerId === normal.playerId);
+
+    const cursedSession = new WorldSession();
+    const cursed = cursedSession.join({
+        ...joinWithCarriedItem('central_castle', 'cursed', 'cursed_blood_reliquary'),
+        partyComposition: [actor('cursed', {
+            stats: createBaseStats({ spd: 10, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    cursedSession.tick(0);
+    cursedSession.tick(250);
+    const cursedActor = cursedSession.createSnapshot(cursed.playerId, 250).partyActors
+        .find((entry) => entry.ownerPlayerId === cursed.playerId);
+
+    assert.ok(normalActor);
+    assert.ok(cursedActor);
+    assert.ok(cursedActor.actionGauge < normalActor.actionGauge);
+
+    const readySession = new WorldSession();
+    const ready = readySession.join({
+        ...joinWithCarriedItem('central_castle', 'ready-cursed', 'cursed_blood_reliquary'),
+        partyComposition: [actor('ready-cursed', {
+            stats: createBaseStats({ hp: 100, maxHp: 100, spd: 1000, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    const firstReadyTick = readySession.tick(0);
+    const secondReadyTick = readySession.tick(1_000);
+    const readyActor = readySession.createSnapshot(ready.playerId, 1_000).partyActors
+        .find((entry) => entry.ownerPlayerId === ready.playerId);
+
+    assert.ok(readyActor);
+    assert.equal(readyActor.stats.hp, 94);
+    const curseEvent = [...firstReadyTick.events, ...secondReadyTick.events].find((event) => event.kind === 'curse');
+    assert.ok(curseEvent);
+    assert.equal(curseEvent.value, 6);
 });
 
 test('server tick keeps passive enemy ATB idle for every client snapshot', () => {
