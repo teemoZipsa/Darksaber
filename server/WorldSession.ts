@@ -3,18 +3,15 @@ import {
     applyStatuses,
     applyStatusesToCarrier,
     cleanseNegativeStatuses,
-    createStatus,
     getEffectiveStats,
     getEffectiveStatsForEnemy,
     hasStatus,
     removeActionStanceStatusesFromCarrier,
-    replaceActionStanceStatuses,
 } from '../src/combat/StatusEffects';
 import { resolveSkillEffect, type SkillEffectResult } from '../src/combat/SkillEffectResolver';
 import { CombatFormulas } from '../src/combat/CombatFormulas';
-import { getClassLine } from '../src/data/ClassTree';
 import { getSkillAttackProfile } from '../src/data/AttackPatternProfiles';
-import { getItemDef, getCombatRecovery, isCombatRecoveryConsumable } from '../src/data/ItemDB';
+import { getItemDef } from '../src/data/ItemDB';
 import { getSkill, type Skill } from '../src/data/SkillDB';
 import {
     getEffectiveSkill,
@@ -47,7 +44,7 @@ import {
 import type { FieldNestState } from '../src/field/SpawnResolver';
 import { Enemy } from '../src/entity/Enemy';
 import { LootObject } from '../src/entity/LootObject';
-import { getCarryAtbMultiplier, getPlacedItemWeight } from '../src/inventory/CarryWeight';
+import { getCarryAtbMultiplier } from '../src/inventory/CarryWeight';
 import {
     countCursedArtifactsInItemCounts,
     getCursedArtifactAtbMultiplier,
@@ -62,18 +59,12 @@ import { getMarkedCacheItems, MASTER_KEY_ITEM_ID } from '../src/raid/MarkedCache
 import { getEnemyLootSourceLabel, getWorldLootSourceLabel } from '../src/loot/LootLabels';
 import { generateWorldLootNear } from '../src/loot/WorldLootGenerator';
 import {
-    ATTACK_AP_COST,
-    DEFEND_ACTION_GAUGE_COST,
     INTERACT_AP_COST,
     FIELD_MAX_ACTION_GAUGE,
     MAGIC_ACTION_GAUGE_COST,
     MIN_FIELD_ACTION_GAUGE_COST,
-    MOVE_ACTION_GAUGE_COST,
-    REST_ACTION_GAUGE_COST,
-    TOOL_ACTION_GAUGE_COST,
 } from '../src/field/FieldActionEconomy';
 import { FIELD_ATB_SCALE } from '../src/field/FieldConfig';
-import { planMoveIntentPath } from './WorldSessionMoveIntent';
 import { advanceAtb } from '../src/field/FieldCombat';
 import {
     manhattan,
@@ -87,7 +78,6 @@ import {
     getSkillCandidateEnemies,
 } from '../src/field/FieldTargeting';
 import {
-    getTerrainMoveCost,
     isTerrainLineOfSightBlocking,
     isTerrainPassable,
 } from '../src/field/TerrainRules';
@@ -98,7 +88,6 @@ import {
     type CombatEventMessage,
     type InventoryConsumedMessage,
     type LootGrantMessage,
-    type RaidResultMessage,
     type ScenarioEnemyDefeatEventMessage,
     type ScenarioFieldEventResultMessage,
     type WorldClientMessage,
@@ -107,7 +96,7 @@ import {
     type WorldSnapshot,
     type WorldWelcomeMessage,
 } from '../src/net/WorldProtocol';
-import { WorldSessionLootState, type WorldSessionLootLock } from './WorldSessionLootState';
+import { WorldSessionLootState } from './WorldSessionLootState';
 import { cloneCharacterSave, WorldSessionSaveState, type WorldCharacterSavePatch } from './WorldSessionSaveState';
 import { WorldSessionEnemyState } from './WorldSessionEnemyState';
 import { WorldSessionEnemyTurnResolver } from './WorldSessionEnemyTurnResolver';
@@ -119,9 +108,12 @@ import {
 } from './WorldSessionFieldNests';
 import { WorldSessionScenarioRewards } from './WorldSessionScenarioRewards';
 import {
-    addCarriedItemQuantity,
-    addCarriedWeight,
-} from './WorldSessionCarryState';
+    WorldSessionPlayerIntentResolver,
+    type WorldSessionActorAttackResult,
+} from './WorldSessionPlayerIntentResolver';
+import { WorldSessionRaidResults } from './WorldSessionRaidResults';
+import { WorldSessionLootResolver } from './WorldSessionLootResolver';
+import { addCarriedItemQuantity } from './WorldSessionCarryState';
 import {
     firstActorTile,
     hasActiveActorWithin,
@@ -146,7 +138,6 @@ import { buildWorldSessionSnapshot } from './WorldSessionSnapshotBuilder';
 import {
     createFallbackActorSnapshot,
     readStringPayload,
-    readTilePayload,
     sanitizeCarriedItems,
     sanitizeCarriedWeight,
     sanitizeStringArray,
@@ -169,7 +160,6 @@ import {
     createActorEvent,
     createEnemyEvent,
     createToken,
-    directionFromTo,
     formationOffset,
     gridToSnapshot,
     hashInt,
@@ -232,6 +222,9 @@ export class WorldSession {
     private readonly enemyTurnResolver: WorldSessionEnemyTurnResolver;
     private readonly fieldNests: WorldSessionFieldNests;
     private readonly scenarioRewards: WorldSessionScenarioRewards;
+    private readonly playerIntentResolver: WorldSessionPlayerIntentResolver;
+    private readonly raidResults: WorldSessionRaidResults;
+    private readonly lootResolver: WorldSessionLootResolver;
     private readonly restingRecoveryTimers = new Map<string, number>();
     private seq = 0;
     private nextPlayerId = 1;
@@ -273,6 +266,33 @@ export class WorldSession {
             findNearbyWalkableTile: (tile, actorId, ownerPlayerId) => this.findNearbyWalkableTile(tile, actorId, ownerPlayerId),
         });
         this.scenarioRewards = new WorldSessionScenarioRewards({
+            saveState: this.saveState,
+        });
+        this.playerIntentResolver = new WorldSessionPlayerIntentResolver({
+            players: this.players,
+            enemies: this.enemies,
+            saveState: this.saveState,
+            getServerTileAt: (tile, ownerPlayerId) => this.getServerTileAt(tile, ownerPlayerId),
+            isFieldPassableForOwner: (query, ownerPlayerId) => this.isFieldPassableForOwner(query, ownerPlayerId),
+            hasFieldLineOfSight: (from, to, ownerPlayerId) => this.hasFieldLineOfSight(from, to, ownerPlayerId),
+            spawnLootNear: (anchor, departureTownId) => this.spawnLootNear(anchor, departureTownId),
+            spendActorGauge: (actor, cost) => this.spendActorGauge(actor, cost),
+            finishActorIfSpent: (actor) => this.finishActorIfSpent(actor),
+            resolveActorAttack: (actor, target, now) => this.resolveActorAttack(actor, target, now),
+        });
+        this.raidResults = new WorldSessionRaidResults({
+            players: this.players,
+            actors: this.actors,
+            worldMap: this.worldMap,
+            saveState: this.saveState,
+            log: (message) => this.log(message),
+            removePlayer: (playerId) => this.removePlayer(playerId),
+        });
+        this.lootResolver = new WorldSessionLootResolver({
+            players: this.players,
+            actors: this.actors,
+            loot: this.loot,
+            lootState: this.lootState,
             saveState: this.saveState,
         });
     }
@@ -500,7 +520,7 @@ export class WorldSession {
             const actor = this.actors.get(actorId);
             if (actor) actor.remainingAp = 0;
         }
-        this.releaseLootLocksForPlayer(playerId);
+        this.lootResolver.releaseLocksForPlayer(playerId);
         this.log(`ghost start player=${playerId} graceMs=${this.ghostGraceMs}`);
     }
 
@@ -513,7 +533,7 @@ export class WorldSession {
                 const actor = this.actors.get(actorId);
                 if (actor) actor.remainingAp = 0;
             }
-            this.releaseLootLocksForPlayer(player.id);
+            this.lootResolver.releaseLocksForPlayer(player.id);
             this.log(`ghost start player=${player.id} reason=server_restart graceMs=${this.ghostGraceMs}`);
         }
     }
@@ -522,7 +542,7 @@ export class WorldSession {
         const perPlayerMessages: Array<{ playerId: string; message: WorldServerMessage }> = [];
         for (const playerId of this.getActivePlayerIds()) {
             this.log(`force extract player=${playerId} reason=server_shutdown`);
-            perPlayerMessages.push({ playerId, message: this.finishPlayerForShutdown(playerId) });
+            perPlayerMessages.push({ playerId, message: this.raidResults.finishPlayerForShutdown(playerId) });
         }
         this.lastTickAt = now;
         return { events: [], perPlayerMessages };
@@ -533,9 +553,9 @@ export class WorldSession {
             case 'PLAYER_INTENT':
                 return this.handleIntent(playerId, message, now);
             case 'LOOT_PICKUP':
-                return this.handleLootPickup(playerId, message.intentId, message.lootId, message.gridX, message.gridY, now);
+                return this.lootResolver.handleLootPickup(playerId, message.intentId, message.lootId, message.gridX, message.gridY, now);
             case 'AUTO_LOOT_RESOLVE':
-                return this.handleAutoLootResolve(playerId, message.lootId, message.acceptedCells);
+                return this.lootResolver.handleAutoLootResolve(playerId, message.lootId, message.acceptedCells);
             case 'SCENARIO_ENTER':
                 return this.handleScenarioEnter(playerId, message, now);
             case 'SCENARIO_FIELD_EVENT_INTERACT':
@@ -543,7 +563,7 @@ export class WorldSession {
             case 'WORLD_LEAVE':
                 this.log(`leave player=${playerId} reason=${message.reason}`);
                 return {
-                    replies: [this.finishPlayer(playerId, this.resolveRequestedRaidResult(playerId, message.reason))],
+                    replies: [this.raidResults.finishPlayer(playerId, this.raidResults.resolveRequestedRaidResult(playerId, message.reason))],
                     broadcasts: [],
                 };
             default:
@@ -569,7 +589,7 @@ export class WorldSession {
 
             player.elapsedSeconds = Math.min(RAID_LIMIT_SECONDS, player.elapsedSeconds + dt);
             if (player.elapsedSeconds >= RAID_LIMIT_SECONDS) {
-                perPlayerMessages.push({ playerId: player.id, message: this.finishPlayer(player.id, 'MIA') });
+                perPlayerMessages.push({ playerId: player.id, message: this.raidResults.finishPlayer(player.id, 'MIA') });
                 continue;
             }
 
@@ -621,12 +641,12 @@ export class WorldSession {
             }
         }
 
-        this.releaseExpiredAutoLoot(now);
-        this.releaseExpiredLootLocks(now);
+        this.lootResolver.releaseExpiredAutoLoot(now);
+        this.lootResolver.releaseExpiredLootLocks(now);
         for (const player of [...this.players.values()]) {
             if (!player.active || player.ghost) continue;
             if (isPlayerWiped(player, this.actors)) {
-                perPlayerMessages.push({ playerId: player.id, message: this.finishPlayer(player.id, 'DEAD') });
+                perPlayerMessages.push({ playerId: player.id, message: this.raidResults.finishPlayer(player.id, 'DEAD') });
             }
         }
 
@@ -724,19 +744,19 @@ export class WorldSession {
 
         switch (message.kind) {
             case 'move':
-                return this.handleMoveIntent(actor!, message.intentId, message.payload);
+                return this.playerIntentResolver.handleMove(actor!, message.intentId, message.payload);
             case 'attack':
-                return this.handleAttackIntent(actor!, message.intentId, message.payload, now);
+                return this.playerIntentResolver.handleAttack(actor!, message.intentId, message.payload, now);
             case 'interact':
                 return this.handleInteractIntent(playerId, actor!, message.intentId, message.payload, now);
             case 'defend':
-                return this.handleDefendIntent(actor!, message.intentId);
+                return this.playerIntentResolver.handleDefend(actor!, message.intentId);
             case 'rest':
-                return this.handleRestIntent(actor!, message.intentId);
+                return this.playerIntentResolver.handleRest(actor!, message.intentId);
             case 'endTurn':
                 return { replies: [], broadcasts: [] };
             case 'useItem':
-                return this.handleUseItemIntent(player!, actor!, message.intentId, message.payload);
+                return this.playerIntentResolver.handleUseItem(player!, actor!, message.intentId, message.payload);
             case 'castSkill':
                 return this.handleCastSkillIntent(player!, actor!, message.intentId, message.payload, now);
         }
@@ -750,121 +770,6 @@ export class WorldSession {
         if (actor.isDead || actor.stats.hp <= 0) return 'Actor is down.';
         if (actor.remainingAp < MIN_FIELD_ACTION_GAUGE_COST) return 'Actor action gauge is not ready.';
         return null;
-    }
-
-    private handleMoveIntent(actor: ServerActor, intentId: string, payload: unknown): WorldSessionMessageResult {
-        const tile = readTilePayload(payload);
-        if (!tile) return reject(intentId, 'Move payload must include a tile.');
-
-        const path = planMoveIntentPath({
-            actor,
-            targetTile: tile,
-            isPassable: (query) => this.isFieldPassableForOwner(query, actor.ownerPlayerId),
-            terrainCost: (step) => getTerrainMoveCost(this.getServerTileAt(step, actor.ownerPlayerId)),
-        });
-        if (path.length === 0 && manhattan(actor.tile, tile) > 0) return reject(intentId, 'No valid path.');
-
-        if (actor.remainingAp < MOVE_ACTION_GAUGE_COST) return reject(intentId, 'No action available for movement.');
-
-        this.spendActorGauge(actor, MOVE_ACTION_GAUGE_COST);
-        removeActionStanceStatusesFromCarrier(actor);
-        if (path.length > 0) {
-            const next = path[path.length - 1];
-            actor.facing = directionFromTo(actor.tile, next);
-            actor.tile = { ...next };
-        }
-        const player = this.players.get(actor.ownerPlayerId);
-        if (!player?.activeDungeonId) this.spawnLootNear(actor.tile, player?.departureTownId);
-        this.finishActorIfSpent(actor);
-        return { replies: [], broadcasts: [] };
-    }
-
-    private handleDefendIntent(actor: ServerActor, intentId: string): WorldSessionMessageResult {
-        if (actor.remainingAp < DEFEND_ACTION_GAUGE_COST) return reject(intentId, 'No action available to defend.');
-
-        this.spendActorGauge(actor, DEFEND_ACTION_GAUGE_COST);
-        const guard = createStatus('guard', { durationTurns: undefined, sourceType: 'action' });
-        const counterReady = createStatus('counterReady', { durationTurns: undefined, sourceType: 'action' });
-        actor.statuses = replaceActionStanceStatuses(actor.statuses, [guard, counterReady]);
-        this.finishActorIfSpent(actor);
-
-        return {
-            replies: [],
-            broadcasts: [createActorEvent('status', actor, actor, undefined, guard)],
-        };
-    }
-
-    private handleRestIntent(actor: ServerActor, intentId: string): WorldSessionMessageResult {
-        if (actor.remainingAp < REST_ACTION_GAUGE_COST) return reject(intentId, 'No action available to rest.');
-
-        this.spendActorGauge(actor, REST_ACTION_GAUGE_COST);
-        const resting = createStatus('resting', { sourceType: 'action' });
-        actor.statuses = replaceActionStanceStatuses(actor.statuses, [resting]);
-        this.finishActorIfSpent(actor);
-
-        return {
-            replies: [],
-            broadcasts: [createActorEvent('status', actor, actor, undefined, resting)],
-        };
-    }
-
-    private handleAttackIntent(actor: ServerActor, intentId: string, payload: unknown, now: number): WorldSessionMessageResult {
-        const targetId = readStringPayload(payload, 'targetId') ?? readStringPayload(payload, 'enemyId');
-        if (!targetId) return reject(intentId, 'Attack payload must include targetId.');
-        const target = this.enemies.get(targetId);
-        if (!target || target.enemy.stats.hp <= 0) return reject(intentId, 'Target is not alive.');
-        if (!canActorTargetEnemy(actor, target)) return reject(intentId, 'Target is not visible.');
-        if (actor.remainingAp < ATTACK_AP_COST) return reject(intentId, 'No action available for attack.');
-
-        const range = getClassLine(actor.classLineId)?.attackRange ?? 1;
-        const targetTile = { x: target.enemy.gridX, y: target.enemy.gridY };
-        if (manhattan(actor.tile, targetTile) > range) return reject(intentId, 'Target is out of range.');
-        if (range > 1 && !this.hasFieldLineOfSight(actor.tile, targetTile, actor.ownerPlayerId)) return reject(intentId, 'Line of sight is blocked.');
-
-        this.spendActorGauge(actor, ATTACK_AP_COST);
-        actor.facing = directionFromTo(actor.tile, targetTile);
-        const { event, autoLootGrant, scenarioEnemyDefeatEvent } = this.resolveActorAttack(actor, target, now);
-        this.finishActorIfSpent(actor);
-        const replies: WorldServerMessage[] = [];
-        if (autoLootGrant) replies.push(autoLootGrant);
-        if (scenarioEnemyDefeatEvent) replies.push(scenarioEnemyDefeatEvent);
-        return { replies, broadcasts: [event] };
-    }
-
-    private handleUseItemIntent(player: ServerPlayer, actor: ServerActor, intentId: string, payload: unknown): WorldSessionMessageResult {
-        const itemId = readStringPayload(payload, 'itemId');
-        if (!itemId) return reject(intentId, 'Use item payload must include itemId.');
-        if ((player.carriedItems.get(itemId) ?? 0) <= 0) return reject(intentId, 'Item is not available on this server session.');
-
-        const item = getItemDef(itemId);
-        if (!item || !isCombatRecoveryConsumable(item)) return reject(intentId, 'Item cannot be used in combat.');
-        if (actor.remainingAp < TOOL_ACTION_GAUGE_COST) return reject(intentId, 'No action available to use item.');
-
-        const recovery = getCombatRecovery(item);
-        const effective = getEffectiveStats(actor.stats, actor.statuses);
-        const effectiveHp = Math.max(0, Math.min(recovery.hp, effective.maxHp - actor.stats.hp));
-        const effectiveMp = Math.max(0, Math.min(recovery.mp, effective.maxMp - actor.stats.mp));
-        if (effectiveHp <= 0 && effectiveMp <= 0) return reject(intentId, 'Item has no effect.');
-
-        this.spendActorGauge(actor, TOOL_ACTION_GAUGE_COST);
-        actor.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.stats.hp + effectiveHp));
-        actor.stats.mp = Math.max(0, Math.min(effective.maxMp, actor.stats.mp + effectiveMp));
-        addCarriedItemQuantity(player, itemId, -1);
-        this.saveState.removeItemQuantity(player, itemId, 1);
-        this.saveState.markDirty(player.id);
-        this.finishActorIfSpent(actor);
-
-        const consumed: InventoryConsumedMessage = { type: 'INVENTORY_CONSUMED', itemId, quantity: 1 };
-        const event: CombatEventMessage = {
-            type: 'COMBAT_EVENT',
-            kind: effectiveHp > 0 ? 'heal' : 'status',
-            sourceId: actor.id,
-            targetId: actor.id,
-            sourceName: actor.name,
-            targetName: actor.name,
-            value: effectiveHp > 0 ? effectiveHp : effectiveMp,
-        };
-        return { replies: [consumed], broadcasts: [event] };
     }
 
     private handleCastSkillIntent(
@@ -980,73 +885,6 @@ export class WorldSession {
             replies,
             broadcasts: [],
         };
-    }
-
-    private handleLootPickup(
-        playerId: string,
-        intentId: string,
-        lootId: string,
-        gridX: number,
-        gridY: number,
-        now: number
-    ): WorldSessionMessageResult {
-        const lootObject = this.loot.get(lootId);
-        if (!lootObject || this.lootState.isAutoLootPending(lootId)) return reject(intentId, 'Loot does not exist.');
-        if (!this.lootState.isOccupiedBy(lootId, playerId)) return reject(intentId, 'Loot is not occupied by this player.');
-
-        const placed = lootObject.inventory.getAt(gridX, gridY);
-        if (!placed) return reject(intentId, 'No item at requested loot cell.');
-        const player = this.players.get(playerId);
-        lootObject.inventory.remove(placed);
-        addCarriedWeight(player, getPlacedItemWeight(placed));
-        addCarriedItemQuantity(player, placed.item.id, placed.quantity);
-        if (player) {
-            this.saveState.addPlacedItem(player, placed);
-            this.saveState.markDirty(playerId);
-        }
-        this.lootState.touch(lootId, now);
-        lootObject.opened = lootObject.inventory.items.length === 0;
-        if (lootObject.opened) this.lootState.releaseLoot(lootId);
-
-        return {
-            replies: [{
-                type: 'LOOT_GRANT',
-                lootId,
-                gridSnapshot: gridToSnapshot(lootObject.inventory),
-            }],
-            broadcasts: [],
-        };
-    }
-
-    private handleAutoLootResolve(
-        playerId: string,
-        lootId: string,
-        acceptedCells: Array<{ gridX: number; gridY: number }>
-    ): WorldSessionMessageResult {
-        const lootObject = this.loot.get(lootId);
-        if (!this.lootState.consumeAutoLootPending(lootId, playerId) || !lootObject) return { replies: [], broadcasts: [] };
-
-        const removed = new Set<object>();
-        let acceptedWeight = 0;
-        const player = this.players.get(playerId);
-        for (const cell of acceptedCells) {
-            const placed = lootObject.inventory.getAt(cell.gridX, cell.gridY);
-            if (!placed || removed.has(placed)) continue;
-            lootObject.inventory.remove(placed);
-            removed.add(placed);
-            acceptedWeight += getPlacedItemWeight(placed);
-            addCarriedItemQuantity(player, placed.item.id, placed.quantity);
-            if (player) this.saveState.addPlacedItem(player, placed);
-        }
-        addCarriedWeight(player, acceptedWeight);
-        if (acceptedWeight > 0 || removed.size > 0) this.saveState.markDirty(playerId);
-
-        lootObject.opened = lootObject.inventory.items.length === 0;
-        if (lootObject.opened) {
-            this.loot.delete(lootId);
-            this.lootState.releaseLoot(lootId);
-        }
-        return { replies: [], broadcasts: [] };
     }
 
     private handleScenarioEnter(
@@ -1250,7 +1088,7 @@ export class WorldSession {
         actor: ServerActor,
         target: ServerEnemy,
         now: number
-    ): { event: CombatEventMessage; autoLootGrant?: AutoLootGrantMessage; scenarioEnemyDefeatEvent?: ScenarioEnemyDefeatEventMessage } {
+    ): WorldSessionActorAttackResult {
         const enemy = target.enemy;
         const result = CombatFormulas.calcPhysicalDamage(
             getEffectiveStats(actor.stats, actor.statuses),
@@ -1303,89 +1141,13 @@ export class WorldSession {
         return { autoLootGrant, scenarioEnemyDefeatEvent };
     }
 
-    private finishPlayer(playerId: string, result: RaidResultMessage['result']): RaidResultMessage {
-        const player = this.players.get(playerId);
-        const extractionTownId = this.resolveExtractionTownId(player);
-        const finalResult = result === 'SURVIVED' && !this.isValidExtractionTown(player, extractionTownId) ? 'LEFT' : result;
-        const message: RaidResultMessage = {
-            type: 'RAID_RESULT',
-            playerId,
-            result: finalResult,
-            elapsedSeconds: player?.elapsedSeconds ?? 0,
-            kills: player?.kills ?? 0,
-            departureTownId: player?.departureTownId ?? 'central_castle',
-            extractionTownId,
-            completedDungeonIds: player ? [...player.completedDungeonIds] : [],
-        };
-        this.log(`raid result player=${playerId} result=${finalResult} kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
-        if (player) {
-            const survived = finalResult === 'SURVIVED';
-            if (survived) {
-                message.firstSurvivalBonusGranted = this.saveState.grantsFirstSurvivalBonus(player);
-            }
-            this.saveState.captureFinalPatch(player, survived ? extractionTownId : undefined, survived);
-            this.saveState.markDirty(playerId);
-        }
-        this.removePlayer(playerId);
-        return message;
-    }
-
-    private finishPlayerForShutdown(playerId: string): RaidResultMessage {
-        const player = this.players.get(playerId);
-        const extractionTownId = player?.departureTownId ?? this.resolveExtractionTownId(player);
-        const message: RaidResultMessage = {
-            type: 'RAID_RESULT',
-            playerId,
-            result: 'SURVIVED',
-            elapsedSeconds: player?.elapsedSeconds ?? 0,
-            kills: player?.kills ?? 0,
-            departureTownId: player?.departureTownId ?? 'central_castle',
-            extractionTownId,
-            completedDungeonIds: player ? [...player.completedDungeonIds] : [],
-        };
-        this.log(`raid result player=${playerId} result=SURVIVED reason=server_shutdown kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
-        if (player) {
-            message.firstSurvivalBonusGranted = this.saveState.grantsFirstSurvivalBonus(player);
-            this.saveState.captureFinalPatch(player, extractionTownId, true);
-            this.saveState.markDirty(playerId);
-        }
-        this.removePlayer(playerId);
-        return message;
-    }
-
     private removePlayer(playerId: string): void {
         const player = this.players.get(playerId);
         if (!player) return;
         this.removeScenarioRuntimeForPlayer(playerId);
         for (const actorId of player.actorIds) this.actors.delete(actorId);
         this.players.delete(playerId);
-        this.releaseLootLocksForPlayer(playerId);
-    }
-
-    private resolveExtractionTownId(player: ServerPlayer | undefined): string {
-        if (!player) return 'central_castle';
-        const actor = player.actorIds.map((id) => this.actors.get(id)).find(Boolean);
-        if (!actor) return player.departureTownId;
-        const town = this.worldMap.getTownAtTile(actor.tile.x, actor.tile.y);
-        return town?.id ?? player.departureTownId;
-    }
-
-    private resolveRequestedRaidResult(
-        playerId: string,
-        reason: Extract<WorldClientMessage, { type: 'WORLD_LEAVE' }>['reason']
-    ): RaidResultMessage['result'] {
-        if (reason === 'wipe') return 'DEAD';
-        if (reason !== 'town') return 'LEFT';
-        const player = this.players.get(playerId);
-        return this.isValidExtractionTown(player, this.resolveExtractionTownId(player)) ? 'SURVIVED' : 'LEFT';
-    }
-
-    private isValidExtractionTown(player: ServerPlayer | undefined, extractionTownId: string): boolean {
-        if (!player) return false;
-        if (extractionTownId === player.departureTownId) return false;
-        const actor = player.actorIds.map((id) => this.actors.get(id)).find(Boolean);
-        if (!actor) return false;
-        return this.worldMap.getTownAtTile(actor.tile.x, actor.tile.y)?.id === extractionTownId;
+        this.lootResolver.releaseLocksForPlayer(playerId);
     }
 
     private isFieldPassable(query: FieldPassableQuery): boolean {
@@ -1868,29 +1630,4 @@ export class WorldSession {
         return dt;
     }
 
-    private releaseLootLocksForPlayer(playerId: string): void {
-        this.lootState.releaseLocksForPlayer(playerId);
-    }
-
-    private releaseExpiredAutoLoot(now: number): void {
-        this.lootState.releaseExpiredAutoLoot(now, (lootId) => {
-            const lootObject = this.loot.get(lootId);
-            if (!lootObject) return;
-            lootObject.opened = lootObject.inventory.items.length === 0;
-            if (lootObject.opened) this.loot.delete(lootId);
-        });
-    }
-
-    private releaseExpiredLootLocks(now: number): void {
-        this.lootState.releaseExpiredLocks(now, (lock) => this.shouldReleaseLootLock(lock));
-    }
-
-    private shouldReleaseLootLock(lock: WorldSessionLootLock): boolean {
-        const actor = this.players.get(lock.playerId)?.actorIds
-            .map((actorId) => this.actors.get(actorId))
-            .find(Boolean);
-        const lootObject = this.loot.get(lock.lootId);
-        const tooFar = actor && lootObject && manhattan(actor.tile, { x: lootObject.x, y: lootObject.y }) > 2;
-        return Boolean(tooFar || !actor || !lootObject);
-    }
 }

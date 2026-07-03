@@ -13,7 +13,6 @@ import type { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { getCarryAtbMultiplier, getPartyCarriedWeight } from '../inventory/CarryWeight';
 import {
-    countCursedArtifactsInPlacedItems,
     getCursedArtifactAtbMultiplier,
     getCursedArtifactTurnDamage,
 } from '../raid/CursedArtifact';
@@ -72,6 +71,12 @@ import { WorldCombatFeedbackController } from './world/WorldCombatFeedbackContro
 import { WorldNetworkIntentController } from './world/WorldNetworkIntentController';
 import { WorldTurnStateController } from './world/WorldTurnStateController';
 import { WorldFieldFeedbackState } from './world/WorldFieldFeedbackState';
+import {
+    getWorldBackpackCursedArtifactCount,
+    getWorldPathPreviewTiles,
+    getWorldSpendableActionGauge,
+    isWorldTurnCombatActive,
+} from './world/WorldEngineTurnQueries';
 import type { CombatFeedbackKind } from './world/CombatFeedback';
 import {
     actorTile,
@@ -658,7 +663,16 @@ export class WorldEngine {
             clearWorldLoot: () => { this.worldMap.loot = []; },
             selectActor: (actorId) => this.selectionController.selectActor(actorId),
             syncCharacterMovementToClass: (character) => syncCharacterMovementToClass(character),
-            isTurnCombatActive: () => this.isTurnCombatActive(),
+            isTurnCombatActive: () => isWorldTurnCombatActive({
+                fieldEnemies: this.fieldEnemies,
+                turnStateController: this.turnStateController,
+                actionMenuUI: this.actionMenuUI,
+                playerActionController: this.playerActionController,
+                tacticalController: this.tacticalController,
+                magicController: this.magicController,
+                toolController: this.toolController,
+                partyActors: this.partyActors,
+            }),
             setPhase: (phase) => { this.currentPhase = phase; },
             applyNetworkSnapshot: (snapshot) => this.applyNetworkSnapshot(snapshot),
             handleNetworkCombatEvent: (event) => this.handleNetworkCombatEvent(event),
@@ -704,11 +718,20 @@ export class WorldEngine {
             getRemainingActionPoints: () => this.getSpendableActionGauge(),
             getMajorActionUsedThisTurn: () => this.turnStateController.getMajorActionUsedThisTurn(),
             getHoverTile: () => this.hoverTile,
-            getPathPreviewTiles: (actor) => this.getPathPreviewTiles(actor),
+            getPathPreviewTiles: (actor) => getWorldPathPreviewTiles(actor, this.networkSyncController),
             getAttackCues: () => this.fieldFeedback.attackCues,
             getCombatLog: () => this.fieldFeedback.combatLog,
             getActorTerrainTraits: (actor) => getWorldActorTerrainTraits(actor),
-            isTurnCombatActive: () => this.isTurnCombatActive(),
+            isTurnCombatActive: () => isWorldTurnCombatActive({
+                fieldEnemies: this.fieldEnemies,
+                turnStateController: this.turnStateController,
+                actionMenuUI: this.actionMenuUI,
+                playerActionController: this.playerActionController,
+                tacticalController: this.tacticalController,
+                magicController: this.magicController,
+                toolController: this.toolController,
+                partyActors: this.partyActors,
+            }),
         });
         this.inputController = new WorldInputController({
             actionMenuUI: this.actionMenuUI,
@@ -1043,16 +1066,6 @@ export class WorldEngine {
 
     private interruptRestingForDamage(beforeHpByActorId: Map<string, number>): void {
         this.restingController.interruptForDamage(beforeHpByActorId);
-    }
-
-    private isTurnCombatActive(): boolean {
-        if (this.fieldEnemies.some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro)) return true;
-        if (this.turnStateController.hasTurnActivity()) return true;
-        if (this.actionMenuUI.getIsOpen() || this.playerActionController.getMode()) return true;
-        if (this.tacticalController.isOpen()) return true;
-        if (this.magicController.isActive()) return true;
-        if (this.toolController?.isActive()) return true;
-        return this.partyActors.some((actor) => actor.queuedIntent || actor.path.length > 0);
     }
 
     private applyCombatResult(result: CombatResult): void {
@@ -1561,31 +1574,16 @@ export class WorldEngine {
         return this.fieldEnemies.find((entry) => entry.enemy.id === enemyId)?.enemy ?? null;
     }
 
-    private getPathPreviewTiles(actor: FieldActor | null): TilePoint[] {
-        if (!actor) return [];
-        const networkPreview = this.networkSyncController.getPathPreviewTiles(actor);
-        if (networkPreview) return networkPreview;
-        if (isEntityMoving(actor.entity)) {
-            const currentTarget = actorTile(actor);
-            const [nextStep] = actor.path;
-            if (!nextStep || nextStep.x !== currentTarget.x || nextStep.y !== currentTarget.y) {
-                return [currentTarget, ...actor.path];
-            }
-        }
-        return actor.path;
-    }
-
     private getSpendableActionGauge(): number {
-        if (this.turnStateController.getActiveTurnActorId() && this.isNetworkRaid) {
-            return Math.max(0, Math.floor(this.turnStateController.getRemainingActionPoints()));
-        }
-        const actor = this.getActivePartyTurnActor();
-        if (!actor) return this.turnStateController.getRemainingActionPoints();
-        return Math.max(this.turnStateController.getRemainingActionPoints(), Math.floor(actor.entity.actionGauge));
+        return getWorldSpendableActionGauge({
+            turnStateController: this.turnStateController,
+            isNetworkRaid: this.isNetworkRaid,
+            activeActor: this.getActivePartyTurnActor(),
+        });
     }
 
     private getBackpackCursedArtifactCount(): number {
-        return countCursedArtifactsInPlacedItems(this.gameManager.inventory.items);
+        return getWorldBackpackCursedArtifactCount(this.gameManager.inventory.items);
     }
 
     private clearIntent(): void {
