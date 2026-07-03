@@ -79,7 +79,7 @@ import {
     type WorldEngineActionControllers,
 } from './world/WorldEngineActionControllers';
 import {
-    createWorldEnginePresentationControllers,
+    createWorldEnginePresentationControllersFromSources,
     type WorldEnginePresentationControllers,
 } from './world/WorldEnginePresentationControllers';
 import {
@@ -305,23 +305,16 @@ export class WorldEngine {
     }
 
     private initializePresentationControllers(): void {
-        const sharedPorts = this.getSharedControllerPorts();
-        const presentationControllers = createWorldEnginePresentationControllers({
-            ...sharedPorts,
+        const presentationControllers = createWorldEnginePresentationControllersFromSources({
             canvas: this.canvas,
-            entityInfoUI: this.getUiState().entityInfoUI,
-            minimapUI: this.worldControllers.minimapUI,
-            magicController: this.actionControllers.magicController,
-            toolController: this.actionControllers.toolController,
-            playerActionController: this.actionControllers.playerActionController,
-            raidOutcomeController: this.raidLifecycleControllers.raidOutcomeController,
-            selectionController: this.actionControllers.selectionController,
-            tutorialController: this.scenarioNetworkControllers.tutorialController,
-            getWorldTime: () => this.getRuntimeState().worldTime,
-            getPhase: () => this.getRuntimeState().currentPhase,
+            ports: this.getSharedControllerPorts(),
+            getUiState: () => this.getUiState(),
+            getRuntimeState: () => this.getRuntimeState(),
+            getActionControllers: () => this.actionControllers,
+            getRaidLifecycleControllers: () => this.raidLifecycleControllers,
+            getScenarioNetworkControllers: () => this.scenarioNetworkControllers,
+            getWorldControllers: () => this.worldControllers,
             getSpendableActionGauge: () => this.getSpendableActionGauge(),
-            getHoverTile: () => this.getRuntimeState().hoverTile,
-            setHoverTile: (tile) => { this.getRuntimeState().hoverTile = tile; },
             getPathPreviewTiles: (actor) => this.getPathPreviewTiles(actor),
             resolveFieldHitAt: (tile) => this.resolveFieldHitAt(tile),
             isTurnCombatActive: () => this.isTurnCombatActive(),

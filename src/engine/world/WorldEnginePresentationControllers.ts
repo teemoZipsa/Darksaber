@@ -28,6 +28,13 @@ import type { WorldTownSession } from './WorldTownSession';
 import type { WorldTutorialController } from './WorldTutorialController';
 import type { WorldFieldFeedbackState } from './WorldFieldFeedbackState';
 import type { WorldTurnStateController } from './WorldTurnStateController';
+import type { WorldEngineActionControllers } from './WorldEngineActionControllers';
+import type { WorldEngineRaidLifecycleControllers } from './WorldEngineRaidLifecycleControllers';
+import type { WorldEngineRuntimeState } from './WorldEngineRuntimeState';
+import type { WorldEngineScenarioNetworkControllers } from './WorldEngineScenarioNetworkControllers';
+import type { WorldEngineSharedControllerPorts } from './WorldEngineSharedControllerPorts';
+import type { WorldEngineUiState } from './WorldEngineUiState';
+import type { WorldEngineWorldControllers } from './WorldEngineWorldControllers';
 
 type WorldPresentationFieldHit = FieldHit<FieldHitParty, Enemy, LootObject>;
 
@@ -81,6 +88,68 @@ export interface WorldEnginePresentationControllers {
     tacticalController: WorldTacticalController;
     renderController: WorldRenderController;
     inputController: WorldInputController;
+}
+
+export interface WorldEnginePresentationControllerSources {
+    canvas: HTMLCanvasElement;
+    ports: WorldEngineSharedControllerPorts;
+    getUiState(): WorldEngineUiState;
+    getRuntimeState(): WorldEngineRuntimeState;
+    getActionControllers(): WorldEngineActionControllers;
+    getRaidLifecycleControllers(): WorldEngineRaidLifecycleControllers;
+    getScenarioNetworkControllers(): WorldEngineScenarioNetworkControllers;
+    getWorldControllers(): WorldEngineWorldControllers;
+    getSpendableActionGauge(): number;
+    getPathPreviewTiles(actor: FieldActor | null): TilePoint[];
+    resolveFieldHitAt(tile: TilePoint): WorldPresentationFieldHit;
+    isTurnCombatActive(): boolean;
+    switchToNextAliveActor(): void;
+    switchToPartyMember(index: number): boolean;
+    toggleActionMenuForControlled(): void;
+    closeActionMenu(): void;
+    dismissActionMenuTurn(): void;
+    closeTacticalMenu(): void;
+    clearIntent(): void;
+    openPauseMenu(): void;
+}
+
+export function createWorldEnginePresentationControllersFromSources(
+    sources: WorldEnginePresentationControllerSources
+): WorldEnginePresentationControllers {
+    const uiState = sources.getUiState();
+    const actionControllers = sources.getActionControllers();
+    const raidLifecycleControllers = sources.getRaidLifecycleControllers();
+    const scenarioNetworkControllers = sources.getScenarioNetworkControllers();
+    const worldControllers = sources.getWorldControllers();
+
+    return createWorldEnginePresentationControllers({
+        ...sources.ports,
+        canvas: sources.canvas,
+        entityInfoUI: uiState.entityInfoUI,
+        minimapUI: worldControllers.minimapUI,
+        magicController: actionControllers.magicController,
+        toolController: actionControllers.toolController,
+        playerActionController: actionControllers.playerActionController,
+        raidOutcomeController: raidLifecycleControllers.raidOutcomeController,
+        selectionController: actionControllers.selectionController,
+        tutorialController: scenarioNetworkControllers.tutorialController,
+        getWorldTime: () => sources.getRuntimeState().worldTime,
+        getPhase: () => sources.getRuntimeState().currentPhase,
+        getSpendableActionGauge: () => sources.getSpendableActionGauge(),
+        getHoverTile: () => sources.getRuntimeState().hoverTile,
+        setHoverTile: (tile) => { sources.getRuntimeState().hoverTile = tile; },
+        getPathPreviewTiles: (actor) => sources.getPathPreviewTiles(actor),
+        resolveFieldHitAt: (tile) => sources.resolveFieldHitAt(tile),
+        isTurnCombatActive: () => sources.isTurnCombatActive(),
+        switchToNextAliveActor: () => sources.switchToNextAliveActor(),
+        switchToPartyMember: (index) => sources.switchToPartyMember(index),
+        toggleActionMenuForControlled: () => sources.toggleActionMenuForControlled(),
+        closeActionMenu: () => sources.closeActionMenu(),
+        dismissActionMenuTurn: () => sources.dismissActionMenuTurn(),
+        closeTacticalMenu: () => sources.closeTacticalMenu(),
+        clearIntent: () => sources.clearIntent(),
+        openPauseMenu: () => sources.openPauseMenu(),
+    });
 }
 
 export function createWorldEnginePresentationControllers(
