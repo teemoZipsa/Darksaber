@@ -15,9 +15,9 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
   #ui-overlay: position:absolute; pointer-events:none  (패널/스크림만 auto)
 ```
 - **마운트**: `src/main.ts` → `mountUiOverlay(manager)` → `createRoot(#ui-overlay)`로 `<OverlayRoot/>` 렌더, `UiStore` 반환 후 `manager.attachUiStore()`.
-- **상태 브리지**(`src/ui/react/UiStore.ts`, `UiContext.tsx`): 게임에 이벤트버스가 없어서, `GameManager.loop()`가 프레임당 `uiStore.tick()` 호출 → React가 `useSyncExternalStore`로 구독.
+- **상태 브리지**(`src/ui/react/UiStore.ts`, `UiContext.tsx`): 게임에 이벤트버스가 없어서, `GameManager.loop()`가 프레임당 `uiStore.tick()` 호출. `UiStore`는 DOM-visible state signature가 바뀐 경우에만 React 구독자에게 알림.
   - `useUiSelector(sel)`: 값 바뀔 때만 리렌더(열림 플래그용).
-  - `useUiVersion()`: 매 프레임 리렌더(열린 패널 내용용 — HP 등 in-place 변경 반영).
+  - `useUiVersion()`: 열린 패널 내용용 변경 감지 버전(HP 등 in-place 변경 반영, 동일 상태 프레임은 리렌더 안 함).
   - 액션은 게임 상태를 직접 안 건드리고 `GameManager`/매니저에 위임 후 `tick()`.
 - **입력 격리**: `InputManager`가 클릭을 캔버스에 바인딩 → DOM 패널이 위에 뜨면 자연히 흡수. 추가로 `GameManager.isDomModalOpen()`가 true면 `worldEngine.update()` 스킵(월드 동결). 각 패널은 풀스크린 `.ds-scrim`(클릭 시 닫힘) 위에 렌더.
 - **열림/닫힘 주인은 GameManager**: 기존 캔버스 UI 객체(`charUI`/`pauseMenu`/`settingsUI`/`partyUI`)의 `isVisible()` 비트를 그대로 재사용(키 토글·상호배제 유지). 캔버스 render/input만 우회하고 React가 대신 그림.
@@ -54,7 +54,7 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
 3. `UiStore`에 `isXOpen` 셀렉터 + 액션(닫기 등) 추가.
 4. `OverlayRoot.tsx`에 `{xOpen && <Scrim><Panel/></Scrim>}` 분기 추가.
 5. `GameManager`: 해당 패널 **캔버스 render·input 우회**, `isDomModalOpen()` OR 체인에 추가, 필요시 ESC/닫기 메서드.
-6. `tsc --noEmit` → 프리뷰 검증 → 커밋.
+6. `npm run typecheck` → 프리뷰 검증 → 커밋.
 
 ## 실행 & 검증
 - 개발 서버: `npm run dev` (Vite, http://127.0.0.1:5731).
@@ -65,7 +65,8 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
   - `npm run dev:raid:loot` 또는 `/?devStart=raid&devScenario=loot`: 레이드 자동 진입 후 전리품 DOM 패널 검증 상태 구성.
   - `npm run dev:raid:story1`~`npm run dev:raid:story31` 또는 `/?devStart=raid&devScenario=storyNN`: 레이드 자동 진입 후 해당 1~31화 시나리오로 바로 진입. 실내는 실내맵, 필드/비공정은 월드맵 목표 상태로 시작.
   - `npm run dev:tutorial` 또는 `/?devStart=tutorial`: 캐릭터 생성 없이 튜토리얼 대련장으로 진입.
-- 타입체크: `npx tsc --noEmit`.
+- 타입체크: `npm run typecheck`.
+- DOM 오버레이 브라우저 스모크: `npm run test:e2e` (새 환경은 먼저 `npx playwright install chromium`).
 - **헤드리스 프리뷰 주의**: 탭이 숨겨지면 브라우저가 `requestAnimationFrame`을 멈춰 루프가 정지 → 스크린샷/자동 tick 불가. 대응:
   - `GameManager.scheduleFrame()`에 **DEV 전용 setTimeout 폴백**(hidden일 때) — 프로덕션 무영향.
   - `main.ts`에 **DEV 전용 `window.__gm`** 디버그 핸들(프리뷰에서 구동/검증용).

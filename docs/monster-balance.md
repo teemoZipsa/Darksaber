@@ -74,6 +74,6 @@ Relevant guards:
 Expected validation before committing:
 
 ```powershell
-npx tsc --noEmit
+npm run typecheck
 npm test
 ```

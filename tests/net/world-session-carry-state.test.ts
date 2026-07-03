@@ -18,6 +18,7 @@ function createPlayer(overrides: Partial<ServerPlayer> = {}): ServerPlayer {
         carriedWeight: 0,
         carriedItems: new Map(),
         raidGoldReward: 0,
+        raidModifier: { id: 'supply_drop' },
         completedQuestIds: new Set(),
         enteredDungeonIds: new Set(),
         completedDungeonIds: new Set(),

@@ -11,7 +11,7 @@ Server-authoritative hub state (gold, backpack, stash, equipment, market) for au
 - [x] Deploy barrier: flush fail blocks join + 409 retry in `AuthClient`
 - [x] Raid end: `syncHubSaveFromServer` before hub flush resume
 - [x] Authenticated `PlayerData.save()`/`load()` no-op + i18n `sessionOnlyNote`
-- [x] CI: `build:server` + `npx tsc --noEmit`
+- [x] CI: `build:server` + `npm run typecheck`
 - [x] `/metrics` Bearer when `WORLD_METRICS_TOKEN` set
 - [x] `WorldSessionMoveIntent` extract (move path planning)
 - [x] combat-parity / hub-save / stash preserve tests

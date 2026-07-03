@@ -102,7 +102,8 @@
 예외 기록: 2026-06-06 몬스터 밸런스 작업에서는 사용자 명시 승인으로 `WorldEngine.ts`의 로컬 실내 시나리오 몬스터 생성 지점만 좁게 수정했다. 이 예외는 UI/오버레이 배선 전체에 대한 일반 허가가 아니다.
 
 ## 검증 명령
-- 타입체크: `npx tsc --noEmit` (반드시 통과).
+- 타입체크: `npm run typecheck` (반드시 통과).
+- DOM 오버레이 브라우저 스모크: `npm run test:e2e` (새 환경은 먼저 `npx playwright install chromium`).
 - 개발 서버: `npm run dev` → http://127.0.0.1:5731 (프리뷰 도구는 `.claude/launch.json`의 5742).
 - 개발자 바로 시작: `npm run dev:town`, `npm run dev:raid`, `npm run dev:raid:aggro`, `npm run dev:raid:loot`, `npm run dev:raid:story1`~`npm run dev:raid:story31`, `npm run dev:tutorial`. 직접 진입 URL은 `/?devStart=raid&devScenario=storyNN` 형식으로 1~31화 전체를 지원.
 - 테스트: `npm test`.

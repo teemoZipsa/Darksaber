@@ -1,8 +1,9 @@
 /**
  * CharacterPanel — the DD-styled DOM replacement for the canvas CharacterPanelUI.
  *
- * Subscribes to the per-frame version (useUiVersion) so live-mutating values
- * (HP/MP/EXP, gold, active member) stay current. Mounted only while open.
+ * Subscribes to the UI version (useUiVersion) so live-mutating values
+ * (HP/MP/EXP, gold, active member) stay current without per-frame re-renders.
+ * Mounted only while open.
  */
 
 import type { CSSProperties } from 'react';
@@ -16,7 +17,7 @@ import { EquipmentSlots } from './EquipmentSlots';
 import { StatGrid } from './StatGrid';
 
 export function CharacterPanel() {
-    useUiVersion(); // re-render each frame so live game state stays in sync
+    useUiVersion(); // keep live game state in sync when UiStore observes changes
     const store = useStore();
 
     const char = store.getActiveCharacter();

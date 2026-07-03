@@ -26,9 +26,10 @@ test('starter equipment bonuses scale with combat stats', () => {
     assert.ok(sword);
     const bonus = getPlacedItemStatBonus({
         item: sword,
-        x: 0,
-        y: 0,
+        gridX: 0,
+        gridY: 0,
         durability: sword.maxDurability,
+        quantity: 1,
         sockets: [],
     });
     assert.equal(bonus.atk, 3);

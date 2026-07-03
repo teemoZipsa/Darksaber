@@ -1,10 +1,10 @@
 /**
  * UiStore — the bridge between the canvas game and the React DOM overlay.
  *
- * The game has no event bus; state is mutated in place and polled each frame.
- * Rather than instrument every mutation site, we reuse the existing frame loop:
- * GameManager calls `tick()` once per frame, which bumps a version counter and
- * notifies React subscribers. React reads live state through the selectors below.
+ * The game has no event bus; state is mutated in place and sampled from the
+ * frame loop. `tick()` builds a compact signature of the DOM-visible state and
+ * only notifies React subscribers when that signature changes. React reads live
+ * state through the selectors below.
  *
  * This mirrors the existing `SettingsManager.onChange` / `i18n.subscribe` patterns.
  * React never mutates game state directly — it calls the action methods here,
@@ -21,6 +21,8 @@ import type { TownInfo } from '../../map/BiomeMask';
 import type { InventoryUI } from '../../inventory/InventoryUI';
 import type { ItemSlot } from '../../data/ItemDB';
 import type { GridInventory, PlacedItem } from '../../inventory/GridInventory';
+import { SettingsManager } from '../../engine/SettingsManager';
+import { i18n } from '../../i18n/LanguageManager';
 import { getRepairCost, getUnsocketCost, repairItem, unsocketAll } from '../../inventory/Socketing';
 import { getStoryQuestViews as buildStoryQuestViews, type StoryQuestView } from '../../data/StoryQuestData';
 import { getSkill, type Skill } from '../../data/SkillDB';
@@ -63,23 +65,141 @@ export interface FacilityUpgradeView {
 export class UiStore {
     private listeners = new Set<() => void>();
     private _version = 0;
+    private lastSignature = '';
 
     constructor(private readonly gm: GameManager) {}
 
     // ─── Subscription (consumed by useSyncExternalStore) ──────────
-    /** Subscribe to per-frame ticks. Returns an unsubscribe fn. */
+    /** Subscribe to DOM-visible state changes. Returns an unsubscribe fn. */
     subscribe = (cb: () => void): (() => void) => {
         this.listeners.add(cb);
         return () => { this.listeners.delete(cb); };
     };
 
-    /** Stable primitive snapshot — the frame version counter. */
+    /** Stable primitive snapshot — bumps only when DOM-visible state changes. */
     getVersion = (): number => this._version;
 
-    /** Called once per frame by GameManager; advances the version and notifies React. */
+    /** Called by GameManager's frame loop; notifies React only when the UI snapshot changed. */
     tick(): void {
+        const signature = this.captureSignature();
+        if (signature === this.lastSignature) return;
+        this.lastSignature = signature;
         this._version++;
         for (const cb of this.listeners) cb();
+    }
+
+    private captureSignature(): string {
+        const flags = [
+            this.isCharPanelOpen() ? 'char' : '',
+            this.isPauseOpen() ? 'pause' : '',
+            this.isSettingsOpen() ? 'settings' : '',
+            this.isPartyOpen() ? 'party' : '',
+            this.isTownOpen() ? 'town' : '',
+            this.isCharCreateOpen() ? 'create' : '',
+            this.isInventoryOpen() ? 'inventory' : '',
+            this.isQuestJournalOpen() ? 'journal' : '',
+            this.isMagicLoadoutOpen() ? 'magic' : '',
+        ].join(',');
+        return [
+            flags,
+            `lang:${i18n.lang}`,
+            `settings:${SettingsManager.lastUpdated}`,
+            `gold:${this.getGold()}`,
+            `party:${this.getActiveIndex()}:${this.getRoster().map((char) => this.characterSignature(char)).join(';')}`,
+            this.isTownOpen() ? `town:${this.townSignature()}` : '',
+            this.isInventoryOpen() ? `worldInv:${this.inventorySignature(this.getWorldInventory())}` : '',
+            this.isQuestJournalOpen() ? `quests:${this.questSignature()}` : '',
+            this.isMagicLoadoutOpen() ? `magic:${this.magicSignature()}` : '',
+        ].join('|');
+    }
+
+    private townSignature(): string {
+        const town = this.getTownInfo();
+        const townInv = this.getTownInventory();
+        return [
+            town?.id ?? '',
+            this.getTownTab(),
+            this.isTownDeployPending() ? 'deploying' : '',
+            this.getTownDeployError() ?? '',
+            this.getPendingRestMenuId() ?? '',
+            this.getInjuredCount(),
+            this.hasRaidInsurance() ? 'insured' : `insurance:${this.getRaidInsurancePrice()}`,
+            `rumors:${this.getTownRumors().join('~')}`,
+            `shop:${this.shopSignature()}`,
+            `facilities:${this.getFacilityUpgradeViews().map((view) => `${view.definition.id}:${view.level}:${view.canUpgrade ? 1 : 0}:${view.items.map((item) => `${item.itemId}:${item.owned}`).join(',')}`).join(';')}`,
+            `contracts:${this.getMerchantContractViews().map((contract) => `${contract.id}:${contract.canComplete ? 1 : 0}`).join(';')}`,
+            townInv ? `inv:${this.inventorySignature(townInv)}` : '',
+            `quests:${this.questSignature()}`,
+        ].join('/');
+    }
+
+    private shopSignature(): string {
+        const shop = this.shop();
+        if (!shop) return '';
+        return [
+            this.getShopKind(),
+            this.getShopGold(),
+            this.getShopBuyEntries().map((entry) => `${entry.item.id}:${entry.remaining}:${entry.price}`).join(','),
+            this.getShopSellEntries().map((entry) => `${entry.source.id}:${this.placedSignature(entry.placed)}:${entry.price}`).join(','),
+        ].join(':');
+    }
+
+    private questSignature(): string {
+        return this.getStoryQuestViews()
+            .map((view) => `${view.quest.id}:${view.status}:${view.rewardView.owned ? 1 : 0}:${view.sideObjectives.map((side) => `${side.labelKey}:${side.completed ? 1 : 0}`).join('~')}`)
+            .join(',');
+    }
+
+    private magicSignature(): string {
+        const char = this.getActiveCharacter();
+        return char
+            ? `${char.id}:${char.magicLoadout.join(',')}:${Object.entries(char.skillUpgradeLevels).sort(([a], [b]) => a.localeCompare(b)).map(([id, level]) => `${id}:${level}`).join(',')}`
+            : '';
+    }
+
+    private inventorySignature(inv: InventoryUI): string {
+        const ext = inv.getExternalGrid();
+        return [
+            inv.isCloseHidden() ? 'hiddenClose' : '',
+            inv.getExternalTitle(),
+            inv.isExternalRaidLoot() ? 'raidLoot' : '',
+            inv.getActiveCharacter()?.id ?? '',
+            `${inv.getFeedback().id}:${inv.getFeedback().text}`,
+            `bag:${this.gridSignature(inv.getBag())}`,
+            ext ? `ext:${this.gridSignature(ext)}` : '',
+        ].join(':');
+    }
+
+    private gridSignature(grid: GridInventory): string {
+        return `${grid.width}x${grid.height}:${grid.items.map((placed) => this.placedSignature(placed)).join(',')}`;
+    }
+
+    private characterSignature(char: Character): string {
+        const stats = char.stats;
+        return [
+            char.id,
+            char.name,
+            char.classLineId,
+            char.currentTier,
+            char.level,
+            char.exp,
+            char.isDead ? 1 : 0,
+            `${stats.hp}/${stats.maxHp}/${stats.mp}/${stats.maxMp}`,
+            `eq:${[...char.equipment.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([slot, placed]) => `${slot}:${this.placedSignature(placed)}`).join(',')}`,
+            `loadout:${char.magicLoadout.join(',')}`,
+        ].join(':');
+    }
+
+    private placedSignature(placed: PlacedItem): string {
+        return [
+            placed.item.id,
+            placed.gridX,
+            placed.gridY,
+            placed.quantity,
+            placed.durability,
+            placed.acquiredInRaid ? 1 : 0,
+            placed.sockets?.map((item) => item.id).join('+') ?? '',
+        ].join('@');
     }
 
     // ─── Selectors (read live from GameManager) ───────────────────

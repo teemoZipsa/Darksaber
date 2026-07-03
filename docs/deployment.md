@@ -235,8 +235,10 @@ Then run one command:
 npm run deploy:prod
 ```
 
-The command requires a clean git working tree, then runs `npx tsc --noEmit`,
-`npm test`, `npm run build`, Render deploy/wait, and Vercel production deploy.
+The command requires a clean git working tree, then runs `npm run typecheck`,
+`npm test`, `npm run test:e2e`, `npm run build`, Render deploy/wait, and Vercel
+production deploy. On a fresh machine, run `npx playwright install chromium`
+once before using the e2e check locally.
 Use narrow skips only when you already did that step intentionally:
 
 ```powershell

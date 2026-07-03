@@ -3,8 +3,8 @@
  *
  * Sections: sound / display / accessibility / language. Uses real form controls (toggle switches,
  * native range sliders, cycle buttons) instead of canvas-drawn widgets. All state
- * goes through SettingsManager (persisted); re-renders via useUiVersion so values
- * stay live. Labels are localized via t(); language toggle re-renders live.
+ * goes through SettingsManager (persisted); re-renders via useUiVersion when
+ * observed settings/language values change. Labels are localized via t().
  */
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';

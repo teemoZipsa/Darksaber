@@ -4,6 +4,8 @@ node_modules/
 dist/
 build/
 server-dist/
+playwright-report/
+test-results/
 .DS_Store
 *.log
 server/.runtime/

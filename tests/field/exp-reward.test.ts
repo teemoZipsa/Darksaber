@@ -9,6 +9,7 @@ test('equal-level kills award enough exp for roughly five tier-1 level-ups', () 
     const tierOneRequirement = getExpToNext('infantry', 1, 1);
 
     assert.equal(expPerKill, 50);
+    assert.ok(tierOneRequirement !== undefined);
     assert.ok(tierOneRequirement >= 200);
     assert.ok(Math.ceil(tierOneRequirement / expPerKill) <= 6);
 });

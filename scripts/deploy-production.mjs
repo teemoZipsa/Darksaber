@@ -16,8 +16,9 @@ if (!skipChecks) {
     if (localHead !== upstreamHead) {
         fail(`Local HEAD ${localHead.slice(0, 8)} does not match upstream ${upstreamHead.slice(0, 8)}. Push or pull before production deploy.`);
     }
-    await run('npx', ['tsc', '--noEmit']);
+    await run('npm', ['run', 'typecheck']);
     await run('npm', ['test']);
+    await run('npm', ['run', 'test:e2e']);
     await run('npm', ['run', 'build']);
 }
 

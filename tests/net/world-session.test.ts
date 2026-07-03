@@ -680,7 +680,7 @@ test('loot contention grants one occupant and rejects the other', () => {
     session.tick(1_000);
 
     const snapshot = session.createSnapshot(a.playerId, 1_000);
-    const loot = snapshot.loot[0];
+    const loot = snapshot.loot.find((entry) => entry.containerType !== 'marked_cache');
     assert.ok(loot);
     const world = new WorldMap();
     const adjacentTile = [

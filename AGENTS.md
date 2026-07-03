@@ -14,7 +14,7 @@ per-panel migration recipe, and known gotchas.
   and `en` blocks.
 - `SettingsManager` is a static class that uses `this`; never pass its methods as
   bare references — wrap them: `() => SettingsManager.setX(v)`.
-- Run `npx tsc --noEmit` before committing. It must pass.
+- Run `npm run typecheck` before committing. It must pass.
 - **One commit per task.** In the commit body, note which checklist item it
   completes (e.g. "Completes ui-tasks: i18n SettingsPanel").
 

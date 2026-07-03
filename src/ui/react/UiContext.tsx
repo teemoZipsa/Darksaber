@@ -5,9 +5,10 @@
  *  - useUiSelector: re-renders only when the selected value changes (by equality).
  *    Use for cheap flags like "is the panel open" so closed UI doesn't re-render
  *    every frame.
- *  - useUiVersion: re-renders every frame tick. Use inside an open panel whose
- *    content reflects in-place-mutating game state (HP/MP/EXP change on the same
- *    object, so reference-equality selectors would miss them).
+ *  - useUiVersion: re-renders when UiStore observes a DOM-visible state change.
+ *    Use inside an open panel whose content reflects in-place-mutating game
+ *    state (HP/MP/EXP change on the same object, so reference-equality selectors
+ *    would miss them).
  */
 
 import { createContext, useContext, useRef, useSyncExternalStore } from 'react';
@@ -58,7 +59,7 @@ export function useUiSelector<T>(
     return useSyncExternalStore(store.subscribe, getSnapshot);
 }
 
-/** Subscribe to the raw frame counter — re-renders on every tick while mounted. */
+/** Subscribe to the UI version counter — re-renders only after observed changes. */
 export function useUiVersion(): number {
     const store = useStore();
     return useSyncExternalStore(store.subscribe, store.getVersion);

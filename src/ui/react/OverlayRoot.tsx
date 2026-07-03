@@ -3,8 +3,8 @@
  *
  * Renders nothing until a DOM-backed panel is open. For the pilot that is the
  * character panel; future panels each add their own open-flag branch here.
- * Uses a selector (not the per-frame version) so a closed overlay does not
- * re-render every frame.
+ * Uses selectors for open flags so closed overlay branches do not re-render
+ * unless a visible flag changes.
  */
 
 import { useStore, useUiSelector } from './UiContext';

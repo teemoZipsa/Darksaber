@@ -1,6 +1,6 @@
 /**
  * mountOverlay — boots the React DOM overlay into #ui-overlay and returns the
- * UiStore so GameManager can drive it with per-frame ticks.
+ * UiStore so GameManager can drive it from the frame loop.
  */
 
 import { createRoot } from 'react-dom/client';
