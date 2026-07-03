@@ -65,6 +65,7 @@
 - [x] `WorldEngine` controller state 필드 축소: combat/action/raid/presentation/scenario/world controller aggregate들을 `controllerState` backing store로 묶어 controller 조립 필드 충돌 표면을 줄임.
 - [x] `WorldEngine` core/session state 필드 축소: canvas/camera/party/player data/game manager/world map/player/town·raid session을 `coreState` aggregate로 묶어 월드 엔진 기본 상태 변경 표면을 줄임.
 - [x] `WorldEngine` 공통 controller port 배선 축소: world/player/field/network/log 포트를 `getSharedControllerPorts()`로 모아 controller initializer별 반복 콜백 작성을 줄임.
+- [x] `WorldEngine` 공통 controller port 계약 분리: shared port 타입과 생성 로직을 `WorldEngineSharedControllerPorts` 모듈로 이동해 `WorldEngine.ts`의 배선 계약 변경 충돌 표면을 줄임.
 
 ---
 

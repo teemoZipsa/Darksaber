@@ -24,6 +24,10 @@ import { WorldTownSession } from './world/WorldTownSession';
 import type { CombatResult } from './world/WorldCombatController';
 import type { WorldTurnStateController } from './world/WorldTurnStateController';
 import {
+    createWorldEngineSharedControllerPorts,
+    type WorldEngineSharedControllerPorts,
+} from './world/WorldEngineSharedControllerPorts';
+import {
     createWorldEngineControllerState,
     type WorldEngineControllerState,
 } from './world/WorldEngineControllerState';
@@ -115,57 +119,6 @@ export interface WorldEngineOptions {
     startIntroTutorial?: boolean;
 }
 
-interface WorldEngineSharedControllerPorts {
-    camera: Camera;
-    party: PartyManager;
-    playerData: PlayerData;
-    gameManager: GameManager;
-    raidSession: WorldRaidSession;
-    townSession: WorldTownSession;
-    fusionTempleUI: WorldEngineUiState['fusionTempleUI'];
-    actionMenuUI: WorldEngineUiState['actionMenuUI'];
-    floatingText: WorldEngineUiState['floatingText'];
-    effectManager: WorldEngineUiState['effectManager'];
-    fieldFeedback: WorldEngineUiState['fieldFeedback'];
-    turnStateController: WorldTurnStateController;
-    getWorldMap(): WorldMap;
-    setWorldMap(worldMap: WorldMap): void;
-    getPlayer(): Player;
-    setPlayer(player: Player): void;
-    getPartyActors(): FieldActor[];
-    setPartyActors(actors: FieldActor[]): void;
-    getRemotePartyActors(): Map<string, FieldActor>;
-    clearRemotePartyActors(): void;
-    getFieldEnemies(): FieldEnemy[];
-    setFieldEnemies(enemies: FieldEnemy[]): void;
-    getControlledActor(): FieldActor | null;
-    getActivePartyTurnActor(): FieldActor | null;
-    getCurrentHubTown(): TownInfo;
-    openTown(town: TownInfo): void;
-    placePartyNear(tile: TilePoint, overrideMembers?: Character[]): void;
-    closeFieldOverlays(): void;
-    clearFieldTurnState(): void;
-    selectActor(actorId: string | null): void;
-    clearSelection(): void;
-    hasSelection(): boolean;
-    selectLoot(lootId: string): void;
-    isNetworkRaid(): boolean;
-    getNetworkRaidClient(): NetworkRaidClient | null;
-    getNetworkPlayerId(): string | null;
-    isRaidOutcomeVisible(): boolean;
-    setCurrentPhase(phase: WorldEngineRuntimeState['currentPhase']): void;
-    getTurnActionStates(actor: FieldActor): ReturnType<WorldEngineActionControllers['playerActionController']['getTurnActionStates']>;
-    getPlayerActionMode(): ReturnType<WorldEngineActionControllers['playerActionController']['getMode']>;
-    hasExecutableAction(actor: FieldActor): boolean;
-    reopenActionMenu(actor: FieldActor): void;
-    getEnemyById(enemyId: string): Enemy | null;
-    updateAttackCues(dt: number): void;
-    beginCombatFeedbackGroup(): string;
-    registerCombatFeedback(kind: CombatFeedbackKind, feedbackGroupId?: string): void;
-    flushCombatFeedbackGroup(feedbackGroupId: string): void;
-    addCombatLog(message: string): void;
-}
-
 export class WorldEngine {
     private coreState?: WorldEngineCoreState;
     private fieldState?: WorldEngineFieldState;
@@ -225,30 +178,24 @@ export class WorldEngine {
     }
 
     private getSharedControllerPorts(): WorldEngineSharedControllerPorts {
-        const uiState = this.getUiState();
-        return {
+        return createWorldEngineSharedControllerPorts({
             camera: this.camera,
             party: this.party,
             playerData: this.playerData,
             gameManager: this.gameManager,
             raidSession: this.raidSession,
             townSession: this.townSession,
-            fusionTempleUI: uiState.fusionTempleUI,
-            actionMenuUI: uiState.actionMenuUI,
-            floatingText: uiState.floatingText,
-            effectManager: uiState.effectManager,
-            fieldFeedback: uiState.fieldFeedback,
-            turnStateController: this.getFlowState().turnStateController,
+            getUiState: () => this.getUiState(),
+            getFlowState: () => this.getFlowState(),
+            getFieldState: () => this.getFieldState(),
+            getNetworkState: () => this.getNetworkState(),
+            getRuntimeState: () => this.getRuntimeState(),
+            getActionControllers: () => this.actionControllers,
+            getRaidLifecycleControllers: () => this.raidLifecycleControllers,
             getWorldMap: () => this.worldMap,
             setWorldMap: (worldMap) => { this.worldMap = worldMap; },
             getPlayer: () => this.player,
             setPlayer: (player) => { this.player = player; },
-            getPartyActors: () => this.getFieldState().partyActors,
-            setPartyActors: (actors) => { this.getFieldState().partyActors = actors; },
-            getRemotePartyActors: () => this.getFieldState().remotePartyActors,
-            clearRemotePartyActors: () => this.getFieldState().remotePartyActors.clear(),
-            getFieldEnemies: () => this.getFieldState().fieldEnemies,
-            setFieldEnemies: (fieldEnemies) => { this.getFieldState().fieldEnemies = fieldEnemies; },
             getControlledActor: () => this.getControlledActor(),
             getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
             getCurrentHubTown: () => this.getCurrentHubTown(),
@@ -256,18 +203,6 @@ export class WorldEngine {
             placePartyNear: (tile, overrideMembers) => this.placePartyNear(tile, overrideMembers),
             closeFieldOverlays: () => this.closeFieldOverlays(),
             clearFieldTurnState: () => this.clearFieldTurnState(),
-            selectActor: (actorId) => this.actionControllers.selectionController.selectActor(actorId),
-            clearSelection: () => this.actionControllers.selectionController.clear(),
-            hasSelection: () => this.actionControllers.selectionController.hasSelection(),
-            selectLoot: (lootId) => this.actionControllers.selectionController.selectLoot(lootId),
-            isNetworkRaid: () => this.getNetworkState().isRaid,
-            getNetworkRaidClient: () => this.getNetworkState().raidClient,
-            getNetworkPlayerId: () => this.getNetworkState().playerId,
-            isRaidOutcomeVisible: () => this.raidLifecycleControllers.raidOutcomeController.isVisible(),
-            setCurrentPhase: (phase) => { this.getRuntimeState().currentPhase = phase; },
-            getTurnActionStates: (actor) => this.actionControllers.playerActionController.getTurnActionStates(actor),
-            getPlayerActionMode: () => this.actionControllers.playerActionController.getMode(),
-            hasExecutableAction: (actor) => this.actionControllers.playerActionController.hasExecutableAction(actor),
             reopenActionMenu: (actor) => this.reopenActionMenu(actor),
             getEnemyById: (enemyId) => this.getEnemyById(enemyId),
             updateAttackCues: (dt) => this.updateAttackCues(dt),
@@ -275,7 +210,7 @@ export class WorldEngine {
             registerCombatFeedback: (kind, feedbackGroupId) => this.registerCombatFeedback(kind, feedbackGroupId),
             flushCombatFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
             addCombatLog: (message) => this.addCombatLog(message),
-        };
+        });
     }
 
     private initializeWorldSupportControllers(): void {
