@@ -1,21 +1,7 @@
 import { getClassLine } from '../src/data/ClassTree';
 import { getItemDef } from '../src/data/ItemDB';
-import type { TilePoint } from '../src/field/FieldPathing';
 import type { ActorSnapshot } from '../src/net/WorldProtocol';
-
-export function readTilePayload(payload: unknown): TilePoint | null {
-    if (!payload || typeof payload !== 'object') return null;
-    const record = payload as Record<string, unknown>;
-    const tile = (record.tile ?? record.targetTile) as Record<string, unknown> | undefined;
-    if (!tile || typeof tile.x !== 'number' || typeof tile.y !== 'number') return null;
-    return { x: Math.floor(tile.x), y: Math.floor(tile.y) };
-}
-
-export function readStringPayload(payload: unknown, key: string): string | null {
-    if (!payload || typeof payload !== 'object') return null;
-    const value = (payload as Record<string, unknown>)[key];
-    return typeof value === 'string' ? value : null;
-}
+export { readStringPayload, readTilePayload } from '../src/net/WorldIntentPayloads';
 
 export function sanitizeCarriedWeight(value: unknown): number {
     if (typeof value !== 'number' || !Number.isFinite(value)) return 0;

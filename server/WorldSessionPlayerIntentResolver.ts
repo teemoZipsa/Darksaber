@@ -26,11 +26,12 @@ import type {
     ScenarioEnemyDefeatEventMessage,
     WorldServerMessage,
 } from '../src/net/WorldProtocol';
-import { planMoveIntentPath } from './WorldSessionMoveIntent';
 import {
+    readAttackTargetId,
     readStringPayload,
     readTilePayload,
-} from './WorldSessionInput';
+} from '../src/net/WorldIntentPayloads';
+import { planMoveIntentPath } from './WorldSessionMoveIntent';
 import { canActorTargetEnemy } from './WorldSessionVisibility';
 import { addCarriedItemQuantity } from './WorldSessionCarryState';
 import { createActorEvent, directionFromTo, reject } from './WorldSessionHelpers';
@@ -121,7 +122,7 @@ export class WorldSessionPlayerIntentResolver {
     }
 
     public handleAttack(actor: ServerActor, intentId: string, payload: unknown, now: number): WorldSessionMessageResult {
-        const targetId = readStringPayload(payload, 'targetId') ?? readStringPayload(payload, 'enemyId');
+        const targetId = readAttackTargetId(payload);
         if (!targetId) return reject(intentId, 'Attack payload must include targetId.');
         const target = this.context.enemies.get(targetId);
         if (!target || target.enemy.stats.hp <= 0) return reject(intentId, 'Target is not alive.');

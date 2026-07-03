@@ -6,6 +6,7 @@ import type { Enemy } from '../../entity/Enemy';
 import type { FieldActor } from '../../field/FieldTypes';
 import type { GameManager } from '../GameManager';
 import type { NetworkRaidClient } from '../../net/NetworkRaidClient';
+import { createInteractIntentPayload } from '../../net/WorldIntentPayloads';
 import type { WorldMap } from '../../map/WorldMap';
 import type { WorldNetworkSyncController } from './WorldNetworkSyncController';
 import type { WorldSelectionController } from './WorldSelectionController';
@@ -91,7 +92,9 @@ export class WorldLootController {
             this.context.selectionController.selectLoot(loot.id);
             this.context.log(`${loot.sourceLabel} 서버 점유 요청.`);
             const actor = this.context.getControlledActor();
-            if (actor) this.context.getNetworkRaidClient()?.sendIntent(actor.id, 'interact', { lootId: loot.id });
+            if (actor) {
+                this.context.getNetworkRaidClient()?.sendIntent(actor.id, 'interact', createInteractIntentPayload(loot.id));
+            }
             return;
         }
         if (!this.context.isLocalLootEnabled()) {

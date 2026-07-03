@@ -18,8 +18,8 @@ import {
 } from '../src/field/FieldTargeting';
 import { isTerrainLineOfSightBlocking } from '../src/field/TerrainRules';
 import type { CombatEventMessage, WorldServerMessage } from '../src/net/WorldProtocol';
+import { readSkillTargetId, readStringPayload } from '../src/net/WorldIntentPayloads';
 import type { WorldMap } from '../src/map/WorldMap';
-import { readStringPayload } from './WorldSessionInput';
 import { canActorTargetEnemy } from './WorldSessionVisibility';
 import {
     applyActorResourceDelta,
@@ -69,7 +69,7 @@ export class WorldSessionSkillResolver {
         if (actor.stats.mp < skill.mpCost) return reject(intentId, 'Actor does not have enough MP.');
 
         const requiresTarget = skill.type === 'damage' || skill.type === 'debuff' || skill.type === 'aoe';
-        const targetId = readStringPayload(payload, 'targetId') ?? readStringPayload(payload, 'enemyId');
+        const targetId = readSkillTargetId(payload);
         const target = targetId ? this.context.enemies.get(targetId) : undefined;
         if (requiresTarget) {
             if (!targetId) return reject(intentId, 'Cast skill payload must include targetId.');

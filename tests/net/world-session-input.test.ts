@@ -1,9 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    createFallbackActorSnapshot,
+    createAttackIntentPayload,
+    createCastSkillIntentPayload,
+    createEndTurnIntentPayload,
+    createInteractIntentPayload,
+    createMoveIntentPayload,
+    createUseItemIntentPayload,
+    readAttackTargetId,
+    readSkillTargetId,
     readStringPayload,
     readTilePayload,
+} from '../../src/net/WorldIntentPayloads';
+import {
+    createFallbackActorSnapshot,
     sanitizeCarriedItems,
     sanitizeCarriedWeight,
     sanitizeStringArray,
@@ -23,6 +33,26 @@ test('world session input helpers normalize client payloads', () => {
     assert.equal(sanitizeTier(99), 10);
     assert.equal(sanitizeTier(0), 1);
     assert.deepEqual(sanitizeStringArray(['a', 1, 'b']), ['a', 'b']);
+});
+
+test('shared world intent payload helpers build client shapes and read server targets', () => {
+    const tile = { x: 3, y: 4 };
+    const path = [{ x: 2, y: 4 }, tile];
+    assert.deepEqual(createMoveIntentPayload(tile, path, 20, 2), { tile, path, apCost: 20, pathCost: 2 });
+    assert.deepEqual(readTilePayload(createMoveIntentPayload({ x: 3.9, y: 4.1 }, [], 20, 0)), { x: 3, y: 4 });
+
+    assert.deepEqual(createAttackIntentPayload('enemy-1'), { targetId: 'enemy-1' });
+    assert.equal(readAttackTargetId({ targetId: 'enemy-1' }), 'enemy-1');
+    assert.equal(readAttackTargetId({ enemyId: 'legacy-enemy' }), 'legacy-enemy');
+
+    assert.deepEqual(createCastSkillIntentPayload('fire', 'enemy-1'), { skillId: 'fire', targetId: 'enemy-1' });
+    assert.deepEqual(createCastSkillIntentPayload('guard'), { skillId: 'guard' });
+    assert.equal(readSkillTargetId({ targetId: 'enemy-1' }), 'enemy-1');
+    assert.equal(readSkillTargetId({ enemyId: 'legacy-enemy' }), 'legacy-enemy');
+
+    assert.deepEqual(createInteractIntentPayload('loot-1'), { lootId: 'loot-1' });
+    assert.deepEqual(createUseItemIntentPayload('herb'), { itemId: 'herb' });
+    assert.deepEqual(createEndTurnIntentPayload('done'), { reason: 'done' });
 });
 
 test('world session carried item input keeps known positive item quantities only', () => {

@@ -3,6 +3,13 @@ import type { FieldActor } from '../../field/FieldTypes';
 import type { TilePoint } from '../../field/FieldPathing';
 import type { NetworkRaidClient } from '../../net/NetworkRaidClient';
 import type { PlayerIntentKind } from '../../net/WorldProtocol';
+import {
+    createAttackIntentPayload,
+    createCastSkillIntentPayload,
+    createEndTurnIntentPayload,
+    createMoveIntentPayload,
+    createUseItemIntentPayload,
+} from '../../net/WorldIntentPayloads';
 import type { WorldNetworkSyncController } from './WorldNetworkSyncController';
 
 export interface WorldNetworkIntentContext {
@@ -21,7 +28,7 @@ export class WorldNetworkIntentController {
     public submitMove(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean {
         const client = this.getClient();
         if (!client) return false;
-        const intentId = client.sendIntent(actor.id, 'move', { tile, path, apCost, pathCost });
+        const intentId = client.sendIntent(actor.id, 'move', createMoveIntentPayload(tile, path, apCost, pathCost));
         this.context.networkSyncController.trackPendingMove(intentId, actor.id, tile, path);
         return true;
     }
@@ -31,24 +38,24 @@ export class WorldNetworkIntentController {
     }
 
     public submitUseItem(actor: FieldActor, itemId: string): boolean {
-        return this.submitOpenIntent(actor, 'useItem', { itemId });
+        return this.submitOpenIntent(actor, 'useItem', createUseItemIntentPayload(itemId));
     }
 
     public submitSkill(actor: FieldActor, skillId: string, targetId?: string): boolean {
-        return this.submitOpenIntent(actor, 'castSkill', { skillId, targetId });
+        return this.submitOpenIntent(actor, 'castSkill', createCastSkillIntentPayload(skillId, targetId));
     }
 
     public submitAttack(actor: FieldActor, enemy: Enemy): boolean {
         const client = this.getClient();
         if (!client) return false;
-        client.sendIntent(actor.id, 'attack', { targetId: enemy.id });
+        client.sendIntent(actor.id, 'attack', createAttackIntentPayload(enemy.id));
         return true;
     }
 
     public submitEndTurn(actor: FieldActor, reason: string): boolean {
         const client = this.getClient();
         if (!client) return false;
-        client.sendIntent(actor.id, 'endTurn', { reason });
+        client.sendIntent(actor.id, 'endTurn', createEndTurnIntentPayload(reason));
         return true;
     }
 

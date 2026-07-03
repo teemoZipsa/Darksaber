@@ -57,6 +57,7 @@
 - [x] `WorldEngine` world support controller 필드 축소: minimap/combat-feedback/temple/resting controller 개별 필드를 `worldControllers` aggregate로 묶어 월드 보조 기능 변경 시 필드 충돌 표면을 줄임.
 - [x] `WorldEngine` scenario/network controller 필드 축소: story/tutorial/network-sync/network-intent/network-events controller 개별 필드를 `scenarioNetworkControllers` aggregate로 묶고 DEV 시나리오 진입도 aggregate를 통해 접근하도록 정리.
 - [x] `WorldEngine` network runtime state 필드 축소: network raid client/connection flags/player id를 `networkState` aggregate로 묶고 DEV/e2e 디버그 접근은 accessor로 유지.
+- [x] 클라이언트/서버 intent payload 규칙 공유화: 네트워크 player intent payload builder/reader를 `WorldIntentPayloads`로 분리해 클라이언트 전송 shape와 서버 검증 key가 갈라지는 위험을 줄임.
 
 ---
 

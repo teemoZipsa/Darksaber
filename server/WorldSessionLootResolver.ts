@@ -8,7 +8,7 @@ import {
 } from './WorldSessionCarryState';
 import { getPlacedItemWeight } from '../src/inventory/CarryWeight';
 import { gridToSnapshot, reject } from './WorldSessionHelpers';
-import { readStringPayload } from './WorldSessionInput';
+import { readStringPayload } from '../src/net/WorldIntentPayloads';
 import type { WorldSessionLootLock, WorldSessionLootState } from './WorldSessionLootState';
 import type { WorldSessionSaveState } from './WorldSessionSaveState';
 import type {
