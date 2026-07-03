@@ -7,7 +7,6 @@ import { Camera } from './Camera';
 import { InputManager } from './InputManager';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
-import type { LootObject } from '../entity/LootObject';
 import { PartyManager } from '../character/PartyManager';
 import type { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
@@ -29,18 +28,13 @@ import type { FieldActor, FieldEnemy, FieldHitParty, FieldTurnEndReason } from '
 import { WorldRaidSession, type WorldPhase } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
 import type { CombatResult } from './world/WorldCombatController';
-import { WorldMagicController } from './world/WorldMagicController';
-import { WorldPlayerActionController } from './world/WorldPlayerActionController';
-import { WorldToolController } from './world/WorldToolController';
 import { WorldRaidOutcomeController } from './world/WorldRaidOutcomeController';
-import { WorldSelectionController } from './world/WorldSelectionController';
 import type { WorldStoryScenarioController } from './world/WorldStoryScenarioController';
 import type { WorldNetworkSyncController } from './world/WorldNetworkSyncController';
 import type { WorldTutorialController } from './world/WorldTutorialController';
 import { WorldRaidLifecycleController } from './world/WorldRaidLifecycleController';
 import type { WorldTempleController } from './world/WorldTempleController';
 import type { WorldRestingController } from './world/WorldRestingController';
-import { WorldLootController } from './world/WorldLootController';
 import type { WorldCombatFeedbackController } from './world/WorldCombatFeedbackController';
 import type { WorldNetworkIntentController } from './world/WorldNetworkIntentController';
 import { WorldTurnStateController } from './world/WorldTurnStateController';
@@ -55,6 +49,10 @@ import {
     createWorldEngineCombatControllers,
     type WorldEngineCombatControllers,
 } from './world/WorldEngineCombatControllers';
+import {
+    createWorldEngineActionControllers,
+    type WorldEngineActionControllers,
+} from './world/WorldEngineActionControllers';
 import {
     createWorldEnginePresentationControllers,
     type WorldEnginePresentationControllers,
@@ -75,18 +73,8 @@ import {
 } from './world/WorldEngineActorQueries';
 import type { CombatFeedbackKind } from './world/CombatFeedback';
 import {
-    getActorTerrainMovementBudget,
-    isActorAt,
-    isEntityMoving,
     syncCharacterMovementToClass,
 } from './world/WorldEngineFieldHelpers';
-import {
-    createWorldPatternContext,
-    getWorldActorAttackProfile,
-    getWorldActorAttackTargetFailure,
-    getWorldActorTerrainStepCost,
-    hasWorldFieldLineOfSight,
-} from './world/WorldAttackTargeting';
 import { NetworkRaidClient } from '../net/NetworkRaidClient';
 import {
     type ActionRejectedMessage,
@@ -127,12 +115,12 @@ export class WorldEngine {
     private currentPhase: WorldPhase = 'lobby';
     private movementController!: WorldEngineCombatControllers['movementController'];
     private enemyTurnController!: WorldEngineCombatControllers['enemyTurnController'];
-    private magicController!: WorldMagicController;
-    private toolController!: WorldToolController;
-    private playerActionController!: WorldPlayerActionController;
+    private magicController!: WorldEngineActionControllers['magicController'];
+    private toolController!: WorldEngineActionControllers['toolController'];
+    private playerActionController!: WorldEngineActionControllers['playerActionController'];
     private raidOutcomeController!: WorldRaidOutcomeController;
     private tacticalController!: WorldEnginePresentationControllers['tacticalController'];
-    private selectionController!: WorldSelectionController;
+    private selectionController!: WorldEngineActionControllers['selectionController'];
     private fieldSpawnController!: WorldEngineCombatControllers['fieldSpawnController'];
     private renderController!: WorldEnginePresentationControllers['renderController'];
     private inputController!: WorldEnginePresentationControllers['inputController'];
@@ -142,7 +130,7 @@ export class WorldEngine {
     private raidLifecycleController!: WorldRaidLifecycleController;
     private templeController: WorldTempleController;
     private restingController: WorldRestingController;
-    private lootController!: WorldLootController;
+    private lootController!: WorldEngineActionControllers['lootController'];
     private combatFeedbackController: WorldCombatFeedbackController;
     private networkIntentController: WorldNetworkIntentController;
     private networkEvents: WorldEngineNetworkEvents;
@@ -332,153 +320,56 @@ export class WorldEngine {
         this.movementController = combatControllers.movementController;
         this.fieldSpawnController = combatControllers.fieldSpawnController;
         this.enemyTurnController = combatControllers.enemyTurnController;
-        this.selectionController = new WorldSelectionController({
-            getPartyActors: () => this.partyActors,
-            getEnemyById: (enemyId) => this.getEnemyById(enemyId),
-            getLootById: (lootId) => this.worldMap.loot.find((candidate) => candidate.id === lootId) ?? null,
-        });
-        this.lootController = new WorldLootController({
+        const actionControllers = createWorldEngineActionControllers({
             gameManager: this.gameManager,
-            selectionController: this.selectionController,
             storyScenarioController: this.storyScenarioController,
             networkSyncController: this.networkSyncController,
+            tutorialController: this.tutorialController,
+            turnStateController: this.turnStateController,
+            movementController: this.movementController,
+            floatingText: this.floatingText,
+            effectManager: this.effectManager,
             getWorldMap: () => this.worldMap,
             isNetworkRaid: () => this.isNetworkRaid,
-            isLocalLootEnabled: () => this.tutorialController.isActive(),
             getNetworkRaidClient: () => this.networkRaidClient,
+            getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
             getControlledActor: () => this.getControlledActor(),
+            getPartyActors: () => this.partyActors,
+            getFieldEnemies: () => this.fieldEnemies,
+            getEnemyById: (enemyId) => this.getEnemyById(enemyId),
+            getSpendableActionGauge: () => this.getSpendableActionGauge(),
+            spendAp: (cost) => this.spendAp(cost),
+            submitNetworkMoveIntent: (actor, tile, path, apCost, pathCost) =>
+                this.submitNetworkMoveIntent(actor, tile, path, apCost, pathCost),
+            submitNetworkActionIntent: (actor, action) => this.submitNetworkActionIntent(actor, action),
+            submitNetworkUseItemIntent: (actor, itemId) => this.submitNetworkUseItemIntent(actor, itemId),
+            submitNetworkSkillIntent: (actor, skillId, targetId) => this.submitNetworkSkillIntent(actor, skillId, targetId),
+            reopenActionMenu: (actor) => this.reopenActionMenu(actor),
+            resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
+            handleEnemyDefeated: (actor, enemy, feedbackGroupId) => this.handleEnemyDefeated(actor, enemy, feedbackGroupId),
             clearControlledPath: () => this.clearControlledPath(),
-            log: (message) => this.addCombatLog(message),
+            getFanfareLeaderId: () => this.fanfareLeaderActorId,
+            setFanfareLeaderId: (actorId) => {
+                this.fanfareLeaderActorId = actorId;
+                this.followRepathTimer = 0;
+            },
+            getFanfareFollowerCount: (actor) => this.getFanfareFollowerCount(actor),
+            tryActorAttack: (actor, enemy) => this.tryActorAttack(actor, enemy),
+            closeActionMenu: () => this.closeActionMenu(),
+            closeTacticalMenu: () => this.closeTacticalMenu(),
+            endActorTurn: (actor, reason, atbCarryover) => this.endActorTurn(actor, reason, atbCarryover),
+            clearActorIntent: (actor) => this.clearActorIntent(actor),
+            setReservedAction: (intent) => this.turnStateController.setReservedAction(intent),
+            beginCombatFeedbackGroup: () => this.beginCombatFeedbackGroup(),
+            registerCombatFeedback: (kind, feedbackGroupId) => this.registerCombatFeedback(kind, feedbackGroupId),
+            flushCombatFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
+            addCombatLog: (message) => this.addCombatLog(message),
         });
-        this.magicController = new WorldMagicController(
-            {
-                getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
-                getPartyActors: () => this.partyActors,
-                getFieldEnemies: () => this.fieldEnemies,
-                getEnemyById: (enemyId) => this.getEnemyById(enemyId),
-                getRemainingActionPoints: () => this.getSpendableActionGauge(),
-                getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
-                getBoundsTiles: () => this.worldMap.getBoundsTiles(),
-                hasFieldLineOfSight: (from, to) => hasWorldFieldLineOfSight(this.worldMap, from, to),
-                spendAp: (cost) => this.spendAp(cost),
-                isMajorActionUsed: () => this.turnStateController.isMajorActionUsed(),
-                markMajorActionUsed: () => this.turnStateController.markMajorActionUsed(),
-                submitNetworkSkillIntent: (actor, skill, targetEnemy) => this.submitNetworkSkillIntent(actor, skill.id, targetEnemy?.id),
-                reopenActionMenu: (actor) => this.reopenActionMenu(actor),
-                resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
-                handleEnemyDefeated: (actor, enemy, feedbackGroupId) => this.handleEnemyDefeated(actor, enemy, feedbackGroupId),
-                onActionCompleted: (action) => this.tutorialController.advanceStep(action),
-            },
-            {
-                log: (message) => this.addCombatLog(message),
-                spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
-                spawnDamage: (x, y, amount, isCrit, isMiss) => this.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
-                spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
-                spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
-                spawnHitEffect: (x, y, feedbackGroupId, feedbackKind) => {
-                    this.effectManager.spawnHitEffect(x, y);
-                    this.registerCombatFeedback(feedbackKind ?? 'normal', feedbackGroupId);
-                },
-                spawnBuffEffect: (x, y) => this.effectManager.spawnBuffEffect(x, y),
-                spawnDebuffEffect: (x, y) => this.effectManager.spawnDebuffEffect(x, y),
-                spawnElementEffect: (element, x, y, feedbackGroupId) => {
-                    this.effectManager.spawnByElement(element, x, y);
-                    this.registerCombatFeedback('normal', feedbackGroupId);
-                },
-                spawnSkillEffect: (skill, x, y, phase, feedbackGroupId) => {
-                    this.effectManager.spawnSkillEffect(skill, x, y, phase);
-                    if (feedbackGroupId) {
-                        const kind = skill.type === 'debuff' ? 'status' : 'normal';
-                        this.registerCombatFeedback(kind, feedbackGroupId);
-                    }
-                },
-                beginFeedbackGroup: () => this.beginCombatFeedbackGroup(),
-                flushFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
-            }
-        );
-        this.toolController = new WorldToolController(
-            {
-                getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
-                getRemainingActionPoints: () => this.getSpendableActionGauge(),
-                getInventoryItems: () => this.gameManager.inventory.items,
-                removeInventoryItem: (placed) => this.gameManager.inventory.remove(placed),
-                spendAp: (cost) => this.spendAp(cost),
-                isMajorActionUsed: () => this.turnStateController.isMajorActionUsed(),
-                markMajorActionUsed: () => this.turnStateController.markMajorActionUsed(),
-                submitNetworkUseItem: (actor, itemId) => this.submitNetworkUseItemIntent(actor, itemId),
-                reopenActionMenu: (actor) => this.reopenActionMenu(actor),
-                resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
-            },
-            {
-                log: (message) => this.addCombatLog(message),
-                spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
-                spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
-                spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
-            }
-        );
-        this.playerActionController = new WorldPlayerActionController(
-            {
-                getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
-                getPartyActors: () => this.partyActors,
-                getFieldEnemies: () => this.fieldEnemies,
-                getRemainingActionPoints: () => this.getSpendableActionGauge(),
-                getReservedAction: () => this.turnStateController.getReservedAction(),
-                getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
-                getActorTerrainMovementBudget: (actor) => getActorTerrainMovementBudget(actor),
-                getActorTerrainStepCost: (actor, tile) => getWorldActorTerrainStepCost(this.worldMap, actor, tile),
-                getActorAttackProfile: (actor) => getWorldActorAttackProfile(actor),
-                getPatternContext: (actor) => createWorldPatternContext({ worldMap: this.worldMap, actor }),
-                getActorAttackTargetFailure: (actor, enemy) => getWorldActorAttackTargetFailure({ worldMap: this.worldMap, actor, enemy }),
-                getEnemyById: (enemyId) => this.getEnemyById(enemyId),
-                getLootById: (lootId) => this.worldMap.loot.find((candidate) => candidate.id === lootId) ?? null,
-                getLoot: () => this.worldMap.loot,
-                isActorAt: (actor, tile) => isActorAt(actor, tile),
-                isEntityMoving: (entity) => isEntityMoving(entity),
-                isFieldPassable: (query) => this.movementController.isFieldPassable(query),
-                getBlockedMoveMessage: (tile) => this.storyScenarioController.getLockedDoorMessage(tile),
-                spendAp: (cost) => this.spendAp(cost),
-                isMajorActionUsed: () => this.turnStateController.isMajorActionUsed(),
-                markMajorActionUsed: () => this.turnStateController.markMajorActionUsed(),
-                getFanfareLeaderId: () => this.fanfareLeaderActorId,
-                setFanfareLeaderId: (actorId) => {
-                    this.fanfareLeaderActorId = actorId;
-                    this.followRepathTimer = 0;
-                },
-                getFanfareFollowerCount: (actor) => this.getFanfareFollowerCount(actor),
-                submitMoveIntent: (actor, tile, path, apCost, pathCost) =>
-                    this.submitNetworkMoveIntent(actor, tile, path, apCost, pathCost),
-                submitActionIntent: (actor, action) => this.submitNetworkActionIntent(actor, action),
-                tryActorAttack: (actor, enemy) => this.tryActorAttack(actor, enemy),
-                openLoot: (loot) => this.openLoot(loot),
-                openMagic: (actor) => this.openFieldMagic(actor),
-                openTool: (actor) => this.openFieldTool(actor),
-                hasCastableFieldSkill: (actor) => (this.isNetworkRaid || this.tutorialController.isActive()) && this.magicController.hasCastableFieldSkill(actor.character),
-                hasUsableCombatTool: (actor) => (this.isNetworkRaid || this.tutorialController.isActive()) && this.toolController.hasUsableCombatTool(actor),
-                getCombatToolAvailability: (actor) => (this.isNetworkRaid || this.tutorialController.isActive())
-                    ? this.toolController.getCombatToolAvailability(actor)
-                    : { hasRecoveryConsumable: false, hasEffectiveRecovery: false },
-                reopenActionMenu: (actor) => this.reopenActionMenu(actor),
-                closeActionMenu: () => this.closeActionMenu(),
-                closeTacticalMenu: () => this.closeTacticalMenu(),
-                resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
-                endActorTurn: (actor, reason, atbCarryover) => this.endActorTurn(actor, reason, atbCarryover),
-                clearActorIntent: (actor) => this.clearActorIntent(actor),
-                setReservedAction: (intent) => this.turnStateController.setReservedAction(intent),
-                selectEnemy: (enemyId) => this.selectionController.selectEnemy(enemyId),
-                selectLoot: (lootId) => this.selectionController.selectLoot(lootId),
-                filterActionTiles: (action, actor, tiles) => this.tutorialController.filterActionTiles(action, actor, tiles),
-                getAdditionalInteractTiles: (actor) => this.storyScenarioController.getInspectableFieldEventTiles(actor),
-                interactAtTile: (actor, tile) => this.storyScenarioController.playFieldEventAt(tile, actor),
-                onActionCompleted: (action) => this.tutorialController.advanceStep(action),
-            },
-            {
-                log: (message) => this.addCombatLog(message),
-                spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
-                spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
-                spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
-                spawnBuffEffect: (x, y) => this.effectManager.spawnBuffEffect(x, y),
-            }
-        );
+        this.selectionController = actionControllers.selectionController;
+        this.lootController = actionControllers.lootController;
+        this.magicController = actionControllers.magicController;
+        this.toolController = actionControllers.toolController;
+        this.playerActionController = actionControllers.playerActionController;
     }
 
     private initializeRaidLifecycleControllers(): void {
@@ -917,28 +808,6 @@ export class WorldEngine {
 
     private handleActorDown(actor: FieldActor): void {
         this.combatFlow.handleActorDown(actor);
-    }
-
-    private openLoot(loot: LootObject): void {
-        this.lootController.openLoot(loot);
-    }
-
-    private openFieldMagic(actor: FieldActor): void {
-        if (!this.isNetworkRaid && !this.tutorialController.isActive()) {
-            this.addCombatLog(t('field.log.serverMagicOnly'));
-            this.reopenActionMenu(actor);
-            return;
-        }
-        this.magicController.open(actor);
-    }
-
-    private openFieldTool(actor: FieldActor): void {
-        if (!this.isNetworkRaid && !this.tutorialController.isActive()) {
-            this.addCombatLog(t('field.log.serverToolOnly'));
-            this.reopenActionMenu(actor);
-            return;
-        }
-        this.toolController.open(actor);
     }
 
     private refreshLootState(): void {

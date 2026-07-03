@@ -46,6 +46,7 @@
 - [x] 클라이언트/서버 레이드 탈출 판정 공유화: 마을 도착 규칙을 `RaidRules`의 leave/result 판정으로 확장하고 서버 `WORLD_LEAVE`/생존 보정을 같은 함수로 처리해 departure town 생환 우회 위험을 축소.
 - [x] `WorldEngine` presentation-controller 배선 분리: tactical/render/input controller 생성을 `WorldEnginePresentationControllers` factory로 이동해 월드 UI 표시·입력 배선의 충돌 표면을 축소.
 - [x] `WorldEngine` combat-core 배선 분리: turn-start/combat flow/movement/enemy-turn/field-spawn controller 생성을 `WorldEngineCombatControllers` factory로 이동해 전투 기능 추가 시 `WorldEngine.ts` 충돌 표면을 축소.
+- [x] `WorldEngine` action-controller 배선 분리: selection/loot/magic/tool/player-action controller 생성을 `WorldEngineActionControllers` factory로 이동해 액션·전리품·전술 입력 기능 추가 시 `WorldEngine.ts` 충돌 표면을 축소.
 
 ---
 
