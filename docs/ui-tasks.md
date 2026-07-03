@@ -69,6 +69,7 @@
 - [x] 클라이언트/서버 마법 시전 readiness 공유화: 장착/학습/침묵/AP/MP/대상 필요 판정을 `MagicCastRules`로 분리해 로컬 마법 메뉴와 서버 `castSkill` 검증 드리프트를 줄임.
 - [x] 브라우저 e2e 마법 장착 상호작용 보강: K키 DOM 패널에서 슬롯 선택, 스킬 swap, 상세 패널 갱신, 재오픈 후 loadout 유지까지 Playwright로 검증.
 - [x] `WorldEngine` update flow 포트 생성 분리: 프레임 루프 controller/state 포트 조립을 `WorldEngineFlows` source adapter로 옮겨 월드 업데이트 기능 변경 시 `WorldEngine.ts` 직접 수정 범위를 줄임.
+- [x] `WorldEngine` startup flow source adapter 추가: 생성자에 남은 시작 흐름 콜백 배선을 shared ports 기반 `runWorldEngineStartupFlowFromSources`로 옮겨 튜토리얼/네트워크 resume/마을 진입 변경 충돌 표면을 줄임.
 
 ---
 

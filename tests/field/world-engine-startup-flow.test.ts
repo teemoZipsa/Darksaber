@@ -6,9 +6,12 @@ import type { FieldActor } from '../../src/field/FieldTypes';
 import { i18n, t, type Language } from '../../src/i18n/LanguageManager';
 import {
     runWorldEngineStartupFlow,
+    runWorldEngineStartupFlowFromSources,
     type WorldEngineStartupFlowContext,
 } from '../../src/engine/world/WorldEngineStartupFlow';
 import type { Camera } from '../../src/engine/Camera';
+import type { WorldEngineActionControllers } from '../../src/engine/world/WorldEngineActionControllers';
+import type { WorldEngineSharedControllerPorts } from '../../src/engine/world/WorldEngineSharedControllerPorts';
 
 class ImageStub {
     public src = '';
@@ -113,6 +116,59 @@ test('world startup flow resumes network raid when a stored token exists', () =>
         assert.equal(calls.includes('begin-raid'), true);
         assert.equal(calls[calls.length - 2], 'follow:0,0');
         assert.equal(calls[calls.length - 1], 'snap');
+    } finally {
+        i18n.lang = previousLang;
+    }
+});
+
+test('world startup flow source adapter wires shared ports and action controllers', () => {
+    const previousLang: Language = i18n.lang;
+    i18n.lang = 'en';
+    try {
+        const calls: string[] = [];
+        const actor = makeActor('hero', 9, 10);
+        let player = new Player(0, 0);
+        const camera = {
+            followTile: (x: number, y: number) => calls.push(`follow:${x},${y}`),
+            snapToTarget: () => calls.push('snap'),
+        } as unknown as Camera;
+        const ports = {
+            getControlledActor: () => actor,
+            setPlayer: (nextPlayer: Player) => {
+                player = nextPlayer;
+                calls.push(`set-player:${nextPlayer.gridX},${nextPlayer.gridY}`);
+            },
+            getPlayer: () => player,
+            getCurrentHubTown: () => ({ id: 'central_castle' }),
+            openTown: (town: { id: string }) => calls.push(`open-town:${town.id}`),
+            addCombatLog: (message: string) => calls.push(`log:${message}`),
+        } as unknown as WorldEngineSharedControllerPorts;
+        const actionControllers = {
+            selectionController: {
+                selectActor: (actorId: string | null) => calls.push(`select:${actorId ?? 'none'}`),
+            },
+        } as unknown as WorldEngineActionControllers;
+
+        runWorldEngineStartupFlowFromSources({
+            camera,
+            options: {},
+            ports,
+            getActionControllers: () => actionControllers,
+            spawnPartyAtCurrentHub: () => calls.push('spawn-party'),
+            startIntroTutorial: () => calls.push('start-tutorial'),
+            beginRaidFromCurrentHub: () => calls.push('begin-raid'),
+            hasStoredNetworkResumeToken: () => false,
+        });
+
+        assert.deepEqual(calls, [
+            'spawn-party',
+            'set-player:9,10',
+            'select:hero',
+            'open-town:central_castle',
+            `log:${t('field.log.townReady')}`,
+            'follow:9,10',
+            'snap',
+        ]);
     } finally {
         i18n.lang = previousLang;
     }

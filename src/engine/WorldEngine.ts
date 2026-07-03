@@ -57,7 +57,7 @@ import {
     createWorldEngineActionTurnFlow,
     createWorldEngineUpdateFlowFromSources,
 } from './world/WorldEngineFlows';
-import { runWorldEngineStartupFlow } from './world/WorldEngineStartupFlow';
+import { runWorldEngineStartupFlowFromSources } from './world/WorldEngineStartupFlow';
 import {
     createWorldEngineNetworkState,
     type WorldEngineNetworkState,
@@ -161,19 +161,14 @@ export class WorldEngine {
         this.initializeCombatActionControllers();
         this.initializeRaidLifecycleControllers();
         this.initializePresentationControllers();
-        runWorldEngineStartupFlow({
+        runWorldEngineStartupFlowFromSources({
             camera,
             options,
+            ports: this.getSharedControllerPorts(),
+            getActionControllers: () => this.actionControllers,
             spawnPartyAtCurrentHub: () => this.spawnPartyAtCurrentHub(),
-            getControlledActor: () => this.getControlledActor(),
-            setPlayer: (player) => { this.player = player; },
-            getPlayer: () => this.player,
-            selectActor: (actorId) => this.actionControllers.selectionController.selectActor(actorId),
             startIntroTutorial: () => this.startIntroTutorial(),
-            hasStoredNetworkResumeToken: () => NetworkRaidClient.hasStoredResumeToken(),
             beginRaidFromCurrentHub: () => { void this.beginRaidFromCurrentHub(); },
-            openCurrentHubTown: () => this.openTown(this.getCurrentHubTown()),
-            addCombatLog: (message) => this.addCombatLog(message),
         });
     }
 
