@@ -46,6 +46,28 @@ async function getNetworkRaidDebug(page: Page) {
     });
 }
 
+async function getRaidLootModelDebug(page: Page) {
+    return page.evaluate(() => {
+        const gm = (window as unknown as { __gm?: any }).__gm;
+        const inventoryUi = gm?.inventoryUI;
+        const externalGrid = inventoryUi?.getExternalGrid?.();
+        const loot = gm?.worldEngine?.worldMap?.loot?.find((entry: any) => entry.id === 'dev_raid_loot');
+        const summarize = (items: any[] | undefined) => ({
+            count: items?.length ?? 0,
+            quantity: (items ?? []).reduce((sum, item) => sum + Math.max(1, item.quantity ?? 1), 0),
+            itemIds: (items ?? []).map((item) => item.item?.id ?? item.itemId ?? '').sort(),
+        });
+        return {
+            inventoryVisible: inventoryUi?.isVisible?.() ?? false,
+            externalRaidLoot: inventoryUi?.isExternalRaidLoot?.() ?? false,
+            bag: summarize(gm?.inventory?.items),
+            external: summarize(externalGrid?.items),
+            worldLoot: summarize(loot?.inventory?.items),
+            status: document.querySelector('.dev-scenario-status')?.textContent ?? '',
+        };
+    });
+}
+
 test('dev town renders the React town overlay with embedded inventory', async ({ page }) => {
     await page.goto('/?devStart=town');
 
@@ -137,6 +159,12 @@ test('dev raid loot can be dragged into the backpack with real pointer input', a
     expect(itemBox).not.toBeNull();
     expect(bagBox).not.toBeNull();
 
+    const before = await getRaidLootModelDebug(page);
+    expect(before.inventoryVisible).toBe(true);
+    expect(before.externalRaidLoot).toBe(true);
+    expect(before.external.quantity).toBeGreaterThan(0);
+    expect(before.worldLoot).toEqual(before.external);
+
     await page.mouse.move(itemBox!.x + itemBox!.width / 2, itemBox!.y + itemBox!.height / 2);
     await page.mouse.down();
     await page.mouse.move(bagBox!.x + bagBox!.width - 20, bagBox!.y + bagBox!.height - 20, { steps: 12 });
@@ -144,6 +172,16 @@ test('dev raid loot can be dragged into the backpack with real pointer input', a
 
     await expect(page.locator('.dev-scenario-status')).toContainText(/picked:dev_raid_loot:\d+,\d+/);
     await expect(page.locator('#ui-overlay [data-inv-grid="ext"] .inv-item')).toHaveCount(0);
+    await expect.poll(() => getRaidLootModelDebug(page)).toMatchObject({
+        inventoryVisible: true,
+        externalRaidLoot: true,
+        external: { count: 0, quantity: 0, itemIds: [] },
+        worldLoot: { count: 0, quantity: 0, itemIds: [] },
+    });
+
+    const after = await getRaidLootModelDebug(page);
+    expect(after.bag.quantity).toBe(before.bag.quantity + before.external.quantity);
+    expect(after.status).toMatch(/picked:dev_raid_loot:\d+,\d+/);
 });
 
 test('network raid logs reconnect UX after a transport drop', async ({ page, isMobile }) => {
