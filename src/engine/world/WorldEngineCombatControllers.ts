@@ -21,7 +21,10 @@ import { directionFromTo } from './WorldEngineFieldHelpers';
 import { WorldCombatController } from './WorldCombatController';
 import { WorldEnemyTurnController } from './WorldEnemyTurnController';
 import { WorldEngineCombatFlow } from './WorldEngineCombatFlow';
+import type { WorldEngineActionControllers } from './WorldEngineActionControllers';
 import type { WorldFieldFeedbackState } from './WorldFieldFeedbackState';
+import type { WorldEngineScenarioNetworkControllers } from './WorldEngineScenarioNetworkControllers';
+import type { WorldEngineSharedControllerPorts } from './WorldEngineSharedControllerPorts';
 import { WorldFieldSpawnController } from './WorldFieldSpawnController';
 import { WorldMovementController } from './WorldMovementController';
 import type { WorldNetworkIntentController } from './WorldNetworkIntentController';
@@ -69,6 +72,46 @@ export interface WorldEngineCombatControllers {
     movementController: WorldMovementController;
     fieldSpawnController: WorldFieldSpawnController;
     enemyTurnController: WorldEnemyTurnController;
+}
+
+export interface WorldEngineCombatControllerSources {
+    ports: WorldEngineSharedControllerPorts;
+    getScenarioNetworkControllers(): WorldEngineScenarioNetworkControllers;
+    getActionControllers(): WorldEngineActionControllers;
+    getActorById(actorId: string): FieldActor | null;
+    getBackpackCursedArtifactCount(): number;
+    handleActorDown(actor: FieldActor): void;
+    handleEnemyDefeated(actor: FieldActor, enemy: Enemy, feedbackGroupId?: string): void;
+    stopResting(actor: FieldActor, logMessage?: string): void;
+    switchToPartyMember(index: number): boolean;
+    snapshotPartyHp(): Map<string, number>;
+    interruptRestingForDamage(beforeHpByActorId: Map<string, number>): void;
+    spawnEnemyLoot(enemy: Enemy): void;
+    awardDefeatExp(actor: FieldActor, enemy: Enemy): void;
+}
+
+export function createWorldEngineCombatControllersFromSources(
+    sources: WorldEngineCombatControllerSources
+): WorldEngineCombatControllers {
+    const scenarioNetworkControllers = sources.getScenarioNetworkControllers();
+
+    return createWorldEngineCombatControllers({
+        ...sources.ports,
+        tutorialController: scenarioNetworkControllers.tutorialController,
+        storyScenarioController: scenarioNetworkControllers.storyScenarioController,
+        networkIntentController: scenarioNetworkControllers.networkIntentController,
+        getActorById: (actorId) => sources.getActorById(actorId),
+        getBackpackCursedArtifactCount: () => sources.getBackpackCursedArtifactCount(),
+        handleActorDown: (actor) => sources.handleActorDown(actor),
+        handleEnemyDefeated: (actor, enemy, feedbackGroupId) => sources.handleEnemyDefeated(actor, enemy, feedbackGroupId),
+        stopResting: (actor, logMessage) => sources.stopResting(actor, logMessage),
+        switchToPartyMember: (index) => sources.switchToPartyMember(index),
+        snapshotPartyHp: () => sources.snapshotPartyHp(),
+        interruptRestingForDamage: (beforeHpByActorId) => sources.interruptRestingForDamage(beforeHpByActorId),
+        spawnEnemyLoot: (enemy) => sources.spawnEnemyLoot(enemy),
+        awardDefeatExp: (actor, enemy) => sources.awardDefeatExp(actor, enemy),
+        clearEnemyIfSelected: (enemyId) => sources.getActionControllers().selectionController.clearEnemyIfSelected(enemyId),
+    });
 }
 
 export function createWorldEngineCombatControllers(

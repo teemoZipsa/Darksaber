@@ -71,7 +71,7 @@ import {
     type WorldEngineWorldControllers,
 } from './world/WorldEngineWorldControllers';
 import {
-    createWorldEngineCombatControllers,
+    createWorldEngineCombatControllersFromSources,
     type WorldEngineCombatControllers,
 } from './world/WorldEngineCombatControllers';
 import {
@@ -236,11 +236,10 @@ export class WorldEngine {
 
     private initializeCombatActionControllers(): void {
         const sharedPorts = this.getSharedControllerPorts();
-        const combatControllers = createWorldEngineCombatControllers({
-            ...sharedPorts,
-            tutorialController: this.scenarioNetworkControllers.tutorialController,
-            storyScenarioController: this.scenarioNetworkControllers.storyScenarioController,
-            networkIntentController: this.scenarioNetworkControllers.networkIntentController,
+        const combatControllers = createWorldEngineCombatControllersFromSources({
+            ports: sharedPorts,
+            getScenarioNetworkControllers: () => this.scenarioNetworkControllers,
+            getActionControllers: () => this.actionControllers,
             getActorById: (actorId) => this.getActorById(actorId),
             getBackpackCursedArtifactCount: () => this.getBackpackCursedArtifactCount(),
             handleActorDown: (actor) => this.handleActorDown(actor),
@@ -251,7 +250,6 @@ export class WorldEngine {
             interruptRestingForDamage: (beforeHpByActorId) => this.interruptRestingForDamage(beforeHpByActorId),
             spawnEnemyLoot: (enemy) => this.spawnEnemyLoot(enemy),
             awardDefeatExp: (actor, enemy) => this.awardDefeatExp(actor, enemy),
-            clearEnemyIfSelected: (enemyId) => this.actionControllers.selectionController.clearEnemyIfSelected(enemyId),
         });
         this.combatControllers = combatControllers;
         const actionControllers = createWorldEngineActionControllersFromSources({
