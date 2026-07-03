@@ -349,7 +349,9 @@ test('world update freezes field simulation while story presentation is active',
         sync: () => calls.push('syncTown'),
         isVisible: () => false,
     };
-    engine.raidOutcomeController = { isVisible: () => false };
+    engine.raidLifecycleControllers = {
+        raidOutcomeController: { isVisible: () => false },
+    };
     engine.fusionTempleUI = { isVisible: () => false };
     engine.tutorialController = {
         isActive: () => false,

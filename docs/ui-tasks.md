@@ -53,6 +53,7 @@
 - [x] `WorldEngine` presentation controller 필드 축소: tactical/render/input controller 개별 필드를 `presentationControllers` aggregate로 묶어 컨트롤러 상태 표면을 줄임.
 - [x] `WorldEngine` action controller 필드 축소: selection/loot/magic/tool/player-action controller 개별 필드를 `actionControllers` aggregate로 묶어 액션 기능 변경 시 필드 충돌 표면을 줄임.
 - [x] `WorldEngine` combat controller 필드 축소: turn-start/combat-flow/movement/enemy-turn/field-spawn controller 개별 필드를 `combatControllers` aggregate로 묶어 전투 기능 변경 시 필드 충돌 표면을 줄임.
+- [x] `WorldEngine` raid lifecycle controller 필드 축소: raid-outcome/raid-lifecycle controller 개별 필드를 `raidLifecycleControllers` aggregate로 묶어 레이드 종료·복귀 기능 변경 시 필드 충돌 표면을 줄임.
 
 ---
 

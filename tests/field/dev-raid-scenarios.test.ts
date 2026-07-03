@@ -208,11 +208,17 @@ test('WorldEngine close hook delegates to the raid lifecycle controller', () => 
     const calls: Array<{ sendLeave: boolean; reason: string | undefined }> = [];
     const engine = Object.create(WorldEngine.prototype) as unknown as {
         closeNetworkRaidClient: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => void;
-        raidLifecycleController: { closeNetworkRaidClient: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => void };
+        raidLifecycleControllers: {
+            raidLifecycleController: {
+                closeNetworkRaidClient: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => void;
+            };
+        };
     };
-    engine.raidLifecycleController = {
-        closeNetworkRaidClient: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => {
-            calls.push({ sendLeave, reason });
+    engine.raidLifecycleControllers = {
+        raidLifecycleController: {
+            closeNetworkRaidClient: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => {
+                calls.push({ sendLeave, reason });
+            },
         },
     };
 

@@ -121,12 +121,11 @@ export class WorldEngine {
     private currentPhase: WorldPhase = 'lobby';
     private combatControllers!: WorldEngineCombatControllers;
     private actionControllers!: WorldEngineActionControllers;
-    private raidOutcomeController!: WorldEngineRaidLifecycleControllers['raidOutcomeController'];
+    private raidLifecycleControllers!: WorldEngineRaidLifecycleControllers;
     private presentationControllers!: WorldEnginePresentationControllers;
     private storyScenarioController!: WorldStoryScenarioController;
     private networkSyncController!: WorldNetworkSyncController;
     private tutorialController!: WorldTutorialController;
-    private raidLifecycleController!: WorldEngineRaidLifecycleControllers['raidLifecycleController'];
     private templeController!: WorldTempleController;
     private restingController!: WorldRestingController;
     private combatFeedbackController!: WorldCombatFeedbackController;
@@ -261,7 +260,7 @@ export class WorldEngine {
             isNetworkRaid: () => this.isNetworkRaid,
             getNetworkRaidClient: () => this.networkRaidClient,
             getNetworkPlayerId: () => this.networkPlayerId,
-            isRaidOutcomeVisible: () => this.raidOutcomeController.isVisible(),
+            isRaidOutcomeVisible: () => this.raidLifecycleControllers.raidOutcomeController.isVisible(),
             setCurrentPhase: (phase) => { this.currentPhase = phase; },
             getTurnActionStates: (actor) => this.actionControllers.playerActionController.getTurnActionStates(actor),
             getPlayerActionMode: () => this.actionControllers.playerActionController.getMode(),
@@ -412,8 +411,7 @@ export class WorldEngine {
             handleNetworkActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
             log: (message) => this.addCombatLog(message),
         });
-        this.raidOutcomeController = raidLifecycleControllers.raidOutcomeController;
-        this.raidLifecycleController = raidLifecycleControllers.raidLifecycleController;
+        this.raidLifecycleControllers = raidLifecycleControllers;
     }
 
     private initializePresentationControllers(): void {
@@ -432,7 +430,7 @@ export class WorldEngine {
             magicController: this.actionControllers.magicController,
             toolController: this.actionControllers.toolController,
             playerActionController: this.actionControllers.playerActionController,
-            raidOutcomeController: this.raidOutcomeController,
+            raidOutcomeController: this.raidLifecycleControllers.raidOutcomeController,
             selectionController: this.actionControllers.selectionController,
             tutorialController: this.tutorialController,
             turnStateController: this.turnStateController,
@@ -485,7 +483,7 @@ export class WorldEngine {
     private getUpdateFlow(): WorldEngineUpdateFlow {
         this.updateFlow ??= createWorldEngineUpdateFlow({
             townSession: this.townSession,
-            raidOutcomeController: this.raidOutcomeController,
+            raidOutcomeController: this.raidLifecycleControllers.raidOutcomeController,
             fusionTempleUI: this.fusionTempleUI,
             tutorialController: this.tutorialController,
             inputController: this.presentationControllers.inputController,
@@ -493,7 +491,7 @@ export class WorldEngine {
             floatingText: this.floatingText,
             playerActionController: this.actionControllers.playerActionController,
             tacticalController: this.presentationControllers.tacticalController,
-            raidLifecycleController: this.raidLifecycleController,
+            raidLifecycleController: this.raidLifecycleControllers.raidLifecycleController,
             templeController: this.templeController,
             storyScenarioController: this.storyScenarioController,
             advanceWorldTime: (dt) => { this.worldTime += dt; },
@@ -544,11 +542,11 @@ export class WorldEngine {
     }
 
     public isModalOverlayVisible(): boolean {
-        return this.townSession.isVisible() || this.raidOutcomeController.isVisible() || this.fusionTempleUI.isVisible();
+        return this.townSession.isVisible() || this.raidLifecycleControllers.raidOutcomeController.isVisible() || this.fusionTempleUI.isVisible();
     }
 
     public isQuestJournalAvailable(): boolean {
-        return !this.raidOutcomeController.isVisible() && !this.fusionTempleUI.isVisible();
+        return !this.raidLifecycleControllers.raidOutcomeController.isVisible() && !this.fusionTempleUI.isVisible();
     }
 
     /** Town visit session (consumed by the React DOM overlay via GameManager). */
@@ -587,15 +585,15 @@ export class WorldEngine {
     }
 
     private openTown(town: TownInfo): void {
-        this.raidLifecycleController.openTown(town);
+        this.raidLifecycleControllers.raidLifecycleController.openTown(town);
     }
 
     private async beginRaidFromCurrentHub(requestedRealm?: WorldRealmId): Promise<void> {
-        return this.raidLifecycleController.beginRaidFromCurrentHub(requestedRealm);
+        return this.raidLifecycleControllers.raidLifecycleController.beginRaidFromCurrentHub(requestedRealm);
     }
 
     public closeNetworkRaidClient(sendLeave: boolean, reason: 'town' | 'wipe' | 'manual' = 'manual'): void {
-        this.raidLifecycleController.closeNetworkRaidClient(sendLeave, reason);
+        this.raidLifecycleControllers.raidLifecycleController.closeNetworkRaidClient(sendLeave, reason);
     }
 
     private closeFieldOverlays(): void {
