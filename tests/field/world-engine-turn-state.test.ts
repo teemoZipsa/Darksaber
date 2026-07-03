@@ -65,7 +65,11 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
         getIsOpen: () => false,
         open: () => calls.push('openActionMenu'),
     };
-    engine.tacticalController = { close: () => calls.push('closeTacticalMenu') };
+    engine.presentationControllers = {
+        tacticalController: { close: () => calls.push('closeTacticalMenu') },
+        renderController: { render: () => undefined },
+        inputController: { process: () => undefined },
+    };
     engine.playerActionController = {
         hasExecutableAction: () => true,
         getTurnActionStates: () => [],
@@ -354,7 +358,11 @@ test('world update freezes field simulation while story presentation is active',
     engine.floatingText = { update: () => calls.push('floatingText') };
     engine.updateAttackCues = () => calls.push('attackCues');
     engine.getControlledActor = () => actor;
-    engine.inputController = { process: () => calls.push('input') };
+    engine.presentationControllers = {
+        tacticalController: { updateMarkers: () => undefined },
+        renderController: { render: () => undefined },
+        inputController: { process: () => calls.push('input') },
+    };
     engine.movementController = {
         updatePartyActors: () => {
             calls.push('partyMovement');

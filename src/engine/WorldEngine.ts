@@ -125,11 +125,9 @@ export class WorldEngine {
     private toolController!: WorldEngineActionControllers['toolController'];
     private playerActionController!: WorldEngineActionControllers['playerActionController'];
     private raidOutcomeController!: WorldEngineRaidLifecycleControllers['raidOutcomeController'];
-    private tacticalController!: WorldEnginePresentationControllers['tacticalController'];
     private selectionController!: WorldEngineActionControllers['selectionController'];
     private fieldSpawnController!: WorldEngineCombatControllers['fieldSpawnController'];
-    private renderController!: WorldEnginePresentationControllers['renderController'];
-    private inputController!: WorldEnginePresentationControllers['inputController'];
+    private presentationControllers!: WorldEnginePresentationControllers;
     private storyScenarioController!: WorldStoryScenarioController;
     private networkSyncController!: WorldNetworkSyncController;
     private tutorialController!: WorldTutorialController;
@@ -480,9 +478,7 @@ export class WorldEngine {
             openPauseMenu: () => this.gameManager.openPauseMenu(),
             addCombatLog: (message) => this.addCombatLog(message),
         });
-        this.tacticalController = presentationControllers.tacticalController;
-        this.renderController = presentationControllers.renderController;
-        this.inputController = presentationControllers.inputController;
+        this.presentationControllers = presentationControllers;
     }
 
     private isTurnCombatActive(): boolean {
@@ -491,7 +487,7 @@ export class WorldEngine {
             turnStateController: this.turnStateController,
             actionMenuUI: this.actionMenuUI,
             playerActionController: this.playerActionController,
-            tacticalController: this.tacticalController,
+            tacticalController: this.presentationControllers.tacticalController,
             magicController: this.magicController,
             toolController: this.toolController,
             partyActors: this.partyActors,
@@ -508,11 +504,11 @@ export class WorldEngine {
             raidOutcomeController: this.raidOutcomeController,
             fusionTempleUI: this.fusionTempleUI,
             tutorialController: this.tutorialController,
-            inputController: this.inputController,
+            inputController: this.presentationControllers.inputController,
             effectManager: this.effectManager,
             floatingText: this.floatingText,
             playerActionController: this.playerActionController,
-            tacticalController: this.tacticalController,
+            tacticalController: this.presentationControllers.tacticalController,
             raidLifecycleController: this.raidLifecycleController,
             templeController: this.templeController,
             storyScenarioController: this.storyScenarioController,
@@ -577,7 +573,7 @@ export class WorldEngine {
     public getRaidSession(): WorldRaidSession { return this.raidSession; }
 
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
-        this.renderController.render(ctx, camera, width, height, { hideWorldHud: this.tutorialController.isActive() });
+        this.presentationControllers.renderController.render(ctx, camera, width, height, { hideWorldHud: this.tutorialController.isActive() });
         if (this.tutorialController.isActive()) this.tutorialController.renderHud(ctx, width, height);
     }
 
@@ -656,7 +652,7 @@ export class WorldEngine {
         if (this.updateStoryPresentation(dt, camera)) return;
 
         this.refreshOpenActionMenuState();
-        this.inputController.process(input, camera);
+        this.presentationControllers.inputController.process(input, camera);
         for (const actor of this.partyActors) actor.entity.update(dt);
         for (const entry of this.fieldEnemies) entry.enemy.update(dt);
         this.networkSyncController.refreshMovePathPreview();
@@ -739,7 +735,7 @@ export class WorldEngine {
     }
 
     private closeTacticalMenu(): void {
-        this.tacticalController.close();
+        this.presentationControllers.tacticalController.close();
     }
 
     private updateRestingActors(dt: number): void {
