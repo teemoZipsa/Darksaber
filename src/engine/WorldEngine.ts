@@ -115,7 +115,7 @@ export class WorldEngine {
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
     private fusionTempleUI = new FusionTempleUI();
-    private minimapUI: MinimapUI;
+    private minimapUI!: MinimapUI;
     private townSession: WorldTownSession;
     private raidSession: WorldRaidSession;
     private currentPhase: WorldPhase = 'lobby';
@@ -130,16 +130,16 @@ export class WorldEngine {
     private fieldSpawnController!: WorldEngineCombatControllers['fieldSpawnController'];
     private renderController!: WorldEnginePresentationControllers['renderController'];
     private inputController!: WorldEnginePresentationControllers['inputController'];
-    private storyScenarioController: WorldStoryScenarioController;
-    private networkSyncController: WorldNetworkSyncController;
-    private tutorialController: WorldTutorialController;
+    private storyScenarioController!: WorldStoryScenarioController;
+    private networkSyncController!: WorldNetworkSyncController;
+    private tutorialController!: WorldTutorialController;
     private raidLifecycleController!: WorldEngineRaidLifecycleControllers['raidLifecycleController'];
-    private templeController: WorldTempleController;
-    private restingController: WorldRestingController;
+    private templeController!: WorldTempleController;
+    private restingController!: WorldRestingController;
     private lootController!: WorldEngineActionControllers['lootController'];
-    private combatFeedbackController: WorldCombatFeedbackController;
-    private networkIntentController: WorldNetworkIntentController;
-    private networkEvents: WorldEngineNetworkEvents;
+    private combatFeedbackController!: WorldCombatFeedbackController;
+    private networkIntentController!: WorldNetworkIntentController;
+    private networkEvents!: WorldEngineNetworkEvents;
     private turnStartResolver!: WorldEngineCombatControllers['turnStartResolver'];
     private combatFlow!: WorldEngineCombatControllers['combatFlow'];
     private actionTurnFlow?: WorldEngineActionTurnFlow;
@@ -179,6 +179,28 @@ export class WorldEngine {
             onDeploy: () => this.beginRaidFromCurrentHub(),
             log: (message) => this.addCombatLog(message),
         });
+        this.initializeWorldSupportControllers();
+        this.initializeScenarioNetworkControllers();
+        this.initializeCombatActionControllers();
+        this.initializeRaidLifecycleControllers();
+        this.initializePresentationControllers();
+        runWorldEngineStartupFlow({
+            camera,
+            options,
+            spawnPartyAtCurrentHub: () => this.spawnPartyAtCurrentHub(),
+            getControlledActor: () => this.getControlledActor(),
+            setPlayer: (player) => { this.player = player; },
+            getPlayer: () => this.player,
+            selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            startIntroTutorial: () => this.startIntroTutorial(),
+            hasStoredNetworkResumeToken: () => NetworkRaidClient.hasStoredResumeToken(),
+            beginRaidFromCurrentHub: () => { void this.beginRaidFromCurrentHub(); },
+            openCurrentHubTown: () => this.openTown(this.getCurrentHubTown()),
+            addCombatLog: (message) => this.addCombatLog(message),
+        });
+    }
+
+    private initializeWorldSupportControllers(): void {
         const worldControllers = createWorldEngineWorldControllers({
             camera: this.camera,
             party: this.party,
@@ -209,6 +231,9 @@ export class WorldEngine {
         this.combatFeedbackController = worldControllers.combatFeedbackController;
         this.templeController = worldControllers.templeController;
         this.restingController = worldControllers.restingController;
+    }
+
+    private initializeScenarioNetworkControllers(): void {
         const scenarioNetworkControllers = createWorldEngineScenarioNetworkControllers({
             party: this.party,
             playerData: this.playerData,
@@ -269,23 +294,6 @@ export class WorldEngine {
         this.networkSyncController = scenarioNetworkControllers.networkSyncController;
         this.networkIntentController = scenarioNetworkControllers.networkIntentController;
         this.networkEvents = scenarioNetworkControllers.networkEvents;
-        this.initializeCombatActionControllers();
-        this.initializeRaidLifecycleControllers();
-        this.initializePresentationControllers();
-        runWorldEngineStartupFlow({
-            camera,
-            options,
-            spawnPartyAtCurrentHub: () => this.spawnPartyAtCurrentHub(),
-            getControlledActor: () => this.getControlledActor(),
-            setPlayer: (player) => { this.player = player; },
-            getPlayer: () => this.player,
-            selectActor: (actorId) => this.selectionController.selectActor(actorId),
-            startIntroTutorial: () => this.startIntroTutorial(),
-            hasStoredNetworkResumeToken: () => NetworkRaidClient.hasStoredResumeToken(),
-            beginRaidFromCurrentHub: () => { void this.beginRaidFromCurrentHub(); },
-            openCurrentHubTown: () => this.openTown(this.getCurrentHubTown()),
-            addCombatLog: (message) => this.addCombatLog(message),
-        });
     }
 
     private initializeCombatActionControllers(): void {

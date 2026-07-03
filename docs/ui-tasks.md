@@ -49,6 +49,7 @@
 - [x] `WorldEngine` action-controller 배선 분리: selection/loot/magic/tool/player-action controller 생성을 `WorldEngineActionControllers` factory로 이동해 액션·전리품·전술 입력 기능 추가 시 `WorldEngine.ts` 충돌 표면을 축소.
 - [x] `WorldEngine` raid-lifecycle 배선 분리: raid outcome/lifecycle controller 생성을 `WorldEngineRaidLifecycleControllers` factory로 이동해 레이드 종료·네트워크 레이드 기능 변경 시 `WorldEngine.ts` 충돌 표면을 축소.
 - [x] `WorldEngine` flow 배선 분리: update/action-turn flow 생성을 `WorldEngineFlows` factory로 이동해 프레임 업데이트·턴 메뉴 기능 변경 시 `WorldEngine.ts` 직접 배선을 줄임.
+- [x] `WorldEngine` 생성자 배선 축소: world support/scenario-network controller 조립을 전용 initializer로 분리해 생성자가 세션 초기화와 조립 순서만 드러내도록 정리.
 
 ---
 
