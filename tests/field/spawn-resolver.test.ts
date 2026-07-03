@@ -113,6 +113,14 @@ test('nest generation is deterministic for the same seed/chunk/context', () => {
     assert.ok(a && a.monsters.length >= 3 && a.monsters.length <= 6, 'danger-scaled pack size');
 });
 
+test('forced nest generation keeps the same layout as normal generation', () => {
+    const ctx: SpawnContext = { realm: 'mortal', chunkX: 36, chunkY: 41, biome: 'grass', seed: 'server:0' };
+    const normal = pickNestForChunk(ctx, false);
+    const forced = pickNestForChunk(ctx, true);
+    assert.ok(normal);
+    assert.deepEqual(forced, normal);
+});
+
 test('starter danger nests use level 1 small packs near Kaosia', () => {
     const ctx: SpawnContext = { realm: 'mortal', chunkX: 37, chunkY: 41, biome: 'grass', seed: 'server:start' };
     assert.ok(getFieldDanger(ctx.chunkX, ctx.chunkY, ctx.realm) <= 2);

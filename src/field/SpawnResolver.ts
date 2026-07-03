@@ -302,7 +302,8 @@ export function pickNestForChunk(ctx: SpawnContext, force = false): FieldNest | 
     const danger = getFieldDanger(ctx.chunkX, ctx.chunkY, ctx.realm);
     const rng = makeRng(ctx.seed, 'nest', ctx.chunkX, ctx.chunkY);
 
-    if (!force && rng() > (danger <= STARTER_DANGER_MAX ? STARTER_NEST_CHANCE : NEST_CHANCE)) return null;
+    const spawnRoll = rng();
+    if (!force && spawnRoll > (danger <= STARTER_DANGER_MAX ? STARTER_NEST_CHANCE : NEST_CHANCE)) return null;
 
     const pool = getRegionPacks(ctx.biome, danger);
     if (pool.length === 0) return null;

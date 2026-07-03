@@ -40,6 +40,7 @@
 - [x] 클라이언트/서버 시나리오 규칙 공유화: 필드 이벤트의 USEITEM/RANDOM/MAGIC trigger 해석과 트랩 피해 계산을 `StoryScenarioFieldEventRules`로 통합해 로컬/네트워크 레이드 분기 위험을 축소.
 - [x] 장시간 DOM 오버레이 e2e 보강: DEV 튜토리얼 월드에서 인벤토리·마법 장착·일시정지 패널을 반복 토글하며 overlay registry, 화면 맞춤, 클라이언트 오류 부재를 검증.
 - [x] i18n guard AST화: `t`/`formatT`/wrapper literal 키, template key family, ko/en 번역 블록 추출을 TypeScript AST 기반으로 바꿔 regex 누락 위험을 축소.
+- [x] field nest 재생성 seed 안정화: forced nest 생성이 일반 생성과 같은 RNG 순서/중심 좌표를 쓰게 해 cleared nest respawn 테스트의 sessionEpoch 의존성을 제거.
 
 ---
 
