@@ -119,11 +119,9 @@ export class WorldEngine {
     private townSession: WorldTownSession;
     private raidSession: WorldRaidSession;
     private currentPhase: WorldPhase = 'lobby';
-    private movementController!: WorldEngineCombatControllers['movementController'];
-    private enemyTurnController!: WorldEngineCombatControllers['enemyTurnController'];
+    private combatControllers!: WorldEngineCombatControllers;
     private actionControllers!: WorldEngineActionControllers;
     private raidOutcomeController!: WorldEngineRaidLifecycleControllers['raidOutcomeController'];
-    private fieldSpawnController!: WorldEngineCombatControllers['fieldSpawnController'];
     private presentationControllers!: WorldEnginePresentationControllers;
     private storyScenarioController!: WorldStoryScenarioController;
     private networkSyncController!: WorldNetworkSyncController;
@@ -134,8 +132,6 @@ export class WorldEngine {
     private combatFeedbackController!: WorldCombatFeedbackController;
     private networkIntentController!: WorldNetworkIntentController;
     private networkEvents!: WorldEngineNetworkEvents;
-    private turnStartResolver!: WorldEngineCombatControllers['turnStartResolver'];
-    private combatFlow!: WorldEngineCombatControllers['combatFlow'];
     private actionTurnFlow?: WorldEngineActionTurnFlow;
     private updateFlow?: WorldEngineUpdateFlow;
     private turnStateController = new WorldTurnStateController();
@@ -323,18 +319,14 @@ export class WorldEngine {
             flushCombatFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
             addCombatLog: (message) => this.addCombatLog(message),
         });
-        this.turnStartResolver = combatControllers.turnStartResolver;
-        this.combatFlow = combatControllers.combatFlow;
-        this.movementController = combatControllers.movementController;
-        this.fieldSpawnController = combatControllers.fieldSpawnController;
-        this.enemyTurnController = combatControllers.enemyTurnController;
+        this.combatControllers = combatControllers;
         const actionControllers = createWorldEngineActionControllers({
             gameManager: this.gameManager,
             storyScenarioController: this.storyScenarioController,
             networkSyncController: this.networkSyncController,
             tutorialController: this.tutorialController,
             turnStateController: this.turnStateController,
-            movementController: this.movementController,
+            movementController: this.combatControllers.movementController,
             floatingText: this.floatingText,
             effectManager: this.effectManager,
             getWorldMap: () => this.worldMap,
@@ -523,7 +515,7 @@ export class WorldEngine {
     }
 
     private updatePartyMovement(dt: number): void {
-        const partyMovement = this.movementController.updatePartyActors({
+        const partyMovement = this.combatControllers.movementController.updatePartyActors({
             dt,
             controlled: this.getFanfareLeaderActor(),
             activeTurnActorId: this.turnStateController.getActiveTurnActorId(),
@@ -534,7 +526,7 @@ export class WorldEngine {
     }
 
     private updateEnemyMovement(dt: number): void {
-        const enemyMovement = this.movementController.updateEnemies({
+        const enemyMovement = this.combatControllers.movementController.updateEnemies({
             dt,
             activeTurnActorId: this.turnStateController.getActiveTurnActorId(),
         });
@@ -580,7 +572,7 @@ export class WorldEngine {
     private placePartyNear(anchorTile: TilePoint, overrideMembers?: Character[]): void {
         const members = (overrideMembers ?? this.party.getCharacters()).slice(0, this.party.MAX_ACTIVE_PARTY_SIZE);
         members.forEach((character) => syncCharacterMovementToClass(character));
-        this.partyActors = this.fieldSpawnController.createPartyActors(anchorTile, members);
+        this.partyActors = this.combatControllers.fieldSpawnController.createPartyActors(anchorTile, members);
         this.fanfareLeaderActorId = null;
     }
 
@@ -747,7 +739,7 @@ export class WorldEngine {
     }
 
     private applyCombatResult(result: CombatResult): void {
-        this.combatFlow.applyCombatResult(result);
+        this.combatControllers.combatFlow.applyCombatResult(result);
     }
 
     private spawnEnemyLoot(enemy: Enemy): void {
@@ -771,19 +763,19 @@ export class WorldEngine {
     }
 
     private tryActorAttack(actor: FieldActor, enemy: Enemy): boolean {
-        return this.combatFlow.tryActorAttack(actor, enemy);
+        return this.combatControllers.combatFlow.tryActorAttack(actor, enemy);
     }
 
     private handleEnemyDefeated(actor: FieldActor, enemy: Enemy, feedbackGroupId?: string): void {
-        this.combatFlow.handleEnemyDefeated(actor, enemy, feedbackGroupId);
+        this.combatControllers.combatFlow.handleEnemyDefeated(actor, enemy, feedbackGroupId);
     }
 
     private awardDefeatExp(actor: FieldActor, enemy: Enemy): void {
-        this.combatFlow.awardDefeatExp(actor, enemy);
+        this.combatControllers.combatFlow.awardDefeatExp(actor, enemy);
     }
 
     private handleActorDown(actor: FieldActor): void {
-        this.combatFlow.handleActorDown(actor);
+        this.combatControllers.combatFlow.handleActorDown(actor);
     }
 
     private refreshLootState(): void {
@@ -955,7 +947,7 @@ export class WorldEngine {
         if (index >= 0) this.switchToPartyMember(index);
         actor.entity.actionGauge = this.turnStateController.beginActorTurn(actor.id);
         this.actionControllers.selectionController.selectActor(actor.id);
-        if (!this.turnStartResolver.processActorTurnStart(actor)) {
+        if (!this.combatControllers.turnStartResolver.processActorTurnStart(actor)) {
             this.endActorTurn(actor, 'statusBlocked');
             return;
         }
@@ -977,20 +969,20 @@ export class WorldEngine {
         this.turnStateController.beginEnemyTurn(enemy.id);
         this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'READY');
 
-        if (!this.turnStartResolver.processEnemyTurnStart(entry)) {
+        if (!this.combatControllers.turnStartResolver.processEnemyTurnStart(entry)) {
             this.endEnemyTurn(enemy);
             return;
         }
 
         const beforeHpByActorId = this.snapshotPartyHp();
-        this.applyCombatResult(this.enemyTurnController.beginEnemyTurn(entry));
+        this.applyCombatResult(this.combatControllers.enemyTurnController.beginEnemyTurn(entry));
         this.interruptRestingForDamage(beforeHpByActorId);
         this.endEnemyTurn(enemy);
     }
 
     private refreshEnemyIntentPreviews(): void {
         for (const entry of this.fieldEnemies) {
-            entry.previewIntent = this.enemyTurnController.previewEnemyIntent(entry);
+            entry.previewIntent = this.combatControllers.enemyTurnController.previewEnemyIntent(entry);
         }
     }
 

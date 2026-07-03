@@ -52,6 +52,7 @@
 - [x] `WorldEngine` 생성자 배선 축소: world support/scenario-network controller 조립을 전용 initializer로 분리해 생성자가 세션 초기화와 조립 순서만 드러내도록 정리.
 - [x] `WorldEngine` presentation controller 필드 축소: tactical/render/input controller 개별 필드를 `presentationControllers` aggregate로 묶어 컨트롤러 상태 표면을 줄임.
 - [x] `WorldEngine` action controller 필드 축소: selection/loot/magic/tool/player-action controller 개별 필드를 `actionControllers` aggregate로 묶어 액션 기능 변경 시 필드 충돌 표면을 줄임.
+- [x] `WorldEngine` combat controller 필드 축소: turn-start/combat-flow/movement/enemy-turn/field-spawn controller 개별 필드를 `combatControllers` aggregate로 묶어 전투 기능 변경 시 필드 충돌 표면을 줄임.
 
 ---
 

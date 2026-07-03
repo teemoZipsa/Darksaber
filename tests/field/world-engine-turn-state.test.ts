@@ -372,14 +372,16 @@ test('world update freezes field simulation while story presentation is active',
     engine.actionControllers = {
         playerActionController: { processQueuedIntents: () => calls.push('queuedIntents') },
     };
-    engine.movementController = {
-        updatePartyActors: () => {
-            calls.push('partyMovement');
-            return { followRepathTimer: 0, readyActorIds: [] };
-        },
-        updateEnemies: () => {
-            calls.push('enemyMovement');
-            return { readyEnemyIds: [] };
+    engine.combatControllers = {
+        movementController: {
+            updatePartyActors: () => {
+                calls.push('partyMovement');
+                return { followRepathTimer: 0, readyActorIds: [] };
+            },
+            updateEnemies: () => {
+                calls.push('enemyMovement');
+                return { readyEnemyIds: [] };
+            },
         },
     };
     const camera = { update: () => calls.push('camera') };
