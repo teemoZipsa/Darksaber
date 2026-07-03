@@ -13,11 +13,6 @@ import { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
 import { formatT, t } from '../i18n/LanguageManager';
 import { removeStatusesFromCarrier } from '../combat/StatusEffects';
-import { ActionMenuUI } from '../ui/ActionMenuUI';
-import { EntityInfoUI } from '../ui/EntityInfoUI';
-import { EffectManager } from '../ui/EffectManager';
-import { FusionTempleUI } from '../ui/FusionTempleUI';
-import { FloatingTextManager } from '../ui/FloatingTextManager';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
@@ -28,11 +23,14 @@ import { WorldRaidSession } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
 import type { CombatResult } from './world/WorldCombatController';
 import { WorldTurnStateController } from './world/WorldTurnStateController';
-import { WorldFieldFeedbackState } from './world/WorldFieldFeedbackState';
 import {
     createWorldEngineRuntimeState,
     type WorldEngineRuntimeState,
 } from './world/WorldEngineRuntimeState';
+import {
+    createWorldEngineUiState,
+    type WorldEngineUiState,
+} from './world/WorldEngineUiState';
 import type { WorldEngineActionTurnFlow } from './world/WorldEngineActionTurnFlow';
 import type { WorldEngineUpdateFlow } from './world/WorldEngineUpdateFlow';
 import {
@@ -113,9 +111,7 @@ export class WorldEngine {
     private fieldEnemies: FieldEnemy[] = [];
     private remotePartyActors: Map<string, FieldActor> = new Map();
     private networkState?: WorldEngineNetworkState;
-    private actionMenuUI = new ActionMenuUI();
-    private entityInfoUI = new EntityInfoUI();
-    private fusionTempleUI = new FusionTempleUI();
+    private uiState?: WorldEngineUiState;
     private townSession: WorldTownSession;
     private raidSession: WorldRaidSession;
     private runtimeState?: WorldEngineRuntimeState;
@@ -128,9 +124,6 @@ export class WorldEngine {
     private actionTurnFlow?: WorldEngineActionTurnFlow;
     private updateFlow?: WorldEngineUpdateFlow;
     private turnStateController = new WorldTurnStateController();
-    private fieldFeedback = new WorldFieldFeedbackState();
-    private floatingText = new FloatingTextManager();
-    private effectManager = new EffectManager();
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -184,9 +177,9 @@ export class WorldEngine {
             camera: this.camera,
             party: this.party,
             raidSession: this.raidSession,
-            fusionTempleUI: this.fusionTempleUI,
-            floatingText: this.floatingText,
-            effectManager: this.effectManager,
+            fusionTempleUI: this.getUiState().fusionTempleUI,
+            floatingText: this.getUiState().floatingText,
+            effectManager: this.getUiState().effectManager,
             getWorldTime: () => this.getRuntimeState().worldTime,
             getWorldMap: () => this.worldMap,
             getPlayer: () => this.player,
@@ -217,11 +210,11 @@ export class WorldEngine {
             camera: this.camera,
             raidSession: this.raidSession,
             townSession: this.townSession,
-            fusionTempleUI: this.fusionTempleUI,
-            actionMenuUI: this.actionMenuUI,
-            floatingText: this.floatingText,
-            effectManager: this.effectManager,
-            fieldFeedback: this.fieldFeedback,
+            fusionTempleUI: this.getUiState().fusionTempleUI,
+            actionMenuUI: this.getUiState().actionMenuUI,
+            floatingText: this.getUiState().floatingText,
+            effectManager: this.getUiState().effectManager,
+            fieldFeedback: this.getUiState().fieldFeedback,
             turnStateController: this.turnStateController,
             getWorldMap: () => this.worldMap,
             setWorldMap: (worldMap) => { this.worldMap = worldMap; },
@@ -260,7 +253,7 @@ export class WorldEngine {
             flushCombatFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
             spawnKillEffect: (enemy, feedbackGroupId, actor) => {
                 const exp = actor ? enemy.calcExpFor(actor.character.level) : enemy.expReward;
-                this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, exp, enemy);
+                this.getUiState().effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, exp, enemy);
                 this.registerCombatFeedback('kill', feedbackGroupId);
             },
             addCombatLog: (message) => this.addCombatLog(message),
@@ -276,9 +269,9 @@ export class WorldEngine {
             tutorialController: this.scenarioNetworkControllers.tutorialController,
             storyScenarioController: this.scenarioNetworkControllers.storyScenarioController,
             networkIntentController: this.scenarioNetworkControllers.networkIntentController,
-            floatingText: this.floatingText,
-            effectManager: this.effectManager,
-            fieldFeedback: this.fieldFeedback,
+            floatingText: this.getUiState().floatingText,
+            effectManager: this.getUiState().effectManager,
+            fieldFeedback: this.getUiState().fieldFeedback,
             getWorldMap: () => this.worldMap,
             isNetworkRaid: () => this.getNetworkState().isRaid,
             getPartyActors: () => this.partyActors,
@@ -309,8 +302,8 @@ export class WorldEngine {
             tutorialController: this.scenarioNetworkControllers.tutorialController,
             turnStateController: this.turnStateController,
             movementController: this.combatControllers.movementController,
-            floatingText: this.floatingText,
-            effectManager: this.effectManager,
+            floatingText: this.getUiState().floatingText,
+            effectManager: this.getUiState().effectManager,
             getWorldMap: () => this.worldMap,
             isNetworkRaid: () => this.getNetworkState().isRaid,
             getNetworkRaidClient: () => this.getNetworkState().raidClient,
@@ -404,11 +397,11 @@ export class WorldEngine {
             playerData: this.playerData,
             townSession: this.townSession,
             raidSession: this.raidSession,
-            fusionTempleUI: this.fusionTempleUI,
-            actionMenuUI: this.actionMenuUI,
-            entityInfoUI: this.entityInfoUI,
-            effectManager: this.effectManager,
-            floatingText: this.floatingText,
+            fusionTempleUI: this.getUiState().fusionTempleUI,
+            actionMenuUI: this.getUiState().actionMenuUI,
+            entityInfoUI: this.getUiState().entityInfoUI,
+            effectManager: this.getUiState().effectManager,
+            floatingText: this.getUiState().floatingText,
             minimapUI: this.worldControllers.minimapUI,
             magicController: this.actionControllers.magicController,
             toolController: this.actionControllers.toolController,
@@ -417,7 +410,7 @@ export class WorldEngine {
             selectionController: this.actionControllers.selectionController,
             tutorialController: this.scenarioNetworkControllers.tutorialController,
             turnStateController: this.turnStateController,
-            fieldFeedback: this.fieldFeedback,
+            fieldFeedback: this.getUiState().fieldFeedback,
             getWorldMap: () => this.worldMap,
             getWorldTime: () => this.getRuntimeState().worldTime,
             getPhase: () => this.getRuntimeState().currentPhase,
@@ -450,7 +443,7 @@ export class WorldEngine {
         return isWorldTurnCombatActive({
             fieldEnemies: this.fieldEnemies,
             turnStateController: this.turnStateController,
-            actionMenuUI: this.actionMenuUI,
+            actionMenuUI: this.getUiState().actionMenuUI,
             playerActionController: this.actionControllers.playerActionController,
             tacticalController: this.presentationControllers.tacticalController,
             magicController: this.actionControllers.magicController,
@@ -467,11 +460,11 @@ export class WorldEngine {
         this.updateFlow ??= createWorldEngineUpdateFlow({
             townSession: this.townSession,
             raidOutcomeController: this.raidLifecycleControllers.raidOutcomeController,
-            fusionTempleUI: this.fusionTempleUI,
+            fusionTempleUI: this.getUiState().fusionTempleUI,
             tutorialController: this.scenarioNetworkControllers.tutorialController,
             inputController: this.presentationControllers.inputController,
-            effectManager: this.effectManager,
-            floatingText: this.floatingText,
+            effectManager: this.getUiState().effectManager,
+            floatingText: this.getUiState().floatingText,
             playerActionController: this.actionControllers.playerActionController,
             tacticalController: this.presentationControllers.tacticalController,
             raidLifecycleController: this.raidLifecycleControllers.raidLifecycleController,
@@ -525,11 +518,11 @@ export class WorldEngine {
     }
 
     public isModalOverlayVisible(): boolean {
-        return this.townSession.isVisible() || this.raidLifecycleControllers.raidOutcomeController.isVisible() || this.fusionTempleUI.isVisible();
+        return this.townSession.isVisible() || this.raidLifecycleControllers.raidOutcomeController.isVisible() || this.getUiState().fusionTempleUI.isVisible();
     }
 
     public isQuestJournalAvailable(): boolean {
-        return !this.raidLifecycleControllers.raidOutcomeController.isVisible() && !this.fusionTempleUI.isVisible();
+        return !this.raidLifecycleControllers.raidOutcomeController.isVisible() && !this.getUiState().fusionTempleUI.isVisible();
     }
 
     /** Town visit session (consumed by the React DOM overlay via GameManager). */
@@ -625,8 +618,8 @@ export class WorldEngine {
         for (const actor of this.partyActors) actor.entity.update(dt);
         for (const entry of this.fieldEnemies) entry.enemy.update(dt);
         this.scenarioNetworkControllers.networkSyncController.refreshMovePathPreview();
-        this.effectManager.update(dt);
-        this.floatingText.update(dt);
+        this.getUiState().effectManager.update(dt);
+        this.getUiState().floatingText.update(dt);
         this.updateAttackCues(dt);
         this.refreshLootState();
         this.scenarioNetworkControllers.storyScenarioController.checkDungeonArrival();
@@ -641,8 +634,8 @@ export class WorldEngine {
     private updateStoryPresentation(dt: number, camera: Camera): boolean {
         if (!this.scenarioNetworkControllers.storyScenarioController.isPresentationActive()) return false;
         this.scenarioNetworkControllers.storyScenarioController.updatePresentation(dt);
-        this.effectManager.update(dt);
-        this.floatingText.update(dt);
+        this.getUiState().effectManager.update(dt);
+        this.getUiState().floatingText.update(dt);
         this.updateAttackCues(dt);
         const controlled = this.getControlledActor();
         if (controlled) this.player = controlled.entity;
@@ -832,7 +825,7 @@ export class WorldEngine {
 
     private getActionTurnFlow(): WorldEngineActionTurnFlow {
         this.actionTurnFlow ??= createWorldEngineActionTurnFlow({
-            actionMenuUI: this.actionMenuUI,
+            actionMenuUI: this.getUiState().actionMenuUI,
             tutorialController: this.scenarioNetworkControllers.tutorialController,
             turnStateController: this.turnStateController,
             selectionController: this.actionControllers.selectionController,
@@ -857,7 +850,7 @@ export class WorldEngine {
     }
 
     private closeActionMenu(): void {
-        this.actionMenuUI.close();
+        this.getUiState().actionMenuUI.close();
     }
 
     private refreshOpenActionMenuState(): void {
@@ -936,7 +929,7 @@ export class WorldEngine {
             this.endActorTurn(actor, 'statusBlocked');
             return;
         }
-        this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'READY');
+        this.getUiState().floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'READY');
         this.addCombatLog(formatT('field.log.turnStart', {
             name: actor.character.name,
             gauge: t('ui.actionGauge'),
@@ -945,14 +938,14 @@ export class WorldEngine {
         if (!this.actionControllers.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, 'noExecutableAction');
         else {
             this.closeTacticalMenu();
-            this.actionMenuUI.open(this.scenarioNetworkControllers.tutorialController.getActionMenuStates(actor));
+            this.getUiState().actionMenuUI.open(this.scenarioNetworkControllers.tutorialController.getActionMenuStates(actor));
         }
     }
 
     private beginEnemyTurn(entry: FieldEnemy): void {
         const enemy = entry.enemy;
         this.turnStateController.beginEnemyTurn(enemy.id);
-        this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'READY');
+        this.getUiState().floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'READY');
 
         if (!this.combatControllers.turnStartResolver.processEnemyTurnStart(entry)) {
             this.endEnemyTurn(enemy);
@@ -1014,11 +1007,11 @@ export class WorldEngine {
     }
 
     private addCombatLog(message: string): void {
-        this.fieldFeedback.addCombatLog(message);
+        this.getUiState().fieldFeedback.addCombatLog(message);
     }
 
     private updateAttackCues(dt: number): void {
-        this.fieldFeedback?.updateAttackCues(dt);
+        this.getUiState().fieldFeedback?.updateAttackCues(dt);
     }
 
     private beginCombatFeedbackGroup(): string {
@@ -1053,6 +1046,10 @@ export class WorldEngine {
         this.getNetworkState().isRaid = isRaid;
     }
 
+    public get fieldFeedback(): WorldEngineUiState['fieldFeedback'] {
+        return this.getUiState().fieldFeedback;
+    }
+
     private getNetworkState(): WorldEngineNetworkState {
         this.networkState ??= createWorldEngineNetworkState();
         return this.networkState;
@@ -1061,6 +1058,24 @@ export class WorldEngine {
     private getRuntimeState(): WorldEngineRuntimeState {
         this.runtimeState ??= createWorldEngineRuntimeState();
         return this.runtimeState;
+    }
+
+    private getUiState(): WorldEngineUiState {
+        if (!this.uiState) {
+            const fallback = createWorldEngineUiState();
+            const injected = this as unknown as WorldEngineUiState;
+            const getOwn = <K extends keyof WorldEngineUiState>(key: K): WorldEngineUiState[K] | undefined =>
+                Object.prototype.hasOwnProperty.call(this, key) ? injected[key] : undefined;
+            this.uiState = {
+                actionMenuUI: getOwn('actionMenuUI') ?? fallback.actionMenuUI,
+                entityInfoUI: getOwn('entityInfoUI') ?? fallback.entityInfoUI,
+                fusionTempleUI: getOwn('fusionTempleUI') ?? fallback.fusionTempleUI,
+                fieldFeedback: getOwn('fieldFeedback') ?? fallback.fieldFeedback,
+                floatingText: getOwn('floatingText') ?? fallback.floatingText,
+                effectManager: getOwn('effectManager') ?? fallback.effectManager,
+            };
+        }
+        return this.uiState;
     }
 
 }

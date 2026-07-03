@@ -59,6 +59,7 @@
 - [x] `WorldEngine` network runtime state 필드 축소: network raid client/connection flags/player id를 `networkState` aggregate로 묶고 DEV/e2e 디버그 접근은 accessor로 유지.
 - [x] 클라이언트/서버 intent payload 규칙 공유화: 네트워크 player intent payload builder/reader를 `WorldIntentPayloads`로 분리해 클라이언트 전송 shape와 서버 검증 key가 갈라지는 위험을 줄임.
 - [x] `WorldEngine` runtime state 필드 축소: phase/worldTime/hover/fanfare-follow 상태를 `runtimeState` aggregate로 묶어 월드 루프 상태 변경 표면을 줄임.
+- [x] `WorldEngine` UI/feedback state 필드 축소: action menu/entity info/fusion temple/floating text/effects/combat log 상태를 `uiState` aggregate로 묶어 표시·피드백 기능 변경 시 필드 충돌 표면을 줄임.
 
 ---
 
