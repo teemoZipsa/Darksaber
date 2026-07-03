@@ -24,11 +24,15 @@ import { TownInfo } from '../map/BiomeMask';
 import { resolveFieldHit } from '../field/FieldInteraction';
 import type { TilePoint } from '../field/FieldPathing';
 import type { FieldActor, FieldEnemy, FieldHitParty, FieldTurnEndReason } from '../field/FieldTypes';
-import { WorldRaidSession, type WorldPhase } from './world/WorldRaidSession';
+import { WorldRaidSession } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
 import type { CombatResult } from './world/WorldCombatController';
 import { WorldTurnStateController } from './world/WorldTurnStateController';
 import { WorldFieldFeedbackState } from './world/WorldFieldFeedbackState';
+import {
+    createWorldEngineRuntimeState,
+    type WorldEngineRuntimeState,
+} from './world/WorldEngineRuntimeState';
 import type { WorldEngineActionTurnFlow } from './world/WorldEngineActionTurnFlow';
 import type { WorldEngineUpdateFlow } from './world/WorldEngineUpdateFlow';
 import {
@@ -114,7 +118,7 @@ export class WorldEngine {
     private fusionTempleUI = new FusionTempleUI();
     private townSession: WorldTownSession;
     private raidSession: WorldRaidSession;
-    private currentPhase: WorldPhase = 'lobby';
+    private runtimeState?: WorldEngineRuntimeState;
     private combatControllers!: WorldEngineCombatControllers;
     private actionControllers!: WorldEngineActionControllers;
     private raidLifecycleControllers!: WorldEngineRaidLifecycleControllers;
@@ -124,13 +128,9 @@ export class WorldEngine {
     private actionTurnFlow?: WorldEngineActionTurnFlow;
     private updateFlow?: WorldEngineUpdateFlow;
     private turnStateController = new WorldTurnStateController();
-    private hoverTile: TilePoint = { x: -1, y: -1 };
     private fieldFeedback = new WorldFieldFeedbackState();
-    private followRepathTimer: number = 0;
-    private fanfareLeaderActorId: string | null = null;
     private floatingText = new FloatingTextManager();
     private effectManager = new EffectManager();
-    private worldTime: number = 0;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -187,7 +187,7 @@ export class WorldEngine {
             fusionTempleUI: this.fusionTempleUI,
             floatingText: this.floatingText,
             effectManager: this.effectManager,
-            getWorldTime: () => this.worldTime,
+            getWorldTime: () => this.getRuntimeState().worldTime,
             getWorldMap: () => this.worldMap,
             getPlayer: () => this.player,
             setPlayer: (player) => { this.player = player; },
@@ -196,8 +196,8 @@ export class WorldEngine {
             getFieldEnemies: () => this.fieldEnemies,
             setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
             isNetworkRaid: () => this.getNetworkState().isRaid,
-            getPhase: () => this.currentPhase,
-            setPhase: (phase) => { this.currentPhase = phase; },
+            getPhase: () => this.getRuntimeState().currentPhase,
+            setPhase: (phase) => { this.getRuntimeState().currentPhase = phase; },
             beginRaidFromCurrentHub: (realm) => { void this.beginRaidFromCurrentHub(realm); },
             closeFieldOverlays: () => this.closeFieldOverlays(),
             clearFieldTurnState: () => this.clearFieldTurnState(),
@@ -248,7 +248,7 @@ export class WorldEngine {
             getNetworkRaidClient: () => this.getNetworkState().raidClient,
             getNetworkPlayerId: () => this.getNetworkState().playerId,
             isRaidOutcomeVisible: () => this.raidLifecycleControllers.raidOutcomeController.isVisible(),
-            setCurrentPhase: (phase) => { this.currentPhase = phase; },
+            setCurrentPhase: (phase) => { this.getRuntimeState().currentPhase = phase; },
             getTurnActionStates: (actor) => this.actionControllers.playerActionController.getTurnActionStates(actor),
             getPlayerActionMode: () => this.actionControllers.playerActionController.getMode(),
             hasExecutableAction: (actor) => this.actionControllers.playerActionController.hasExecutableAction(actor),
@@ -330,10 +330,10 @@ export class WorldEngine {
             resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
             handleEnemyDefeated: (actor, enemy, feedbackGroupId) => this.handleEnemyDefeated(actor, enemy, feedbackGroupId),
             clearControlledPath: () => this.clearControlledPath(),
-            getFanfareLeaderId: () => this.fanfareLeaderActorId,
+            getFanfareLeaderId: () => this.getRuntimeState().fanfareLeaderActorId,
             setFanfareLeaderId: (actorId) => {
-                this.fanfareLeaderActorId = actorId;
-                this.followRepathTimer = 0;
+                this.getRuntimeState().fanfareLeaderActorId = actorId;
+                this.getRuntimeState().followRepathTimer = 0;
             },
             getFanfareFollowerCount: (actor) => this.getFanfareFollowerCount(actor),
             tryActorAttack: (actor, enemy) => this.tryActorAttack(actor, enemy),
@@ -384,7 +384,7 @@ export class WorldEngine {
             setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
             selectActor: (actorId) => this.actionControllers.selectionController.selectActor(actorId),
             isTurnCombatActive: () => this.isTurnCombatActive(),
-            setPhase: (phase) => { this.currentPhase = phase; },
+            setPhase: (phase) => { this.getRuntimeState().currentPhase = phase; },
             openTown: (town) => this.openTown(town),
             applyNetworkSnapshot: (snapshot) => this.applyNetworkSnapshot(snapshot),
             handleNetworkCombatEvent: (event) => this.handleNetworkCombatEvent(event),
@@ -419,16 +419,16 @@ export class WorldEngine {
             turnStateController: this.turnStateController,
             fieldFeedback: this.fieldFeedback,
             getWorldMap: () => this.worldMap,
-            getWorldTime: () => this.worldTime,
-            getPhase: () => this.currentPhase,
+            getWorldTime: () => this.getRuntimeState().worldTime,
+            getPhase: () => this.getRuntimeState().currentPhase,
             getPlayer: () => this.player,
             getControlledActor: () => this.getControlledActor(),
             getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
             getPartyActors: () => this.partyActors,
             getFieldEnemies: () => this.fieldEnemies,
             getSpendableActionGauge: () => this.getSpendableActionGauge(),
-            getHoverTile: () => this.hoverTile,
-            setHoverTile: (tile) => { this.hoverTile = tile; },
+            getHoverTile: () => this.getRuntimeState().hoverTile,
+            setHoverTile: (tile) => { this.getRuntimeState().hoverTile = tile; },
             getPathPreviewTiles: (actor) => this.getPathPreviewTiles(actor),
             resolveFieldHitAt: (tile) => this.resolveFieldHitAt(tile),
             getEnemyById: (enemyId) => this.getEnemyById(enemyId),
@@ -477,7 +477,7 @@ export class WorldEngine {
             raidLifecycleController: this.raidLifecycleControllers.raidLifecycleController,
             templeController: this.worldControllers.templeController,
             storyScenarioController: this.scenarioNetworkControllers.storyScenarioController,
-            advanceWorldTime: (dt) => { this.worldTime += dt; },
+            advanceWorldTime: (dt) => { this.getRuntimeState().worldTime += dt; },
             isNetworkRaid: () => this.getNetworkState().isRaid,
             updateNetworkRaid: (dt, input, camera) => this.updateNetworkRaid(dt, input, camera),
             updateStoryPresentation: (dt, camera) => this.updateStoryPresentation(dt, camera),
@@ -500,9 +500,9 @@ export class WorldEngine {
             dt,
             controlled: this.getFanfareLeaderActor(),
             activeTurnActorId: this.turnStateController.getActiveTurnActorId(),
-            followRepathTimer: this.followRepathTimer,
+            followRepathTimer: this.getRuntimeState().followRepathTimer,
         });
-        this.followRepathTimer = partyMovement.followRepathTimer;
+        this.getRuntimeState().followRepathTimer = partyMovement.followRepathTimer;
         for (const actorId of partyMovement.readyActorIds) this.turnStateController.enqueueReadyActor(actorId);
     }
 
@@ -558,7 +558,7 @@ export class WorldEngine {
         const members = (overrideMembers ?? this.party.getCharacters()).slice(0, this.party.MAX_ACTIVE_PARTY_SIZE);
         members.forEach((character) => syncCharacterMovementToClass(character));
         this.partyActors = this.combatControllers.fieldSpawnController.createPartyActors(anchorTile, members);
-        this.fanfareLeaderActorId = null;
+        this.getRuntimeState().fanfareLeaderActorId = null;
     }
 
     private getTownById(townId: string): TownInfo | null {
@@ -598,7 +598,7 @@ export class WorldEngine {
 
     private clearFieldTurnState(): void {
         this.turnStateController.clear();
-        this.fanfareLeaderActorId = null;
+        this.getRuntimeState().fanfareLeaderActorId = null;
         this.worldControllers.restingController.clearTimers();
         this.closeActionMenu();
         this.actionControllers.magicController.reset();
@@ -789,10 +789,10 @@ export class WorldEngine {
         const leader = getWorldFanfareLeaderActor({
             partyActors: this.partyActors,
             characters: this.party.getCharacters(),
-            leaderActorId: this.fanfareLeaderActorId,
+            leaderActorId: this.getRuntimeState().fanfareLeaderActorId,
             isNetworkRaid: this.getNetworkState().isRaid,
         });
-        if (!leader) this.fanfareLeaderActorId = null;
+        if (!leader) this.getRuntimeState().fanfareLeaderActorId = null;
         return leader;
     }
 
@@ -1056,6 +1056,11 @@ export class WorldEngine {
     private getNetworkState(): WorldEngineNetworkState {
         this.networkState ??= createWorldEngineNetworkState();
         return this.networkState;
+    }
+
+    private getRuntimeState(): WorldEngineRuntimeState {
+        this.runtimeState ??= createWorldEngineRuntimeState();
+        return this.runtimeState;
     }
 
 }
