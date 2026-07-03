@@ -24,7 +24,7 @@ import { EntityInfoUI } from '../ui/EntityInfoUI';
 import { EffectManager } from '../ui/EffectManager';
 import { FusionTempleUI } from '../ui/FusionTempleUI';
 import { FloatingTextManager } from '../ui/FloatingTextManager';
-import { MinimapUI } from '../ui/MinimapUI';
+import type { MinimapUI } from '../ui/MinimapUI';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
@@ -49,10 +49,10 @@ import type { WorldStoryScenarioController } from './world/WorldStoryScenarioCon
 import type { WorldNetworkSyncController } from './world/WorldNetworkSyncController';
 import type { WorldTutorialController } from './world/WorldTutorialController';
 import { WorldRaidLifecycleController } from './world/WorldRaidLifecycleController';
-import { WorldTempleController } from './world/WorldTempleController';
-import { WorldRestingController } from './world/WorldRestingController';
+import type { WorldTempleController } from './world/WorldTempleController';
+import type { WorldRestingController } from './world/WorldRestingController';
 import { WorldLootController } from './world/WorldLootController';
-import { WorldCombatFeedbackController } from './world/WorldCombatFeedbackController';
+import type { WorldCombatFeedbackController } from './world/WorldCombatFeedbackController';
 import type { WorldNetworkIntentController } from './world/WorldNetworkIntentController';
 import { WorldTurnStateController } from './world/WorldTurnStateController';
 import { WorldFieldFeedbackState } from './world/WorldFieldFeedbackState';
@@ -63,6 +63,7 @@ import { WorldEngineActionTurnFlow } from './world/WorldEngineActionTurnFlow';
 import { WorldEngineUpdateFlow } from './world/WorldEngineUpdateFlow';
 import { runWorldEngineStartupFlow } from './world/WorldEngineStartupFlow';
 import { createWorldEngineScenarioNetworkControllers } from './world/WorldEngineScenarioNetworkControllers';
+import { createWorldEngineWorldControllers } from './world/WorldEngineWorldControllers';
 import {
     getWorldBackpackCursedArtifactCount,
     getWorldPathPreviewTiles,
@@ -186,19 +187,6 @@ export class WorldEngine {
         this.playerData = playerData;
         this.gameManager = gameManager;
         this.worldMap = new WorldMap();
-        this.minimapUI = new MinimapUI({
-            getTile: (gx, gy) => this.worldMap.getTileAt(gx, gy),
-            getPlayerPos: () => ({ x: this.player.gridX, y: this.player.gridY }),
-            getBounds: () => this.worldMap.getBoundsTiles(),
-            getLandmarks: () => this.worldMap.getMapLandmarks(),
-            getEnemies: () => this.fieldEnemies.map((entry) => entry.enemy),
-            getExtractionZones: () => this.worldMap.extractionZones,
-            getLoot: () => this.worldMap.loot,
-        });
-        this.combatFeedbackController = new WorldCombatFeedbackController({
-            getWorldTime: () => this.worldTime,
-            shakeCamera: (amount, durationMs) => this.camera.shake(amount, durationMs),
-        });
         const initialHubTownId = this.getTownById(this.playerData.currentHubTownId)?.id ?? 'central_castle';
         this.raidSession = new WorldRaidSession(initialHubTownId);
         this.townSession = new WorldTownSession({
@@ -208,13 +196,21 @@ export class WorldEngine {
             onDeploy: () => this.beginRaidFromCurrentHub(),
             log: (message) => this.addCombatLog(message),
         });
-        this.templeController = new WorldTempleController({
+        const worldControllers = createWorldEngineWorldControllers({
+            camera: this.camera,
             party: this.party,
             raidSession: this.raidSession,
             fusionTempleUI: this.fusionTempleUI,
+            floatingText: this.floatingText,
+            effectManager: this.effectManager,
+            getWorldTime: () => this.worldTime,
             getWorldMap: () => this.worldMap,
+            getPlayer: () => this.player,
+            setPlayer: (player) => { this.player = player; },
             getControlledActor: () => this.getControlledActor(),
+            getPartyActors: () => this.partyActors,
             getFieldEnemies: () => this.fieldEnemies,
+            setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
             isNetworkRaid: () => this.isNetworkRaid,
             getPhase: () => this.currentPhase,
             setPhase: (phase) => { this.currentPhase = phase; },
@@ -222,19 +218,14 @@ export class WorldEngine {
             closeFieldOverlays: () => this.closeFieldOverlays(),
             clearFieldTurnState: () => this.clearFieldTurnState(),
             placePartyNear: (tile) => this.placePartyNear(tile),
-            setPlayer: (player) => { this.player = player; },
-            setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
             clearWorldLoot: () => { this.worldMap.loot = []; },
             selectActor: (actorId) => this.selectionController.selectActor(actorId),
-            log: (message) => this.addCombatLog(message),
+            addCombatLog: (message) => this.addCombatLog(message),
         });
-        this.restingController = new WorldRestingController({
-            getPartyActors: () => this.partyActors,
-            spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
-            spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
-            spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
-            log: (message) => this.addCombatLog(message),
-        });
+        this.minimapUI = worldControllers.minimapUI;
+        this.combatFeedbackController = worldControllers.combatFeedbackController;
+        this.templeController = worldControllers.templeController;
+        this.restingController = worldControllers.restingController;
         const scenarioNetworkControllers = createWorldEngineScenarioNetworkControllers({
             party: this.party,
             playerData: this.playerData,
