@@ -37,6 +37,10 @@ import {
 } from './world/WorldEngineFlows';
 import { runWorldEngineStartupFlow } from './world/WorldEngineStartupFlow';
 import {
+    createWorldEngineNetworkState,
+    type WorldEngineNetworkState,
+} from './world/WorldEngineNetworkState';
+import {
     createWorldEngineScenarioNetworkControllers,
     type WorldEngineScenarioNetworkControllers,
 } from './world/WorldEngineScenarioNetworkControllers';
@@ -104,11 +108,7 @@ export class WorldEngine {
     private partyActors: FieldActor[] = [];
     private fieldEnemies: FieldEnemy[] = [];
     private remotePartyActors: Map<string, FieldActor> = new Map();
-    private networkRaidClient: NetworkRaidClient | null = null;
-    private isNetworkRaid = false;
-    private isNetworkRaidConnecting = false;
-    private networkWasReconnecting = false;
-    private networkPlayerId: string | null = null;
+    private networkState?: WorldEngineNetworkState;
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
     private fusionTempleUI = new FusionTempleUI();
@@ -195,7 +195,7 @@ export class WorldEngine {
             getPartyActors: () => this.partyActors,
             getFieldEnemies: () => this.fieldEnemies,
             setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
-            isNetworkRaid: () => this.isNetworkRaid,
+            isNetworkRaid: () => this.getNetworkState().isRaid,
             getPhase: () => this.currentPhase,
             setPhase: (phase) => { this.currentPhase = phase; },
             beginRaidFromCurrentHub: (realm) => { void this.beginRaidFromCurrentHub(realm); },
@@ -244,9 +244,9 @@ export class WorldEngine {
             clearSelection: () => this.actionControllers.selectionController.clear(),
             hasSelection: () => this.actionControllers.selectionController.hasSelection(),
             selectLoot: (lootId) => this.actionControllers.selectionController.selectLoot(lootId),
-            isNetworkRaid: () => this.isNetworkRaid,
-            getNetworkRaidClient: () => this.networkRaidClient,
-            getNetworkPlayerId: () => this.networkPlayerId,
+            isNetworkRaid: () => this.getNetworkState().isRaid,
+            getNetworkRaidClient: () => this.getNetworkState().raidClient,
+            getNetworkPlayerId: () => this.getNetworkState().playerId,
             isRaidOutcomeVisible: () => this.raidLifecycleControllers.raidOutcomeController.isVisible(),
             setCurrentPhase: (phase) => { this.currentPhase = phase; },
             getTurnActionStates: (actor) => this.actionControllers.playerActionController.getTurnActionStates(actor),
@@ -280,7 +280,7 @@ export class WorldEngine {
             effectManager: this.effectManager,
             fieldFeedback: this.fieldFeedback,
             getWorldMap: () => this.worldMap,
-            isNetworkRaid: () => this.isNetworkRaid,
+            isNetworkRaid: () => this.getNetworkState().isRaid,
             getPartyActors: () => this.partyActors,
             getFieldEnemies: () => this.fieldEnemies,
             getControlledActor: () => this.getControlledActor(),
@@ -312,8 +312,8 @@ export class WorldEngine {
             floatingText: this.floatingText,
             effectManager: this.effectManager,
             getWorldMap: () => this.worldMap,
-            isNetworkRaid: () => this.isNetworkRaid,
-            getNetworkRaidClient: () => this.networkRaidClient,
+            isNetworkRaid: () => this.getNetworkState().isRaid,
+            getNetworkRaidClient: () => this.getNetworkState().raidClient,
             getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
             getControlledActor: () => this.getControlledActor(),
             getPartyActors: () => this.partyActors,
@@ -362,16 +362,16 @@ export class WorldEngine {
             getWorldMap: () => this.worldMap,
             getTownById: (townId) => this.getTownById(townId),
             getCurrentHubTown: () => this.getCurrentHubTown(),
-            getNetworkRaidClient: () => this.networkRaidClient,
-            setNetworkRaidClient: (client) => { this.networkRaidClient = client; },
-            isNetworkRaid: () => this.isNetworkRaid,
-            setIsNetworkRaid: (isNetworkRaid) => { this.isNetworkRaid = isNetworkRaid; },
-            isNetworkRaidConnecting: () => this.isNetworkRaidConnecting,
-            setIsNetworkRaidConnecting: (isConnecting) => { this.isNetworkRaidConnecting = isConnecting; },
-            isNetworkWasReconnecting: () => this.networkWasReconnecting,
-            setNetworkWasReconnecting: (wasReconnecting) => { this.networkWasReconnecting = wasReconnecting; },
-            getNetworkPlayerId: () => this.networkPlayerId,
-            setNetworkPlayerId: (playerId) => { this.networkPlayerId = playerId; },
+            getNetworkRaidClient: () => this.getNetworkState().raidClient,
+            setNetworkRaidClient: (client) => { this.getNetworkState().raidClient = client; },
+            isNetworkRaid: () => this.getNetworkState().isRaid,
+            setIsNetworkRaid: (isNetworkRaid) => { this.getNetworkState().isRaid = isNetworkRaid; },
+            isNetworkRaidConnecting: () => this.getNetworkState().isConnecting,
+            setIsNetworkRaidConnecting: (isConnecting) => { this.getNetworkState().isConnecting = isConnecting; },
+            isNetworkWasReconnecting: () => this.getNetworkState().wasReconnecting,
+            setNetworkWasReconnecting: (wasReconnecting) => { this.getNetworkState().wasReconnecting = wasReconnecting; },
+            getNetworkPlayerId: () => this.getNetworkState().playerId,
+            setNetworkPlayerId: (playerId) => { this.getNetworkState().playerId = playerId; },
             closeFieldOverlays: () => this.closeFieldOverlays(),
             clearFieldTurnState: () => this.clearFieldTurnState(),
             clearIntroTutorialStateForNetworkRaid: () => this.scenarioNetworkControllers.tutorialController.clearForNetworkRaid(),
@@ -478,7 +478,7 @@ export class WorldEngine {
             templeController: this.worldControllers.templeController,
             storyScenarioController: this.scenarioNetworkControllers.storyScenarioController,
             advanceWorldTime: (dt) => { this.worldTime += dt; },
-            isNetworkRaid: () => this.isNetworkRaid,
+            isNetworkRaid: () => this.getNetworkState().isRaid,
             updateNetworkRaid: (dt, input, camera) => this.updateNetworkRaid(dt, input, camera),
             updateStoryPresentation: (dt, camera) => this.updateStoryPresentation(dt, camera),
             refreshOpenActionMenuState: () => this.refreshOpenActionMenuState(),
@@ -781,7 +781,7 @@ export class WorldEngine {
             partyActors: this.partyActors,
             characters: this.party.getCharacters(),
             actor,
-            isNetworkRaid: this.isNetworkRaid,
+            isNetworkRaid: this.getNetworkState().isRaid,
         });
     }
 
@@ -790,7 +790,7 @@ export class WorldEngine {
             partyActors: this.partyActors,
             characters: this.party.getCharacters(),
             leaderActorId: this.fanfareLeaderActorId,
-            isNetworkRaid: this.isNetworkRaid,
+            isNetworkRaid: this.getNetworkState().isRaid,
         });
         if (!leader) this.fanfareLeaderActorId = null;
         return leader;
@@ -982,7 +982,7 @@ export class WorldEngine {
     private getSpendableActionGauge(): number {
         return getWorldSpendableActionGauge({
             turnStateController: this.turnStateController,
-            isNetworkRaid: this.isNetworkRaid,
+            isNetworkRaid: this.getNetworkState().isRaid,
             activeActor: this.getActivePartyTurnActor(),
         });
     }
@@ -1034,7 +1034,28 @@ export class WorldEngine {
     }
 
     public isNetworkRaidActive(): boolean {
-        return this.isNetworkRaid;
+        return this.getNetworkState().isRaid;
+    }
+
+    public get networkRaidClient(): NetworkRaidClient | null {
+        return this.getNetworkState().raidClient;
+    }
+
+    public set networkRaidClient(client: NetworkRaidClient | null) {
+        this.getNetworkState().raidClient = client;
+    }
+
+    public get isNetworkRaid(): boolean {
+        return this.getNetworkState().isRaid;
+    }
+
+    public set isNetworkRaid(isRaid: boolean) {
+        this.getNetworkState().isRaid = isRaid;
+    }
+
+    private getNetworkState(): WorldEngineNetworkState {
+        this.networkState ??= createWorldEngineNetworkState();
+        return this.networkState;
     }
 
 }
