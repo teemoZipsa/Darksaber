@@ -38,8 +38,12 @@ import type { WorldNetworkIntentController } from './world/WorldNetworkIntentCon
 import { WorldTurnStateController } from './world/WorldTurnStateController';
 import { WorldFieldFeedbackState } from './world/WorldFieldFeedbackState';
 import type { WorldEngineNetworkEvents } from './world/WorldEngineNetworkEvents';
-import { WorldEngineActionTurnFlow } from './world/WorldEngineActionTurnFlow';
-import { WorldEngineUpdateFlow } from './world/WorldEngineUpdateFlow';
+import type { WorldEngineActionTurnFlow } from './world/WorldEngineActionTurnFlow';
+import type { WorldEngineUpdateFlow } from './world/WorldEngineUpdateFlow';
+import {
+    createWorldEngineActionTurnFlow,
+    createWorldEngineUpdateFlow,
+} from './world/WorldEngineFlows';
 import { runWorldEngineStartupFlow } from './world/WorldEngineStartupFlow';
 import { createWorldEngineScenarioNetworkControllers } from './world/WorldEngineScenarioNetworkControllers';
 import { createWorldEngineWorldControllers } from './world/WorldEngineWorldControllers';
@@ -491,40 +495,31 @@ export class WorldEngine {
     }
 
     private getUpdateFlow(): WorldEngineUpdateFlow {
-        this.updateFlow ??= new WorldEngineUpdateFlow({
+        this.updateFlow ??= createWorldEngineUpdateFlow({
+            townSession: this.townSession,
+            raidOutcomeController: this.raidOutcomeController,
+            fusionTempleUI: this.fusionTempleUI,
+            tutorialController: this.tutorialController,
+            inputController: this.inputController,
+            effectManager: this.effectManager,
+            floatingText: this.floatingText,
+            playerActionController: this.playerActionController,
+            tacticalController: this.tacticalController,
+            raidLifecycleController: this.raidLifecycleController,
+            templeController: this.templeController,
+            storyScenarioController: this.storyScenarioController,
             advanceWorldTime: (dt) => { this.worldTime += dt; },
-            syncTown: () => this.townSession.sync(),
-            isRaidOutcomeVisible: () => this.raidOutcomeController.isVisible(),
-            updateRaidOutcomeInput: (input) => this.raidOutcomeController.updateInput(input),
-            isFusionTempleVisible: () => this.fusionTempleUI.isVisible(),
-            updateFusionTempleInput: (input) => this.fusionTempleUI.updateInput(input),
-            isTownVisible: () => this.townSession.isVisible(),
-            updateTownInput: (input) => this.townSession.updateInput(input),
-            isTutorialActive: () => this.tutorialController.isActive(),
-            isTutorialCompletePending: () => this.tutorialController.isCompletePending(),
-            updateTutorialCompletion: (input, dt, camera) => this.tutorialController.updateCompletion(input, dt, camera),
-            finishTutorial: (skipReward) => this.tutorialController.finish(skipReward),
-            addTutorialBlockedLog: () => this.tutorialController.addBlockedLog(),
             isNetworkRaid: () => this.isNetworkRaid,
             updateNetworkRaid: (dt, input, camera) => this.updateNetworkRaid(dt, input, camera),
             updateStoryPresentation: (dt, camera) => this.updateStoryPresentation(dt, camera),
             refreshOpenActionMenuState: () => this.refreshOpenActionMenuState(),
-            processInput: (input, camera) => this.inputController.process(input, camera),
             updatePartyMovement: (dt) => this.updatePartyMovement(dt),
             updateEnemyMovement: (dt) => this.updateEnemyMovement(dt),
             refreshEnemyIntentPreviews: () => this.refreshEnemyIntentPreviews(),
             updateRestingActors: (dt) => this.updateRestingActors(dt),
-            updateEffects: (dt) => this.effectManager.update(dt),
-            updateFloatingText: (dt) => this.floatingText.update(dt),
             updateAttackCues: (dt) => this.updateAttackCues(dt),
-            processQueuedIntents: () => this.playerActionController.processQueuedIntents(),
             refreshLootState: () => this.refreshLootState(),
-            updateTacticalMarkers: (dt) => this.tacticalController.updateMarkers(dt),
             startNextReadyTurn: () => this.startNextReadyTurn(),
-            updateRaidTimer: (dt) => this.raidLifecycleController.updateRaidTimer(dt),
-            checkRaidEndConditions: () => this.raidLifecycleController.checkRaidEndConditions(),
-            checkTempleArrival: () => this.templeController.checkArrival(),
-            checkDungeonArrival: () => this.storyScenarioController.checkDungeonArrival(),
             syncControlledPlayer: () => this.syncControlledPlayer(),
             followPlayerCamera: (camera, dt) => this.followPlayerCamera(camera, dt),
         });
@@ -863,32 +858,22 @@ export class WorldEngine {
     }
 
     private getActionTurnFlow(): WorldEngineActionTurnFlow {
-        this.actionTurnFlow ??= new WorldEngineActionTurnFlow({
+        this.actionTurnFlow ??= createWorldEngineActionTurnFlow({
+            actionMenuUI: this.actionMenuUI,
+            tutorialController: this.tutorialController,
+            turnStateController: this.turnStateController,
+            selectionController: this.selectionController,
+            playerActionController: this.playerActionController,
+            networkIntentController: this.networkIntentController,
+            magicController: this.magicController,
+            toolController: this.toolController,
             getControlledActor: () => this.getControlledActor(),
             getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
             getSpendableActionGauge: () => this.getSpendableActionGauge(),
-            getActionMenuIsOpen: () => this.actionMenuUI.getIsOpen(),
-            openActionMenu: (states) => this.actionMenuUI.open(states as ReturnType<WorldTutorialController['getActionMenuStates']>),
-            updateActionMenuStates: (states) => this.actionMenuUI.updateStates(states as ReturnType<WorldTutorialController['getActionMenuStates']>),
+            beginActorTurn: (actor) => this.beginActorTurn(actor),
             closeActionMenu: () => this.closeActionMenu(),
             closeTacticalMenu: () => this.closeTacticalMenu(),
-            selectActor: (actorId) => this.selectionController.selectActor(actorId),
-            getActionMenuStates: (actor) => this.tutorialController.getActionMenuStates(actor),
-            isTutorialActive: () => this.tutorialController.isActive(),
-            addTutorialBlockedLog: () => this.tutorialController.addBlockedLog(),
-            getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
-            beginActorTurn: (actor) => this.beginActorTurn(actor),
-            spendTurnAp: (cost, fallbackGauge) => this.turnStateController.spendAp(cost, fallbackGauge),
-            getRemainingActionPoints: () => this.turnStateController.getRemainingActionPoints(),
-            setRemainingActionPoints: (points) => this.turnStateController.setRemainingActionPoints(points),
-            getDismissCarryover: () => this.turnStateController.getDismissCarryover(),
-            endActiveTurn: () => this.turnStateController.endActiveTurn(),
-            hasExecutableAction: (actor) => this.playerActionController.hasExecutableAction(actor),
-            submitEndTurn: (actor, reason) => this.networkIntentController.submitEndTurn(actor, reason),
             clearActorIntent: (actor) => this.clearActorIntent(actor),
-            clearTargeting: () => this.playerActionController.clearTargeting(),
-            resetMagic: () => this.magicController.reset(),
-            resetTool: () => this.toolController?.reset(),
             log: (message) => this.addCombatLog(message),
         });
         return this.actionTurnFlow;

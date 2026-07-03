@@ -1,18 +1,19 @@
 import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
 import type { FieldActor, FieldTurnEndReason } from '../../field/FieldTypes';
 import { formatT, t } from '../../i18n/LanguageManager';
+import type { ActionMenuSlotState } from '../../ui/ActionMenuUI';
 
 export interface WorldEngineActionTurnFlowContext {
     getControlledActor: () => FieldActor | null;
     getActivePartyTurnActor: () => FieldActor | null;
     getSpendableActionGauge: () => number;
     getActionMenuIsOpen: () => boolean;
-    openActionMenu: (states: unknown) => void;
-    updateActionMenuStates: (states: unknown) => void;
+    openActionMenu: (states: ActionMenuSlotState[]) => void;
+    updateActionMenuStates: (states: ActionMenuSlotState[]) => void;
     closeActionMenu: () => void;
     closeTacticalMenu: () => void;
     selectActor: (actorId: string | null) => void;
-    getActionMenuStates: (actor: FieldActor) => unknown;
+    getActionMenuStates: (actor: FieldActor) => ActionMenuSlotState[];
     isTutorialActive: () => boolean;
     addTutorialBlockedLog: () => void;
     getActiveTurnActorId: () => string | null;
