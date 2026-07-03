@@ -38,6 +38,7 @@
 - [x] `WorldEngine` 시작 흐름 후속 정리: 생성자에 남은 튜토리얼/네트워크 resume/마을 진입 분기를 `WorldEngineStartupFlow`로 분리하고 단위 테스트로 순서를 고정.
 - [x] `WorldEngine` 시나리오/네트워크 배선 후속 정리: 스토리·튜토리얼·네트워크 sync/intent/event 컨트롤러 생성을 `WorldEngineScenarioNetworkControllers` factory로 분리해 생성자 충돌 표면을 축소.
 - [x] 클라이언트/서버 시나리오 규칙 공유화: 필드 이벤트의 USEITEM/RANDOM/MAGIC trigger 해석과 트랩 피해 계산을 `StoryScenarioFieldEventRules`로 통합해 로컬/네트워크 레이드 분기 위험을 축소.
+- [x] 장시간 DOM 오버레이 e2e 보강: DEV 튜토리얼 월드에서 인벤토리·마법 장착·일시정지 패널을 반복 토글하며 overlay registry, 화면 맞춤, 클라이언트 오류 부재를 검증.
 
 ---
 

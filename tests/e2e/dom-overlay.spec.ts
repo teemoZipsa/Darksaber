@@ -11,6 +11,27 @@ async function expectFitsViewport(page: Page, locator: Locator) {
     expect(box!.y + box!.height).toBeLessThanOrEqual(viewport!.height);
 }
 
+async function expectOverlayState(page: Page, expected: Partial<Record<string, boolean>>) {
+    await expect.poll(async () => page.evaluate(() => {
+        const gm = (window as unknown as {
+            __gm?: {
+                getOverlayOpenState: () => Record<string, boolean>;
+                isDomModalOpen: () => boolean;
+                state?: string;
+            };
+        }).__gm;
+        return {
+            state: gm?.state,
+            modal: gm?.isDomModalOpen() ?? false,
+            overlays: gm?.getOverlayOpenState() ?? {},
+        };
+    })).toMatchObject({
+        state: 'WORLD',
+        modal: Object.values(expected).some(Boolean),
+        overlays: expected,
+    });
+}
+
 test('dev town renders the React town overlay with embedded inventory', async ({ page }) => {
     await page.goto('/?devStart=town');
 
@@ -109,4 +130,55 @@ test('mobile viewport keeps town and standalone inventory overlays within the sc
     const inventory = page.locator('#ui-overlay .ds-scrim .ds-inv:not(.is-embedded)');
     await expect(inventory).toBeVisible({ timeout: 10_000 });
     await expectFitsViewport(page, inventory);
+});
+
+test('dev tutorial remains stable through repeated overlay toggles', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Sustained overlay churn is covered on the desktop browser project.');
+    test.setTimeout(45_000);
+
+    const clientErrors: string[] = [];
+    page.on('pageerror', (error) => clientErrors.push(error.message));
+    page.on('console', (message) => {
+        if (message.type() === 'error') clientErrors.push(message.text());
+    });
+
+    await page.goto('/?devStart=tutorial');
+    await expect(page.locator('#gameCanvas')).toBeVisible();
+    await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
+
+    for (let cycle = 0; cycle < 4; cycle++) {
+        await page.keyboard.press('KeyI');
+        const inventory = page.locator('#ui-overlay .ds-scrim .ds-inv:not(.is-embedded)');
+        await expect(inventory).toBeVisible({ timeout: 10_000 });
+        await expectFitsViewport(page, inventory);
+        await expectOverlayState(page, { inventory: true });
+        await page.waitForTimeout(250);
+        await page.getByRole('button', { name: /닫기|Close/ }).click();
+        await expect(inventory).toBeHidden();
+        await expectOverlayState(page, { inventory: false });
+
+        await page.keyboard.press('KeyK');
+        const magic = page.locator('#ui-overlay .ds-scrim .ds-panel').filter({ hasText: /마법 장착|Magic Loadout/ });
+        await expect(magic).toBeVisible({ timeout: 10_000 });
+        await expectFitsViewport(page, magic);
+        await expectOverlayState(page, { magic: true });
+        await page.waitForTimeout(250);
+        await page.getByRole('button', { name: /Close/ }).click();
+        await expect(magic).toBeHidden();
+        await expectOverlayState(page, { magic: false });
+
+        await page.evaluate(() => (window as unknown as { __gm?: { openPauseMenu: () => void } }).__gm?.openPauseMenu());
+        const pause = page.locator('#ui-overlay .ds-pause');
+        await expect(pause).toBeVisible({ timeout: 10_000 });
+        await expectFitsViewport(page, pause);
+        await expectOverlayState(page, { pause: true });
+        await page.waitForTimeout(250);
+        await page.getByRole('button', { name: /이어하기|Resume/ }).click();
+        await expect(pause).toBeHidden();
+        await expectOverlayState(page, { pause: false });
+    }
+
+    await page.waitForTimeout(1000);
+    await expectOverlayState(page, {});
+    expect(clientErrors).toEqual([]);
 });
