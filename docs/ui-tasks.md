@@ -97,6 +97,7 @@
 - [x] `WorldEngine` world/scenario bootstrap source adapter 추가. 월드 지원 컨트롤러의 runtime phase/time 연결과 scenario/network 컨트롤러의 kill effect feedback 연결을 각 컨트롤러 모듈의 source adapter로 옮겨 월드 부트스트랩 변경 시 `WorldEngine.ts` 수정 범위를 줄인다.
 - [x] dev tutorial script 하드코딩 제거. `dev:tutorial`의 직접 `/?devStart=tutorial` URL 호출을 `scripts/dev-town.mjs tutorial` 경로로 통합하고 launcher helper가 tutorial 모드를 생성하도록 테스트를 보강한다.
 - [x] i18n 동적 키 guard 보강. `t(variable)`/`formatT(variable)` 호출 목록을 AST 기반 허용 목록으로 고정해 새 동적 키 사용이 guard 갱신 없이 추가되지 않게 하고, 마법 강화 실패 사유 키를 export 상수 기반 데이터 guard에 포함한다.
+- [x] 전투 회복 아이템 공유 규칙 추가. 클라이언트 도구 컨트롤러와 서버 `useItem` intent가 같은 `FieldCombatItemRules` preview로 AP/회복 가능 여부/실제 회복량을 판정하게 해 규칙 drift를 줄인다.
 
 ---
 

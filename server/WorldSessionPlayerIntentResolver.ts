@@ -1,22 +1,17 @@
 import {
     createStatus,
-    getEffectiveStats,
     removeActionStanceStatusesFromCarrier,
     replaceActionStanceStatuses,
 } from '../src/combat/StatusEffects';
 import { getClassLine } from '../src/data/ClassTree';
-import {
-    getCombatRecovery,
-    getItemDef,
-    isCombatRecoveryConsumable,
-} from '../src/data/ItemDB';
+import { getItemDef } from '../src/data/ItemDB';
 import {
     ATTACK_AP_COST,
     DEFEND_ACTION_GAUGE_COST,
     MOVE_ACTION_GAUGE_COST,
     REST_ACTION_GAUGE_COST,
-    TOOL_ACTION_GAUGE_COST,
 } from '../src/field/FieldActionEconomy';
+import { previewCombatItemUse } from '../src/field/FieldCombatItemRules';
 import { manhattan, type FieldPassableQuery, type TilePoint } from '../src/field/FieldPathing';
 import { getTerrainMoveCost } from '../src/field/TerrainRules';
 import type {
@@ -152,18 +147,20 @@ export class WorldSessionPlayerIntentResolver {
         if ((player.carriedItems.get(itemId) ?? 0) <= 0) return reject(intentId, 'Item is not available on this server session.');
 
         const item = getItemDef(itemId);
-        if (!item || !isCombatRecoveryConsumable(item)) return reject(intentId, 'Item cannot be used in combat.');
-        if (actor.remainingAp < TOOL_ACTION_GAUGE_COST) return reject(intentId, 'No action available to use item.');
+        const preview = previewCombatItemUse({
+            item,
+            carrier: actor,
+            remainingAp: actor.remainingAp,
+        });
+        if (!preview.ok) {
+            if (preview.reason === 'notCombatRecovery') return reject(intentId, 'Item cannot be used in combat.');
+            if (preview.reason === 'noAction') return reject(intentId, 'No action available to use item.');
+            return reject(intentId, 'Item has no effect.');
+        }
 
-        const recovery = getCombatRecovery(item);
-        const effective = getEffectiveStats(actor.stats, actor.statuses);
-        const effectiveHp = Math.max(0, Math.min(recovery.hp, effective.maxHp - actor.stats.hp));
-        const effectiveMp = Math.max(0, Math.min(recovery.mp, effective.maxMp - actor.stats.mp));
-        if (effectiveHp <= 0 && effectiveMp <= 0) return reject(intentId, 'Item has no effect.');
-
-        this.context.spendActorGauge(actor, TOOL_ACTION_GAUGE_COST);
-        actor.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.stats.hp + effectiveHp));
-        actor.stats.mp = Math.max(0, Math.min(effective.maxMp, actor.stats.mp + effectiveMp));
+        this.context.spendActorGauge(actor, preview.apCost);
+        actor.stats.hp = preview.nextHp;
+        actor.stats.mp = preview.nextMp;
         addCarriedItemQuantity(player, itemId, -1);
         this.context.saveState.removeItemQuantity(player, itemId, 1);
         this.context.saveState.markDirty(player.id);
@@ -172,12 +169,12 @@ export class WorldSessionPlayerIntentResolver {
         const consumed: InventoryConsumedMessage = { type: 'INVENTORY_CONSUMED', itemId, quantity: 1 };
         const event: CombatEventMessage = {
             type: 'COMBAT_EVENT',
-            kind: effectiveHp > 0 ? 'heal' : 'status',
+            kind: preview.effectiveHp > 0 ? 'heal' : 'status',
             sourceId: actor.id,
             targetId: actor.id,
             sourceName: actor.name,
             targetName: actor.name,
-            value: effectiveHp > 0 ? effectiveHp : effectiveMp,
+            value: preview.effectiveHp > 0 ? preview.effectiveHp : preview.effectiveMp,
         };
         return { replies: [consumed], broadcasts: [event] };
     }

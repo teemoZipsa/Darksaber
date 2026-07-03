@@ -1,20 +1,19 @@
-import { getEffectiveStatsForCharacter } from '../../combat/StatusEffects';
 import { TOOL_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
-import type { FieldActor } from '../../field/FieldTypes';
 import {
-    getCombatRecovery,
-    isCombatRecoveryConsumable,
-    type ItemDef,
-} from '../../data/ItemDB';
+    isCombatRecoveryItem,
+    previewCombatItemRecovery,
+    previewCombatItemUse,
+    type CombatItemApplicationPreview,
+} from '../../field/FieldCombatItemRules';
+import type { FieldActor } from '../../field/FieldTypes';
+import type { ItemDef } from '../../data/ItemDB';
 import type { PlacedItem } from '../../inventory/GridInventory';
 import { ToolUI, type ToolOptionView } from '../../ui/ToolUI';
 import { formatT, t } from '../../i18n/LanguageManager';
 
-interface ToolUseCandidate {
+type ToolUseCandidate = CombatItemApplicationPreview & {
     placed: PlacedItem;
-    effectiveHp: number;
-    effectiveMp: number;
-}
+};
 
 export interface CombatToolAvailability {
     hasRecoveryConsumable: boolean;
@@ -110,14 +109,18 @@ export class WorldToolController {
     }
 
     public getCombatToolAvailability(actor: FieldActor): CombatToolAvailability {
-        const recoveryConsumables = this.context.getInventoryItems()
-            .filter((placed) => placed.quantity > 0 && isCombatRecoveryConsumable(placed.item));
+        let hasRecoveryConsumable = false;
+        let hasEffectiveRecovery = false;
+        for (const placed of this.context.getInventoryItems()) {
+            if (placed.quantity <= 0 || !isCombatRecoveryItem(placed.item)) continue;
+            hasRecoveryConsumable = true;
+            if (previewCombatItemRecovery(placed.item, actor.character).ok) {
+                hasEffectiveRecovery = true;
+            }
+        }
         return {
-            hasRecoveryConsumable: recoveryConsumables.length > 0,
-            hasEffectiveRecovery: recoveryConsumables.some((placed) => {
-                const recovery = this.getEffectiveRecovery(actor, placed.item);
-                return recovery.effectiveHp > 0 || recovery.effectiveMp > 0;
-            }),
+            hasRecoveryConsumable,
+            hasEffectiveRecovery,
         };
     }
 
@@ -138,14 +141,17 @@ export class WorldToolController {
             return;
         }
 
-        if (this.context.getRemainingActionPoints() < TOOL_ACTION_GAUGE_COST) {
-            this.sink.log(t('field.log.toolApLow'));
-            this.context.reopenActionMenu(actor);
-            return;
-        }
-
-        if (candidate.effectiveHp <= 0 && candidate.effectiveMp <= 0) {
-            this.sink.log(t('field.log.toolNoEffect'));
+        const preview = previewCombatItemUse({
+            item: candidate.placed.item,
+            carrier: actor.character,
+            remainingAp: this.context.getRemainingActionPoints(),
+        });
+        if (!preview.ok) {
+            this.sink.log(preview.reason === 'noAction'
+                ? t('field.log.toolApLow')
+                : preview.reason === 'noEffect'
+                    ? t('field.log.toolNoEffect')
+                    : t('field.log.toolUnavailable'));
             this.context.reopenActionMenu(actor);
             return;
         }
@@ -155,14 +161,14 @@ export class WorldToolController {
             return;
         }
 
-        if (!this.context.spendAp(TOOL_ACTION_GAUGE_COST)) {
+        if (!this.context.spendAp(preview.apCost)) {
             this.sink.log(t('field.log.toolApLow'));
             this.context.reopenActionMenu(actor);
             return;
         }
 
-        actor.character.stats.hp += candidate.effectiveHp;
-        actor.character.stats.mp += candidate.effectiveMp;
+        actor.character.stats.hp = preview.nextHp;
+        actor.character.stats.mp = preview.nextMp;
 
         if (candidate.placed.quantity > 1) {
             candidate.placed.quantity -= 1;
@@ -170,17 +176,17 @@ export class WorldToolController {
             this.context.removeInventoryItem(candidate.placed);
         }
 
-        if (candidate.effectiveHp > 0) {
-            this.sink.spawnHeal(actor.entity.gridX, actor.entity.gridY, candidate.effectiveHp);
+        if (preview.effectiveHp > 0) {
+            this.sink.spawnHeal(actor.entity.gridX, actor.entity.gridY, preview.effectiveHp);
         }
-        if (candidate.effectiveMp > 0) {
-            this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, `MP+${candidate.effectiveMp}`);
+        if (preview.effectiveMp > 0) {
+            this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, `MP+${preview.effectiveMp}`);
         }
         this.sink.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
         this.sink.log(formatT('field.log.toolUsed', {
             item: candidate.placed.item.nameKr,
-            hp: candidate.effectiveHp,
-            mp: candidate.effectiveMp,
+            hp: preview.effectiveHp,
+            mp: preview.effectiveMp,
         }));
         this.context.resumeOrEndActiveTurn(actor);
     }
@@ -219,21 +225,12 @@ export class WorldToolController {
     }
 
     private getToolCandidates(actor: FieldActor): ToolUseCandidate[] {
-        return this.context.getInventoryItems()
-            .filter((placed) => placed.quantity > 0 && isCombatRecoveryConsumable(placed.item))
-            .map((placed) => ({
-                placed,
-                ...this.getEffectiveRecovery(actor, placed.item),
-            }))
-            .filter((candidate) => candidate.effectiveHp > 0 || candidate.effectiveMp > 0);
-    }
-
-    private getEffectiveRecovery(actor: FieldActor, item: ItemDef): { effectiveHp: number; effectiveMp: number } {
-        const recovery = getCombatRecovery(item);
-        const effective = getEffectiveStatsForCharacter(actor.character);
-        return {
-            effectiveHp: Math.max(0, Math.min(recovery.hp, effective.maxHp - actor.character.stats.hp)),
-            effectiveMp: Math.max(0, Math.min(recovery.mp, effective.maxMp - actor.character.stats.mp)),
-        };
+        const candidates: ToolUseCandidate[] = [];
+        for (const placed of this.context.getInventoryItems()) {
+            if (placed.quantity <= 0) continue;
+            const preview = previewCombatItemRecovery(placed.item, actor.character);
+            if (preview.ok) candidates.push({ placed, ...preview });
+        }
+        return candidates;
     }
 }
