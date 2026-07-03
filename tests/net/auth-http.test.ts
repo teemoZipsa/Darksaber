@@ -197,7 +197,7 @@ test('character save HTTP rejects forbidden questState and unknown fields', asyn
     }
 });
 
-test('character save HTTP allows hub inventory patch and strips acquiredInRaid', async () => {
+test('character save HTTP allows paid hub inventory patch and strips acquiredInRaid', async () => {
     const harness = await createHarness();
     try {
         const registered = await harness.request('/auth/register', {
@@ -216,7 +216,7 @@ test('character save HTTP allows hub inventory patch and strips acquiredInRaid',
             body: {
                 expectedRevision: 1,
                 save: {
-                    questState: { gold: 750 },
+                    questState: { gold: 490 },
                     inventory: {
                         width: 10,
                         height: 6,
@@ -234,10 +234,51 @@ test('character save HTTP allows hub inventory patch and strips acquiredInRaid',
         });
         assert.equal(updated.status, 200);
         const save = asRecord(updated.body.save);
-        assert.equal((asRecord(save.questState).gold), 750);
+        assert.equal((asRecord(save.questState).gold), 490);
         const items = asRecord(save.inventory).items as Array<Record<string, unknown>>;
         assert.equal(items.length, 1);
         assert.equal(items[0]?.acquiredInRaid, undefined);
+    } finally {
+        await harness.close();
+    }
+});
+
+test('character save HTTP rejects free hub gold and item creation', async () => {
+    const harness = await createHarness();
+    try {
+        const registered = await harness.request('/auth/register', {
+            method: 'POST',
+            body: { loginName: 'hubforge01', password: 'password-1234' },
+        });
+        const created = await harness.request('/characters', {
+            method: 'POST',
+            accessToken: String(registered.body.accessToken),
+            body: { name: 'Forger', classKey: 'infantry', gender: 'M' },
+        });
+        const characterId = String(asRecord(created.body.character).id);
+        const forged = await harness.request(`/characters/${characterId}/save`, {
+            method: 'PATCH',
+            accessToken: String(registered.body.accessToken),
+            body: {
+                expectedRevision: 1,
+                save: {
+                    questState: { gold: 999_999 },
+                    stashSnapshot: {
+                        width: 15,
+                        height: 10,
+                        items: [{
+                            itemId: 'cursed_artifact',
+                            gridX: 0,
+                            gridY: 0,
+                            quantity: 1,
+                            durability: 1,
+                        }],
+                    },
+                },
+            },
+        });
+        assert.equal(forged.status, 400);
+        assert.equal(forged.body.error, 'invalid_hub_economy_patch');
     } finally {
         await harness.close();
     }
@@ -322,7 +363,7 @@ test('character save HTTP preserves authoritative roster fields', async () => {
         assert.equal(updatedCharacter.level, originalCharacter.level);
         assert.equal(updatedCharacter.exp, originalCharacter.exp);
         assert.deepEqual(updatedCharacter.baseStats, originalCharacter.baseStats);
-        assert.equal(updatedCharacter.skillUpgradeLevels, undefined);
+        assert.deepEqual(updatedCharacter.skillUpgradeLevels, { inf_t1: 5 });
         assert.ok(Array.isArray(updatedCharacter.magicLoadout));
     } finally {
         await harness.close();

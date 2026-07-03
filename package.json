@@ -1,7 +1,7 @@
 {
-  "name": "sin-eater",
+  "name": "darksaber",
   "version": "0.1.0",
-  "description": "Sin Eater — Grid-based SRPG with growth weapon system",
+  "description": "Darksaber : Extraction — grid-based SRPG extraction RPG",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -74,7 +74,7 @@
     "srpg",
     "grid",
     "rpg",
-    "sin-eater"
+    "darksaber"
   ],
   "author": "teemoZipsa",
   "license": "MIT",

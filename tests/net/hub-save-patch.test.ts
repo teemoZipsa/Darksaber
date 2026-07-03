@@ -55,6 +55,65 @@ test('buildHubSavePatch floors negative gold to zero', () => {
     assert.equal((patch.questState as Record<string, unknown>).gold, 0);
 });
 
+test('buildHubSavePatch rejects free hub gold and item creation', () => {
+    const current = createDefaultCharacterSave(authCharacter());
+    assert.throws(
+        () => buildHubSavePatch({
+            questState: { gold: 999_999 },
+            stashSnapshot: {
+                width: 15,
+                height: 10,
+                items: [{
+                    itemId: 'cursed_artifact',
+                    gridX: 0,
+                    gridY: 0,
+                    quantity: 1,
+                    durability: 1,
+                }],
+            },
+        }, current),
+        (error: unknown) => error instanceof HttpError && error.code === 'invalid_hub_economy_patch',
+    );
+});
+
+test('buildHubSavePatch allows paid item additions', () => {
+    const current = createDefaultCharacterSave(authCharacter());
+    const patch = buildHubSavePatch({
+        questState: { gold: 490 },
+        stashSnapshot: {
+            width: 15,
+            height: 10,
+            items: [{
+                itemId: 'herb_cheap',
+                gridX: 0,
+                gridY: 0,
+                quantity: 1,
+                durability: 1,
+            }],
+        },
+    }, current);
+    assert.equal((patch.questState as Record<string, unknown>).gold, 490);
+    assert.equal(patch.stashSnapshot?.items[0]?.itemId, 'herb_cheap');
+});
+
+test('buildHubSavePatch preserves existing market contracts instead of accepting forged ones', () => {
+    const current = createDefaultCharacterSave(authCharacter());
+    const patch = buildHubSavePatch({
+        questState: {
+            marketCycle: 1,
+            marketContracts: [{
+                id: 'forged-contract',
+                targetTownId: 'central_castle',
+                itemId: 'trade_forest_resin',
+                remainingQuantity: 1,
+                bonusPerUnit: 999_999,
+                expiresCycle: 99,
+            }],
+        },
+    }, current);
+    assert.deepEqual((patch.questState as Record<string, unknown>).marketContracts, []);
+});
+
 test('buildHubSavePatch accepts normalized facility upgrades', () => {
     const current = createDefaultCharacterSave(authCharacter());
     const patch = buildHubSavePatch({
@@ -70,4 +129,26 @@ test('buildHubSavePatch accepts normalized facility upgrades', () => {
         infirmary: 1,
         workshop: 2,
     });
+});
+
+test('buildHubSavePatch persists normalized learned skill upgrade levels', () => {
+    const current = createDefaultCharacterSave(authCharacter());
+    const patch = buildHubSavePatch({
+        rosterSnapshot: {
+            characters: [{
+                id: 'char-1',
+                magicLoadout: ['inf_t1'],
+                skillUpgradeLevels: {
+                    inf_t1: 9,
+                    mag_t1: 3,
+                    not_a_skill: 4,
+                    inf_t2: '5',
+                },
+            }],
+        },
+    }, current);
+
+    const roster = patch.rosterSnapshot as Record<string, unknown>;
+    const character = (roster.characters as Array<Record<string, unknown>>)[0];
+    assert.deepEqual(character.skillUpgradeLevels, { inf_t1: 5 });
 });

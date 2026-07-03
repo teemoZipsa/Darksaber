@@ -93,6 +93,7 @@ export async function replayWorldSaveSpool(
             applied++;
             if (entry.reason === 'dirty_recovery' && entry.resumeToken) recoveredResumeTokens.push(entry.resumeToken);
         } catch (error) {
+            if (error instanceof UnrecoverableWorldSaveSpoolError) spool.remove(entry.key);
             failed++;
             options.logger?.(`Failed to replay pending world save ${entry.key}: ${error instanceof Error ? error.message : error}`);
         }
@@ -117,11 +118,14 @@ async function applyPendingWorldSave(
         if (result.status === 'conflict') {
             expectedRevision = result.currentRevision;
         } else {
-            throw new Error('character save was not found');
+            throw new UnrecoverableWorldSaveSpoolError('character save was not found');
         }
         if (attempt < retryLimit - 1 && retryBaseMs > 0) await sleep(retryBaseMs * (attempt + 1));
     }
     throw new Error('pending world save retry limit exhausted');
+}
+
+class UnrecoverableWorldSaveSpoolError extends Error {
 }
 
 function readSpoolFile(persistPath: string): WorldSaveSpoolFile | null {

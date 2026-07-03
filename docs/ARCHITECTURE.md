@@ -9,7 +9,7 @@
 
 ## 2. Server Architecture (Phase 4)
 - **Node.js**: The central lightweight game server.
-- **WebSockets (Socket.io)**: Crucial for real-time grid positioning, chat, and Action Point synchronization without HTTP overhead.
+- **WebSockets (`ws`)**: Crucial for real-time grid positioning, chat, and Action Point synchronization without HTTP overhead.
 - **Authoritative Server**: The server independently verifies pathfinding, line-of-sight, and combat formulas to prevent client-side memory manipulation or cheating.
 
 ## 3. Core Data Structures

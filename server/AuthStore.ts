@@ -144,6 +144,7 @@ export function createDefaultCharacterSave(character: AuthCharacter, gender: str
         },
         questState: {
             completedQuestIds: [],
+            gold: 500,
         },
         inventory: {
             width: 10,

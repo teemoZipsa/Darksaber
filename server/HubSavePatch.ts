@@ -1,12 +1,14 @@
 import { ITEMS } from '../src/data/ItemDB';
 import { normalizeFacilityUpgradeState } from '../src/data/FacilityUpgradeData';
 import {
+    type MarketContract,
     normalizeMarketContracts,
     normalizeMarketCycle,
     normalizeMarketState,
 } from '../src/data/MarketData';
+import { getSellPrice, TRADE_GOOD_SELL_MULTIPLIERS } from '../src/data/ShopData';
 import { isTownId } from '../src/data/TownFacilityData';
-import { normalizeLoadout } from '../src/magic/MagicLoadout';
+import { getLearnedSkillIdSet, normalizeLoadout, normalizeUpgradeLevels } from '../src/magic/MagicLoadout';
 import type { CharacterSave, CharacterSavePatch, InventorySaveSnapshot } from '../src/shared/CharacterSave';
 import { HttpError } from './HttpError';
 import { normalizeInventorySnapshot } from './AuthStore';
@@ -69,6 +71,7 @@ export function buildHubSavePatch(
     if (isRecord(patch.rosterSnapshot)) {
         next.rosterSnapshot = mergeClientRosterSnapshot(currentSave.rosterSnapshot, patch.rosterSnapshot);
     }
+    assertNoFreeHubEconomyGain(next, currentSave);
     return next;
 }
 
@@ -121,8 +124,9 @@ function sanitizeClientQuestState(
         next.marketCycle = normalizeMarketCycle(incoming.marketCycle);
     }
     if (Array.isArray(incoming.marketContracts)) {
-        next.marketContracts = normalizeMarketContracts(
+        next.marketContracts = sanitizeClientMarketContracts(
             incoming.marketContracts,
+            current.marketContracts,
             normalizeMarketCycle(next.marketCycle),
         );
     }
@@ -146,6 +150,23 @@ function sanitizeClientInventorySnapshot(value: Record<string, unknown>): Invent
         })
         : [];
     return normalizeInventorySnapshot({ width, height, items: items as InventorySaveSnapshot['items'] });
+}
+
+function sanitizeClientMarketContracts(
+    incoming: unknown[],
+    currentRaw: unknown,
+    marketCycle: number,
+): MarketContract[] {
+    const current = normalizeMarketContracts(currentRaw, marketCycle);
+    const incomingById = new Map(
+        normalizeMarketContracts(incoming, marketCycle).map((contract) => [contract.id, contract])
+    );
+    return current.flatMap((contract) => {
+        const incomingContract = incomingById.get(contract.id);
+        if (!incomingContract) return [contract];
+        const remainingQuantity = Math.min(contract.remainingQuantity, incomingContract.remainingQuantity);
+        return remainingQuantity > 0 ? [{ ...contract, remainingQuantity }] : [];
+    });
 }
 
 function sanitizeEquipment(value: Record<string, unknown>): Record<string, unknown> {
@@ -222,11 +243,29 @@ function mergeClientRosterCharacter(
     incoming: Record<string, unknown>,
 ): Record<string, unknown> {
     const owner = readLoadoutOwner(current);
-    if (!owner || !Array.isArray(incoming.magicLoadout)) return current;
-    return {
-        ...current,
-        magicLoadout: normalizeLoadout(readStringArray(incoming.magicLoadout), owner),
-    };
+    if (!owner) return current;
+    const next: Record<string, unknown> = { ...current };
+    if (Array.isArray(incoming.magicLoadout)) {
+        next.magicLoadout = normalizeLoadout(readStringArray(incoming.magicLoadout), owner);
+    }
+    if (isRecord(incoming.skillUpgradeLevels)) {
+        const learned = getLearnedSkillIdSet(owner);
+        const normalized = normalizeUpgradeLevels(readNumberRecord(incoming.skillUpgradeLevels));
+        const upgrades: Record<string, number> = {};
+        for (const [skillId, level] of Object.entries(normalized)) {
+            if (learned.has(skillId)) upgrades[skillId] = level;
+        }
+        next.skillUpgradeLevels = upgrades;
+    }
+    return next;
+}
+
+function readNumberRecord(value: Record<string, unknown>): Record<string, number> {
+    const result: Record<string, number> = {};
+    for (const [key, raw] of Object.entries(value)) {
+        if (typeof raw === 'number' && Number.isFinite(raw)) result[key] = raw;
+    }
+    return result;
 }
 
 function readLoadoutOwner(character: Record<string, unknown>): { classLineId: string; currentTier: number } | null {
@@ -271,4 +310,87 @@ function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function assertNoFreeHubEconomyGain(patch: CharacterSavePatch, currentSave: CharacterSave): void {
+    const nextQuestState = isRecord(patch.questState) ? patch.questState : currentSave.questState;
+    const currentGold = readGold(currentSave.questState);
+    const nextGold = readGold(nextQuestState);
+    const currentCounts = countSaveItems(currentSave.inventory, currentSave.stashSnapshot, currentSave.equipment);
+    const nextCounts = countSaveItems(
+        patch.inventory ?? currentSave.inventory,
+        patch.stashSnapshot ?? currentSave.stashSnapshot,
+        isRecord(patch.equipment) ? patch.equipment : currentSave.equipment,
+    );
+
+    let requiredSpend = 0;
+    let allowedEarn = 0;
+    const itemIds = new Set([...currentCounts.keys(), ...nextCounts.keys()]);
+    for (const itemId of itemIds) {
+        const currentQuantity = currentCounts.get(itemId) ?? 0;
+        const nextQuantity = nextCounts.get(itemId) ?? 0;
+        const delta = nextQuantity - currentQuantity;
+        if (delta > 0) requiredSpend += delta * getHubBuyValue(itemId);
+        else if (delta < 0) allowedEarn += Math.abs(delta) * getHubSellCredit(itemId, currentSave.questState);
+    }
+
+    const goldDelta = nextGold - currentGold;
+    if (goldDelta > allowedEarn - requiredSpend) {
+        throw new HttpError(400, 'invalid_hub_economy_patch', 'Hub save patch creates gold or items without a matching cost.');
+    }
+}
+
+function readGold(questState: Record<string, unknown>): number {
+    return typeof questState.gold === 'number' && Number.isFinite(questState.gold)
+        ? Math.max(0, Math.floor(questState.gold))
+        : 500;
+}
+
+function countSaveItems(
+    inventory: InventorySaveSnapshot,
+    stash: InventorySaveSnapshot,
+    equipment: Record<string, unknown>,
+): Map<string, number> {
+    const counts = new Map<string, number>();
+    addInventoryCounts(counts, inventory);
+    addInventoryCounts(counts, stash);
+    for (const raw of Object.values(equipment)) {
+        if (!isRecord(raw) || typeof raw.itemId !== 'string') continue;
+        addItemCount(counts, raw.itemId, 1);
+        if (Array.isArray(raw.sockets)) {
+            for (const socketId of raw.sockets) {
+                if (typeof socketId === 'string') addItemCount(counts, socketId, 1);
+            }
+        }
+    }
+    return counts;
+}
+
+function addInventoryCounts(counts: Map<string, number>, snapshot: InventorySaveSnapshot): void {
+    for (const item of snapshot.items) {
+        addItemCount(counts, item.itemId, item.quantity);
+        for (const socketId of item.sockets ?? []) addItemCount(counts, socketId, 1);
+    }
+}
+
+function addItemCount(counts: Map<string, number>, itemId: string, quantity: unknown): void {
+    if (!ITEMS.some((item) => item.id === itemId)) return;
+    const amount = typeof quantity === 'number' && Number.isFinite(quantity) ? Math.max(1, Math.floor(quantity)) : 1;
+    counts.set(itemId, (counts.get(itemId) ?? 0) + amount);
+}
+
+function getHubBuyValue(itemId: string): number {
+    const item = ITEMS.find((candidate) => candidate.id === itemId);
+    return Math.max(1, Math.floor(item?.buyPrice ?? item?.baseValue ?? 10));
+}
+
+function getHubSellCredit(itemId: string, currentQuestState: Record<string, unknown>): number {
+    const item = ITEMS.find((candidate) => candidate.id === itemId);
+    if (!item) return 0;
+    const towns = Object.keys(TRADE_GOOD_SELL_MULTIPLIERS[itemId] ?? {});
+    const sellPrices = [getSellPrice(item), ...towns.map((townId) => getSellPrice(item, townId))];
+    const contractBonus = normalizeMarketContracts(currentQuestState.marketContracts, normalizeMarketCycle(currentQuestState.marketCycle))
+        .filter((contract) => contract.itemId === itemId)
+        .reduce((max, contract) => Math.max(max, contract.bonusPerUnit), 0);
+    return Math.max(0, ...sellPrices) + contractBonus;
 }

@@ -84,3 +84,32 @@ test('world save spool replay retries revision conflicts and clears successful e
         rmSync(dir, { recursive: true, force: true });
     }
 });
+
+test('world save spool replay clears unrecoverable missing character entries', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'darksaber-world-spool-'));
+    const persistPath = join(dir, 'world-save-spool.json');
+    try {
+        const store = new InMemoryAuthStore();
+        await store.initialize();
+        const spool = new WorldSaveSpool({ persistPath });
+        spool.upsert({
+            key: 'mortal:player_missing',
+            sessionKey: 'mortal',
+            playerId: 'player_missing',
+            accountId: 'account_missing',
+            characterId: 'character_missing',
+            expectedRevision: 1,
+            reason: 'dirty_recovery',
+            patch: { hubLocation: { townId: 'central_castle' } },
+        });
+
+        const messages: string[] = [];
+        const result = await replayWorldSaveSpool(store, spool, { logger: (message) => messages.push(message) });
+
+        assert.deepEqual(result, { applied: 0, failed: 1, recoveredResumeTokens: [] });
+        assert.deepEqual(new WorldSaveSpool({ persistPath }).list(), []);
+        assert.match(messages[0] ?? '', /character save was not found/);
+    } finally {
+        rmSync(dir, { recursive: true, force: true });
+    }
+});

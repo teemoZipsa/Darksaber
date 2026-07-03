@@ -1,4 +1,4 @@
-# ⚔️ Sin Eater : Prologue
+# ⚔️ Darksaber : Extraction
 
 > "이곳은 아직 미완의 전장. 생존과 탈출의 룰만 덩그러니 놓여있을 뿐입니다."
 

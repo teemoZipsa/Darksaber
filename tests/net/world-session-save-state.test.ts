@@ -199,7 +199,7 @@ test('final world save patch grants the first-survival bonus exactly once', () =
     saveState.captureFinalPatch(firstPlayer, 'central_castle', true);
     const firstPatch = saveState.consumeFinalPatch(firstPlayer.id);
     assert.ok(firstPatch);
-    assert.equal(firstPatch.questState?.gold, FIRST_SURVIVAL_GOLD_REWARD);
+    assert.equal(firstPatch.questState?.gold, 500 + FIRST_SURVIVAL_GOLD_REWARD);
     assert.ok((firstPatch.questState?.completedQuestIds as string[]).includes(FIRST_SURVIVAL_QUEST_ID));
 
     // A character that already holds the marker must not be re-credited.
