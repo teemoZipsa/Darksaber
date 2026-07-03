@@ -24,6 +24,10 @@ import { WorldTownSession } from './world/WorldTownSession';
 import type { CombatResult } from './world/WorldCombatController';
 import type { WorldTurnStateController } from './world/WorldTurnStateController';
 import {
+    createWorldEngineControllerState,
+    type WorldEngineControllerState,
+} from './world/WorldEngineControllerState';
+import {
     createWorldEngineFieldState,
     type WorldEngineFieldState,
 } from './world/WorldEngineFieldState';
@@ -122,12 +126,7 @@ export class WorldEngine {
     private raidSession: WorldRaidSession;
     private runtimeState?: WorldEngineRuntimeState;
     private flowState?: WorldEngineFlowState;
-    private combatControllers!: WorldEngineCombatControllers;
-    private actionControllers!: WorldEngineActionControllers;
-    private raidLifecycleControllers!: WorldEngineRaidLifecycleControllers;
-    private presentationControllers!: WorldEnginePresentationControllers;
-    private scenarioNetworkControllers!: WorldEngineScenarioNetworkControllers;
-    private worldControllers!: WorldEngineWorldControllers;
+    private controllerState?: WorldEngineControllerState;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -1088,6 +1087,54 @@ export class WorldEngine {
         return this.getUiState().fieldFeedback;
     }
 
+    private get combatControllers(): WorldEngineCombatControllers {
+        return this.getControllerState().combatControllers!;
+    }
+
+    private set combatControllers(controllers: WorldEngineCombatControllers) {
+        this.getControllerState().combatControllers = controllers;
+    }
+
+    private get actionControllers(): WorldEngineActionControllers {
+        return this.getControllerState().actionControllers!;
+    }
+
+    private set actionControllers(controllers: WorldEngineActionControllers) {
+        this.getControllerState().actionControllers = controllers;
+    }
+
+    private get raidLifecycleControllers(): WorldEngineRaidLifecycleControllers {
+        return this.getControllerState().raidLifecycleControllers!;
+    }
+
+    private set raidLifecycleControllers(controllers: WorldEngineRaidLifecycleControllers) {
+        this.getControllerState().raidLifecycleControllers = controllers;
+    }
+
+    private get presentationControllers(): WorldEnginePresentationControllers {
+        return this.getControllerState().presentationControllers!;
+    }
+
+    private set presentationControllers(controllers: WorldEnginePresentationControllers) {
+        this.getControllerState().presentationControllers = controllers;
+    }
+
+    private get scenarioNetworkControllers(): WorldEngineScenarioNetworkControllers {
+        return this.getControllerState().scenarioNetworkControllers!;
+    }
+
+    private set scenarioNetworkControllers(controllers: WorldEngineScenarioNetworkControllers) {
+        this.getControllerState().scenarioNetworkControllers = controllers;
+    }
+
+    private get worldControllers(): WorldEngineWorldControllers {
+        return this.getControllerState().worldControllers!;
+    }
+
+    private set worldControllers(controllers: WorldEngineWorldControllers) {
+        this.getControllerState().worldControllers = controllers;
+    }
+
     private getNetworkState(): WorldEngineNetworkState {
         this.networkState ??= createWorldEngineNetworkState();
         return this.networkState;
@@ -1126,6 +1173,11 @@ export class WorldEngine {
             };
         }
         return this.flowState;
+    }
+
+    private getControllerState(): WorldEngineControllerState {
+        this.controllerState ??= createWorldEngineControllerState();
+        return this.controllerState;
     }
 
     private getUiState(): WorldEngineUiState {
