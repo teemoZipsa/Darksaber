@@ -17,7 +17,6 @@ import {
 } from '../raid/CursedArtifact';
 import { getRaidModifierEffects } from '../raid/RaidModifiers';
 import { PlayerData } from '../data/PlayerData';
-import { getItemDef } from '../data/ItemDB';
 import { formatT, t } from '../i18n/LanguageManager';
 import { removeStatusesFromCarrier } from '../combat/StatusEffects';
 import { ActionMenuUI } from '../ui/ActionMenuUI';
@@ -46,24 +45,24 @@ import { WorldSelectionController } from './world/WorldSelectionController';
 import { WorldFieldSpawnController } from './world/WorldFieldSpawnController';
 import { WorldRenderController } from './world/WorldRenderController';
 import { WorldInputController } from './world/WorldInputController';
-import { WorldStoryScenarioController } from './world/WorldStoryScenarioController';
-import { WorldNetworkSyncController } from './world/WorldNetworkSyncController';
-import { WorldTutorialController } from './world/WorldTutorialController';
+import type { WorldStoryScenarioController } from './world/WorldStoryScenarioController';
+import type { WorldNetworkSyncController } from './world/WorldNetworkSyncController';
+import type { WorldTutorialController } from './world/WorldTutorialController';
 import { WorldRaidLifecycleController } from './world/WorldRaidLifecycleController';
 import { WorldTempleController } from './world/WorldTempleController';
 import { WorldRestingController } from './world/WorldRestingController';
 import { WorldLootController } from './world/WorldLootController';
 import { WorldCombatFeedbackController } from './world/WorldCombatFeedbackController';
-import { WorldNetworkIntentController } from './world/WorldNetworkIntentController';
+import type { WorldNetworkIntentController } from './world/WorldNetworkIntentController';
 import { WorldTurnStateController } from './world/WorldTurnStateController';
 import { WorldFieldFeedbackState } from './world/WorldFieldFeedbackState';
-import { WorldEngineNetworkEvents } from './world/WorldEngineNetworkEvents';
+import type { WorldEngineNetworkEvents } from './world/WorldEngineNetworkEvents';
 import { WorldTurnStartResolver } from './world/WorldTurnStartResolver';
 import { WorldEngineCombatFlow } from './world/WorldEngineCombatFlow';
 import { WorldEngineActionTurnFlow } from './world/WorldEngineActionTurnFlow';
 import { WorldEngineUpdateFlow } from './world/WorldEngineUpdateFlow';
 import { runWorldEngineStartupFlow } from './world/WorldEngineStartupFlow';
-import { applyMonsterSprite } from './world/NetworkSnapshotMapping';
+import { createWorldEngineScenarioNetworkControllers } from './world/WorldEngineScenarioNetworkControllers';
 import {
     getWorldBackpackCursedArtifactCount,
     getWorldPathPreviewTiles,
@@ -80,9 +79,7 @@ import {
 } from './world/WorldEngineActorQueries';
 import type { CombatFeedbackKind } from './world/CombatFeedback';
 import {
-    actorTile,
     directionFromTo,
-    enemyTile,
     getActorTerrainMovementBudget,
     isActorAt,
     isEntityMoving,
@@ -238,162 +235,66 @@ export class WorldEngine {
             spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
             log: (message) => this.addCombatLog(message),
         });
-        this.storyScenarioController = new WorldStoryScenarioController({
-            playerData: this.playerData,
-            raidSession: this.raidSession,
-            getWorldMap: () => this.worldMap,
-            setWorldMap: (worldMap) => { this.worldMap = worldMap; },
-            getPlayer: () => this.player,
-            setPlayer: (player) => { this.player = player; },
-            getFieldEnemies: () => this.fieldEnemies,
-            setFieldEnemies: (fieldEnemies) => { this.fieldEnemies = fieldEnemies; },
-            getControlledActor: () => this.getControlledActor(),
-            actorTile: (actor) => actorTile(actor),
-            placePartyNear: (tile) => this.placePartyNear(tile),
-            clearFieldTurnState: () => this.clearFieldTurnState(),
-            closeFieldOverlays: () => this.closeFieldOverlays(),
-            selectActor: (actorId) => this.selectionController.selectActor(actorId),
-            clearSelection: () => this.selectionController.clear(),
-            applyMonsterSprite: (enemy, monsterId) => applyMonsterSprite(enemy, monsterId),
-            isEntityMoving: (entity) => isEntityMoving(entity),
-            isNetworkRaid: () => this.isNetworkRaid,
-            getNetworkRaidClient: () => this.networkRaidClient,
-            isRaidOutcomeVisible: () => this.raidOutcomeController.isVisible(),
-            isTownVisible: () => this.townSession.isVisible(),
-            isFusionTempleVisible: () => this.fusionTempleUI.isVisible(),
-            followCameraToPlayer: () => {
-                this.camera.followTile(this.player.gridX, this.player.gridY);
-                this.camera.snapToTarget();
-            },
-            focusCameraOnTile: (tile) => {
-                this.camera.followTile(tile.x, tile.y);
-                this.camera.snapToTarget();
-            },
-            autoPlaceRewardItem: (itemId) => {
-                const item = getItemDef(itemId);
-                if (!item) return false;
-                const placed = this.gameManager.inventory.autoPlace(item);
-                if (placed) placed.acquiredInRaid = true;
-                return Boolean(placed);
-            },
-            hasScenarioItem: (itemId) => this.gameManager.inventory.items.some((placed) => placed.item.id === itemId && placed.quantity > 0),
-            consumeScenarioItem: (itemId) => {
-                const placed = this.gameManager.inventory.items.find((entry) => entry.item.id === itemId && entry.quantity > 0);
-                if (!placed) return false;
-                if (placed.quantity > 1) {
-                    placed.quantity -= 1;
-                    return true;
-                }
-                this.gameManager.inventory.remove(placed);
-                return true;
-            },
-            rollScenarioRandom: () => Math.random(),
-            spawnDamage: (x, y, amount) => this.floatingText.spawnDamage(x, y, amount, false, false),
-            log: (message) => this.addCombatLog(message),
-        });
-        this.tutorialController = new WorldTutorialController({
+        const scenarioNetworkControllers = createWorldEngineScenarioNetworkControllers({
             party: this.party,
+            playerData: this.playerData,
+            gameManager: this.gameManager,
+            camera: this.camera,
             raidSession: this.raidSession,
             townSession: this.townSession,
+            fusionTempleUI: this.fusionTempleUI,
+            actionMenuUI: this.actionMenuUI,
+            floatingText: this.floatingText,
+            effectManager: this.effectManager,
+            fieldFeedback: this.fieldFeedback,
+            turnStateController: this.turnStateController,
             getWorldMap: () => this.worldMap,
             setWorldMap: (worldMap) => { this.worldMap = worldMap; },
-            getCurrentHubTown: () => this.getCurrentHubTown(),
-            openTown: (town) => this.openTown(town),
-            closeFieldOverlays: () => this.closeFieldOverlays(),
-            resetStoryVisitState: () => this.storyScenarioController.resetVisitState(),
-            resetPartyForRaid: () => this.party.resetForNewRaid(),
-            applyPendingRestForRaidStart: () => this.townSession.applyPendingRestForRaidStart(),
-            clearRemotePartyActors: () => this.remotePartyActors.clear(),
-            setFieldEnemies: (fieldEnemies) => { this.fieldEnemies = fieldEnemies; },
-            placePartyNear: (tile, overrideMembers) => this.placePartyNear(tile, overrideMembers),
-            getControlledActor: () => this.getControlledActor(),
-            getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
-            setPlayer: (player) => { this.player = player; },
             getPlayer: () => this.player,
-            selectActor: (actorId) => this.selectionController.selectActor(actorId),
-            clearFieldTurnState: () => this.clearFieldTurnState(),
-            setCurrentPhaseToRaid: () => { this.currentPhase = 'raid'; },
-            setActiveTurn: (actorId, remainingActionPoints, majorActionUsed) => {
-                if (actorId) this.turnStateController.setActiveTurn(actorId, remainingActionPoints, majorActionUsed);
-                else this.turnStateController.endActiveTurn();
-            },
-            getTurnActionStates: (actor) => this.playerActionController.getTurnActionStates(actor),
-            openActionMenu: (states) => this.actionMenuUI.open(states),
-            getEnemyById: (enemyId) => this.getEnemyById(enemyId),
-            actorTile: (actor) => actorTile(actor),
-            getActorAttackTargetFailureFromTile: (actor, casterTile, enemy) =>
-                getWorldActorAttackTargetFailure({ worldMap: this.worldMap, actor, enemy, casterTile }),
-            updateEffects: (dt) => this.effectManager.update(dt),
-            updateFloatingText: (dt) => this.floatingText.update(dt),
-            updateAttackCues: (dt) => this.updateAttackCues(dt),
-            followCameraToPlayer: (camera, dt) => {
-                camera.followTile(this.player.gridX, this.player.gridY);
-                if (dt !== undefined) camera.update(dt);
-            },
-            snapCameraToActor: (actor) => {
-                this.camera.followTile(actor.entity.gridX, actor.entity.gridY);
-                this.camera.snapToTarget();
-            },
-            getLastCombatLog: () => this.fieldFeedback.lastCombatLog(),
-            log: (message) => this.addCombatLog(message),
-        });
-        this.networkSyncController = new WorldNetworkSyncController({
-            party: this.party,
-            gameManager: this.gameManager,
-            storyScenarioController: this.storyScenarioController,
-            getNetworkPlayerId: () => this.networkPlayerId,
-            getNetworkRaidClient: () => this.networkRaidClient,
-            getWorldMap: () => this.worldMap,
+            setPlayer: (player) => { this.player = player; },
             getPartyActors: () => this.partyActors,
             setPartyActors: (actors) => { this.partyActors = actors; },
             getRemotePartyActors: () => this.remotePartyActors,
+            clearRemotePartyActors: () => this.remotePartyActors.clear(),
             getFieldEnemies: () => this.fieldEnemies,
             setFieldEnemies: (fieldEnemies) => { this.fieldEnemies = fieldEnemies; },
             getControlledActor: () => this.getControlledActor(),
-            setPlayer: (player) => { this.player = player; },
-            getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
-            setActiveTurnActorId: (actorId) => this.turnStateController.setActiveTurnActorId(actorId),
-            getRemainingActionPoints: () => this.turnStateController.getRemainingActionPoints(),
-            setRemainingActionPoints: (points) => this.turnStateController.setRemainingActionPoints(points),
-            setMajorActionUsedThisTurn: (used) => this.turnStateController.setMajorActionUsedThisTurn(used),
-            hasSelection: () => this.selectionController.hasSelection(),
+            getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
+            getCurrentHubTown: () => this.getCurrentHubTown(),
+            openTown: (town) => this.openTown(town),
+            placePartyNear: (tile, overrideMembers) => this.placePartyNear(tile, overrideMembers),
+            closeFieldOverlays: () => this.closeFieldOverlays(),
+            clearFieldTurnState: () => this.clearFieldTurnState(),
             selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            clearSelection: () => this.selectionController.clear(),
+            hasSelection: () => this.selectionController.hasSelection(),
             selectLoot: (lootId) => this.selectionController.selectLoot(lootId),
-            getActionMenuIsOpen: () => this.actionMenuUI.getIsOpen(),
+            isNetworkRaid: () => this.isNetworkRaid,
+            getNetworkRaidClient: () => this.networkRaidClient,
+            getNetworkPlayerId: () => this.networkPlayerId,
+            isRaidOutcomeVisible: () => this.raidOutcomeController.isVisible(),
+            setCurrentPhase: (phase) => { this.currentPhase = phase; },
+            getTurnActionStates: (actor) => this.playerActionController.getTurnActionStates(actor),
             getPlayerActionMode: () => this.playerActionController.getMode(),
             hasExecutableAction: (actor) => this.playerActionController.hasExecutableAction(actor),
             reopenActionMenu: (actor) => this.reopenActionMenu(actor),
             getEnemyById: (enemyId) => this.getEnemyById(enemyId),
-            actorTile: (actor) => actorTile(actor),
-            enemyTile: (enemy) => enemyTile(enemy),
-            applyMonsterSprite: (enemy, monsterId) => applyMonsterSprite(enemy, monsterId),
-            isEntityMoving: (entity) => isEntityMoving(entity),
+            updateAttackCues: (dt) => this.updateAttackCues(dt),
             beginCombatFeedbackGroup: () => this.beginCombatFeedbackGroup(),
             registerCombatFeedback: (kind, feedbackGroupId) => this.registerCombatFeedback(kind, feedbackGroupId),
             flushCombatFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
-            spawnAttackCue: (from, to, color, label) => this.fieldFeedback.spawnAttackCue(from, to, color, label),
             spawnKillEffect: (enemy, feedbackGroupId, actor) => {
                 const exp = actor ? enemy.calcExpFor(actor.character.level) : enemy.expReward;
                 this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, exp, enemy);
                 this.registerCombatFeedback('kill', feedbackGroupId);
             },
-            spawnDebuffEffect: (x, y) => this.effectManager.spawnDebuffEffect(x, y),
-            spawnHitEffect: (x, y) => this.effectManager.spawnHitEffect(x, y),
-            spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
-            spawnDamage: (x, y, amount, isCrit, isMiss) => this.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
-            spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
-            spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
-            log: (message) => this.addCombatLog(message),
+            addCombatLog: (message) => this.addCombatLog(message),
         });
-        this.networkIntentController = new WorldNetworkIntentController({
-            networkSyncController: this.networkSyncController,
-            isNetworkRaid: () => this.isNetworkRaid,
-            getNetworkRaidClient: () => this.networkRaidClient,
-        });
-        this.networkEvents = new WorldEngineNetworkEvents({
-            raidSession: this.raidSession,
-            networkSyncController: this.networkSyncController,
-        });
+        this.storyScenarioController = scenarioNetworkControllers.storyScenarioController;
+        this.tutorialController = scenarioNetworkControllers.tutorialController;
+        this.networkSyncController = scenarioNetworkControllers.networkSyncController;
+        this.networkIntentController = scenarioNetworkControllers.networkIntentController;
+        this.networkEvents = scenarioNetworkControllers.networkEvents;
         this.initializeCombatActionControllers();
         this.initializeRaidLifecycleControllers();
         this.initializePresentationControllers();

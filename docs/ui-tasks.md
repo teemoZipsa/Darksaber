@@ -36,6 +36,7 @@
 - [x] 브라우저 e2e 보강: Playwright에 Mobile Chrome 프로젝트를 추가하고, DEV 전리품 패널에서 실제 포인터 드래그로 loot→backpack 이동을 검증.
 - [x] 서버 세션 snapshot restore 초기화 순서 수정: `ownedSessionKeys`를 restore 호출 전에 초기화해 서버 재시작 복구 경로의 TDZ 오류를 제거.
 - [x] `WorldEngine` 시작 흐름 후속 정리: 생성자에 남은 튜토리얼/네트워크 resume/마을 진입 분기를 `WorldEngineStartupFlow`로 분리하고 단위 테스트로 순서를 고정.
+- [x] `WorldEngine` 시나리오/네트워크 배선 후속 정리: 스토리·튜토리얼·네트워크 sync/intent/event 컨트롤러 생성을 `WorldEngineScenarioNetworkControllers` factory로 분리해 생성자 충돌 표면을 축소.
 
 ---
 
