@@ -4,31 +4,34 @@ import type { ItemSlot } from '../data/ItemDB';
 import type { PlacedItem } from '../inventory/GridInventory';
 import { applyEquipmentStatBonuses } from '../inventory/Socketing';
 
-export type StatusKind =
-    | 'guard'
-    | 'counterReady'
-    | 'resting'
-    | 'poison'
-    | 'regen'
-    | 'slow'
-    | 'silence'
-    | 'immobilize'
-    | 'blind'
-    | 'attackDown'
-    | 'defenseDown'
-    | 'resistDown'
-    | 'attackUp'
-    | 'defenseUp'
-    | 'speedUp'
-    | 'resistUp'
-    | 'allUp'
-    | 'maxHpUp'
-    | 'maxMpUp'
-    | 'critUp'
-    | 'evasionUp'
-    | 'hitDown'
-    | 'damageTakenDown'
-    | 'injury';
+export const STATUS_KINDS = [
+    'guard',
+    'counterReady',
+    'resting',
+    'poison',
+    'regen',
+    'slow',
+    'silence',
+    'immobilize',
+    'blind',
+    'attackDown',
+    'defenseDown',
+    'resistDown',
+    'attackUp',
+    'defenseUp',
+    'speedUp',
+    'resistUp',
+    'allUp',
+    'maxHpUp',
+    'maxMpUp',
+    'critUp',
+    'evasionUp',
+    'hitDown',
+    'damageTakenDown',
+    'injury',
+] as const;
+
+export type StatusKind = typeof STATUS_KINDS[number];
 
 export type StatusActivation = 'immediate' | 'on_raid_start';
 export type StatusSourceType = 'skill' | 'rest' | 'injury' | 'action';

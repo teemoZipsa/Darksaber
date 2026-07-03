@@ -28,6 +28,7 @@ import { SettingsUI } from '../ui/SettingsUI';
 import { HitStop } from './world/HitStop';
 import { AudioManager } from './AudioManager';
 import type { UiStore } from '../ui/react/UiStore';
+import { hasBlockingOverlay, type OverlayOpenState } from '../ui/react/OverlayRegistry';
 import type { WorldTownSession } from './world/WorldTownSession';
 import type { WorldRaidSession } from './world/WorldRaidSession';
 import type { AccountProgress, AuthCharacter, AuthClient, CharacterSave, InventorySaveItem } from '../net/AuthClient';
@@ -195,15 +196,28 @@ export class GameManager {
         this.uiStore = store;
     }
 
+    /** Current visibility of every DOM-backed overlay. */
+    public getOverlayOpenState(): OverlayOpenState {
+        return {
+            char: this.charUI.isVisible(),
+            pause: this.pauseMenu.isVisible(),
+            settings: this.settingsUI.isVisible(),
+            party: this.partyUI.isVisible(),
+            town: this.getTownSession()?.isVisible() ?? false,
+            create: this.isCharCreationState(),
+            inventory: this.isWorldInventoryOpen(),
+            journal: this.questJournalOpen,
+            magic: this.magicLoadoutOpen,
+        };
+    }
+
     /**
      * True when a DOM-overlay modal owns the screen. The world engine must not
      * process input while this is the case (the DOM scrim also absorbs clicks,
      * but this guard keeps correctness independent of DOM layering).
      */
     public isDomModalOpen(): boolean {
-        return this.charUI.isVisible() || this.pauseMenu.isVisible()
-            || this.settingsUI.isVisible() || this.partyUI.isVisible()
-            || this.questJournalOpen || this.magicLoadoutOpen;
+        return hasBlockingOverlay(this.getOverlayOpenState());
     }
 
     /**
@@ -698,15 +712,7 @@ export class GameManager {
                     break;
                 }
 
-                // Inventory is a React DOM overlay; it owns its own pointer handling.
-                // Freeze the world while it is open.
-                if (this.inventoryUI.isVisible()) break;
-                // The character panel is now a React DOM overlay (see ui/react).
-                // It owns its own pointer handling; the DOM panel sits above the
-                // canvas so clicks never reach InputManager. We only need to keep
-                // the world frozen while it (or any DOM modal) is open.
-                // partyUI is now a React DOM overlay (see ui/react/party); world
-                // input is frozen below via isDomModalOpen while it's open.
+                // DOM overlays own their pointer handling and freeze world input.
                 if (this.isDomModalOpen()) break;
 
                 this.worldEngine.update(dt, this.input, this.camera);

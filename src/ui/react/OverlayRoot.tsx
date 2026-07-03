@@ -20,15 +20,15 @@ import { MagicLoadoutPanel } from './magic/MagicLoadoutPanel';
 
 export function OverlayRoot() {
     const store = useStore();
-    const charOpen = useUiSelector((s) => s.isCharPanelOpen());
-    const pauseOpen = useUiSelector((s) => s.isPauseOpen());
-    const settingsOpen = useUiSelector((s) => s.isSettingsOpen());
-    const partyOpen = useUiSelector((s) => s.isPartyOpen());
-    const townOpen = useUiSelector((s) => s.isTownOpen());
-    const charCreateOpen = useUiSelector((s) => s.isCharCreateOpen());
-    const inventoryOpen = useUiSelector((s) => s.isInventoryOpen());
-    const questJournalOpen = useUiSelector((s) => s.isQuestJournalOpen());
-    const magicLoadoutOpen = useUiSelector((s) => s.isMagicLoadoutOpen());
+    const charOpen = useUiSelector((s) => s.isOverlayOpen('char'));
+    const pauseOpen = useUiSelector((s) => s.isOverlayOpen('pause'));
+    const settingsOpen = useUiSelector((s) => s.isOverlayOpen('settings'));
+    const partyOpen = useUiSelector((s) => s.isOverlayOpen('party'));
+    const townOpen = useUiSelector((s) => s.isOverlayOpen('town'));
+    const charCreateOpen = useUiSelector((s) => s.isOverlayOpen('create'));
+    const inventoryOpen = useUiSelector((s) => s.isOverlayOpen('inventory'));
+    const questJournalOpen = useUiSelector((s) => s.isOverlayOpen('journal'));
+    const magicLoadoutOpen = useUiSelector((s) => s.isOverlayOpen('magic'));
 
     return (
         <>

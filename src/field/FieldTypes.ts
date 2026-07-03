@@ -25,7 +25,15 @@ export interface FieldActor {
     queuedIntent: FieldIntent | null;
 }
 
-export type FieldTurnEndReason = 'wait' | 'incapacitated' | 'gaugeLow' | 'statusBlocked' | 'noExecutableAction';
+export const FIELD_TURN_END_REASONS = [
+    'wait',
+    'incapacitated',
+    'gaugeLow',
+    'statusBlocked',
+    'noExecutableAction',
+] as const;
+
+export type FieldTurnEndReason = typeof FIELD_TURN_END_REASONS[number];
 
 export interface FieldEnemy {
     enemy: Enemy;

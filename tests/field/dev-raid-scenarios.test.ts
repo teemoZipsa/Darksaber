@@ -175,8 +175,9 @@ test('dev raid scenario parser accepts implemented story episodes through episod
     assert.equal(parseDevRaidScenario('storyxx'), null);
 });
 
-test('package scripts expose each story dev entry through episode 31', () => {
+test('package scripts expose a generic story dev entry and legacy episode aliases', () => {
     const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
+    assert.equal(packageJson.scripts['dev:raid:story'], 'node scripts/dev-town.mjs raid');
     for (const episode of DEV_STORY_EPISODES) {
         assert.equal(
             packageJson.scripts[`dev:raid:story${episode}`],

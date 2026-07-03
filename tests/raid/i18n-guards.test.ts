@@ -11,7 +11,11 @@ import { STORY_INTERIOR_LAYOUTS } from '../../src/data/StoryInteriorData';
 import { STORY_QUESTS, getStoryCompanionRewards } from '../../src/data/StoryQuestData';
 import { STORY_SCENARIO_EVENT_SEQUENCES, type StoryScenarioEventStep } from '../../src/data/StoryScenarioEventData';
 import { TOWN_FACILITY_META } from '../../src/data/TownFacilityData';
+import { STATUS_KINDS } from '../../src/combat/StatusEffects';
+import { FIELD_TURN_END_REASONS } from '../../src/field/FieldTypes';
 import { EQUIP_SLOT_LIST } from '../../src/inventory/InventoryUI';
+import { WORLD_LOOT_CONTAINER_TYPES } from '../../src/loot/WorldLootTypes';
+import { RAID_MODIFIERS } from '../../src/raid/RaidModifiers';
 import { SHOP_KIND_TABS } from '../../src/ui/ShopUI';
 
 function walkFiles(dir: string): string[] {
@@ -124,6 +128,24 @@ function collectDataDrivenUiKeys(): Set<string> {
     for (const slot of ['weapon', 'shield', 'head', 'body', 'boots', 'accessory', 'accessory2']) add(`inv.${slot}`);
     for (const branch of MASTER_CLASSES.map((master) => master.branch)) add(`tierChart.branch.${branch}`);
     for (const status of ['active', 'objectiveComplete', 'completed']) add(`quest.status.${status}`);
+    for (const containerType of WORLD_LOOT_CONTAINER_TYPES) add(`worldLoot.source.${containerType}`);
+    for (const kind of STATUS_KINDS) {
+        add(`status.${kind}.name`);
+        add(`status.${kind}.desc`);
+    }
+    for (const reason of FIELD_TURN_END_REASONS) add(`field.log.reason.${reason}`);
+    for (const modifier of RAID_MODIFIERS) {
+        add(`raid.modifier.${modifier}.name`);
+        add(`raid.modifier.${modifier}.desc`);
+    }
+    for (const step of ['move', 'attack', 'rest', 'magic', 'defeat']) {
+        add(`tutorial.world.dialogue.${step}`);
+        add(`tutorial.world.press.${step}`);
+        add(`tutorial.world.target.${step}`);
+        add(`tutorial.world.step.${step}`);
+        add(`tutorial.world.step.${step}.log`);
+    }
+    for (const action of ['move', 'attack', 'rest', 'magic']) add(`tutorial.world.action.${action}`);
 
     return keys;
 }

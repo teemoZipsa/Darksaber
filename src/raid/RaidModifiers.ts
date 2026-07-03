@@ -11,7 +11,7 @@ export interface RaidModifierEffects {
     supplyDrop: boolean;
 }
 
-const RAID_MODIFIERS: RaidModifierId[] = ['night_raid', 'dense_fog', 'supply_drop'];
+export const RAID_MODIFIERS: readonly RaidModifierId[] = ['night_raid', 'dense_fog', 'supply_drop'];
 
 const EFFECTS: Record<RaidModifierId, RaidModifierEffects> = {
     night_raid: {

@@ -26,6 +26,7 @@ import { i18n } from '../../i18n/LanguageManager';
 import { getRepairCost, getUnsocketCost, repairItem, unsocketAll } from '../../inventory/Socketing';
 import { getStoryQuestViews as buildStoryQuestViews, type StoryQuestView } from '../../data/StoryQuestData';
 import { getSkill, type Skill } from '../../data/SkillDB';
+import { overlayFlagsSignature, type OverlayPanelId, type OverlayOpenState } from './OverlayRegistry';
 import {
     applyFacilityCostMultiplier,
     getNextFacilityUpgradeTier,
@@ -89,27 +90,18 @@ export class UiStore {
     }
 
     private captureSignature(): string {
-        const flags = [
-            this.isCharPanelOpen() ? 'char' : '',
-            this.isPauseOpen() ? 'pause' : '',
-            this.isSettingsOpen() ? 'settings' : '',
-            this.isPartyOpen() ? 'party' : '',
-            this.isTownOpen() ? 'town' : '',
-            this.isCharCreateOpen() ? 'create' : '',
-            this.isInventoryOpen() ? 'inventory' : '',
-            this.isQuestJournalOpen() ? 'journal' : '',
-            this.isMagicLoadoutOpen() ? 'magic' : '',
-        ].join(',');
+        const openState = this.getOverlayOpenState();
+        const flags = overlayFlagsSignature(openState);
         return [
             flags,
             `lang:${i18n.lang}`,
             `settings:${SettingsManager.lastUpdated}`,
             `gold:${this.getGold()}`,
             `party:${this.getActiveIndex()}:${this.getRoster().map((char) => this.characterSignature(char)).join(';')}`,
-            this.isTownOpen() ? `town:${this.townSignature()}` : '',
-            this.isInventoryOpen() ? `worldInv:${this.inventorySignature(this.getWorldInventory())}` : '',
-            this.isQuestJournalOpen() ? `quests:${this.questSignature()}` : '',
-            this.isMagicLoadoutOpen() ? `magic:${this.magicSignature()}` : '',
+            openState.town ? `town:${this.townSignature()}` : '',
+            openState.inventory ? `worldInv:${this.inventorySignature(this.getWorldInventory())}` : '',
+            openState.journal ? `quests:${this.questSignature()}` : '',
+            openState.magic ? `magic:${this.magicSignature()}` : '',
         ].join('|');
     }
 
@@ -209,11 +201,13 @@ export class UiStore {
     getActiveIndex = (): number => this.gm.party.getActiveIndex();
     isPartyFull = (): boolean => this.gm.party.isFull();
     getGold = (): number => this.gm.playerData.gold;
-    isCharPanelOpen = (): boolean => this.gm.charUI.isVisible();
-    isPauseOpen = (): boolean => this.gm.isPauseMenuOpen();
-    isSettingsOpen = (): boolean => this.gm.isSettingsMenuOpen();
-    isPartyOpen = (): boolean => this.gm.partyUI.isVisible();
-    isQuestJournalOpen = (): boolean => this.gm.isQuestJournalOpen();
+    getOverlayOpenState = (): OverlayOpenState => this.gm.getOverlayOpenState();
+    isOverlayOpen = (id: OverlayPanelId): boolean => this.getOverlayOpenState()[id];
+    isCharPanelOpen = (): boolean => this.isOverlayOpen('char');
+    isPauseOpen = (): boolean => this.isOverlayOpen('pause');
+    isSettingsOpen = (): boolean => this.isOverlayOpen('settings');
+    isPartyOpen = (): boolean => this.isOverlayOpen('party');
+    isQuestJournalOpen = (): boolean => this.isOverlayOpen('journal');
     getStoryQuestViews = (): StoryQuestView[] => buildStoryQuestViews(this.gm.playerData, this.gm.getRaidSession());
 
     // ─── Actions (delegate to GameManager; never mutate directly) ──
@@ -245,7 +239,7 @@ export class UiStore {
     closeQuestJournal = (): void => { this.gm.closeQuestJournal(); this.tick(); };
 
     // ─── Magic loadout / upgrade (DOM overlay, K key) ─────────────
-    isMagicLoadoutOpen = (): boolean => this.gm.isMagicLoadoutOpen();
+    isMagicLoadoutOpen = (): boolean => this.isOverlayOpen('magic');
     closeMagicLoadout = (): void => { this.gm.closeMagicLoadout(); this.tick(); };
 
     /** Equipped skill ids for a character, normalized to currently-learnable ones. */
@@ -306,7 +300,7 @@ export class UiStore {
     private townUi = () => this.town()?.ui ?? null;
     private shop = () => this.townUi()?.getShopUI() ?? null;
 
-    isTownOpen = (): boolean => this.town()?.isVisible() ?? false;
+    isTownOpen = (): boolean => this.isOverlayOpen('town');
     getTownTab = (): TownTab => this.townUi()?.getActiveTab() ?? 'storage';
     getTownInfo = (): TownInfo | null => this.townUi()?.getCurrentTown() ?? null;
     getTownRumors = (): string[] => this.townUi()?.getRumors() ?? [];
@@ -407,7 +401,7 @@ export class UiStore {
     };
 
     // ─── Character creation (DOM overlay) ─────────────────────────
-    isCharCreateOpen = (): boolean => this.gm.isCharCreationState();
+    isCharCreateOpen = (): boolean => this.isOverlayOpen('create');
     charCreateComplete = (name: string, classId: string, gender: string): void => {
         this.gm.completeCharacterCreation(name, classId, gender);
         this.tick();
@@ -415,7 +409,7 @@ export class UiStore {
 
     // ─── Inventory (DOM overlay) ──────────────────────────────────
     /** Standalone world inventory (I/Tab); town storage uses its own instance. */
-    isInventoryOpen = (): boolean => this.gm.isWorldInventoryOpen();
+    isInventoryOpen = (): boolean => this.isOverlayOpen('inventory');
     getWorldInventory = (): InventoryUI => this.gm.inventoryUI;
     getTownInventory = (): InventoryUI | null => this.townUi()?.getInventoryUI() ?? null;
     closeInventory = (): void => { this.gm.closeWorldInventory(); this.tick(); };

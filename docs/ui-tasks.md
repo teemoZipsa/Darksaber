@@ -29,6 +29,7 @@
   - 진행: Browser에서 `devStart=raid` 레이드 자동 진입과 월드 인벤토리 오버레이를 확인.
   - 완료: `devStart=raid&devScenario=aggro` 실제 레이드 화면에서 어그로 적의 추격 후 강제 인접 공격 로그/상태 배지 확인.
 - [x] 저주받은 유물 구현: 봉인된 유물함에서 낮은 확률로 고가치 저주 유물이 나오고, 레이드 배낭에 든 동안 행동력 회복 저하와 턴 시작 HP 피해를 적용한다.
+- [x] DOM 오버레이 후속 약점 보강: 오버레이 열림/월드 차단 레지스트리 단일화, 동적 i18n guard 보강, 모바일 오버레이 e2e 추가, 일반형 스토리 dev 스크립트 추가.
 
 ---
 
@@ -105,7 +106,7 @@
 - 타입체크: `npm run typecheck` (반드시 통과).
 - DOM 오버레이 브라우저 스모크: `npm run test:e2e` (새 환경은 먼저 `npx playwright install chromium`).
 - 개발 서버: `npm run dev` → http://127.0.0.1:5731 (프리뷰 도구는 `.claude/launch.json`의 5742).
-- 개발자 바로 시작: `npm run dev:town`, `npm run dev:raid`, `npm run dev:raid:aggro`, `npm run dev:raid:loot`, `npm run dev:raid:story1`~`npm run dev:raid:story31`, `npm run dev:tutorial`. 직접 진입 URL은 `/?devStart=raid&devScenario=storyNN` 형식으로 1~31화 전체를 지원.
+- 개발자 바로 시작: `npm run dev:town`, `npm run dev:raid`, `npm run dev:raid:aggro`, `npm run dev:raid:loot`, `npm run dev:raid:story -- storyNN`, `npm run dev:tutorial`. 기존 `npm run dev:raid:story1`~`npm run dev:raid:story31` 별칭도 호환용으로 유지. 직접 진입 URL은 `/?devStart=raid&devScenario=storyNN` 형식으로 1~31화 전체를 지원.
 - 테스트: `npm test`.
 
 ## 알려진 함정

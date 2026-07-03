@@ -9,6 +9,7 @@
     "dev:raid": "node scripts/dev-town.mjs raid",
     "dev:raid:aggro": "node scripts/dev-town.mjs raid aggro",
     "dev:raid:loot": "node scripts/dev-town.mjs raid loot",
+    "dev:raid:story": "node scripts/dev-town.mjs raid",
     "dev:raid:story1": "node scripts/dev-town.mjs raid story1",
     "dev:raid:story2": "node scripts/dev-town.mjs raid story2",
     "dev:raid:story3": "node scripts/dev-town.mjs raid story3",

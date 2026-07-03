@@ -63,7 +63,7 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
   - `npm run dev:raid` 또는 `/?devStart=raid`: 마을 출격 경로를 통해 레이드 자동 진입.
   - `npm run dev:raid:aggro` 또는 `/?devStart=raid&devScenario=aggro`: 레이드 자동 진입 후 어그로 추격/공격 검증 상태 구성.
   - `npm run dev:raid:loot` 또는 `/?devStart=raid&devScenario=loot`: 레이드 자동 진입 후 전리품 DOM 패널 검증 상태 구성.
-  - `npm run dev:raid:story1`~`npm run dev:raid:story31` 또는 `/?devStart=raid&devScenario=storyNN`: 레이드 자동 진입 후 해당 1~31화 시나리오로 바로 진입. 실내는 실내맵, 필드/비공정은 월드맵 목표 상태로 시작.
+  - `npm run dev:raid:story -- storyNN` 또는 `/?devStart=raid&devScenario=storyNN`: 레이드 자동 진입 후 해당 1~31화 시나리오로 바로 진입. 기존 `npm run dev:raid:story1`~`npm run dev:raid:story31` 별칭도 호환용으로 유지. 실내는 실내맵, 필드/비공정은 월드맵 목표 상태로 시작.
   - `npm run dev:tutorial` 또는 `/?devStart=tutorial`: 캐릭터 생성 없이 튜토리얼 대련장으로 진입.
 - 타입체크: `npm run typecheck`.
 - DOM 오버레이 브라우저 스모크: `npm run test:e2e` (새 환경은 먼저 `npx playwright install chromium`).
