@@ -78,6 +78,7 @@ const worldSaveSpool = new WorldSaveSpool({
 const worldSessionSnapshotStore = createWorldSessionSnapshotStore();
 await worldSessionSnapshotStore.initialize();
 const sessions = new Map<string, WorldSession>();
+const ownedSessionKeys = new Set<string>();
 const replayedWorldSaves = await replayWorldSaveSpool(authStore, worldSaveSpool, {
     retryLimit: WORLD_SAVE_RETRY_LIMIT,
     retryBaseMs: WORLD_SAVE_RETRY_BASE_MS,
@@ -163,7 +164,6 @@ const playerBySocket = new Map<WebSocket, SocketBinding>();
 const socketByPlayer = new Map<string, WebSocket>();
 const socketRateLimits = new Map<WebSocket, { windowStart: number; count: number; lastMessageAt: number; isAlive: boolean }>();
 const saveTrackers = new Map<string, PlayerSaveTracker>();
-const ownedSessionKeys = new Set<string>();
 const serverStartedAtMs = Date.now();
 let immediateSnapshotFlushScheduled = false;
 

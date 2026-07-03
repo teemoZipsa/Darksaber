@@ -34,6 +34,7 @@
 - [x] DEV 스토리 시작 스크립트 정리: `dev:raid:story1`~`story31` 수동 별칭을 제거하고, 일반형 `dev:raid:story -- storyNN`이 `story-scenarios.json` 데이터로 지원 에피소드를 검증하도록 변경.
 - [x] i18n guard 보강: wrapper literal 키(`formatSkillLog`/`logEnemy`/로그 색상 키), 템플릿 조합 key family, 타일/지형 hazard 데이터 키를 ko/en 양쪽 검증에 포함.
 - [x] 브라우저 e2e 보강: Playwright에 Mobile Chrome 프로젝트를 추가하고, DEV 전리품 패널에서 실제 포인터 드래그로 loot→backpack 이동을 검증.
+- [x] 서버 세션 snapshot restore 초기화 순서 수정: `ownedSessionKeys`를 restore 호출 전에 초기화해 서버 재시작 복구 경로의 TDZ 오류를 제거.
 
 ---
 
