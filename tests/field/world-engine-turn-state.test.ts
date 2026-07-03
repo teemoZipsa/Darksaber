@@ -42,7 +42,7 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
     engine.partyActors = [actor];
     engine.fieldEnemies = [];
     engine.remotePartyActors = new Map();
-    engine.storyScenarioController = {
+    const storyScenarioController = {
         applyNetworkScenarioSnapshot: () => undefined,
         handleNetworkActionRejected: () => false,
     };
@@ -76,7 +76,7 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
         getMode: () => null,
         clearTargeting: () => calls.push('clearTargeting'),
     };
-    engine.tutorialController = {
+    const tutorialController = {
         isActive: () => false,
         isCompletePending: () => false,
         getInstructor: () => null,
@@ -140,10 +140,10 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
             revertRaidLoot: () => undefined,
         },
     };
-    engine.networkSyncController = new WorldNetworkSyncController({
+    const networkSyncController = new WorldNetworkSyncController({
         party: engine.party,
         gameManager: engine.gameManager,
-        storyScenarioController: engine.storyScenarioController,
+        storyScenarioController: storyScenarioController as never,
         getNetworkPlayerId: () => engine.networkPlayerId,
         getNetworkRaidClient: () => engine.networkRaidClient ?? null,
         getWorldMap: () => engine.worldMap,
@@ -184,11 +184,17 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
         spawnStatus: (x, y, text) => engine.floatingText.spawnStatus(x, y, text),
         log: (message) => engine.addCombatLog(message),
     });
-    engine.networkIntentController = new WorldNetworkIntentController({
-        networkSyncController: engine.networkSyncController,
+    const networkIntentController = new WorldNetworkIntentController({
+        networkSyncController,
         isNetworkRaid: () => engine.isNetworkRaid,
         getNetworkRaidClient: () => engine.networkRaidClient ?? null,
     });
+    engine.scenarioNetworkControllers = {
+        storyScenarioController,
+        tutorialController,
+        networkSyncController,
+        networkIntentController,
+    };
     return { engine, calls };
 }
 
@@ -355,15 +361,17 @@ test('world update freezes field simulation while story presentation is active',
         raidOutcomeController: { isVisible: () => false },
     };
     engine.fusionTempleUI = { isVisible: () => false };
-    engine.tutorialController = {
-        isActive: () => false,
-        isCompletePending: () => false,
+    engine.scenarioNetworkControllers = {
+        tutorialController: {
+            isActive: () => false,
+            isCompletePending: () => false,
+        },
+        storyScenarioController: {
+            isPresentationActive: () => true,
+            updatePresentation: (dt: number) => calls.push(`presentation:${dt}`),
+        },
     };
     engine.isNetworkRaid = false;
-    engine.storyScenarioController = {
-        isPresentationActive: () => true,
-        updatePresentation: (dt: number) => calls.push(`presentation:${dt}`),
-    };
     engine.effectManager = { update: () => calls.push('effects') };
     engine.floatingText = { update: () => calls.push('floatingText') };
     engine.updateAttackCues = () => calls.push('attackCues');
@@ -416,9 +424,9 @@ test('network snapshot resolves zero remaining gauge from ready actor action gau
     const actor = makeActor('hero');
     const { engine } = makeEngineHarness(actor);
 
-    assert.equal(engine.networkSyncController.resolveSnapshotRemainingGauge(0, 100), 100);
-    assert.equal(engine.networkSyncController.resolveSnapshotRemainingGauge(0, 10), 0);
-    assert.equal(engine.networkSyncController.resolveSnapshotRemainingGauge(25, 80), 25);
+    assert.equal(engine.scenarioNetworkControllers.networkSyncController.resolveSnapshotRemainingGauge(0, 100), 100);
+    assert.equal(engine.scenarioNetworkControllers.networkSyncController.resolveSnapshotRemainingGauge(0, 10), 0);
+    assert.equal(engine.scenarioNetworkControllers.networkSyncController.resolveSnapshotRemainingGauge(25, 80), 25);
 });
 
 test('network snapshot treats local player actorIds as owned and prefers actor remaining AP', () => {
@@ -476,9 +484,9 @@ test('network move reopens the action menu when the server confirms the moved ti
     const actor = makeActor('hero');
     const { engine, calls } = makeEngineHarness(actor);
     engine.turnStateController.setRemainingActionPoints(80);
-    engine.networkSyncController.trackPendingMove('move-1', actor.id, { x: 1, y: 0 }, []);
+    engine.scenarioNetworkControllers.networkSyncController.trackPendingMove('move-1', actor.id, { x: 1, y: 0 }, []);
 
-    engine.networkSyncController.reopenPendingMoveMenu([{ id: actor.id, tile: { x: 1, y: 0 } }]);
+    engine.scenarioNetworkControllers.networkSyncController.reopenPendingMoveMenu([{ id: actor.id, tile: { x: 1, y: 0 } }]);
 
     assert.ok(calls.includes('openActionMenu'));
 });
@@ -487,7 +495,7 @@ test('network move rejection reopens the action menu when the actor can still ac
     const actor = makeActor('hero');
     const { engine, calls } = makeEngineHarness(actor);
     engine.turnStateController.setRemainingActionPoints(80);
-    engine.networkSyncController.trackPendingMove('move-1', actor.id, { x: 1, y: 0 }, [{ x: 1, y: 0 }]);
+    engine.scenarioNetworkControllers.networkSyncController.trackPendingMove('move-1', actor.id, { x: 1, y: 0 }, [{ x: 1, y: 0 }]);
 
     engine.handleNetworkActionRejected({ type: 'ACTION_REJECTED', intentId: 'move-1', reason: 'blocked' });
 
@@ -523,18 +531,18 @@ test('network move stores a render-only path preview without queuing local movem
 test('network move path preview remains through confirmed interpolation and clears on arrival', () => {
     const actor = makeActor('hero');
     const { engine } = makeEngineHarness(actor);
-    engine.networkSyncController.trackPendingMove('move-1', actor.id, { x: 1, y: 0 }, [{ x: 1, y: 0 }]);
+    engine.scenarioNetworkControllers.networkSyncController.trackPendingMove('move-1', actor.id, { x: 1, y: 0 }, [{ x: 1, y: 0 }]);
     actor.entity.gridX = 1;
     actor.entity.gridY = 0;
     actor.entity.pixelX = 0.25;
     actor.entity.pixelY = 0;
 
-    engine.networkSyncController.refreshMovePathPreview();
+    engine.scenarioNetworkControllers.networkSyncController.refreshMovePathPreview();
 
     assert.deepEqual(engine.getPathPreviewTiles(actor), [{ x: 1, y: 0 }]);
 
     actor.entity.pixelX = 1;
-    engine.networkSyncController.refreshMovePathPreview();
+    engine.scenarioNetworkControllers.networkSyncController.refreshMovePathPreview();
 
     assert.deepEqual(engine.getPathPreviewTiles(actor), []);
 });
@@ -542,13 +550,13 @@ test('network move path preview remains through confirmed interpolation and clea
 test('network move path preview drops tiles already reached during interpolation', () => {
     const actor = makeActor('hero');
     const { engine } = makeEngineHarness(actor);
-    engine.networkSyncController.trackPendingMove('move-1', actor.id, { x: 2, y: 0 }, [{ x: 1, y: 0 }, { x: 2, y: 0 }]);
+    engine.scenarioNetworkControllers.networkSyncController.trackPendingMove('move-1', actor.id, { x: 2, y: 0 }, [{ x: 1, y: 0 }, { x: 2, y: 0 }]);
     actor.entity.gridX = 2;
     actor.entity.gridY = 0;
     actor.entity.pixelX = 1;
     actor.entity.pixelY = 0;
 
-    engine.networkSyncController.refreshMovePathPreview();
+    engine.scenarioNetworkControllers.networkSyncController.refreshMovePathPreview();
 
     assert.deepEqual(engine.getPathPreviewTiles(actor), [{ x: 2, y: 0 }]);
 });
@@ -582,7 +590,7 @@ test('grid snapshot without sockets restores placed items with an empty socket l
         ],
     };
 
-    const grid = engine.networkSyncController.gridFromSnapshot(snapshot);
+    const grid = engine.scenarioNetworkControllers.networkSyncController.gridFromSnapshot(snapshot);
 
     assert.equal(grid.items.length, 1);
     assert.deepEqual(grid.items[0].sockets, []);
@@ -611,7 +619,7 @@ test('network auto-loot log uses localized item names', () => {
             },
         };
 
-        engine.networkSyncController.handleAutoLootGrant(grant);
+        engine.scenarioNetworkControllers.networkSyncController.handleAutoLootGrant(grant);
 
         assert.deepEqual(engine.combatLog, ['Training Dummy Loot auto-collected: Short Sword']);
     } finally {

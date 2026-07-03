@@ -203,8 +203,9 @@ function installLootController(engine: any, options: {
         getEnemyById: () => null,
         getLootById: () => null,
     });
-    engine.storyScenarioController ??= { getActiveInterior: () => null };
-    engine.networkSyncController = {
+    engine.scenarioNetworkControllers ??= {};
+    engine.scenarioNetworkControllers.storyScenarioController ??= { getActiveInterior: () => null };
+    engine.scenarioNetworkControllers.networkSyncController = {
         addPendingLootPick: () => undefined,
         purgeStaleLootPicks: () => undefined,
     };
@@ -216,8 +217,8 @@ function installLootController(engine: any, options: {
     const lootController = new WorldLootController({
         gameManager: engine.gameManager,
         selectionController,
-        storyScenarioController: engine.storyScenarioController,
-        networkSyncController: engine.networkSyncController,
+        storyScenarioController: engine.scenarioNetworkControllers.storyScenarioController,
+        networkSyncController: engine.scenarioNetworkControllers.networkSyncController,
         getWorldMap: () => engine.worldMap,
         isNetworkRaid: () => engine.isNetworkRaid,
         isLocalLootEnabled: () => false,
@@ -457,7 +458,9 @@ test('Burgos boss corpse loot includes a guaranteed rune', () => {
     const boss = new Enemy('burgos_boss', 100, 100, bossDef.name, bossDef.level, bossDef.color, bossDef.role);
     const engine = Object.create(WorldEngine.prototype) as any;
     engine.worldMap = { loot: [] };
-    engine.storyScenarioController = { getActiveInterior: () => null };
+    engine.scenarioNetworkControllers = {
+        storyScenarioController: { getActiveInterior: () => null },
+    };
     installLootController(engine);
 
     engine.spawnEnemyLoot(boss);
@@ -496,13 +499,15 @@ test('story interior boss loot returns to the original world entrance through ep
         const logs: string[] = [];
         const engine = Object.create(WorldEngine.prototype) as any;
         engine.worldMap = interiorMap;
-        engine.storyScenarioController = {
-            getActiveInterior: () => ({
-                dungeonId: scenario.dungeonId,
-                layout,
-                previousWorldMap,
-                returnTile,
-            }),
+        engine.scenarioNetworkControllers = {
+            storyScenarioController: {
+                getActiveInterior: () => ({
+                    dungeonId: scenario.dungeonId,
+                    layout,
+                    previousWorldMap,
+                    returnTile,
+                }),
+            },
         };
         installLootController(engine, { logs });
 

@@ -55,6 +55,7 @@
 - [x] `WorldEngine` combat controller 필드 축소: turn-start/combat-flow/movement/enemy-turn/field-spawn controller 개별 필드를 `combatControllers` aggregate로 묶어 전투 기능 변경 시 필드 충돌 표면을 줄임.
 - [x] `WorldEngine` raid lifecycle controller 필드 축소: raid-outcome/raid-lifecycle controller 개별 필드를 `raidLifecycleControllers` aggregate로 묶어 레이드 종료·복귀 기능 변경 시 필드 충돌 표면을 줄임.
 - [x] `WorldEngine` world support controller 필드 축소: minimap/combat-feedback/temple/resting controller 개별 필드를 `worldControllers` aggregate로 묶어 월드 보조 기능 변경 시 필드 충돌 표면을 줄임.
+- [x] `WorldEngine` scenario/network controller 필드 축소: story/tutorial/network-sync/network-intent/network-events controller 개별 필드를 `scenarioNetworkControllers` aggregate로 묶고 DEV 시나리오 진입도 aggregate를 통해 접근하도록 정리.
 
 ---
 

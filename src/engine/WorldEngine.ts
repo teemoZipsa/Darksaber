@@ -27,13 +27,8 @@ import type { FieldActor, FieldEnemy, FieldHitParty, FieldTurnEndReason } from '
 import { WorldRaidSession, type WorldPhase } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
 import type { CombatResult } from './world/WorldCombatController';
-import type { WorldStoryScenarioController } from './world/WorldStoryScenarioController';
-import type { WorldNetworkSyncController } from './world/WorldNetworkSyncController';
-import type { WorldTutorialController } from './world/WorldTutorialController';
-import type { WorldNetworkIntentController } from './world/WorldNetworkIntentController';
 import { WorldTurnStateController } from './world/WorldTurnStateController';
 import { WorldFieldFeedbackState } from './world/WorldFieldFeedbackState';
-import type { WorldEngineNetworkEvents } from './world/WorldEngineNetworkEvents';
 import type { WorldEngineActionTurnFlow } from './world/WorldEngineActionTurnFlow';
 import type { WorldEngineUpdateFlow } from './world/WorldEngineUpdateFlow';
 import {
@@ -41,7 +36,10 @@ import {
     createWorldEngineUpdateFlow,
 } from './world/WorldEngineFlows';
 import { runWorldEngineStartupFlow } from './world/WorldEngineStartupFlow';
-import { createWorldEngineScenarioNetworkControllers } from './world/WorldEngineScenarioNetworkControllers';
+import {
+    createWorldEngineScenarioNetworkControllers,
+    type WorldEngineScenarioNetworkControllers,
+} from './world/WorldEngineScenarioNetworkControllers';
 import {
     createWorldEngineWorldControllers,
     type WorldEngineWorldControllers,
@@ -121,12 +119,8 @@ export class WorldEngine {
     private actionControllers!: WorldEngineActionControllers;
     private raidLifecycleControllers!: WorldEngineRaidLifecycleControllers;
     private presentationControllers!: WorldEnginePresentationControllers;
-    private storyScenarioController!: WorldStoryScenarioController;
-    private networkSyncController!: WorldNetworkSyncController;
-    private tutorialController!: WorldTutorialController;
+    private scenarioNetworkControllers!: WorldEngineScenarioNetworkControllers;
     private worldControllers!: WorldEngineWorldControllers;
-    private networkIntentController!: WorldNetworkIntentController;
-    private networkEvents!: WorldEngineNetworkEvents;
     private actionTurnFlow?: WorldEngineActionTurnFlow;
     private updateFlow?: WorldEngineUpdateFlow;
     private turnStateController = new WorldTurnStateController();
@@ -271,11 +265,7 @@ export class WorldEngine {
             },
             addCombatLog: (message) => this.addCombatLog(message),
         });
-        this.storyScenarioController = scenarioNetworkControllers.storyScenarioController;
-        this.tutorialController = scenarioNetworkControllers.tutorialController;
-        this.networkSyncController = scenarioNetworkControllers.networkSyncController;
-        this.networkIntentController = scenarioNetworkControllers.networkIntentController;
-        this.networkEvents = scenarioNetworkControllers.networkEvents;
+        this.scenarioNetworkControllers = scenarioNetworkControllers;
     }
 
     private initializeCombatActionControllers(): void {
@@ -283,9 +273,9 @@ export class WorldEngine {
             party: this.party,
             gameManager: this.gameManager,
             raidSession: this.raidSession,
-            tutorialController: this.tutorialController,
-            storyScenarioController: this.storyScenarioController,
-            networkIntentController: this.networkIntentController,
+            tutorialController: this.scenarioNetworkControllers.tutorialController,
+            storyScenarioController: this.scenarioNetworkControllers.storyScenarioController,
+            networkIntentController: this.scenarioNetworkControllers.networkIntentController,
             floatingText: this.floatingText,
             effectManager: this.effectManager,
             fieldFeedback: this.fieldFeedback,
@@ -314,9 +304,9 @@ export class WorldEngine {
         this.combatControllers = combatControllers;
         const actionControllers = createWorldEngineActionControllers({
             gameManager: this.gameManager,
-            storyScenarioController: this.storyScenarioController,
-            networkSyncController: this.networkSyncController,
-            tutorialController: this.tutorialController,
+            storyScenarioController: this.scenarioNetworkControllers.storyScenarioController,
+            networkSyncController: this.scenarioNetworkControllers.networkSyncController,
+            tutorialController: this.scenarioNetworkControllers.tutorialController,
             turnStateController: this.turnStateController,
             movementController: this.combatControllers.movementController,
             floatingText: this.floatingText,
@@ -367,8 +357,8 @@ export class WorldEngine {
             gameManager: this.gameManager,
             raidSession: this.raidSession,
             townSession: this.townSession,
-            storyScenarioController: this.storyScenarioController,
-            networkSyncController: this.networkSyncController,
+            storyScenarioController: this.scenarioNetworkControllers.storyScenarioController,
+            networkSyncController: this.scenarioNetworkControllers.networkSyncController,
             getWorldMap: () => this.worldMap,
             getTownById: (townId) => this.getTownById(townId),
             getCurrentHubTown: () => this.getCurrentHubTown(),
@@ -384,7 +374,7 @@ export class WorldEngine {
             setNetworkPlayerId: (playerId) => { this.networkPlayerId = playerId; },
             closeFieldOverlays: () => this.closeFieldOverlays(),
             clearFieldTurnState: () => this.clearFieldTurnState(),
-            clearIntroTutorialStateForNetworkRaid: () => this.tutorialController.clearForNetworkRaid(),
+            clearIntroTutorialStateForNetworkRaid: () => this.scenarioNetworkControllers.tutorialController.clearForNetworkRaid(),
             clearRemotePartyActors: () => this.remotePartyActors.clear(),
             placePartyNear: (tile) => this.placePartyNear(tile),
             getControlledActor: () => this.getControlledActor(),
@@ -425,7 +415,7 @@ export class WorldEngine {
             playerActionController: this.actionControllers.playerActionController,
             raidOutcomeController: this.raidLifecycleControllers.raidOutcomeController,
             selectionController: this.actionControllers.selectionController,
-            tutorialController: this.tutorialController,
+            tutorialController: this.scenarioNetworkControllers.tutorialController,
             turnStateController: this.turnStateController,
             fieldFeedback: this.fieldFeedback,
             getWorldMap: () => this.worldMap,
@@ -478,7 +468,7 @@ export class WorldEngine {
             townSession: this.townSession,
             raidOutcomeController: this.raidLifecycleControllers.raidOutcomeController,
             fusionTempleUI: this.fusionTempleUI,
-            tutorialController: this.tutorialController,
+            tutorialController: this.scenarioNetworkControllers.tutorialController,
             inputController: this.presentationControllers.inputController,
             effectManager: this.effectManager,
             floatingText: this.floatingText,
@@ -486,7 +476,7 @@ export class WorldEngine {
             tacticalController: this.presentationControllers.tacticalController,
             raidLifecycleController: this.raidLifecycleControllers.raidLifecycleController,
             templeController: this.worldControllers.templeController,
-            storyScenarioController: this.storyScenarioController,
+            storyScenarioController: this.scenarioNetworkControllers.storyScenarioController,
             advanceWorldTime: (dt) => { this.worldTime += dt; },
             isNetworkRaid: () => this.isNetworkRaid,
             updateNetworkRaid: (dt, input, camera) => this.updateNetworkRaid(dt, input, camera),
@@ -548,12 +538,16 @@ export class WorldEngine {
     public getRaidSession(): WorldRaidSession { return this.raidSession; }
 
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
-        this.presentationControllers.renderController.render(ctx, camera, width, height, { hideWorldHud: this.tutorialController.isActive() });
-        if (this.tutorialController.isActive()) this.tutorialController.renderHud(ctx, width, height);
+        this.presentationControllers.renderController.render(ctx, camera, width, height, {
+            hideWorldHud: this.scenarioNetworkControllers.tutorialController.isActive(),
+        });
+        if (this.scenarioNetworkControllers.tutorialController.isActive()) {
+            this.scenarioNetworkControllers.tutorialController.renderHud(ctx, width, height);
+        }
     }
 
     public startIntroTutorial(): void {
-        this.tutorialController.start();
+        this.scenarioNetworkControllers.tutorialController.start();
     }
 
     private spawnPartyAtCurrentHub(): void {
@@ -630,12 +624,12 @@ export class WorldEngine {
         this.presentationControllers.inputController.process(input, camera);
         for (const actor of this.partyActors) actor.entity.update(dt);
         for (const entry of this.fieldEnemies) entry.enemy.update(dt);
-        this.networkSyncController.refreshMovePathPreview();
+        this.scenarioNetworkControllers.networkSyncController.refreshMovePathPreview();
         this.effectManager.update(dt);
         this.floatingText.update(dt);
         this.updateAttackCues(dt);
         this.refreshLootState();
-        this.storyScenarioController.checkDungeonArrival();
+        this.scenarioNetworkControllers.storyScenarioController.checkDungeonArrival();
         this.refreshOpenActionMenuState();
 
         const controlled = this.getControlledActor();
@@ -645,8 +639,8 @@ export class WorldEngine {
     }
 
     private updateStoryPresentation(dt: number, camera: Camera): boolean {
-        if (!this.storyScenarioController.isPresentationActive()) return false;
-        this.storyScenarioController.updatePresentation(dt);
+        if (!this.scenarioNetworkControllers.storyScenarioController.isPresentationActive()) return false;
+        this.scenarioNetworkControllers.storyScenarioController.updatePresentation(dt);
         this.effectManager.update(dt);
         this.floatingText.update(dt);
         this.updateAttackCues(dt);
@@ -657,42 +651,42 @@ export class WorldEngine {
     }
 
     private applyNetworkSnapshot(snapshot: WorldSnapshot): void {
-        if (this.networkEvents) {
-            this.networkEvents.applySnapshot(snapshot);
+        if (this.scenarioNetworkControllers.networkEvents) {
+            this.scenarioNetworkControllers.networkEvents.applySnapshot(snapshot);
             return;
         }
         this.raidSession.elapsedSeconds = snapshot.raidTimer.elapsedSeconds;
         this.raidSession.setRaidModifier(snapshot.raidTimer.modifier ?? null);
-        this.networkSyncController.applySnapshot(snapshot);
+        this.scenarioNetworkControllers.networkSyncController.applySnapshot(snapshot);
     }
 
     private openNetworkLoot(grant: LootGrantMessage): void {
-        if (this.networkEvents) this.networkEvents.openLoot(grant);
-        else this.networkSyncController.openLoot(grant);
+        if (this.scenarioNetworkControllers.networkEvents) this.scenarioNetworkControllers.networkEvents.openLoot(grant);
+        else this.scenarioNetworkControllers.networkSyncController.openLoot(grant);
     }
 
     private handleNetworkAutoLootGrant(grant: AutoLootGrantMessage): void {
-        if (this.networkEvents) this.networkEvents.handleAutoLootGrant(grant);
-        else this.networkSyncController.handleAutoLootGrant(grant);
+        if (this.scenarioNetworkControllers.networkEvents) this.scenarioNetworkControllers.networkEvents.handleAutoLootGrant(grant);
+        else this.scenarioNetworkControllers.networkSyncController.handleAutoLootGrant(grant);
     }
 
     private handleNetworkInventoryConsumed(message: InventoryConsumedMessage): void {
-        if (this.networkEvents) this.networkEvents.handleInventoryConsumed(message);
-        else this.networkSyncController.handleInventoryConsumed(message);
+        if (this.scenarioNetworkControllers.networkEvents) this.scenarioNetworkControllers.networkEvents.handleInventoryConsumed(message);
+        else this.scenarioNetworkControllers.networkSyncController.handleInventoryConsumed(message);
     }
 
     private handleNetworkActionRejected(rejection: ActionRejectedMessage): void {
-        if (this.networkEvents) this.networkEvents.handleActionRejected(rejection);
-        else this.networkSyncController.handleActionRejected(rejection);
+        if (this.scenarioNetworkControllers.networkEvents) this.scenarioNetworkControllers.networkEvents.handleActionRejected(rejection);
+        else this.scenarioNetworkControllers.networkSyncController.handleActionRejected(rejection);
     }
 
     private handleNetworkCombatEvent(event: CombatEventMessage): void {
-        if (this.networkEvents) this.networkEvents.handleCombatEvent(event);
-        else this.networkSyncController.handleCombatEvent(event);
+        if (this.scenarioNetworkControllers.networkEvents) this.scenarioNetworkControllers.networkEvents.handleCombatEvent(event);
+        else this.scenarioNetworkControllers.networkSyncController.handleCombatEvent(event);
     }
 
     private getPathPreviewTiles(actor: FieldActor | null): TilePoint[] {
-        return getWorldPathPreviewTiles(actor, this.networkSyncController);
+        return getWorldPathPreviewTiles(actor, this.scenarioNetworkControllers.networkSyncController);
     }
 
     private resolveFieldHitAt(tile: TilePoint) {
@@ -738,19 +732,19 @@ export class WorldEngine {
     }
 
     private submitNetworkMoveIntent(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean {
-        return this.networkIntentController.submitMove(actor, tile, path, apCost, pathCost);
+        return this.scenarioNetworkControllers.networkIntentController.submitMove(actor, tile, path, apCost, pathCost);
     }
 
     private submitNetworkActionIntent(actor: FieldActor, action: 'defend' | 'rest'): boolean {
-        return this.networkIntentController.submitAction(actor, action);
+        return this.scenarioNetworkControllers.networkIntentController.submitAction(actor, action);
     }
 
     private submitNetworkUseItemIntent(actor: FieldActor, itemId: string): boolean {
-        return this.networkIntentController.submitUseItem(actor, itemId);
+        return this.scenarioNetworkControllers.networkIntentController.submitUseItem(actor, itemId);
     }
 
     private submitNetworkSkillIntent(actor: FieldActor, skillId: string, targetId?: string): boolean {
-        return this.networkIntentController.submitSkill(actor, skillId, targetId);
+        return this.scenarioNetworkControllers.networkIntentController.submitSkill(actor, skillId, targetId);
     }
 
     private tryActorAttack(actor: FieldActor, enemy: Enemy): boolean {
@@ -817,8 +811,8 @@ export class WorldEngine {
     private switchToPartyMember(index: number): boolean {
         const actor = this.partyActors[index];
         if (!actor || actor.character.isDead) return false;
-        if (this.tutorialController.isActive() && actor.id !== this.turnStateController.getActiveTurnActorId()) {
-            this.tutorialController.addBlockedLog();
+        if (this.scenarioNetworkControllers.tutorialController.isActive() && actor.id !== this.turnStateController.getActiveTurnActorId()) {
+            this.scenarioNetworkControllers.tutorialController.addBlockedLog();
             return false;
         }
         if (!this.party.getCharacters().includes(actor.character)) {
@@ -839,11 +833,11 @@ export class WorldEngine {
     private getActionTurnFlow(): WorldEngineActionTurnFlow {
         this.actionTurnFlow ??= createWorldEngineActionTurnFlow({
             actionMenuUI: this.actionMenuUI,
-            tutorialController: this.tutorialController,
+            tutorialController: this.scenarioNetworkControllers.tutorialController,
             turnStateController: this.turnStateController,
             selectionController: this.actionControllers.selectionController,
             playerActionController: this.actionControllers.playerActionController,
-            networkIntentController: this.networkIntentController,
+            networkIntentController: this.scenarioNetworkControllers.networkIntentController,
             magicController: this.actionControllers.magicController,
             toolController: this.actionControllers.toolController,
             getControlledActor: () => this.getControlledActor(),
@@ -951,7 +945,7 @@ export class WorldEngine {
         if (!this.actionControllers.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, 'noExecutableAction');
         else {
             this.closeTacticalMenu();
-            this.actionMenuUI.open(this.tutorialController.getActionMenuStates(actor));
+            this.actionMenuUI.open(this.scenarioNetworkControllers.tutorialController.getActionMenuStates(actor));
         }
     }
 

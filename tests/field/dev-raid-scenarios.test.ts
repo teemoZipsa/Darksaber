@@ -126,17 +126,19 @@ function createManagerHarness() {
                 selectLoot: (lootId: string) => { selected.lootId = lootId; },
             },
         },
-        storyScenarioController: {
-            started: null as null | { dungeonId: string; questId: string },
-            startedScenario: null as null | { dungeonId: string; questId: string },
-            startLocalStoryScenarioDungeon(dungeon: { id: string }, storyQuest: { id: string }) {
-                this.startedScenario = { dungeonId: dungeon.id, questId: storyQuest.id };
-                if (STORY_SCENARIOS.find((scenario) => scenario.dungeonId === dungeon.id)?.missionKind === 'soloInterior') {
-                    this.startLocalStoryInteriorDungeon(dungeon, storyQuest);
-                }
-            },
-            startLocalStoryInteriorDungeon(dungeon: { id: string }, storyQuest: { id: string }) {
-                this.started = { dungeonId: dungeon.id, questId: storyQuest.id };
+        scenarioNetworkControllers: {
+            storyScenarioController: {
+                started: null as null | { dungeonId: string; questId: string },
+                startedScenario: null as null | { dungeonId: string; questId: string },
+                startLocalStoryScenarioDungeon(dungeon: { id: string }, storyQuest: { id: string }) {
+                    this.startedScenario = { dungeonId: dungeon.id, questId: storyQuest.id };
+                    if (STORY_SCENARIOS.find((scenario) => scenario.dungeonId === dungeon.id)?.missionKind === 'soloInterior') {
+                        this.startLocalStoryInteriorDungeon(dungeon, storyQuest);
+                    }
+                },
+                startLocalStoryInteriorDungeon(dungeon: { id: string }, storyQuest: { id: string }) {
+                    this.started = { dungeonId: dungeon.id, questId: storyQuest.id };
+                },
             },
         },
         clearFieldTurnStateCalls: 0,
@@ -237,11 +239,11 @@ test('dev story31 scenario launches local Demon Fixer Den without network raid s
     assert.equal(world.isNetworkRaid, false);
     assert.equal(world.networkRaidClient, null);
     assert.equal(inventory.activeCharacter, actor.character);
-    assert.deepEqual(world.storyScenarioController.started, {
+    assert.deepEqual(world.scenarioNetworkControllers.storyScenarioController.started, {
         dungeonId: 'demon_fixers_den',
         questId: 'main:episode_31_demon_fixers',
     });
-    assert.deepEqual(world.storyScenarioController.startedScenario, {
+    assert.deepEqual(world.scenarioNetworkControllers.storyScenarioController.startedScenario, {
         dungeonId: 'demon_fixers_den',
         questId: 'main:episode_31_demon_fixers',
     });
@@ -262,17 +264,21 @@ test('dev story scenarios launch local starts through episode 31', () => {
             assert.equal(world.currentPhase, 'raid', `episode ${episode} phase`);
             assert.equal(world.isNetworkRaid, false, `episode ${episode} network raid`);
             assert.equal(world.networkRaidClient, null, `episode ${episode} network client`);
-            assert.deepEqual(world.storyScenarioController.startedScenario, {
+            assert.deepEqual(world.scenarioNetworkControllers.storyScenarioController.startedScenario, {
                 dungeonId: scenario.dungeonId,
                 questId: scenario.questId,
             }, `episode ${episode} story start`);
             if (scenario.missionKind === 'soloInterior') {
-                assert.deepEqual(world.storyScenarioController.started, {
+                assert.deepEqual(world.scenarioNetworkControllers.storyScenarioController.started, {
                     dungeonId: scenario.dungeonId,
                     questId: scenario.questId,
                 }, `episode ${episode} interior start`);
             } else {
-                assert.equal(world.storyScenarioController.started, null, `episode ${episode} should not start an interior`);
+                assert.equal(
+                    world.scenarioNetworkControllers.storyScenarioController.started,
+                    null,
+                    `episode ${episode} should not start an interior`
+                );
             }
             assert.equal(logs.length, 1, `episode ${episode} dev log`);
             assert.match(logs[0], new RegExp(`${episode}화|Episode ${episode}`), `episode ${episode} log text`);

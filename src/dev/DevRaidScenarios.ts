@@ -63,9 +63,11 @@ type DevWorldEngine = {
     actionControllers: {
         selectionController: { selectActor: (actorId: string | null) => void; selectLoot: (lootId: string) => void };
     };
-    storyScenarioController?: {
-        startLocalStoryScenarioDungeon?: (dungeon: DevDungeon, storyQuest: NonNullable<ReturnType<typeof getStoryQuestByDungeonId>>) => void;
-        startLocalStoryInteriorDungeon: (dungeon: DevDungeon, storyQuest: NonNullable<ReturnType<typeof getStoryQuestByDungeonId>>) => void;
+    scenarioNetworkControllers?: {
+        storyScenarioController?: {
+            startLocalStoryScenarioDungeon?: (dungeon: DevDungeon, storyQuest: NonNullable<ReturnType<typeof getStoryQuestByDungeonId>>) => void;
+            startLocalStoryInteriorDungeon: (dungeon: DevDungeon, storyQuest: NonNullable<ReturnType<typeof getStoryQuestByDungeonId>>) => void;
+        };
     };
     clearFieldTurnState: () => void;
     closeNetworkRaidClient?: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => void;
@@ -192,15 +194,16 @@ function applyDevStoryScenario(world: DevWorldEngine, scenarioId: DevStoryScenar
     const scenario = STORY_SCENARIOS.find((candidate) => candidate.episode === episode);
     const dungeon = world.worldMap.getDungeons?.().find((candidate) => candidate.id === scenario?.dungeonId);
     const quest = scenario ? getStoryQuestByDungeonId(scenario.dungeonId) : null;
-    if (!scenario || !dungeon || !quest || !world.storyScenarioController) {
+    const storyScenarioController = world.scenarioNetworkControllers?.storyScenarioController;
+    if (!scenario || !dungeon || !quest || !storyScenarioController) {
         console.warn(`[Darksaber] Dev ${scenarioId} scenario could not find the dungeon, quest, or controller.`);
         return;
     }
 
-    if (world.storyScenarioController.startLocalStoryScenarioDungeon) {
-        world.storyScenarioController.startLocalStoryScenarioDungeon(dungeon, quest);
+    if (storyScenarioController.startLocalStoryScenarioDungeon) {
+        storyScenarioController.startLocalStoryScenarioDungeon(dungeon, quest);
     } else {
-        world.storyScenarioController.startLocalStoryInteriorDungeon(dungeon, quest);
+        storyScenarioController.startLocalStoryInteriorDungeon(dungeon, quest);
     }
     world.addCombatLog?.(formatT('dev.scenario.storyReady', { episode, dungeon: dungeon.nameKr }));
     setDevScenarioStatus(scenarioId, scenario.missionKind === 'soloInterior' ? 'interior-ready' : 'scenario-ready');
