@@ -1,16 +1,16 @@
 import {
     getItemDef,
-    getItemDefByOriginalGetItemId,
     type ItemDef,
 } from '../src/data/ItemDB';
 import {
     getStoryScenarioEventSequence,
-    getStoryScenarioTrapMagicDamage,
-    getStoryScenarioTriggerMagicCodes,
-    getStoryScenarioTriggerRandomChance,
-    getStoryScenarioTriggerUseItemIds,
     type StoryScenarioFieldEvent,
 } from '../src/data/StoryScenarioEventData';
+import {
+    doesStoryScenarioFieldEventRandomPass,
+    getStoryScenarioFieldEventRequiredItems,
+    getStoryScenarioFieldEventTrapDamage,
+} from '../src/raid/StoryScenarioFieldEventRules';
 import type {
     ScenarioFieldEventResultMessage,
     ScenarioFieldEventRewardResult,
@@ -43,12 +43,9 @@ export class WorldSessionScenarioRewards {
         actor: ServerActor,
         event: StoryScenarioFieldEvent
     ): ScenarioFieldEventResultMessage['trapDamage'] {
-        const magicCodes = getStoryScenarioTriggerMagicCodes(event.trigger);
-        if (magicCodes.length === 0 || actor.isDead || actor.stats.hp <= 1) return undefined;
+        if (actor.isDead || actor.stats.hp <= 1) return undefined;
 
-        const maxHp = Math.max(actor.stats.maxHp, actor.stats.hp, 1);
-        const rawDamage = magicCodes.reduce((sum, magicCode) => sum + getStoryScenarioTrapMagicDamage(magicCode, maxHp), 0);
-        const damage = Math.min(actor.stats.hp - 1, rawDamage);
+        const damage = getStoryScenarioFieldEventTrapDamage(event, actor.stats.hp, actor.stats.maxHp);
         if (damage <= 0) return undefined;
 
         actor.stats.hp = Math.max(1, actor.stats.hp - damage);
@@ -57,10 +54,7 @@ export class WorldSessionScenarioRewards {
     }
 
     public rollFieldEventRandom(event: StoryScenarioFieldEvent): boolean {
-        const chance = getStoryScenarioTriggerRandomChance(event.trigger);
-        if (chance === null || chance >= 100) return true;
-        if (chance <= 0) return false;
-        return Math.random() * 100 < chance;
+        return doesStoryScenarioFieldEventRandomPass(event, () => Math.random());
     }
 
     public canConsumeFieldEventUseItems(player: ServerPlayer, event: StoryScenarioFieldEvent): boolean {
@@ -127,9 +121,7 @@ export class WorldSessionScenarioRewards {
     }
 
     private getRequiredItems(event: StoryScenarioFieldEvent): ItemDef[] {
-        return getStoryScenarioTriggerUseItemIds(event.trigger)
-            .map((originalItemId) => getItemDefByOriginalGetItemId(originalItemId))
-            .filter((item): item is ItemDef => Boolean(item));
+        return getStoryScenarioFieldEventRequiredItems(event);
     }
 
     private getPlayerItemQuantity(player: ServerPlayer, itemId: string): number {

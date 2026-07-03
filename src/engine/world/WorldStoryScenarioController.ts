@@ -1,5 +1,5 @@
 import type { PlayerData } from '../../data/PlayerData';
-import { getItemDef, getItemDefByOriginalGetItemId } from '../../data/ItemDB';
+import { getItemDef, type ItemDef } from '../../data/ItemDB';
 import { getStoryQuestByDungeonId, isStoryQuestAvailable, type StoryQuestDefinition } from '../../data/StoryQuestData';
 import { getStoryScenarioByDungeonId, type StoryScenarioDefinition } from '../../data/StoryScenarioData';
 import {
@@ -12,10 +12,6 @@ import {
     getStoryScenarioEventStepDurationMs,
     getStoryScenarioEventSequence,
     getStoryScenarioPresentationDurationMs,
-    getStoryScenarioTrapMagicDamage,
-    getStoryScenarioTriggerMagicCodes,
-    getStoryScenarioTriggerRandomChance,
-    getStoryScenarioTriggerUseItemIds,
     type StoryScenarioEventSequence,
     type StoryScenarioEventStep,
     type StoryScenarioFieldEvent,
@@ -29,6 +25,11 @@ import type { Player } from '../../entity/Player';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
 import { manhattan, type TilePoint } from '../../field/FieldPathing';
 import { StoryInteriorMap } from '../../map/StoryInteriorMap';
+import {
+    doesStoryScenarioFieldEventRandomPass,
+    getStoryScenarioFieldEventRequiredItems,
+    getStoryScenarioFieldEventTrapDamage,
+} from '../../raid/StoryScenarioFieldEventRules';
 import type { WorldDungeonInfo, WorldInspectMarker, WorldMap } from '../../map/WorldMap';
 import type {
     ScenarioEnemyDefeatEventMessage,
@@ -702,17 +703,12 @@ export class WorldStoryScenarioController {
         return `${dungeonId}:${eventId}`;
     }
 
-    private getFieldEventRequiredItems(event: StoryScenarioFieldEvent): NonNullable<ReturnType<typeof getItemDef>>[] {
-        return getStoryScenarioTriggerUseItemIds(event.trigger)
-            .map((originalItemId) => getItemDefByOriginalGetItemId(originalItemId))
-            .filter((item): item is NonNullable<ReturnType<typeof getItemDef>> => Boolean(item));
+    private getFieldEventRequiredItems(event: StoryScenarioFieldEvent): ItemDef[] {
+        return getStoryScenarioFieldEventRequiredItems(event);
     }
 
     private rollFieldEventRandom(event: StoryScenarioFieldEvent): boolean {
-        const chance = getStoryScenarioTriggerRandomChance(event.trigger);
-        if (chance === null || chance >= 100) return true;
-        if (chance <= 0) return false;
-        return this.context.rollScenarioRandom() * 100 < chance;
+        return doesStoryScenarioFieldEventRandomPass(event, () => this.context.rollScenarioRandom());
     }
 
     private getFieldEventDungeonId(): string | null {
@@ -877,16 +873,11 @@ export class WorldStoryScenarioController {
     }
 
     private applyFieldEventTrapMagic(event: StoryScenarioFieldEvent, actor: FieldActor | null): void {
-        const magicCodes = getStoryScenarioTriggerMagicCodes(event.trigger);
-        if (magicCodes.length === 0) return;
-
         const targetActor = actor?.character ? actor : this.context.getControlledActor();
         const character = targetActor?.character;
         if (!targetActor || !character || character.isDead || character.stats.hp <= 1) return;
 
-        const maxHp = Math.max(character.stats.maxHp, character.stats.hp, 1);
-        const rawDamage = magicCodes.reduce((sum, magicCode) => sum + getStoryScenarioTrapMagicDamage(magicCode, maxHp), 0);
-        const damage = Math.min(character.stats.hp - 1, rawDamage);
+        const damage = getStoryScenarioFieldEventTrapDamage(event, character.stats.hp, character.stats.maxHp);
         if (damage <= 0) return;
 
         character.stats.hp = Math.max(1, character.stats.hp - damage);
