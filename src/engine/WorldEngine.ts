@@ -18,7 +18,6 @@ import {
 import { getRaidModifierEffects } from '../raid/RaidModifiers';
 import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
-import { isMasterClassLineId } from '../data/ClassTree';
 import { formatT, t } from '../i18n/LanguageManager';
 import { removeStatusesFromCarrier } from '../combat/StatusEffects';
 import { ActionMenuUI } from '../ui/ActionMenuUI';
@@ -36,7 +35,7 @@ import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST } from '../field/Fi
 import type { FieldActor, FieldEnemy, FieldHitParty, FieldTurnEndReason } from '../field/FieldTypes';
 import { WorldRaidSession, type WorldPhase } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
-import { WorldCombatController, createCombatResult, type CombatResult } from './world/WorldCombatController';
+import { WorldCombatController, type CombatResult } from './world/WorldCombatController';
 import { WorldMovementController } from './world/WorldMovementController';
 import { WorldEnemyTurnController } from './world/WorldEnemyTurnController';
 import { WorldMagicController } from './world/WorldMagicController';
@@ -61,6 +60,7 @@ import { WorldTurnStateController } from './world/WorldTurnStateController';
 import { WorldFieldFeedbackState } from './world/WorldFieldFeedbackState';
 import { WorldEngineNetworkEvents } from './world/WorldEngineNetworkEvents';
 import { WorldTurnStartResolver } from './world/WorldTurnStartResolver';
+import { WorldEngineCombatFlow } from './world/WorldEngineCombatFlow';
 import { applyMonsterSprite } from './world/NetworkSnapshotMapping';
 import {
     getWorldBackpackCursedArtifactCount,
@@ -94,7 +94,6 @@ import {
     getWorldActorAttackTargetFailure,
     getWorldActorTerrainTraits,
     getWorldActorTerrainStepCost,
-    getWorldAttackPatternTargetEnemies,
     getWorldTerrainTraitsForActorId,
     hasWorldFieldLineOfSight,
 } from './world/WorldAttackTargeting';
@@ -159,6 +158,7 @@ export class WorldEngine {
     private networkIntentController: WorldNetworkIntentController;
     private networkEvents: WorldEngineNetworkEvents;
     private turnStartResolver: WorldTurnStartResolver;
+    private combatFlow: WorldEngineCombatFlow;
     private turnStateController = new WorldTurnStateController();
     private hoverTile: TilePoint = { x: -1, y: -1 };
     private fieldFeedback = new WorldFieldFeedbackState();
@@ -431,6 +431,32 @@ export class WorldEngine {
                 this.storyScenarioController.completeDungeonIfBossDefeated(enemy);
             },
             flushFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
+        });
+        this.combatFlow = new WorldEngineCombatFlow({
+            isNetworkRaid: () => this.isNetworkRaid,
+            isTutorialActive: () => this.tutorialController.isActive(),
+            isTutorialEnemy: (enemy) => this.tutorialController.isTutorialEnemy(enemy),
+            completeTutorial: () => this.tutorialController.complete(),
+            getWorldMap: () => this.worldMap,
+            getFieldEnemies: () => this.fieldEnemies,
+            getPartyActors: () => this.partyActors,
+            getActivePartyIndex: () => this.party.getActiveIndex(),
+            markActiveDead: () => this.party.markActiveDead(),
+            switchToPartyMember: (index) => this.switchToPartyMember(index),
+            submitNetworkAttack: (actor, enemy) => this.networkIntentController.submitAttack(actor, enemy),
+            combatController: this.combatController,
+            snapshotPartyHp: () => this.snapshotPartyHp(),
+            interruptRestingForDamage: (beforeHpByActorId) => this.interruptRestingForDamage(beforeHpByActorId),
+            recordKill: () => this.raidSession.recordKill(),
+            recordCharacterDown: (characterId) => this.raidSession.recordCharacterDown(characterId),
+            clearEnemyIfSelected: (enemyId) => this.selectionController.clearEnemyIfSelected(enemyId),
+            spawnKillEffect: (enemy, exp) => this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, exp, enemy),
+            spawnStatus: (x, y, text) => this.floatingText.spawnStatus(x, y, text),
+            registerCombatFeedback: (kind, feedbackGroupId) => this.registerCombatFeedback(kind, feedbackGroupId),
+            spawnEnemyLoot: (enemy) => this.spawnEnemyLoot(enemy),
+            playEnemyDefeatEvent: (enemy) => this.storyScenarioController.playEnemyDefeatEvent(enemy),
+            completeDungeonIfBossDefeated: (enemy) => this.storyScenarioController.completeDungeonIfBossDefeated(enemy),
+            log: (message) => this.addCombatLog(message),
         });
         this.movementController = new WorldMovementController({
             getPartyActors: () => this.partyActors,
@@ -1083,15 +1109,7 @@ export class WorldEngine {
     }
 
     private applyCombatResult(result: CombatResult): void {
-        for (const enemyId of result.killedEnemyIds) {
-            this.raidSession.recordKill();
-            this.selectionController.clearEnemyIfSelected(enemyId);
-        }
-        for (const characterId of result.downedCharacterIds) {
-            const actor = this.partyActors.find((candidate) => candidate.character.id === characterId);
-            if (actor && !actor.character.isDead) this.handleActorDown(actor);
-            else this.raidSession.recordCharacterDown(characterId);
-        }
+        this.combatFlow.applyCombatResult(result);
     }
 
     private spawnEnemyLoot(enemy: Enemy): void {
@@ -1115,121 +1133,19 @@ export class WorldEngine {
     }
 
     private tryActorAttack(actor: FieldActor, enemy: Enemy): boolean {
-        if (this.isNetworkRaid) {
-            return this.networkIntentController.submitAttack(actor, enemy);
-        }
-        if (!this.tutorialController.isActive()) {
-            this.addCombatLog(t('field.log.serverCombatOnly'));
-            return false;
-        }
-        if (!canWorldActorAttackTarget({ worldMap: this.worldMap, actor, enemy })) return false;
-        const profile = getWorldActorAttackProfile(actor);
-        const targetEnemies = getWorldAttackPatternTargetEnemies({
-            worldMap: this.worldMap,
-            fieldEnemies: this.fieldEnemies,
-            actor,
-            selectedEnemy: enemy,
-        });
-        const beforeHpByActorId = this.snapshotPartyHp();
-        const result = this.combatController.tryActorAttack({
-            actor,
-            selectedEnemy: enemy,
-            targetEnemies,
-            profile,
-            getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
-            directionFromTo: (from, to) => directionFromTo(from, to),
-            tryEnemyCounterAttack: (counterEnemy, counterActor) => {
-                const countered = this.tryEnemyCounterAttack(counterEnemy, counterActor);
-                return createCombatResult(countered);
-            },
-        });
-        this.applyCombatResult(result);
-        this.interruptRestingForDamage(beforeHpByActorId);
-        return result.executed;
-    }
-
-    private tryEnemyCounterAttack(enemy: Enemy, actor: FieldActor): boolean {
-        const beforeHpByActorId = this.snapshotPartyHp();
-        const result = this.combatController.tryEnemyCounterAttack({
-            enemy,
-            actor,
-            getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
-            getActorTerrainTraits: (targetActor) => getWorldActorTerrainTraits(targetActor),
-        });
-        this.applyCombatResult(result);
-        this.interruptRestingForDamage(beforeHpByActorId);
-        return result.executed;
+        return this.combatFlow.tryActorAttack(actor, enemy);
     }
 
     private handleEnemyDefeated(actor: FieldActor, enemy: Enemy, feedbackGroupId?: string): void {
-        if (this.tutorialController.isTutorialEnemy(enemy)) {
-            this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy);
-            this.registerCombatFeedback('kill', feedbackGroupId);
-            this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
-            enemy.isAggro = false;
-            this.selectionController.clearEnemyIfSelected(enemy.id);
-            this.tutorialController.complete();
-            return;
-        }
-
-        this.awardDefeatExp(actor, enemy);
-        this.raidSession.recordKill();
-        const killExp = enemy.calcExpFor(actor.character.level);
-        this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, killExp, enemy);
-        this.registerCombatFeedback('kill', feedbackGroupId);
-        this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
-        enemy.isAggro = false;
-        this.selectionController.clearEnemyIfSelected(enemy.id);
-
-        this.spawnEnemyLoot(enemy);
-        this.storyScenarioController.playEnemyDefeatEvent(enemy);
-        this.storyScenarioController.completeDungeonIfBossDefeated(enemy);
+        this.combatFlow.handleEnemyDefeated(actor, enemy, feedbackGroupId);
     }
 
     private awardDefeatExp(actor: FieldActor, enemy: Enemy): void {
-        const exp = enemy.calcExpFor(actor.character.level);
-        const canGainExp = this.canCharacterGainExpInCurrentRealm(actor.character);
-        this.addCombatLog(canGainExp
-            ? formatT('field.log.enemyDefeatedExp', { enemy: enemy.name, exp })
-            : formatT('field.log.enemyDefeated', { enemy: enemy.name }));
-        if (canGainExp) {
-            const expResult = actor.character.gainExp(exp);
-            if (expResult.promoted && expResult.newTierName) {
-                this.addCombatLog(formatT('field.log.actorPromoted', { name: actor.character.name, tier: expResult.newTierName }));
-            }
-            if (expResult.emblemUnlocked) {
-                this.addCombatLog(formatT('field.log.emblemUnlocked', { name: actor.character.name }));
-            }
-        } else {
-            this.addCombatLog(t('field.log.noGrowthRealm'));
-        }
-    }
-
-    private canCharacterGainExpInCurrentRealm(character: Character): boolean {
-        const isMaster = isMasterClassLineId(character.classLineId) || character.currentTier >= 8;
-        return this.worldMap.getRealm() === 'master' ? isMaster : !isMaster;
+        this.combatFlow.awardDefeatExp(actor, enemy);
     }
 
     private handleActorDown(actor: FieldActor): void {
-        this.raidSession.recordCharacterDown(actor.character.id);
-        const index = this.partyActors.indexOf(actor);
-        if (index === this.party.getActiveIndex()) {
-            const next = this.party.markActiveDead();
-            this.addCombatLog(formatT('field.log.actorDown', { name: actor.character.name }));
-            this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'DOWN');
-            if (next) {
-                const nextIndex = this.partyActors.findIndex((candidate) => candidate.character === next);
-                if (nextIndex >= 0) this.switchToPartyMember(nextIndex);
-            } else {
-                this.addCombatLog(t('field.log.partyAllDown'));
-            }
-            return;
-        }
-
-        actor.character.isDead = true;
-        actor.character.exp = 0;
-        this.addCombatLog(formatT('field.log.actorDown', { name: actor.character.name }));
-        this.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'DOWN');
+        this.combatFlow.handleActorDown(actor);
     }
 
     private openLoot(loot: LootObject): void {
