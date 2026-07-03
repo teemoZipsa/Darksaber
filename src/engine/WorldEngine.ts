@@ -62,6 +62,7 @@ import { WorldTurnStartResolver } from './world/WorldTurnStartResolver';
 import { WorldEngineCombatFlow } from './world/WorldEngineCombatFlow';
 import { WorldEngineActionTurnFlow } from './world/WorldEngineActionTurnFlow';
 import { WorldEngineUpdateFlow } from './world/WorldEngineUpdateFlow';
+import { runWorldEngineStartupFlow } from './world/WorldEngineStartupFlow';
 import { applyMonsterSprite } from './world/NetworkSnapshotMapping';
 import {
     getWorldBackpackCursedArtifactCount,
@@ -120,7 +121,7 @@ export class WorldEngine {
     private playerData: PlayerData;
     private gameManager: GameManager;
     private worldMap: WorldMap;
-    private player: Player;
+    private player!: Player;
     private partyActors: FieldActor[] = [];
     private fieldEnemies: FieldEnemy[] = [];
     private remotePartyActors: Map<string, FieldActor> = new Map();
@@ -396,21 +397,20 @@ export class WorldEngine {
         this.initializeCombatActionControllers();
         this.initializeRaidLifecycleControllers();
         this.initializePresentationControllers();
-        this.spawnPartyAtCurrentHub();
-        this.player = this.getControlledActor()?.entity ?? new Player(0, 0);
-        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-        if (options.startIntroTutorial) {
-            this.startIntroTutorial();
-        } else if (NetworkRaidClient.hasStoredResumeToken()) {
-            this.addCombatLog(t('mp.resumeAttempt'));
-            void this.beginRaidFromCurrentHub();
-        } else {
-            this.openTown(this.getCurrentHubTown());
-            this.addCombatLog(t('field.log.townReady'));
-        }
-
-        camera.followTile(this.player.gridX, this.player.gridY);
-        camera.snapToTarget();
+        runWorldEngineStartupFlow({
+            camera,
+            options,
+            spawnPartyAtCurrentHub: () => this.spawnPartyAtCurrentHub(),
+            getControlledActor: () => this.getControlledActor(),
+            setPlayer: (player) => { this.player = player; },
+            getPlayer: () => this.player,
+            selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            startIntroTutorial: () => this.startIntroTutorial(),
+            hasStoredNetworkResumeToken: () => NetworkRaidClient.hasStoredResumeToken(),
+            beginRaidFromCurrentHub: () => { void this.beginRaidFromCurrentHub(); },
+            openCurrentHubTown: () => this.openTown(this.getCurrentHubTown()),
+            addCombatLog: (message) => this.addCombatLog(message),
+        });
     }
 
     private initializeCombatActionControllers(): void {
