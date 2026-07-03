@@ -55,7 +55,7 @@ import type { WorldEngineActionTurnFlow } from './world/WorldEngineActionTurnFlo
 import type { WorldEngineUpdateFlow } from './world/WorldEngineUpdateFlow';
 import {
     createWorldEngineActionTurnFlow,
-    createWorldEngineUpdateFlow,
+    createWorldEngineUpdateFlowFromSources,
 } from './world/WorldEngineFlows';
 import { runWorldEngineStartupFlow } from './world/WorldEngineStartupFlow';
 import {
@@ -372,21 +372,16 @@ export class WorldEngine {
 
     private getUpdateFlow(): WorldEngineUpdateFlow {
         const flowState = this.getFlowState();
-        flowState.updateFlow ??= createWorldEngineUpdateFlow({
+        flowState.updateFlow ??= createWorldEngineUpdateFlowFromSources({
             townSession: this.townSession,
-            raidOutcomeController: this.raidLifecycleControllers.raidOutcomeController,
-            fusionTempleUI: this.getUiState().fusionTempleUI,
-            tutorialController: this.scenarioNetworkControllers.tutorialController,
-            inputController: this.presentationControllers.inputController,
-            effectManager: this.getUiState().effectManager,
-            floatingText: this.getUiState().floatingText,
-            playerActionController: this.actionControllers.playerActionController,
-            tacticalController: this.presentationControllers.tacticalController,
-            raidLifecycleController: this.raidLifecycleControllers.raidLifecycleController,
-            templeController: this.worldControllers.templeController,
-            storyScenarioController: this.scenarioNetworkControllers.storyScenarioController,
-            advanceWorldTime: (dt) => { this.getRuntimeState().worldTime += dt; },
-            isNetworkRaid: () => this.getNetworkState().isRaid,
+            getUiState: () => this.getUiState(),
+            getNetworkState: () => this.getNetworkState(),
+            getRuntimeState: () => this.getRuntimeState(),
+            getActionControllers: () => this.actionControllers,
+            getPresentationControllers: () => this.presentationControllers,
+            getRaidLifecycleControllers: () => this.raidLifecycleControllers,
+            getWorldControllers: () => this.worldControllers,
+            getScenarioNetworkControllers: () => this.scenarioNetworkControllers,
             updateNetworkRaid: (dt, input, camera) => this.updateNetworkRaid(dt, input, camera),
             updateStoryPresentation: (dt, camera) => this.updateStoryPresentation(dt, camera),
             refreshOpenActionMenuState: () => this.refreshOpenActionMenuState(),

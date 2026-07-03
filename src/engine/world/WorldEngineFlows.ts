@@ -7,9 +7,14 @@ import type { Camera } from '../Camera';
 import type { InputManager } from '../InputManager';
 import { WorldEngineActionTurnFlow } from './WorldEngineActionTurnFlow';
 import type { WorldEngineActionControllers } from './WorldEngineActionControllers';
+import type { WorldEngineNetworkState } from './WorldEngineNetworkState';
 import type { WorldEnginePresentationControllers } from './WorldEnginePresentationControllers';
 import type { WorldEngineRaidLifecycleControllers } from './WorldEngineRaidLifecycleControllers';
+import type { WorldEngineRuntimeState } from './WorldEngineRuntimeState';
+import type { WorldEngineScenarioNetworkControllers } from './WorldEngineScenarioNetworkControllers';
+import type { WorldEngineUiState } from './WorldEngineUiState';
 import { WorldEngineUpdateFlow } from './WorldEngineUpdateFlow';
+import type { WorldEngineWorldControllers } from './WorldEngineWorldControllers';
 import type { WorldNetworkIntentController } from './WorldNetworkIntentController';
 import type { WorldStoryScenarioController } from './WorldStoryScenarioController';
 import type { WorldTempleController } from './WorldTempleController';
@@ -32,6 +37,30 @@ export interface WorldEngineUpdateFlowPorts {
     storyScenarioController: WorldStoryScenarioController;
     advanceWorldTime(dt: number): void;
     isNetworkRaid(): boolean;
+    updateNetworkRaid(dt: number, input: InputManager, camera: Camera): void;
+    updateStoryPresentation(dt: number, camera: Camera): boolean;
+    refreshOpenActionMenuState(): void;
+    updatePartyMovement(dt: number): void;
+    updateEnemyMovement(dt: number): void;
+    refreshEnemyIntentPreviews(): void;
+    updateRestingActors(dt: number): void;
+    updateAttackCues(dt: number): void;
+    refreshLootState(): void;
+    startNextReadyTurn(): void;
+    syncControlledPlayer(): void;
+    followPlayerCamera(camera: Camera, dt: number): void;
+}
+
+export interface WorldEngineUpdateFlowSources {
+    townSession: WorldTownSession;
+    getUiState(): WorldEngineUiState;
+    getNetworkState(): WorldEngineNetworkState;
+    getRuntimeState(): WorldEngineRuntimeState;
+    getActionControllers(): WorldEngineActionControllers;
+    getPresentationControllers(): WorldEnginePresentationControllers;
+    getRaidLifecycleControllers(): WorldEngineRaidLifecycleControllers;
+    getWorldControllers(): WorldEngineWorldControllers;
+    getScenarioNetworkControllers(): WorldEngineScenarioNetworkControllers;
     updateNetworkRaid(dt: number, input: InputManager, camera: Camera): void;
     updateStoryPresentation(dt: number, camera: Camera): boolean;
     refreshOpenActionMenuState(): void;
@@ -102,6 +131,46 @@ export function createWorldEngineUpdateFlow(ports: WorldEngineUpdateFlowPorts): 
         checkDungeonArrival: () => ports.storyScenarioController.checkDungeonArrival(),
         syncControlledPlayer: () => ports.syncControlledPlayer(),
         followPlayerCamera: (camera, dt) => ports.followPlayerCamera(camera, dt),
+    });
+}
+
+export function createWorldEngineUpdateFlowFromSources(
+    sources: WorldEngineUpdateFlowSources
+): WorldEngineUpdateFlow {
+    const uiState = sources.getUiState();
+    const actionControllers = sources.getActionControllers();
+    const presentationControllers = sources.getPresentationControllers();
+    const raidLifecycleControllers = sources.getRaidLifecycleControllers();
+    const worldControllers = sources.getWorldControllers();
+    const scenarioNetworkControllers = sources.getScenarioNetworkControllers();
+
+    return createWorldEngineUpdateFlow({
+        townSession: sources.townSession,
+        raidOutcomeController: raidLifecycleControllers.raidOutcomeController,
+        fusionTempleUI: uiState.fusionTempleUI,
+        tutorialController: scenarioNetworkControllers.tutorialController,
+        inputController: presentationControllers.inputController,
+        effectManager: uiState.effectManager,
+        floatingText: uiState.floatingText,
+        playerActionController: actionControllers.playerActionController,
+        tacticalController: presentationControllers.tacticalController,
+        raidLifecycleController: raidLifecycleControllers.raidLifecycleController,
+        templeController: worldControllers.templeController,
+        storyScenarioController: scenarioNetworkControllers.storyScenarioController,
+        advanceWorldTime: (dt) => { sources.getRuntimeState().worldTime += dt; },
+        isNetworkRaid: () => sources.getNetworkState().isRaid,
+        updateNetworkRaid: (dt, input, camera) => sources.updateNetworkRaid(dt, input, camera),
+        updateStoryPresentation: (dt, camera) => sources.updateStoryPresentation(dt, camera),
+        refreshOpenActionMenuState: () => sources.refreshOpenActionMenuState(),
+        updatePartyMovement: (dt) => sources.updatePartyMovement(dt),
+        updateEnemyMovement: (dt) => sources.updateEnemyMovement(dt),
+        refreshEnemyIntentPreviews: () => sources.refreshEnemyIntentPreviews(),
+        updateRestingActors: (dt) => sources.updateRestingActors(dt),
+        updateAttackCues: (dt) => sources.updateAttackCues(dt),
+        refreshLootState: () => sources.refreshLootState(),
+        startNextReadyTurn: () => sources.startNextReadyTurn(),
+        syncControlledPlayer: () => sources.syncControlledPlayer(),
+        followPlayerCamera: (camera, dt) => sources.followPlayerCamera(camera, dt),
     });
 }
 
