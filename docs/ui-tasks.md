@@ -60,6 +60,7 @@
 - [x] 클라이언트/서버 intent payload 규칙 공유화: 네트워크 player intent payload builder/reader를 `WorldIntentPayloads`로 분리해 클라이언트 전송 shape와 서버 검증 key가 갈라지는 위험을 줄임.
 - [x] `WorldEngine` runtime state 필드 축소: phase/worldTime/hover/fanfare-follow 상태를 `runtimeState` aggregate로 묶어 월드 루프 상태 변경 표면을 줄임.
 - [x] `WorldEngine` UI/feedback state 필드 축소: action menu/entity info/fusion temple/floating text/effects/combat log 상태를 `uiState` aggregate로 묶어 표시·피드백 기능 변경 시 필드 충돌 표면을 줄임.
+- [x] `WorldEngine` field state 필드 축소: party actors/field enemies/remote party actors를 `fieldState` aggregate로 묶어 전투·네트워크 snapshot 상태 변경 표면을 줄임.
 
 ---
 

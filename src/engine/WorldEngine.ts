@@ -24,6 +24,10 @@ import { WorldTownSession } from './world/WorldTownSession';
 import type { CombatResult } from './world/WorldCombatController';
 import { WorldTurnStateController } from './world/WorldTurnStateController';
 import {
+    createWorldEngineFieldState,
+    type WorldEngineFieldState,
+} from './world/WorldEngineFieldState';
+import {
     createWorldEngineRuntimeState,
     type WorldEngineRuntimeState,
 } from './world/WorldEngineRuntimeState';
@@ -107,9 +111,7 @@ export class WorldEngine {
     private gameManager: GameManager;
     private worldMap: WorldMap;
     private player!: Player;
-    private partyActors: FieldActor[] = [];
-    private fieldEnemies: FieldEnemy[] = [];
-    private remotePartyActors: Map<string, FieldActor> = new Map();
+    private fieldState?: WorldEngineFieldState;
     private networkState?: WorldEngineNetworkState;
     private uiState?: WorldEngineUiState;
     private townSession: WorldTownSession;
@@ -185,9 +187,9 @@ export class WorldEngine {
             getPlayer: () => this.player,
             setPlayer: (player) => { this.player = player; },
             getControlledActor: () => this.getControlledActor(),
-            getPartyActors: () => this.partyActors,
-            getFieldEnemies: () => this.fieldEnemies,
-            setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
+            getPartyActors: () => this.getFieldState().partyActors,
+            getFieldEnemies: () => this.getFieldState().fieldEnemies,
+            setFieldEnemies: (enemies) => { this.getFieldState().fieldEnemies = enemies; },
             isNetworkRaid: () => this.getNetworkState().isRaid,
             getPhase: () => this.getRuntimeState().currentPhase,
             setPhase: (phase) => { this.getRuntimeState().currentPhase = phase; },
@@ -220,12 +222,12 @@ export class WorldEngine {
             setWorldMap: (worldMap) => { this.worldMap = worldMap; },
             getPlayer: () => this.player,
             setPlayer: (player) => { this.player = player; },
-            getPartyActors: () => this.partyActors,
-            setPartyActors: (actors) => { this.partyActors = actors; },
-            getRemotePartyActors: () => this.remotePartyActors,
-            clearRemotePartyActors: () => this.remotePartyActors.clear(),
-            getFieldEnemies: () => this.fieldEnemies,
-            setFieldEnemies: (fieldEnemies) => { this.fieldEnemies = fieldEnemies; },
+            getPartyActors: () => this.getFieldState().partyActors,
+            setPartyActors: (actors) => { this.getFieldState().partyActors = actors; },
+            getRemotePartyActors: () => this.getFieldState().remotePartyActors,
+            clearRemotePartyActors: () => this.getFieldState().remotePartyActors.clear(),
+            getFieldEnemies: () => this.getFieldState().fieldEnemies,
+            setFieldEnemies: (fieldEnemies) => { this.getFieldState().fieldEnemies = fieldEnemies; },
             getControlledActor: () => this.getControlledActor(),
             getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
             getCurrentHubTown: () => this.getCurrentHubTown(),
@@ -274,8 +276,8 @@ export class WorldEngine {
             fieldFeedback: this.getUiState().fieldFeedback,
             getWorldMap: () => this.worldMap,
             isNetworkRaid: () => this.getNetworkState().isRaid,
-            getPartyActors: () => this.partyActors,
-            getFieldEnemies: () => this.fieldEnemies,
+            getPartyActors: () => this.getFieldState().partyActors,
+            getFieldEnemies: () => this.getFieldState().fieldEnemies,
             getControlledActor: () => this.getControlledActor(),
             getActorById: (actorId) => this.getActorById(actorId),
             getEnemyById: (enemyId) => this.getEnemyById(enemyId),
@@ -309,8 +311,8 @@ export class WorldEngine {
             getNetworkRaidClient: () => this.getNetworkState().raidClient,
             getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
             getControlledActor: () => this.getControlledActor(),
-            getPartyActors: () => this.partyActors,
-            getFieldEnemies: () => this.fieldEnemies,
+            getPartyActors: () => this.getFieldState().partyActors,
+            getFieldEnemies: () => this.getFieldState().fieldEnemies,
             getEnemyById: (enemyId) => this.getEnemyById(enemyId),
             getSpendableActionGauge: () => this.getSpendableActionGauge(),
             spendAp: (cost) => this.spendAp(cost),
@@ -368,13 +370,13 @@ export class WorldEngine {
             closeFieldOverlays: () => this.closeFieldOverlays(),
             clearFieldTurnState: () => this.clearFieldTurnState(),
             clearIntroTutorialStateForNetworkRaid: () => this.scenarioNetworkControllers.tutorialController.clearForNetworkRaid(),
-            clearRemotePartyActors: () => this.remotePartyActors.clear(),
+            clearRemotePartyActors: () => this.getFieldState().remotePartyActors.clear(),
             placePartyNear: (tile) => this.placePartyNear(tile),
             getControlledActor: () => this.getControlledActor(),
             getPlayer: () => this.player,
             setPlayer: (player) => { this.player = player; },
-            setPartyActors: (actors) => { this.partyActors = actors; },
-            setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
+            setPartyActors: (actors) => { this.getFieldState().partyActors = actors; },
+            setFieldEnemies: (enemies) => { this.getFieldState().fieldEnemies = enemies; },
             selectActor: (actorId) => this.actionControllers.selectionController.selectActor(actorId),
             isTurnCombatActive: () => this.isTurnCombatActive(),
             setPhase: (phase) => { this.getRuntimeState().currentPhase = phase; },
@@ -417,8 +419,8 @@ export class WorldEngine {
             getPlayer: () => this.player,
             getControlledActor: () => this.getControlledActor(),
             getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
-            getPartyActors: () => this.partyActors,
-            getFieldEnemies: () => this.fieldEnemies,
+            getPartyActors: () => this.getFieldState().partyActors,
+            getFieldEnemies: () => this.getFieldState().fieldEnemies,
             getSpendableActionGauge: () => this.getSpendableActionGauge(),
             getHoverTile: () => this.getRuntimeState().hoverTile,
             setHoverTile: (tile) => { this.getRuntimeState().hoverTile = tile; },
@@ -441,14 +443,14 @@ export class WorldEngine {
 
     private isTurnCombatActive(): boolean {
         return isWorldTurnCombatActive({
-            fieldEnemies: this.fieldEnemies,
+            fieldEnemies: this.getFieldState().fieldEnemies,
             turnStateController: this.turnStateController,
             actionMenuUI: this.getUiState().actionMenuUI,
             playerActionController: this.actionControllers.playerActionController,
             tacticalController: this.presentationControllers.tacticalController,
             magicController: this.actionControllers.magicController,
             toolController: this.actionControllers.toolController,
-            partyActors: this.partyActors,
+            partyActors: this.getFieldState().partyActors,
         });
     }
 
@@ -550,7 +552,7 @@ export class WorldEngine {
     private placePartyNear(anchorTile: TilePoint, overrideMembers?: Character[]): void {
         const members = (overrideMembers ?? this.party.getCharacters()).slice(0, this.party.MAX_ACTIVE_PARTY_SIZE);
         members.forEach((character) => syncCharacterMovementToClass(character));
-        this.partyActors = this.combatControllers.fieldSpawnController.createPartyActors(anchorTile, members);
+        this.getFieldState().partyActors = this.combatControllers.fieldSpawnController.createPartyActors(anchorTile, members);
         this.getRuntimeState().fanfareLeaderActorId = null;
     }
 
@@ -596,13 +598,13 @@ export class WorldEngine {
         this.closeActionMenu();
         this.actionControllers.magicController.reset();
         this.actionControllers.toolController?.reset();
-        for (const actor of this.partyActors) {
+        for (const actor of this.getFieldState().partyActors) {
             actor.path = [];
             actor.queuedIntent = null;
             actor.entity.actionGauge = 0;
             removeStatusesFromCarrier(actor.character, (status) => status.kind === 'resting');
         }
-        for (const entry of this.fieldEnemies) {
+        for (const entry of this.getFieldState().fieldEnemies) {
             entry.path = [];
             entry.previewIntent = null;
             entry.enemy.actionGauge = 0;
@@ -615,8 +617,8 @@ export class WorldEngine {
 
         this.refreshOpenActionMenuState();
         this.presentationControllers.inputController.process(input, camera);
-        for (const actor of this.partyActors) actor.entity.update(dt);
-        for (const entry of this.fieldEnemies) entry.enemy.update(dt);
+        for (const actor of this.getFieldState().partyActors) actor.entity.update(dt);
+        for (const entry of this.getFieldState().fieldEnemies) entry.enemy.update(dt);
         this.scenarioNetworkControllers.networkSyncController.refreshMovePathPreview();
         this.getUiState().effectManager.update(dt);
         this.getUiState().floatingText.update(dt);
@@ -683,14 +685,14 @@ export class WorldEngine {
     }
 
     private resolveFieldHitAt(tile: TilePoint) {
-        const partyTargets: FieldHitParty[] = this.partyActors.map((actor) => ({
+        const partyTargets: FieldHitParty[] = this.getFieldState().partyActors.map((actor) => ({
             ...actor,
             gridX: actor.entity.gridX,
             gridY: actor.entity.gridY,
         }));
         return resolveFieldHit(tile, {
             party: partyTargets,
-            enemies: this.fieldEnemies.map((entry) => entry.enemy),
+            enemies: this.getFieldState().fieldEnemies.map((entry) => entry.enemy),
             loot: this.worldMap.loot,
             isGroundWalkable: (x, y) => this.worldMap.isWalkable(x, y),
         });
@@ -763,7 +765,7 @@ export class WorldEngine {
     private getControlledActor(): FieldActor | null {
         const characters = this.party.getCharacters();
         return getWorldControlledActor({
-            partyActors: this.partyActors,
+            partyActors: this.getFieldState().partyActors,
             characters,
             activeIndex: this.party.getActiveIndex(),
         });
@@ -771,7 +773,7 @@ export class WorldEngine {
 
     private getFanfareFollowerCount(actor: FieldActor): number {
         return getWorldFanfareFollowerCount({
-            partyActors: this.partyActors,
+            partyActors: this.getFieldState().partyActors,
             characters: this.party.getCharacters(),
             actor,
             isNetworkRaid: this.getNetworkState().isRaid,
@@ -780,7 +782,7 @@ export class WorldEngine {
 
     private getFanfareLeaderActor(): FieldActor | null {
         const leader = getWorldFanfareLeaderActor({
-            partyActors: this.partyActors,
+            partyActors: this.getFieldState().partyActors,
             characters: this.party.getCharacters(),
             leaderActorId: this.getRuntimeState().fanfareLeaderActorId,
             isNetworkRaid: this.getNetworkState().isRaid,
@@ -790,19 +792,19 @@ export class WorldEngine {
     }
 
     private getActivePartyTurnActor(): FieldActor | null {
-        return getWorldActivePartyTurnActor(this.partyActors, this.turnStateController.getActiveTurnActorId());
+        return getWorldActivePartyTurnActor(this.getFieldState().partyActors, this.turnStateController.getActiveTurnActorId());
     }
 
     private switchToNextAliveActor(): void {
         const current = this.party.getActiveIndex();
-        for (let offset = 1; offset <= this.partyActors.length; offset++) {
-            const next = (current + offset) % this.partyActors.length;
+        for (let offset = 1; offset <= this.getFieldState().partyActors.length; offset++) {
+            const next = (current + offset) % this.getFieldState().partyActors.length;
             if (this.switchToPartyMember(next)) return;
         }
     }
 
     private switchToPartyMember(index: number): boolean {
-        const actor = this.partyActors[index];
+        const actor = this.getFieldState().partyActors[index];
         if (!actor || actor.character.isDead) return false;
         if (this.scenarioNetworkControllers.tutorialController.isActive() && actor.id !== this.turnStateController.getActiveTurnActorId()) {
             this.scenarioNetworkControllers.tutorialController.addBlockedLog();
@@ -889,14 +891,14 @@ export class WorldEngine {
         while (this.turnStateController.hasReadyActors()) {
             const actorId = this.turnStateController.shiftReadyActorId();
             if (!actorId) return;
-            const actor = this.partyActors.find((candidate) => candidate.id === actorId);
+            const actor = this.getFieldState().partyActors.find((candidate) => candidate.id === actorId);
             if (actor) {
                 if (actor.character.isDead) continue;
                 this.beginActorTurn(actor);
                 return;
             }
 
-            const enemyEntry = this.fieldEnemies.find((entry) => entry.enemy.id === actorId);
+            const enemyEntry = this.getFieldState().fieldEnemies.find((entry) => entry.enemy.id === actorId);
             if (!enemyEntry || enemyEntry.enemy.stats.hp <= 0) continue;
             this.beginEnemyTurn(enemyEntry);
             if (this.turnStateController.getActiveTurnActorId()) return;
@@ -905,10 +907,10 @@ export class WorldEngine {
 
     private clearInvalidActiveTurn(): void {
         const cleared = this.turnStateController.clearInvalidActiveTurn((actorId) => {
-            const activePartyActor = this.partyActors.find((actor) => actor.id === actorId);
+            const activePartyActor = this.getFieldState().partyActors.find((actor) => actor.id === actorId);
             if (activePartyActor && !activePartyActor.character.isDead && activePartyActor.character.stats.hp > 0) return true;
 
-            const activeEnemy = this.fieldEnemies.find((entry) => entry.enemy.id === actorId)?.enemy;
+            const activeEnemy = this.getFieldState().fieldEnemies.find((entry) => entry.enemy.id === actorId)?.enemy;
             return activeEnemy !== undefined && activeEnemy.stats.hp > 0;
         });
         if (!cleared) return;
@@ -921,7 +923,7 @@ export class WorldEngine {
     }
 
     private beginActorTurn(actor: FieldActor): void {
-        const index = this.partyActors.indexOf(actor);
+        const index = this.getFieldState().partyActors.indexOf(actor);
         if (index >= 0) this.switchToPartyMember(index);
         actor.entity.actionGauge = this.turnStateController.beginActorTurn(actor.id);
         this.actionControllers.selectionController.selectActor(actor.id);
@@ -959,17 +961,17 @@ export class WorldEngine {
     }
 
     private refreshEnemyIntentPreviews(): void {
-        for (const entry of this.fieldEnemies) {
+        for (const entry of this.getFieldState().fieldEnemies) {
             entry.previewIntent = this.combatControllers.enemyTurnController.previewEnemyIntent(entry);
         }
     }
 
     private getActorById(actorId: string): FieldActor | null {
-        return getWorldActorById(this.partyActors, actorId);
+        return getWorldActorById(this.getFieldState().partyActors, actorId);
     }
 
     private getEnemyById(enemyId: string): Enemy | null {
-        return getWorldEnemyById(this.fieldEnemies, enemyId);
+        return getWorldEnemyById(this.getFieldState().fieldEnemies, enemyId);
     }
 
     private getSpendableActionGauge(): number {
@@ -1046,6 +1048,30 @@ export class WorldEngine {
         this.getNetworkState().isRaid = isRaid;
     }
 
+    public get partyActors(): FieldActor[] {
+        return this.getFieldState().partyActors;
+    }
+
+    public set partyActors(actors: FieldActor[]) {
+        this.getFieldState().partyActors = actors;
+    }
+
+    public get fieldEnemies(): FieldEnemy[] {
+        return this.getFieldState().fieldEnemies;
+    }
+
+    public set fieldEnemies(enemies: FieldEnemy[]) {
+        this.getFieldState().fieldEnemies = enemies;
+    }
+
+    public get remotePartyActors(): Map<string, FieldActor> {
+        return this.getFieldState().remotePartyActors;
+    }
+
+    public set remotePartyActors(actors: Map<string, FieldActor>) {
+        this.getFieldState().remotePartyActors = actors;
+    }
+
     public get fieldFeedback(): WorldEngineUiState['fieldFeedback'] {
         return this.getUiState().fieldFeedback;
     }
@@ -1053,6 +1079,21 @@ export class WorldEngine {
     private getNetworkState(): WorldEngineNetworkState {
         this.networkState ??= createWorldEngineNetworkState();
         return this.networkState;
+    }
+
+    private getFieldState(): WorldEngineFieldState {
+        if (!this.fieldState) {
+            const fallback = createWorldEngineFieldState();
+            const injected = this as unknown as WorldEngineFieldState;
+            const getOwn = <K extends keyof WorldEngineFieldState>(key: K): WorldEngineFieldState[K] | undefined =>
+                Object.prototype.hasOwnProperty.call(this, key) ? injected[key] : undefined;
+            this.fieldState = {
+                partyActors: getOwn('partyActors') ?? fallback.partyActors,
+                fieldEnemies: getOwn('fieldEnemies') ?? fallback.fieldEnemies,
+                remotePartyActors: getOwn('remotePartyActors') ?? fallback.remotePartyActors,
+            };
+        }
+        return this.fieldState;
     }
 
     private getRuntimeState(): WorldEngineRuntimeState {
