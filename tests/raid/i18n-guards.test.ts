@@ -13,8 +13,10 @@ import { STORY_SCENARIO_EVENT_SEQUENCES, type StoryScenarioEventStep } from '../
 import { TOWN_FACILITY_META } from '../../src/data/TownFacilityData';
 import { STATUS_KINDS } from '../../src/combat/StatusEffects';
 import { FIELD_TURN_END_REASONS } from '../../src/field/FieldTypes';
+import { getTerrainEntryHazards } from '../../src/field/TerrainRules';
 import { EQUIP_SLOT_LIST } from '../../src/inventory/InventoryUI';
 import { WORLD_LOOT_CONTAINER_TYPES } from '../../src/loot/WorldLootTypes';
+import { TileType, TILE_PROPERTIES } from '../../src/map/Tile';
 import { RAID_MODIFIERS } from '../../src/raid/RaidModifiers';
 import { SHOP_KIND_TABS } from '../../src/ui/ShopUI';
 
@@ -51,11 +53,28 @@ function collectLiteralUiKeys(): Set<string> {
     const keys = new Set<string>();
     for (const file of walkFiles(join(process.cwd(), 'src'))) {
         const text = readFileSync(file, 'utf8');
-        for (const re of [/\bt\(\s*['"]([^'"]+)['"]\s*\)/g, /\bformatT\(\s*['"]([^'"]+)['"]/g]) {
+        for (const re of [
+            /\bt\(\s*['"]([^'"]+)['"]\s*\)/g,
+            /\bformatT\(\s*['"]([^'"]+)['"]/g,
+            /\bformatSkillLog\(\s*['"]([^'"]+)['"]/g,
+            /\blogEnemy\(\s*['"]([^'"]+)['"]/g,
+            /\bmatchesAnyLocalizedKeyword\(\s*line\s*,\s*['"]([^'"]+)['"]/g,
+        ]) {
             for (const match of text.matchAll(re)) keys.add(match[1]);
         }
     }
     return keys;
+}
+
+function collectTemplateUiKeyPatterns(): Set<string> {
+    const patterns = new Set<string>();
+    for (const file of walkFiles(join(process.cwd(), 'src'))) {
+        const text = readFileSync(file, 'utf8');
+        for (const match of text.matchAll(/\b(?:t|formatT)\(\s*`([^`]*\$\{[^`]*?)`/g)) {
+            patterns.add(match[1].replace(/\$\{[^}]+\}/g, '${}'));
+        }
+    }
+    return patterns;
 }
 
 function collectDataDrivenUiKeys(): Set<string> {
@@ -138,6 +157,14 @@ function collectDataDrivenUiKeys(): Set<string> {
         add(`raid.modifier.${modifier}.name`);
         add(`raid.modifier.${modifier}.desc`);
     }
+    for (const props of Object.values(TILE_PROPERTIES)) add(props.labelKey);
+    for (const tile of Object.values(TileType).filter((value): value is TileType => typeof value === 'number')) {
+        for (const hazard of getTerrainEntryHazards(tile)) {
+            add(hazard.hoverKey);
+            add(hazard.logKey);
+            add(hazard.statusTextKey);
+        }
+    }
     for (const step of ['move', 'attack', 'rest', 'magic', 'defeat']) {
         add(`tutorial.world.dialogue.${step}`);
         add(`tutorial.world.press.${step}`);
@@ -164,6 +191,28 @@ test('literal UI translation keys exist in both languages', () => {
 
     assert.deepEqual([...used].filter((key) => !ko.has(key)).sort(), []);
     assert.deepEqual([...used].filter((key) => !en.has(key)).sort(), []);
+});
+
+test('template-composed UI translation key families are covered by the data-driven guard', () => {
+    assert.deepEqual([...collectTemplateUiKeyPatterns()].sort(), [
+        'field.log.reason.${}',
+        'inv.${}',
+        'magic.element.${}',
+        'magic.type.${}',
+        'quest.status.${}',
+        'raid.modifier.${}.desc',
+        'raid.modifier.${}.name',
+        'rarity.${}',
+        'status.${}.desc',
+        'status.${}.name',
+        'tierChart.branch.${}',
+        'tutorial.world.action.${}',
+        'tutorial.world.dialogue.${}',
+        'tutorial.world.press.${}',
+        'tutorial.world.step.${}.log',
+        'tutorial.world.target.${}',
+        'worldLoot.source.${}',
+    ]);
 });
 
 test('data-driven UI translation keys exist in both languages', () => {

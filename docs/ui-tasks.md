@@ -32,6 +32,7 @@
 - [x] DOM 오버레이 후속 약점 보강: 오버레이 열림/월드 차단 레지스트리 단일화, 동적 i18n guard 보강, 모바일 오버레이 e2e 추가, 일반형 스토리 dev 스크립트 추가.
 - [x] `WorldEngine` 생성자 후속 정리: 전투·행동, 레이드 라이프사이클, 표시·입력 컨트롤러 배선을 feature별 initializer로 분리해 생성자 조립부를 축소.
 - [x] DEV 스토리 시작 스크립트 정리: `dev:raid:story1`~`story31` 수동 별칭을 제거하고, 일반형 `dev:raid:story -- storyNN`이 `story-scenarios.json` 데이터로 지원 에피소드를 검증하도록 변경.
+- [x] i18n guard 보강: wrapper literal 키(`formatSkillLog`/`logEnemy`/로그 색상 키), 템플릿 조합 key family, 타일/지형 hazard 데이터 키를 ko/en 양쪽 검증에 포함.
 
 ---
 
