@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import ts from 'typescript';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
 import { MASTER_CLASSES } from '../../src/data/ClassTree';
@@ -17,6 +17,7 @@ import { FIELD_TURN_END_REASONS } from '../../src/field/FieldTypes';
 import { getTerrainEntryHazards } from '../../src/field/TerrainRules';
 import { EQUIP_SLOT_LIST } from '../../src/inventory/InventoryUI';
 import { WORLD_LOOT_CONTAINER_TYPES } from '../../src/loot/WorldLootTypes';
+import { MAGIC_UPGRADE_REASON_KEYS } from '../../src/magic/MagicLoadout';
 import { TileType, TILE_PROPERTIES } from '../../src/map/Tile';
 import { RAID_MODIFIERS } from '../../src/raid/RaidModifiers';
 import { SHOP_KIND_TABS } from '../../src/ui/ShopUI';
@@ -37,10 +38,10 @@ function readSourceFile(file: string): ts.SourceFile {
     return ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, scriptKind);
 }
 
-function visitSourceFile(file: string, visitor: (node: ts.Node) => void): void {
+function visitSourceFile(file: string, visitor: (node: ts.Node, sourceFile: ts.SourceFile) => void): void {
     const sourceFile = readSourceFile(file);
     const visit = (node: ts.Node) => {
-        visitor(node);
+        visitor(node, sourceFile);
         ts.forEachChild(node, visit);
     };
     visit(sourceFile);
@@ -101,6 +102,23 @@ function collectTemplateUiKeyPatterns(): Set<string> {
         });
     }
     return patterns;
+}
+
+function collectDynamicUiKeyCalls(): string[] {
+    const calls: string[] = [];
+    for (const file of walkFiles(join(process.cwd(), 'src'))) {
+        visitSourceFile(file, (node, sourceFile) => {
+            if (!ts.isCallExpression(node)) return;
+            const name = getCallIdentifier(node);
+            if (name !== 't' && name !== 'formatT' && name !== 'formatSkillLog' && name !== 'logEnemy') return;
+            const keyArg = node.arguments[0];
+            if (!keyArg) return;
+            if (getStaticString(keyArg) || getTemplatePattern(keyArg)) return;
+            const relativeFile = relative(process.cwd(), file).replace(/\\/g, '/');
+            calls.push(`${relativeFile}: ${name}(${keyArg.getText(sourceFile)})`);
+        });
+    }
+    return calls.sort();
 }
 
 function collectDataDrivenUiKeys(): Set<string> {
@@ -199,6 +217,7 @@ function collectDataDrivenUiKeys(): Set<string> {
         add(`tutorial.world.step.${step}.log`);
     }
     for (const action of ['move', 'attack', 'rest', 'magic']) add(`tutorial.world.action.${action}`);
+    for (const key of MAGIC_UPGRADE_REASON_KEYS) add(key);
 
     return keys;
 }
@@ -255,6 +274,84 @@ test('template-composed UI translation key families are covered by the data-driv
         'tutorial.world.step.${}.log',
         'tutorial.world.target.${}',
         'worldLoot.source.${}',
+    ]);
+});
+
+test('dynamic UI translation key calls are reviewed by the guard allowlist', () => {
+    assert.deepEqual(collectDynamicUiKeyCalls(), [
+        "src/combat/SkillEffectResolver.ts: formatT(key)",
+        "src/data/HybridMarketService.ts: t(key)",
+        "src/data/MarketService.ts: t(key)",
+        "src/engine/GameManager.ts: t(companion.nameKey)",
+        "src/engine/world/WorldEnemyTurnController.ts: formatT(key)",
+        "src/engine/world/WorldEngineCombatControllers.ts: formatT(hazard.logKey)",
+        "src/engine/world/WorldEngineCombatControllers.ts: t(hazard.statusTextKey)",
+        "src/engine/world/WorldRaidOutcomeController.ts: t(nextQuest.titleKey)",
+        "src/engine/world/WorldRaidOutcomeController.ts: t(quest.titleKey)",
+        "src/engine/world/WorldRaidOutcomeController.ts: t(quest.titleKey)",
+        "src/engine/world/WorldRaidOutcomeController.ts: t(quest.titleKey)",
+        "src/engine/world/WorldRaidOutcomeController.ts: t(reward.nameKey)",
+        "src/engine/world/WorldRaidOutcomeController.ts: t(reward.nameKey)",
+        "src/engine/world/WorldRenderController.ts: t(lineKey)",
+        "src/engine/world/WorldRenderController.ts: t(model.storyInterior.objectiveKey)",
+        "src/engine/world/WorldStoryScenarioController.ts: t(door.lockedLogKey ?? 'story.interior.lockedDoor')",
+        "src/engine/world/WorldStoryScenarioController.ts: t(lockedLogKey)",
+        "src/engine/world/WorldStoryScenarioController.ts: t(step.labelKey)",
+        "src/engine/world/WorldStoryScenarioController.ts: t(step.labelKey)",
+        "src/engine/world/WorldStoryScenarioController.ts: t(step.speakerNameKey)",
+        "src/engine/world/WorldStoryScenarioController.ts: t(step.textKey)",
+        "src/engine/world/WorldStoryScenarioController.ts: t(storyQuest.enterLogKey)",
+        "src/engine/world/WorldStoryScenarioController.ts: t(storyQuest.enterLogKey)",
+        "src/engine/world/WorldStoryScenarioController.ts: t(storyQuest.enterLogKey)",
+        "src/engine/world/WorldStoryScenarioController.ts: t(storyQuest.objectiveCompleteLogKey)",
+        "src/engine/world/WorldTownSession.ts: t(FACILITY_UPGRADES[id].nameKey)",
+        "src/engine/world/WorldTownSession.ts: t(menu.nameKey)",
+        "src/engine/world/WorldTownSession.ts: t(menu.nameKey)",
+        "src/engine/world/WorldTutorialController.ts: t(skipped ? 'tutorial.world.skipLog' : 'tutorial.world.townLog')",
+        "src/field/FieldDisplay.ts: t(key)",
+        "src/field/TerrainRules.ts: t(hazard.hoverKey)",
+        "src/field/TerrainRules.ts: t(props.labelKey)",
+        "src/map/StoryInteriorMap.ts: formatT(this.layout.displayNameKey)",
+        "src/map/StoryInteriorMap.ts: t(marker.labelKey)",
+        "src/map/StoryInteriorMap.ts: t(prop.labelKey)",
+        "src/map/StoryInteriorMap.ts: t(room.nameKey)",
+        "src/map/WorldMap.ts: t(marker.labelKey)",
+        "src/ui/ActionMenuUI.ts: t(slot.labelKey)",
+        "src/ui/TacticalContextMenuUI.ts: t(this.items[i].labelKey)",
+        "src/ui/TownUI.ts: t(key)",
+        "src/ui/react/auth/AuthGate.tsx: t(config.labelKey)",
+        "src/ui/react/auth/AuthGate.tsx: t(entry.labelKey)",
+        "src/ui/react/auth/AuthGate.tsx: t(key)",
+        "src/ui/react/auth/AuthGate.tsx: t(selectedClass.labelKey)",
+        "src/ui/react/character/EquipmentSlots.tsx: t(labelKey)",
+        "src/ui/react/character/StatGrid.tsx: t(k)",
+        "src/ui/react/character/StatGrid.tsx: t(k)",
+        "src/ui/react/charcreate/CharacterCreation.tsx: t(cfg.labelKey)",
+        "src/ui/react/charcreate/CharacterCreation.tsx: t(row.labelKey)",
+        "src/ui/react/inventory/InventoryPanel.tsx: t(labelKey)",
+        "src/ui/react/inventory/InventoryPanel.tsx: t(labelKey)",
+        "src/ui/react/magic/MagicLoadoutPanel.tsx: t(result.reasonKey)",
+        "src/ui/react/quest/QuestList.tsx: t(objective.labelKey)",
+        "src/ui/react/quest/QuestList.tsx: t(quest.objectiveKey)",
+        "src/ui/react/quest/QuestList.tsx: t(quest.recommendedLevelKey)",
+        "src/ui/react/quest/QuestList.tsx: t(quest.summaryKey)",
+        "src/ui/react/quest/QuestList.tsx: t(quest.titleKey)",
+        "src/ui/react/quest/QuestList.tsx: t(reward.nameKey)",
+        "src/ui/react/settings/SettingsPanel.tsx: t(definition.labelKey)",
+        "src/ui/react/town/BlacksmithPanel.tsx: t(entry.sourceLabel)",
+        "src/ui/react/town/FacilityUpgradePanel.tsx: t(view.definition.descKey)",
+        "src/ui/react/town/FacilityUpgradePanel.tsx: t(view.definition.effectKey)",
+        "src/ui/react/town/FacilityUpgradePanel.tsx: t(view.definition.nameKey)",
+        "src/ui/react/town/RestPanel.tsx: t(facility.nameKey)",
+        "src/ui/react/town/RestPanel.tsx: t(getRestMenu(confirmId)?.nameKey ?? '')",
+        "src/ui/react/town/RestPanel.tsx: t(getRestMenu(pendingId)?.nameKey ?? '')",
+        "src/ui/react/town/RestPanel.tsx: t(menu.descKey)",
+        "src/ui/react/town/RestPanel.tsx: t(menu.nameKey)",
+        "src/ui/react/town/ShopPanel.tsx: t(tab.labelKey)",
+        "src/ui/react/town/TownScreen.tsx: t(deployPending ? 'town.deploying' : 'town.deploy')",
+        "src/ui/react/town/TownScreen.tsx: t(meta.labelKey)",
+        "src/ui/react/town/TownScreen.tsx: t(restFacility.nameKey)",
+        "src/ui/react/town/itemView.tsx: t(SLOT_LABEL_KEY[item.slot] ?? '')",
     ]);
 });
 

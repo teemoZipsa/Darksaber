@@ -114,12 +114,20 @@ export function getUpgradeCost(skill: Skill, nextLevel: number): number {
     return 100 * skill.tier * nextLevel;
 }
 
+export const MAGIC_UPGRADE_REASON_KEYS = [
+    'magic.upgrade.maxed',
+    'magic.upgrade.gold',
+    'magic.upgrade.unlearned',
+] as const;
+
+export type MagicUpgradeReasonKey = typeof MAGIC_UPGRADE_REASON_KEYS[number];
+
 export interface UpgradeCheck {
     ok: boolean;
     /** Cost of the next level (0 when already maxed). */
     cost: number;
     /** i18n reason key when not ok. */
-    reasonKey?: 'magic.upgrade.maxed' | 'magic.upgrade.gold' | 'magic.upgrade.unlearned';
+    reasonKey?: MagicUpgradeReasonKey;
 }
 
 /** Whether a skill can be upgraded right now, with cost and (if not) the reason. */
