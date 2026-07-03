@@ -7,6 +7,7 @@
  */
 
 import { createBaseStats, type CharacterStats } from '../Stats';
+import { COMBAT_STAT_SCALE } from '../combatScale';
 import { getOriginalMonsterRow, type OriginalMonsterRow } from './originalMonsters';
 
 export interface NormalizedMonsterBalance {
@@ -38,6 +39,15 @@ const RAW_BASELINE = {
     magAtk: 45,
     magDef: 40,
 } as const;
+
+const LOW_LEVEL_CURVE_EASE: Record<number, number> = {
+    1: 0.88,
+    2: 0.94,
+};
+
+function levelCurveEase(level: number): number {
+    return LOW_LEVEL_CURVE_EASE[level] ?? 1;
+}
 
 const MONSTER_SOFTENING = {
     hp: 0.85,
@@ -76,12 +86,41 @@ export function getNormalizedMonsterBalance(
     const magAtkRaw = pairedRaw(c.magAtkLo, c.magAtkHi);
     const magDefRaw = pairedRaw(c.magDefLo, c.magDefHi);
 
-    const maxHp = softenStat(scaleCurve(78 + safeLevel * 18, hpRaw, RAW_BASELINE.hp, 0.28), MONSTER_SOFTENING.hp);
-    const maxMp = softenStat(scaleCurve(16 + safeLevel * 4, mpRaw, RAW_BASELINE.mp, 0.22), MONSTER_SOFTENING.mp);
-    const atk = softenCombatStat(scaleCurve(28 + safeLevel * 4.5, atkRaw, RAW_BASELINE.atk, 0.3), MONSTER_SOFTENING.offense);
-    const def = softenCombatStat(scaleCurve(15 + safeLevel * 2.7, defRaw, RAW_BASELINE.def, 0.28), MONSTER_SOFTENING.defense);
-    const magAtk = softenCombatStat(scaleCurve(18 + safeLevel * 3.8, magAtkRaw, RAW_BASELINE.magAtk, 0.28), MONSTER_SOFTENING.offense);
-    const magDef = softenCombatStat(scaleCurve(13 + safeLevel * 2.6, magDefRaw, RAW_BASELINE.magDef, 0.28), MONSTER_SOFTENING.defense);
+    const curveEase = levelCurveEase(safeLevel);
+    const maxHp = scaleMonsterStat(
+        softenStat(scaleCurve((78 + safeLevel * 18) * curveEase, hpRaw, RAW_BASELINE.hp, 0.28), MONSTER_SOFTENING.hp),
+        hpRaw,
+        RAW_BASELINE.hp,
+    );
+    const maxMp = scaleMonsterStat(
+        softenStat(scaleCurve(16 + safeLevel * 4, mpRaw, RAW_BASELINE.mp, 0.22), MONSTER_SOFTENING.mp),
+        mpRaw,
+        RAW_BASELINE.mp,
+    );
+    const atk = scaleMonsterStat(
+        softenCombatStat(scaleCurve((28 + safeLevel * 4.5) * curveEase, atkRaw, RAW_BASELINE.atk, 0.3), MONSTER_SOFTENING.offense),
+        atkRaw,
+        RAW_BASELINE.atk,
+        true,
+    );
+    const def = scaleMonsterStat(
+        softenCombatStat(scaleCurve(15 + safeLevel * 2.7, defRaw, RAW_BASELINE.def, 0.28), MONSTER_SOFTENING.defense),
+        defRaw,
+        RAW_BASELINE.def,
+        true,
+    );
+    const magAtk = scaleMonsterStat(
+        softenCombatStat(scaleCurve(18 + safeLevel * 3.8, magAtkRaw, RAW_BASELINE.magAtk, 0.28), MONSTER_SOFTENING.offense),
+        magAtkRaw,
+        RAW_BASELINE.magAtk,
+        true,
+    );
+    const magDef = scaleMonsterStat(
+        softenCombatStat(scaleCurve(13 + safeLevel * 2.6, magDefRaw, RAW_BASELINE.magDef, 0.28), MONSTER_SOFTENING.defense),
+        magDefRaw,
+        RAW_BASELINE.magDef,
+        true,
+    );
     const spd = roundToTenth(clamp(11 + Math.min(safeLevel, 20) * 0.3 + ((c.spd ?? 18) - 18) * 0.18, 8, 24));
 
     return {
@@ -109,15 +148,16 @@ export function getNormalizedMonsterBalance(
 
 export function createFallbackMonsterStats(level: number): CharacterStats {
     const safeLevel = normalizeLevel(level);
+    const curveEase = levelCurveEase(safeLevel);
     return createBaseStats({
-        maxHp: softenStat(80 + safeLevel * 22, MONSTER_SOFTENING.hp),
-        hp: softenStat(80 + safeLevel * 22, MONSTER_SOFTENING.hp),
-        maxMp: softenStat(25 + safeLevel * 5, MONSTER_SOFTENING.mp),
-        mp: softenStat(25 + safeLevel * 5, MONSTER_SOFTENING.mp),
-        atk: softenCombatStat(35 + safeLevel * 7, MONSTER_SOFTENING.offense),
-        def: softenCombatStat(20 + safeLevel * 5, MONSTER_SOFTENING.defense),
-        magAtk: softenCombatStat(25 + safeLevel * 4, MONSTER_SOFTENING.offense),
-        magDef: softenCombatStat(18 + safeLevel * 4, MONSTER_SOFTENING.defense),
+        maxHp: scaleMonsterStat(softenStat((80 + safeLevel * 22) * curveEase, MONSTER_SOFTENING.hp)),
+        hp: scaleMonsterStat(softenStat((80 + safeLevel * 22) * curveEase, MONSTER_SOFTENING.hp)),
+        maxMp: scaleMonsterStat(softenStat(25 + safeLevel * 5, MONSTER_SOFTENING.mp)),
+        mp: scaleMonsterStat(softenStat(25 + safeLevel * 5, MONSTER_SOFTENING.mp)),
+        atk: scaleMonsterStat(softenCombatStat((35 + safeLevel * 7) * curveEase, MONSTER_SOFTENING.offense), null, RAW_BASELINE.atk, true),
+        def: scaleMonsterStat(softenCombatStat(20 + safeLevel * 5, MONSTER_SOFTENING.defense), null, RAW_BASELINE.def, true),
+        magAtk: scaleMonsterStat(softenCombatStat(25 + safeLevel * 4, MONSTER_SOFTENING.offense), null, RAW_BASELINE.magAtk, true),
+        magDef: scaleMonsterStat(softenCombatStat(18 + safeLevel * 4, MONSTER_SOFTENING.defense), null, RAW_BASELINE.magDef, true),
         spd: 13 + safeLevel * 0.4,
         hitRate: 88 + safeLevel - MONSTER_SOFTENING.hitRatePenalty,
         critRate: 3,
@@ -164,6 +204,20 @@ function softenStat(value: number, multiplier: number): number {
 
 function softenCombatStat(value: number, multiplier: number): number {
     return Math.max(1, roundToTenth(value * multiplier));
+}
+
+function scaleMonsterStat(
+    value: number,
+    raw: number | null,
+    baseline: number,
+    tenth = false,
+): number {
+    let scaled = value * COMBAT_STAT_SCALE;
+    if (raw !== null && raw > 0 && baseline > 0) {
+        scaled += Math.log(raw / baseline) * 0.2;
+    }
+    if (tenth) return Math.max(1, roundToTenth(scaled));
+    return Math.max(1, Math.round(scaled));
 }
 
 function pairedRaw(lo: number | null, hi: number | null): number | null {

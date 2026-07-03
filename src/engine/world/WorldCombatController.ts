@@ -31,7 +31,7 @@ export interface CombatEventSink {
     spawnDamage(x: number, y: number, amount: number, isCrit: boolean, isMiss: boolean): void;
     spawnStatus(x: number, y: number, text: string): void;
     spawnHitEffect(x: number, y: number, isCrit: boolean, feedbackGroupId?: string, feedbackKind?: CombatFeedbackKind): void;
-    spawnKillEffect(enemy: Enemy, feedbackGroupId?: string): void;
+    spawnKillEffect(enemy: Enemy, feedbackGroupId?: string, actor?: FieldActor): void;
     spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void;
     spawnLoot(enemy: Enemy): void;
     flushFeedbackGroup?(feedbackGroupId: string): void;
@@ -314,10 +314,11 @@ export class WorldCombatController {
         result.killedEnemyIds.push(enemy.id);
         if (this.sink.awardExp) this.sink.awardExp(actor, enemy);
         else {
-            this.sink.log(formatT('field.log.enemyDefeatedExp', { enemy: enemy.name, exp: enemy.expReward }));
-            actor.character.gainExp(enemy.expReward);
+            const exp = enemy.calcExpFor(actor.character.level);
+            this.sink.log(formatT('field.log.enemyDefeatedExp', { enemy: enemy.name, exp }));
+            actor.character.gainExp(exp);
         }
-        this.sink.spawnKillEffect(enemy, feedbackGroupId);
+        this.sink.spawnKillEffect(enemy, feedbackGroupId, actor);
         this.sink.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
         enemy.isAggro = false;
         this.sink.spawnLoot(enemy);

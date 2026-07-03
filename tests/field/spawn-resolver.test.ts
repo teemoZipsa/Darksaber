@@ -119,7 +119,7 @@ test('starter danger nests use level 1 small packs near Kaosia', () => {
 
     const nest = pickNestForChunk(ctx, true);
     assert.ok(nest);
-    assert.ok(nest.monsters.length >= 2 && nest.monsters.length <= 3, 'starter pack size 2-3');
+    assert.ok(nest.monsters.length >= 1 && nest.monsters.length <= 2, 'starter pack size 1-2');
     assert.deepEqual([...new Set(nest.monsters.map((monster) => monster.level))], [1]);
 });
 

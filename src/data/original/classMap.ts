@@ -58,12 +58,27 @@ export const ORIGINAL_CLASS_TIER_IDS: Record<string, Record<number, number>> = {
     master_magic: { 8: 166, 9: 169 },
 };
 
-/** Class lines with no original data — derive their progression by analogy. */
-export const CLASSES_WITHOUT_ORIGINAL = ['alchemist', 'shrine', 'master_healer'] as const;
+/**
+ * Class lines added in this project without their own ability.json rows.
+ * Stats/progression mirror the nearest original line at the same tier index.
+ */
+export const ORIGINAL_CLASS_REFERENCE: Record<string, string> = {
+    alchemist: 'mage',
+    shrine: 'priest',
+};
+
+/** Class lines with no original or reference data — derive progression by formula. */
+export const CLASSES_WITHOUT_ORIGINAL = ['master_healer'] as const;
 
 /** The original class id backing a given class line + tier, if any. */
 export function getOriginalClassId(classLineId: string, tier: number): number | undefined {
-    return ORIGINAL_CLASS_TIER_IDS[classLineId]?.[tier];
+    const resolvedLineId = ORIGINAL_CLASS_REFERENCE[classLineId] ?? classLineId;
+    return ORIGINAL_CLASS_TIER_IDS[resolvedLineId]?.[tier];
+}
+
+/** Class line whose original rows back this line (self when not a reference). */
+export function resolveOriginalClassLineId(classLineId: string): string {
+    return ORIGINAL_CLASS_REFERENCE[classLineId] ?? classLineId;
 }
 
 /** Original per-level rows (sorted) for a class line + tier, or [] if none. */

@@ -255,11 +255,12 @@ function weightedPick(pool: WeightedMonster[], rng: () => number): MonsterId {
 // ── Pack + nest generation ─────────────────────────────────────────────────────
 
 const NEST_CHANCE = 0.85; // share of land chunks that hold a nest
+const STARTER_NEST_CHANCE = 0.55; // lighter encounter density near the first town
 const PACK_MIN = 4;
 const PACK_MAX = 6;
 const STARTER_DANGER_MAX = 2;
-const STARTER_PACK_MIN = 2;
-const STARTER_PACK_MAX = 3;
+const STARTER_PACK_MIN = 1;
+const STARTER_PACK_MAX = 2;
 const LOW_DANGER_MAX = 4;
 const LOW_DANGER_PACK_MIN = 3;
 const LOW_DANGER_PACK_MAX = 5;
@@ -301,7 +302,7 @@ export function pickNestForChunk(ctx: SpawnContext, force = false): FieldNest | 
     const danger = getFieldDanger(ctx.chunkX, ctx.chunkY, ctx.realm);
     const rng = makeRng(ctx.seed, 'nest', ctx.chunkX, ctx.chunkY);
 
-    if (!force && rng() > NEST_CHANCE) return null;
+    if (!force && rng() > (danger <= STARTER_DANGER_MAX ? STARTER_NEST_CHANCE : NEST_CHANCE)) return null;
 
     const pool = getRegionPacks(ctx.biome, danger);
     if (pool.length === 0) return null;

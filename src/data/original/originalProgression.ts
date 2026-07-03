@@ -5,11 +5,12 @@
  * level caps (5/10/15/20/25/30/35) and explicit exp thresholds, but players gain
  * 2x exp vs the original — implemented by halving the required exp.
  *
- * Classes/tiers with no original counterpart (alchemist, shrine, master_healer,
+ * Classes/tiers with no original counterpart (master_healer,
  * master tier 10) return undefined here so callers fall back to the formula.
  */
 
 import type { CharacterStats } from '../Stats';
+import { scaleCombatStatPatch } from '../combatScale';
 import { getOriginalAbility, getOriginalLevelCap, getOriginalLevelRows } from './classMap';
 
 /** Default level cap for tiers with no original data. */
@@ -70,7 +71,7 @@ export function getOriginalStats(
     const lerp = (lo: number, hi: number) => Math.round(lo + (hi - lo) * frac);
     const hp = lerp(s[COL.hpLo], s[COL.hpHi]);
     const mp = lerp(s[COL.mpLo], s[COL.mpHi]);
-    return {
+    return scaleCombatStatPatch({
         hp, maxHp: hp,
         mp, maxMp: mp,
         atk: lerp(s[COL.atkLo], s[COL.atkHi]),
@@ -83,5 +84,5 @@ export function getOriginalStats(
         critRate: s[COL.crit],
         magHit: s[COL.magHit],
         magEva: s[COL.magEva],
-    };
+    });
 }

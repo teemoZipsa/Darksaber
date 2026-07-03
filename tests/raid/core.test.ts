@@ -278,7 +278,7 @@ test('equipment and socket bonuses are included in effective character stats', (
         statuses: [],
         equipment: new Map([['weapon', sword]]),
     });
-    assert.equal(effective.atk, 19);
+    assert.equal(effective.atk, 14);
 
     sword.durability = 0;
     const broken = getEffectiveStatsForCharacter({

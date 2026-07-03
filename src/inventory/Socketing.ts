@@ -1,4 +1,5 @@
 import type { CharacterStats } from '../data/Stats';
+import { scaleCombatStatPatch } from '../data/combatScale';
 import type { ItemDef, ItemSlot, SocketHostKind } from '../data/ItemDB';
 import type { GridInventory, PlacedItem } from './GridInventory';
 
@@ -57,7 +58,8 @@ export function getPlacedItemStatBonus(placed: PlacedItem): Partial<CharacterSta
     if (!hostKind) return bonus;
 
     for (const socket of placed.sockets ?? []) {
-        addBonusInto(bonus, socket.socketEffects?.[hostKind]);
+        const socketBonus = socket.socketEffects?.[hostKind];
+        if (socketBonus) addBonusInto(bonus, scaleCombatStatPatch(socketBonus));
     }
     return bonus;
 }
@@ -181,7 +183,7 @@ function normalizeItemStats(stats: Partial<CharacterStats> | undefined): Partial
     }
     if (stats.hp) bonus.maxHp = (bonus.maxHp ?? 0) + stats.hp;
     if (stats.mp) bonus.maxMp = (bonus.maxMp ?? 0) + stats.mp;
-    return bonus;
+    return scaleCombatStatPatch(bonus);
 }
 
 function addBonusInto(target: Partial<CharacterStats>, bonus: Partial<CharacterStats> | undefined): void {

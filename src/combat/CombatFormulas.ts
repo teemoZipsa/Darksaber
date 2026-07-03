@@ -101,11 +101,12 @@ export class CombatFormulas {
 
     /**
      * Calculate EXP gained from defeating an enemy.
+     * Equal-level kills target ~5 kills per tier-1 level-up (250 XP).
      */
     public static calcExpGain(playerLevel: number, enemyLevel: number): number {
         const diff = enemyLevel - playerLevel;
-        const base = 20 + diff * 5;
-        return Math.max(5, Math.min(100, base));
+        const base = 50 + diff * 10;
+        return Math.max(15, Math.min(150, base));
     }
 
     /**

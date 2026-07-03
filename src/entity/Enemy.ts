@@ -2,6 +2,7 @@
  * Enemy — enemy entity with basic AI: aggro detection and movement toward player.
  */
 
+import { CombatFormulas } from '../combat/CombatFormulas';
 import { Entity } from './Entity';
 import { type CharacterStats } from '../data/Stats';
 import { getNormalizedMonsterBalance } from '../data/original/originalMonsterBalance';
@@ -48,7 +49,7 @@ export class Enemy extends Entity {
         this.name = name;
         this.level = level;
         this.aggroRange = 5;
-        this.expReward = 25 + level * 8;
+        this.expReward = CombatFormulas.calcExpGain(level, level);
         this.role = role;
         this.aiProfile = createEnemyAIProfile(role);
 
@@ -68,6 +69,11 @@ export class Enemy extends Entity {
         this.stats.hp = Math.max(0, Math.min(this.stats.maxHp, Math.floor(this.stats.maxHp * hpRatio)));
         this.stats.mp = Math.max(0, Math.min(this.stats.maxMp, Math.floor(this.stats.maxMp * mpRatio)));
         this.applyRoleTuning(role);
+    }
+
+    /** EXP for a kill, scaled to the defeating character's level. */
+    public calcExpFor(playerLevel: number): number {
+        return CombatFormulas.calcExpGain(playerLevel, this.level);
     }
 
     /** Check if player is within aggro range (Manhattan distance) */

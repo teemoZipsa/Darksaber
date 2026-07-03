@@ -367,8 +367,9 @@ export class WorldEngine {
             registerCombatFeedback: (kind, feedbackGroupId) => this.registerCombatFeedback(kind, feedbackGroupId),
             flushCombatFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
             spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
-            spawnKillEffect: (enemy, feedbackGroupId) => {
-                this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy);
+            spawnKillEffect: (enemy, feedbackGroupId, actor) => {
+                const exp = actor ? enemy.calcExpFor(actor.character.level) : enemy.expReward;
+                this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, exp, enemy);
                 this.registerCombatFeedback('kill', feedbackGroupId);
             },
             spawnDebuffEffect: (x, y) => this.effectManager.spawnDebuffEffect(x, y),
@@ -392,8 +393,9 @@ export class WorldEngine {
                 this.effectManager.spawnHitEffect(x, y, isCrit);
                 this.registerCombatFeedback(feedbackKind ?? (isCrit ? 'critical' : 'normal'), feedbackGroupId);
             },
-            spawnKillEffect: (enemy, feedbackGroupId) => {
-                this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy);
+            spawnKillEffect: (enemy, feedbackGroupId, actor) => {
+                const exp = actor ? enemy.calcExpFor(actor.character.level) : enemy.expReward;
+                this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, exp, enemy);
                 this.registerCombatFeedback('kill', feedbackGroupId);
             },
             spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
@@ -1145,7 +1147,8 @@ export class WorldEngine {
 
         this.awardDefeatExp(actor, enemy);
         this.raidSession.recordKill();
-        this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, enemy.expReward, enemy);
+        const killExp = enemy.calcExpFor(actor.character.level);
+        this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, killExp, enemy);
         this.registerCombatFeedback('kill', feedbackGroupId);
         this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'DOWN');
         enemy.isAggro = false;
@@ -1157,12 +1160,13 @@ export class WorldEngine {
     }
 
     private awardDefeatExp(actor: FieldActor, enemy: Enemy): void {
+        const exp = enemy.calcExpFor(actor.character.level);
         const canGainExp = this.canCharacterGainExpInCurrentRealm(actor.character);
         this.addCombatLog(canGainExp
-            ? formatT('field.log.enemyDefeatedExp', { enemy: enemy.name, exp: enemy.expReward })
+            ? formatT('field.log.enemyDefeatedExp', { enemy: enemy.name, exp })
             : formatT('field.log.enemyDefeated', { enemy: enemy.name }));
         if (canGainExp) {
-            const expResult = actor.character.gainExp(enemy.expReward);
+            const expResult = actor.character.gainExp(exp);
             if (expResult.promoted && expResult.newTierName) {
                 this.addCombatLog(formatT('field.log.actorPromoted', { name: actor.character.name, tier: expResult.newTierName }));
             }

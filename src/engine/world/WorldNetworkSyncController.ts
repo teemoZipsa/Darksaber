@@ -88,7 +88,7 @@ export interface WorldNetworkSyncContext {
     registerCombatFeedback(kind: CombatFeedbackKind, feedbackGroupId?: string): void;
     flushCombatFeedbackGroup(feedbackGroupId: string): void;
     spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void;
-    spawnKillEffect(enemy: Enemy, feedbackGroupId?: string): void;
+    spawnKillEffect(enemy: Enemy, feedbackGroupId?: string, actor?: FieldActor): void;
     spawnDebuffEffect(x: number, y: number): void;
     spawnHitEffect(x: number, y: number): void;
     spawnHealEffect(x: number, y: number): void;
@@ -380,7 +380,7 @@ export class WorldNetworkSyncController {
 
         if (targetEnemy) {
             if (event.kind === 'kill') {
-                this.context.spawnKillEffect(targetEnemy, feedbackGroupId);
+                this.context.spawnKillEffect(targetEnemy, feedbackGroupId, sourceActor);
                 this.context.registerCombatFeedback('kill', feedbackGroupId);
             } else if (event.kind === 'status') {
                 this.context.spawnStatus(targetEnemy.gridX, targetEnemy.gridY, 'WEAK');
