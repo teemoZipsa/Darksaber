@@ -29,9 +29,8 @@ import { MinimapUI } from '../ui/MinimapUI';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
-import { TilePoint } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
-import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST } from '../field/FieldActionEconomy';
+import type { TilePoint } from '../field/FieldPathing';
 import type { FieldActor, FieldEnemy, FieldHitParty, FieldTurnEndReason } from '../field/FieldTypes';
 import { WorldRaidSession, type WorldPhase } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
@@ -61,6 +60,7 @@ import { WorldFieldFeedbackState } from './world/WorldFieldFeedbackState';
 import { WorldEngineNetworkEvents } from './world/WorldEngineNetworkEvents';
 import { WorldTurnStartResolver } from './world/WorldTurnStartResolver';
 import { WorldEngineCombatFlow } from './world/WorldEngineCombatFlow';
+import { WorldEngineActionTurnFlow } from './world/WorldEngineActionTurnFlow';
 import { applyMonsterSprite } from './world/NetworkSnapshotMapping';
 import {
     getWorldBackpackCursedArtifactCount,
@@ -159,6 +159,7 @@ export class WorldEngine {
     private networkEvents: WorldEngineNetworkEvents;
     private turnStartResolver: WorldTurnStartResolver;
     private combatFlow: WorldEngineCombatFlow;
+    private actionTurnFlow?: WorldEngineActionTurnFlow;
     private turnStateController = new WorldTurnStateController();
     private hoverTile: TilePoint = { x: -1, y: -1 };
     private fieldFeedback = new WorldFieldFeedbackState();
@@ -1237,27 +1238,40 @@ export class WorldEngine {
         return true;
     }
 
+    private getActionTurnFlow(): WorldEngineActionTurnFlow {
+        this.actionTurnFlow ??= new WorldEngineActionTurnFlow({
+            getControlledActor: () => this.getControlledActor(),
+            getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
+            getSpendableActionGauge: () => this.getSpendableActionGauge(),
+            getActionMenuIsOpen: () => this.actionMenuUI.getIsOpen(),
+            openActionMenu: (states) => this.actionMenuUI.open(states as ReturnType<WorldTutorialController['getActionMenuStates']>),
+            updateActionMenuStates: (states) => this.actionMenuUI.updateStates(states as ReturnType<WorldTutorialController['getActionMenuStates']>),
+            closeActionMenu: () => this.closeActionMenu(),
+            closeTacticalMenu: () => this.closeTacticalMenu(),
+            selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            getActionMenuStates: (actor) => this.tutorialController.getActionMenuStates(actor),
+            isTutorialActive: () => this.tutorialController.isActive(),
+            addTutorialBlockedLog: () => this.tutorialController.addBlockedLog(),
+            getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
+            beginActorTurn: (actor) => this.beginActorTurn(actor),
+            spendTurnAp: (cost, fallbackGauge) => this.turnStateController.spendAp(cost, fallbackGauge),
+            getRemainingActionPoints: () => this.turnStateController.getRemainingActionPoints(),
+            setRemainingActionPoints: (points) => this.turnStateController.setRemainingActionPoints(points),
+            getDismissCarryover: () => this.turnStateController.getDismissCarryover(),
+            endActiveTurn: () => this.turnStateController.endActiveTurn(),
+            hasExecutableAction: (actor) => this.playerActionController.hasExecutableAction(actor),
+            submitEndTurn: (actor, reason) => this.networkIntentController.submitEndTurn(actor, reason),
+            clearActorIntent: (actor) => this.clearActorIntent(actor),
+            clearTargeting: () => this.playerActionController.clearTargeting(),
+            resetMagic: () => this.magicController.reset(),
+            resetTool: () => this.toolController?.reset(),
+            log: (message) => this.addCombatLog(message),
+        });
+        return this.actionTurnFlow;
+    }
+
     private toggleActionMenuForControlled(): void {
-        const actor = this.getControlledActor();
-        if (!actor) return;
-        this.selectionController.selectActor(actor.id);
-
-        if (!this.turnStateController.getActiveTurnActorId() && actor.entity.actionGauge >= FIELD_MAX_ACTION_GAUGE) {
-            this.beginActorTurn(actor);
-        }
-
-        if (actor.id !== this.turnStateController.getActiveTurnActorId()) {
-            this.addCombatLog(t('field.log.notTurn'));
-            return;
-        }
-
-        if (this.actionMenuUI.getIsOpen()) {
-            this.dismissActionMenuTurn();
-            return;
-        }
-
-        this.closeTacticalMenu();
-        this.actionMenuUI.open(this.tutorialController.getActionMenuStates(actor));
+        this.getActionTurnFlow().toggleActionMenuForControlled();
     }
 
     private closeActionMenu(): void {
@@ -1265,76 +1279,27 @@ export class WorldEngine {
     }
 
     private refreshOpenActionMenuState(): void {
-        if (!this.actionMenuUI.getIsOpen()) return;
-        const actor = this.getActivePartyTurnActor();
-        if (!actor) {
-            this.closeActionMenu();
-            return;
-        }
-        this.actionMenuUI.updateStates(this.tutorialController.getActionMenuStates(actor));
+        this.getActionTurnFlow().refreshOpenActionMenuState();
     }
 
     private dismissActionMenuTurn(): void {
-        if (this.tutorialController.isActive()) {
-            const actor = this.getActivePartyTurnActor();
-            if (actor) this.reopenActionMenu(actor);
-            this.tutorialController.addBlockedLog();
-            return;
-        }
-        const actor = this.getActivePartyTurnActor();
-        if (!actor) {
-            this.closeActionMenu();
-            return;
-        }
-        const carryover = this.turnStateController.getDismissCarryover();
-        this.endActorTurn(actor, 'wait', carryover);
+        this.getActionTurnFlow().dismissActionMenuTurn();
     }
 
     private spendAp(cost: number): boolean {
-        if (!this.turnStateController.spendAp(cost, this.getSpendableActionGauge())) return false;
-        const actor = this.getActivePartyTurnActor();
-        if (actor) actor.entity.actionGauge = this.turnStateController.getRemainingActionPoints();
-        return true;
+        return this.getActionTurnFlow().spendAp(cost);
     }
 
     private resumeOrEndActiveTurn(actor: FieldActor): void {
-        if (actor.id !== this.turnStateController.getActiveTurnActorId()) return;
-        if (actor.character.isDead || actor.character.stats.hp <= 0) {
-            this.endActorTurn(actor, 'incapacitated', 0);
-            return;
-        }
-        if (this.playerActionController.hasExecutableAction(actor)) {
-            this.reopenActionMenu(actor);
-            return;
-        }
-        this.endActorTurn(actor, 'gaugeLow', this.turnStateController.getRemainingActionPoints());
+        this.getActionTurnFlow().resumeOrEndActiveTurn(actor);
     }
 
     private reopenActionMenu(actor: FieldActor): void {
-        if (actor.id !== this.turnStateController.getActiveTurnActorId()) return;
-        if (actor.character.isDead || actor.character.stats.hp <= 0) return;
-        if (this.turnStateController.getRemainingActionPoints() <= 0 && actor.entity.actionGauge >= MIN_FIELD_ACTION_GAUGE_COST) {
-            this.turnStateController.setRemainingActionPoints(Math.floor(actor.entity.actionGauge));
-        }
-        this.selectionController.selectActor(actor.id);
-        this.closeTacticalMenu();
-        this.actionMenuUI.open(this.tutorialController.getActionMenuStates(actor));
+        this.getActionTurnFlow().reopenActionMenu(actor);
     }
 
     private endActorTurn(actor: FieldActor, reason: FieldTurnEndReason, atbCarryover: number = this.turnStateController.getRemainingActionPoints()): void {
-        if (actor.id === this.turnStateController.getActiveTurnActorId()) this.networkIntentController.submitEndTurn(actor, reason);
-        actor.entity.actionGauge = Math.max(0, Math.min(FIELD_MAX_ACTION_GAUGE, atbCarryover));
-        this.turnStateController.endActiveTurn();
-        this.clearActorIntent(actor);
-        this.closeActionMenu();
-        this.closeTacticalMenu();
-        this.playerActionController.clearTargeting();
-        this.magicController.reset();
-        this.toolController?.reset();
-        this.addCombatLog(formatT('field.log.turnEnd', {
-            name: actor.character.name,
-            reason: t(`field.log.reason.${reason}`),
-        }));
+        this.getActionTurnFlow().endActorTurn(actor, reason, atbCarryover);
     }
 
     private endEnemyTurn(enemy: Enemy): void {
