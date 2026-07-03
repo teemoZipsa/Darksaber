@@ -2763,6 +2763,7 @@ test('cleared field nests respawn after five minutes away from active actors', (
     assert.equal(state.monsterIds.length, 0);
     const respawnAt = state.respawnAt;
     assert.ok(respawnAt >= 310_000);
+    (internals.enemies as unknown as Map<string, unknown>).clear();
     const stateChunkX = Math.floor(state.centerTile.x / CHUNK_SIZE);
     const stateChunkY = Math.floor(state.centerTile.y / CHUNK_SIZE);
 

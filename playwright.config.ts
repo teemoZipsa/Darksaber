@@ -9,6 +9,7 @@ export default defineConfig({
         timeout: 10_000,
     },
     fullyParallel: false,
+    workers: 1,
     reporter: process.env.CI ? 'github' : 'list',
     use: {
         baseURL: 'http://127.0.0.1:5731',
@@ -18,6 +19,10 @@ export default defineConfig({
         {
             name: 'chromium',
             use: { ...devices['Desktop Chrome'] },
+        },
+        {
+            name: 'mobile-chrome',
+            use: { ...devices['Pixel 7'] },
         },
     ],
     webServer: [

@@ -66,6 +66,30 @@ test('dev tutorial opens the magic loadout overlay from the world hotkey', async
     await expect(page.locator('#ui-overlay .ds-scrim .ds-panel').filter({ hasText: /마법 장착|Magic Loadout/ })).toBeHidden();
 });
 
+test('dev raid loot can be dragged into the backpack with real pointer input', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Pointer drag coverage is exercised on the desktop browser project.');
+
+    await page.goto('/?devStart=raid&devScenario=loot');
+
+    const externalItem = page.locator('#ui-overlay [data-inv-grid="ext"] .inv-item').first();
+    const backpack = page.locator('#ui-overlay [data-inv-grid="bag"]');
+    await expect(externalItem).toBeVisible({ timeout: 20_000 });
+    await expect(backpack).toBeVisible();
+
+    const itemBox = await externalItem.boundingBox();
+    const bagBox = await backpack.boundingBox();
+    expect(itemBox).not.toBeNull();
+    expect(bagBox).not.toBeNull();
+
+    await page.mouse.move(itemBox!.x + itemBox!.width / 2, itemBox!.y + itemBox!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(bagBox!.x + bagBox!.width - 20, bagBox!.y + bagBox!.height - 20, { steps: 12 });
+    await page.mouse.up();
+
+    await expect(page.locator('.dev-scenario-status')).toContainText(/picked:dev_raid_loot:\d+,\d+/);
+    await expect(page.locator('#ui-overlay [data-inv-grid="ext"] .inv-item')).toHaveCount(0);
+});
+
 test('mobile viewport keeps town and standalone inventory overlays within the screen', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/?devStart=town');
