@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import ts from 'typescript';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
 import { MASTER_CLASSES } from '../../src/data/ClassTree';
 import { getFacilityUpgradeDefinitions } from '../../src/data/FacilityUpgradeData';
@@ -31,37 +32,59 @@ function walkFiles(dir: string): string[] {
     return out;
 }
 
-function objectBlockAfter(text: string, marker: string): string {
-    const markerIndex = text.indexOf(marker);
-    assert.notEqual(markerIndex, -1, `missing marker ${marker}`);
-    const start = text.indexOf('{', markerIndex);
-    assert.notEqual(start, -1, `missing object after ${marker}`);
+function readSourceFile(file: string): ts.SourceFile {
+    const scriptKind = file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+    return ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, scriptKind);
+}
 
-    let depth = 0;
-    for (let i = start; i < text.length; i++) {
-        const ch = text[i];
-        if (ch === '{') depth++;
-        else if (ch === '}') {
-            depth--;
-            if (depth === 0) return text.slice(start + 1, i);
-        }
-    }
-    assert.fail(`unterminated object after ${marker}`);
+function visitSourceFile(file: string, visitor: (node: ts.Node) => void): void {
+    const sourceFile = readSourceFile(file);
+    const visit = (node: ts.Node) => {
+        visitor(node);
+        ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+}
+
+function getPropertyNameText(name: ts.PropertyName): string | null {
+    if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) return name.text;
+    return null;
+}
+
+function getStaticString(node: ts.Expression | undefined): string | null {
+    if (!node) return null;
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+    return null;
+}
+
+function getTemplatePattern(node: ts.Expression | undefined): string | null {
+    if (!node || !ts.isTemplateExpression(node)) return null;
+    return [
+        node.head.text,
+        ...node.templateSpans.flatMap((span) => ['${}', span.literal.text]),
+    ].join('');
+}
+
+function getCallIdentifier(node: ts.CallExpression): string | null {
+    return ts.isIdentifier(node.expression) ? node.expression.text : null;
 }
 
 function collectLiteralUiKeys(): Set<string> {
     const keys = new Set<string>();
     for (const file of walkFiles(join(process.cwd(), 'src'))) {
-        const text = readFileSync(file, 'utf8');
-        for (const re of [
-            /\bt\(\s*['"]([^'"]+)['"]\s*\)/g,
-            /\bformatT\(\s*['"]([^'"]+)['"]/g,
-            /\bformatSkillLog\(\s*['"]([^'"]+)['"]/g,
-            /\blogEnemy\(\s*['"]([^'"]+)['"]/g,
-            /\bmatchesAnyLocalizedKeyword\(\s*line\s*,\s*['"]([^'"]+)['"]/g,
-        ]) {
-            for (const match of text.matchAll(re)) keys.add(match[1]);
-        }
+        visitSourceFile(file, (node) => {
+            if (!ts.isCallExpression(node)) return;
+            const name = getCallIdentifier(node);
+            if (name === 't' || name === 'formatT' || name === 'formatSkillLog' || name === 'logEnemy') {
+                const key = getStaticString(node.arguments[0]);
+                if (key) keys.add(key);
+                return;
+            }
+            if (name === 'matchesAnyLocalizedKeyword') {
+                const key = getStaticString(node.arguments[1]);
+                if (key) keys.add(key);
+            }
+        });
     }
     return keys;
 }
@@ -69,10 +92,13 @@ function collectLiteralUiKeys(): Set<string> {
 function collectTemplateUiKeyPatterns(): Set<string> {
     const patterns = new Set<string>();
     for (const file of walkFiles(join(process.cwd(), 'src'))) {
-        const text = readFileSync(file, 'utf8');
-        for (const match of text.matchAll(/\b(?:t|formatT)\(\s*`([^`]*\$\{[^`]*?)`/g)) {
-            patterns.add(match[1].replace(/\$\{[^}]+\}/g, '${}'));
-        }
+        visitSourceFile(file, (node) => {
+            if (!ts.isCallExpression(node)) return;
+            const name = getCallIdentifier(node);
+            if (name !== 't' && name !== 'formatT') return;
+            const pattern = getTemplatePattern(node.arguments[0]);
+            if (pattern) patterns.add(pattern);
+        });
     }
     return patterns;
 }
@@ -178,10 +204,27 @@ function collectDataDrivenUiKeys(): Set<string> {
 }
 
 function collectLanguageKeys(lang: 'ko' | 'en'): Set<string> {
-    const text = readFileSync(join(process.cwd(), 'src/i18n/translations.ts'), 'utf8');
-    const stringsBlock = objectBlockAfter(text, 'I18N_STRINGS');
-    const langBlock = objectBlockAfter(stringsBlock, `${lang}:`);
-    return new Set([...langBlock.matchAll(/['"]([^'"]+)['"]\s*:/g)].map((match) => match[1]));
+    const sourceFile = readSourceFile(join(process.cwd(), 'src/i18n/translations.ts'));
+    for (const statement of sourceFile.statements) {
+        if (!ts.isVariableStatement(statement)) continue;
+        for (const declaration of statement.declarationList.declarations) {
+            if (!ts.isIdentifier(declaration.name) || declaration.name.text !== 'I18N_STRINGS') continue;
+            const table = declaration.initializer;
+            if (!table || !ts.isObjectLiteralExpression(table)) continue;
+            const langEntry = table.properties.find((property): property is ts.PropertyAssignment =>
+                ts.isPropertyAssignment(property)
+                && getPropertyNameText(property.name) === lang
+                && ts.isObjectLiteralExpression(property.initializer)
+            );
+            assert.ok(langEntry, `missing ${lang} translation block`);
+            return new Set((langEntry.initializer as ts.ObjectLiteralExpression).properties.flatMap((property) => {
+                if (!ts.isPropertyAssignment(property)) return [];
+                const key = getPropertyNameText(property.name);
+                return key ? [key] : [];
+            }));
+        }
+    }
+    assert.fail('missing I18N_STRINGS declaration');
 }
 
 test('literal UI translation keys exist in both languages', () => {
