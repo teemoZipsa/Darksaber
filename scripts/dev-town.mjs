@@ -1,9 +1,16 @@
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 const isWin = process.platform === 'win32';
 const npmCmd = isWin ? 'npm.cmd' : 'npm';
 const children = [];
+const storyScenarioDataUrl = new URL('../src/data/content/story-scenarios.json', import.meta.url);
+const devStoryEpisodes = new Set(
+    JSON.parse(readFileSync(storyScenarioDataUrl, 'utf8'))
+        .map((scenario) => scenario.episode)
+        .filter((episode) => Number.isInteger(episode) && episode > 0)
+);
 
 function run(label, args) {
     const child = spawn(npmCmd, args, {
@@ -58,7 +65,7 @@ export function normalizeDevScenarioArg(scenarioArg) {
     const match = /^story(\d+)$/.exec(scenarioArg ?? '');
     if (!match) return null;
     const episode = Number(match[1]);
-    return episode >= 1 && episode <= 31 ? `story${episode}` : null;
+    return devStoryEpisodes.has(episode) ? `story${episode}` : null;
 }
 
 export function buildDevOpenPath(modeArg, scenarioArg = null) {

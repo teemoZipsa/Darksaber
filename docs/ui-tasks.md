@@ -31,6 +31,7 @@
 - [x] 저주받은 유물 구현: 봉인된 유물함에서 낮은 확률로 고가치 저주 유물이 나오고, 레이드 배낭에 든 동안 행동력 회복 저하와 턴 시작 HP 피해를 적용한다.
 - [x] DOM 오버레이 후속 약점 보강: 오버레이 열림/월드 차단 레지스트리 단일화, 동적 i18n guard 보강, 모바일 오버레이 e2e 추가, 일반형 스토리 dev 스크립트 추가.
 - [x] `WorldEngine` 생성자 후속 정리: 전투·행동, 레이드 라이프사이클, 표시·입력 컨트롤러 배선을 feature별 initializer로 분리해 생성자 조립부를 축소.
+- [x] DEV 스토리 시작 스크립트 정리: `dev:raid:story1`~`story31` 수동 별칭을 제거하고, 일반형 `dev:raid:story -- storyNN`이 `story-scenarios.json` 데이터로 지원 에피소드를 검증하도록 변경.
 
 ---
 
@@ -107,7 +108,7 @@
 - 타입체크: `npm run typecheck` (반드시 통과).
 - DOM 오버레이 브라우저 스모크: `npm run test:e2e` (새 환경은 먼저 `npx playwright install chromium`).
 - 개발 서버: `npm run dev` → http://127.0.0.1:5731 (프리뷰 도구는 `.claude/launch.json`의 5742).
-- 개발자 바로 시작: `npm run dev:town`, `npm run dev:raid`, `npm run dev:raid:aggro`, `npm run dev:raid:loot`, `npm run dev:raid:story -- storyNN`, `npm run dev:tutorial`. 기존 `npm run dev:raid:story1`~`npm run dev:raid:story31` 별칭도 호환용으로 유지. 직접 진입 URL은 `/?devStart=raid&devScenario=storyNN` 형식으로 1~31화 전체를 지원.
+- 개발자 바로 시작: `npm run dev:town`, `npm run dev:raid`, `npm run dev:raid:aggro`, `npm run dev:raid:loot`, `npm run dev:raid:story -- storyNN`, `npm run dev:tutorial`. 직접 진입 URL은 `/?devStart=raid&devScenario=storyNN` 형식이며, 지원 에피소드는 `story-scenarios.json` 데이터에서 결정된다.
 - 테스트: `npm test`.
 
 ## 알려진 함정

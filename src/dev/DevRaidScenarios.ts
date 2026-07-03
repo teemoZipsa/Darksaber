@@ -6,11 +6,14 @@ import { LootObject } from '../entity/LootObject';
 import type { GameManager } from '../engine/GameManager';
 import { formatT, t } from '../i18n/LanguageManager';
 
-export const DEV_STORY_EPISODES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31] as const;
-export const DEV_STORY_INTERIOR_EPISODES = [1, 2, 3, 7, 13, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31] as const;
-export const DEV_LATE_STORY_EPISODES = [23, 24, 25, 26, 27, 28, 29, 30, 31] as const;
-type DevStoryEpisode = typeof DEV_STORY_EPISODES[number];
-type DevStoryScenario = `story${DevStoryEpisode}`;
+export const DEV_STORY_EPISODES = STORY_SCENARIOS.map((scenario) => scenario.episode);
+export const DEV_STORY_INTERIOR_EPISODES = STORY_SCENARIOS
+    .filter((scenario) => scenario.missionKind === 'soloInterior')
+    .map((scenario) => scenario.episode);
+export const DEV_LATE_STORY_EPISODES = STORY_SCENARIOS
+    .filter((scenario) => scenario.episode >= 23)
+    .map((scenario) => scenario.episode);
+type DevStoryScenario = `story${number}`;
 
 export type DevRaidScenario = 'aggro' | 'loot' | DevStoryScenario;
 
@@ -19,8 +22,8 @@ export function parseDevRaidScenario(value: string | null): DevRaidScenario | nu
     const match = value?.match(/^story(\d+)$/);
     if (!match) return null;
     const episode = Number(match[1]);
-    return DEV_STORY_EPISODES.includes(episode as DevStoryEpisode)
-        ? `story${episode as DevStoryEpisode}`
+    return DEV_STORY_EPISODES.includes(episode)
+        ? `story${episode}`
         : null;
 }
 

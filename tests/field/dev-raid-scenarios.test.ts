@@ -175,17 +175,11 @@ test('dev raid scenario parser accepts implemented story episodes through episod
     assert.equal(parseDevRaidScenario('storyxx'), null);
 });
 
-test('package scripts expose a generic story dev entry and legacy episode aliases', () => {
+test('package scripts expose a generic data-driven story dev entry without numbered aliases', () => {
     const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
     assert.equal(packageJson.scripts['dev:raid:story'], 'node scripts/dev-town.mjs raid');
-    for (const episode of DEV_STORY_EPISODES) {
-        assert.equal(
-            packageJson.scripts[`dev:raid:story${episode}`],
-            `node scripts/dev-town.mjs raid story${episode}`,
-            `episode ${episode} dev script`
-        );
-    }
-    assert.equal(packageJson.scripts['dev:raid:story32'], undefined);
+    const numberedStoryScripts = Object.keys(packageJson.scripts).filter((key) => /^dev:raid:story\d+$/.test(key));
+    assert.deepEqual(numberedStoryScripts, []);
 });
 
 test('dev town launcher forwards each implemented story scenario to the open URL', async () => {
