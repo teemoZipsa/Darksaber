@@ -198,7 +198,7 @@ function installLootController(engine: any, options: {
             setExternalGrid: () => undefined,
         },
     };
-    engine.selectionController = new WorldSelectionController({
+    const selectionController = new WorldSelectionController({
         getPartyActors: () => [],
         getEnemyById: () => null,
         getLootById: () => null,
@@ -213,9 +213,9 @@ function installLootController(engine: any, options: {
     engine.addCombatLog = (message: string) => logs.push(message);
     engine.getControlledActor = () => null;
     engine.clearControlledPath = () => undefined;
-    engine.lootController = new WorldLootController({
+    const lootController = new WorldLootController({
         gameManager: engine.gameManager,
-        selectionController: engine.selectionController,
+        selectionController,
         storyScenarioController: engine.storyScenarioController,
         networkSyncController: engine.networkSyncController,
         getWorldMap: () => engine.worldMap,
@@ -226,6 +226,10 @@ function installLootController(engine: any, options: {
         clearControlledPath: () => engine.clearControlledPath(),
         log: (message) => engine.addCombatLog(message),
     });
+    engine.actionControllers = {
+        selectionController,
+        lootController,
+    };
 }
 
 test('monster catalog includes 16 general monsters and story boss sprites', () => {

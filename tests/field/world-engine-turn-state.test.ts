@@ -70,7 +70,7 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
         renderController: { render: () => undefined },
         inputController: { process: () => undefined },
     };
-    engine.playerActionController = {
+    const playerActionController = {
         hasExecutableAction: () => true,
         getTurnActionStates: () => [],
         getMode: () => null,
@@ -80,18 +80,24 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
         isActive: () => false,
         isCompletePending: () => false,
         getInstructor: () => null,
-        getActionMenuStates: (targetActor: FieldActor) => engine.playerActionController.getTurnActionStates(targetActor),
+        getActionMenuStates: (targetActor: FieldActor) => engine.actionControllers.playerActionController.getTurnActionStates(targetActor),
         filterActionTiles: (_action: string, _targetActor: FieldActor, tiles: Set<string>) => tiles,
         addBlockedLog: () => undefined,
         isTutorialEnemy: () => false,
         complete: () => undefined,
         advanceStep: () => undefined,
     };
-    engine.magicController = { reset: () => calls.push('resetMagic') };
-    engine.selectionController = {
+    const selectionController = {
         hasSelection: () => false,
         selectActor: () => calls.push('selectActor'),
         selectLoot: () => calls.push('selectLoot'),
+    };
+    engine.actionControllers = {
+        selectionController,
+        lootController: { refreshLootState: () => undefined, spawnEnemyLoot: () => undefined },
+        magicController: { reset: () => calls.push('resetMagic') },
+        toolController: { reset: () => calls.push('resetTool') },
+        playerActionController,
     };
     engine.getControlledActor = () => engine.partyActors.find((entry: FieldActor) => engine.party.getCharacters().includes(entry.character)) ?? null;
     engine.getEnemyById = () => null;
@@ -151,12 +157,12 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
         getRemainingActionPoints: () => engine.turnStateController.getRemainingActionPoints(),
         setRemainingActionPoints: (points) => engine.turnStateController.setRemainingActionPoints(points),
         setMajorActionUsedThisTurn: (used) => engine.turnStateController.setMajorActionUsedThisTurn(used),
-        hasSelection: () => engine.selectionController.hasSelection(),
-        selectActor: (actorId) => engine.selectionController.selectActor(actorId),
-        selectLoot: (lootId) => engine.selectionController.selectLoot(lootId),
+        hasSelection: () => engine.actionControllers.selectionController.hasSelection(),
+        selectActor: (actorId) => engine.actionControllers.selectionController.selectActor(actorId),
+        selectLoot: (lootId) => engine.actionControllers.selectionController.selectLoot(lootId),
         getActionMenuIsOpen: () => engine.actionMenuUI.getIsOpen(),
-        getPlayerActionMode: () => engine.playerActionController.getMode(),
-        hasExecutableAction: (targetActor) => engine.playerActionController.hasExecutableAction(targetActor),
+        getPlayerActionMode: () => engine.actionControllers.playerActionController.getMode(),
+        hasExecutableAction: (targetActor) => engine.actionControllers.playerActionController.hasExecutableAction(targetActor),
         reopenActionMenu: () => calls.push('openActionMenu'),
         getEnemyById: (enemyId) => engine.getEnemyById(enemyId),
         actorTile: (targetActor) => engine.actorTile(targetActor),
@@ -362,6 +368,9 @@ test('world update freezes field simulation while story presentation is active',
         tacticalController: { updateMarkers: () => undefined },
         renderController: { render: () => undefined },
         inputController: { process: () => calls.push('input') },
+    };
+    engine.actionControllers = {
+        playerActionController: { processQueuedIntents: () => calls.push('queuedIntents') },
     };
     engine.movementController = {
         updatePartyActors: () => {

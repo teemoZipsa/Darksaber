@@ -121,11 +121,8 @@ export class WorldEngine {
     private currentPhase: WorldPhase = 'lobby';
     private movementController!: WorldEngineCombatControllers['movementController'];
     private enemyTurnController!: WorldEngineCombatControllers['enemyTurnController'];
-    private magicController!: WorldEngineActionControllers['magicController'];
-    private toolController!: WorldEngineActionControllers['toolController'];
-    private playerActionController!: WorldEngineActionControllers['playerActionController'];
+    private actionControllers!: WorldEngineActionControllers;
     private raidOutcomeController!: WorldEngineRaidLifecycleControllers['raidOutcomeController'];
-    private selectionController!: WorldEngineActionControllers['selectionController'];
     private fieldSpawnController!: WorldEngineCombatControllers['fieldSpawnController'];
     private presentationControllers!: WorldEnginePresentationControllers;
     private storyScenarioController!: WorldStoryScenarioController;
@@ -134,7 +131,6 @@ export class WorldEngine {
     private raidLifecycleController!: WorldEngineRaidLifecycleControllers['raidLifecycleController'];
     private templeController!: WorldTempleController;
     private restingController!: WorldRestingController;
-    private lootController!: WorldEngineActionControllers['lootController'];
     private combatFeedbackController!: WorldCombatFeedbackController;
     private networkIntentController!: WorldNetworkIntentController;
     private networkEvents!: WorldEngineNetworkEvents;
@@ -189,7 +185,7 @@ export class WorldEngine {
             getControlledActor: () => this.getControlledActor(),
             setPlayer: (player) => { this.player = player; },
             getPlayer: () => this.player,
-            selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            selectActor: (actorId) => this.actionControllers.selectionController.selectActor(actorId),
             startIntroTutorial: () => this.startIntroTutorial(),
             hasStoredNetworkResumeToken: () => NetworkRaidClient.hasStoredResumeToken(),
             beginRaidFromCurrentHub: () => { void this.beginRaidFromCurrentHub(); },
@@ -222,7 +218,7 @@ export class WorldEngine {
             clearFieldTurnState: () => this.clearFieldTurnState(),
             placePartyNear: (tile) => this.placePartyNear(tile),
             clearWorldLoot: () => { this.worldMap.loot = []; },
-            selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            selectActor: (actorId) => this.actionControllers.selectionController.selectActor(actorId),
             addCombatLog: (message) => this.addCombatLog(message),
         });
         this.minimapUI = worldControllers.minimapUI;
@@ -262,18 +258,18 @@ export class WorldEngine {
             placePartyNear: (tile, overrideMembers) => this.placePartyNear(tile, overrideMembers),
             closeFieldOverlays: () => this.closeFieldOverlays(),
             clearFieldTurnState: () => this.clearFieldTurnState(),
-            selectActor: (actorId) => this.selectionController.selectActor(actorId),
-            clearSelection: () => this.selectionController.clear(),
-            hasSelection: () => this.selectionController.hasSelection(),
-            selectLoot: (lootId) => this.selectionController.selectLoot(lootId),
+            selectActor: (actorId) => this.actionControllers.selectionController.selectActor(actorId),
+            clearSelection: () => this.actionControllers.selectionController.clear(),
+            hasSelection: () => this.actionControllers.selectionController.hasSelection(),
+            selectLoot: (lootId) => this.actionControllers.selectionController.selectLoot(lootId),
             isNetworkRaid: () => this.isNetworkRaid,
             getNetworkRaidClient: () => this.networkRaidClient,
             getNetworkPlayerId: () => this.networkPlayerId,
             isRaidOutcomeVisible: () => this.raidOutcomeController.isVisible(),
             setCurrentPhase: (phase) => { this.currentPhase = phase; },
-            getTurnActionStates: (actor) => this.playerActionController.getTurnActionStates(actor),
-            getPlayerActionMode: () => this.playerActionController.getMode(),
-            hasExecutableAction: (actor) => this.playerActionController.hasExecutableAction(actor),
+            getTurnActionStates: (actor) => this.actionControllers.playerActionController.getTurnActionStates(actor),
+            getPlayerActionMode: () => this.actionControllers.playerActionController.getMode(),
+            hasExecutableAction: (actor) => this.actionControllers.playerActionController.hasExecutableAction(actor),
             reopenActionMenu: (actor) => this.reopenActionMenu(actor),
             getEnemyById: (enemyId) => this.getEnemyById(enemyId),
             updateAttackCues: (dt) => this.updateAttackCues(dt),
@@ -321,7 +317,7 @@ export class WorldEngine {
             interruptRestingForDamage: (beforeHpByActorId) => this.interruptRestingForDamage(beforeHpByActorId),
             spawnEnemyLoot: (enemy) => this.spawnEnemyLoot(enemy),
             awardDefeatExp: (actor, enemy) => this.awardDefeatExp(actor, enemy),
-            clearEnemyIfSelected: (enemyId) => this.selectionController.clearEnemyIfSelected(enemyId),
+            clearEnemyIfSelected: (enemyId) => this.actionControllers.selectionController.clearEnemyIfSelected(enemyId),
             beginCombatFeedbackGroup: () => this.beginCombatFeedbackGroup(),
             registerCombatFeedback: (kind, feedbackGroupId) => this.registerCombatFeedback(kind, feedbackGroupId),
             flushCombatFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
@@ -377,11 +373,7 @@ export class WorldEngine {
             flushCombatFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
             addCombatLog: (message) => this.addCombatLog(message),
         });
-        this.selectionController = actionControllers.selectionController;
-        this.lootController = actionControllers.lootController;
-        this.magicController = actionControllers.magicController;
-        this.toolController = actionControllers.toolController;
-        this.playerActionController = actionControllers.playerActionController;
+        this.actionControllers = actionControllers;
     }
 
     private initializeRaidLifecycleControllers(): void {
@@ -416,7 +408,7 @@ export class WorldEngine {
             setPlayer: (player) => { this.player = player; },
             setPartyActors: (actors) => { this.partyActors = actors; },
             setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
-            selectActor: (actorId) => this.selectionController.selectActor(actorId),
+            selectActor: (actorId) => this.actionControllers.selectionController.selectActor(actorId),
             isTurnCombatActive: () => this.isTurnCombatActive(),
             setPhase: (phase) => { this.currentPhase = phase; },
             openTown: (town) => this.openTown(town),
@@ -445,11 +437,11 @@ export class WorldEngine {
             effectManager: this.effectManager,
             floatingText: this.floatingText,
             minimapUI: this.minimapUI,
-            magicController: this.magicController,
-            toolController: this.toolController,
-            playerActionController: this.playerActionController,
+            magicController: this.actionControllers.magicController,
+            toolController: this.actionControllers.toolController,
+            playerActionController: this.actionControllers.playerActionController,
             raidOutcomeController: this.raidOutcomeController,
-            selectionController: this.selectionController,
+            selectionController: this.actionControllers.selectionController,
             tutorialController: this.tutorialController,
             turnStateController: this.turnStateController,
             fieldFeedback: this.fieldFeedback,
@@ -486,10 +478,10 @@ export class WorldEngine {
             fieldEnemies: this.fieldEnemies,
             turnStateController: this.turnStateController,
             actionMenuUI: this.actionMenuUI,
-            playerActionController: this.playerActionController,
+            playerActionController: this.actionControllers.playerActionController,
             tacticalController: this.presentationControllers.tacticalController,
-            magicController: this.magicController,
-            toolController: this.toolController,
+            magicController: this.actionControllers.magicController,
+            toolController: this.actionControllers.toolController,
             partyActors: this.partyActors,
         });
     }
@@ -507,7 +499,7 @@ export class WorldEngine {
             inputController: this.presentationControllers.inputController,
             effectManager: this.effectManager,
             floatingText: this.floatingText,
-            playerActionController: this.playerActionController,
+            playerActionController: this.actionControllers.playerActionController,
             tacticalController: this.presentationControllers.tacticalController,
             raidLifecycleController: this.raidLifecycleController,
             templeController: this.templeController,
@@ -622,9 +614,9 @@ export class WorldEngine {
         this.gameManager.closePauseMenu();
         this.closeActionMenu();
         this.closeTacticalMenu();
-        this.magicController.reset();
-        this.toolController?.reset();
-        this.playerActionController.clearTargeting();
+        this.actionControllers.magicController.reset();
+        this.actionControllers.toolController?.reset();
+        this.actionControllers.playerActionController.clearTargeting();
     }
 
     private clearFieldTurnState(): void {
@@ -632,8 +624,8 @@ export class WorldEngine {
         this.fanfareLeaderActorId = null;
         this.restingController.clearTimers();
         this.closeActionMenu();
-        this.magicController.reset();
-        this.toolController?.reset();
+        this.actionControllers.magicController.reset();
+        this.actionControllers.toolController?.reset();
         for (const actor of this.partyActors) {
             actor.path = [];
             actor.queuedIntent = null;
@@ -759,7 +751,7 @@ export class WorldEngine {
     }
 
     private spawnEnemyLoot(enemy: Enemy): void {
-        this.lootController.spawnEnemyLoot(enemy);
+        this.actionControllers.lootController.spawnEnemyLoot(enemy);
     }
 
     private submitNetworkMoveIntent(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean {
@@ -795,7 +787,7 @@ export class WorldEngine {
     }
 
     private refreshLootState(): void {
-        this.lootController.refreshLootState();
+        this.actionControllers.lootController.refreshLootState();
     }
 
     private getControlledActor(): FieldActor | null {
@@ -847,14 +839,14 @@ export class WorldEngine {
             return false;
         }
         if (!this.party.getCharacters().includes(actor.character)) {
-            this.selectionController.selectActor(actor.id);
+            this.actionControllers.selectionController.selectActor(actor.id);
             this.addCombatLog(formatT('field.log.remoteDisplayOnly', { name: actor.character.name }));
             return false;
         }
         if (!this.party.switchTo(index)) return false;
         this.player = actor.entity;
-        this.selectionController.selectActor(actor.id);
-        this.playerActionController.clearTargeting();
+        this.actionControllers.selectionController.selectActor(actor.id);
+        this.actionControllers.playerActionController.clearTargeting();
         this.closeActionMenu();
         this.closeTacticalMenu();
         this.addCombatLog(formatT('field.log.actorControl', { name: actor.character.name }));
@@ -866,11 +858,11 @@ export class WorldEngine {
             actionMenuUI: this.actionMenuUI,
             tutorialController: this.tutorialController,
             turnStateController: this.turnStateController,
-            selectionController: this.selectionController,
-            playerActionController: this.playerActionController,
+            selectionController: this.actionControllers.selectionController,
+            playerActionController: this.actionControllers.playerActionController,
             networkIntentController: this.networkIntentController,
-            magicController: this.magicController,
-            toolController: this.toolController,
+            magicController: this.actionControllers.magicController,
+            toolController: this.actionControllers.toolController,
             getControlledActor: () => this.getControlledActor(),
             getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
             getSpendableActionGauge: () => this.getSpendableActionGauge(),
@@ -953,16 +945,16 @@ export class WorldEngine {
 
         this.closeActionMenu();
         this.closeTacticalMenu();
-        this.playerActionController.clearTargeting();
-        this.magicController.reset();
-        this.toolController?.reset();
+        this.actionControllers.playerActionController.clearTargeting();
+        this.actionControllers.magicController.reset();
+        this.actionControllers.toolController?.reset();
     }
 
     private beginActorTurn(actor: FieldActor): void {
         const index = this.partyActors.indexOf(actor);
         if (index >= 0) this.switchToPartyMember(index);
         actor.entity.actionGauge = this.turnStateController.beginActorTurn(actor.id);
-        this.selectionController.selectActor(actor.id);
+        this.actionControllers.selectionController.selectActor(actor.id);
         if (!this.turnStartResolver.processActorTurnStart(actor)) {
             this.endActorTurn(actor, 'statusBlocked');
             return;
@@ -973,7 +965,7 @@ export class WorldEngine {
             gauge: t('ui.actionGauge'),
             value: this.turnStateController.getRemainingActionPoints(),
         }));
-        if (!this.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, 'noExecutableAction');
+        if (!this.actionControllers.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, 'noExecutableAction');
         else {
             this.closeTacticalMenu();
             this.actionMenuUI.open(this.tutorialController.getActionMenuStates(actor));
@@ -1026,12 +1018,12 @@ export class WorldEngine {
         if (this.turnStateController.getReservedAction()) return;
         const actor = this.getControlledActor();
         if (actor) this.clearActorIntent(actor);
-        this.selectionController.selectActor(actor?.id ?? null);
+        this.actionControllers.selectionController.selectActor(actor?.id ?? null);
         this.closeActionMenu();
         this.closeTacticalMenu();
-        this.playerActionController.clearTargeting();
-        this.magicController.reset();
-        this.toolController?.reset();
+        this.actionControllers.playerActionController.clearTargeting();
+        this.actionControllers.magicController.reset();
+        this.actionControllers.toolController?.reset();
     }
 
     private clearActorIntent(actor: FieldActor): void {

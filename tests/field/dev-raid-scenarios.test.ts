@@ -120,9 +120,11 @@ function createManagerHarness() {
                     tileRadius: 1,
                 })),
         },
-        selectionController: {
-            selectActor: (actorId: string | null) => { selected.actorId = actorId; },
-            selectLoot: (lootId: string) => { selected.lootId = lootId; },
+        actionControllers: {
+            selectionController: {
+                selectActor: (actorId: string | null) => { selected.actorId = actorId; },
+                selectLoot: (lootId: string) => { selected.lootId = lootId; },
+            },
         },
         storyScenarioController: {
             started: null as null | { dungeonId: string; questId: string },

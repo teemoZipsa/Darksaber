@@ -60,7 +60,9 @@ type DevWorldEngine = {
         isWalkable: (x: number, y: number) => boolean;
         getDungeons?: () => DevDungeon[];
     };
-    selectionController: { selectActor: (actorId: string | null) => void; selectLoot: (lootId: string) => void };
+    actionControllers: {
+        selectionController: { selectActor: (actorId: string | null) => void; selectLoot: (lootId: string) => void };
+    };
     storyScenarioController?: {
         startLocalStoryScenarioDungeon?: (dungeon: DevDungeon, storyQuest: NonNullable<ReturnType<typeof getStoryQuestByDungeonId>>) => void;
         startLocalStoryInteriorDungeon: (dungeon: DevDungeon, storyQuest: NonNullable<ReturnType<typeof getStoryQuestByDungeonId>>) => void;
@@ -126,7 +128,7 @@ function applyDevAggroScenario(world: DevWorldEngine, actor: DevFieldActor): voi
     world.fieldEnemies = [{ enemy, home: { ...enemyTile }, path: [] }];
     world.worldMap.loot = [];
     world.player = actor.entity;
-    world.selectionController.selectActor(actor.id);
+    world.actionControllers.selectionController.selectActor(actor.id);
     world.clearFieldTurnState();
     enemy.isAggro = true;
     enemy.actionGauge = 100;
@@ -177,7 +179,7 @@ function applyDevLootScenario(manager: GameManager, world: DevWorldEngine, actor
         gridH: 2,
     });
     world.worldMap.loot = [loot];
-    world.selectionController.selectLoot(loot.id);
+    world.actionControllers.selectionController.selectLoot(loot.id);
     manager.inventoryUI.setExternalGrid(loot.inventory, loot.sourceLabel, { isRaidLoot: true });
     if (!manager.inventoryUI.isVisible()) manager.inventoryUI.toggle();
     world.addCombatLog?.(t('dev.scenario.lootReady'));
