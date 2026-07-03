@@ -46,7 +46,7 @@ import { TownInfo } from '../map/BiomeMask';
 import { TilePoint } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
 import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST } from '../field/FieldActionEconomy';
-import type { AttackCue, FieldActor, FieldEnemy, FieldHitParty, FieldTurnEndReason } from '../field/FieldTypes';
+import type { FieldActor, FieldEnemy, FieldHitParty, FieldTurnEndReason } from '../field/FieldTypes';
 import { WorldRaidSession, type WorldPhase } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
 import { WorldCombatController, createCombatResult, type CombatResult } from './world/WorldCombatController';
@@ -71,6 +71,7 @@ import { WorldLootController } from './world/WorldLootController';
 import { WorldCombatFeedbackController } from './world/WorldCombatFeedbackController';
 import { WorldNetworkIntentController } from './world/WorldNetworkIntentController';
 import { WorldTurnStateController } from './world/WorldTurnStateController';
+import { WorldFieldFeedbackState } from './world/WorldFieldFeedbackState';
 import type { CombatFeedbackKind } from './world/CombatFeedback';
 import {
     actorTile,
@@ -154,12 +155,11 @@ export class WorldEngine {
     private networkIntentController: WorldNetworkIntentController;
     private turnStateController = new WorldTurnStateController();
     private hoverTile: TilePoint = { x: -1, y: -1 };
-    private combatLog: string[] = [];
+    private fieldFeedback = new WorldFieldFeedbackState();
     private followRepathTimer: number = 0;
     private fanfareLeaderActorId: string | null = null;
     private floatingText = new FloatingTextManager();
     private effectManager = new EffectManager();
-    private attackCues: AttackCue[] = [];
     private worldTime: number = 0;
 
     constructor(
@@ -315,7 +315,7 @@ export class WorldEngine {
                 getWorldActorAttackTargetFailure({ worldMap: this.worldMap, actor, enemy, casterTile }),
             updateEffects: (dt) => this.effectManager.update(dt),
             updateFloatingText: (dt) => this.floatingText.update(dt),
-            updateAttackCues: (dt) => this.updateAttackCues(dt),
+            updateAttackCues: (dt) => this.fieldFeedback.updateAttackCues(dt),
             followCameraToPlayer: (camera, dt) => {
                 camera.followTile(this.player.gridX, this.player.gridY);
                 if (dt !== undefined) camera.update(dt);
@@ -324,7 +324,7 @@ export class WorldEngine {
                 this.camera.followTile(actor.entity.gridX, actor.entity.gridY);
                 this.camera.snapToTarget();
             },
-            getLastCombatLog: () => this.combatLog[this.combatLog.length - 1],
+            getLastCombatLog: () => this.fieldFeedback.lastCombatLog(),
             log: (message) => this.addCombatLog(message),
         });
         this.networkSyncController = new WorldNetworkSyncController({
@@ -361,7 +361,7 @@ export class WorldEngine {
             beginCombatFeedbackGroup: () => this.beginCombatFeedbackGroup(),
             registerCombatFeedback: (kind, feedbackGroupId) => this.registerCombatFeedback(kind, feedbackGroupId),
             flushCombatFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
-            spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
+            spawnAttackCue: (from, to, color, label) => this.fieldFeedback.spawnAttackCue(from, to, color, label),
             spawnKillEffect: (enemy, feedbackGroupId, actor) => {
                 const exp = actor ? enemy.calcExpFor(actor.character.level) : enemy.expReward;
                 this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, exp, enemy);
@@ -393,7 +393,7 @@ export class WorldEngine {
                 this.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, exp, enemy);
                 this.registerCombatFeedback('kill', feedbackGroupId);
             },
-            spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
+            spawnAttackCue: (from, to, color, label) => this.fieldFeedback.spawnAttackCue(from, to, color, label),
             spawnLoot: (enemy) => {
                 if (!this.tutorialController.isTutorialEnemy(enemy)) this.spawnEnemyLoot(enemy);
             },
@@ -454,7 +454,7 @@ export class WorldEngine {
                     this.effectManager.spawnByElement(element, x, y);
                     this.registerCombatFeedback('normal', feedbackGroupId);
                 },
-                spawnAttackCue: (from, to, color, label) => this.spawnAttackCue(from, to, color, label),
+                spawnAttackCue: (from, to, color, label) => this.fieldFeedback.spawnAttackCue(from, to, color, label),
                 beginFeedbackGroup: () => this.beginCombatFeedbackGroup(),
                 flushFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
             }
@@ -705,8 +705,8 @@ export class WorldEngine {
             getMajorActionUsedThisTurn: () => this.turnStateController.getMajorActionUsedThisTurn(),
             getHoverTile: () => this.hoverTile,
             getPathPreviewTiles: (actor) => this.getPathPreviewTiles(actor),
-            getAttackCues: () => this.attackCues,
-            getCombatLog: () => this.combatLog,
+            getAttackCues: () => this.fieldFeedback.attackCues,
+            getCombatLog: () => this.fieldFeedback.combatLog,
             getActorTerrainTraits: (actor) => getWorldActorTerrainTraits(actor),
             isTurnCombatActive: () => this.isTurnCombatActive(),
         });
@@ -737,7 +737,7 @@ export class WorldEngine {
             closeTacticalMenu: () => this.closeTacticalMenu(),
             clearIntent: () => this.clearIntent(),
             log: (message) => this.addCombatLog(message),
-            getCombatLog: () => this.combatLog,
+            getCombatLog: () => this.fieldFeedback.combatLog,
             onUnhandledEscape: () => this.gameManager.openPauseMenu(),
         });
         this.spawnPartyAtCurrentHub();
@@ -830,7 +830,7 @@ export class WorldEngine {
         this.updateRestingActors(dt);
         this.effectManager.update(dt);
         this.floatingText.update(dt);
-        this.updateAttackCues(dt);
+        this.fieldFeedback.updateAttackCues(dt);
         this.playerActionController.processQueuedIntents();
         this.refreshLootState();
         this.tacticalController.updateMarkers(dt);
@@ -945,7 +945,7 @@ export class WorldEngine {
         this.networkSyncController.refreshMovePathPreview();
         this.effectManager.update(dt);
         this.floatingText.update(dt);
-        this.updateAttackCues(dt);
+        this.fieldFeedback.updateAttackCues(dt);
         this.refreshLootState();
         this.storyScenarioController.checkDungeonArrival();
         this.refreshOpenActionMenuState();
@@ -961,7 +961,7 @@ export class WorldEngine {
         this.storyScenarioController.updatePresentation(dt);
         this.effectManager.update(dt);
         this.floatingText.update(dt);
-        this.updateAttackCues(dt);
+        this.fieldFeedback.updateAttackCues(dt);
         const controlled = this.getControlledActor();
         if (controlled) this.player = controlled.entity;
         camera.update(dt);
@@ -1611,9 +1611,7 @@ export class WorldEngine {
     }
 
     private addCombatLog(message: string): void {
-        this.combatLog.push(message);
-        // Keep a generous history so drag-to-scroll can reach further back.
-        if (this.combatLog.length > 200) this.combatLog.shift();
+        this.fieldFeedback.addCombatLog(message);
     }
 
     private beginCombatFeedbackGroup(): string {
@@ -1626,17 +1624,6 @@ export class WorldEngine {
 
     private flushCombatFeedbackGroup(feedbackGroupId: string): void {
         this.combatFeedbackController.flush(feedbackGroupId);
-    }
-
-    private spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void {
-        this.attackCues.push({ from, to, color, label, timer: 0, duration: 0.38 });
-    }
-
-    private updateAttackCues(dt: number): void {
-        for (let i = this.attackCues.length - 1; i >= 0; i--) {
-            this.attackCues[i].timer += dt;
-            if (this.attackCues[i].timer >= this.attackCues[i].duration) this.attackCues.splice(i, 1);
-        }
     }
 
     public isNetworkRaidActive(): boolean {

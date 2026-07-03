@@ -1,5 +1,4 @@
 import {
-    applyStatus,
     applyGuardToDamage,
     applyStatuses,
     applyStatusesToCarrier,
@@ -15,7 +14,7 @@ import { resolveSkillEffect, type SkillEffectResult } from '../src/combat/SkillE
 import { CombatFormulas } from '../src/combat/CombatFormulas';
 import { getClassLine } from '../src/data/ClassTree';
 import { getSkillAttackProfile } from '../src/data/AttackPatternProfiles';
-import { getItemDef, getItemDefByOriginalGetItemId, getCombatRecovery, isCombatRecoveryConsumable, type ItemDef } from '../src/data/ItemDB';
+import { getItemDef, getCombatRecovery, isCombatRecoveryConsumable } from '../src/data/ItemDB';
 import { getSkill, type Skill } from '../src/data/SkillDB';
 import {
     getEffectiveSkill,
@@ -32,13 +31,8 @@ import { getStoryScenarioByDungeonId, type StoryScenarioDefinition } from '../sr
 import { getStoryScenarioMonsterLayout } from '../src/data/StoryScenarioMonsterData';
 import {
     getStoryScenarioEventSequence,
-    getStoryScenarioTrapMagicDamage,
-    getStoryScenarioTriggerMagicCodes,
-    getStoryScenarioTriggerRandomChance,
-    getStoryScenarioTriggerUseItemIds,
     type StoryScenarioEnemyDefeatEvent,
     type StoryScenarioEventStep,
-    type StoryScenarioFieldEvent,
 } from '../src/data/StoryScenarioEventData';
 import {
     getStoryScenarioFieldEventFlag,
@@ -50,7 +44,7 @@ import {
     getStoryInteriorTileAt,
     type StoryInteriorLayout,
 } from '../src/data/StoryInteriorData';
-import { CHUNK_TILES, nestMemberOffsets, pickNestForChunk, type FieldNest, type FieldNestState } from '../src/field/SpawnResolver';
+import type { FieldNestState } from '../src/field/SpawnResolver';
 import { Enemy } from '../src/entity/Enemy';
 import { LootObject } from '../src/entity/LootObject';
 import { getCarryAtbMultiplier, getPlacedItemWeight } from '../src/inventory/CarryWeight';
@@ -78,18 +72,11 @@ import {
     REST_ACTION_GAUGE_COST,
     TOOL_ACTION_GAUGE_COST,
 } from '../src/field/FieldActionEconomy';
-import {
-    ENEMY_AGGRO_RANGE,
-    FIELD_ATB_SCALE,
-    ENEMY_LEASH_RANGE,
-} from '../src/field/FieldConfig';
-import { decideEnemyAction, type EnemyAIDecision } from '../src/field/EnemyAI';
+import { FIELD_ATB_SCALE } from '../src/field/FieldConfig';
 import { planMoveIntentPath } from './WorldSessionMoveIntent';
 import { advanceAtb } from '../src/field/FieldCombat';
 import {
-    findPathToAny,
     manhattan,
-    tilesInRange,
     type FieldPassableQuery,
     type TilePoint,
 } from '../src/field/FieldPathing';
@@ -114,7 +101,6 @@ import {
     type RaidResultMessage,
     type ScenarioEnemyDefeatEventMessage,
     type ScenarioFieldEventResultMessage,
-    type ScenarioFieldEventRewardResult,
     type WorldClientMessage,
     type WorldJoinMessage,
     type WorldServerMessage,
@@ -124,14 +110,20 @@ import {
 import { WorldSessionLootState, type WorldSessionLootLock } from './WorldSessionLootState';
 import { cloneCharacterSave, WorldSessionSaveState, type WorldCharacterSavePatch } from './WorldSessionSaveState';
 import { WorldSessionEnemyState } from './WorldSessionEnemyState';
+import { WorldSessionEnemyTurnResolver } from './WorldSessionEnemyTurnResolver';
+import {
+    FIELD_NEST_NEARBY_ENEMY_DISTANCE,
+    WorldSessionFieldNests,
+    WORLD_SESSION_FIELD_NEST_DEPARTURE_MAX_ENEMIES,
+    WORLD_SESSION_FIELD_NEST_DEPARTURE_RADIUS_CHUNKS,
+} from './WorldSessionFieldNests';
+import { WorldSessionScenarioRewards } from './WorldSessionScenarioRewards';
 import {
     addCarriedItemQuantity,
     addCarriedWeight,
-    removeCarriedWeight,
 } from './WorldSessionCarryState';
 import {
     firstActorTile,
-    firstLivingActorTile,
     hasActiveActorWithin,
     hasNearbyAggroEnemy,
     hasNearbyLiveEnemy,
@@ -173,7 +165,6 @@ import {
     updateRestingActorResources,
 } from './WorldSessionSkillState';
 import {
-    chunkOffsetsByDistance,
     cloneStatuses,
     createActorEvent,
     createEnemyEvent,
@@ -182,12 +173,9 @@ import {
     formationOffset,
     gridToSnapshot,
     hashInt,
-    nestStateKey,
     reject,
     storyScenarioGuardOffsets,
     syncStatsMovementToClass,
-    toActorAIUnit,
-    toEnemyAIUnit,
 } from './WorldSessionHelpers';
 import type {
     CompleteEnemyKillResult,
@@ -207,14 +195,6 @@ export const WORLD_TICK_MS = 100;
 export const DISCONNECT_GRACE_MS = 30_000;
 const RAID_LIMIT_SECONDS = 30 * 60;
 const AUTO_LOOT_RESPONSE_MS = 5_000;
-const FIELD_NEST_RESPAWN_MS = 5 * 60_000;
-const FIELD_NEST_RESPAWN_SAFE_DISTANCE = 18;
-const FIELD_NEST_ROAM_RADIUS_CHUNKS = 2;
-const FIELD_NEST_DEPARTURE_RADIUS_CHUNKS = 4;
-const FIELD_NEST_DEPARTURE_MAX_ENEMIES = 18;
-const FIELD_NEST_REFRESH_MAX_ENEMIES = 28;
-const FIELD_NEST_NEARBY_ENEMY_DISTANCE = 24;
-const FIELD_NEST_SPAWN_SAFE_DISTANCE = ENEMY_AGGRO_RANGE;
 const FIELD_NEST_REFRESH_INTERVAL_MS = 1_000;
 
 export type { WorldCharacterSavePatch } from './WorldSessionSaveState';
@@ -249,6 +229,9 @@ export class WorldSession {
     private readonly generatedLootChunks = new Set<string>();
     private readonly saveState = new WorldSessionSaveState();
     private readonly enemyState: WorldSessionEnemyState<ServerEnemy, ServerActor>;
+    private readonly enemyTurnResolver: WorldSessionEnemyTurnResolver;
+    private readonly fieldNests: WorldSessionFieldNests;
+    private readonly scenarioRewards: WorldSessionScenarioRewards;
     private readonly restingRecoveryTimers = new Map<string, number>();
     private seq = 0;
     private nextPlayerId = 1;
@@ -269,6 +252,28 @@ export class WorldSession {
             getTargetableActors: (entry) => getTargetableActors(this.players, this.actors.values(), entry),
             hasActiveActorWithin: (tile, distance, ownerPlayerId) =>
                 hasActiveActorWithin(this.players.values(), this.actors, tile, distance, ownerPlayerId),
+        });
+        this.enemyTurnResolver = new WorldSessionEnemyTurnResolver({
+            players: this.players,
+            actors: this.actors,
+            enemies: this.enemies,
+            enemyState: this.enemyState,
+            getServerTileAt: (tile, ownerPlayerId) => this.getServerTileAt(tile, ownerPlayerId),
+            isFieldPassable: (query) => this.isFieldPassable(query),
+            hasFieldLineOfSight: (from, to, ownerPlayerId) => this.hasFieldLineOfSight(from, to, ownerPlayerId),
+        });
+        this.fieldNests = new WorldSessionFieldNests({
+            worldMap: this.worldMap,
+            players: this.players,
+            actors: this.actors,
+            enemies: this.enemies,
+            nestStates: this.nestStates,
+            sessionEpoch: this.sessionEpoch,
+            nextEnemyId: () => this.nextEnemyId++,
+            findNearbyWalkableTile: (tile, actorId, ownerPlayerId) => this.findNearbyWalkableTile(tile, actorId, ownerPlayerId),
+        });
+        this.scenarioRewards = new WorldSessionScenarioRewards({
+            saveState: this.saveState,
         });
     }
 
@@ -604,14 +609,14 @@ export class WorldSession {
 
         if (now - this.lastNestRefreshAt >= FIELD_NEST_REFRESH_INTERVAL_MS) {
             this.lastNestRefreshAt = now;
-            this.refreshFieldNests(now);
+            this.fieldNests.refreshFieldNests(now);
         }
 
         for (const entry of this.enemies.values()) {
             const enemy = entry.enemy;
             if (enemy.stats.hp <= 0) continue;
             if (this.enemyState.advanceEnemy(entry, dt) === 'ready') {
-                events.push(...this.resolveEnemyTurn(entry, now));
+                events.push(...this.enemyTurnResolver.resolveEnemyTurn(entry, now));
                 enemy.actionGauge = 0;
             }
         }
@@ -1114,20 +1119,20 @@ export class WorldSession {
         if (!triggerTiles.some((tile) => manhattan(actor!.tile, tile) <= 1)) {
             return reject(message.intentId, 'Scenario field event is too far away.');
         }
-        if (!this.canConsumeScenarioFieldEventUseItems(player!, event)) {
+        if (!this.scenarioRewards.canConsumeFieldEventUseItems(player!, event)) {
             return reject(message.intentId, 'Scenario field event requires a missing item.');
         }
-        if (!this.rollScenarioFieldEventRandom(event)) {
+        if (!this.scenarioRewards.rollFieldEventRandom(event)) {
             return reject(message.intentId, 'Scenario field event random condition failed.');
         }
-        if (!this.canApplyScenarioRewards(player!, event.rewards)) {
+        if (!this.scenarioRewards.canApplyRewards(player!, event.rewards)) {
             return reject(message.intentId, 'Scenario field event reward storage is full.');
         }
 
         this.markScenarioFieldEventFlagComplete(player!, dungeonId, flag, scope);
-        this.consumeScenarioFieldEventUseItems(player!, event);
-        const rewards = this.applyScenarioFieldEventRewards(player!, event);
-        const trapDamage = this.applyScenarioFieldEventTrapMagic(actor!, event);
+        this.scenarioRewards.consumeFieldEventUseItems(player!, event);
+        const rewards = this.scenarioRewards.applyFieldEventRewards(player!, event);
+        const trapDamage = this.scenarioRewards.applyFieldEventTrapMagic(actor!, event);
         if (event.completesObjective) this.completeScenarioObjective(player!, dungeonId, { clearEnemies: false });
         const result: ScenarioFieldEventResultMessage = {
             type: 'SCENARIO_FIELD_EVENT_RESULT',
@@ -1287,7 +1292,7 @@ export class WorldSession {
             ? { ...scenarioState.returnTile }
             : null;
         this.enemies.delete(enemy.id);
-        if (target.nestKey) this.markNestEnemyKilled(target.nestKey, enemy.id, now);
+        if (target.nestKey) this.fieldNests.markNestEnemyKilled(target.nestKey, enemy.id, now);
         if (target.scenarioPlayerId && target.scenarioDungeonId) this.markScenarioEnemyKilled(target, enemy.id);
         const player = this.players.get(actor.ownerPlayerId);
         if (player) player.kills += 1;
@@ -1296,131 +1301,6 @@ export class WorldSession {
             : this.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
         if (enemy.isBoss || !autoLootGrant) this.spawnEnemyLoot(enemy, scenarioBossLootTile ?? undefined);
         return { autoLootGrant, scenarioEnemyDefeatEvent };
-    }
-
-    private resolveEnemyTurn(entry: ServerEnemy, now: number): CombatEventMessage[] {
-        const enemy = entry.enemy;
-        const targets = getTargetableActors(this.players, this.actors.values(), entry);
-        const closest = this.enemyState.findClosestTarget(entry, targets);
-        if (!closest) {
-            this.wanderEnemy(entry, now);
-            return [];
-        }
-
-        if (!this.enemyState.refreshAggro(entry, closest)) {
-            this.wanderEnemy(entry, now);
-            return [];
-        }
-
-        enemy.aiMemory.turnCount += 1;
-        const decision = decideEnemyAction({
-            self: toEnemyAIUnit(enemy),
-            targets: targets.map((actor) => toActorAIUnit(actor)),
-            allies: [...this.enemies.values()]
-                .filter((candidate) => entry.scenarioPlayerId
-                    ? candidate.scenarioPlayerId === entry.scenarioPlayerId
-                    : !candidate.scenarioPlayerId)
-                .map((candidate) => candidate.enemy)
-                .filter((candidate) => candidate.stats.hp > 0)
-                .map((candidate) => toEnemyAIUnit(candidate)),
-            profile: enemy.aiProfile,
-            turnCount: enemy.aiMemory.turnCount,
-            hasLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to, entry.scenarioPlayerId),
-        });
-        return this.executeEnemyDecision(entry, decision);
-    }
-
-    private executeEnemyDecision(entry: ServerEnemy, decision: EnemyAIDecision): CombatEventMessage[] {
-        const enemy = entry.enemy;
-        switch (decision.kind) {
-            case 'attack': {
-                const actor = this.actors.get(decision.targetId);
-                if (!actor || !this.canEnemyAttack(enemy, actor, decision.range)) return [];
-                return [this.resolveEnemyAttack(enemy, actor, decision.range)];
-            }
-            case 'moveToward': {
-                const actor = this.actors.get(decision.targetId);
-                if (actor) this.enemyStepToward(entry, actor, decision.desiredRange);
-                return [];
-            }
-            case 'moveAway': {
-                const actor = this.actors.get(decision.targetId);
-                if (actor) this.enemyStepAway(entry, actor);
-                return [];
-            }
-            case 'healAlly':
-            case 'buffAlly':
-            case 'debuffTarget':
-                return [];
-            case 'guard':
-                enemy.statuses = applyStatus(enemy.statuses, createStatus('guard'));
-                return [{
-                    type: 'COMBAT_EVENT',
-                    kind: 'status',
-                    sourceId: enemy.id,
-                    targetId: enemy.id,
-                    sourceName: enemy.name,
-                    targetName: enemy.name,
-                    statusEffect: createStatus('guard'),
-                }];
-            case 'bossPattern': {
-                const actor = this.actors.get(decision.targetId);
-                if (!actor) return [];
-                if (decision.pattern === 'enrage') {
-                    const status = createStatus('allUp', { durationTurns: 4, magnitude: 1.3 });
-                    enemy.statuses = applyStatus(enemy.statuses, status);
-                    return [{
-                        type: 'COMBAT_EVENT',
-                        kind: 'status',
-                        sourceId: enemy.id,
-                        targetId: enemy.id,
-                        sourceName: enemy.name,
-                        targetName: enemy.name,
-                        statusEffect: status,
-                    }];
-                }
-                if (this.canEnemyAttack(enemy, actor, enemy.aiProfile.attackRange)) {
-                    return [this.resolveEnemyAttack(enemy, actor, enemy.aiProfile.attackRange)];
-                }
-                this.enemyStepToward(entry, actor, enemy.aiProfile.preferredRange);
-                return [];
-            }
-            case 'wait':
-                return [];
-        }
-    }
-
-    private resolveEnemyAttack(enemy: Enemy, actor: ServerActor, range: number): CombatEventMessage {
-        const result = CombatFormulas.calcPhysicalDamage(
-            getEffectiveStatsForEnemy(enemy),
-            getEffectiveStats(actor.stats, actor.statuses),
-            this.getServerTileAt(actor.tile, actor.ownerPlayerId),
-            { isRanged: range > 1 }
-        );
-        enemy.facing = directionFromTo({ x: enemy.gridX, y: enemy.gridY }, actor.tile);
-        let dealtDamage = result.damage;
-        if (!result.isMiss) {
-            const guarded = applyGuardToDamage(actor.statuses, result.damage);
-            actor.statuses = guarded.statuses;
-            dealtDamage = guarded.damage;
-            actor.stats.hp = Math.max(0, actor.stats.hp - dealtDamage);
-            if (dealtDamage > 0) removeActionStanceStatusesFromCarrier(actor);
-            if (actor.stats.hp <= 0) {
-                actor.isDead = true;
-                actor.remainingAp = 0;
-                actor.actionGauge = 0;
-                actor.majorActionUsed = false;
-            }
-        }
-        return {
-            type: 'COMBAT_EVENT',
-            kind: result.isMiss ? 'miss' : actor.isDead ? 'down' : 'damage',
-            sourceId: enemy.id,
-            targetId: actor.id,
-            sourceName: enemy.name,
-            targetName: actor.name,
-            value: dealtDamage,
-        };
     }
 
     private finishPlayer(playerId: string, result: RaidResultMessage['result']): RaidResultMessage {
@@ -1506,60 +1386,6 @@ export class WorldSession {
         const actor = player.actorIds.map((id) => this.actors.get(id)).find(Boolean);
         if (!actor) return false;
         return this.worldMap.getTownAtTile(actor.tile.x, actor.tile.y)?.id === extractionTownId;
-    }
-
-    private canEnemyAttack(enemy: Enemy, actor: ServerActor, range: number): boolean {
-        const enemyTile = { x: enemy.gridX, y: enemy.gridY };
-        if (manhattan(enemyTile, actor.tile) > range) return false;
-        return range <= 1 || this.hasFieldLineOfSight(enemyTile, actor.tile, actor.ownerPlayerId);
-    }
-
-    private enemyStepToward(entry: ServerEnemy, actor: ServerActor, desiredRange: number): void {
-        const enemy = entry.enemy;
-        const targetTile = actor.tile;
-        const enemyTile = { x: enemy.gridX, y: enemy.gridY };
-        if (manhattan(enemyTile, targetTile) <= desiredRange) return;
-        const goals = tilesInRange(targetTile, desiredRange)
-            .filter((tile) => manhattan(tile, targetTile) === desiredRange)
-            .filter((tile) => this.isFieldPassable({ ...tile, actorId: enemy.id, intent: 'enemy', goal: targetTile }));
-        const path = findPathToAny(enemyTile, goals, (query) => this.isFieldPassable(query), {
-            actorId: enemy.id,
-            intent: 'enemy',
-            maxNodes: 2500,
-        });
-        if (path.length === 0) return;
-        const next = path[0];
-        enemy.facing = directionFromTo(enemyTile, next);
-        enemy.gridX = next.x;
-        enemy.gridY = next.y;
-    }
-
-    private enemyStepAway(entry: ServerEnemy, actor: ServerActor): void {
-        const enemy = entry.enemy;
-        const start = { x: enemy.gridX, y: enemy.gridY };
-        const candidates = tilesInRange(start, 1)
-            .filter((tile) => manhattan(tile, start) === 1)
-            .filter((tile) => this.isFieldPassable({ ...tile, actorId: enemy.id, intent: 'enemy' }))
-            .sort((a, b) => manhattan(b, actor.tile) - manhattan(a, actor.tile));
-        const next = candidates.find((tile) => manhattan(tile, actor.tile) > manhattan(start, actor.tile));
-        if (!next) return;
-        enemy.facing = directionFromTo(start, next);
-        enemy.gridX = next.x;
-        enemy.gridY = next.y;
-    }
-
-    private wanderEnemy(entry: ServerEnemy, now: number): void {
-        const enemy = entry.enemy;
-        const start = { x: enemy.gridX, y: enemy.gridY };
-        const options = tilesInRange(start, 1)
-            .filter((tile) => manhattan(tile, start) === 1)
-            .filter((tile) => manhattan(tile, entry.home) <= ENEMY_LEASH_RANGE)
-            .filter((tile) => this.isFieldPassable({ ...tile, actorId: enemy.id, intent: 'enemy' }));
-        if (options.length === 0) return;
-        const next = options[Math.abs(hashInt(now + entry.wanderSeed)) % options.length];
-        enemy.facing = directionFromTo(start, next);
-        enemy.gridX = next.x;
-        enemy.gridY = next.y;
     }
 
     private isFieldPassable(query: FieldPassableQuery): boolean {
@@ -1842,7 +1668,7 @@ export class WorldSession {
         player.completedDungeonIds.add(dungeonId);
         const quest = getStoryQuestByDungeonId(dungeonId);
         if (quest) player.completedQuestIds.add(quest.id);
-        this.applyScenarioBossDefeatRewards(player, dungeonId);
+        this.scenarioRewards.applyBossDefeatRewards(player, dungeonId);
         if (state?.returnTile) this.returnPlayerActorsFromScenarioInterior(player, state.returnTile);
         this.saveState.markDirty(player.id);
 
@@ -1886,244 +1712,19 @@ export class WorldSession {
         this.saveState.markDirty(player.id);
     }
 
-    private applyScenarioFieldEventRewards(
-        player: ServerPlayer,
-        event: StoryScenarioFieldEvent
-    ): ScenarioFieldEventRewardResult[] {
-        return this.applyScenarioRewards(player, event.rewards);
-    }
-
-    private applyScenarioFieldEventTrapMagic(
-        actor: ServerActor,
-        event: StoryScenarioFieldEvent
-    ): ScenarioFieldEventResultMessage['trapDamage'] {
-        const magicCodes = getStoryScenarioTriggerMagicCodes(event.trigger);
-        if (magicCodes.length === 0 || actor.isDead || actor.stats.hp <= 1) return undefined;
-
-        const maxHp = Math.max(actor.stats.maxHp, actor.stats.hp, 1);
-        const rawDamage = magicCodes.reduce((sum, magicCode) => sum + getStoryScenarioTrapMagicDamage(magicCode, maxHp), 0);
-        const damage = Math.min(actor.stats.hp - 1, rawDamage);
-        if (damage <= 0) return undefined;
-
-        actor.stats.hp = Math.max(1, actor.stats.hp - damage);
-        removeActionStanceStatusesFromCarrier(actor);
-        return { actorId: actor.id, damage };
-    }
-
-    private getScenarioFieldEventRequiredItems(event: StoryScenarioFieldEvent): ItemDef[] {
-        return getStoryScenarioTriggerUseItemIds(event.trigger)
-            .map((originalItemId) => getItemDefByOriginalGetItemId(originalItemId))
-            .filter((item): item is ItemDef => Boolean(item));
-    }
-
-    private rollScenarioFieldEventRandom(event: StoryScenarioFieldEvent): boolean {
-        const chance = getStoryScenarioTriggerRandomChance(event.trigger);
-        if (chance === null || chance >= 100) return true;
-        if (chance <= 0) return false;
-        return Math.random() * 100 < chance;
-    }
-
-    private canConsumeScenarioFieldEventUseItems(player: ServerPlayer, event: StoryScenarioFieldEvent): boolean {
-        return this.getScenarioFieldEventRequiredItems(event).every((item) => this.getPlayerItemQuantity(player, item.id) > 0);
-    }
-
-    private consumeScenarioFieldEventUseItems(player: ServerPlayer, event: StoryScenarioFieldEvent): void {
-        for (const item of this.getScenarioFieldEventRequiredItems(event)) {
-            if (this.getPlayerItemQuantity(player, item.id) <= 0) continue;
-            this.saveState.removeItemQuantity(player, item.id, 1);
-            addCarriedItemQuantity(player, item.id, -1);
-            removeCarriedWeight(player, getPlacedItemWeight({ item, quantity: 1 }));
-            this.saveState.markDirty(player.id);
-        }
-    }
-
-    private getPlayerItemQuantity(player: ServerPlayer, itemId: string): number {
-        const carriedQuantity = player.carriedItems.get(itemId) ?? 0;
-        const savedQuantity = (player.saveSnapshot?.inventory.items ?? [])
-            .filter((entry) => entry.itemId === itemId)
-            .reduce((sum, entry) => sum + Math.max(1, Math.floor(entry.quantity ?? 1)), 0);
-        return Math.max(carriedQuantity, savedQuantity);
-    }
-
-    private applyScenarioBossDefeatRewards(
-        player: ServerPlayer,
-        dungeonId: string
-    ): ScenarioFieldEventRewardResult[] {
-        const event = getStoryScenarioEventSequence(dungeonId)?.bossDefeatEvent;
-        return this.applyScenarioRewards(player, event?.rewards);
-    }
-
-    private applyScenarioRewards(
-        player: ServerPlayer,
-        rewards: StoryScenarioFieldEvent['rewards']
-    ): ScenarioFieldEventRewardResult[] {
-        const results: ScenarioFieldEventRewardResult[] = [];
-        for (const reward of rewards ?? []) {
-            if (reward.type === 'gold') {
-                player.raidGoldReward += Math.max(0, Math.floor(reward.amount));
-                results.push({ type: 'gold', amount: reward.amount });
-                continue;
-            }
-
-            const item = getItemDef(reward.itemId);
-            if (!item) continue;
-            const saved = this.saveState.addPlacedItem(player, {
-                item,
-                durability: item.maxDurability,
-                quantity: 1,
-            });
-            if (!saved) continue;
-            addCarriedItemQuantity(player, item.id, 1);
-            addCarriedWeight(player, getPlacedItemWeight({ item, quantity: 1 }));
-            this.saveState.markDirty(player.id);
-            results.push({
-                type: 'item',
-                itemId: item.id,
-                ...(reward.originalItemId !== undefined && reward.originalItemId > 0 ? { originalItemId: reward.originalItemId } : {}),
-            });
-        }
-        return results;
-    }
-
-    private canApplyScenarioRewards(player: ServerPlayer, rewards: StoryScenarioFieldEvent['rewards']): boolean {
-        const placedItems = (rewards ?? []).flatMap((reward) => {
-            if (reward.type !== 'item') return [];
-            const item = getItemDef(reward.itemId);
-            return item ? [{ item, durability: item.maxDurability, quantity: 1 }] : [];
-        });
-        return this.saveState.canAddPlacedItems(player, placedItems);
-    }
-
     private ensureContentNear(spawnTile: TilePoint, departureTownId: string | null | undefined, now: number): void {
         if (!hasNearbyLiveEnemy(this.enemies.values(), spawnTile, FIELD_NEST_NEARBY_ENEMY_DISTANCE)) {
-            this.spawnEnemiesNear(
+            this.fieldNests.spawnEnemiesNear(
                 spawnTile,
                 now,
                 false,
                 new Set(),
-                FIELD_NEST_DEPARTURE_RADIUS_CHUNKS,
-                FIELD_NEST_DEPARTURE_MAX_ENEMIES,
+                WORLD_SESSION_FIELD_NEST_DEPARTURE_RADIUS_CHUNKS,
+                WORLD_SESSION_FIELD_NEST_DEPARTURE_MAX_ENEMIES,
             );
         }
 
         this.spawnLootNear(spawnTile, departureTownId);
-    }
-
-    private refreshFieldNests(now: number): void {
-        const visited = new Set<string>();
-        for (const player of this.players.values()) {
-            if (!player.active || player.ghost) continue;
-            if (player.activeDungeonId) continue;
-            const anchor = firstLivingActorTile(player, this.actors);
-            if (!anchor) continue;
-            const forceCenter = !hasNearbyLiveEnemy(this.enemies.values(), anchor, FIELD_NEST_NEARBY_ENEMY_DISTANCE);
-            this.spawnEnemiesNear(anchor, now, forceCenter, visited, FIELD_NEST_ROAM_RADIUS_CHUNKS, FIELD_NEST_REFRESH_MAX_ENEMIES);
-        }
-    }
-
-    private spawnEnemiesNear(
-        anchor: TilePoint,
-        now: number,
-        forceCenter: boolean,
-        visited: Set<string> = new Set(),
-        radiusChunks = FIELD_NEST_ROAM_RADIUS_CHUNKS,
-        maxSpawnedEnemies = Number.POSITIVE_INFINITY,
-    ): number {
-        const realm = this.worldMap.getRealm();
-        const seed = `server:${this.sessionEpoch}`;
-        const centerChunkX = Math.floor(anchor.x / CHUNK_TILES);
-        const centerChunkY = Math.floor(anchor.y / CHUNK_TILES);
-
-        let spawned = 0;
-        for (const offset of chunkOffsetsByDistance(radiusChunks)) {
-            if (spawned >= maxSpawnedEnemies) return spawned;
-            const chunkX = centerChunkX + offset.dx;
-            const chunkY = centerChunkY + offset.dy;
-            const stateKey = nestStateKey(realm, chunkX, chunkY);
-            if (visited.has(stateKey)) continue;
-            visited.add(stateKey);
-            const biome = this.worldMap.getBiomeAtChunk(chunkX, chunkY);
-            const force = forceCenter && offset.dx === 0 && offset.dy === 0;
-            spawned += this.spawnNest(chunkX, chunkY, biome, realm, seed, force, now);
-        }
-
-        // Player boxed in by water/town chunks — force one grass pack at the spawn chunk.
-        if (forceCenter && spawned === 0) spawned += this.spawnNest(centerChunkX, centerChunkY, 'grass', realm, seed, true, now);
-        return spawned;
-    }
-
-    private spawnNest(
-        chunkX: number,
-        chunkY: number,
-        biome: ReturnType<WorldMap['getBiomeAtChunk']>,
-        realm: ReturnType<WorldMap['getRealm']>,
-        seed: string,
-        force: boolean,
-        now: number,
-    ): number {
-        const nest = pickNestForChunk({ realm, chunkX, chunkY, biome, seed }, force);
-        if (!nest) return 0;
-        if (hasActiveActorWithin(this.players.values(), this.actors, nest.centerTile, FIELD_NEST_SPAWN_SAFE_DISTANCE)) return 0;
-        const stateKey = nestStateKey(realm, chunkX, chunkY);
-        const state = this.getOrCreateNestState(stateKey, nest);
-        this.retainLiveNestEnemies(state);
-        if (state.monsterIds.length > 0) return 0;
-        if (state.cleared) {
-            if (now < state.respawnAt) return 0;
-            if (hasActiveActorWithin(this.players.values(), this.actors, state.centerTile, FIELD_NEST_RESPAWN_SAFE_DISTANCE)) return 0;
-        }
-
-        const offsets = nestMemberOffsets(nest.monsters.length);
-        const spawnedEnemyIds: string[] = [];
-        nest.monsters.forEach((monster, index) => {
-            const offset = offsets[index] ?? { x: 0, y: 0 };
-            const id = `enemy_${this.nextEnemyId++}`;
-            const tile = this.findNearbyWalkableTile(
-                { x: nest.centerTile.x + offset.x, y: nest.centerTile.y + offset.y },
-                id,
-            );
-            const definition = getMonsterDefinition(monster.monsterId);
-            const enemy = new Enemy(id, tile.x, tile.y, definition.name, monster.level, definition.color, definition.role, monster.monsterId);
-            enemy.aggroRange = definition.aggroRange;
-            this.enemies.set(id, { enemy, monsterId: monster.monsterId, nestKey: stateKey, home: tile, wanderSeed: this.nextEnemyId * 7919 });
-            spawnedEnemyIds.push(id);
-        });
-        state.monsterIds = spawnedEnemyIds;
-        state.cleared = false;
-        state.respawnAt = 0;
-        return spawnedEnemyIds.length;
-    }
-
-    private getOrCreateNestState(stateKey: string, nest: FieldNest): FieldNestState {
-        let state = this.nestStates.get(stateKey);
-        if (!state) {
-            state = {
-                chunkKey: stateKey,
-                nestId: nest.nestId,
-                centerTile: { ...nest.centerTile },
-                monsterIds: [],
-                respawnAt: 0,
-                cleared: false,
-            };
-            this.nestStates.set(stateKey, state);
-        }
-        return state;
-    }
-
-    private retainLiveNestEnemies(state: FieldNestState): void {
-        state.monsterIds = state.monsterIds.filter((enemyId) => {
-            const entry = this.enemies.get(enemyId);
-            return Boolean(entry && entry.enemy.stats.hp > 0);
-        });
-    }
-
-    private markNestEnemyKilled(nestKey: string, enemyId: string, now: number): void {
-        const state = this.nestStates.get(nestKey);
-        if (!state) return;
-        state.monsterIds = state.monsterIds.filter((id) => id !== enemyId);
-        if (state.monsterIds.length > 0) return;
-        state.cleared = true;
-        state.respawnAt = now + FIELD_NEST_RESPAWN_MS;
     }
 
     private spawnLootNear(anchor: TilePoint, departureTownId?: string | null): void {
