@@ -16,7 +16,6 @@ import {
     type StoryInteriorLayout,
 } from '../src/data/StoryInteriorData';
 import type { FieldNestState } from '../src/field/SpawnResolver';
-import { Enemy } from '../src/entity/Enemy';
 import { LootObject } from '../src/entity/LootObject';
 import { getCarryAtbMultiplier } from '../src/inventory/CarryWeight';
 import {
@@ -26,14 +25,9 @@ import {
 } from '../src/raid/CursedArtifact';
 import {
     getRaidModifierEffects,
-    getRaidModifierSupplyItems,
     rollRaidModifier,
 } from '../src/raid/RaidModifiers';
-import { getMarkedCacheItems, MASTER_KEY_ITEM_ID } from '../src/raid/MarkedCache';
-import { getEnemyLootSourceLabel, getWorldLootSourceLabel } from '../src/loot/LootLabels';
-import { generateWorldLootNear } from '../src/loot/WorldLootGenerator';
 import {
-    INTERACT_AP_COST,
     FIELD_MAX_ACTION_GAUGE,
     MIN_FIELD_ACTION_GAUGE_COST,
 } from '../src/field/FieldActionEconomy';
@@ -54,8 +48,6 @@ import type { TownInfo } from '../src/map/BiomeMask';
 import {
     type AutoLootGrantMessage,
     type CombatEventMessage,
-    type InventoryConsumedMessage,
-    type LootGrantMessage,
     type ScenarioEnemyDefeatEventMessage,
     type WorldClientMessage,
     type WorldJoinMessage,
@@ -68,10 +60,7 @@ import { cloneCharacterSave, WorldSessionSaveState, type WorldCharacterSavePatch
 import { WorldSessionEnemyState } from './WorldSessionEnemyState';
 import { WorldSessionEnemyTurnResolver } from './WorldSessionEnemyTurnResolver';
 import {
-    FIELD_NEST_NEARBY_ENEMY_DISTANCE,
     WorldSessionFieldNests,
-    WORLD_SESSION_FIELD_NEST_DEPARTURE_MAX_ENEMIES,
-    WORLD_SESSION_FIELD_NEST_DEPARTURE_RADIUS_CHUNKS,
 } from './WorldSessionFieldNests';
 import { WorldSessionScenarioRewards } from './WorldSessionScenarioRewards';
 import { WorldSessionScenarioRuntime } from './WorldSessionScenarioRuntime';
@@ -82,11 +71,10 @@ import {
 import { WorldSessionRaidResults } from './WorldSessionRaidResults';
 import { WorldSessionLootResolver } from './WorldSessionLootResolver';
 import { WorldSessionSkillResolver } from './WorldSessionSkillResolver';
-import { addCarriedItemQuantity } from './WorldSessionCarryState';
+import { WorldSessionContentSpawner } from './WorldSessionContentSpawner';
 import {
     firstActorTile,
     hasActiveActorWithin,
-    hasNearbyLiveEnemy,
 } from './WorldSessionSpatialQueries';
 import {
     getTargetableActors,
@@ -104,7 +92,6 @@ import { buildWorldSessionPersistentSnapshot } from './WorldSessionPersistentSna
 import { buildWorldSessionSnapshot } from './WorldSessionSnapshotBuilder';
 import {
     createFallbackActorSnapshot,
-    readStringPayload,
     sanitizeCarriedItems,
     sanitizeCarriedWeight,
     sanitizeStringArray,
@@ -122,7 +109,6 @@ import {
     createActorEvent,
     createToken,
     formationOffset,
-    gridToSnapshot,
     reject,
     syncStatsMovementToClass,
 } from './WorldSessionHelpers';
@@ -186,6 +172,7 @@ export class WorldSession {
     private readonly raidResults: WorldSessionRaidResults;
     private readonly lootResolver: WorldSessionLootResolver;
     private readonly skillResolver: WorldSessionSkillResolver;
+    private readonly contentSpawner: WorldSessionContentSpawner;
     private readonly restingRecoveryTimers = new Map<string, number>();
     private seq = 0;
     private nextPlayerId = 1;
@@ -245,6 +232,20 @@ export class WorldSession {
             findNearbyWalkableTile: (tile, actorId, ownerPlayerId) => this.findNearbyWalkableTile(tile, actorId, ownerPlayerId),
             log: (message) => this.log(message),
         });
+        this.contentSpawner = new WorldSessionContentSpawner({
+            worldMap: this.worldMap,
+            enemies: this.enemies,
+            loot: this.loot,
+            lootState: this.lootState,
+            fieldNests: this.fieldNests,
+            generatedLootChunks: this.generatedLootChunks,
+            sessionEpoch: this.sessionEpoch,
+            shardId: this.shardId,
+            allocateLootId: (containerType) => containerType
+                ? `loot_${containerType}_${this.nextLootId++}`
+                : `loot_${this.nextLootId++}`,
+            findNearbyWalkableTile: (tile, actorId, ownerPlayerId) => this.findNearbyWalkableTile(tile, actorId, ownerPlayerId),
+        });
         this.playerIntentResolver = new WorldSessionPlayerIntentResolver({
             players: this.players,
             enemies: this.enemies,
@@ -252,7 +253,7 @@ export class WorldSession {
             getServerTileAt: (tile, ownerPlayerId) => this.getServerTileAt(tile, ownerPlayerId),
             isFieldPassableForOwner: (query, ownerPlayerId) => this.isFieldPassableForOwner(query, ownerPlayerId),
             hasFieldLineOfSight: (from, to, ownerPlayerId) => this.hasFieldLineOfSight(from, to, ownerPlayerId),
-            spawnLootNear: (anchor, departureTownId) => this.spawnLootNear(anchor, departureTownId),
+            spawnLootNear: (anchor, departureTownId) => this.contentSpawner.spawnLootNear(anchor, departureTownId),
             spendActorGauge: (actor, cost) => this.spendActorGauge(actor, cost),
             finishActorIfSpent: (actor) => this.finishActorIfSpent(actor),
             resolveActorAttack: (actor, target, now) => this.resolveActorAttack(actor, target, now),
@@ -271,6 +272,8 @@ export class WorldSession {
             loot: this.loot,
             lootState: this.lootState,
             saveState: this.saveState,
+            spendActorGauge: (actor, cost) => this.spendActorGauge(actor, cost),
+            finishActorIfSpent: (actor) => this.finishActorIfSpent(actor),
         });
         this.skillResolver = new WorldSessionSkillResolver({
             actors: this.actors,
@@ -455,9 +458,9 @@ export class WorldSession {
             player.actorIds.push(actorId);
         });
 
-        this.ensureContentNear(spawnTile, player.departureTownId, now);
-        this.spawnRaidModifierSupplyDrop(player, spawnTile);
-        this.spawnMarkedCache(player, spawnTile);
+        this.contentSpawner.ensureContentNear(spawnTile, player.departureTownId, now);
+        this.contentSpawner.spawnRaidModifierSupplyDrop(player, spawnTile);
+        this.contentSpawner.spawnMarkedCache(player, spawnTile);
         this.log(`join player=${playerId} origin=${originHubId} actors=${player.actorIds.length}`);
         return {
             playerId,
@@ -735,7 +738,7 @@ export class WorldSession {
             case 'attack':
                 return this.playerIntentResolver.handleAttack(actor!, message.intentId, message.payload, now);
             case 'interact':
-                return this.handleInteractIntent(playerId, actor!, message.intentId, message.payload, now);
+                return this.lootResolver.handleLootInspect(playerId, actor!, message.intentId, message.payload, now);
             case 'defend':
                 return this.playerIntentResolver.handleDefend(actor!, message.intentId);
             case 'rest':
@@ -757,54 +760,6 @@ export class WorldSession {
         if (actor.isDead || actor.stats.hp <= 0) return 'Actor is down.';
         if (actor.remainingAp < MIN_FIELD_ACTION_GAUGE_COST) return 'Actor action gauge is not ready.';
         return null;
-    }
-
-    private handleInteractIntent(
-        playerId: string,
-        actor: ServerActor,
-        intentId: string,
-        payload: unknown,
-        now: number
-    ): WorldSessionMessageResult {
-        const lootId = readStringPayload(payload, 'lootId');
-        if (!lootId) return reject(intentId, 'Interact payload must include lootId.');
-        const player = this.players.get(playerId);
-        if (player?.activeDungeonId) return reject(intentId, 'Loot is not visible.');
-        const lootObject = this.loot.get(lootId);
-        if (!lootObject || lootObject.opened || this.lootState.isAutoLootPending(lootId)) return reject(intentId, 'Loot is not available.');
-        if (actor.remainingAp < INTERACT_AP_COST) return reject(intentId, 'No action available to inspect loot.');
-        if (manhattan(actor.tile, { x: lootObject.x, y: lootObject.y }) > 1) return reject(intentId, 'Loot is too far away.');
-        if (lootObject.containerType === 'marked_cache' && !lootObject.unlocked) {
-            if ((player?.carriedItems.get(MASTER_KEY_ITEM_ID) ?? 0) <= 0) {
-                return reject(intentId, 'Master key is required to open this marked cache.');
-            }
-        }
-
-        if (this.lootState.occupy(lootId, playerId, now) === 'occupied_by_other') return reject(intentId, 'Loot is already occupied.');
-
-        this.spendActorGauge(actor, INTERACT_AP_COST);
-        const replies: WorldServerMessage[] = [];
-        if (lootObject.containerType === 'marked_cache' && !lootObject.unlocked && player) {
-            addCarriedItemQuantity(player, MASTER_KEY_ITEM_ID, -1);
-            this.saveState.removeItemQuantity(player, MASTER_KEY_ITEM_ID, 1);
-            this.saveState.markDirty(player.id);
-            lootObject.unlocked = true;
-            replies.push({
-                type: 'INVENTORY_CONSUMED',
-                itemId: MASTER_KEY_ITEM_ID,
-                quantity: 1,
-            } satisfies InventoryConsumedMessage);
-        }
-        this.finishActorIfSpent(actor);
-        replies.push({
-            type: 'LOOT_GRANT',
-            lootId,
-            gridSnapshot: gridToSnapshot(lootObject.inventory),
-        } satisfies LootGrantMessage);
-        return {
-            replies,
-            broadcasts: [],
-        };
     }
 
     private resolveActorAttack(
@@ -854,8 +809,8 @@ export class WorldSession {
         if (player) player.kills += 1;
         const autoLootGrant = enemy.isBoss
             ? undefined
-            : this.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
-        if (enemy.isBoss || !autoLootGrant) this.spawnEnemyLoot(enemy, scenarioKillResult.bossLootTile);
+            : this.contentSpawner.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
+        if (enemy.isBoss || !autoLootGrant) this.contentSpawner.spawnEnemyLoot(enemy, scenarioKillResult.bossLootTile);
         return { autoLootGrant, scenarioEnemyDefeatEvent: scenarioKillResult.scenarioEnemyDefeatEvent };
     }
 
@@ -962,103 +917,6 @@ export class WorldSession {
     private spendActorGauge(actor: ServerActor, cost: number): void {
         actor.remainingAp = Math.max(0, actor.remainingAp - cost);
         actor.actionGauge = actor.remainingAp;
-    }
-
-    private ensureContentNear(spawnTile: TilePoint, departureTownId: string | null | undefined, now: number): void {
-        if (!hasNearbyLiveEnemy(this.enemies.values(), spawnTile, FIELD_NEST_NEARBY_ENEMY_DISTANCE)) {
-            this.fieldNests.spawnEnemiesNear(
-                spawnTile,
-                now,
-                false,
-                new Set(),
-                WORLD_SESSION_FIELD_NEST_DEPARTURE_RADIUS_CHUNKS,
-                WORLD_SESSION_FIELD_NEST_DEPARTURE_MAX_ENEMIES,
-            );
-        }
-
-        this.spawnLootNear(spawnTile, departureTownId);
-    }
-
-    private spawnLootNear(anchor: TilePoint, departureTownId?: string | null): void {
-        const loot = generateWorldLootNear({
-            worldMap: this.worldMap,
-            playerTile: anchor,
-            seed: `server:${this.sessionEpoch}`,
-            generatedChunks: this.generatedLootChunks,
-            existingLoot: [...this.loot.values()],
-            departureTownId,
-            findNearbyWalkableTile: (tile, actorId) => this.findNearbyWalkableTile(tile, actorId),
-            createId: (containerType) => `loot_${containerType}_${this.nextLootId++}`,
-        });
-        for (const lootObject of loot) {
-            this.loot.set(lootObject.id, lootObject);
-        }
-    }
-
-    private spawnRaidModifierSupplyDrop(player: ServerPlayer, spawnTile: TilePoint): void {
-        if (!getRaidModifierEffects(player.raidModifier).supplyDrop) return;
-        const items = getRaidModifierSupplyItems();
-        if (items.length === 0) return;
-
-        const tile = this.findNearbyWalkableTile({
-            x: spawnTile.x + 6,
-            y: spawnTile.y + 3,
-        }, `${player.id}:supply_drop`, player.id);
-        const id = `loot_supply_drop_${player.id}`;
-        this.loot.set(id, new LootObject(id, tile.x, tile.y, items, {
-            sourceLabel: 'Supply Drop',
-            kind: 'chest',
-            containerType: 'supply_cache',
-            gridW: 5,
-            gridH: 4,
-        }));
-    }
-
-    private spawnMarkedCache(player: ServerPlayer, spawnTile: TilePoint): void {
-        const items = getMarkedCacheItems(`${this.sessionEpoch}:${this.shardId}:${player.id}:marked_cache`);
-        if (items.length === 0) return;
-
-        const tile = this.findNearbyWalkableTile({
-            x: spawnTile.x + 34,
-            y: spawnTile.y + 18,
-        }, `${player.id}:marked_cache`, player.id);
-        const id = `loot_marked_cache_${player.id}`;
-        this.loot.set(id, new LootObject(id, tile.x, tile.y, items, {
-            sourceLabel: getWorldLootSourceLabel('marked_cache'),
-            kind: 'chest',
-            containerType: 'marked_cache',
-            gridW: 5,
-            gridH: 5,
-        }));
-    }
-
-    private spawnEnemyLoot(enemy: Enemy, tile: TilePoint = { x: enemy.gridX, y: enemy.gridY }): void {
-        const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
-        if (!herb) return;
-        const id = `loot_${this.nextLootId++}`;
-        this.loot.set(id, new LootObject(id, tile.x, tile.y, [herb], {
-            sourceLabel: getEnemyLootSourceLabel(enemy.name),
-            kind: 'corpse',
-        }));
-    }
-
-    private spawnEnemyAutoLoot(enemy: Enemy, playerId: string, now: number): AutoLootGrantMessage | undefined {
-        const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
-        if (!herb) return undefined;
-
-        const id = `loot_${this.nextLootId++}`;
-        const loot = new LootObject(id, enemy.gridX, enemy.gridY, [herb], {
-            sourceLabel: getEnemyLootSourceLabel(enemy.name),
-            kind: 'corpse',
-        });
-        this.loot.set(id, loot);
-        this.lootState.createAutoLootPending(id, playerId, now);
-        return {
-            type: 'AUTO_LOOT_GRANT',
-            lootId: id,
-            sourceName: enemy.name,
-            gridSnapshot: gridToSnapshot(loot.inventory),
-        };
     }
 
     private findNearbyWalkableTile(tile: TilePoint, actorId: string, ownerPlayerId?: string): TilePoint {
