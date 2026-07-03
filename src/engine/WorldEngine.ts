@@ -14,19 +14,13 @@ import { GridInventory } from '../inventory/GridInventory';
 import { getCarryAtbMultiplier, getPartyCarriedWeight } from '../inventory/CarryWeight';
 import {
     getCursedArtifactAtbMultiplier,
-    getCursedArtifactTurnDamage,
 } from '../raid/CursedArtifact';
 import { getRaidModifierEffects } from '../raid/RaidModifiers';
 import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
 import { isMasterClassLineId } from '../data/ClassTree';
 import { formatT, t } from '../i18n/LanguageManager';
-import {
-    getEffectiveStatsForCharacter,
-    getEffectiveStatsForEnemy,
-    removeStatusesFromCarrier,
-    resolveTurnStartStatuses,
-} from '../combat/StatusEffects';
+import { removeStatusesFromCarrier } from '../combat/StatusEffects';
 import { ActionMenuUI } from '../ui/ActionMenuUI';
 import { EntityInfoUI } from '../ui/EntityInfoUI';
 import { EffectManager } from '../ui/EffectManager';
@@ -66,6 +60,7 @@ import { WorldNetworkIntentController } from './world/WorldNetworkIntentControll
 import { WorldTurnStateController } from './world/WorldTurnStateController';
 import { WorldFieldFeedbackState } from './world/WorldFieldFeedbackState';
 import { WorldEngineNetworkEvents } from './world/WorldEngineNetworkEvents';
+import { WorldTurnStartResolver } from './world/WorldTurnStartResolver';
 import { applyMonsterSprite } from './world/NetworkSnapshotMapping';
 import {
     getWorldBackpackCursedArtifactCount,
@@ -104,7 +99,15 @@ import {
     hasWorldFieldLineOfSight,
 } from './world/WorldAttackTargeting';
 import { NetworkRaidClient } from '../net/NetworkRaidClient';
-import { type WorldRealmId } from '../net/WorldProtocol';
+import {
+    type ActionRejectedMessage,
+    type AutoLootGrantMessage,
+    type CombatEventMessage,
+    type InventoryConsumedMessage,
+    type LootGrantMessage,
+    type WorldRealmId,
+    type WorldSnapshot,
+} from '../net/WorldProtocol';
 
 export interface WorldEngineOptions {
     startIntroTutorial?: boolean;
@@ -155,6 +158,7 @@ export class WorldEngine {
     private combatFeedbackController: WorldCombatFeedbackController;
     private networkIntentController: WorldNetworkIntentController;
     private networkEvents: WorldEngineNetworkEvents;
+    private turnStartResolver: WorldTurnStartResolver;
     private turnStateController = new WorldTurnStateController();
     private hoverTile: TilePoint = { x: -1, y: -1 };
     private fieldFeedback = new WorldFieldFeedbackState();
@@ -317,7 +321,7 @@ export class WorldEngine {
                 getWorldActorAttackTargetFailure({ worldMap: this.worldMap, actor, enemy, casterTile }),
             updateEffects: (dt) => this.effectManager.update(dt),
             updateFloatingText: (dt) => this.floatingText.update(dt),
-            updateAttackCues: (dt) => this.fieldFeedback.updateAttackCues(dt),
+            updateAttackCues: (dt) => this.updateAttackCues(dt),
             followCameraToPlayer: (camera, dt) => {
                 camera.followTile(this.player.gridX, this.player.gridY);
                 if (dt !== undefined) camera.update(dt);
@@ -385,6 +389,19 @@ export class WorldEngine {
         this.networkEvents = new WorldEngineNetworkEvents({
             raidSession: this.raidSession,
             networkSyncController: this.networkSyncController,
+        });
+        this.turnStartResolver = new WorldTurnStartResolver({
+            getBackpackCursedArtifactCount: () => this.getBackpackCursedArtifactCount(),
+            getFallbackActor: () => this.getControlledActor() ?? this.partyActors.find((candidate) => !candidate.character.isDead) ?? null,
+            handleActorDown: (actor) => this.handleActorDown(actor),
+            handleEnemyDefeated: (actor, enemy) => this.handleEnemyDefeated(actor, enemy),
+            stopResting: (actor, logMessage) => this.stopResting(actor, logMessage),
+            spawnDamage: (x, y, amount) => this.floatingText.spawnDamage(x, y, amount, false, false),
+            spawnHeal: (x, y, amount) => this.floatingText.spawnHeal(x, y, amount),
+            spawnDebuffEffect: (x, y) => this.effectManager.spawnDebuffEffect(x, y),
+            spawnHealEffect: (x, y) => this.effectManager.spawnHealEffect(x, y),
+            spawnDarkEffect: (x, y) => this.effectManager.spawnDarkEffect(x, y),
+            log: (message) => this.addCombatLog(message),
         });
         this.combatController = new WorldCombatController({
             log: (message) => this.addCombatLog(message),
@@ -675,12 +692,12 @@ export class WorldEngine {
                 partyActors: this.partyActors,
             }),
             setPhase: (phase) => { this.currentPhase = phase; },
-            applyNetworkSnapshot: (snapshot) => this.networkEvents.applySnapshot(snapshot),
-            handleNetworkCombatEvent: (event) => this.networkEvents.handleCombatEvent(event),
-            openNetworkLoot: (grant) => this.networkEvents.openLoot(grant),
-            handleNetworkAutoLootGrant: (grant) => this.networkEvents.handleAutoLootGrant(grant),
-            handleNetworkInventoryConsumed: (message) => this.networkEvents.handleInventoryConsumed(message),
-            handleNetworkActionRejected: (rejection) => this.networkEvents.handleActionRejected(rejection),
+            applyNetworkSnapshot: (snapshot) => this.applyNetworkSnapshot(snapshot),
+            handleNetworkCombatEvent: (event) => this.handleNetworkCombatEvent(event),
+            openNetworkLoot: (grant) => this.openNetworkLoot(grant),
+            handleNetworkAutoLootGrant: (grant) => this.handleNetworkAutoLootGrant(grant),
+            handleNetworkInventoryConsumed: (message) => this.handleNetworkInventoryConsumed(message),
+            handleNetworkActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
             log: (message) => this.addCombatLog(message),
         });
         this.tacticalController = new WorldTacticalController({
@@ -719,7 +736,7 @@ export class WorldEngine {
             getRemainingActionPoints: () => this.getSpendableActionGauge(),
             getMajorActionUsedThisTurn: () => this.turnStateController.getMajorActionUsedThisTurn(),
             getHoverTile: () => this.hoverTile,
-            getPathPreviewTiles: (actor) => getWorldPathPreviewTiles(actor, this.networkSyncController),
+            getPathPreviewTiles: (actor) => this.getPathPreviewTiles(actor),
             getAttackCues: () => this.fieldFeedback.attackCues,
             getCombatLog: () => this.fieldFeedback.combatLog,
             getActorTerrainTraits: (actor) => getWorldActorTerrainTraits(actor),
@@ -854,7 +871,7 @@ export class WorldEngine {
         this.updateRestingActors(dt);
         this.effectManager.update(dt);
         this.floatingText.update(dt);
-        this.fieldFeedback.updateAttackCues(dt);
+        this.updateAttackCues(dt);
         this.playerActionController.processQueuedIntents();
         this.refreshLootState();
         this.tacticalController.updateMarkers(dt);
@@ -969,7 +986,7 @@ export class WorldEngine {
         this.networkSyncController.refreshMovePathPreview();
         this.effectManager.update(dt);
         this.floatingText.update(dt);
-        this.fieldFeedback.updateAttackCues(dt);
+        this.updateAttackCues(dt);
         this.refreshLootState();
         this.storyScenarioController.checkDungeonArrival();
         this.refreshOpenActionMenuState();
@@ -985,11 +1002,50 @@ export class WorldEngine {
         this.storyScenarioController.updatePresentation(dt);
         this.effectManager.update(dt);
         this.floatingText.update(dt);
-        this.fieldFeedback.updateAttackCues(dt);
+        this.updateAttackCues(dt);
         const controlled = this.getControlledActor();
         if (controlled) this.player = controlled.entity;
         camera.update(dt);
         return true;
+    }
+
+    private applyNetworkSnapshot(snapshot: WorldSnapshot): void {
+        if (this.networkEvents) {
+            this.networkEvents.applySnapshot(snapshot);
+            return;
+        }
+        this.raidSession.elapsedSeconds = snapshot.raidTimer.elapsedSeconds;
+        this.raidSession.setRaidModifier(snapshot.raidTimer.modifier ?? null);
+        this.networkSyncController.applySnapshot(snapshot);
+    }
+
+    private openNetworkLoot(grant: LootGrantMessage): void {
+        if (this.networkEvents) this.networkEvents.openLoot(grant);
+        else this.networkSyncController.openLoot(grant);
+    }
+
+    private handleNetworkAutoLootGrant(grant: AutoLootGrantMessage): void {
+        if (this.networkEvents) this.networkEvents.handleAutoLootGrant(grant);
+        else this.networkSyncController.handleAutoLootGrant(grant);
+    }
+
+    private handleNetworkInventoryConsumed(message: InventoryConsumedMessage): void {
+        if (this.networkEvents) this.networkEvents.handleInventoryConsumed(message);
+        else this.networkSyncController.handleInventoryConsumed(message);
+    }
+
+    private handleNetworkActionRejected(rejection: ActionRejectedMessage): void {
+        if (this.networkEvents) this.networkEvents.handleActionRejected(rejection);
+        else this.networkSyncController.handleActionRejected(rejection);
+    }
+
+    private handleNetworkCombatEvent(event: CombatEventMessage): void {
+        if (this.networkEvents) this.networkEvents.handleCombatEvent(event);
+        else this.networkSyncController.handleCombatEvent(event);
+    }
+
+    private getPathPreviewTiles(actor: FieldActor | null): TilePoint[] {
+        return getWorldPathPreviewTiles(actor, this.networkSyncController);
     }
 
     private resolveFieldHitAt(tile: TilePoint) {
@@ -1408,82 +1464,12 @@ export class WorldEngine {
         this.toolController?.reset();
     }
 
-    private processActorTurnStartStatuses(actor: FieldActor): boolean {
-        const result = resolveTurnStartStatuses(getEffectiveStatsForCharacter(actor.character), actor.character.statuses);
-        actor.character.statuses = result.statuses;
-        if (result.expiredReaction) this.addCombatLog(formatT('field.log.statusReactionExpired', { name: actor.character.name }));
-        if (result.poisonDamage > 0) {
-            this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, result.poisonDamage, false, false);
-            this.effectManager.spawnDebuffEffect(actor.entity.gridX, actor.entity.gridY);
-            this.addCombatLog(formatT('field.log.statusPoisonDamage', { name: actor.character.name, value: result.poisonDamage }));
-            this.stopResting(actor, formatT('field.log.restInterruptedDamage', { name: actor.character.name }));
-        }
-        if (result.regenHealing > 0) {
-            this.floatingText.spawnHeal(actor.entity.gridX, actor.entity.gridY, result.regenHealing);
-            this.effectManager.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
-            this.addCombatLog(formatT('field.log.statusRegenHealing', { name: actor.character.name, value: result.regenHealing }));
-        }
-        const effective = getEffectiveStatsForCharacter(actor.character);
-        actor.character.stats.hp = Math.max(0, Math.min(effective.maxHp, actor.character.stats.hp + result.hpDelta));
-        this.applyCursedArtifactTurnDamage(actor, effective);
-
-        if (actor.character.stats.hp <= 0 && !actor.character.isDead) {
-            this.handleActorDown(actor);
-            return false;
-        }
-        return true;
-    }
-
-    private applyCursedArtifactTurnDamage(actor: FieldActor, effective: ReturnType<typeof getEffectiveStatsForCharacter>): void {
-        const cursedCount = this.getBackpackCursedArtifactCount();
-        const damage = Math.min(
-            actor.character.stats.hp,
-            getCursedArtifactTurnDamage(effective, cursedCount)
-        );
-        if (damage <= 0) return;
-
-        actor.character.stats.hp = Math.max(0, actor.character.stats.hp - damage);
-        this.floatingText.spawnDamage(actor.entity.gridX, actor.entity.gridY, damage, false, false);
-        this.effectManager.spawnDarkEffect(actor.entity.gridX, actor.entity.gridY);
-        this.addCombatLog(formatT('field.log.cursedArtifactDamage', {
-            name: actor.character.name,
-            value: damage,
-        }));
-        this.stopResting(actor, formatT('field.log.restInterruptedDamage', { name: actor.character.name }));
-    }
-
-    private processEnemyTurnStartStatuses(entry: FieldEnemy): boolean {
-        const enemy = entry.enemy;
-        const result = resolveTurnStartStatuses(getEffectiveStatsForEnemy(enemy), enemy.statuses);
-        enemy.statuses = result.statuses;
-        if (result.expiredReaction) this.addCombatLog(formatT('field.log.statusReactionExpired', { name: enemy.name }));
-        if (result.poisonDamage > 0) {
-            this.floatingText.spawnDamage(enemy.gridX, enemy.gridY, result.poisonDamage, false, false);
-            this.effectManager.spawnDebuffEffect(enemy.gridX, enemy.gridY);
-            this.addCombatLog(formatT('field.log.statusPoisonDamage', { name: enemy.name, value: result.poisonDamage }));
-        }
-        if (result.regenHealing > 0) {
-            this.floatingText.spawnHeal(enemy.gridX, enemy.gridY, result.regenHealing);
-            this.effectManager.spawnHealEffect(enemy.gridX, enemy.gridY);
-            this.addCombatLog(formatT('field.log.statusRegenHealing', { name: enemy.name, value: result.regenHealing }));
-        }
-        enemy.stats.hp = Math.max(0, Math.min(enemy.stats.maxHp, enemy.stats.hp + result.hpDelta));
-
-        if (enemy.stats.hp <= 0) {
-            const actor = this.getControlledActor() ?? this.partyActors.find((candidate) => !candidate.character.isDead);
-            if (actor) this.handleEnemyDefeated(actor, enemy);
-            else enemy.isAggro = false;
-            return false;
-        }
-        return true;
-    }
-
     private beginActorTurn(actor: FieldActor): void {
         const index = this.partyActors.indexOf(actor);
         if (index >= 0) this.switchToPartyMember(index);
         actor.entity.actionGauge = this.turnStateController.beginActorTurn(actor.id);
         this.selectionController.selectActor(actor.id);
-        if (!this.processActorTurnStartStatuses(actor)) {
+        if (!this.turnStartResolver.processActorTurnStart(actor)) {
             this.endActorTurn(actor, 'statusBlocked');
             return;
         }
@@ -1505,7 +1491,7 @@ export class WorldEngine {
         this.turnStateController.beginEnemyTurn(enemy.id);
         this.floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'READY');
 
-        if (!this.processEnemyTurnStartStatuses(entry)) {
+        if (!this.turnStartResolver.processEnemyTurnStart(entry)) {
             this.endEnemyTurn(enemy);
             return;
         }
@@ -1566,6 +1552,10 @@ export class WorldEngine {
 
     private addCombatLog(message: string): void {
         this.fieldFeedback.addCombatLog(message);
+    }
+
+    private updateAttackCues(dt: number): void {
+        this.fieldFeedback?.updateAttackCues(dt);
     }
 
     private beginCombatFeedbackGroup(): string {
