@@ -87,18 +87,39 @@ test('pause menu hands off to the React settings panel', async ({ page }) => {
     await expect(page.locator('#ui-overlay .ds-settings')).toBeHidden();
 });
 
-test('dev tutorial opens the magic loadout overlay from the world hotkey', async ({ page }) => {
+test('dev tutorial can swap magic loadout slots from the world hotkey overlay', async ({ page }) => {
     await page.goto('/?devStart=tutorial');
     await expect(page.locator('#gameCanvas')).toBeVisible();
     await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
 
     await page.keyboard.press('KeyK');
 
-    await expect(page.locator('#ui-overlay .ds-scrim .ds-panel').filter({ hasText: /마법 장착|Magic Loadout/ })).toBeVisible({ timeout: 10_000 });
+    const panel = page.locator('#ui-overlay .ds-scrim .ds-panel').filter({ hasText: /마법 장착|Magic Loadout/ });
+    await expect(panel).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('#ui-overlay .ds-scrim').getByText(/장착 슬롯|Equipped Slots/)).toBeVisible();
 
+    const slot0 = panel.locator('[data-magic-slot="0"]');
+    const slot1 = panel.locator('[data-magic-slot="1"]');
+    const firstSkill = await slot0.getAttribute('data-magic-slot-skill');
+    const secondSkill = await slot1.getAttribute('data-magic-slot-skill');
+    expect(firstSkill).toBeTruthy();
+    expect(secondSkill).toBeTruthy();
+    expect(secondSkill).not.toBe(firstSkill);
+
+    await slot0.click();
+    await expect(slot0).toHaveAttribute('aria-selected', 'true');
+    await panel.locator(`[data-magic-skill="${secondSkill}"]`).click();
+
+    await expect(slot0).toHaveAttribute('data-magic-slot-skill', secondSkill!);
+    await expect(slot1).toHaveAttribute('data-magic-slot-skill', firstSkill!);
+    await expect(panel.locator('[data-magic-detail]')).toHaveAttribute('data-magic-detail', secondSkill!);
+
     await page.getByRole('button', { name: /Close/ }).click();
-    await expect(page.locator('#ui-overlay .ds-scrim .ds-panel').filter({ hasText: /마법 장착|Magic Loadout/ })).toBeHidden();
+    await expect(panel).toBeHidden();
+
+    await page.keyboard.press('KeyK');
+    const reopened = page.locator('#ui-overlay .ds-scrim .ds-panel').filter({ hasText: /마법 장착|Magic Loadout/ });
+    await expect(reopened.locator('[data-magic-slot="0"]')).toHaveAttribute('data-magic-slot-skill', secondSkill!);
 });
 
 test('dev raid loot can be dragged into the backpack with real pointer input', async ({ page, isMobile }) => {

@@ -105,6 +105,8 @@ export function MagicLoadoutPanel() {
                                     key={i}
                                     className="ds-btn"
                                     aria-selected={isSelected}
+                                    data-magic-slot={i}
+                                    data-magic-slot-skill={skillId ?? ''}
                                     disabled={!skill && i >= loadout.length}
                                     onClick={() => { setSelectedSlot(i); if (skill) setSelectedSkillId(skill.id); }}
                                     style={{
@@ -152,6 +154,7 @@ export function MagicLoadoutPanel() {
                                     key={skill.id}
                                     className="ds-btn"
                                     aria-selected={isSel}
+                                    data-magic-skill={skill.id}
                                     onClick={() => onPickSkill(skill.id)}
                                     style={{
                                         display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left',
@@ -172,7 +175,7 @@ export function MagicLoadoutPanel() {
                         <div style={{
                             background: 'var(--ds-panel-inset)', border: '1px solid var(--ds-border-shadow)',
                             borderRadius: 'var(--ds-radius-sm)', padding: 12,
-                        }}>
+                        }} data-magic-detail={detail.id}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span style={{ fontSize: 20 }}>{detail.icon}</span>
                                 <strong>{detail.nameKr}</strong>
