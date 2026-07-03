@@ -136,30 +136,30 @@ export class WorldEngine {
     private townSession: WorldTownSession;
     private raidSession: WorldRaidSession;
     private currentPhase: WorldPhase = 'lobby';
-    private combatController: WorldCombatController;
-    private movementController: WorldMovementController;
-    private enemyTurnController: WorldEnemyTurnController;
-    private magicController: WorldMagicController;
-    private toolController: WorldToolController;
-    private playerActionController: WorldPlayerActionController;
-    private raidOutcomeController: WorldRaidOutcomeController;
-    private tacticalController: WorldTacticalController;
-    private selectionController: WorldSelectionController;
-    private fieldSpawnController: WorldFieldSpawnController;
-    private renderController: WorldRenderController;
-    private inputController: WorldInputController;
+    private combatController!: WorldCombatController;
+    private movementController!: WorldMovementController;
+    private enemyTurnController!: WorldEnemyTurnController;
+    private magicController!: WorldMagicController;
+    private toolController!: WorldToolController;
+    private playerActionController!: WorldPlayerActionController;
+    private raidOutcomeController!: WorldRaidOutcomeController;
+    private tacticalController!: WorldTacticalController;
+    private selectionController!: WorldSelectionController;
+    private fieldSpawnController!: WorldFieldSpawnController;
+    private renderController!: WorldRenderController;
+    private inputController!: WorldInputController;
     private storyScenarioController: WorldStoryScenarioController;
     private networkSyncController: WorldNetworkSyncController;
     private tutorialController: WorldTutorialController;
-    private raidLifecycleController: WorldRaidLifecycleController;
+    private raidLifecycleController!: WorldRaidLifecycleController;
     private templeController: WorldTempleController;
     private restingController: WorldRestingController;
-    private lootController: WorldLootController;
+    private lootController!: WorldLootController;
     private combatFeedbackController: WorldCombatFeedbackController;
     private networkIntentController: WorldNetworkIntentController;
     private networkEvents: WorldEngineNetworkEvents;
-    private turnStartResolver: WorldTurnStartResolver;
-    private combatFlow: WorldEngineCombatFlow;
+    private turnStartResolver!: WorldTurnStartResolver;
+    private combatFlow!: WorldEngineCombatFlow;
     private actionTurnFlow?: WorldEngineActionTurnFlow;
     private updateFlow?: WorldEngineUpdateFlow;
     private turnStateController = new WorldTurnStateController();
@@ -393,6 +393,27 @@ export class WorldEngine {
             raidSession: this.raidSession,
             networkSyncController: this.networkSyncController,
         });
+        this.initializeCombatActionControllers();
+        this.initializeRaidLifecycleControllers();
+        this.initializePresentationControllers();
+        this.spawnPartyAtCurrentHub();
+        this.player = this.getControlledActor()?.entity ?? new Player(0, 0);
+        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
+        if (options.startIntroTutorial) {
+            this.startIntroTutorial();
+        } else if (NetworkRaidClient.hasStoredResumeToken()) {
+            this.addCombatLog(t('mp.resumeAttempt'));
+            void this.beginRaidFromCurrentHub();
+        } else {
+            this.openTown(this.getCurrentHubTown());
+            this.addCombatLog(t('field.log.townReady'));
+        }
+
+        camera.followTile(this.player.gridX, this.player.gridY);
+        camera.snapToTarget();
+    }
+
+    private initializeCombatActionControllers(): void {
         this.turnStartResolver = new WorldTurnStartResolver({
             getBackpackCursedArtifactCount: () => this.getBackpackCursedArtifactCount(),
             getFallbackActor: () => this.getControlledActor() ?? this.partyActors.find((candidate) => !candidate.character.isDead) ?? null,
@@ -658,6 +679,9 @@ export class WorldEngine {
                 spawnBuffEffect: (x, y) => this.effectManager.spawnBuffEffect(x, y),
             }
         );
+    }
+
+    private initializeRaidLifecycleControllers(): void {
         this.raidOutcomeController = new WorldRaidOutcomeController({
             party: this.party,
             playerData: this.playerData,
@@ -710,16 +734,7 @@ export class WorldEngine {
             clearWorldLoot: () => { this.worldMap.loot = []; },
             selectActor: (actorId) => this.selectionController.selectActor(actorId),
             syncCharacterMovementToClass: (character) => syncCharacterMovementToClass(character),
-            isTurnCombatActive: () => isWorldTurnCombatActive({
-                fieldEnemies: this.fieldEnemies,
-                turnStateController: this.turnStateController,
-                actionMenuUI: this.actionMenuUI,
-                playerActionController: this.playerActionController,
-                tacticalController: this.tacticalController,
-                magicController: this.magicController,
-                toolController: this.toolController,
-                partyActors: this.partyActors,
-            }),
+            isTurnCombatActive: () => this.isTurnCombatActive(),
             setPhase: (phase) => { this.currentPhase = phase; },
             applyNetworkSnapshot: (snapshot) => this.applyNetworkSnapshot(snapshot),
             handleNetworkCombatEvent: (event) => this.handleNetworkCombatEvent(event),
@@ -729,6 +744,9 @@ export class WorldEngine {
             handleNetworkActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
             log: (message) => this.addCombatLog(message),
         });
+    }
+
+    private initializePresentationControllers(): void {
         this.tacticalController = new WorldTacticalController({
             resolveFieldHitAt: (tile) => this.resolveFieldHitAt(tile),
             getEnemyById: (enemyId) => this.getEnemyById(enemyId),
@@ -769,16 +787,7 @@ export class WorldEngine {
             getAttackCues: () => this.fieldFeedback.attackCues,
             getCombatLog: () => this.fieldFeedback.combatLog,
             getActorTerrainTraits: (actor) => getWorldActorTerrainTraits(actor),
-            isTurnCombatActive: () => isWorldTurnCombatActive({
-                fieldEnemies: this.fieldEnemies,
-                turnStateController: this.turnStateController,
-                actionMenuUI: this.actionMenuUI,
-                playerActionController: this.playerActionController,
-                tacticalController: this.tacticalController,
-                magicController: this.magicController,
-                toolController: this.toolController,
-                partyActors: this.partyActors,
-            }),
+            isTurnCombatActive: () => this.isTurnCombatActive(),
         });
         this.inputController = new WorldInputController({
             actionMenuUI: this.actionMenuUI,
@@ -810,21 +819,19 @@ export class WorldEngine {
             getCombatLog: () => this.fieldFeedback.combatLog,
             onUnhandledEscape: () => this.gameManager.openPauseMenu(),
         });
-        this.spawnPartyAtCurrentHub();
-        this.player = this.getControlledActor()?.entity ?? new Player(0, 0);
-        this.selectionController.selectActor(this.getControlledActor()?.id ?? null);
-        if (options.startIntroTutorial) {
-            this.startIntroTutorial();
-        } else if (NetworkRaidClient.hasStoredResumeToken()) {
-            this.addCombatLog(t('mp.resumeAttempt'));
-            void this.beginRaidFromCurrentHub();
-        } else {
-            this.openTown(this.getCurrentHubTown());
-            this.addCombatLog(t('field.log.townReady'));
-        }
+    }
 
-        camera.followTile(this.player.gridX, this.player.gridY);
-        camera.snapToTarget();
+    private isTurnCombatActive(): boolean {
+        return isWorldTurnCombatActive({
+            fieldEnemies: this.fieldEnemies,
+            turnStateController: this.turnStateController,
+            actionMenuUI: this.actionMenuUI,
+            playerActionController: this.playerActionController,
+            tacticalController: this.tacticalController,
+            magicController: this.magicController,
+            toolController: this.toolController,
+            partyActors: this.partyActors,
+        });
     }
 
     public update(dt: number, input: InputManager, camera: Camera): void {
