@@ -40,11 +40,8 @@ import { WorldMagicController } from './world/WorldMagicController';
 import { WorldPlayerActionController } from './world/WorldPlayerActionController';
 import { WorldToolController } from './world/WorldToolController';
 import { WorldRaidOutcomeController } from './world/WorldRaidOutcomeController';
-import { WorldTacticalController } from './world/WorldTacticalController';
 import { WorldSelectionController } from './world/WorldSelectionController';
 import { WorldFieldSpawnController } from './world/WorldFieldSpawnController';
-import { WorldRenderController } from './world/WorldRenderController';
-import { WorldInputController } from './world/WorldInputController';
 import type { WorldStoryScenarioController } from './world/WorldStoryScenarioController';
 import type { WorldNetworkSyncController } from './world/WorldNetworkSyncController';
 import type { WorldTutorialController } from './world/WorldTutorialController';
@@ -64,6 +61,10 @@ import { WorldEngineUpdateFlow } from './world/WorldEngineUpdateFlow';
 import { runWorldEngineStartupFlow } from './world/WorldEngineStartupFlow';
 import { createWorldEngineScenarioNetworkControllers } from './world/WorldEngineScenarioNetworkControllers';
 import { createWorldEngineWorldControllers } from './world/WorldEngineWorldControllers';
+import {
+    createWorldEnginePresentationControllers,
+    type WorldEnginePresentationControllers,
+} from './world/WorldEnginePresentationControllers';
 import {
     getWorldBackpackCursedArtifactCount,
     getWorldPathPreviewTiles,
@@ -142,11 +143,11 @@ export class WorldEngine {
     private toolController!: WorldToolController;
     private playerActionController!: WorldPlayerActionController;
     private raidOutcomeController!: WorldRaidOutcomeController;
-    private tacticalController!: WorldTacticalController;
+    private tacticalController!: WorldEnginePresentationControllers['tacticalController'];
     private selectionController!: WorldSelectionController;
     private fieldSpawnController!: WorldFieldSpawnController;
-    private renderController!: WorldRenderController;
-    private inputController!: WorldInputController;
+    private renderController!: WorldEnginePresentationControllers['renderController'];
+    private inputController!: WorldEnginePresentationControllers['inputController'];
     private storyScenarioController: WorldStoryScenarioController;
     private networkSyncController: WorldNetworkSyncController;
     private tutorialController: WorldTutorialController;
@@ -639,17 +640,10 @@ export class WorldEngine {
     }
 
     private initializePresentationControllers(): void {
-        this.tacticalController = new WorldTacticalController({
-            resolveFieldHitAt: (tile) => this.resolveFieldHitAt(tile),
-            getEnemyById: (enemyId) => this.getEnemyById(enemyId),
-            getPartyActors: () => this.partyActors,
-            getLoot: () => this.worldMap.loot,
-            log: (message) => this.addCombatLog(message),
-        });
-        this.renderController = new WorldRenderController({
+        const presentationControllers = createWorldEnginePresentationControllers({
+            canvas: this.canvas,
             party: this.party,
             playerData: this.playerData,
-            getWorldMap: () => this.worldMap,
             townSession: this.townSession,
             raidSession: this.raidSession,
             fusionTempleUI: this.fusionTempleUI,
@@ -662,44 +656,25 @@ export class WorldEngine {
             toolController: this.toolController,
             playerActionController: this.playerActionController,
             raidOutcomeController: this.raidOutcomeController,
-            tacticalController: this.tacticalController,
             selectionController: this.selectionController,
+            tutorialController: this.tutorialController,
+            turnStateController: this.turnStateController,
+            fieldFeedback: this.fieldFeedback,
+            getWorldMap: () => this.worldMap,
             getWorldTime: () => this.worldTime,
             getPhase: () => this.currentPhase,
             getPlayer: () => this.player,
             getControlledActor: () => this.getControlledActor(),
-            getPartyActors: () => this.partyActors,
-            getTutorialActors: () => this.tutorialController.getInstructor() ? [this.tutorialController.getInstructor()!] : [],
-            getFieldEnemies: () => this.fieldEnemies,
-            getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
-            getRemainingActionPoints: () => this.getSpendableActionGauge(),
-            getMajorActionUsedThisTurn: () => this.turnStateController.getMajorActionUsedThisTurn(),
-            getHoverTile: () => this.hoverTile,
-            getPathPreviewTiles: (actor) => this.getPathPreviewTiles(actor),
-            getAttackCues: () => this.fieldFeedback.attackCues,
-            getCombatLog: () => this.fieldFeedback.combatLog,
-            getActorTerrainTraits: (actor) => getWorldActorTerrainTraits(actor),
-            isTurnCombatActive: () => this.isTurnCombatActive(),
-        });
-        this.inputController = new WorldInputController({
-            actionMenuUI: this.actionMenuUI,
-            entityInfoUI: this.entityInfoUI,
-            magicController: this.magicController,
-            toolController: this.toolController,
-            minimapUI: this.minimapUI,
-            playerActionController: this.playerActionController,
-            selectionController: this.selectionController,
-            tacticalController: this.tacticalController,
-            getCanvasSize: () => ({ width: this.canvas.width, height: this.canvas.height }),
             getActivePartyTurnActor: () => this.getActivePartyTurnActor(),
-            getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
-            getReservedAction: () => this.turnStateController.getReservedAction(),
-            getControlledActor: () => this.getControlledActor(),
             getPartyActors: () => this.partyActors,
+            getFieldEnemies: () => this.fieldEnemies,
+            getSpendableActionGauge: () => this.getSpendableActionGauge(),
             getHoverTile: () => this.hoverTile,
             setHoverTile: (tile) => { this.hoverTile = tile; },
-            isEntityMoving: (entity) => isEntityMoving(entity),
+            getPathPreviewTiles: (actor) => this.getPathPreviewTiles(actor),
             resolveFieldHitAt: (tile) => this.resolveFieldHitAt(tile),
+            getEnemyById: (enemyId) => this.getEnemyById(enemyId),
+            isTurnCombatActive: () => this.isTurnCombatActive(),
             switchToNextAliveActor: () => this.switchToNextAliveActor(),
             switchToPartyMember: (index) => this.switchToPartyMember(index),
             toggleActionMenuForControlled: () => this.toggleActionMenuForControlled(),
@@ -707,10 +682,12 @@ export class WorldEngine {
             dismissActionMenuTurn: () => this.dismissActionMenuTurn(),
             closeTacticalMenu: () => this.closeTacticalMenu(),
             clearIntent: () => this.clearIntent(),
-            log: (message) => this.addCombatLog(message),
-            getCombatLog: () => this.fieldFeedback.combatLog,
-            onUnhandledEscape: () => this.gameManager.openPauseMenu(),
+            openPauseMenu: () => this.gameManager.openPauseMenu(),
+            addCombatLog: (message) => this.addCombatLog(message),
         });
+        this.tacticalController = presentationControllers.tacticalController;
+        this.renderController = presentationControllers.renderController;
+        this.inputController = presentationControllers.inputController;
     }
 
     private isTurnCombatActive(): boolean {
