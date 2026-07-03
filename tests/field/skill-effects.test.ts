@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveSkillEffect } from '../../src/combat/SkillEffectResolver';
-import { getEffectiveStats, getStatusEffectsForSkill } from '../../src/combat/StatusEffects';
+import { createStatus, getEffectiveStats, getStatusEffectsForSkill } from '../../src/combat/StatusEffects';
 import { ALL_SKILLS, getLearnedSkills, getSkill, getSkillGroup, type Skill } from '../../src/data/SkillDB';
 import { getSkillVisualProfile } from '../../src/data/SkillVisualProfiles';
 import { createBaseStats } from '../../src/data/Stats';
 import type { FieldActor } from '../../src/field/FieldTypes';
 import { getAlliedActorsInManhattanRange } from '../../src/engine/world/WorldMagicController';
+import { MAGIC_ACTION_GAUGE_COST } from '../../src/field/FieldActionEconomy';
+import { getMagicCastReadinessFailure, isTargetedMagicSkill } from '../../src/magic/MagicCastRules';
 
 const AUXILIARY_SKILL_IDS = [
     'inf_guard_stance',
@@ -134,6 +136,28 @@ test('skill groups resolve explicit auxiliary groups and legacy defaults', () =>
     assert.equal(getSkillGroup(requireSkill('shr_guardian_aura')), 'classAura');
     assert.equal(getSkillGroup(requireSkill('cav_t1')), 'classSkill');
     assert.equal(getSkillGroup(requireSkill('og_fire')), 'commonMagic');
+});
+
+test('shared magic cast readiness covers loadout, silence, resources, and targets', () => {
+    const fire = requireSkill('og_fire');
+    const base = {
+        skill: fire,
+        learnedSkillIds: new Set([fire.id]),
+        equippedSkillIds: [fire.id],
+        statuses: [],
+        mp: fire.mpCost,
+        remainingAp: MAGIC_ACTION_GAUGE_COST,
+    };
+
+    assert.equal(isTargetedMagicSkill(fire), true);
+    assert.equal(getMagicCastReadinessFailure({ ...base, requireTarget: true, targetId: 'enemy-1' }), null);
+    assert.equal(getMagicCastReadinessFailure({ ...base, learnedSkillIds: new Set() }), 'notLearned');
+    assert.equal(getMagicCastReadinessFailure({ ...base, equippedSkillIds: [] }), 'notEquipped');
+    assert.equal(getMagicCastReadinessFailure({ ...base, statuses: [createStatus('silence')] }), 'silenced');
+    assert.equal(getMagicCastReadinessFailure({ ...base, remainingAp: MAGIC_ACTION_GAUGE_COST - 1 }), 'noAp');
+    assert.equal(getMagicCastReadinessFailure({ ...base, mp: fire.mpCost - 1 }), 'noMp');
+    assert.equal(getMagicCastReadinessFailure({ ...base, requireTarget: true }), 'targetRequired');
+    assert.equal(isTargetedMagicSkill(requireSkill('og_heal')), false);
 });
 
 test('selfAndNearbyAllies uses caster-inclusive Manhattan ally range', () => {

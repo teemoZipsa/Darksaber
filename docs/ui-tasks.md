@@ -66,6 +66,7 @@
 - [x] `WorldEngine` core/session state 필드 축소: canvas/camera/party/player data/game manager/world map/player/town·raid session을 `coreState` aggregate로 묶어 월드 엔진 기본 상태 변경 표면을 줄임.
 - [x] `WorldEngine` 공통 controller port 배선 축소: world/player/field/network/log 포트를 `getSharedControllerPorts()`로 모아 controller initializer별 반복 콜백 작성을 줄임.
 - [x] `WorldEngine` 공통 controller port 계약 분리: shared port 타입과 생성 로직을 `WorldEngineSharedControllerPorts` 모듈로 이동해 `WorldEngine.ts`의 배선 계약 변경 충돌 표면을 줄임.
+- [x] 클라이언트/서버 마법 시전 readiness 공유화: 장착/학습/침묵/AP/MP/대상 필요 판정을 `MagicCastRules`로 분리해 로컬 마법 메뉴와 서버 `castSkill` 검증 드리프트를 줄임.
 
 ---
 

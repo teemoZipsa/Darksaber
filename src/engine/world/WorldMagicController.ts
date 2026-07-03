@@ -16,6 +16,11 @@ import {
     getUpgradeLevel,
     normalizeLoadout,
 } from '../../magic/MagicLoadout';
+import {
+    getMagicCastReadinessFailure,
+    isTargetedMagicSkill,
+    type MagicCastReadinessFailure,
+} from '../../magic/MagicCastRules';
 import type { SkillVisualPhase } from '../../data/SkillVisualProfiles';
 import type { Enemy } from '../../entity/Enemy';
 import type { TileType } from '../../map/Tile';
@@ -178,17 +183,18 @@ export class WorldMagicController {
     private buildSlots(actor: FieldActor): FieldMagicSlot[] {
         const character = actor.character;
         const loadout = normalizeLoadout(character.magicLoadout, character);
-        const silenced = hasStatus(character.statuses, 'silence');
-        const hasAp = this.context.getRemainingActionPoints() >= MAGIC_ACTION_GAUGE_COST;
         const slots: FieldMagicSlot[] = [];
         for (const id of loadout) {
             const skill = getSkill(id);
             if (!skill) continue;
-            let enabled = true;
-            let disabledReason: string | undefined;
-            if (silenced) { enabled = false; disabledReason = t('magic.menu.silenced'); }
-            else if (!hasAp) { enabled = false; disabledReason = t('magic.menu.noAp'); }
-            else if (character.stats.mp < skill.mpCost) { enabled = false; disabledReason = t('magic.menu.noMp'); }
+            const failure = getMagicCastReadinessFailure({
+                skill,
+                statuses: character.statuses,
+                mp: character.stats.mp,
+                remainingAp: this.context.getRemainingActionPoints(),
+            });
+            const enabled = failure === null;
+            const disabledReason = this.getMenuDisabledReason(failure);
             slots.push({ skill, level: getUpgradeLevel(character.skillUpgradeLevels, id), enabled, disabledReason });
         }
         return slots;
@@ -250,29 +256,34 @@ export class WorldMagicController {
     }
 
     public hasCastableFieldSkill(character: Character): boolean {
-        if (hasStatus(character.statuses, 'silence')) return false;
-        return this.getLearnedFieldSkills(character).some((skill) => character.stats.mp >= skill.mpCost);
+        return this.getLearnedFieldSkills(character).some((skill) =>
+            getMagicCastReadinessFailure({
+                skill,
+                statuses: character.statuses,
+                mp: character.stats.mp,
+                remainingAp: MAGIC_ACTION_GAUGE_COST,
+            }) === null
+        );
     }
 
     private handleSkillSelect(skill: Skill): void {
         const actor = this.context.getActivePartyTurnActor();
         if (!actor) return;
 
-        if (this.context.getRemainingActionPoints() < MAGIC_ACTION_GAUGE_COST) {
-            this.sink.log(t('field.magic.noAp'));
+        const failure = getMagicCastReadinessFailure({
+            skill,
+            statuses: actor.character.statuses,
+            mp: actor.character.stats.mp,
+            remainingAp: this.context.getRemainingActionPoints(),
+        });
+        if (failure) {
+            this.logReadinessFailure(failure, skill);
             this.reset();
             this.context.reopenActionMenu(actor);
             return;
         }
 
-        if (actor.character.stats.mp < skill.mpCost) {
-            this.sink.log(formatT('field.magic.noMp', { cost: skill.mpCost }));
-            this.reset();
-            this.context.reopenActionMenu(actor);
-            return;
-        }
-
-        if (skill.type === 'heal' || skill.type === 'buff') {
+        if (!isTargetedMagicSkill(skill)) {
             this.cast(actor, skill);
             return;
         }
@@ -284,18 +295,17 @@ export class WorldMagicController {
     }
 
     private cast(actor: FieldActor, skill: Skill, targetEnemy?: Enemy): void {
-        if (this.context.getRemainingActionPoints() < MAGIC_ACTION_GAUGE_COST) {
-            this.sink.log(t('field.magic.noAp'));
-            this.context.reopenActionMenu(actor);
-            return;
-        }
-        if (actor.character.stats.mp < skill.mpCost) {
-            this.sink.log(formatT('field.magic.noMp', { cost: skill.mpCost }));
-            this.context.reopenActionMenu(actor);
-            return;
-        }
-        if ((skill.type === 'damage' || skill.type === 'debuff' || skill.type === 'aoe') && !targetEnemy) {
-            this.sink.log(t('field.magic.noTarget'));
+        const failure = getMagicCastReadinessFailure({
+            skill,
+            statuses: actor.character.statuses,
+            mp: actor.character.stats.mp,
+            remainingAp: this.context.getRemainingActionPoints(),
+            requireTarget: true,
+            targetId: targetEnemy?.id,
+        });
+        if (failure) {
+            this.logReadinessFailure(failure, skill);
+            if (failure !== 'targetRequired') this.context.reopenActionMenu(actor);
             return;
         }
 
@@ -519,6 +529,43 @@ export class WorldMagicController {
 
     private enemyTile(enemy: Enemy): TilePoint {
         return { x: enemy.gridX, y: enemy.gridY };
+    }
+
+    private getMenuDisabledReason(failure: MagicCastReadinessFailure | null): string | undefined {
+        switch (failure) {
+            case 'silenced':
+                return t('magic.menu.silenced');
+            case 'noAp':
+                return t('magic.menu.noAp');
+            case 'noMp':
+                return t('magic.menu.noMp');
+            case null:
+            case 'notLearned':
+            case 'notEquipped':
+            case 'targetRequired':
+                return undefined;
+        }
+    }
+
+    private logReadinessFailure(failure: MagicCastReadinessFailure, skill: Skill): void {
+        switch (failure) {
+            case 'silenced':
+                this.sink.log(t('field.magic.silenced'));
+                return;
+            case 'noAp':
+                this.sink.log(t('field.magic.noAp'));
+                return;
+            case 'noMp':
+                this.sink.log(formatT('field.magic.noMp', { cost: skill.mpCost }));
+                return;
+            case 'targetRequired':
+                this.sink.log(t('field.magic.noTarget'));
+                return;
+            case 'notLearned':
+            case 'notEquipped':
+                this.sink.log(t('field.magic.noSkills'));
+                return;
+        }
     }
 }
 

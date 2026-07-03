@@ -3,12 +3,16 @@ import {
     applyStatuses,
     applyStatusesToCarrier,
     cleanseNegativeStatuses,
-    hasStatus,
 } from '../src/combat/StatusEffects';
 import { resolveSkillEffect, type SkillEffectResult } from '../src/combat/SkillEffectResolver';
 import { getSkillAttackProfile } from '../src/data/AttackPatternProfiles';
 import { getSkill, type Skill } from '../src/data/SkillDB';
 import { getEffectiveSkill, getUpgradeLevel } from '../src/magic/MagicLoadout';
+import {
+    getMagicCastReadinessFailure,
+    isTargetedMagicSkill,
+    type MagicCastReadinessFailure,
+} from '../src/magic/MagicCastRules';
 import { MAGIC_ACTION_GAUGE_COST } from '../src/field/FieldActionEconomy';
 import type { TilePoint } from '../src/field/FieldPathing';
 import {
@@ -62,17 +66,22 @@ export class WorldSessionSkillResolver {
         if (!skillId) return reject(intentId, 'Cast skill payload must include skillId.');
         const skill = getSkill(skillId);
         if (!skill) return reject(intentId, 'Skill does not exist.');
-        if (!getActorLearnedSkillIds(actor).has(skill.id)) return reject(intentId, 'Skill is not learned by this actor.');
-        if (!actor.magicLoadout.includes(skill.id)) return reject(intentId, 'Skill is not equipped by this actor.');
-        if (hasStatus(actor.statuses, 'silence')) return reject(intentId, 'Actor is silenced.');
-        if (actor.remainingAp < MAGIC_ACTION_GAUGE_COST) return reject(intentId, 'No action available to cast skill.');
-        if (actor.stats.mp < skill.mpCost) return reject(intentId, 'Actor does not have enough MP.');
-
-        const requiresTarget = skill.type === 'damage' || skill.type === 'debuff' || skill.type === 'aoe';
         const targetId = readSkillTargetId(payload);
+        const readinessFailure = getMagicCastReadinessFailure({
+            skill,
+            learnedSkillIds: getActorLearnedSkillIds(actor),
+            equippedSkillIds: actor.magicLoadout,
+            statuses: actor.statuses,
+            mp: actor.stats.mp,
+            remainingAp: actor.remainingAp,
+            requireTarget: true,
+            targetId,
+        });
+        if (readinessFailure) return reject(intentId, magicCastFailureToServerReason(readinessFailure));
+
+        const requiresTarget = isTargetedMagicSkill(skill);
         const target = targetId ? this.context.enemies.get(targetId) : undefined;
         if (requiresTarget) {
-            if (!targetId) return reject(intentId, 'Cast skill payload must include targetId.');
             if (!target || target.enemy.stats.hp <= 0) return reject(intentId, 'Target is not alive.');
             if (!canActorTargetEnemy(actor, target)) return reject(intentId, 'Target is not visible.');
         }
@@ -203,5 +212,22 @@ export class WorldSessionSkillResolver {
             isBlockingTile: (tile: TilePoint) => isTerrainLineOfSightBlocking(this.context.getServerTileAt(tile, actor.ownerPlayerId)),
             hasLineOfSight: (from: TilePoint, to: TilePoint) => this.context.hasFieldLineOfSight(from, to, actor.ownerPlayerId),
         };
+    }
+}
+
+function magicCastFailureToServerReason(failure: MagicCastReadinessFailure): string {
+    switch (failure) {
+        case 'notLearned':
+            return 'Skill is not learned by this actor.';
+        case 'notEquipped':
+            return 'Skill is not equipped by this actor.';
+        case 'silenced':
+            return 'Actor is silenced.';
+        case 'noAp':
+            return 'No action available to cast skill.';
+        case 'noMp':
+            return 'Actor does not have enough MP.';
+        case 'targetRequired':
+            return 'Cast skill payload must include targetId.';
     }
 }
