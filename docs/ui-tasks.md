@@ -63,6 +63,7 @@
 - [x] `WorldEngine` field state 필드 축소: party actors/field enemies/remote party actors를 `fieldState` aggregate로 묶어 전투·네트워크 snapshot 상태 변경 표면을 줄임.
 - [x] `WorldEngine` flow state 필드 축소: turn state controller와 update/action-turn flow cache를 `flowState` aggregate로 묶어 프레임·턴 흐름 상태 변경 표면을 줄임.
 - [x] `WorldEngine` controller state 필드 축소: combat/action/raid/presentation/scenario/world controller aggregate들을 `controllerState` backing store로 묶어 controller 조립 필드 충돌 표면을 줄임.
+- [x] `WorldEngine` core/session state 필드 축소: canvas/camera/party/player data/game manager/world map/player/town·raid session을 `coreState` aggregate로 묶어 월드 엔진 기본 상태 변경 표면을 줄임.
 
 ---
 

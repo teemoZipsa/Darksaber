@@ -28,6 +28,10 @@ import {
     type WorldEngineControllerState,
 } from './world/WorldEngineControllerState';
 import {
+    createWorldEngineCoreState,
+    type WorldEngineCoreState,
+} from './world/WorldEngineCoreState';
+import {
     createWorldEngineFieldState,
     type WorldEngineFieldState,
 } from './world/WorldEngineFieldState';
@@ -112,18 +116,10 @@ export interface WorldEngineOptions {
 }
 
 export class WorldEngine {
-    private canvas: HTMLCanvasElement;
-    private camera: Camera;
-    private party: PartyManager;
-    private playerData: PlayerData;
-    private gameManager: GameManager;
-    private worldMap: WorldMap;
-    private player!: Player;
+    private coreState?: WorldEngineCoreState;
     private fieldState?: WorldEngineFieldState;
     private networkState?: WorldEngineNetworkState;
     private uiState?: WorldEngineUiState;
-    private townSession: WorldTownSession;
-    private raidSession: WorldRaidSession;
     private runtimeState?: WorldEngineRuntimeState;
     private flowState?: WorldEngineFlowState;
     private controllerState?: WorldEngineControllerState;
@@ -139,12 +135,14 @@ export class WorldEngine {
         gameManager: GameManager,
         options: WorldEngineOptions = {}
     ) {
-        this.canvas = canvas;
-        this.camera = camera;
-        this.party = party;
-        this.playerData = playerData;
-        this.gameManager = gameManager;
-        this.worldMap = new WorldMap();
+        this.coreState = createWorldEngineCoreState({
+            canvas,
+            camera,
+            party,
+            playerData,
+            gameManager,
+            worldMap: new WorldMap(),
+        });
         const initialHubTownId = this.getTownById(this.playerData.currentHubTownId)?.id ?? 'central_castle';
         this.raidSession = new WorldRaidSession(initialHubTownId);
         this.townSession = new WorldTownSession({
@@ -1087,6 +1085,78 @@ export class WorldEngine {
         return this.getUiState().fieldFeedback;
     }
 
+    private get canvas(): HTMLCanvasElement {
+        return this.getCoreState().canvas!;
+    }
+
+    private set canvas(canvas: HTMLCanvasElement) {
+        this.getCoreState().canvas = canvas;
+    }
+
+    private get camera(): Camera {
+        return this.getCoreState().camera!;
+    }
+
+    private set camera(camera: Camera) {
+        this.getCoreState().camera = camera;
+    }
+
+    private get party(): PartyManager {
+        return this.getCoreState().party!;
+    }
+
+    private set party(party: PartyManager) {
+        this.getCoreState().party = party;
+    }
+
+    private get playerData(): PlayerData {
+        return this.getCoreState().playerData!;
+    }
+
+    private set playerData(playerData: PlayerData) {
+        this.getCoreState().playerData = playerData;
+    }
+
+    private get gameManager(): GameManager {
+        return this.getCoreState().gameManager!;
+    }
+
+    private set gameManager(gameManager: GameManager) {
+        this.getCoreState().gameManager = gameManager;
+    }
+
+    private get worldMap(): WorldMap {
+        return this.getCoreState().worldMap;
+    }
+
+    private set worldMap(worldMap: WorldMap) {
+        this.getCoreState().worldMap = worldMap;
+    }
+
+    private get player(): Player {
+        return this.getCoreState().player!;
+    }
+
+    private set player(player: Player) {
+        this.getCoreState().player = player;
+    }
+
+    private get townSession(): WorldTownSession {
+        return this.getCoreState().townSession!;
+    }
+
+    private set townSession(townSession: WorldTownSession) {
+        this.getCoreState().townSession = townSession;
+    }
+
+    private get raidSession(): WorldRaidSession {
+        return this.getCoreState().raidSession!;
+    }
+
+    private set raidSession(raidSession: WorldRaidSession) {
+        this.getCoreState().raidSession = raidSession;
+    }
+
     private get combatControllers(): WorldEngineCombatControllers {
         return this.getControllerState().combatControllers!;
     }
@@ -1138,6 +1208,27 @@ export class WorldEngine {
     private getNetworkState(): WorldEngineNetworkState {
         this.networkState ??= createWorldEngineNetworkState();
         return this.networkState;
+    }
+
+    private getCoreState(): WorldEngineCoreState {
+        if (!this.coreState) {
+            const fallback = createWorldEngineCoreState();
+            const injected = this as unknown as WorldEngineCoreState;
+            const getOwn = <K extends keyof WorldEngineCoreState>(key: K): WorldEngineCoreState[K] | undefined =>
+                Object.prototype.hasOwnProperty.call(this, key) ? injected[key] : undefined;
+            this.coreState = {
+                canvas: getOwn('canvas') ?? fallback.canvas,
+                camera: getOwn('camera') ?? fallback.camera,
+                party: getOwn('party') ?? fallback.party,
+                playerData: getOwn('playerData') ?? fallback.playerData,
+                gameManager: getOwn('gameManager') ?? fallback.gameManager,
+                worldMap: getOwn('worldMap') ?? fallback.worldMap,
+                player: getOwn('player') ?? fallback.player,
+                townSession: getOwn('townSession') ?? fallback.townSession,
+                raidSession: getOwn('raidSession') ?? fallback.raidSession,
+            };
+        }
+        return this.coreState;
     }
 
     private getFieldState(): WorldEngineFieldState {
