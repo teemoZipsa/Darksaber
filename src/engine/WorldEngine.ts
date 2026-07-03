@@ -18,7 +18,6 @@ import { EntityInfoUI } from '../ui/EntityInfoUI';
 import { EffectManager } from '../ui/EffectManager';
 import { FusionTempleUI } from '../ui/FusionTempleUI';
 import { FloatingTextManager } from '../ui/FloatingTextManager';
-import type { MinimapUI } from '../ui/MinimapUI';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
@@ -31,9 +30,6 @@ import type { CombatResult } from './world/WorldCombatController';
 import type { WorldStoryScenarioController } from './world/WorldStoryScenarioController';
 import type { WorldNetworkSyncController } from './world/WorldNetworkSyncController';
 import type { WorldTutorialController } from './world/WorldTutorialController';
-import type { WorldTempleController } from './world/WorldTempleController';
-import type { WorldRestingController } from './world/WorldRestingController';
-import type { WorldCombatFeedbackController } from './world/WorldCombatFeedbackController';
 import type { WorldNetworkIntentController } from './world/WorldNetworkIntentController';
 import { WorldTurnStateController } from './world/WorldTurnStateController';
 import { WorldFieldFeedbackState } from './world/WorldFieldFeedbackState';
@@ -46,7 +42,10 @@ import {
 } from './world/WorldEngineFlows';
 import { runWorldEngineStartupFlow } from './world/WorldEngineStartupFlow';
 import { createWorldEngineScenarioNetworkControllers } from './world/WorldEngineScenarioNetworkControllers';
-import { createWorldEngineWorldControllers } from './world/WorldEngineWorldControllers';
+import {
+    createWorldEngineWorldControllers,
+    type WorldEngineWorldControllers,
+} from './world/WorldEngineWorldControllers';
 import {
     createWorldEngineCombatControllers,
     type WorldEngineCombatControllers,
@@ -115,7 +114,6 @@ export class WorldEngine {
     private actionMenuUI = new ActionMenuUI();
     private entityInfoUI = new EntityInfoUI();
     private fusionTempleUI = new FusionTempleUI();
-    private minimapUI!: MinimapUI;
     private townSession: WorldTownSession;
     private raidSession: WorldRaidSession;
     private currentPhase: WorldPhase = 'lobby';
@@ -126,9 +124,7 @@ export class WorldEngine {
     private storyScenarioController!: WorldStoryScenarioController;
     private networkSyncController!: WorldNetworkSyncController;
     private tutorialController!: WorldTutorialController;
-    private templeController!: WorldTempleController;
-    private restingController!: WorldRestingController;
-    private combatFeedbackController!: WorldCombatFeedbackController;
+    private worldControllers!: WorldEngineWorldControllers;
     private networkIntentController!: WorldNetworkIntentController;
     private networkEvents!: WorldEngineNetworkEvents;
     private actionTurnFlow?: WorldEngineActionTurnFlow;
@@ -216,10 +212,7 @@ export class WorldEngine {
             selectActor: (actorId) => this.actionControllers.selectionController.selectActor(actorId),
             addCombatLog: (message) => this.addCombatLog(message),
         });
-        this.minimapUI = worldControllers.minimapUI;
-        this.combatFeedbackController = worldControllers.combatFeedbackController;
-        this.templeController = worldControllers.templeController;
-        this.restingController = worldControllers.restingController;
+        this.worldControllers = worldControllers;
     }
 
     private initializeScenarioNetworkControllers(): void {
@@ -426,7 +419,7 @@ export class WorldEngine {
             entityInfoUI: this.entityInfoUI,
             effectManager: this.effectManager,
             floatingText: this.floatingText,
-            minimapUI: this.minimapUI,
+            minimapUI: this.worldControllers.minimapUI,
             magicController: this.actionControllers.magicController,
             toolController: this.actionControllers.toolController,
             playerActionController: this.actionControllers.playerActionController,
@@ -492,7 +485,7 @@ export class WorldEngine {
             playerActionController: this.actionControllers.playerActionController,
             tacticalController: this.presentationControllers.tacticalController,
             raidLifecycleController: this.raidLifecycleControllers.raidLifecycleController,
-            templeController: this.templeController,
+            templeController: this.worldControllers.templeController,
             storyScenarioController: this.storyScenarioController,
             advanceWorldTime: (dt) => { this.worldTime += dt; },
             isNetworkRaid: () => this.isNetworkRaid,
@@ -612,7 +605,7 @@ export class WorldEngine {
     private clearFieldTurnState(): void {
         this.turnStateController.clear();
         this.fanfareLeaderActorId = null;
-        this.restingController.clearTimers();
+        this.worldControllers.restingController.clearTimers();
         this.closeActionMenu();
         this.actionControllers.magicController.reset();
         this.actionControllers.toolController?.reset();
@@ -721,19 +714,19 @@ export class WorldEngine {
     }
 
     private updateRestingActors(dt: number): void {
-        this.restingController.update(dt);
+        this.worldControllers.restingController.update(dt);
     }
 
     private stopResting(actor: FieldActor, logMessage?: string): void {
-        this.restingController.stop(actor, logMessage);
+        this.worldControllers.restingController.stop(actor, logMessage);
     }
 
     private snapshotPartyHp(): Map<string, number> {
-        return this.restingController.snapshotPartyHp();
+        return this.worldControllers.restingController.snapshotPartyHp();
     }
 
     private interruptRestingForDamage(beforeHpByActorId: Map<string, number>): void {
-        this.restingController.interruptForDamage(beforeHpByActorId);
+        this.worldControllers.restingController.interruptForDamage(beforeHpByActorId);
     }
 
     private applyCombatResult(result: CombatResult): void {
@@ -1035,15 +1028,15 @@ export class WorldEngine {
     }
 
     private beginCombatFeedbackGroup(): string {
-        return this.combatFeedbackController.beginGroup();
+        return this.worldControllers.combatFeedbackController.beginGroup();
     }
 
     private registerCombatFeedback(kind: CombatFeedbackKind, feedbackGroupId?: string): void {
-        this.combatFeedbackController.register(kind, feedbackGroupId);
+        this.worldControllers.combatFeedbackController.register(kind, feedbackGroupId);
     }
 
     private flushCombatFeedbackGroup(feedbackGroupId: string): void {
-        this.combatFeedbackController.flush(feedbackGroupId);
+        this.worldControllers.combatFeedbackController.flush(feedbackGroupId);
     }
 
     public isNetworkRaidActive(): boolean {
