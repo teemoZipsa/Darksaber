@@ -208,8 +208,8 @@ function softenCombatStat(value: number, multiplier: number): number {
 
 function scaleMonsterStat(
     value: number,
-    raw: number | null,
-    baseline: number,
+    raw: number | null = null,
+    baseline = 1,
     tenth = false,
 ): number {
     let scaled = value * COMBAT_STAT_SCALE;
