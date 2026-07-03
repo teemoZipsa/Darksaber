@@ -37,14 +37,14 @@ import {
 } from './WorldSessionSnapshotStore';
 import { createWorldSessionKey, resolveWorldSessionRoute, type WorldSessionRoute } from './WorldSessionRouter';
 import { createWorldServerMetrics, errorToLogValue, formatWorldServerMetrics, logServerEvent } from './WorldServerObservability';
+import { createOriginPolicy, isAllowedOrigin, parseAllowedOrigins } from './OriginPolicy';
+import { createWorldShardConfig } from './WorldShardConfig';
 
 const PORT = Number(process.env.PORT ?? 8765);
 const HOST = process.env.HOST;
 const ENABLE_DEBUG_COUNTS = process.env.WORLD_DEBUG_COUNTS === '1';
-const WORLD_SHARD_COUNT = Math.max(1, Math.floor(Number(process.env.WORLD_SHARD_COUNT ?? 1)));
-if (WORLD_SHARD_COUNT > 1) {
-    throw new Error('WORLD_SHARD_COUNT > 1 requires party/raid-instance session keys. Keep WORLD_SHARD_COUNT=1 until multiplayer sharding is implemented.');
-}
+const WORLD_SHARD_CONFIG = createWorldShardConfig(process.env.WORLD_SHARD_COUNT);
+const WORLD_SHARD_COUNT = WORLD_SHARD_CONFIG.count;
 const MAX_WS_PAYLOAD_BYTES = Math.max(1024, Math.floor(Number(process.env.WORLD_WS_MAX_PAYLOAD_BYTES ?? 64 * 1024)));
 const WS_RATE_LIMIT_WINDOW_MS = 10_000;
 const WS_RATE_LIMIT_MESSAGES = Math.max(1, Math.floor(Number(process.env.WORLD_WS_RATE_LIMIT ?? 120)));
@@ -56,6 +56,7 @@ const WORLD_SAVE_RETRY_LIMIT = Math.max(1, Math.floor(Number(process.env.WORLD_S
 const WORLD_SAVE_RETRY_BASE_MS = Math.max(100, Math.floor(Number(process.env.WORLD_SAVE_RETRY_BASE_MS ?? 750)));
 const WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS = Math.max(1_000, Math.floor(Number(process.env.WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS ?? 8_000)));
 const allowedOrigins = parseAllowedOrigins(process.env.AUTH_ALLOWED_ORIGINS);
+const originPolicy = createOriginPolicy({ allowedOrigins });
 const authStoreKind = process.env.DATABASE_URL ? 'postgres' : 'memory';
 const jwtSecret = process.env.AUTH_JWT_SECRET ?? process.env.JWT_SECRET ?? (process.env.NODE_ENV === 'production' ? '' : 'darksaber-dev-jwt-secret-change-me');
 if (!jwtSecret) throw new Error('AUTH_JWT_SECRET is required when NODE_ENV=production.');
@@ -1097,8 +1098,7 @@ function normalizeRealm(value: unknown): WorldRealmId {
 }
 
 function isAllowedWsOrigin(origin: string | null): boolean {
-    if (!origin) return true;
-    return allowedOrigins.includes(origin);
+    return isAllowedOrigin(origin, originPolicy);
 }
 
 function isAllowedTransportSecurity(request: { headers: Record<string, string | string[] | undefined>; socket: unknown }): boolean {
@@ -1109,22 +1109,6 @@ function isAllowedTransportSecurity(request: { headers: Record<string, string | 
         && request.socket !== null
         && 'encrypted' in request.socket
         && (request.socket as { encrypted?: boolean }).encrypted === true;
-}
-
-function parseAllowedOrigins(value: string | undefined): string[] {
-    const configured = value
-        ?.split(',')
-        .map((origin) => origin.trim())
-        .filter((origin) => origin.length > 0);
-    if (configured && configured.length > 0) return configured;
-    return [
-        'http://localhost:5731',
-        'http://127.0.0.1:5731',
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'http://localhost:4173',
-        'http://127.0.0.1:4173',
-    ];
 }
 
 function parseSameSite(value: string | undefined): 'Lax' | 'Strict' | 'None' {

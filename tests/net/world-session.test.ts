@@ -74,7 +74,7 @@ function readyActorNextToLoot(session: WorldSession, playerId: string, lootId: s
     const snapshot = session.createSnapshot(playerId, 1_000);
     const loot = snapshot.loot.find((entry) => entry.id === lootId);
     assert.ok(loot);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === playerId);
     assert.ok(serverActor);
     serverActor.tile = { ...loot.tile };
@@ -164,7 +164,7 @@ test('server town leave only survives at a non-departure town', () => {
     for (const entry of cases) {
         const session = new WorldSession();
         const joined = session.join(joinMessage('central_castle', `hero-${entry.id}`), 0);
-        const internals = session as any;
+        const internals = session.getDebugState();
         const serverActor = [...internals.actors.values()].find((actorEntry: any) => actorEntry.ownerPlayerId === joined.playerId);
         assert.ok(serverActor, `${entry.id} actor`);
         serverActor.tile = { ...entry.tile };
@@ -188,9 +188,10 @@ test('server shutdown force-extracts active raids and preserves raid loot in the
     });
     const raidItem = getItemDef('herb_common');
     assert.ok(raidItem);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverPlayer = internals.players.get(joined.playerId);
     assert.ok(serverPlayer);
+    assert.ok(serverPlayer.saveSnapshot);
     serverPlayer.saveSnapshot.inventory.items.push({
         itemId: raidItem.id,
         gridX: 4,
@@ -230,9 +231,10 @@ test('persistent world session snapshots restore active raid reconnect state', (
     const raidItem = getItemDef('herb_common');
     assert.ok(raidItem);
 
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverPlayer = internals.players.get(joined.playerId);
     assert.ok(serverPlayer);
+    assert.ok(serverPlayer.saveSnapshot);
     serverPlayer.saveSnapshot.inventory.items.push({
         itemId: raidItem.id,
         gridX: 4,
@@ -241,7 +243,7 @@ test('persistent world session snapshots restore active raid reconnect state', (
         durability: raidItem.maxDurability,
         acquiredInRaid: true,
     });
-    internals.saveState.markDirty(joined.playerId);
+    session.markCharacterSaveDirty(joined.playerId);
 
     const before = session.createSnapshot(joined.playerId, 1_000);
     session.disconnect(joined.playerId, 1_500);
@@ -372,8 +374,9 @@ test('marked cache consumes one master key and stays unlocked after persistence 
     }, 1_100);
 
     assert.deepEqual(opened.replies.map((reply) => reply.type), ['INVENTORY_CONSUMED', 'LOOT_GRANT']);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const player = internals.players.get(joined.playerId);
+    assert.ok(player);
     assert.equal(player.carriedItems.has(MASTER_KEY_ITEM_ID), false);
     const unlocked = session.createSnapshot(joined.playerId, 1_100).loot.find((loot) => loot.id === marked.id);
     assert.equal(unlocked?.unlocked, true);
@@ -463,10 +466,7 @@ test('server tick keeps passive enemy ATB idle for every client snapshot', () =>
 test('server tick charges only enemies with an active aggro target', () => {
     const session = new WorldSession();
     const a = session.join(joinMessage('central_castle', 'hero-a'), 0);
-    const internals = session as unknown as {
-        actors: Map<string, { tile: { x: number; y: number } }>;
-        enemies: Map<string, { enemy: { gridX: number; gridY: number; id: string } }>;
-    };
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()][0];
     const enemyEntry = [...internals.enemies.values()][0];
     assert.ok(serverActor);
@@ -486,10 +486,7 @@ test('server tick charges only enemies with an active aggro target', () => {
 test('server tick freezes enemies outside the active simulation range', () => {
     const session = new WorldSession();
     const a = session.join(joinMessage('central_castle', 'hero-a'), 0);
-    const internals = session as unknown as {
-        actors: Map<string, { tile: { x: number; y: number } }>;
-        enemies: Map<string, { enemy: { gridX: number; gridY: number; id: string; actionGauge: number; isAggro: boolean } }>;
-    };
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()][0];
     const enemyEntry = [...internals.enemies.values()][0];
     assert.ok(serverActor);
@@ -534,7 +531,7 @@ test('useItem intent consumes server-owned carried inventory and heals actor', (
             stats: createBaseStats({ hp: 10, maxHp: 100, mp: 0, maxMp: 20, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
         })],
     }, 0);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === a.playerId);
     assert.ok(serverActor);
     serverActor.actionGauge = 100;
@@ -597,7 +594,7 @@ test('character save dirty state is event-driven and not created by world ticks'
     session.tick(1_000);
     assert.deepEqual(session.consumeSaveDirtyPlayerIds(), []);
 
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     assert.ok(serverActor);
     serverActor.actionGauge = 100;
@@ -691,7 +688,7 @@ test('loot contention grants one occupant and rejects the other', () => {
     ].find((tile) => world.isWalkable(tile.x, tile.y));
     assert.ok(adjacentTile);
 
-    const internals = session as any;
+    const internals = session.getDebugState();
     for (const playerId of [a.playerId, b.playerId]) {
         const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === playerId);
         assert.ok(serverActor);
@@ -756,7 +753,7 @@ test('network kills auto-grant normal enemy loot and include display names in co
             stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
         })],
     }, 0);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const serverEnemyEntry = [...internals.enemies.values()][0];
     assert.ok(serverActor);
@@ -805,7 +802,7 @@ test('castSkill intent is resolved by server skill rules', () => {
             stats: createBaseStats({ atk: 999, mp: 50, maxMp: 50, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
         })],
     }, 0);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const serverEnemyEntry = [...internals.enemies.values()][0];
     assert.ok(serverActor);
@@ -843,7 +840,7 @@ test('castSkill rejects a learned-but-unequipped skill', () => {
             stats: createBaseStats({ atk: 999, mp: 50, maxMp: 50, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
         })],
     }, 0);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const serverEnemyEntry = [...internals.enemies.values()][0];
     assert.ok(serverActor);
@@ -874,7 +871,7 @@ test('server-owned scenario entry spawns objective enemies and records completio
             stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
         })],
     }, 0);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === 'burgos_castle');
     const interior = getStoryInteriorLayout('burgos_castle');
@@ -946,7 +943,7 @@ test('server burgos cain side event records raid flag and gold without persistin
             stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
         })],
     }, 0);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === 'burgos_castle');
     const sequence = getStoryScenarioEventSequence('burgos_castle');
@@ -1007,7 +1004,7 @@ test('solo interior scenario enemies stay private to the entering player', () =>
             stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
         })],
     }, 0);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const actorA = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedA.playerId);
     const actorB = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedB.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === 'burgos_castle');
@@ -1074,7 +1071,7 @@ test('server late story interiors spawn original objective and guard layouts thr
             ...joinMessage('central_castle', `hero-ep${episode}`),
             completedQuestIds,
         }, episode);
-        const internals = session as any;
+        const internals = session.getDebugState();
         const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
         assert.ok(serverActor, `episode ${episode} actor`);
         serverActor.tile = world.getDungeonEntranceTile(dungeon);
@@ -1127,6 +1124,7 @@ test('server late story interiors spawn original objective and guard layouts thr
         for (const enemyId of state.enemyIds) {
             const serverEnemy = internals.enemies.get(enemyId);
             const snapshotEnemy = snapshot.enemies.find((enemy) => enemy.id === enemyId);
+            assert.ok(serverEnemy, `episode ${episode} server enemy ${enemyId}`);
             assert.ok(snapshotEnemy, `episode ${episode} visible enemy ${enemyId}`);
             assert.equal(snapshotEnemy.monsterId, serverEnemy.monsterId, `episode ${episode} snapshot monster ${enemyId}`);
             assert.deepEqual(snapshotEnemy.tile, { x: serverEnemy.enemy.gridX, y: serverEnemy.enemy.gridY }, `episode ${episode} snapshot tile ${enemyId}`);
@@ -1162,7 +1160,7 @@ test('server late story boss clears secure original EVENT 99 rewards only after 
             completedQuestIds,
             saveSnapshot: save,
         });
-        const internals = session as any;
+        const internals = session.getDebugState();
         const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
         assert.ok(serverActor, `episode ${episode} actor`);
         const entranceTile = world.getDungeonEntranceTile(dungeon);
@@ -1289,7 +1287,7 @@ test('server late story interior cache rewards persist only after survival throu
             completedQuestIds,
             saveSnapshot: save,
         });
-        const internals = session as any;
+        const internals = session.getDebugState();
         const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
         assert.ok(serverActor, `episode ${episode} actor`);
         serverActor.tile = world.getDungeonEntranceTile(dungeon);
@@ -1429,7 +1427,7 @@ test('server late story interior cache rewards are not persisted on failed raid 
             completedQuestIds,
             saveSnapshot: save,
         });
-        const internals = session as any;
+        const internals = session.getDebugState();
         const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
         assert.ok(serverActor, `episode ${episode} actor`);
         serverActor.tile = world.getDungeonEntranceTile(dungeon);
@@ -1517,7 +1515,7 @@ test('server late story boss rewards are not persisted on failed raid results', 
             completedQuestIds,
             saveSnapshot: save,
         });
-        const internals = session as any;
+        const internals = session.getDebugState();
         const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
         assert.ok(serverActor, `episode ${episode} actor`);
         serverActor.tile = world.getDungeonEntranceTile(dungeon);
@@ -1597,7 +1595,7 @@ test('server late story objectives do not persist when extracting back to the de
             completedQuestIds,
             saveSnapshot: save,
         });
-        const internals = session as any;
+        const internals = session.getDebugState();
         const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
         assert.ok(serverActor, `episode ${episode} actor`);
         serverActor.tile = world.getDungeonEntranceTile(dungeon);
@@ -1660,7 +1658,7 @@ test('scenario entry validates quest prerequisites on the server', () => {
     const session = new WorldSession();
     const world = new WorldMap();
     const joined = session.join(joinMessage('central_castle', 'hero-a'), 0);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === 'zamora_fortress');
     assert.ok(serverActor);
@@ -1688,7 +1686,7 @@ test('bossless server scenarios complete immediately while keeping optional enem
         ...joinMessage('central_castle', 'hero-a'),
         completedQuestIds,
     }, 0);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === 'airship');
     assert.ok(serverActor);
@@ -1722,7 +1720,7 @@ test('server scenario entry starts every implemented episode through 31', () => 
             ...joinMessage('central_castle', `hero-episode-${scenario.episode}`),
             completedQuestIds,
         }, scenario.episode);
-        const internals = session as any;
+        const internals = session.getDebugState();
         const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
         const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
         const monsterLayout = getStoryScenarioMonsterLayout(scenario);
@@ -1816,7 +1814,7 @@ test('server story objectives through episode 31 persist only after valid surviv
             completedQuestIds,
             saveSnapshot: save,
         });
-        const internals = session as any;
+        const internals = session.getDebugState();
         const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
         assert.ok(dungeon, `episode ${scenario.episode} dungeon`);
         assert.ok(serverActor, `episode ${scenario.episode} actor`);
@@ -1902,7 +1900,7 @@ test('server-authoritative field scenario events complete per player without tru
         ...joinMessage('central_castle', 'hero-b'),
         completedQuestIds,
     }, 0);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const actorA = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedA.playerId);
     const actorB = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedB.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === 'arcadia_plain');
@@ -1943,7 +1941,9 @@ test('server-authoritative field scenario events complete per player without tru
     assert.equal(fieldResult.scope, 'player');
     assert.equal(fieldResult.flag, 'arcadia_gold_chest_01');
     assert.deepEqual(fieldResult.rewards, [{ type: 'gold', amount: 100 }]);
-    assert.equal('amount' in (result.replies[0] as any) && (result.replies[0] as any).amount === 9999, false);
+    const firstReply = result.replies[0];
+    assert.ok(firstReply);
+    assert.equal('amount' in firstReply && firstReply.amount === 9999, false);
 
     const snapshotA = session.createSnapshot(joinedA.playerId, 1_100);
     const snapshotB = session.createSnapshot(joinedB.playerId, 1_100);
@@ -1998,7 +1998,7 @@ test('server-authoritative original MAGIC field traps damage the actor once', ()
         completedQuestIds,
         saveSnapshot: save,
     });
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
     assert.ok(serverActor);
@@ -2064,7 +2064,7 @@ test('server-authoritative RANDOM field events reject without completing until t
         completedQuestIds,
         saveSnapshot: save,
     });
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === 'oasis');
     const sequence = getStoryScenarioEventSequence('oasis');
@@ -2136,7 +2136,7 @@ test('server-authoritative SCENECLEAR field events complete scenario objectives'
         completedQuestIds,
         saveSnapshot: save,
     });
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
     assert.ok(serverActor);
@@ -2203,7 +2203,7 @@ test('server-authoritative field scenario gold rewards are lost on failed raids'
         completedQuestIds,
         saveSnapshot: save,
     });
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === 'arcadia_plain');
     const sequence = getStoryScenarioEventSequence('arcadia_plain');
@@ -2261,7 +2261,7 @@ test('server-authoritative field scenario item rewards reject full save storage 
         completedQuestIds,
         saveSnapshot: save,
     });
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const player = internals.players.get(joined.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === 'arcadia_plain');
@@ -2269,6 +2269,7 @@ test('server-authoritative field scenario item rewards reject full save storage 
     const event = sequence?.fieldEvents.find((candidate) => candidate.id === 'arcadia_item_chest_05');
     assert.ok(serverActor);
     assert.ok(player);
+    assert.ok(player.saveSnapshot);
     assert.ok(dungeon);
     assert.ok(event);
     serverActor.tile = world.getDungeonEntranceTile(dungeon);
@@ -2331,7 +2332,7 @@ test('server omits zero original item ids from scenario field reward payloads', 
         completedQuestIds,
         saveSnapshot: save,
     });
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === 'valhalla_plain');
     const sequence = getStoryScenarioEventSequence('valhalla_plain');
@@ -2381,7 +2382,7 @@ test('server-authoritative USEITEM scenario field events require and consume the
         completedQuestIds,
         saveSnapshot: save,
     });
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const serverPlayer = internals.players.get(joined.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === 'skeria_2');
@@ -2390,6 +2391,7 @@ test('server-authoritative USEITEM scenario field events require and consume the
     const flowerEvent = sequence?.fieldEvents.find((event) => event.id === 'skeria_2_yellow_flower_10');
     assert.ok(serverActor);
     assert.ok(serverPlayer);
+    assert.ok(serverPlayer.saveSnapshot);
     assert.ok(dungeon);
     assert.ok(shamanEvent);
     assert.ok(flowerEvent);
@@ -2468,7 +2470,7 @@ test('server-authoritative field scenario events reject invalid actors and dista
         .map((scenario) => scenario.questId);
     const joinedA = session.join({ ...joinMessage('central_castle', 'hero-a'), completedQuestIds }, 0);
     const joinedB = session.join({ ...joinMessage('central_castle', 'hero-b'), completedQuestIds }, 0);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const actorA = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedA.playerId);
     const actorB = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedB.playerId);
     const dungeon = world.getDungeons().find((entry) => entry.id === 'arcadia_plain');
@@ -2539,7 +2541,7 @@ test('server scenario enemy deaths return all original CHARDEAD presentation ste
                     stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
                 })],
             }, scenario.episode);
-            const internals = session as any;
+            const internals = session.getDebugState();
             const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
             const dungeon = world.getDungeons().find((entry) => entry.id === scenario.dungeonId);
             assert.ok(serverActor, `episode ${scenario.episode} actor`);
@@ -2616,7 +2618,7 @@ test('shared field scenario event flags are included for late join snapshots', (
             .filter((scenario) => scenario.episode < 4)
             .map((scenario) => scenario.questId);
         const joinedA = session.join({ ...joinMessage('central_castle', 'hero-a'), completedQuestIds }, 0);
-        const internals = session as any;
+        const internals = session.getDebugState();
         const actorA = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joinedA.playerId);
         const dungeon = world.getDungeons().find((entry) => entry.id === 'arcadia_plain');
         assert.ok(actorA);
@@ -2658,7 +2660,7 @@ test('network auto-loot exposes unaccepted leftovers on the field', () => {
             stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
         })],
     }, 0);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const serverEnemyEntry = [...internals.enemies.values()][0];
     assert.ok(serverActor);
@@ -2694,7 +2696,7 @@ test('network auto-loot exposes unaccepted leftovers on the field', () => {
 test('server generates nest content around roaming players', () => {
     const session = new WorldSession();
     const joined = session.join(joinMessage('central_castle', 'hero-a'), 0);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     assert.ok(serverActor);
 
@@ -2734,7 +2736,7 @@ test('cleared field nests respawn after five minutes away from active actors', (
             stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
         })],
     }, 0);
-    const internals = session as any;
+    const internals = session.getDebugState();
     const serverActor = [...internals.actors.values()].find((entry: any) => entry.ownerPlayerId === joined.playerId);
     const state = [...internals.nestStates.values()].find((entry: any) => entry.monsterIds.length > 0);
     assert.ok(serverActor);
@@ -2763,14 +2765,12 @@ test('cleared field nests respawn after five minutes away from active actors', (
     assert.ok(respawnAt >= 310_000);
     const stateChunkX = Math.floor(state.centerTile.x / CHUNK_SIZE);
     const stateChunkY = Math.floor(state.centerTile.y / CHUNK_SIZE);
-    const realm = internals.worldMap.getRealm();
-    const biome = internals.worldMap.getBiomeAtChunk(stateChunkX, stateChunkY);
-    const seed = `server:${internals.sessionEpoch}`;
 
     serverActor.tile = { ...state.centerTile };
-    internals.spawnNest(stateChunkX, stateChunkY, biome, realm, seed, false, respawnAt + 1);
+    session.tick(respawnAt + 1);
     assert.equal(state.monsterIds.length, 0, 'nest should not respawn inside the 18-tile safety radius');
 
+    const worldMap = new WorldMap();
     let outsideSafeTile: { x: number; y: number } | null = null;
     const chunkMinX = stateChunkX * CHUNK_SIZE;
     const chunkMinY = stateChunkY * CHUNK_SIZE;
@@ -2778,13 +2778,13 @@ test('cleared field nests respawn after five minutes away from active actors', (
         for (let x = chunkMinX; x < chunkMinX + CHUNK_SIZE; x++) {
             const distance = Math.abs(x - state.centerTile.x) + Math.abs(y - state.centerTile.y);
             if (distance <= ENEMY_AGGRO_RANGE) continue;
-            if (!internals.worldMap.isWalkable(x, y)) continue;
+            if (!worldMap.isWalkable(x, y)) continue;
             outsideSafeTile = { x, y };
             break;
         }
     }
     assert.ok(outsideSafeTile, 'test fixture should find a same-chunk tile outside the nest spawn safety radius');
     serverActor.tile = outsideSafeTile;
-    internals.spawnNest(stateChunkX, stateChunkY, biome, realm, seed, false, respawnAt + 1_001);
+    session.tick(respawnAt + 1_001);
     assert.ok(state.monsterIds.length > 0, 'nest should respawn once the timer passed and actors are outside the spawn safety radius');
 });

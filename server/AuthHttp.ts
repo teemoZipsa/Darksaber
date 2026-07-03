@@ -29,11 +29,13 @@ import {
     resolveClientIp,
     resolveTrustProxy,
 } from './AuthRateLimit';
+import { createOriginPolicy, isAllowedOrigin } from './OriginPolicy';
 
 export interface AuthHttpOptions {
     store: AuthStore;
     jwt: JwtOptions;
     allowedOrigins: string[];
+    allowMissingOrigin?: boolean;
     refreshTtlMs?: number;
     refreshCookieSecure?: boolean;
     sameSite?: 'Lax' | 'Strict' | 'None';
@@ -83,12 +85,16 @@ const REFRESH_IP_LIMIT = 60;
 
 export function createAuthHttpHandler(options: AuthHttpOptions): (request: IncomingMessage, response: ServerResponse) => Promise<boolean> {
     const runtime = createAuthHttpRuntime(options);
+    const originPolicy = createOriginPolicy({
+        allowedOrigins: options.allowedOrigins,
+        allowMissingOrigin: options.allowMissingOrigin,
+    });
     return async (request, response) => {
         const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
         if (!isAuthPath(url.pathname)) return false;
 
         const origin = typeof request.headers.origin === 'string' ? request.headers.origin : null;
-        if (!isAllowedOrigin(origin, options.allowedOrigins)) {
+        if (!isAllowedOrigin(origin, originPolicy)) {
             writeJson(response, 403, { error: 'origin_forbidden' }, origin, options);
             return true;
         }
@@ -548,13 +554,12 @@ function writeCorsPreflight(response: ServerResponse, origin: string | null, opt
 }
 
 function writeCorsHeaders(response: ServerResponse, origin: string | null, options: AuthHttpOptions): void {
-    if (origin && isAllowedOrigin(origin, options.allowedOrigins)) response.setHeader('Access-Control-Allow-Origin', origin);
+    const originPolicy = createOriginPolicy({
+        allowedOrigins: options.allowedOrigins,
+        allowMissingOrigin: options.allowMissingOrigin,
+    });
+    if (origin && isAllowedOrigin(origin, originPolicy)) response.setHeader('Access-Control-Allow-Origin', origin);
     response.setHeader('Access-Control-Allow-Credentials', 'true');
-}
-
-function isAllowedOrigin(origin: string | null, allowedOrigins: readonly string[]): boolean {
-    if (!origin) return true;
-    return allowedOrigins.includes(origin);
 }
 
 function userAgent(context: HandlerContext): string | null {

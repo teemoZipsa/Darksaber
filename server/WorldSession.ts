@@ -117,7 +117,6 @@ import {
     type ScenarioFieldEventRewardResult,
     type WorldClientMessage,
     type WorldJoinMessage,
-    type WorldPlayerSnapshot,
     type WorldServerMessage,
     type WorldSnapshot,
     type WorldWelcomeMessage,
@@ -140,8 +139,6 @@ import {
 import {
     canActorTargetEnemy,
     getTargetableActors,
-    isActorVisibleToViewer,
-    isEnemyVisibleToViewer,
     isPlayerWiped,
 } from './WorldSessionVisibility';
 import {
@@ -151,10 +148,9 @@ import {
     restorePersistentEnemy,
     restorePersistentLoot,
     restorePersistentPlayer,
-    toPersistentEnemy,
-    toPersistentLoot,
-    toPersistentPlayer,
 } from './WorldSessionPersistence';
+import { buildWorldSessionPersistentSnapshot } from './WorldSessionPersistentSnapshotBuilder';
+import { buildWorldSessionSnapshot } from './WorldSessionSnapshotBuilder';
 import {
     createFallbackActorSnapshot,
     readStringPayload,
@@ -165,9 +161,9 @@ import {
     sanitizeTier,
 } from './WorldSessionInput';
 import {
-    toActorSnapshot,
-    toLootSnapshot,
-} from './WorldSessionSnapshotViews';
+    createWorldSessionDebugState,
+    type WorldSessionDebugState,
+} from './WorldSessionDebugState';
 import {
     applyActorResourceDelta,
     getActorCasterSkillStats,
@@ -178,7 +174,6 @@ import {
 } from './WorldSessionSkillState';
 import {
     chunkOffsetsByDistance,
-    cloneStats,
     cloneStatuses,
     createActorEvent,
     createEnemyEvent,
@@ -189,7 +184,6 @@ import {
     hashInt,
     nestStateKey,
     reject,
-    scenarioFlagSnapshot,
     storyScenarioGuardOffsets,
     syncStatsMovementToClass,
     toActorAIUnit,
@@ -224,6 +218,7 @@ const FIELD_NEST_SPAWN_SAFE_DISTANCE = ENEMY_AGGRO_RANGE;
 const FIELD_NEST_REFRESH_INTERVAL_MS = 1_000;
 
 export type { WorldCharacterSavePatch } from './WorldSessionSaveState';
+export type { WorldSessionDebugState } from './WorldSessionDebugState';
 export { gridToSnapshot } from './WorldSessionHelpers';
 export type {
     WorldJoinContext,
@@ -335,8 +330,7 @@ export class WorldSession {
     }
 
     public createPersistentSnapshot(): WorldSessionPersistentSnapshot {
-        return {
-            version: 1,
+        return buildWorldSessionPersistentSnapshot({
             realm: this.worldMap.getRealm(),
             shardId: this.shardId,
             sessionEpoch: this.sessionEpoch,
@@ -346,17 +340,16 @@ export class WorldSession {
             nextLootId: this.nextLootId,
             lastTickAt: this.lastTickAt,
             lastNestRefreshAt: this.lastNestRefreshAt,
-            players: [...this.players.values()].map((player) => toPersistentPlayer(player)),
-            actors: [...this.actors.values()].map((actor) => clonePersistentActor(actor)),
-            enemies: [...this.enemies.values()].map((entry) => toPersistentEnemy(entry)),
-            nestStates: [...this.nestStates.values()].map((state) => clonePersistentNestState(state)),
-            scenarioStates: [...this.scenarioStates.values()].map((state) => clonePersistentScenarioState(state)),
-            sharedScenarioFieldEventFlags: [...this.sharedScenarioFieldEventFlags.entries()]
-                .map(([dungeonId, flags]) => [dungeonId, [...flags]]),
-            loot: [...this.loot.values()].map((lootObject) => toPersistentLoot(lootObject)),
-            generatedLootChunks: [...this.generatedLootChunks],
+            players: this.players.values(),
+            actors: this.actors.values(),
+            enemies: this.enemies.values(),
+            nestStates: this.nestStates.values(),
+            scenarioStates: this.scenarioStates.values(),
+            sharedScenarioFieldEventFlags: this.sharedScenarioFieldEventFlags.entries(),
+            loot: this.loot.values(),
+            generatedLootChunks: this.generatedLootChunks,
             dirtyPlayerIds: this.saveState.getDirtyPlayerIds(),
-        };
+        });
     }
 
     public join(message: WorldJoinMessage, now: number = Date.now(), context: WorldJoinContext = {}): { playerId: string; welcome: WorldWelcomeMessage } {
@@ -637,78 +630,18 @@ export class WorldSession {
 
     public createSnapshot(viewerPlayerId: string | null = null, now: number = Date.now()): WorldSnapshot {
         this.seq += 1;
-        const viewer = viewerPlayerId ? this.players.get(viewerPlayerId) : undefined;
-        const players: WorldPlayerSnapshot[] = [...this.players.values()]
-            .filter((player) => player.active)
-            .map((player) => ({
-                playerId: player.id,
-                originHubId: player.originHubId,
-                isGhost: player.ghost,
-                actorIds: [...player.actorIds],
-            }));
-        const partyActors = [...this.actors.values()]
-            .filter((actor) => {
-                const owner = this.players.get(actor.ownerPlayerId);
-                return owner?.active && !owner.ghost;
-            })
-            .filter((actor) => isActorVisibleToViewer(this.players, actor, viewerPlayerId))
-            .map((actor) => toActorSnapshot(actor, this.players.get(actor.ownerPlayerId)?.ghost ?? false));
-        const enemies = [...this.enemies.values()]
-            .filter((entry) => entry.enemy.stats.hp > 0)
-            .filter((entry) => isEnemyVisibleToViewer(this.players, entry, viewerPlayerId))
-            .map((entry) => ({
-                id: entry.enemy.id,
-                monsterId: entry.monsterId,
-                name: entry.enemy.name,
-                role: entry.enemy.role,
-                level: entry.enemy.level,
-                color: entry.enemy.color,
-                tile: { x: entry.enemy.gridX, y: entry.enemy.gridY },
-                home: { ...entry.home },
-                stats: cloneStats(entry.enemy.stats),
-                statuses: cloneStatuses(entry.enemy.statuses),
-                actionGauge: entry.enemy.actionGauge,
-                facing: entry.enemy.facing,
-                isAggro: entry.enemy.isAggro,
-                isBoss: entry.enemy.isBoss,
-            }));
-        const loot = [...this.loot.values()]
-            .filter((lootObject) => !this.lootState.isAutoLootPending(lootObject.id))
-            .filter(() => !viewer?.activeDungeonId)
-            .map((lootObject) => toLootSnapshot(lootObject, this.lootState.getLockPlayerId(lootObject.id)));
-        const readyActors = partyActors
-            .filter((actor) => !actor.isDead && !actor.isGhost && actor.remainingAp >= MIN_FIELD_ACTION_GAUGE_COST)
-            .map((actor) => actor.id);
-        const remainingApByActor: Record<string, number> = {};
-        for (const actor of partyActors) remainingApByActor[actor.id] = actor.remainingAp;
-
-        const fallbackPlayer = viewer ?? [...this.players.values()].find((player) => player.active);
-        return {
+        return buildWorldSessionSnapshot({
             seq: this.seq,
-            serverTime: now,
-            players,
-            partyActors,
-            enemies,
-            loot,
-            readyActors,
-            remainingApByActor,
-            raidTimer: {
-                active: Boolean(fallbackPlayer?.active),
-                elapsedSeconds: fallbackPlayer?.elapsedSeconds ?? 0,
-                limitSeconds: RAID_LIMIT_SECONDS,
-                departureTownId: fallbackPlayer?.departureTownId ?? 'central_castle',
-                modifier: fallbackPlayer?.raidModifier ?? null,
-            },
-            scenario: {
-                enteredDungeonIds: fallbackPlayer ? [...fallbackPlayer.enteredDungeonIds] : [],
-                activeDungeonId: fallbackPlayer?.activeDungeonId ?? null,
-                completedDungeonIds: fallbackPlayer ? [...fallbackPlayer.completedDungeonIds] : [],
-                playerFieldEventFlagsByDungeonId: fallbackPlayer
-                    ? scenarioFlagSnapshot(fallbackPlayer.fieldEventFlagsByDungeonId)
-                    : {},
-                sharedFieldEventFlagsByDungeonId: scenarioFlagSnapshot(this.sharedScenarioFieldEventFlags),
-            },
-        };
+            now,
+            viewerPlayerId,
+            raidLimitSeconds: RAID_LIMIT_SECONDS,
+            players: this.players,
+            actors: this.actors,
+            enemies: this.enemies.values(),
+            loot: this.loot.values(),
+            lootState: this.lootState,
+            sharedScenarioFieldEventFlags: this.sharedScenarioFieldEventFlags,
+        });
     }
 
     public getActivePlayerIds(): string[] {
@@ -757,6 +690,17 @@ export class WorldSession {
             enemies,
             lootLocks: this.lootState.lockCount(),
         };
+    }
+
+    public getDebugState(): WorldSessionDebugState {
+        return createWorldSessionDebugState({
+            players: this.players,
+            actors: this.actors,
+            enemies: this.enemies,
+            nestStates: this.nestStates,
+            scenarioStates: this.scenarioStates,
+            loot: this.loot,
+        });
     }
 
     private handleIntent(

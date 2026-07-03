@@ -418,6 +418,38 @@ test('login IP rate limit uses x-forwarded-for when trust proxy is enabled', asy
     }
 });
 
+test('auth HTTP rejects browser requests from origins outside the allowlist', async () => {
+    const harness = await createHarness();
+    try {
+        const rejected = await harness.request('/auth/register', {
+            method: 'POST',
+            origin: 'http://evil.test',
+            body: { loginName: 'originblock01', password: 'password-1234' },
+        });
+
+        assert.equal(rejected.status, 403);
+        assert.equal(rejected.body.error, 'origin_forbidden');
+    } finally {
+        await harness.close();
+    }
+});
+
+test('auth HTTP allows requests without Origin for non-browser clients', async () => {
+    const harness = await createHarness();
+    try {
+        const accepted = await harness.request('/auth/register', {
+            method: 'POST',
+            origin: null,
+            body: { loginName: 'nativeclient01', password: 'password-1234' },
+        });
+
+        assert.equal(accepted.status, 201);
+        assert.equal(accepted.accessControlAllowOrigin, '');
+    } finally {
+        await harness.close();
+    }
+});
+
 async function createHarness(options: {
     trustProxy?: boolean;
     registerRateLimiter?: MemoryRateLimiter;
@@ -430,8 +462,9 @@ async function createHarness(options: {
         body?: unknown;
         accessToken?: string;
         cookie?: string;
+        origin?: string | null;
         headers?: Record<string, string>;
-    }): Promise<{ status: number; body: Record<string, unknown>; setCookie: string }>;
+    }): Promise<{ status: number; body: Record<string, unknown>; setCookie: string; accessControlAllowOrigin: string }>;
     close(): Promise<void>;
 }> {
     const store = new InMemoryAuthStore();
@@ -465,9 +498,9 @@ async function createHarness(options: {
         store,
         request: async (path, options) => {
             const headers: Record<string, string> = {
-                Origin: 'http://client.test',
                 ...options.headers,
             };
+            if (options.origin !== null) headers.Origin = options.origin ?? 'http://client.test';
             if (options.body !== undefined) headers['Content-Type'] = 'application/json';
             if (options.accessToken) headers.Authorization = `Bearer ${options.accessToken}`;
             if (options.cookie) headers.Cookie = options.cookie;
@@ -482,6 +515,7 @@ async function createHarness(options: {
                 status: response.status,
                 body: parsed,
                 setCookie: response.headers.get('set-cookie') ?? '',
+                accessControlAllowOrigin: response.headers.get('access-control-allow-origin') ?? '',
             };
         },
         close: () => closeServer(server),

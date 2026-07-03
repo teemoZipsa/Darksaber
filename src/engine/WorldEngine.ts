@@ -9,7 +9,7 @@ import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
 import type { LootObject } from '../entity/LootObject';
 import { PartyManager } from '../character/PartyManager';
-import { Character } from '../character/Character';
+import type { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { getCarryAtbMultiplier, getPartyCarriedWeight } from '../inventory/CarryWeight';
 import {
@@ -20,8 +20,7 @@ import {
 import { getRaidModifierEffects } from '../raid/RaidModifiers';
 import { PlayerData } from '../data/PlayerData';
 import { getItemDef } from '../data/ItemDB';
-import { getClassLine, isMasterClassLineId } from '../data/ClassTree';
-import { getClassAttackProfile } from '../data/AttackPatternProfiles';
+import { isMasterClassLineId } from '../data/ClassTree';
 import { formatT, t } from '../i18n/LanguageManager';
 import {
     MONSTER_ROW_BY_FACING,
@@ -44,25 +43,10 @@ import { MinimapUI } from '../ui/MinimapUI';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
-import { TilePoint, manhattan, tileKey } from '../field/FieldPathing';
+import { TilePoint } from '../field/FieldPathing';
 import { resolveFieldHit } from '../field/FieldInteraction';
 import { FIELD_MAX_ACTION_GAUGE, MIN_FIELD_ACTION_GAUGE_COST } from '../field/FieldActionEconomy';
-import { hasLineOfSight } from '../field/LineOfSight';
-import {
-    AttackPatternProfile,
-    PatternContext,
-    getEffectTiles,
-} from '../field/TargetPatterns';
-import {
-    getTerrainMoveCost,
-    isTerrainLineOfSightBlocking,
-    TerrainActorTraits,
-} from '../field/TerrainRules';
 import type { AttackCue, FieldActor, FieldEnemy, FieldHitParty, FieldTurnEndReason } from '../field/FieldTypes';
-import {
-    getActorAttackTargetFailure as resolveActorAttackTargetFailure,
-    type AttackTargetFailure,
-} from '../field/FieldTargeting';
 import { WorldRaidSession, type WorldPhase } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
 import { WorldCombatController, createCombatResult, type CombatResult } from './world/WorldCombatController';
@@ -93,11 +77,22 @@ import {
     directionFromTo,
     enemyTile,
     getActorTerrainMovementBudget,
-    getActorTerrainTraits,
     isActorAt,
     isEntityMoving,
     syncCharacterMovementToClass,
 } from './world/WorldEngineFieldHelpers';
+import {
+    canWorldActorAttackTarget,
+    canWorldEnemyAttackTarget,
+    createWorldPatternContext,
+    getWorldActorAttackProfile,
+    getWorldActorAttackTargetFailure,
+    getWorldActorTerrainTraits,
+    getWorldActorTerrainStepCost,
+    getWorldAttackPatternTargetEnemies,
+    getWorldTerrainTraitsForActorId,
+    hasWorldFieldLineOfSight,
+} from './world/WorldAttackTargeting';
 import { NetworkRaidClient } from '../net/NetworkRaidClient';
 import {
     type ActionRejectedMessage,
@@ -317,7 +312,7 @@ export class WorldEngine {
             getEnemyById: (enemyId) => this.getEnemyById(enemyId),
             actorTile: (actor) => actorTile(actor),
             getActorAttackTargetFailureFromTile: (actor, casterTile, enemy) =>
-                this.getActorAttackTargetFailureFromTile(actor, casterTile, enemy),
+                getWorldActorAttackTargetFailure({ worldMap: this.worldMap, actor, enemy, casterTile }),
             updateEffects: (dt) => this.effectManager.update(dt),
             updateFloatingText: (dt) => this.floatingText.update(dt),
             updateAttackCues: (dt) => this.updateAttackCues(dt),
@@ -419,7 +414,7 @@ export class WorldEngine {
             getFieldEnemies: () => this.fieldEnemies,
             getTileAt: (x, y) => this.worldMap.getTileAt(x, y),
             isGroundWalkable: (x, y) => this.worldMap.isWalkable(x, y),
-            getTerrainTraitsForActorId: (actorId) => this.getTerrainTraitsForActorId(actorId),
+            getTerrainTraitsForActorId: (actorId) => getWorldTerrainTraitsForActorId(this.partyActors, actorId),
             getPartyCarryAtbMultiplier: () => getCarryAtbMultiplier(
                 getPartyCarriedWeight(this.gameManager.inventory.items, this.party.getCharacters())
             ),
@@ -438,10 +433,10 @@ export class WorldEngine {
                 getActorById: (actorId) => this.getActorById(actorId),
                 getEnemyById: (enemyId) => this.getEnemyById(enemyId),
                 getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
-                getActorTerrainTraits: (actor) => getActorTerrainTraits(actor),
-                canEnemyAttackTarget: (enemy, actor, range) => this.canEnemyAttackTarget(enemy, actor, range),
-                canActorAttackTarget: (actor, enemy) => this.canActorAttackTarget(actor, enemy),
-                hasFieldLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to),
+                getActorTerrainTraits: (actor) => getWorldActorTerrainTraits(actor),
+                canEnemyAttackTarget: (enemy, actor, range) => canWorldEnemyAttackTarget({ worldMap: this.worldMap, enemy, actor, range }),
+                canActorAttackTarget: (actor, enemy) => canWorldActorAttackTarget({ worldMap: this.worldMap, actor, enemy }),
+                hasFieldLineOfSight: (from, to) => hasWorldFieldLineOfSight(this.worldMap, from, to),
                 directionFromTo: (from, to) => directionFromTo(from, to),
             },
             this.movementController,
@@ -491,7 +486,7 @@ export class WorldEngine {
                 getRemainingActionPoints: () => this.getSpendableActionGauge(),
                 getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
                 getBoundsTiles: () => this.worldMap.getBoundsTiles(),
-                hasFieldLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to),
+                hasFieldLineOfSight: (from, to) => hasWorldFieldLineOfSight(this.worldMap, from, to),
                 spendAp: (cost) => this.spendAp(cost),
                 isMajorActionUsed: () => this.turnStateController.isMajorActionUsed(),
                 markMajorActionUsed: () => this.turnStateController.markMajorActionUsed(),
@@ -557,10 +552,10 @@ export class WorldEngine {
                 getReservedAction: () => this.turnStateController.getReservedAction(),
                 getActiveTurnActorId: () => this.turnStateController.getActiveTurnActorId(),
                 getActorTerrainMovementBudget: (actor) => getActorTerrainMovementBudget(actor),
-                getActorTerrainStepCost: (actor, tile) => this.getActorTerrainStepCost(actor, tile),
-                getActorAttackProfile: (actor) => this.getActorAttackProfile(actor),
-                getPatternContext: (actor) => this.getPatternContext(actor),
-                getActorAttackTargetFailure: (actor, enemy) => this.getActorAttackTargetFailure(actor, enemy),
+                getActorTerrainStepCost: (actor, tile) => getWorldActorTerrainStepCost(this.worldMap, actor, tile),
+                getActorAttackProfile: (actor) => getWorldActorAttackProfile(actor),
+                getPatternContext: (actor) => createWorldPatternContext({ worldMap: this.worldMap, actor }),
+                getActorAttackTargetFailure: (actor, enemy) => getWorldActorAttackTargetFailure({ worldMap: this.worldMap, actor, enemy }),
                 getEnemyById: (enemyId) => this.getEnemyById(enemyId),
                 getLootById: (lootId) => this.worldMap.loot.find((candidate) => candidate.id === lootId) ?? null,
                 getLoot: () => this.worldMap.loot,
@@ -712,7 +707,7 @@ export class WorldEngine {
             getPathPreviewTiles: (actor) => this.getPathPreviewTiles(actor),
             getAttackCues: () => this.attackCues,
             getCombatLog: () => this.combatLog,
-            getActorTerrainTraits: (actor) => getActorTerrainTraits(actor),
+            getActorTerrainTraits: (actor) => getWorldActorTerrainTraits(actor),
             isTurnCombatActive: () => this.isTurnCombatActive(),
         });
         this.inputController = new WorldInputController({
@@ -1100,9 +1095,14 @@ export class WorldEngine {
             this.addCombatLog(t('field.log.serverCombatOnly'));
             return false;
         }
-        if (!this.canActorAttackTarget(actor, enemy)) return false;
-        const profile = this.getActorAttackProfile(actor);
-        const targetEnemies = this.getAttackPatternTargetEnemies(actor, enemy);
+        if (!canWorldActorAttackTarget({ worldMap: this.worldMap, actor, enemy })) return false;
+        const profile = getWorldActorAttackProfile(actor);
+        const targetEnemies = getWorldAttackPatternTargetEnemies({
+            worldMap: this.worldMap,
+            fieldEnemies: this.fieldEnemies,
+            actor,
+            selectedEnemy: enemy,
+        });
         const beforeHpByActorId = this.snapshotPartyHp();
         const result = this.combatController.tryActorAttack({
             actor,
@@ -1127,7 +1127,7 @@ export class WorldEngine {
             enemy,
             actor,
             getTileAt: (tile) => this.worldMap.getTileAt(tile.x, tile.y),
-            getActorTerrainTraits: (targetActor) => getActorTerrainTraits(targetActor),
+            getActorTerrainTraits: (targetActor) => getWorldActorTerrainTraits(targetActor),
         });
         this.applyCombatResult(result);
         this.interruptRestingForDamage(beforeHpByActorId);
@@ -1557,53 +1557,8 @@ export class WorldEngine {
         return this.partyActors.find((actor) => actor.id === actorId && !actor.character.isDead) ?? null;
     }
 
-    private canEnemyAttackTarget(enemy: Enemy, actor: FieldActor, range: number): boolean {
-        const distance = manhattan(enemyTile(enemy), actorTile(actor));
-        if (distance > range) return false;
-        return range <= 1 || this.hasFieldLineOfSight(enemyTile(enemy), actorTile(actor));
-    }
-
     private getEnemyById(enemyId: string): Enemy | null {
         return this.fieldEnemies.find((entry) => entry.enemy.id === enemyId)?.enemy ?? null;
-    }
-
-    private getAttackRange(character: Character): number {
-        return getClassLine(character.classLineId)?.attackRange ?? 1;
-    }
-
-    private getActorAttackProfile(actor: FieldActor): AttackPatternProfile {
-        return getClassAttackProfile(actor.character.classLineId, this.getAttackRange(actor.character));
-    }
-
-    private getAttackPatternTargetEnemies(actor: FieldActor, selectedEnemy: Enemy): Enemy[] {
-        const profile = this.getActorAttackProfile(actor);
-        const effectTileKeys = new Set(
-            getEffectTiles(profile, this.getPatternContext(actor, enemyTile(selectedEnemy)))
-                .map((tile) => tileKey(tile.x, tile.y))
-        );
-        return this.fieldEnemies
-            .map((entry) => entry.enemy)
-            .filter((enemy) => enemy.stats.hp > 0 && effectTileKeys.has(tileKey(enemy.gridX, enemy.gridY)));
-    }
-
-    private getPatternContext(actor: FieldActor, selectedTile?: TilePoint, casterTile: TilePoint = actorTile(actor)): PatternContext {
-        const bounds = this.worldMap.getBoundsTiles();
-        return {
-            casterTile,
-            selectedTile,
-            isInsideMap: (tile) => tile.x >= 0 && tile.y >= 0 && tile.x < bounds.width && tile.y < bounds.height,
-            isBlockingTile: (tile) => isTerrainLineOfSightBlocking(this.worldMap.getTileAt(tile.x, tile.y)),
-            hasLineOfSight: (from, to) => this.hasFieldLineOfSight(from, to),
-        };
-    }
-
-    private getTerrainTraitsForActorId(actorId?: string): TerrainActorTraits {
-        const actor = actorId ? this.partyActors.find((candidate) => candidate.id === actorId) : undefined;
-        return actor ? getActorTerrainTraits(actor) : { ignoresTerrain: false, waterBonus: false };
-    }
-
-    private getActorTerrainStepCost(actor: FieldActor, tile: TilePoint): number {
-        return getTerrainMoveCost(this.worldMap.getTileAt(tile.x, tile.y), getActorTerrainTraits(actor));
     }
 
     private getPathPreviewTiles(actor: FieldActor | null): TilePoint[] {
@@ -1631,31 +1586,6 @@ export class WorldEngine {
 
     private getBackpackCursedArtifactCount(): number {
         return countCursedArtifactsInPlacedItems(this.gameManager.inventory.items);
-    }
-
-    private hasFieldLineOfSight(from: TilePoint, to: TilePoint): boolean {
-        return hasLineOfSight(from, to, (tile) =>
-            isTerrainLineOfSightBlocking(this.worldMap.getTileAt(tile.x, tile.y))
-        );
-    }
-
-    private canActorAttackTarget(actor: FieldActor, enemy: Enemy): boolean {
-        return this.getActorAttackTargetFailure(actor, enemy) === null;
-    }
-
-    private getActorAttackTargetFailure(actor: FieldActor, enemy: Enemy): AttackTargetFailure | null {
-        return this.getActorAttackTargetFailureFromTile(actor, actorTile(actor), enemy);
-    }
-
-    private getActorAttackTargetFailureFromTile(actor: FieldActor, casterTile: TilePoint, enemy: Enemy): AttackTargetFailure | null {
-        const profile = this.getActorAttackProfile(actor);
-        const target = enemyTile(enemy);
-        return resolveActorAttackTargetFailure({
-            profile,
-            context: this.getPatternContext(actor, undefined, casterTile),
-            selectedContext: this.getPatternContext(actor, target, casterTile),
-            target,
-        });
     }
 
     private clearIntent(): void {

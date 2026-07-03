@@ -36,7 +36,7 @@ export function reject(intentId: string, reason: string): WorldSessionMessageRes
     };
 }
 
-export function scenarioFlagSnapshot(flagsByDungeonId: Map<string, Set<string>>): Record<string, string[]> {
+export function scenarioFlagSnapshot(flagsByDungeonId: ReadonlyMap<string, Set<string>>): Record<string, string[]> {
     const snapshot: Record<string, string[]> = {};
     for (const [dungeonId, flags] of flagsByDungeonId) {
         snapshot[dungeonId] = [...flags].sort();
