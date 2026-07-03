@@ -142,8 +142,9 @@ function createManagerHarness() {
             this.clearFieldTurnStateCalls += 1;
         },
         closeNetworkRaidClientCalls: 0,
-        closeNetworkRaidClient(sendLeave: boolean) {
-            assert.equal(sendLeave, false);
+        closeNetworkRaidClient(sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') {
+            assert.equal(sendLeave, true);
+            assert.equal(reason, 'manual');
             this.closeNetworkRaidClientCalls += 1;
         },
         addCombatLog(message: string) {

@@ -32,6 +32,20 @@ async function expectOverlayState(page: Page, expected: Partial<Record<string, b
     });
 }
 
+async function getNetworkRaidDebug(page: Page) {
+    return page.evaluate(() => {
+        const gm = (window as unknown as { __gm?: any }).__gm;
+        const engine = gm?.worldEngine;
+        return {
+            state: gm?.state,
+            raidActive: gm?.getRaidSession?.()?.active ?? false,
+            networkRaidActive: engine?.isNetworkRaidActive?.() ?? false,
+            networkStatus: engine?.networkRaidClient?.getStatus?.() ?? null,
+            logs: engine?.fieldFeedback?.combatLog ?? [],
+        };
+    });
+}
+
 test('dev town renders the React town overlay with embedded inventory', async ({ page }) => {
     await page.goto('/?devStart=town');
 
@@ -109,6 +123,44 @@ test('dev raid loot can be dragged into the backpack with real pointer input', a
 
     await expect(page.locator('.dev-scenario-status')).toContainText(/picked:dev_raid_loot:\d+,\d+/);
     await expect(page.locator('#ui-overlay [data-inv-grid="ext"] .inv-item')).toHaveCount(0);
+});
+
+test('network raid logs reconnect UX after a transport drop', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Network reconnect UX is covered on the desktop browser project.');
+    test.setTimeout(45_000);
+
+    const clientErrors: string[] = [];
+    page.on('pageerror', (error) => clientErrors.push(error.message));
+    page.on('console', (message) => {
+        if (/Failed to load resource: the server responded with a status of 401 \(Unauthorized\)/.test(message.text())) return;
+        if (message.type() === 'error') clientErrors.push(message.text());
+    });
+
+    await page.goto('/?devStart=raid');
+    await expect(page.locator('#gameCanvas')).toBeVisible();
+    await expect.poll(() => getNetworkRaidDebug(page), { timeout: 30_000 }).toMatchObject({
+        state: 'WORLD',
+        raidActive: true,
+        networkRaidActive: true,
+        networkStatus: 'connected',
+    });
+
+    await page.evaluate(() => {
+        const engine = (window as unknown as { __gm?: any }).__gm?.worldEngine;
+        engine?.networkRaidClient?.socket?.close();
+    });
+
+    await expect.poll(() => getNetworkRaidDebug(page), { timeout: 10_000 }).toMatchObject({
+        state: 'WORLD',
+        raidActive: true,
+        networkRaidActive: true,
+    });
+    await expect.poll(async () => (await getNetworkRaidDebug(page)).logs.join('\n'), { timeout: 10_000 })
+        .toMatch(/네트워크 상태: 재접속 중|Network status: Reconnecting/);
+    await expect.poll(async () => (await getNetworkRaidDebug(page)).networkStatus, { timeout: 15_000 })
+        .toBe('connected');
+
+    expect(clientErrors).toEqual([]);
 });
 
 test('mobile viewport keeps town and standalone inventory overlays within the screen', async ({ page }) => {

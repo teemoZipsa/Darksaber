@@ -98,7 +98,7 @@ function getDevWorldEngine(manager: GameManager): DevWorldEngine | null {
 }
 
 function deactivateDevNetworkRaid(world: DevWorldEngine): void {
-    world.closeNetworkRaidClient?.(false);
+    world.closeNetworkRaidClient?.(true, 'manual');
     world.isNetworkRaid = false;
     world.networkRaidClient = null;
 }
