@@ -92,6 +92,7 @@
 - [x] 환경 함정/독 늪지대 체감 강화 V1 구현. 독 늪 진입 시 중독과 둔화를 부여하고, 지형 hover와 전투 로그/상태 텍스트로 위험을 명확히 표시한다.
 - [x] `WorldEngine` raid lifecycle source adapter 추가. 레이드 생명주기 컨트롤러의 네트워크 runtime state setter와 scenario/network controller 연결을 `WorldEngineRaidLifecycleControllers` source adapter로 옮겨 네트워크 레이드 흐름 변경 시 `WorldEngine.ts` 수정 범위를 줄인다.
 - [x] `WorldEngine` presentation controller source adapter 추가. 렌더/입력/전술 컨트롤러의 UI state, runtime state, action/raid/scenario/world controller 연결을 `WorldEnginePresentationControllers` source adapter로 옮겨 화면·입력 배선 변경 시 `WorldEngine.ts` 수정 범위를 줄인다.
+- [x] `WorldEngine` action controller source adapter 추가. 행동 컨트롤러의 scenario/network/tutorial, movement controller, fanfare runtime state 연결을 `WorldEngineActionControllers` source adapter로 옮겨 행동 메뉴·마법·도구 배선 변경 시 `WorldEngine.ts` 수정 범위를 줄인다.
 
 ---
 

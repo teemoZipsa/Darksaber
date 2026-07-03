@@ -75,7 +75,7 @@ import {
     type WorldEngineCombatControllers,
 } from './world/WorldEngineCombatControllers';
 import {
-    createWorldEngineActionControllers,
+    createWorldEngineActionControllersFromSources,
     type WorldEngineActionControllers,
 } from './world/WorldEngineActionControllers';
 import {
@@ -254,12 +254,11 @@ export class WorldEngine {
             clearEnemyIfSelected: (enemyId) => this.actionControllers.selectionController.clearEnemyIfSelected(enemyId),
         });
         this.combatControllers = combatControllers;
-        const actionControllers = createWorldEngineActionControllers({
-            ...sharedPorts,
-            storyScenarioController: this.scenarioNetworkControllers.storyScenarioController,
-            networkSyncController: this.scenarioNetworkControllers.networkSyncController,
-            tutorialController: this.scenarioNetworkControllers.tutorialController,
-            movementController: this.combatControllers.movementController,
+        const actionControllers = createWorldEngineActionControllersFromSources({
+            ports: sharedPorts,
+            getScenarioNetworkControllers: () => this.scenarioNetworkControllers,
+            getCombatControllers: () => this.combatControllers,
+            getRuntimeState: () => this.getRuntimeState(),
             getSpendableActionGauge: () => this.getSpendableActionGauge(),
             spendAp: (cost) => this.spendAp(cost),
             submitNetworkMoveIntent: (actor, tile, path, apCost, pathCost) =>
@@ -271,18 +270,12 @@ export class WorldEngine {
             resumeOrEndActiveTurn: (actor) => this.resumeOrEndActiveTurn(actor),
             handleEnemyDefeated: (actor, enemy, feedbackGroupId) => this.handleEnemyDefeated(actor, enemy, feedbackGroupId),
             clearControlledPath: () => this.clearControlledPath(),
-            getFanfareLeaderId: () => this.getRuntimeState().fanfareLeaderActorId,
-            setFanfareLeaderId: (actorId) => {
-                this.getRuntimeState().fanfareLeaderActorId = actorId;
-                this.getRuntimeState().followRepathTimer = 0;
-            },
             getFanfareFollowerCount: (actor) => this.getFanfareFollowerCount(actor),
             tryActorAttack: (actor, enemy) => this.tryActorAttack(actor, enemy),
             closeActionMenu: () => this.closeActionMenu(),
             closeTacticalMenu: () => this.closeTacticalMenu(),
             endActorTurn: (actor, reason, atbCarryover) => this.endActorTurn(actor, reason, atbCarryover),
             clearActorIntent: (actor) => this.clearActorIntent(actor),
-            setReservedAction: (intent) => this.getFlowState().turnStateController.setReservedAction(intent),
         });
         this.actionControllers = actionControllers;
     }

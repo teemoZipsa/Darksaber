@@ -21,6 +21,9 @@ import {
 } from './WorldEngineFieldHelpers';
 import type { CombatFeedbackKind } from './CombatFeedback';
 import type { WorldEngineCombatControllers } from './WorldEngineCombatControllers';
+import type { WorldEngineRuntimeState } from './WorldEngineRuntimeState';
+import type { WorldEngineScenarioNetworkControllers } from './WorldEngineScenarioNetworkControllers';
+import type { WorldEngineSharedControllerPorts } from './WorldEngineSharedControllerPorts';
 import { WorldLootController } from './WorldLootController';
 import { WorldMagicController } from './WorldMagicController';
 import type { WorldNetworkSyncController } from './WorldNetworkSyncController';
@@ -79,6 +82,68 @@ export interface WorldEngineActionControllers {
     magicController: WorldMagicController;
     toolController: WorldToolController;
     playerActionController: WorldPlayerActionController;
+}
+
+export interface WorldEngineActionControllerSources {
+    ports: WorldEngineSharedControllerPorts;
+    getScenarioNetworkControllers(): WorldEngineScenarioNetworkControllers;
+    getCombatControllers(): WorldEngineCombatControllers;
+    getRuntimeState(): WorldEngineRuntimeState;
+    getSpendableActionGauge(): number;
+    spendAp(cost: number): boolean;
+    submitNetworkMoveIntent(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean;
+    submitNetworkActionIntent(actor: FieldActor, action: 'defend' | 'rest'): boolean;
+    submitNetworkUseItemIntent(actor: FieldActor, itemId: string): boolean;
+    submitNetworkSkillIntent(actor: FieldActor, skillId: string, targetId?: string): boolean;
+    reopenActionMenu(actor: FieldActor): void;
+    resumeOrEndActiveTurn(actor: FieldActor): void;
+    handleEnemyDefeated(actor: FieldActor, enemy: Enemy, feedbackGroupId?: string): void;
+    clearControlledPath(): void;
+    getFanfareFollowerCount(actor: FieldActor): number;
+    tryActorAttack(actor: FieldActor, enemy: Enemy): boolean;
+    closeActionMenu(): void;
+    closeTacticalMenu(): void;
+    endActorTurn(actor: FieldActor, reason: FieldTurnEndReason, atbCarryover?: number): void;
+    clearActorIntent(actor: FieldActor): void;
+}
+
+export function createWorldEngineActionControllersFromSources(
+    sources: WorldEngineActionControllerSources
+): WorldEngineActionControllers {
+    const scenarioNetworkControllers = sources.getScenarioNetworkControllers();
+    const combatControllers = sources.getCombatControllers();
+
+    return createWorldEngineActionControllers({
+        ...sources.ports,
+        storyScenarioController: scenarioNetworkControllers.storyScenarioController,
+        networkSyncController: scenarioNetworkControllers.networkSyncController,
+        tutorialController: scenarioNetworkControllers.tutorialController,
+        movementController: combatControllers.movementController,
+        getSpendableActionGauge: () => sources.getSpendableActionGauge(),
+        spendAp: (cost) => sources.spendAp(cost),
+        submitNetworkMoveIntent: (actor, tile, path, apCost, pathCost) =>
+            sources.submitNetworkMoveIntent(actor, tile, path, apCost, pathCost),
+        submitNetworkActionIntent: (actor, action) => sources.submitNetworkActionIntent(actor, action),
+        submitNetworkUseItemIntent: (actor, itemId) => sources.submitNetworkUseItemIntent(actor, itemId),
+        submitNetworkSkillIntent: (actor, skillId, targetId) => sources.submitNetworkSkillIntent(actor, skillId, targetId),
+        reopenActionMenu: (actor) => sources.reopenActionMenu(actor),
+        resumeOrEndActiveTurn: (actor) => sources.resumeOrEndActiveTurn(actor),
+        handleEnemyDefeated: (actor, enemy, feedbackGroupId) => sources.handleEnemyDefeated(actor, enemy, feedbackGroupId),
+        clearControlledPath: () => sources.clearControlledPath(),
+        getFanfareLeaderId: () => sources.getRuntimeState().fanfareLeaderActorId,
+        setFanfareLeaderId: (actorId) => {
+            const runtimeState = sources.getRuntimeState();
+            runtimeState.fanfareLeaderActorId = actorId;
+            runtimeState.followRepathTimer = 0;
+        },
+        getFanfareFollowerCount: (actor) => sources.getFanfareFollowerCount(actor),
+        tryActorAttack: (actor, enemy) => sources.tryActorAttack(actor, enemy),
+        closeActionMenu: () => sources.closeActionMenu(),
+        closeTacticalMenu: () => sources.closeTacticalMenu(),
+        endActorTurn: (actor, reason, atbCarryover) => sources.endActorTurn(actor, reason, atbCarryover),
+        clearActorIntent: (actor) => sources.clearActorIntent(actor),
+        setReservedAction: (intent) => sources.ports.turnStateController.setReservedAction(intent),
+    });
 }
 
 export function createWorldEngineActionControllers(
