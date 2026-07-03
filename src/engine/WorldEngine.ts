@@ -22,12 +22,6 @@ import { getItemDef } from '../data/ItemDB';
 import { isMasterClassLineId } from '../data/ClassTree';
 import { formatT, t } from '../i18n/LanguageManager';
 import {
-    MONSTER_ROW_BY_FACING,
-    MONSTER_SPRITE_PATH,
-    getMonsterDefinition,
-    type MonsterId,
-} from '../data/MonsterCatalog';
-import {
     getEffectiveStatsForCharacter,
     getEffectiveStatsForEnemy,
     removeStatusesFromCarrier,
@@ -71,12 +65,22 @@ import { WorldCombatFeedbackController } from './world/WorldCombatFeedbackContro
 import { WorldNetworkIntentController } from './world/WorldNetworkIntentController';
 import { WorldTurnStateController } from './world/WorldTurnStateController';
 import { WorldFieldFeedbackState } from './world/WorldFieldFeedbackState';
+import { WorldEngineNetworkEvents } from './world/WorldEngineNetworkEvents';
+import { applyMonsterSprite } from './world/NetworkSnapshotMapping';
 import {
     getWorldBackpackCursedArtifactCount,
     getWorldPathPreviewTiles,
     getWorldSpendableActionGauge,
     isWorldTurnCombatActive,
 } from './world/WorldEngineTurnQueries';
+import {
+    getWorldActivePartyTurnActor,
+    getWorldActorById,
+    getWorldControlledActor,
+    getWorldEnemyById,
+    getWorldFanfareFollowerCount,
+    getWorldFanfareLeaderActor,
+} from './world/WorldEngineActorQueries';
 import type { CombatFeedbackKind } from './world/CombatFeedback';
 import {
     actorTile,
@@ -100,15 +104,7 @@ import {
     hasWorldFieldLineOfSight,
 } from './world/WorldAttackTargeting';
 import { NetworkRaidClient } from '../net/NetworkRaidClient';
-import {
-    type ActionRejectedMessage,
-    type AutoLootGrantMessage,
-    type CombatEventMessage,
-    type InventoryConsumedMessage,
-    type LootGrantMessage,
-    type WorldRealmId,
-    type WorldSnapshot,
-} from '../net/WorldProtocol';
+import { type WorldRealmId } from '../net/WorldProtocol';
 
 export interface WorldEngineOptions {
     startIntroTutorial?: boolean;
@@ -158,6 +154,7 @@ export class WorldEngine {
     private lootController: WorldLootController;
     private combatFeedbackController: WorldCombatFeedbackController;
     private networkIntentController: WorldNetworkIntentController;
+    private networkEvents: WorldEngineNetworkEvents;
     private turnStateController = new WorldTurnStateController();
     private hoverTile: TilePoint = { x: -1, y: -1 };
     private fieldFeedback = new WorldFieldFeedbackState();
@@ -249,7 +246,7 @@ export class WorldEngine {
             closeFieldOverlays: () => this.closeFieldOverlays(),
             selectActor: (actorId) => this.selectionController.selectActor(actorId),
             clearSelection: () => this.selectionController.clear(),
-            applyMonsterSprite: (enemy, monsterId) => this.applyMonsterSprite(enemy, monsterId),
+            applyMonsterSprite: (enemy, monsterId) => applyMonsterSprite(enemy, monsterId),
             isEntityMoving: (entity) => isEntityMoving(entity),
             isNetworkRaid: () => this.isNetworkRaid,
             getNetworkRaidClient: () => this.networkRaidClient,
@@ -361,7 +358,7 @@ export class WorldEngine {
             getEnemyById: (enemyId) => this.getEnemyById(enemyId),
             actorTile: (actor) => actorTile(actor),
             enemyTile: (enemy) => enemyTile(enemy),
-            applyMonsterSprite: (enemy, monsterId) => this.applyMonsterSprite(enemy, monsterId),
+            applyMonsterSprite: (enemy, monsterId) => applyMonsterSprite(enemy, monsterId),
             isEntityMoving: (entity) => isEntityMoving(entity),
             beginCombatFeedbackGroup: () => this.beginCombatFeedbackGroup(),
             registerCombatFeedback: (kind, feedbackGroupId) => this.registerCombatFeedback(kind, feedbackGroupId),
@@ -384,6 +381,10 @@ export class WorldEngine {
             networkSyncController: this.networkSyncController,
             isNetworkRaid: () => this.isNetworkRaid,
             getNetworkRaidClient: () => this.networkRaidClient,
+        });
+        this.networkEvents = new WorldEngineNetworkEvents({
+            raidSession: this.raidSession,
+            networkSyncController: this.networkSyncController,
         });
         this.combatController = new WorldCombatController({
             log: (message) => this.addCombatLog(message),
@@ -674,12 +675,12 @@ export class WorldEngine {
                 partyActors: this.partyActors,
             }),
             setPhase: (phase) => { this.currentPhase = phase; },
-            applyNetworkSnapshot: (snapshot) => this.applyNetworkSnapshot(snapshot),
-            handleNetworkCombatEvent: (event) => this.handleNetworkCombatEvent(event),
-            openNetworkLoot: (grant) => this.openNetworkLoot(grant),
-            handleNetworkAutoLootGrant: (grant) => this.handleNetworkAutoLootGrant(grant),
-            handleNetworkInventoryConsumed: (message) => this.handleNetworkInventoryConsumed(message),
-            handleNetworkActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
+            applyNetworkSnapshot: (snapshot) => this.networkEvents.applySnapshot(snapshot),
+            handleNetworkCombatEvent: (event) => this.networkEvents.handleCombatEvent(event),
+            openNetworkLoot: (grant) => this.networkEvents.openLoot(grant),
+            handleNetworkAutoLootGrant: (grant) => this.networkEvents.handleAutoLootGrant(grant),
+            handleNetworkInventoryConsumed: (message) => this.networkEvents.handleInventoryConsumed(message),
+            handleNetworkActionRejected: (rejection) => this.networkEvents.handleActionRejected(rejection),
             log: (message) => this.addCombatLog(message),
         });
         this.tacticalController = new WorldTacticalController({
@@ -991,49 +992,6 @@ export class WorldEngine {
         return true;
     }
 
-    private applyNetworkSnapshot(snapshot: WorldSnapshot): void {
-        this.raidSession.elapsedSeconds = snapshot.raidTimer.elapsedSeconds;
-        this.raidSession.setRaidModifier(snapshot.raidTimer.modifier ?? null);
-        this.networkSyncController.applySnapshot(snapshot);
-    }
-
-    private applyMonsterSprite(enemy: Enemy, monsterId: string): void {
-        try {
-            const definition = getMonsterDefinition(monsterId as MonsterId);
-            enemy.setWalkSprite(
-                `${MONSTER_SPRITE_PATH}/${definition.sprite}`,
-                definition.frameSize,
-                definition.frameSize,
-                definition.frameCount,
-                definition.framesPerSecond,
-                MONSTER_ROW_BY_FACING,
-                definition.renderScale
-            );
-        } catch {
-            // Snapshot can still render with the fallback colored glyph.
-        }
-    }
-
-    private openNetworkLoot(grant: LootGrantMessage): void {
-        this.networkSyncController.openLoot(grant);
-    }
-
-    private handleNetworkAutoLootGrant(grant: AutoLootGrantMessage): void {
-        this.networkSyncController.handleAutoLootGrant(grant);
-    }
-
-    private handleNetworkInventoryConsumed(message: InventoryConsumedMessage): void {
-        this.networkSyncController.handleInventoryConsumed(message);
-    }
-
-    private handleNetworkActionRejected(rejection: ActionRejectedMessage): void {
-        this.networkSyncController.handleActionRejected(rejection);
-    }
-
-    private handleNetworkCombatEvent(event: CombatEventMessage): void {
-        this.networkSyncController.handleCombatEvent(event);
-    }
-
     private resolveFieldHitAt(tile: TilePoint) {
         const partyTargets: FieldHitParty[] = this.partyActors.map((actor) => ({
             ...actor,
@@ -1244,39 +1202,37 @@ export class WorldEngine {
         this.lootController.refreshLootState();
     }
 
-    private getLocalPartyActors(): FieldActor[] {
-        // partyActors may also hold remote players' actors during a network raid, so
-        // resolve local actors by Character identity rather than by raw index.
-        const characters = this.party.getCharacters();
-        return this.partyActors.filter((actor) => characters.includes(actor.character));
-    }
-
     private getControlledActor(): FieldActor | null {
         const characters = this.party.getCharacters();
-        const activeChar = characters[this.party.getActiveIndex()];
-        const localActors = this.getLocalPartyActors();
-        return localActors.find((actor) => actor.character === activeChar)
-            ?? localActors.find((actor) => !actor.character.isDead)
-            ?? localActors[0]
-            ?? null;
+        return getWorldControlledActor({
+            partyActors: this.partyActors,
+            characters,
+            activeIndex: this.party.getActiveIndex(),
+        });
     }
 
     private getFanfareFollowerCount(actor: FieldActor): number {
-        if (this.isNetworkRaid) return 0;
-        return this.getLocalPartyActors().filter((candidate) => candidate !== actor && !candidate.character.isDead).length;
+        return getWorldFanfareFollowerCount({
+            partyActors: this.partyActors,
+            characters: this.party.getCharacters(),
+            actor,
+            isNetworkRaid: this.isNetworkRaid,
+        });
     }
 
     private getFanfareLeaderActor(): FieldActor | null {
-        if (!this.fanfareLeaderActorId || this.isNetworkRaid) return null;
-        const leader = this.getLocalPartyActors().find((actor) => actor.id === this.fanfareLeaderActorId && !actor.character.isDead) ?? null;
+        const leader = getWorldFanfareLeaderActor({
+            partyActors: this.partyActors,
+            characters: this.party.getCharacters(),
+            leaderActorId: this.fanfareLeaderActorId,
+            isNetworkRaid: this.isNetworkRaid,
+        });
         if (!leader) this.fanfareLeaderActorId = null;
         return leader;
     }
 
     private getActivePartyTurnActor(): FieldActor | null {
-        const activeTurnActorId = this.turnStateController.getActiveTurnActorId();
-        if (!activeTurnActorId) return null;
-        return this.partyActors.find((actor) => actor.id === activeTurnActorId && !actor.character.isDead) ?? null;
+        return getWorldActivePartyTurnActor(this.partyActors, this.turnStateController.getActiveTurnActorId());
     }
 
     private switchToNextAliveActor(): void {
@@ -1567,11 +1523,11 @@ export class WorldEngine {
     }
 
     private getActorById(actorId: string): FieldActor | null {
-        return this.partyActors.find((actor) => actor.id === actorId && !actor.character.isDead) ?? null;
+        return getWorldActorById(this.partyActors, actorId);
     }
 
     private getEnemyById(enemyId: string): Enemy | null {
-        return this.fieldEnemies.find((entry) => entry.enemy.id === enemyId)?.enemy ?? null;
+        return getWorldEnemyById(this.fieldEnemies, enemyId);
     }
 
     private getSpendableActionGauge(): number {

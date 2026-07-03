@@ -20,23 +20,6 @@ import {
     normalizeUpgradeLevels,
 } from '../src/magic/MagicLoadout';
 import {
-    getMonsterDefinition,
-    type MonsterId,
-} from '../src/data/MonsterCatalog';
-import { getStoryQuestByDungeonId } from '../src/data/StoryQuestData';
-import { getStoryScenarioByDungeonId, type StoryScenarioDefinition } from '../src/data/StoryScenarioData';
-import { getStoryScenarioMonsterLayout } from '../src/data/StoryScenarioMonsterData';
-import {
-    getStoryScenarioEventSequence,
-    type StoryScenarioEnemyDefeatEvent,
-    type StoryScenarioEventStep,
-} from '../src/data/StoryScenarioEventData';
-import {
-    getStoryScenarioFieldEventFlag,
-    getStoryScenarioFieldEventScope,
-    getStoryScenarioFieldEventTiles,
-} from '../src/data/StoryScenarioFieldEventPlacement';
-import {
     getStoryInteriorLayout,
     getStoryInteriorTileAt,
     type StoryInteriorLayout,
@@ -89,7 +72,6 @@ import {
     type InventoryConsumedMessage,
     type LootGrantMessage,
     type ScenarioEnemyDefeatEventMessage,
-    type ScenarioFieldEventResultMessage,
     type WorldClientMessage,
     type WorldJoinMessage,
     type WorldServerMessage,
@@ -107,6 +89,7 @@ import {
     WORLD_SESSION_FIELD_NEST_DEPARTURE_RADIUS_CHUNKS,
 } from './WorldSessionFieldNests';
 import { WorldSessionScenarioRewards } from './WorldSessionScenarioRewards';
+import { WorldSessionScenarioRuntime } from './WorldSessionScenarioRuntime';
 import {
     WorldSessionPlayerIntentResolver,
     type WorldSessionActorAttackResult,
@@ -117,7 +100,6 @@ import { addCarriedItemQuantity } from './WorldSessionCarryState';
 import {
     firstActorTile,
     hasActiveActorWithin,
-    hasNearbyAggroEnemy,
     hasNearbyLiveEnemy,
 } from './WorldSessionSpatialQueries';
 import {
@@ -162,9 +144,7 @@ import {
     createToken,
     formationOffset,
     gridToSnapshot,
-    hashInt,
     reject,
-    storyScenarioGuardOffsets,
     syncStatsMovementToClass,
 } from './WorldSessionHelpers';
 import type {
@@ -222,6 +202,7 @@ export class WorldSession {
     private readonly enemyTurnResolver: WorldSessionEnemyTurnResolver;
     private readonly fieldNests: WorldSessionFieldNests;
     private readonly scenarioRewards: WorldSessionScenarioRewards;
+    private readonly scenarioRuntime: WorldSessionScenarioRuntime;
     private readonly playerIntentResolver: WorldSessionPlayerIntentResolver;
     private readonly raidResults: WorldSessionRaidResults;
     private readonly lootResolver: WorldSessionLootResolver;
@@ -267,6 +248,22 @@ export class WorldSession {
         });
         this.scenarioRewards = new WorldSessionScenarioRewards({
             saveState: this.saveState,
+        });
+        this.scenarioRuntime = new WorldSessionScenarioRuntime({
+            players: this.players,
+            actors: this.actors,
+            enemies: this.enemies,
+            scenarioStates: this.scenarioStates,
+            sharedFieldEventFlags: this.sharedScenarioFieldEventFlags,
+            worldMap: this.worldMap,
+            saveState: this.saveState,
+            rewards: this.scenarioRewards,
+            allocateScenarioEnemyId: () => {
+                const id = `scenario_${this.nextEnemyId++}`;
+                return { id, seedOrdinal: this.nextEnemyId };
+            },
+            findNearbyWalkableTile: (tile, actorId, ownerPlayerId) => this.findNearbyWalkableTile(tile, actorId, ownerPlayerId),
+            log: (message) => this.log(message),
         });
         this.playerIntentResolver = new WorldSessionPlayerIntentResolver({
             players: this.players,
@@ -557,9 +554,9 @@ export class WorldSession {
             case 'AUTO_LOOT_RESOLVE':
                 return this.lootResolver.handleAutoLootResolve(playerId, message.lootId, message.acceptedCells);
             case 'SCENARIO_ENTER':
-                return this.handleScenarioEnter(playerId, message, now);
+                return this.scenarioRuntime.handleEnter(playerId, message, now);
             case 'SCENARIO_FIELD_EVENT_INTERACT':
-                return this.handleScenarioFieldEventInteract(playerId, message, now);
+                return this.scenarioRuntime.handleFieldEventInteract(playerId, message);
             case 'WORLD_LEAVE':
                 this.log(`leave player=${playerId} reason=${message.reason}`);
                 return {
@@ -887,125 +884,6 @@ export class WorldSession {
         };
     }
 
-    private handleScenarioEnter(
-        playerId: string,
-        message: Extract<WorldClientMessage, { type: 'SCENARIO_ENTER' }>,
-        now: number
-    ): WorldSessionMessageResult {
-        const player = this.players.get(playerId);
-        const actor = this.actors.get(message.actorId);
-        const validationError = this.validateScenarioActor(player, actor);
-        if (validationError) return reject(message.intentId, validationError);
-
-        const dungeonId = message.dungeonId.trim();
-        const scenario = getStoryScenarioByDungeonId(dungeonId);
-        const quest = getStoryQuestByDungeonId(dungeonId);
-        if (!scenario || !quest) return reject(message.intentId, 'Scenario dungeon does not exist.');
-        if (player!.activeDungeonId) return reject(message.intentId, 'A scenario is already active.');
-        if (player!.completedDungeonIds.has(dungeonId)) return reject(message.intentId, 'Scenario objective is already complete in this raid.');
-        if (quest.prerequisiteQuestId && !player!.completedQuestIds.has(quest.prerequisiteQuestId)) {
-            return reject(message.intentId, 'Scenario prerequisite quest is not complete.');
-        }
-
-        const dungeon = this.worldMap.getDungeonAtTile(actor!.tile.x, actor!.tile.y);
-        if (!dungeon || dungeon.id !== dungeonId) return reject(message.intentId, 'Actor is not at the requested scenario entrance.');
-        if (hasNearbyAggroEnemy(this.enemies.values(), actor!.tile, 18, playerId)) return reject(message.intentId, 'Nearby combat must be resolved before entering a scenario.');
-
-        const interiorLayout = getStoryInteriorLayout(dungeonId);
-        const returnTile = interiorLayout ? { ...actor!.tile } : null;
-        this.removeScenarioRuntimeForPlayer(playerId);
-        player!.enteredDungeonIds.add(dungeonId);
-        player!.activeDungeonId = dungeonId;
-        if (interiorLayout) this.placePlayerActorsInScenarioInterior(player!, interiorLayout);
-
-        const state = this.spawnScenarioEncounter(player!, scenario, interiorLayout?.playerStart ?? actor!.tile, now, returnTile);
-        this.scenarioStates.set(playerId, state);
-        if (!state.objectiveEnemyId) this.completeScenarioObjective(player!, dungeonId, { clearEnemies: false });
-
-        this.log(`scenario enter player=${playerId} dungeon=${dungeonId} enemies=${state.enemyIds.length}`);
-        return { replies: [], broadcasts: [] };
-    }
-
-    private handleScenarioFieldEventInteract(
-        playerId: string,
-        message: Extract<WorldClientMessage, { type: 'SCENARIO_FIELD_EVENT_INTERACT' }>,
-        _now: number
-    ): WorldSessionMessageResult {
-        const player = this.players.get(playerId);
-        const actor = this.actors.get(message.actorId);
-        const validationError = this.validateScenarioActor(player, actor);
-        if (validationError) return reject(message.intentId, validationError);
-
-        const dungeonId = typeof message.dungeonId === 'string' ? message.dungeonId.trim() : '';
-        const eventId = typeof message.eventId === 'string' ? message.eventId.trim() : '';
-        if (!dungeonId || !eventId) return reject(message.intentId, 'Scenario field event request is malformed.');
-        if (player!.activeDungeonId !== dungeonId) return reject(message.intentId, 'Scenario is not active for this player.');
-
-        const sequence = getStoryScenarioEventSequence(dungeonId);
-        const event = sequence?.fieldEvents.find((candidate) => candidate.id === eventId);
-        if (!event) return reject(message.intentId, 'Scenario field event does not exist.');
-
-        const flag = getStoryScenarioFieldEventFlag(event);
-        const scope = getStoryScenarioFieldEventScope(event);
-        if (this.isScenarioFieldEventFlagComplete(player!, dungeonId, flag, scope)) {
-            return reject(message.intentId, 'Scenario field event is already complete.');
-        }
-
-        const triggerTiles = getStoryInteriorLayout(dungeonId)
-            ? event.triggerTiles
-            : getStoryScenarioFieldEventTiles(dungeonId, event, this.worldMap);
-        if (!triggerTiles.some((tile) => manhattan(actor!.tile, tile) <= 1)) {
-            return reject(message.intentId, 'Scenario field event is too far away.');
-        }
-        if (!this.scenarioRewards.canConsumeFieldEventUseItems(player!, event)) {
-            return reject(message.intentId, 'Scenario field event requires a missing item.');
-        }
-        if (!this.scenarioRewards.rollFieldEventRandom(event)) {
-            return reject(message.intentId, 'Scenario field event random condition failed.');
-        }
-        if (!this.scenarioRewards.canApplyRewards(player!, event.rewards)) {
-            return reject(message.intentId, 'Scenario field event reward storage is full.');
-        }
-
-        this.markScenarioFieldEventFlagComplete(player!, dungeonId, flag, scope);
-        this.scenarioRewards.consumeFieldEventUseItems(player!, event);
-        const rewards = this.scenarioRewards.applyFieldEventRewards(player!, event);
-        const trapDamage = this.scenarioRewards.applyFieldEventTrapMagic(actor!, event);
-        if (event.completesObjective) this.completeScenarioObjective(player!, dungeonId, { clearEnemies: false });
-        const result: ScenarioFieldEventResultMessage = {
-            type: 'SCENARIO_FIELD_EVENT_RESULT',
-            intentId: message.intentId,
-            dungeonId,
-            eventId: event.id,
-            scope,
-            flag,
-            presentationSteps: event.steps.map((step) => ({ ...step })),
-            rewards,
-            ...(trapDamage ? { trapDamage } : {}),
-        };
-        const broadcasts: WorldServerMessage[] = scope === 'shared'
-            ? [{
-                type: 'SCENARIO_FIELD_EVENT_BROADCAST',
-                dungeonId,
-                eventId: event.id,
-                scope: 'shared',
-                flag,
-                presentationSteps: event.steps.map((step) => ({ ...step })),
-            }]
-            : [];
-        this.log(`scenario field event player=${playerId} dungeon=${dungeonId} event=${event.id} scope=${scope}`);
-        return { replies: [result], broadcasts };
-    }
-
-    private validateScenarioActor(player: ServerPlayer | undefined, actor: ServerActor | undefined): string | null {
-        if (!player || !player.active) return 'Player is not in an active raid.';
-        if (player.ghost) return 'Ghost players cannot enter scenarios.';
-        if (!actor) return 'Actor does not exist.';
-        if (actor.ownerPlayerId !== player.id) return 'Actor is not owned by this player.';
-        if (actor.isDead || actor.stats.hp <= 0) return 'Actor is down.';
-        return null;
-    }
-
     private applySkillEffect(
         player: ServerPlayer,
         actor: ServerActor,
@@ -1124,27 +1002,22 @@ export class WorldSession {
 
     private completeEnemyKill(actor: ServerActor, target: ServerEnemy, now: number): CompleteEnemyKillResult {
         const enemy = target.enemy;
-        const scenarioEnemyDefeatEvent = this.createScenarioEnemyDefeatEventMessage(target);
-        const scenarioState = target.scenarioPlayerId ? this.scenarioStates.get(target.scenarioPlayerId) : undefined;
-        const scenarioBossLootTile = target.scenarioObjective && scenarioState?.returnTile
-            ? { ...scenarioState.returnTile }
-            : null;
+        const scenarioKillResult = this.scenarioRuntime.completeEnemyKill(target, enemy.id);
         this.enemies.delete(enemy.id);
         if (target.nestKey) this.fieldNests.markNestEnemyKilled(target.nestKey, enemy.id, now);
-        if (target.scenarioPlayerId && target.scenarioDungeonId) this.markScenarioEnemyKilled(target, enemy.id);
         const player = this.players.get(actor.ownerPlayerId);
         if (player) player.kills += 1;
         const autoLootGrant = enemy.isBoss
             ? undefined
             : this.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
-        if (enemy.isBoss || !autoLootGrant) this.spawnEnemyLoot(enemy, scenarioBossLootTile ?? undefined);
-        return { autoLootGrant, scenarioEnemyDefeatEvent };
+        if (enemy.isBoss || !autoLootGrant) this.spawnEnemyLoot(enemy, scenarioKillResult.bossLootTile);
+        return { autoLootGrant, scenarioEnemyDefeatEvent: scenarioKillResult.scenarioEnemyDefeatEvent };
     }
 
     private removePlayer(playerId: string): void {
         const player = this.players.get(playerId);
         if (!player) return;
-        this.removeScenarioRuntimeForPlayer(playerId);
+        this.scenarioRuntime.removePlayerRuntime(playerId);
         for (const actorId of player.actorIds) this.actors.delete(actorId);
         this.players.delete(playerId);
         this.lootResolver.releaseLocksForPlayer(playerId);
@@ -1255,223 +1128,6 @@ export class WorldSession {
     private spendActorGauge(actor: ServerActor, cost: number): void {
         actor.remainingAp = Math.max(0, actor.remainingAp - cost);
         actor.actionGauge = actor.remainingAp;
-    }
-
-    private placePlayerActorsInScenarioInterior(player: ServerPlayer, layout: StoryInteriorLayout): void {
-        player.actorIds.forEach((actorId, index) => {
-            const actor = this.actors.get(actorId);
-            if (!actor) return;
-            const offset = formationOffset(index);
-            const tile = this.findNearbyWalkableTile({
-                x: layout.playerStart.x + offset.x,
-                y: layout.playerStart.y + offset.y,
-            }, actor.id, player.id);
-            actor.tile = tile;
-            actor.facing = 'right';
-        });
-    }
-
-    private returnPlayerActorsFromScenarioInterior(player: ServerPlayer, returnTile: TilePoint): void {
-        player.actorIds.forEach((actorId, index) => {
-            const actor = this.actors.get(actorId);
-            if (!actor) return;
-            const offset = formationOffset(index);
-            const tile = this.findNearbyWalkableTile({
-                x: returnTile.x + offset.x,
-                y: returnTile.y + offset.y,
-            }, actor.id);
-            actor.tile = tile;
-            actor.facing = 'down';
-        });
-    }
-
-    private spawnScenarioEncounter(
-        player: ServerPlayer,
-        scenario: StoryScenarioDefinition,
-        anchor: TilePoint,
-        now: number,
-        returnTile: TilePoint | null = null
-    ): ServerScenarioState {
-        const state: ServerScenarioState = {
-            playerId: player.id,
-            dungeonId: scenario.dungeonId,
-            missionKind: scenario.missionKind,
-            returnTile: returnTile ? { ...returnTile } : null,
-            enemyIds: [],
-            objectiveEnemyId: null,
-            completed: false,
-        };
-        const layout = getStoryScenarioMonsterLayout(scenario);
-        const interiorLayout = getStoryInteriorLayout(scenario.dungeonId);
-        const guardOffsets = layout.guardOffsets ?? storyScenarioGuardOffsets(scenario.guardCount, Boolean(scenario.bossName));
-
-        for (let index = 0; index < scenario.guardCount; index++) {
-            const monsterId = layout.guardMonsterIds[index % layout.guardMonsterIds.length];
-            const definition = getMonsterDefinition(monsterId);
-            const offset = guardOffsets[index] ?? { x: index % 2 === 0 ? 2 : -2, y: Math.floor(index / 2) + 1 };
-            const tile = interiorLayout?.guardTiles[index] ?? { x: anchor.x + offset.x, y: anchor.y + offset.y };
-            this.spawnScenarioEnemy({
-                state,
-                monsterId,
-                name: definition.name,
-                level: Math.max(scenario.guardLevel, definition.level),
-                color: definition.color,
-                role: definition.role,
-                tile,
-                isObjective: false,
-                now,
-            });
-        }
-
-        if (scenario.bossName) {
-            const monsterId = layout.bossMonsterId;
-            const definition = monsterId ? getMonsterDefinition(monsterId) : null;
-            const objectiveEnemyId = this.spawnScenarioEnemy({
-                state,
-                monsterId,
-                name: scenario.bossName,
-                level: scenario.bossLevel,
-                color: scenario.bossColor,
-                role: 'boss',
-                tile: interiorLayout?.bossTile ?? { x: anchor.x + (layout.bossOffset?.x ?? 4), y: anchor.y + (layout.bossOffset?.y ?? 0) },
-                isObjective: true,
-                now,
-                aggroRange: Math.max(definition?.aggroRange ?? 0, 9),
-            });
-            state.objectiveEnemyId = objectiveEnemyId;
-        }
-
-        return state;
-    }
-
-    private spawnScenarioEnemy(input: {
-        state: ServerScenarioState;
-        monsterId?: MonsterId;
-        name: string;
-        level: number;
-        color: string;
-        role: Enemy['role'];
-        tile: TilePoint;
-        isObjective: boolean;
-        now: number;
-        aggroRange?: number;
-    }): string {
-        const id = `scenario_${this.nextEnemyId++}`;
-        const tile = this.findNearbyWalkableTile(input.tile, id, input.state.playerId);
-        const definition = input.monsterId ? getMonsterDefinition(input.monsterId) : null;
-        const enemy = new Enemy(id, tile.x, tile.y, input.name, input.level, input.color, input.role, input.monsterId);
-        enemy.aggroRange = input.aggroRange ?? definition?.aggroRange ?? enemy.aggroRange;
-        enemy.isAggro = true;
-        this.enemies.set(id, {
-            enemy,
-            monsterId: input.monsterId,
-            scenarioPlayerId: input.state.playerId,
-            scenarioDungeonId: input.state.dungeonId,
-            scenarioObjective: input.isObjective,
-            home: tile,
-            wanderSeed: hashInt(input.now + this.nextEnemyId * 7919),
-        });
-        input.state.enemyIds.push(id);
-        return id;
-    }
-
-    private createScenarioEnemyDefeatEventMessage(target: ServerEnemy): ScenarioEnemyDefeatEventMessage | undefined {
-        if (target.scenarioObjective || !target.scenarioPlayerId || !target.scenarioDungeonId) return undefined;
-        const event = this.getScenarioEnemyDefeatEvent(target);
-        if (!event) return undefined;
-        const focus = { x: target.enemy.gridX, y: target.enemy.gridY };
-        return {
-            type: 'SCENARIO_ENEMY_DEFEAT_EVENT',
-            dungeonId: target.scenarioDungeonId,
-            enemyId: target.enemy.id,
-            eventId: event.id,
-            presentationSteps: event.steps.map((step) => this.withScenarioEnemyDefeatFocus(step, focus)),
-        };
-    }
-
-    private getScenarioEnemyDefeatEvent(target: ServerEnemy): StoryScenarioEnemyDefeatEvent | undefined {
-        if (!target.scenarioPlayerId || !target.scenarioDungeonId) return undefined;
-        const state = this.scenarioStates.get(target.scenarioPlayerId);
-        if (!state || state.dungeonId !== target.scenarioDungeonId) return undefined;
-        const scenarioEnemyIndex = state.enemyIds.indexOf(target.enemy.id);
-        if (scenarioEnemyIndex < 0) return undefined;
-        return getStoryScenarioEventSequence(target.scenarioDungeonId)?.enemyDefeatEvents
-            ?.find((event) => event.scenarioEnemyIndex === scenarioEnemyIndex);
-    }
-
-    private withScenarioEnemyDefeatFocus(step: StoryScenarioEventStep, focus: TilePoint): StoryScenarioEventStep {
-        if (step.kind === 'focus') return { ...step, target: { ...focus } };
-        return { ...step, focus: { ...focus } };
-    }
-
-    private markScenarioEnemyKilled(target: ServerEnemy, enemyId: string): void {
-        const playerId = target.scenarioPlayerId;
-        const dungeonId = target.scenarioDungeonId;
-        if (!playerId || !dungeonId) return;
-
-        const state = this.scenarioStates.get(playerId);
-        if (state && state.dungeonId === dungeonId) {
-            state.enemyIds = state.enemyIds.filter((id) => id !== enemyId);
-        }
-
-        if (!target.scenarioObjective) return;
-        const player = this.players.get(playerId);
-        if (!player) return;
-        this.completeScenarioObjective(player, dungeonId, { clearEnemies: true });
-    }
-
-    private completeScenarioObjective(
-        player: ServerPlayer,
-        dungeonId: string,
-        options: { clearEnemies?: boolean }
-    ): void {
-        const state = this.scenarioStates.get(player.id);
-        if (player.activeDungeonId === dungeonId) player.activeDungeonId = null;
-        player.completedDungeonIds.add(dungeonId);
-        const quest = getStoryQuestByDungeonId(dungeonId);
-        if (quest) player.completedQuestIds.add(quest.id);
-        this.scenarioRewards.applyBossDefeatRewards(player, dungeonId);
-        if (state?.returnTile) this.returnPlayerActorsFromScenarioInterior(player, state.returnTile);
-        this.saveState.markDirty(player.id);
-
-        if (state && state.dungeonId === dungeonId) {
-            state.completed = true;
-            if (options.clearEnemies ?? true) this.removeScenarioRuntimeForPlayer(player.id);
-        }
-        this.log(`scenario complete player=${player.id} dungeon=${dungeonId}`);
-    }
-
-    private removeScenarioRuntimeForPlayer(playerId: string): void {
-        const state = this.scenarioStates.get(playerId);
-        if (!state) return;
-        for (const enemyId of state.enemyIds) this.enemies.delete(enemyId);
-        this.scenarioStates.delete(playerId);
-    }
-
-    private isScenarioFieldEventFlagComplete(
-        player: ServerPlayer,
-        dungeonId: string,
-        flag: string,
-        scope: 'player' | 'shared'
-    ): boolean {
-        const store = scope === 'shared' ? this.sharedScenarioFieldEventFlags : player.fieldEventFlagsByDungeonId;
-        return store.get(dungeonId)?.has(flag) ?? false;
-    }
-
-    private markScenarioFieldEventFlagComplete(
-        player: ServerPlayer,
-        dungeonId: string,
-        flag: string,
-        scope: 'player' | 'shared'
-    ): void {
-        const store = scope === 'shared' ? this.sharedScenarioFieldEventFlags : player.fieldEventFlagsByDungeonId;
-        let flags = store.get(dungeonId);
-        if (!flags) {
-            flags = new Set();
-            store.set(dungeonId, flags);
-        }
-        flags.add(flag);
-        this.saveState.markDirty(player.id);
     }
 
     private ensureContentNear(spawnTile: TilePoint, departureTownId: string | null | undefined, now: number): void {
