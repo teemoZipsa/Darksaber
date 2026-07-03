@@ -22,11 +22,15 @@ import type { FieldActor, FieldEnemy, FieldHitParty, FieldTurnEndReason } from '
 import { WorldRaidSession } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
 import type { CombatResult } from './world/WorldCombatController';
-import { WorldTurnStateController } from './world/WorldTurnStateController';
+import type { WorldTurnStateController } from './world/WorldTurnStateController';
 import {
     createWorldEngineFieldState,
     type WorldEngineFieldState,
 } from './world/WorldEngineFieldState';
+import {
+    createWorldEngineFlowState,
+    type WorldEngineFlowState,
+} from './world/WorldEngineFlowState';
 import {
     createWorldEngineRuntimeState,
     type WorldEngineRuntimeState,
@@ -117,15 +121,13 @@ export class WorldEngine {
     private townSession: WorldTownSession;
     private raidSession: WorldRaidSession;
     private runtimeState?: WorldEngineRuntimeState;
+    private flowState?: WorldEngineFlowState;
     private combatControllers!: WorldEngineCombatControllers;
     private actionControllers!: WorldEngineActionControllers;
     private raidLifecycleControllers!: WorldEngineRaidLifecycleControllers;
     private presentationControllers!: WorldEnginePresentationControllers;
     private scenarioNetworkControllers!: WorldEngineScenarioNetworkControllers;
     private worldControllers!: WorldEngineWorldControllers;
-    private actionTurnFlow?: WorldEngineActionTurnFlow;
-    private updateFlow?: WorldEngineUpdateFlow;
-    private turnStateController = new WorldTurnStateController();
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -217,7 +219,7 @@ export class WorldEngine {
             floatingText: this.getUiState().floatingText,
             effectManager: this.getUiState().effectManager,
             fieldFeedback: this.getUiState().fieldFeedback,
-            turnStateController: this.turnStateController,
+            turnStateController: this.getFlowState().turnStateController,
             getWorldMap: () => this.worldMap,
             setWorldMap: (worldMap) => { this.worldMap = worldMap; },
             getPlayer: () => this.player,
@@ -302,7 +304,7 @@ export class WorldEngine {
             storyScenarioController: this.scenarioNetworkControllers.storyScenarioController,
             networkSyncController: this.scenarioNetworkControllers.networkSyncController,
             tutorialController: this.scenarioNetworkControllers.tutorialController,
-            turnStateController: this.turnStateController,
+            turnStateController: this.getFlowState().turnStateController,
             movementController: this.combatControllers.movementController,
             floatingText: this.getUiState().floatingText,
             effectManager: this.getUiState().effectManager,
@@ -336,7 +338,7 @@ export class WorldEngine {
             closeTacticalMenu: () => this.closeTacticalMenu(),
             endActorTurn: (actor, reason, atbCarryover) => this.endActorTurn(actor, reason, atbCarryover),
             clearActorIntent: (actor) => this.clearActorIntent(actor),
-            setReservedAction: (intent) => this.turnStateController.setReservedAction(intent),
+            setReservedAction: (intent) => this.getFlowState().turnStateController.setReservedAction(intent),
             beginCombatFeedbackGroup: () => this.beginCombatFeedbackGroup(),
             registerCombatFeedback: (kind, feedbackGroupId) => this.registerCombatFeedback(kind, feedbackGroupId),
             flushCombatFeedbackGroup: (feedbackGroupId) => this.flushCombatFeedbackGroup(feedbackGroupId),
@@ -411,7 +413,7 @@ export class WorldEngine {
             raidOutcomeController: this.raidLifecycleControllers.raidOutcomeController,
             selectionController: this.actionControllers.selectionController,
             tutorialController: this.scenarioNetworkControllers.tutorialController,
-            turnStateController: this.turnStateController,
+            turnStateController: this.getFlowState().turnStateController,
             fieldFeedback: this.getUiState().fieldFeedback,
             getWorldMap: () => this.worldMap,
             getWorldTime: () => this.getRuntimeState().worldTime,
@@ -444,7 +446,7 @@ export class WorldEngine {
     private isTurnCombatActive(): boolean {
         return isWorldTurnCombatActive({
             fieldEnemies: this.getFieldState().fieldEnemies,
-            turnStateController: this.turnStateController,
+            turnStateController: this.getFlowState().turnStateController,
             actionMenuUI: this.getUiState().actionMenuUI,
             playerActionController: this.actionControllers.playerActionController,
             tacticalController: this.presentationControllers.tacticalController,
@@ -459,7 +461,8 @@ export class WorldEngine {
     }
 
     private getUpdateFlow(): WorldEngineUpdateFlow {
-        this.updateFlow ??= createWorldEngineUpdateFlow({
+        const flowState = this.getFlowState();
+        flowState.updateFlow ??= createWorldEngineUpdateFlow({
             townSession: this.townSession,
             raidOutcomeController: this.raidLifecycleControllers.raidOutcomeController,
             fusionTempleUI: this.getUiState().fusionTempleUI,
@@ -487,26 +490,26 @@ export class WorldEngine {
             syncControlledPlayer: () => this.syncControlledPlayer(),
             followPlayerCamera: (camera, dt) => this.followPlayerCamera(camera, dt),
         });
-        return this.updateFlow;
+        return flowState.updateFlow;
     }
 
     private updatePartyMovement(dt: number): void {
         const partyMovement = this.combatControllers.movementController.updatePartyActors({
             dt,
             controlled: this.getFanfareLeaderActor(),
-            activeTurnActorId: this.turnStateController.getActiveTurnActorId(),
+            activeTurnActorId: this.getFlowState().turnStateController.getActiveTurnActorId(),
             followRepathTimer: this.getRuntimeState().followRepathTimer,
         });
         this.getRuntimeState().followRepathTimer = partyMovement.followRepathTimer;
-        for (const actorId of partyMovement.readyActorIds) this.turnStateController.enqueueReadyActor(actorId);
+        for (const actorId of partyMovement.readyActorIds) this.getFlowState().turnStateController.enqueueReadyActor(actorId);
     }
 
     private updateEnemyMovement(dt: number): void {
         const enemyMovement = this.combatControllers.movementController.updateEnemies({
             dt,
-            activeTurnActorId: this.turnStateController.getActiveTurnActorId(),
+            activeTurnActorId: this.getFlowState().turnStateController.getActiveTurnActorId(),
         });
-        for (const enemyId of enemyMovement.readyEnemyIds) this.turnStateController.enqueueReadyActor(enemyId);
+        for (const enemyId of enemyMovement.readyEnemyIds) this.getFlowState().turnStateController.enqueueReadyActor(enemyId);
     }
 
     private syncControlledPlayer(): void {
@@ -592,7 +595,7 @@ export class WorldEngine {
     }
 
     private clearFieldTurnState(): void {
-        this.turnStateController.clear();
+        this.getFlowState().turnStateController.clear();
         this.getRuntimeState().fanfareLeaderActorId = null;
         this.worldControllers.restingController.clearTimers();
         this.closeActionMenu();
@@ -792,7 +795,7 @@ export class WorldEngine {
     }
 
     private getActivePartyTurnActor(): FieldActor | null {
-        return getWorldActivePartyTurnActor(this.getFieldState().partyActors, this.turnStateController.getActiveTurnActorId());
+        return getWorldActivePartyTurnActor(this.getFieldState().partyActors, this.getFlowState().turnStateController.getActiveTurnActorId());
     }
 
     private switchToNextAliveActor(): void {
@@ -806,7 +809,7 @@ export class WorldEngine {
     private switchToPartyMember(index: number): boolean {
         const actor = this.getFieldState().partyActors[index];
         if (!actor || actor.character.isDead) return false;
-        if (this.scenarioNetworkControllers.tutorialController.isActive() && actor.id !== this.turnStateController.getActiveTurnActorId()) {
+        if (this.scenarioNetworkControllers.tutorialController.isActive() && actor.id !== this.getFlowState().turnStateController.getActiveTurnActorId()) {
             this.scenarioNetworkControllers.tutorialController.addBlockedLog();
             return false;
         }
@@ -826,10 +829,11 @@ export class WorldEngine {
     }
 
     private getActionTurnFlow(): WorldEngineActionTurnFlow {
-        this.actionTurnFlow ??= createWorldEngineActionTurnFlow({
+        const flowState = this.getFlowState();
+        flowState.actionTurnFlow ??= createWorldEngineActionTurnFlow({
             actionMenuUI: this.getUiState().actionMenuUI,
             tutorialController: this.scenarioNetworkControllers.tutorialController,
-            turnStateController: this.turnStateController,
+            turnStateController: flowState.turnStateController,
             selectionController: this.actionControllers.selectionController,
             playerActionController: this.actionControllers.playerActionController,
             networkIntentController: this.scenarioNetworkControllers.networkIntentController,
@@ -844,7 +848,7 @@ export class WorldEngine {
             clearActorIntent: (actor) => this.clearActorIntent(actor),
             log: (message) => this.addCombatLog(message),
         });
-        return this.actionTurnFlow;
+        return flowState.actionTurnFlow;
     }
 
     private toggleActionMenuForControlled(): void {
@@ -875,21 +879,21 @@ export class WorldEngine {
         this.getActionTurnFlow().reopenActionMenu(actor);
     }
 
-    private endActorTurn(actor: FieldActor, reason: FieldTurnEndReason, atbCarryover: number = this.turnStateController.getRemainingActionPoints()): void {
+    private endActorTurn(actor: FieldActor, reason: FieldTurnEndReason, atbCarryover: number = this.getFlowState().turnStateController.getRemainingActionPoints()): void {
         this.getActionTurnFlow().endActorTurn(actor, reason, atbCarryover);
     }
 
     private endEnemyTurn(enemy: Enemy): void {
         enemy.actionGauge = 0;
-        this.turnStateController.endActiveTurn();
+        this.getFlowState().turnStateController.endActiveTurn();
     }
 
     private startNextReadyTurn(): void {
         this.clearInvalidActiveTurn();
-        if (this.turnStateController.isReadyTurnBlocked()) return;
+        if (this.getFlowState().turnStateController.isReadyTurnBlocked()) return;
 
-        while (this.turnStateController.hasReadyActors()) {
-            const actorId = this.turnStateController.shiftReadyActorId();
+        while (this.getFlowState().turnStateController.hasReadyActors()) {
+            const actorId = this.getFlowState().turnStateController.shiftReadyActorId();
             if (!actorId) return;
             const actor = this.getFieldState().partyActors.find((candidate) => candidate.id === actorId);
             if (actor) {
@@ -901,12 +905,12 @@ export class WorldEngine {
             const enemyEntry = this.getFieldState().fieldEnemies.find((entry) => entry.enemy.id === actorId);
             if (!enemyEntry || enemyEntry.enemy.stats.hp <= 0) continue;
             this.beginEnemyTurn(enemyEntry);
-            if (this.turnStateController.getActiveTurnActorId()) return;
+            if (this.getFlowState().turnStateController.getActiveTurnActorId()) return;
         }
     }
 
     private clearInvalidActiveTurn(): void {
-        const cleared = this.turnStateController.clearInvalidActiveTurn((actorId) => {
+        const cleared = this.getFlowState().turnStateController.clearInvalidActiveTurn((actorId) => {
             const activePartyActor = this.getFieldState().partyActors.find((actor) => actor.id === actorId);
             if (activePartyActor && !activePartyActor.character.isDead && activePartyActor.character.stats.hp > 0) return true;
 
@@ -925,7 +929,7 @@ export class WorldEngine {
     private beginActorTurn(actor: FieldActor): void {
         const index = this.getFieldState().partyActors.indexOf(actor);
         if (index >= 0) this.switchToPartyMember(index);
-        actor.entity.actionGauge = this.turnStateController.beginActorTurn(actor.id);
+        actor.entity.actionGauge = this.getFlowState().turnStateController.beginActorTurn(actor.id);
         this.actionControllers.selectionController.selectActor(actor.id);
         if (!this.combatControllers.turnStartResolver.processActorTurnStart(actor)) {
             this.endActorTurn(actor, 'statusBlocked');
@@ -935,7 +939,7 @@ export class WorldEngine {
         this.addCombatLog(formatT('field.log.turnStart', {
             name: actor.character.name,
             gauge: t('ui.actionGauge'),
-            value: this.turnStateController.getRemainingActionPoints(),
+            value: this.getFlowState().turnStateController.getRemainingActionPoints(),
         }));
         if (!this.actionControllers.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, 'noExecutableAction');
         else {
@@ -946,7 +950,7 @@ export class WorldEngine {
 
     private beginEnemyTurn(entry: FieldEnemy): void {
         const enemy = entry.enemy;
-        this.turnStateController.beginEnemyTurn(enemy.id);
+        this.getFlowState().turnStateController.beginEnemyTurn(enemy.id);
         this.getUiState().floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'READY');
 
         if (!this.combatControllers.turnStartResolver.processEnemyTurnStart(entry)) {
@@ -976,7 +980,7 @@ export class WorldEngine {
 
     private getSpendableActionGauge(): number {
         return getWorldSpendableActionGauge({
-            turnStateController: this.turnStateController,
+            turnStateController: this.getFlowState().turnStateController,
             isNetworkRaid: this.getNetworkState().isRaid,
             activeActor: this.getActivePartyTurnActor(),
         });
@@ -987,7 +991,7 @@ export class WorldEngine {
     }
 
     private clearIntent(): void {
-        if (this.turnStateController.getReservedAction()) return;
+        if (this.getFlowState().turnStateController.getReservedAction()) return;
         const actor = this.getControlledActor();
         if (actor) this.clearActorIntent(actor);
         this.actionControllers.selectionController.selectActor(actor?.id ?? null);
@@ -1072,6 +1076,14 @@ export class WorldEngine {
         this.getFieldState().remotePartyActors = actors;
     }
 
+    public get turnStateController(): WorldTurnStateController {
+        return this.getFlowState().turnStateController;
+    }
+
+    public set turnStateController(controller: WorldTurnStateController) {
+        this.getFlowState().turnStateController = controller;
+    }
+
     public get fieldFeedback(): WorldEngineUiState['fieldFeedback'] {
         return this.getUiState().fieldFeedback;
     }
@@ -1099,6 +1111,21 @@ export class WorldEngine {
     private getRuntimeState(): WorldEngineRuntimeState {
         this.runtimeState ??= createWorldEngineRuntimeState();
         return this.runtimeState;
+    }
+
+    private getFlowState(): WorldEngineFlowState {
+        if (!this.flowState) {
+            const fallback = createWorldEngineFlowState();
+            const injected = this as unknown as WorldEngineFlowState;
+            const getOwn = <K extends keyof WorldEngineFlowState>(key: K): WorldEngineFlowState[K] | undefined =>
+                Object.prototype.hasOwnProperty.call(this, key) ? injected[key] : undefined;
+            this.flowState = {
+                turnStateController: getOwn('turnStateController') ?? fallback.turnStateController,
+                actionTurnFlow: getOwn('actionTurnFlow') ?? fallback.actionTurnFlow,
+                updateFlow: getOwn('updateFlow') ?? fallback.updateFlow,
+            };
+        }
+        return this.flowState;
     }
 
     private getUiState(): WorldEngineUiState {
