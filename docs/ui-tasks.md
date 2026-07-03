@@ -43,6 +43,7 @@
 - [x] field nest 재생성 seed 안정화: forced nest 생성이 일반 생성과 같은 RNG 순서/중심 좌표를 쓰게 해 cleared nest respawn 테스트의 sessionEpoch 의존성을 제거.
 - [x] `WorldEngine` support-controller 배선 분리: minimap/combat feedback/temple/resting controller 생성을 `WorldEngineWorldControllers` factory로 이동해 생성자 직접 배선과 충돌 표면을 축소.
 - [x] 네트워크 끊김 UX e2e 보강: 실제 dev 네트워크 레이드에서 WebSocket transport drop을 유발하고 재접속 상태 로그와 레이드 유지/복구를 Playwright로 검증.
+- [x] 클라이언트/서버 레이드 탈출 판정 공유화: 마을 도착 규칙을 `RaidRules`의 leave/result 판정으로 확장하고 서버 `WORLD_LEAVE`/생존 보정을 같은 함수로 처리해 departure town 생환 우회 위험을 축소.
 
 ---
 

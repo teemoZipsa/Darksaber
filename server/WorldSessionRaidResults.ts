@@ -3,6 +3,10 @@ import type {
     RaidResultMessage,
     WorldClientMessage,
 } from '../src/net/WorldProtocol';
+import {
+    coerceRaidResultForTownArrival,
+    resolveRaidLeaveResult,
+} from '../src/raid/RaidRules';
 import type { WorldSessionSaveState } from './WorldSessionSaveState';
 import type {
     ServerActor,
@@ -24,7 +28,7 @@ export class WorldSessionRaidResults {
     public finishPlayer(playerId: string, result: RaidResultMessage['result']): RaidResultMessage {
         const player = this.context.players.get(playerId);
         const extractionTownId = this.resolveExtractionTownId(player);
-        const finalResult = result === 'SURVIVED' && !this.isValidExtractionTown(player, extractionTownId) ? 'LEFT' : result;
+        const finalResult = this.coerceRaidResultForPlayer(result, player);
         const message = this.createRaidResultMessage(playerId, finalResult, player, extractionTownId);
         this.context.log(`raid result player=${playerId} result=${finalResult} kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
         if (player) {
@@ -57,10 +61,13 @@ export class WorldSessionRaidResults {
         playerId: string,
         reason: Extract<WorldClientMessage, { type: 'WORLD_LEAVE' }>['reason']
     ): RaidResultMessage['result'] {
-        if (reason === 'wipe') return 'DEAD';
-        if (reason !== 'town') return 'LEFT';
         const player = this.context.players.get(playerId);
-        return this.isValidExtractionTown(player, this.resolveExtractionTownId(player)) ? 'SURVIVED' : 'LEFT';
+        return resolveRaidLeaveResult(
+            reason,
+            this.resolveCurrentTownId(player),
+            player?.departureTownId,
+            Boolean(player)
+        );
     }
 
     private createRaidResultMessage(
@@ -89,11 +96,22 @@ export class WorldSessionRaidResults {
         return town?.id ?? player.departureTownId;
     }
 
-    private isValidExtractionTown(player: ServerPlayer | undefined, extractionTownId: string): boolean {
-        if (!player) return false;
-        if (extractionTownId === player.departureTownId) return false;
+    private coerceRaidResultForPlayer(
+        result: RaidResultMessage['result'],
+        player: ServerPlayer | undefined
+    ): RaidResultMessage['result'] {
+        return coerceRaidResultForTownArrival(
+            result,
+            this.resolveCurrentTownId(player),
+            player?.departureTownId,
+            Boolean(player)
+        );
+    }
+
+    private resolveCurrentTownId(player: ServerPlayer | undefined): string | null {
+        if (!player) return null;
         const actor = player.actorIds.map((id) => this.context.actors.get(id)).find(Boolean);
-        if (!actor) return false;
-        return this.context.worldMap.getTownAtTile(actor.tile.x, actor.tile.y)?.id === extractionTownId;
+        if (!actor) return null;
+        return this.context.worldMap.getTownAtTile(actor.tile.x, actor.tile.y)?.id ?? null;
     }
 }

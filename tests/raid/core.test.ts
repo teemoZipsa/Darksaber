@@ -14,7 +14,12 @@ import {
 import { getRepairCost, repairItem, unsocketAll } from '../../src/inventory/Socketing';
 import { computeRaidFailureLoss } from '../../src/raid/RaidOutcome';
 import { applyRaidInsurance } from '../../src/raid/RaidInsurance';
-import { resolveTownArrival, shouldAdvanceRaidTimer } from '../../src/raid/RaidRules';
+import {
+    coerceRaidResultForTownArrival,
+    resolveRaidLeaveResult,
+    resolveTownArrival,
+    shouldAdvanceRaidTimer,
+} from '../../src/raid/RaidRules';
 import { WorldMap } from '../../src/map/WorldMap';
 import { CHUNK_SIZE } from '../../src/map/Chunk';
 import { TileType } from '../../src/map/Tile';
@@ -959,5 +964,17 @@ test('town arrival blocks departure and survives at any other town', () => {
     assert.deepEqual(resolveTownArrival('central_castle', 'central_castle', false), {
         kind: 'none',
     });
+});
+
+test('network raid leave results share town arrival survival rules', () => {
+    assert.equal(resolveRaidLeaveResult('town', 'w_forest_village', 'central_castle', true), 'SURVIVED');
+    assert.equal(resolveRaidLeaveResult('town', 'central_castle', 'central_castle', true), 'LEFT');
+    assert.equal(resolveRaidLeaveResult('town', null, 'central_castle', true), 'LEFT');
+    assert.equal(resolveRaidLeaveResult('manual', 'w_forest_village', 'central_castle', true), 'LEFT');
+    assert.equal(resolveRaidLeaveResult('wipe', 'w_forest_village', 'central_castle', true), 'DEAD');
+
+    assert.equal(coerceRaidResultForTownArrival('SURVIVED', 'w_forest_village', 'central_castle', true), 'SURVIVED');
+    assert.equal(coerceRaidResultForTownArrival('SURVIVED', 'central_castle', 'central_castle', true), 'LEFT');
+    assert.equal(coerceRaidResultForTownArrival('MIA', 'w_forest_village', 'central_castle', true), 'MIA');
 });
 
