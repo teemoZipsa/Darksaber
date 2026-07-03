@@ -64,6 +64,7 @@
 - [x] `WorldEngine` flow state 필드 축소: turn state controller와 update/action-turn flow cache를 `flowState` aggregate로 묶어 프레임·턴 흐름 상태 변경 표면을 줄임.
 - [x] `WorldEngine` controller state 필드 축소: combat/action/raid/presentation/scenario/world controller aggregate들을 `controllerState` backing store로 묶어 controller 조립 필드 충돌 표면을 줄임.
 - [x] `WorldEngine` core/session state 필드 축소: canvas/camera/party/player data/game manager/world map/player/town·raid session을 `coreState` aggregate로 묶어 월드 엔진 기본 상태 변경 표면을 줄임.
+- [x] `WorldEngine` 공통 controller port 배선 축소: world/player/field/network/log 포트를 `getSharedControllerPorts()`로 모아 controller initializer별 반복 콜백 작성을 줄임.
 
 ---
 
