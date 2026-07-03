@@ -28,11 +28,9 @@ import type { FieldActor, FieldEnemy, FieldHitParty, FieldTurnEndReason } from '
 import { WorldRaidSession, type WorldPhase } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
 import type { CombatResult } from './world/WorldCombatController';
-import { WorldRaidOutcomeController } from './world/WorldRaidOutcomeController';
 import type { WorldStoryScenarioController } from './world/WorldStoryScenarioController';
 import type { WorldNetworkSyncController } from './world/WorldNetworkSyncController';
 import type { WorldTutorialController } from './world/WorldTutorialController';
-import { WorldRaidLifecycleController } from './world/WorldRaidLifecycleController';
 import type { WorldTempleController } from './world/WorldTempleController';
 import type { WorldRestingController } from './world/WorldRestingController';
 import type { WorldCombatFeedbackController } from './world/WorldCombatFeedbackController';
@@ -57,6 +55,10 @@ import {
     createWorldEnginePresentationControllers,
     type WorldEnginePresentationControllers,
 } from './world/WorldEnginePresentationControllers';
+import {
+    createWorldEngineRaidLifecycleControllers,
+    type WorldEngineRaidLifecycleControllers,
+} from './world/WorldEngineRaidLifecycleControllers';
 import {
     getWorldBackpackCursedArtifactCount,
     getWorldPathPreviewTiles,
@@ -118,7 +120,7 @@ export class WorldEngine {
     private magicController!: WorldEngineActionControllers['magicController'];
     private toolController!: WorldEngineActionControllers['toolController'];
     private playerActionController!: WorldEngineActionControllers['playerActionController'];
-    private raidOutcomeController!: WorldRaidOutcomeController;
+    private raidOutcomeController!: WorldEngineRaidLifecycleControllers['raidOutcomeController'];
     private tacticalController!: WorldEnginePresentationControllers['tacticalController'];
     private selectionController!: WorldEngineActionControllers['selectionController'];
     private fieldSpawnController!: WorldEngineCombatControllers['fieldSpawnController'];
@@ -127,7 +129,7 @@ export class WorldEngine {
     private storyScenarioController: WorldStoryScenarioController;
     private networkSyncController: WorldNetworkSyncController;
     private tutorialController: WorldTutorialController;
-    private raidLifecycleController!: WorldRaidLifecycleController;
+    private raidLifecycleController!: WorldEngineRaidLifecycleControllers['raidLifecycleController'];
     private templeController: WorldTempleController;
     private restingController: WorldRestingController;
     private lootController!: WorldEngineActionControllers['lootController'];
@@ -373,31 +375,12 @@ export class WorldEngine {
     }
 
     private initializeRaidLifecycleControllers(): void {
-        this.raidOutcomeController = new WorldRaidOutcomeController({
+        const raidLifecycleControllers = createWorldEngineRaidLifecycleControllers({
             party: this.party,
             playerData: this.playerData,
             gameManager: this.gameManager,
             raidSession: this.raidSession,
             townSession: this.townSession,
-            getTownById: (townId) => this.getTownById(townId),
-            getCurrentHubTown: () => this.getCurrentHubTown(),
-            resetStoryScenarioStateForRaidEnd: () => this.storyScenarioController.resetRunState(),
-            placePartyAtTown: (town) => {
-                this.placePartyNear(this.worldMap.getTownSpawnTile(town));
-                this.player = this.getControlledActor()?.entity ?? this.player;
-                this.clearFieldTurnState();
-            },
-            openTown: (town) => this.openTown(town),
-            setPhase: (phase) => { this.currentPhase = phase; },
-            log: (message) => this.addCombatLog(message),
-        });
-        this.raidLifecycleController = new WorldRaidLifecycleController({
-            party: this.party,
-            playerData: this.playerData,
-            gameManager: this.gameManager,
-            raidSession: this.raidSession,
-            townSession: this.townSession,
-            raidOutcomeController: this.raidOutcomeController,
             storyScenarioController: this.storyScenarioController,
             networkSyncController: this.networkSyncController,
             getWorldMap: () => this.worldMap,
@@ -419,14 +402,14 @@ export class WorldEngine {
             clearRemotePartyActors: () => this.remotePartyActors.clear(),
             placePartyNear: (tile) => this.placePartyNear(tile),
             getControlledActor: () => this.getControlledActor(),
+            getPlayer: () => this.player,
             setPlayer: (player) => { this.player = player; },
             setPartyActors: (actors) => { this.partyActors = actors; },
             setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
-            clearWorldLoot: () => { this.worldMap.loot = []; },
             selectActor: (actorId) => this.selectionController.selectActor(actorId),
-            syncCharacterMovementToClass: (character) => syncCharacterMovementToClass(character),
             isTurnCombatActive: () => this.isTurnCombatActive(),
             setPhase: (phase) => { this.currentPhase = phase; },
+            openTown: (town) => this.openTown(town),
             applyNetworkSnapshot: (snapshot) => this.applyNetworkSnapshot(snapshot),
             handleNetworkCombatEvent: (event) => this.handleNetworkCombatEvent(event),
             openNetworkLoot: (grant) => this.openNetworkLoot(grant),
@@ -435,6 +418,8 @@ export class WorldEngine {
             handleNetworkActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
             log: (message) => this.addCombatLog(message),
         });
+        this.raidOutcomeController = raidLifecycleControllers.raidOutcomeController;
+        this.raidLifecycleController = raidLifecycleControllers.raidLifecycleController;
     }
 
     private initializePresentationControllers(): void {
