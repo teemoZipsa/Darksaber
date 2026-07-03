@@ -83,7 +83,7 @@ import {
     type WorldEnginePresentationControllers,
 } from './world/WorldEnginePresentationControllers';
 import {
-    createWorldEngineRaidLifecycleControllers,
+    createWorldEngineRaidLifecycleControllersFromSources,
     type WorldEngineRaidLifecycleControllers,
 } from './world/WorldEngineRaidLifecycleControllers';
 import {
@@ -288,29 +288,18 @@ export class WorldEngine {
     }
 
     private initializeRaidLifecycleControllers(): void {
-        const sharedPorts = this.getSharedControllerPorts();
-        const raidLifecycleControllers = createWorldEngineRaidLifecycleControllers({
-            ...sharedPorts,
-            storyScenarioController: this.scenarioNetworkControllers.storyScenarioController,
-            networkSyncController: this.scenarioNetworkControllers.networkSyncController,
+        const raidLifecycleControllers = createWorldEngineRaidLifecycleControllersFromSources({
+            ports: this.getSharedControllerPorts(),
+            getNetworkState: () => this.getNetworkState(),
+            getScenarioNetworkControllers: () => this.scenarioNetworkControllers,
             getTownById: (townId) => this.getTownById(townId),
-            setNetworkRaidClient: (client) => { this.getNetworkState().raidClient = client; },
-            setIsNetworkRaid: (isNetworkRaid) => { this.getNetworkState().isRaid = isNetworkRaid; },
-            isNetworkRaidConnecting: () => this.getNetworkState().isConnecting,
-            setIsNetworkRaidConnecting: (isConnecting) => { this.getNetworkState().isConnecting = isConnecting; },
-            isNetworkWasReconnecting: () => this.getNetworkState().wasReconnecting,
-            setNetworkWasReconnecting: (wasReconnecting) => { this.getNetworkState().wasReconnecting = wasReconnecting; },
-            setNetworkPlayerId: (playerId) => { this.getNetworkState().playerId = playerId; },
-            clearIntroTutorialStateForNetworkRaid: () => this.scenarioNetworkControllers.tutorialController.clearForNetworkRaid(),
             isTurnCombatActive: () => this.isTurnCombatActive(),
-            setPhase: sharedPorts.setCurrentPhase,
             applyNetworkSnapshot: (snapshot) => this.applyNetworkSnapshot(snapshot),
             handleNetworkCombatEvent: (event) => this.handleNetworkCombatEvent(event),
             openNetworkLoot: (grant) => this.openNetworkLoot(grant),
             handleNetworkAutoLootGrant: (grant) => this.handleNetworkAutoLootGrant(grant),
             handleNetworkInventoryConsumed: (message) => this.handleNetworkInventoryConsumed(message),
             handleNetworkActionRejected: (rejection) => this.handleNetworkActionRejected(rejection),
-            log: sharedPorts.addCombatLog,
         });
         this.raidLifecycleControllers = raidLifecycleControllers;
     }

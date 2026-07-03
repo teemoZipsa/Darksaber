@@ -17,6 +17,9 @@ import type {
 } from '../../net/WorldProtocol';
 import type { GameManager } from '../GameManager';
 import { syncCharacterMovementToClass } from './WorldEngineFieldHelpers';
+import type { WorldEngineNetworkState } from './WorldEngineNetworkState';
+import type { WorldEngineScenarioNetworkControllers } from './WorldEngineScenarioNetworkControllers';
+import type { WorldEngineSharedControllerPorts } from './WorldEngineSharedControllerPorts';
 import type { WorldNetworkSyncController } from './WorldNetworkSyncController';
 import { WorldRaidLifecycleController } from './WorldRaidLifecycleController';
 import { WorldRaidOutcomeController } from './WorldRaidOutcomeController';
@@ -71,6 +74,51 @@ export interface WorldEngineRaidLifecycleControllerPorts {
 export interface WorldEngineRaidLifecycleControllers {
     raidOutcomeController: WorldRaidOutcomeController;
     raidLifecycleController: WorldRaidLifecycleController;
+}
+
+export interface WorldEngineRaidLifecycleControllerSources {
+    ports: WorldEngineSharedControllerPorts;
+    getNetworkState(): WorldEngineNetworkState;
+    getScenarioNetworkControllers(): WorldEngineScenarioNetworkControllers;
+    getTownById(townId: string): TownInfo | null;
+    isTurnCombatActive(): boolean;
+    applyNetworkSnapshot(snapshot: WorldSnapshot): void;
+    handleNetworkCombatEvent(event: CombatEventMessage): void;
+    openNetworkLoot(grant: LootGrantMessage): void;
+    handleNetworkAutoLootGrant(grant: AutoLootGrantMessage): void;
+    handleNetworkInventoryConsumed(message: InventoryConsumedMessage): void;
+    handleNetworkActionRejected(rejection: ActionRejectedMessage): void;
+}
+
+export function createWorldEngineRaidLifecycleControllersFromSources(
+    sources: WorldEngineRaidLifecycleControllerSources
+): WorldEngineRaidLifecycleControllers {
+    const scenarioNetworkControllers = sources.getScenarioNetworkControllers();
+    const networkState = () => sources.getNetworkState();
+
+    return createWorldEngineRaidLifecycleControllers({
+        ...sources.ports,
+        storyScenarioController: scenarioNetworkControllers.storyScenarioController,
+        networkSyncController: scenarioNetworkControllers.networkSyncController,
+        getTownById: (townId) => sources.getTownById(townId),
+        setNetworkRaidClient: (client) => { networkState().raidClient = client; },
+        setIsNetworkRaid: (isNetworkRaid) => { networkState().isRaid = isNetworkRaid; },
+        isNetworkRaidConnecting: () => networkState().isConnecting,
+        setIsNetworkRaidConnecting: (isConnecting) => { networkState().isConnecting = isConnecting; },
+        isNetworkWasReconnecting: () => networkState().wasReconnecting,
+        setNetworkWasReconnecting: (wasReconnecting) => { networkState().wasReconnecting = wasReconnecting; },
+        setNetworkPlayerId: (playerId) => { networkState().playerId = playerId; },
+        clearIntroTutorialStateForNetworkRaid: () => scenarioNetworkControllers.tutorialController.clearForNetworkRaid(),
+        isTurnCombatActive: () => sources.isTurnCombatActive(),
+        setPhase: (phase) => sources.ports.setCurrentPhase(phase),
+        applyNetworkSnapshot: (snapshot) => sources.applyNetworkSnapshot(snapshot),
+        handleNetworkCombatEvent: (event) => sources.handleNetworkCombatEvent(event),
+        openNetworkLoot: (grant) => sources.openNetworkLoot(grant),
+        handleNetworkAutoLootGrant: (grant) => sources.handleNetworkAutoLootGrant(grant),
+        handleNetworkInventoryConsumed: (message) => sources.handleNetworkInventoryConsumed(message),
+        handleNetworkActionRejected: (rejection) => sources.handleNetworkActionRejected(rejection),
+        log: (message) => sources.ports.addCombatLog(message),
+    });
 }
 
 export function createWorldEngineRaidLifecycleControllers(
