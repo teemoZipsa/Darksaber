@@ -183,6 +183,7 @@ test('dev raid scenario parser accepts implemented story episodes through episod
 test('package scripts expose a generic data-driven story dev entry without numbered aliases', () => {
     const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
     assert.equal(packageJson.scripts['dev:raid:story'], 'node scripts/dev-town.mjs raid');
+    assert.equal(packageJson.scripts['dev:tutorial'], 'node scripts/dev-town.mjs tutorial');
     const numberedStoryScripts = Object.keys(packageJson.scripts).filter((key) => /^dev:raid:story\d+$/.test(key));
     assert.deepEqual(numberedStoryScripts, []);
 });
@@ -190,8 +191,12 @@ test('package scripts expose a generic data-driven story dev entry without numbe
 test('dev town launcher forwards each implemented story scenario to the open URL', async () => {
     const helper = await import(pathToFileURL(resolve('scripts/dev-town.mjs')).href) as {
         buildDevOpenPath: (modeArg: string, scenarioArg?: string | null) => string;
+        normalizeDevModeArg: (modeArg: string | null) => string;
         normalizeDevScenarioArg: (scenarioArg: string | null) => string | null;
     };
+    assert.equal(helper.normalizeDevModeArg(null), 'town');
+    assert.equal(helper.normalizeDevModeArg('tutorial'), 'tutorial');
+    assert.equal(helper.buildDevOpenPath('tutorial', 'loot'), '/?devStart=tutorial');
     assert.equal(helper.buildDevOpenPath('raid', 'aggro'), '/?devStart=raid&devScenario=aggro');
     assert.equal(helper.buildDevOpenPath('raid', 'loot'), '/?devStart=raid&devScenario=loot');
     for (const episode of DEV_STORY_EPISODES) {

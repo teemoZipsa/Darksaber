@@ -95,6 +95,7 @@
 - [x] `WorldEngine` action controller source adapter 추가. 행동 컨트롤러의 scenario/network/tutorial, movement controller, fanfare runtime state 연결을 `WorldEngineActionControllers` source adapter로 옮겨 행동 메뉴·마법·도구 배선 변경 시 `WorldEngine.ts` 수정 범위를 줄인다.
 - [x] `WorldEngine` combat controller source adapter 추가. 전투 컨트롤러의 tutorial/story/networkIntent와 selection clear 연결을 `WorldEngineCombatControllers` source adapter로 옮겨 전투 흐름 배선 변경 시 `WorldEngine.ts` 수정 범위를 줄인다.
 - [x] `WorldEngine` world/scenario bootstrap source adapter 추가. 월드 지원 컨트롤러의 runtime phase/time 연결과 scenario/network 컨트롤러의 kill effect feedback 연결을 각 컨트롤러 모듈의 source adapter로 옮겨 월드 부트스트랩 변경 시 `WorldEngine.ts` 수정 범위를 줄인다.
+- [x] dev tutorial script 하드코딩 제거. `dev:tutorial`의 직접 `/?devStart=tutorial` URL 호출을 `scripts/dev-town.mjs tutorial` 경로로 통합하고 launcher helper가 tutorial 모드를 생성하도록 테스트를 보강한다.
 
 ---
 

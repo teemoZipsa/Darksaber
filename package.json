@@ -10,7 +10,7 @@
     "dev:raid:aggro": "node scripts/dev-town.mjs raid aggro",
     "dev:raid:loot": "node scripts/dev-town.mjs raid loot",
     "dev:raid:story": "node scripts/dev-town.mjs raid",
-    "dev:tutorial": "npm run dev -- --open /?devStart=tutorial",
+    "dev:tutorial": "node scripts/dev-town.mjs tutorial",
     "start": "npm run dev",
     "build": "tsc && vite build",
     "build:server": "npm run typecheck:server && node scripts/build-server.mjs",

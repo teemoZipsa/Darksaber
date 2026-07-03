@@ -68,8 +68,14 @@ export function normalizeDevScenarioArg(scenarioArg) {
     return devStoryEpisodes.has(episode) ? `story${episode}` : null;
 }
 
+export function normalizeDevModeArg(modeArg) {
+    if (modeArg === 'raid' || modeArg === 'tutorial') return modeArg;
+    return 'town';
+}
+
 export function buildDevOpenPath(modeArg, scenarioArg = null) {
-    const mode = modeArg === 'raid' ? 'raid' : 'town';
+    const mode = normalizeDevModeArg(modeArg);
+    if (mode === 'tutorial') return '/?devStart=tutorial';
     const scenario = normalizeDevScenarioArg(scenarioArg);
     return scenario
         ? `/?devStart=${mode}&devScenario=${scenario}`
@@ -77,8 +83,9 @@ export function buildDevOpenPath(modeArg, scenarioArg = null) {
 }
 
 function main() {
-    const openPath = buildDevOpenPath(process.argv[2], process.argv[3] ?? null);
-    run('world', ['run', 'server']);
+    const mode = normalizeDevModeArg(process.argv[2]);
+    const openPath = buildDevOpenPath(mode, process.argv[3] ?? null);
+    if (mode !== 'tutorial') run('world', ['run', 'server']);
     run('vite', ['run', 'dev', '--', '--open', openPath]);
 }
 
