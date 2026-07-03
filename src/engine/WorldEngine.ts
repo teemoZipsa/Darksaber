@@ -61,6 +61,7 @@ import { WorldEngineNetworkEvents } from './world/WorldEngineNetworkEvents';
 import { WorldTurnStartResolver } from './world/WorldTurnStartResolver';
 import { WorldEngineCombatFlow } from './world/WorldEngineCombatFlow';
 import { WorldEngineActionTurnFlow } from './world/WorldEngineActionTurnFlow';
+import { WorldEngineUpdateFlow } from './world/WorldEngineUpdateFlow';
 import { applyMonsterSprite } from './world/NetworkSnapshotMapping';
 import {
     getWorldBackpackCursedArtifactCount,
@@ -160,6 +161,7 @@ export class WorldEngine {
     private turnStartResolver: WorldTurnStartResolver;
     private combatFlow: WorldEngineCombatFlow;
     private actionTurnFlow?: WorldEngineActionTurnFlow;
+    private updateFlow?: WorldEngineUpdateFlow;
     private turnStateController = new WorldTurnStateController();
     private hoverTile: TilePoint = { x: -1, y: -1 };
     private fieldFeedback = new WorldFieldFeedbackState();
@@ -826,59 +828,51 @@ export class WorldEngine {
     }
 
     public update(dt: number, input: InputManager, camera: Camera): void {
-        this.worldTime += dt;
-        this.townSession.sync();
+        this.getUpdateFlow().update(dt, input, camera);
+    }
 
-        if (this.raidOutcomeController.isVisible()) {
-            this.raidOutcomeController.updateInput(input);
-            camera.followTile(this.player.gridX, this.player.gridY);
-            camera.update(dt);
-            return;
-        }
+    private getUpdateFlow(): WorldEngineUpdateFlow {
+        this.updateFlow ??= new WorldEngineUpdateFlow({
+            advanceWorldTime: (dt) => { this.worldTime += dt; },
+            syncTown: () => this.townSession.sync(),
+            isRaidOutcomeVisible: () => this.raidOutcomeController.isVisible(),
+            updateRaidOutcomeInput: (input) => this.raidOutcomeController.updateInput(input),
+            isFusionTempleVisible: () => this.fusionTempleUI.isVisible(),
+            updateFusionTempleInput: (input) => this.fusionTempleUI.updateInput(input),
+            isTownVisible: () => this.townSession.isVisible(),
+            updateTownInput: (input) => this.townSession.updateInput(input),
+            isTutorialActive: () => this.tutorialController.isActive(),
+            isTutorialCompletePending: () => this.tutorialController.isCompletePending(),
+            updateTutorialCompletion: (input, dt, camera) => this.tutorialController.updateCompletion(input, dt, camera),
+            finishTutorial: (skipReward) => this.tutorialController.finish(skipReward),
+            addTutorialBlockedLog: () => this.tutorialController.addBlockedLog(),
+            isNetworkRaid: () => this.isNetworkRaid,
+            updateNetworkRaid: (dt, input, camera) => this.updateNetworkRaid(dt, input, camera),
+            updateStoryPresentation: (dt, camera) => this.updateStoryPresentation(dt, camera),
+            refreshOpenActionMenuState: () => this.refreshOpenActionMenuState(),
+            processInput: (input, camera) => this.inputController.process(input, camera),
+            updatePartyMovement: (dt) => this.updatePartyMovement(dt),
+            updateEnemyMovement: (dt) => this.updateEnemyMovement(dt),
+            refreshEnemyIntentPreviews: () => this.refreshEnemyIntentPreviews(),
+            updateRestingActors: (dt) => this.updateRestingActors(dt),
+            updateEffects: (dt) => this.effectManager.update(dt),
+            updateFloatingText: (dt) => this.floatingText.update(dt),
+            updateAttackCues: (dt) => this.updateAttackCues(dt),
+            processQueuedIntents: () => this.playerActionController.processQueuedIntents(),
+            refreshLootState: () => this.refreshLootState(),
+            updateTacticalMarkers: (dt) => this.tacticalController.updateMarkers(dt),
+            startNextReadyTurn: () => this.startNextReadyTurn(),
+            updateRaidTimer: (dt) => this.raidLifecycleController.updateRaidTimer(dt),
+            checkRaidEndConditions: () => this.raidLifecycleController.checkRaidEndConditions(),
+            checkTempleArrival: () => this.templeController.checkArrival(),
+            checkDungeonArrival: () => this.storyScenarioController.checkDungeonArrival(),
+            syncControlledPlayer: () => this.syncControlledPlayer(),
+            followPlayerCamera: (camera, dt) => this.followPlayerCamera(camera, dt),
+        });
+        return this.updateFlow;
+    }
 
-        if (this.fusionTempleUI.isVisible()) {
-            this.fusionTempleUI.updateInput(input);
-            camera.followTile(this.player.gridX, this.player.gridY);
-            camera.update(dt);
-            return;
-        }
-
-        if (this.townSession.isVisible()) {
-            this.townSession.updateInput(input);
-            camera.followTile(this.player.gridX, this.player.gridY);
-            camera.update(dt);
-            return;
-        }
-
-        if (this.tutorialController.isActive() && this.tutorialController.isCompletePending()) {
-            this.tutorialController.updateCompletion(input, dt, camera);
-            return;
-        }
-
-        if (this.tutorialController.isActive() && input.justPressed('Escape')) {
-            this.tutorialController.finish(true);
-            camera.followTile(this.player.gridX, this.player.gridY);
-            camera.update(dt);
-            return;
-        }
-
-        if (this.isNetworkRaid) {
-            this.updateNetworkRaid(dt, input, camera);
-            return;
-        }
-
-        if (this.updateStoryPresentation(dt, camera)) return;
-
-        if (this.tutorialController.isActive() && input.mouseRightJustDown) {
-            this.tutorialController.addBlockedLog();
-            camera.followTile(this.player.gridX, this.player.gridY);
-            camera.update(dt);
-            return;
-        }
-
-        this.refreshOpenActionMenuState();
-        this.inputController.process(input, camera);
-
+    private updatePartyMovement(dt: number): void {
         const partyMovement = this.movementController.updatePartyActors({
             dt,
             controlled: this.getFanfareLeaderActor(),
@@ -887,29 +881,22 @@ export class WorldEngine {
         });
         this.followRepathTimer = partyMovement.followRepathTimer;
         for (const actorId of partyMovement.readyActorIds) this.turnStateController.enqueueReadyActor(actorId);
+    }
 
+    private updateEnemyMovement(dt: number): void {
         const enemyMovement = this.movementController.updateEnemies({
             dt,
             activeTurnActorId: this.turnStateController.getActiveTurnActorId(),
         });
         for (const enemyId of enemyMovement.readyEnemyIds) this.turnStateController.enqueueReadyActor(enemyId);
-        this.refreshEnemyIntentPreviews();
-        this.refreshOpenActionMenuState();
-        this.updateRestingActors(dt);
-        this.effectManager.update(dt);
-        this.floatingText.update(dt);
-        this.updateAttackCues(dt);
-        this.playerActionController.processQueuedIntents();
-        this.refreshLootState();
-        this.tacticalController.updateMarkers(dt);
-        this.startNextReadyTurn();
-        this.raidLifecycleController.updateRaidTimer(dt);
-        this.raidLifecycleController.checkRaidEndConditions();
-        this.templeController.checkArrival();
-        this.storyScenarioController.checkDungeonArrival();
+    }
 
+    private syncControlledPlayer(): void {
         const controlled = this.getControlledActor();
         if (controlled) this.player = controlled.entity;
+    }
+
+    private followPlayerCamera(camera: Camera, dt: number): void {
         camera.followTile(this.player.gridX, this.player.gridY);
         camera.update(dt);
     }
