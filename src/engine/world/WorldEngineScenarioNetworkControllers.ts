@@ -18,6 +18,7 @@ import type { FusionTempleUI } from '../../ui/FusionTempleUI';
 import type { WorldPhase, WorldRaidSession } from './WorldRaidSession';
 import type { WorldTownSession } from './WorldTownSession';
 import type { WorldFieldFeedbackState } from './WorldFieldFeedbackState';
+import type { WorldEngineSharedControllerPorts } from './WorldEngineSharedControllerPorts';
 import type { WorldTurnStateController } from './WorldTurnStateController';
 import { WorldStoryScenarioController } from './WorldStoryScenarioController';
 import { WorldTutorialController } from './WorldTutorialController';
@@ -87,6 +88,23 @@ export interface WorldEngineScenarioNetworkControllers {
     networkSyncController: WorldNetworkSyncController;
     networkIntentController: WorldNetworkIntentController;
     networkEvents: WorldEngineNetworkEvents;
+}
+
+export interface WorldEngineScenarioNetworkControllerSources {
+    ports: WorldEngineSharedControllerPorts;
+}
+
+export function createWorldEngineScenarioNetworkControllersFromSources(
+    sources: WorldEngineScenarioNetworkControllerSources
+): WorldEngineScenarioNetworkControllers {
+    return createWorldEngineScenarioNetworkControllers({
+        ...sources.ports,
+        spawnKillEffect: (enemy, feedbackGroupId, actor) => {
+            const exp = actor ? enemy.calcExpFor(actor.character.level) : enemy.expReward;
+            sources.ports.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, exp, enemy);
+            sources.ports.registerCombatFeedback('kill', feedbackGroupId);
+        },
+    });
 }
 
 export function createWorldEngineScenarioNetworkControllers(

@@ -63,11 +63,11 @@ import {
     type WorldEngineNetworkState,
 } from './world/WorldEngineNetworkState';
 import {
-    createWorldEngineScenarioNetworkControllers,
+    createWorldEngineScenarioNetworkControllersFromSources,
     type WorldEngineScenarioNetworkControllers,
 } from './world/WorldEngineScenarioNetworkControllers';
 import {
-    createWorldEngineWorldControllers,
+    createWorldEngineWorldControllersFromSources,
     type WorldEngineWorldControllers,
 } from './world/WorldEngineWorldControllers';
 import {
@@ -209,27 +209,17 @@ export class WorldEngine {
     }
 
     private initializeWorldSupportControllers(): void {
-        const sharedPorts = this.getSharedControllerPorts();
-        const worldControllers = createWorldEngineWorldControllers({
-            ...sharedPorts,
-            getWorldTime: () => this.getRuntimeState().worldTime,
-            getPhase: () => this.getRuntimeState().currentPhase,
-            setPhase: (phase) => { this.getRuntimeState().currentPhase = phase; },
+        const worldControllers = createWorldEngineWorldControllersFromSources({
+            ports: this.getSharedControllerPorts(),
+            getRuntimeState: () => this.getRuntimeState(),
             beginRaidFromCurrentHub: (realm) => { void this.beginRaidFromCurrentHub(realm); },
-            clearWorldLoot: () => { this.worldMap.loot = []; },
         });
         this.worldControllers = worldControllers;
     }
 
     private initializeScenarioNetworkControllers(): void {
-        const sharedPorts = this.getSharedControllerPorts();
-        const scenarioNetworkControllers = createWorldEngineScenarioNetworkControllers({
-            ...sharedPorts,
-            spawnKillEffect: (enemy, feedbackGroupId, actor) => {
-                const exp = actor ? enemy.calcExpFor(actor.character.level) : enemy.expReward;
-                this.getUiState().effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, exp, enemy);
-                this.registerCombatFeedback('kill', feedbackGroupId);
-            },
+        const scenarioNetworkControllers = createWorldEngineScenarioNetworkControllersFromSources({
+            ports: this.getSharedControllerPorts(),
         });
         this.scenarioNetworkControllers = scenarioNetworkControllers;
     }

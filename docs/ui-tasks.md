@@ -94,6 +94,7 @@
 - [x] `WorldEngine` presentation controller source adapter 추가. 렌더/입력/전술 컨트롤러의 UI state, runtime state, action/raid/scenario/world controller 연결을 `WorldEnginePresentationControllers` source adapter로 옮겨 화면·입력 배선 변경 시 `WorldEngine.ts` 수정 범위를 줄인다.
 - [x] `WorldEngine` action controller source adapter 추가. 행동 컨트롤러의 scenario/network/tutorial, movement controller, fanfare runtime state 연결을 `WorldEngineActionControllers` source adapter로 옮겨 행동 메뉴·마법·도구 배선 변경 시 `WorldEngine.ts` 수정 범위를 줄인다.
 - [x] `WorldEngine` combat controller source adapter 추가. 전투 컨트롤러의 tutorial/story/networkIntent와 selection clear 연결을 `WorldEngineCombatControllers` source adapter로 옮겨 전투 흐름 배선 변경 시 `WorldEngine.ts` 수정 범위를 줄인다.
+- [x] `WorldEngine` world/scenario bootstrap source adapter 추가. 월드 지원 컨트롤러의 runtime phase/time 연결과 scenario/network 컨트롤러의 kill effect feedback 연결을 각 컨트롤러 모듈의 source adapter로 옮겨 월드 부트스트랩 변경 시 `WorldEngine.ts` 수정 범위를 줄인다.
 
 ---
 

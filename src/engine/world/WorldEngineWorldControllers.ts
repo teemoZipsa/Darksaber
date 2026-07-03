@@ -11,6 +11,8 @@ import { MinimapUI } from '../../ui/MinimapUI';
 import type { Camera } from '../Camera';
 import type { WorldPhase, WorldRaidSession } from './WorldRaidSession';
 import { WorldCombatFeedbackController } from './WorldCombatFeedbackController';
+import type { WorldEngineRuntimeState } from './WorldEngineRuntimeState';
+import type { WorldEngineSharedControllerPorts } from './WorldEngineSharedControllerPorts';
 import { WorldRestingController } from './WorldRestingController';
 import { WorldTempleController } from './WorldTempleController';
 
@@ -46,6 +48,25 @@ export interface WorldEngineWorldControllers {
     combatFeedbackController: WorldCombatFeedbackController;
     templeController: WorldTempleController;
     restingController: WorldRestingController;
+}
+
+export interface WorldEngineWorldControllerSources {
+    ports: WorldEngineSharedControllerPorts;
+    getRuntimeState(): WorldEngineRuntimeState;
+    beginRaidFromCurrentHub(realm: WorldRealmId): void;
+}
+
+export function createWorldEngineWorldControllersFromSources(
+    sources: WorldEngineWorldControllerSources
+): WorldEngineWorldControllers {
+    return createWorldEngineWorldControllers({
+        ...sources.ports,
+        getWorldTime: () => sources.getRuntimeState().worldTime,
+        getPhase: () => sources.getRuntimeState().currentPhase,
+        setPhase: (phase) => sources.ports.setCurrentPhase(phase),
+        beginRaidFromCurrentHub: (realm) => sources.beginRaidFromCurrentHub(realm),
+        clearWorldLoot: () => { sources.ports.getWorldMap().loot = []; },
+    });
 }
 
 export function createWorldEngineWorldControllers(
