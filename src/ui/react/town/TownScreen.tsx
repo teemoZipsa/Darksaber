@@ -82,7 +82,11 @@ export function TownScreen() {
                         role="tab"
                         aria-selected={tab === tb.id}
                         className={`ds-town__tab${tab === tb.id ? ' is-active' : ''}`}
-                        onClick={() => { store.townSetTab(tb.id); AudioManager.playUi('ui.hover'); }}
+                        onClick={() => {
+                            if (tab === tb.id) return;
+                            store.townSetTab(tb.id);
+                            AudioManager.playUi('ui.hover');
+                        }}
                     >
                         {tb.icon} {tb.label}
                     </button>
