@@ -281,7 +281,7 @@ export class InMemoryAuthStore implements AuthStore {
     }
 
     public async createCharacter(accountId: string, input: NewCharacterInput): Promise<{ character: AuthCharacter; save: CharacterSave }> {
-        const characters = [...this.characters.values()].filter((character) => character.accountId === accountId);
+        const characters = [...this.characters.values()].filter((character) => character.accountId === accountId && !character.deletedAt);
         if (characters.some((character) => normalizeCharacterName(character.name) === normalizeCharacterName(input.name))) {
             throw new AuthStoreConflict('character_name');
         }
@@ -436,9 +436,7 @@ export class PostgresAuthStore implements AuthStore {
                 base_stats jsonb NOT NULL,
                 created_at timestamptz NOT NULL,
                 updated_at timestamptz NOT NULL,
-                deleted_at timestamptz NULL,
-                UNIQUE(account_id, slot_no),
-                UNIQUE(account_id, name)
+                deleted_at timestamptz NULL
             );
 
             CREATE TABLE IF NOT EXISTS character_saves (
@@ -466,6 +464,16 @@ export class PostgresAuthStore implements AuthStore {
             ALTER TABLE character_saves
             ADD COLUMN IF NOT EXISTS stash_snapshot jsonb NOT NULL
             DEFAULT '{"width":15,"height":10,"items":[]}'::jsonb
+        `);
+        await this.pool.query(`
+            ALTER TABLE characters DROP CONSTRAINT IF EXISTS characters_account_id_slot_no_key;
+            ALTER TABLE characters DROP CONSTRAINT IF EXISTS characters_account_id_name_key;
+            CREATE UNIQUE INDEX IF NOT EXISTS characters_active_slot_idx
+                ON characters(account_id, slot_no)
+                WHERE deleted_at IS NULL;
+            CREATE UNIQUE INDEX IF NOT EXISTS characters_active_name_idx
+                ON characters(account_id, lower(name))
+                WHERE deleted_at IS NULL;
         `);
     }
 
@@ -602,7 +610,7 @@ export class PostgresAuthStore implements AuthStore {
         try {
             await client.query('BEGIN');
             const existing = await client.query(
-                'SELECT slot_no, name FROM characters WHERE account_id = $1 FOR UPDATE',
+                'SELECT slot_no, name FROM characters WHERE account_id = $1 AND deleted_at IS NULL FOR UPDATE',
                 [accountId]
             );
             const rows = existing.rows as Array<{ slot_no: number; name: string }>;

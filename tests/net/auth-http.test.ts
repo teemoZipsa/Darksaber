@@ -201,6 +201,15 @@ test('character delete hides the character and clears last selected id', async (
         });
         assert.equal(deletedSelect.status, 404);
         assert.equal(deletedSelect.body.error, 'character_not_found');
+
+        const recreated = await harness.request('/characters', {
+            method: 'POST',
+            accessToken: String(registered.body.accessToken),
+            body: { name: 'Vanishing', classKey: 'infantry', gender: 'M' },
+        });
+        assert.equal(recreated.status, 201);
+        assert.equal(asRecord(recreated.body.character).slotNo, 0);
+        assert.equal(asRecord(recreated.body.character).name, 'Vanishing');
     } finally {
         await harness.close();
     }
