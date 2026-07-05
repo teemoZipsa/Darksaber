@@ -485,7 +485,7 @@ export class GameManager {
         const selected = characters.get(selectedCharacter.id);
         if (selected) this.loadEquipmentFromSave(save, selected);
 
-        const deployIds = activeIds.length > 0 ? activeIds : [selectedCharacter.id];
+        const deployIds = [selectedCharacter.id, ...activeIds.filter((id) => id !== selectedCharacter.id)];
         for (const id of deployIds.slice(0, this.party.MAX_ACTIVE_PARTY_SIZE)) {
             const character = characters.get(id);
             if (character) this.party.deployCharacter(character);
