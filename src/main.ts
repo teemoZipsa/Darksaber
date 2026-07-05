@@ -10,6 +10,7 @@ import { DarksaberSpriteAtlas } from './ui/DarksaberSpriteAtlas';
 import { mountUiOverlay } from './ui/react/mountOverlay';
 import { mountAuthGate } from './ui/react/auth/mountAuthGate';
 import { AuthApiError, AuthClient, type AuthSessionResponse } from './net/AuthClient';
+import { NetworkRaidClient } from './net/NetworkRaidClient';
 import { formatT, t } from './i18n/LanguageManager';
 import { applyDevRaidScenario, DEV_STORY_EPISODES, parseDevRaidScenario, type DevRaidScenario } from './dev/DevRaidScenarios';
 
@@ -83,11 +84,7 @@ function getDevRaidScenario(): DevRaidScenario | null {
 }
 
 function clearDevWorldResumeToken(): void {
-    try {
-        localStorage.removeItem('darksaber_world_resume_token');
-    } catch {
-        // Ignore storage failures; dev autostart still works without persistence.
-    }
+    NetworkRaidClient.clearStoredResumeTokens();
 }
 
 async function enterDevTown(manager: GameManager, mode: Extract<DevStartMode, 'town' | 'raid'>, scenario: DevRaidScenario | null): Promise<void> {
@@ -107,23 +104,25 @@ async function enterDevTown(manager: GameManager, mode: Extract<DevStartMode, 't
             accountProgress: selected.accountProgress,
             authClient: client,
         });
-        if (mode === 'raid') scheduleDevRaidDeploy(manager, scenario);
+        if (mode === 'raid') scheduleDevRaidDeploy(manager, scenario, false);
     } catch (error) {
-        console.error('[Darksaber] Dev autostart failed', error);
-        mountAuthGate(manager);
+        console.warn('[Darksaber] Dev auth autostart unavailable; using local dev character.', error);
+        manager.enterLocalDevCharacter('Dev Hero', 'infantry', 'M');
+        if (mode === 'raid') scheduleDevRaidDeploy(manager, scenario, true);
     }
 }
 
 function enterDevTutorial(manager: GameManager): void {
-    manager.completeCharacterCreation('Dev Hero', 'infantry', 'M');
+    manager.enterLocalDevCharacter('Dev Hero', 'infantry', 'M', { startIntroTutorial: true });
 }
 
-function scheduleDevRaidDeploy(manager: GameManager, scenario: DevRaidScenario | null): void {
+function scheduleDevRaidDeploy(manager: GameManager, scenario: DevRaidScenario | null, localFallback: boolean): void {
     const startedAt = performance.now();
     const attempt = () => {
         const townSession = manager.getTownSession();
         if (townSession?.isVisible()) {
-            townSession.ui.requestDeploy(Number.POSITIVE_INFINITY);
+            if (localFallback) manager.beginLocalDevRaidFromTown();
+            else townSession.ui.requestDeploy(Number.POSITIVE_INFINITY);
             if (scenario) scheduleDevRaidScenario(manager, scenario);
             return;
         }

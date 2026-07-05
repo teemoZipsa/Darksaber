@@ -103,6 +103,7 @@
 - [x] 레이드 중 캐릭터 삭제 차단. 진행 중인 원정 세션이 보유한 캐릭터는 `DELETE /characters/:id`에서 409로 막아 월드 저장 flush와 계정 캐릭터 목록이 어긋나지 않게 한다.
 - [x] 네트워크 세션 경계 안정화. resumeToken을 캐릭터별로 저장하고 서버 resume 소유권을 검증하며, 복구된 active raid 세션 삭제 차단과 원격 actor 소유권 분류를 보강한다.
 - [x] 로그아웃/배포 세션 후속 정리. 로그아웃 시 모든 network resume token을 제거하고 캐릭터 ID 없는 startup resume 기본값과 production SameSite 예시를 배포 문서 기준에 맞춘다.
+- [x] 수동 개발 진입 auth 폴백 수정. `?devStart=town/raid`에서 auth 서버가 없으면 로그인 화면 대신 로컬 개발 캐릭터로 바로 월드에 진입하고, 초기 auth refresh 실패가 다른 화면을 덮지 않게 한다.
 
 ---
 

@@ -235,6 +235,11 @@ export class GameManager {
         return this.worldEngine.getRaidSession();
     }
 
+    public beginLocalDevRaidFromTown(): boolean {
+        if (this.state !== GameState.WORLD || !this.worldEngine) return false;
+        return this.worldEngine.beginLocalDevRaidFromCurrentHub();
+    }
+
     public isQuestJournalOpen(): boolean {
         return this.questJournalOpen;
     }
@@ -417,6 +422,43 @@ export class GameManager {
         this.syncStoryCompanionsToRoster();
         this.inventoryUI.setActiveCharacter(char);
         this.startIntroTutorialOnWorldInit = true;
+        this.transitionTo(GameState.WORLD, () => this.initWorldEngine());
+    }
+
+    public enterLocalDevCharacter(
+        name: string = 'Dev Hero',
+        classId: string = 'infantry',
+        gender: string = 'M',
+        options: { startIntroTutorial?: boolean } = {}
+    ): void {
+        this.networkAuthContext = null;
+        this.authClient = null;
+        this.networkSaveRevision = 0;
+        this.hubFlushEnabled = true;
+        this.playerData = new PlayerData();
+        this.playerData.setAuthenticatedSession(false);
+        this.playerData.setHubPersistCallback(null);
+        this.playerData.setCharacterSaveProvider(null);
+        this.party.clear();
+        this.inventory.clear();
+        this.stash.clear();
+        this.questJournalOpen = false;
+        this.magicLoadoutOpen = false;
+        if (this.inventoryUI.isVisible()) this.inventoryUI.toggle();
+        if (this.partyUI.isVisible()) this.partyUI.toggle();
+        if (this.charUI.isVisible()) this.charUI.toggle();
+        this.pauseMenu.close();
+        this.settingsUI.close();
+
+        const char = new Character(`dev_player_${Date.now()}`, name.trim() || 'Dev Hero', classId);
+        char.gender = gender;
+        this.applyStarterEquipment(char);
+        this.grantStarterConsumables();
+        this.party.addToRoster(char);
+        this.party.deployCharacter(char);
+        this.party.switchTo(0);
+        this.inventoryUI.setActiveCharacter(char);
+        this.startIntroTutorialOnWorldInit = options.startIntroTutorial === true;
         this.transitionTo(GameState.WORLD, () => this.initWorldEngine());
     }
 

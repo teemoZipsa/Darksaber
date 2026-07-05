@@ -11,7 +11,7 @@ import { PartyManager } from '../character/PartyManager';
 import type { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
-import { formatT, t } from '../i18n/LanguageManager';
+import { formatT, i18n, t } from '../i18n/LanguageManager';
 import { removeStatusesFromCarrier } from '../combat/StatusEffects';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
@@ -397,6 +397,28 @@ export class WorldEngine {
     public getTownSession(): WorldTownSession { return this.townSession; }
 
     public getRaidSession(): WorldRaidSession { return this.raidSession; }
+
+    public beginLocalDevRaidFromCurrentHub(): boolean {
+        if (!import.meta.env.DEV) return false;
+        const town = this.getCurrentHubTown();
+        this.closeFieldOverlays();
+        this.townSession.hide();
+        this.getNetworkState().isRaid = false;
+        this.getNetworkState().isConnecting = false;
+        this.getNetworkState().playerId = null;
+        this.raidSession.beginRaidFromTown(town.id);
+        this.party.resetForNewRaid();
+        this.townSession.applyPendingRestForRaidStart();
+        this.scenarioNetworkControllers.storyScenarioController.resetVisitState();
+        this.scenarioNetworkControllers.storyScenarioController.resetNetworkState();
+        this.placePartyNear(this.worldMap.getTownSpawnTile(town));
+        const controlled = this.getControlledActor();
+        if (controlled) this.player = controlled.entity;
+        this.actionControllers.selectionController.selectActor(controlled?.id ?? null);
+        this.clearFieldTurnState();
+        this.addCombatLog(formatT('mp.deployStarted', { town: i18n.lang === 'ko' ? town.nameKr : town.name, world: this.worldMap.getDisplayName() }));
+        return true;
+    }
 
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
         this.presentationControllers.renderController.render(ctx, camera, width, height, {

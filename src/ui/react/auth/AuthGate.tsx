@@ -28,7 +28,7 @@ export function AuthGate({ client, gameManager }: AuthGateProps) {
                 setScreen(session.characters.length > 0 ? 'select' : 'create');
             })
             .catch(() => {
-                if (!cancelled) setScreen('auth');
+                if (!cancelled) setScreen((current) => current === 'loading' ? 'auth' : current);
             });
         return () => { cancelled = true; };
     }, [client, gameManager]);
