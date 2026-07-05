@@ -80,6 +80,43 @@ test('dev town renders the React town overlay with embedded inventory', async ({
     await expect(page.locator('#ui-overlay .ds-shop')).toBeVisible();
 });
 
+test('dev launcher buttons are readable and enter dev modes', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Launcher navigation coverage is exercised on the desktop browser project.');
+
+    await page.goto('/');
+    const launcher = page.locator('.dev-launcher');
+    await expect(launcher).toBeVisible({ timeout: 20_000 });
+
+    const metrics = await page.locator('.dev-launcher a').evaluateAll((links) => links.slice(0, 8).map((link) => {
+        const rect = link.getBoundingClientRect();
+        const style = window.getComputedStyle(link);
+        return {
+            height: rect.height,
+            width: rect.width,
+            flexShrink: style.flexShrink,
+            whiteSpace: style.whiteSpace,
+        };
+    }));
+    expect(metrics.length).toBeGreaterThanOrEqual(8);
+    for (const metric of metrics) {
+        expect(metric.flexShrink).toBe('0');
+        expect(metric.whiteSpace).toBe('nowrap');
+        expect(metric.height).toBeGreaterThanOrEqual(32);
+        expect(metric.width).toBeGreaterThan(metric.height);
+    }
+
+    await page.locator('.dev-launcher a[href="/?devStart=town"]').click();
+    await expect(page.locator('#ui-overlay .ds-town')).toBeVisible({ timeout: 20_000 });
+
+    await page.goto('/');
+    await page.locator('.dev-launcher a[href="/?devStart=raid&devScenario=loot"]').click();
+    await expect(page.locator('#ui-overlay [data-inv-grid="ext"] .inv-item').first()).toBeVisible({ timeout: 25_000 });
+
+    await page.goto('/');
+    await page.locator('.dev-launcher a[href="/?devStart=tutorial"]').click();
+    await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
+});
+
 test('auth character select deletes the last character after exact-name confirmation', async ({ page, request, isMobile }) => {
     test.skip(isMobile, 'Auth account creation and deletion flow is covered on the desktop browser project.');
 

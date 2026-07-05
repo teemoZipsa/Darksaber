@@ -105,6 +105,7 @@
 - [x] 로그아웃/배포 세션 후속 정리. 로그아웃 시 모든 network resume token을 제거하고 캐릭터 ID 없는 startup resume 기본값과 production SameSite 예시를 배포 문서 기준에 맞춘다.
 - [x] 수동 개발 진입 auth 폴백 수정. `?devStart=town/raid`에서 auth 서버가 없으면 로그인 화면 대신 로컬 개발 캐릭터로 바로 월드에 진입하고, 초기 auth refresh 실패가 다른 화면을 덮지 않게 한다.
 - [x] 전수조사 auth/dev 후속 수정. 로컬 dev 레이드 시작 phase를 네트워크 출격 경로와 맞추고, dev auth 회복 reload와 로그아웃 실패 경로에서도 로컬 세션/resume token 정리가 끝나게 하며, dev raid scenario 적용을 준비될 때까지 재시도한다.
+- [x] 개발자 런처 버튼 안정화. 초기 페이드 전환이 끝난 뒤 devStart 진입을 실행해 상단 런처 클릭이 타이틀에 머물지 않게 하고, 버튼 폭/줄바꿈/가로 스크롤 스타일을 보강한다.
 
 ---
 

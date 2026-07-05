@@ -52,10 +52,10 @@ async function init(): Promise<void> {
     const devRaidScenario = getDevRaidScenario();
     if (devStartMode) {
         clearDevWorldResumeToken();
-        window.setTimeout(() => {
+        runAfterInitialTransition(manager, () => {
             if (devStartMode === 'tutorial') enterDevTutorial(manager);
             else void enterDevTown(manager, devStartMode, devRaidScenario);
-        }, 550);
+        });
     } else {
         mountAuthGate(manager);
         mountDevLauncher();
@@ -85,6 +85,18 @@ function getDevRaidScenario(): DevRaidScenario | null {
 
 function clearDevWorldResumeToken(): void {
     NetworkRaidClient.clearStoredResumeTokens();
+}
+
+function runAfterInitialTransition(manager: GameManager, callback: () => void): void {
+    const startedAt = performance.now();
+    const attempt = () => {
+        if (!manager.isTransitionActive() || performance.now() - startedAt > 5000) {
+            callback();
+            return;
+        }
+        window.setTimeout(attempt, 80);
+    };
+    window.setTimeout(attempt, 80);
 }
 
 async function enterDevTown(manager: GameManager, mode: Extract<DevStartMode, 'town' | 'raid'>, scenario: DevRaidScenario | null): Promise<void> {

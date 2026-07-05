@@ -181,6 +181,10 @@ export class GameManager {
         });
     }
 
+    public isTransitionActive(): boolean {
+        return this.transitions.isActive();
+    }
+
     /** Called by WorldEngine when ESC has no in-world target to cancel. */
     public openPauseMenu(): void {
         if (this.state !== GameState.WORLD) return;
