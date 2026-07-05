@@ -1355,11 +1355,18 @@
 #ui-overlay .ds-inv__town-side {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    align-items: stretch;
+    gap: 18px;
+    width: max-content;
     min-width: 0;
 }
 #ui-overlay .ds-inv__town-side .ds-inv__equipcol {
-    align-items: flex-start;
+    width: 100%;
+    align-items: center;
+}
+#ui-overlay .ds-inv__town-side .ds-inv__equipcol .ds-inv__coltitle {
+    align-self: stretch;
+    justify-content: center;
 }
 #ui-overlay .ds-inv__col { display: flex; flex-direction: column; gap: 8px; flex: none; }
 #ui-overlay .ds-inv__equipcol { align-items: center; }
