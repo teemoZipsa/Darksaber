@@ -10,6 +10,8 @@ import type { WorldMap } from '../../src/map/WorldMap';
 import type { WorldRaidOutcomeController } from '../../src/engine/world/WorldRaidOutcomeController';
 import type { WorldTownSession } from '../../src/engine/world/WorldTownSession';
 
+const originalFetch = globalThis.fetch;
+
 const HUB_TOWN: TownInfo = {
     id: 'central_castle',
     name: 'Central Castle',
@@ -19,7 +21,22 @@ const HUB_TOWN: TownInfo = {
     radius: 2,
 };
 
-function createLifecycleHarness() {
+function stubRefreshResponse(accessToken: string | null): void {
+    globalThis.fetch = (async () => ({
+        ok: accessToken !== null,
+        status: accessToken === null ? 401 : 200,
+        json: async () => accessToken ? { accessToken } : { error: 'refresh_missing' },
+    })) as unknown as typeof fetch;
+}
+
+function restoreFetch(): void {
+    globalThis.fetch = originalFetch;
+}
+
+function createLifecycleHarness(options: {
+    flushResult?: { ok: boolean; code?: string; message?: string };
+    accessToken?: string;
+} = {}) {
     const raidSession = new WorldRaidSession(HUB_TOWN.id);
     const party = new PartyManager();
     const playerData = new PlayerData();
@@ -27,14 +44,20 @@ function createLifecycleHarness() {
     let isNetworkRaidConnecting = false;
     let networkClientSet = false;
     let deployError: string | null = null;
+    let authContext = { accessToken: options.accessToken ?? 'token', characterId: 'hero-1' };
     const logs: string[] = [];
     const flushCalls: number[] = [];
+    const flushTokens: string[] = [];
 
     const gameManager = {
-        getNetworkAuthContext: () => ({ accessToken: 'token', characterId: 'hero-1' }),
+        getNetworkAuthContext: () => authContext,
+        updateNetworkAccessToken: (accessToken: string) => {
+            authContext = { ...authContext, accessToken };
+        },
         flushHubSaveToServer: async () => {
             flushCalls.push(Date.now());
-            return { ok: false, code: 'hub_flush_failed', message: 'save rejected' };
+            flushTokens.push(authContext.accessToken);
+            return options.flushResult ?? { ok: false, code: 'hub_flush_failed', message: 'save rejected' };
         },
         setHubFlushEnabled: () => undefined,
     } as unknown as GameManager;
@@ -97,14 +120,45 @@ function createLifecycleHarness() {
     };
 
     const controller = new WorldRaidLifecycleController(context);
-    return { controller, flushCalls, logs, getNetworkRaid: () => isNetworkRaid, getNetworkClientSet: () => networkClientSet, getDeployError: () => deployError };
+    return {
+        controller,
+        flushCalls,
+        flushTokens,
+        logs,
+        getAuthContext: () => authContext,
+        getNetworkRaid: () => isNetworkRaid,
+        getNetworkClientSet: () => networkClientSet,
+        getDeployError: () => deployError,
+    };
 }
 
 test('deploy is blocked when hub flush fails before join', async () => {
-    const harness = createLifecycleHarness();
-    await harness.controller.beginRaidFromCurrentHub();
-    assert.equal(harness.flushCalls.length, 1);
-    assert.equal(harness.getNetworkRaid(), false);
-    assert.equal(harness.getNetworkClientSet(), false);
-    assert.ok(harness.getDeployError());
+    stubRefreshResponse(null);
+    try {
+        const harness = createLifecycleHarness();
+        await harness.controller.beginRaidFromCurrentHub();
+        assert.equal(harness.flushCalls.length, 1);
+        assert.equal(harness.getNetworkRaid(), false);
+        assert.equal(harness.getNetworkClientSet(), false);
+        assert.ok(harness.getDeployError());
+    } finally {
+        restoreFetch();
+    }
+});
+
+test('deploy refreshes auth before flushing the hub save', async () => {
+    stubRefreshResponse('fresh-token');
+    try {
+        const harness = createLifecycleHarness({ accessToken: 'expired-token' });
+
+        await harness.controller.beginRaidFromCurrentHub();
+
+        assert.equal(harness.getAuthContext().accessToken, 'fresh-token');
+        assert.deepEqual(harness.flushTokens, ['fresh-token']);
+        assert.equal(harness.getNetworkRaid(), false);
+        assert.equal(harness.getNetworkClientSet(), false);
+        assert.ok(harness.getDeployError());
+    } finally {
+        restoreFetch();
+    }
 });

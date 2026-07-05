@@ -107,6 +107,7 @@
 - [x] 전수조사 auth/dev 후속 수정. 로컬 dev 레이드 시작 phase를 네트워크 출격 경로와 맞추고, dev auth 회복 reload와 로그아웃 실패 경로에서도 로컬 세션/resume token 정리가 끝나게 하며, dev raid scenario 적용을 준비될 때까지 재시도한다.
 - [x] 개발자 런처 버튼 안정화. 초기 페이드 전환이 끝난 뒤 devStart 진입을 실행해 상단 런처 클릭이 타이틀에 머물지 않게 하고, 버튼 폭/줄바꿈/가로 스크롤 스타일을 보강한다.
 - [x] 네트워크 레이드 액터 선택/행동 메뉴 복구. 원격 액터가 섞인 partyActors 인덱스를 로컬 파티 인덱스로 매핑하고, legacy localActorId 복구와 닫힌 행동 메뉴 재오픈, stale save tracker 차단 해제를 보강한다.
+- [x] 출격 전 auth refresh 안정화. dev auth 서버 hostname을 현재 페이지와 맞추고, 레이드 출격 전 access token refresh를 `AuthClient` 내부 토큰까지 반영해 만료 토큰으로 마을 저장이 막히지 않게 한다.
 
 ---
 

@@ -9,7 +9,7 @@ import type { WorldMap } from '../../map/WorldMap';
 import { resolveTownArrival } from '../../raid/RaidRules';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
 import { AudioManager } from '../AudioManager';
-import type { GameManager } from '../GameManager';
+import type { GameManager, HubFlushResult } from '../GameManager';
 import type { Player } from '../../entity/Player';
 import { DEFAULT_AUTH_SERVER_URL } from '../../net/AuthClient';
 import { NetworkRaidClient, WorldServerError, type NetworkRaidStatus } from '../../net/NetworkRaidClient';
@@ -130,8 +130,20 @@ export class WorldRaidLifecycleController {
         const isResumeJoin = NetworkRaidClient.hasStoredResumeToken(authContext.characterId);
 
         try {
+            let joinAuthContext = await this.refreshNetworkAuthContext(authContext) ?? authContext;
             if (!isResumeJoin) {
-                const flushResult = await this.context.gameManager.flushHubSaveToServer();
+                let flushResult = await this.context.gameManager.flushHubSaveToServer();
+                if (!flushResult.ok && this.isAuthExpiredHubFlush(flushResult)) {
+                    const refreshed = await this.refreshNetworkAuthContext(joinAuthContext, true);
+                    if (refreshed && refreshed.accessToken !== joinAuthContext.accessToken) {
+                        joinAuthContext = refreshed;
+                        flushResult = await this.context.gameManager.flushHubSaveToServer();
+                    }
+                }
+                if (!flushResult.ok && this.shouldReloadDevAutoStartAuthFromHubFlush(flushResult)) {
+                    this.reloadDevAutoStartAuth(town);
+                    return;
+                }
                 if (!flushResult.ok) {
                     this.context.log(t('mp.deployUnavailable'));
                     this.context.setPhase('town');
@@ -143,7 +155,6 @@ export class WorldRaidLifecycleController {
                 }
             }
 
-            let joinAuthContext = await this.refreshNetworkAuthContext(authContext) ?? authContext;
             let welcome;
             try {
                 welcome = await this.connectNetworkRaid(town, targetRealm, joinAuthContext);
@@ -186,13 +197,7 @@ export class WorldRaidLifecycleController {
             if (this.context.raidSession.raidModifier) this.context.log(formatRaidModifierLog(this.context.raidSession.raidModifier));
         } catch (error) {
             if (this.shouldReloadDevAutoStartAuth(error)) {
-                console.warn('[Darksaber] Dev auth expired after server restart; reloading to issue a fresh dev session.');
-                this.context.log(t('mp.devAuthReload'));
-                this.context.setPhase('town');
-                this.context.townSession.show(town);
-                this.context.townSession.setDeployError(t('mp.devAuthRefreshing'));
-                NetworkRaidClient.clearStoredResumeTokens();
-                window.setTimeout(() => window.location.reload(), 250);
+                this.reloadDevAutoStartAuth(town);
                 return;
             }
             this.context.setIsNetworkRaid(false);
@@ -208,6 +213,14 @@ export class WorldRaidLifecycleController {
         } finally {
             this.context.setIsNetworkRaidConnecting(false);
         }
+    }
+
+    private isAuthExpiredHubFlush(result: HubFlushResult): boolean {
+        return result.code === 'access_invalid' || result.code === 'access_missing';
+    }
+
+    private shouldReloadDevAutoStartAuthFromHubFlush(result: HubFlushResult): boolean {
+        return this.isAuthExpiredHubFlush(result) && this.isDevAutoStart();
     }
 
     public updateRaidTimer(dt: number): void {
@@ -319,10 +332,24 @@ export class WorldRaidLifecycleController {
     }
 
     private shouldReloadDevAutoStartAuth(error: unknown): boolean {
-        if (!import.meta.env.DEV) return false;
         if (!(error instanceof WorldServerError) || error.code !== 'AUTH_FAILED') return false;
+        return this.isDevAutoStart();
+    }
+
+    private isDevAutoStart(): boolean {
+        if (import.meta.env?.DEV !== true || typeof window === 'undefined') return false;
         const devStart = new URLSearchParams(window.location.search).get('devStart');
         return devStart === '1' || devStart === 'town' || devStart === 'raid';
+    }
+
+    private reloadDevAutoStartAuth(town: TownInfo): void {
+        console.warn('[Darksaber] Dev auth expired after server restart; reloading to issue a fresh dev session.');
+        this.context.log(t('mp.devAuthReload'));
+        this.context.setPhase('town');
+        this.context.townSession.show(town);
+        this.context.townSession.setDeployError(t('mp.devAuthRefreshing'));
+        NetworkRaidClient.clearStoredResumeTokens();
+        window.setTimeout(() => window.location.reload(), 250);
     }
 
     private async connectNetworkRaid(

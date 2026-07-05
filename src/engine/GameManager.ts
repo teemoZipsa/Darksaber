@@ -493,6 +493,7 @@ export class GameManager {
     public updateNetworkAccessToken(accessToken: string): void {
         if (!this.networkAuthContext) return;
         this.networkAuthContext = { ...this.networkAuthContext, accessToken };
+        this.authClient?.setAccessToken(accessToken);
     }
 
     public getNetworkAuthContext(): { accessToken: string; characterId: string } | null {

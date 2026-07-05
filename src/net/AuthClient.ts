@@ -79,6 +79,10 @@ export class AuthClient {
         return this.accessToken;
     }
 
+    public setAccessToken(accessToken: string | null): void {
+        this.accessToken = accessToken;
+    }
+
     public async register(loginName: string, password: string): Promise<AuthSessionResponse> {
         const response = await this.request<AuthSessionResponse>('/auth/register', {
             method: 'POST',
@@ -211,7 +215,12 @@ async function parseResponse(response: Response): Promise<unknown> {
 function readAuthServerUrl(): string {
     const configured = import.meta.env?.VITE_AUTH_SERVER_URL?.trim();
     if (configured) return configured.replace(/\/$/, '');
-    if (import.meta.env?.DEV) return 'http://localhost:8765';
+    if (import.meta.env?.DEV) {
+        if (typeof window === 'undefined') return 'http://localhost:8765';
+        const hostname = window.location.hostname || 'localhost';
+        const host = hostname.includes(':') ? `[${hostname}]` : hostname;
+        return `http://${host}:8765`;
+    }
     if (typeof window === 'undefined') return 'http://localhost:8765';
     return window.location.origin;
 }
