@@ -35,10 +35,11 @@ npm run start
 
 ## 🌐 공개 배포
 
-포트폴리오용 공개 배포는 프론트엔드(Vite 정적 사이트)와 WebSocket 월드 서버를 분리해서 올립니다.
+포트폴리오용 공개 배포는 프론트엔드(Vite 정적 사이트), WebSocket 월드 서버, 관리형 데이터베이스를 분리해서 올립니다.
 
-- 프론트엔드: Vercel 또는 Cloudflare Pages
-- 월드 서버: Render, Fly.io, Railway, 또는 VPS
+- 프론트엔드: Vercel
+- 월드 서버: Render Web Service
+- 데이터베이스: Neon Postgres
 - 배포 문서: [`docs/deployment.md`](docs/deployment.md)
 
 ## 🗺️ 챕터 3: 모험가의 이정표
