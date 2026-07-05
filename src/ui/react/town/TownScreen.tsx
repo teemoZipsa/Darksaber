@@ -22,6 +22,15 @@ import { restIcon } from './restIcon';
 import { InventoryPanel } from '../inventory/InventoryPanel';
 import { FacilityUpgradePanel } from './FacilityUpgradePanel';
 
+function townBackdropKey(tab: TownTab): string {
+    if (tab === 'weapon_shop' || tab === 'armor_shop') return 'armory';
+    if (tab === 'general_store' || tab === 'specialty_trader' || tab === 'shrine') return 'market';
+    if (tab === 'blacksmith') return 'forge';
+    if (tab === 'rest' || tab === 'healer') return 'infirmary';
+    if (tab === 'quest' || tab === 'rumors') return 'guild';
+    return 'warehouse';
+}
+
 export function TownScreen() {
     useUiVersion();
     const store = useStore();
@@ -60,7 +69,7 @@ export function TownScreen() {
     };
 
     return (
-        <div className="ds-town">
+        <div className={`ds-town ds-town--${townBackdropKey(tab)}`}>
             <div className="ds-town__header" style={scaleVar}>
                 <span className="ds-town__name">🏰 {townPrimaryName}</span>
                 <span className="ds-town__sub">{townSecondaryName}</span>

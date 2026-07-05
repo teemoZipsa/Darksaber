@@ -748,6 +748,7 @@
 
 /* ─── Town screen ───────────────────────────────────────────── */
 #ui-overlay .ds-town {
+    --ds-town-backdrop: url('/assets/images/town/town-bg-warehouse.png');
     position: absolute;
     inset: 0;
     pointer-events: auto;
@@ -762,6 +763,38 @@
     animation: ds-fade-in 140ms ease-out;
     overflow: hidden;
 }
+#ui-overlay .ds-town::before,
+#ui-overlay .ds-town::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+#ui-overlay .ds-town::before {
+    z-index: 0;
+    background-image: var(--ds-town-backdrop);
+    background-position: center;
+    background-size: cover;
+    opacity: 0.52;
+    filter: saturate(0.86) brightness(0.86);
+    transform: scale(1.02);
+}
+#ui-overlay .ds-town::after {
+    z-index: 0;
+    background:
+        radial-gradient(ellipse at 50% 45%, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.32) 48%, rgba(0, 0, 0, 0.76) 100%),
+        linear-gradient(180deg, rgba(7, 6, 10, 0.18) 0%, rgba(7, 6, 10, 0.16) 46%, rgba(7, 6, 10, 0.66) 100%);
+}
+#ui-overlay .ds-town > * {
+    position: relative;
+    z-index: 1;
+}
+#ui-overlay .ds-town--warehouse { --ds-town-backdrop: url('/assets/images/town/town-bg-warehouse.png'); }
+#ui-overlay .ds-town--armory { --ds-town-backdrop: url('/assets/images/town/town-bg-armory.png'); }
+#ui-overlay .ds-town--market { --ds-town-backdrop: url('/assets/images/town/town-bg-market.png'); }
+#ui-overlay .ds-town--forge { --ds-town-backdrop: url('/assets/images/town/town-bg-forge.png'); }
+#ui-overlay .ds-town--infirmary { --ds-town-backdrop: url('/assets/images/town/town-bg-infirmary.png'); }
+#ui-overlay .ds-town--guild { --ds-town-backdrop: url('/assets/images/town/town-bg-guild.png'); }
 #ui-overlay .ds-town__header {
     display: flex;
     flex-direction: column;
