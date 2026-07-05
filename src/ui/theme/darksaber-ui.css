@@ -251,11 +251,24 @@
 
 #auth-overlay .auth-character-card {
     min-height: 118px;
-    padding: 14px;
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+    text-align: left;
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+    background: linear-gradient(180deg, var(--ds-panel-1), var(--ds-panel-0));
+}
+
+#auth-overlay .auth-character-card__select {
+    min-height: 82px;
+    padding: 4px;
     display: grid;
     align-content: center;
     gap: 8px;
     text-align: left;
+    border: 0;
+    background: transparent;
 }
 
 #auth-overlay .auth-character-card__slot,
@@ -268,6 +281,66 @@
     font-family: var(--ds-font-title, "DOSMyungjo", serif);
     color: var(--ds-text);
     font-size: 20px;
+}
+
+#auth-overlay .auth-character-card__delete {
+    min-height: 32px;
+    padding: 6px 10px;
+    color: #ffd4dc;
+    border-color: rgba(228, 63, 90, 0.45);
+    background: rgba(120, 18, 34, 0.22);
+}
+
+#auth-overlay .auth-character-card__delete:hover {
+    color: #ffe7ed;
+    border-color: rgba(228, 63, 90, 0.85);
+}
+
+#auth-overlay .auth-delete-confirm {
+    margin: 12px 0;
+    padding: 14px;
+    border: 1px solid rgba(228, 63, 90, 0.55);
+    border-radius: var(--ds-radius-sm);
+    background: rgba(42, 10, 16, 0.5);
+}
+
+#auth-overlay .auth-delete-confirm__title {
+    color: #ffd4dc;
+    font-family: var(--ds-font-title, "DOSMyungjo", serif);
+    font-size: 18px;
+}
+
+#auth-overlay .auth-delete-confirm p {
+    margin: 8px 0 10px;
+    color: var(--ds-text-muted);
+    line-height: 1.45;
+}
+
+#auth-overlay .auth-delete-confirm strong {
+    color: var(--ds-text);
+}
+
+#auth-overlay .auth-delete-confirm__actions {
+    display: flex;
+    gap: 8px;
+}
+
+#auth-overlay .auth-delete-confirm__actions button {
+    flex: 1;
+    min-height: 38px;
+    padding: 8px 12px;
+}
+
+#auth-overlay .auth-danger {
+    color: #fff1f4;
+    border-color: rgba(228, 63, 90, 0.75);
+    background: linear-gradient(180deg, rgba(166, 34, 54, 0.92), rgba(104, 18, 33, 0.92));
+}
+
+#auth-overlay .auth-danger:disabled {
+    color: rgba(255, 212, 220, 0.48);
+    border-color: rgba(228, 63, 90, 0.28);
+    background: rgba(80, 20, 30, 0.34);
 }
 
 #auth-overlay .auth-create-layout {
@@ -325,6 +398,10 @@
 
     #auth-overlay .auth-create-layout {
         grid-template-columns: 1fr;
+    }
+
+    #auth-overlay .auth-delete-confirm__actions {
+        flex-direction: column;
     }
 }
 

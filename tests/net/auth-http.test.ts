@@ -154,6 +154,58 @@ test('character APIs enforce ownership and save revision conflicts', async () =>
     }
 });
 
+test('character delete hides the character and clears last selected id', async () => {
+    const harness = await createHarness();
+    try {
+        const registered = await harness.request('/auth/register', {
+            method: 'POST',
+            body: { loginName: 'delete01', password: 'password-1234' },
+        });
+        const created = await harness.request('/characters', {
+            method: 'POST',
+            accessToken: String(registered.body.accessToken),
+            body: { name: 'Vanishing', classKey: 'infantry', gender: 'M' },
+        });
+        assert.equal(created.status, 201);
+        const characterId = String(asRecord(created.body.character).id);
+
+        const selected = await harness.request(`/characters/${characterId}/select`, {
+            method: 'POST',
+            accessToken: String(registered.body.accessToken),
+        });
+        assert.equal(selected.status, 200);
+
+        const deleted = await harness.request(`/characters/${characterId}`, {
+            method: 'DELETE',
+            accessToken: String(registered.body.accessToken),
+        });
+        assert.equal(deleted.status, 200);
+
+        const characters = await harness.request('/characters', {
+            method: 'GET',
+            accessToken: String(registered.body.accessToken),
+        });
+        assert.equal(characters.status, 200);
+        assert.deepEqual(characters.body.characters, []);
+
+        const me = await harness.request('/account/me', {
+            method: 'GET',
+            accessToken: String(registered.body.accessToken),
+        });
+        assert.equal(me.status, 200);
+        assert.equal(me.body.lastSelectedCharacterId, null);
+
+        const deletedSelect = await harness.request(`/characters/${characterId}/select`, {
+            method: 'POST',
+            accessToken: String(registered.body.accessToken),
+        });
+        assert.equal(deletedSelect.status, 404);
+        assert.equal(deletedSelect.body.error, 'character_not_found');
+    } finally {
+        await harness.close();
+    }
+});
+
 test('character save HTTP rejects forbidden questState and unknown fields', async () => {
     const harness = await createHarness();
     try {

@@ -99,6 +99,7 @@
 - [x] i18n 동적 키 guard 보강. `t(variable)`/`formatT(variable)` 호출 목록을 AST 기반 허용 목록으로 고정해 새 동적 키 사용이 guard 갱신 없이 추가되지 않게 하고, 마법 강화 실패 사유 키를 export 상수 기반 데이터 guard에 포함한다.
 - [x] 전투 회복 아이템 공유 규칙 추가. 클라이언트 도구 컨트롤러와 서버 `useItem` intent가 같은 `FieldCombatItemRules` preview로 AP/회복 가능 여부/실제 회복량을 판정하게 해 규칙 drift를 줄인다.
 - [x] 브라우저 e2e 모델 검증 보강. 레이드 전리품 포인터 드래그 스모크가 DOM 변화뿐 아니라 backpack/external/world loot 모델 수량과 DEV 획득 ledger까지 함께 검증하게 한다.
+- [x] 캐릭터 삭제 UI 추가. 캐릭터 선택 화면에서 이름 입력 확인을 거쳐 기존 `DELETE /characters/:id` API로 삭제하고, 마지막 캐릭터 삭제 후 캐릭터 생성 화면으로 이동한다.
 
 ---
 

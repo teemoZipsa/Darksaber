@@ -85,6 +85,19 @@ export function AuthGate({ client, gameManager }: AuthGateProps) {
         }
     };
 
+    const deleteCharacter = async (characterId: string) => {
+        try {
+            await client.deleteCharacter(characterId);
+            const nextAccount = await client.me();
+            setAccount(nextAccount);
+            setError('');
+            setScreen(nextAccount.characters.length > 0 ? 'select' : 'create');
+        } catch (nextError) {
+            showError(nextError);
+            throw nextError;
+        }
+    };
+
     const logout = async () => {
         await client.logout();
         setAccount(null);
@@ -110,6 +123,7 @@ export function AuthGate({ client, gameManager }: AuthGateProps) {
                         lastSelectedCharacterId={account.lastSelectedCharacterId}
                         error={error}
                         onSelect={selectCharacter}
+                        onDelete={deleteCharacter}
                         onCreate={() => { setError(''); setScreen('create'); }}
                         onLogout={logout}
                     />
@@ -174,18 +188,56 @@ function AuthForm({ client, error, onError, onSession }: {
     );
 }
 
-function CharacterSelect({ characters, lastSelectedCharacterId, error, onSelect, onCreate, onLogout }: {
+function CharacterSelect({ characters, lastSelectedCharacterId, error, onSelect, onDelete, onCreate, onLogout }: {
     characters: AuthCharacter[];
     lastSelectedCharacterId: string | null;
     error: string;
     onSelect: (characterId: string) => void;
+    onDelete: (characterId: string) => Promise<void>;
     onCreate: () => void;
     onLogout: () => void;
 }) {
+    const [deleteTarget, setDeleteTarget] = useState<AuthCharacter | null>(null);
+    const [confirmName, setConfirmName] = useState('');
+    const [deleteBusy, setDeleteBusy] = useState(false);
     const lastSelected = useMemo(
         () => characters.find((character) => character.id === lastSelectedCharacterId) ?? characters[0],
         [characters, lastSelectedCharacterId]
     );
+
+    useEffect(() => {
+        if (deleteTarget && !characters.some((character) => character.id === deleteTarget.id)) {
+            setDeleteTarget(null);
+            setConfirmName('');
+        }
+    }, [characters, deleteTarget]);
+
+    const openDeleteConfirm = (character: AuthCharacter) => {
+        setDeleteTarget(character);
+        setConfirmName('');
+    };
+
+    const closeDeleteConfirm = () => {
+        if (deleteBusy) return;
+        setDeleteTarget(null);
+        setConfirmName('');
+    };
+
+    const submitDelete = async (event: FormEvent) => {
+        event.preventDefault();
+        if (!deleteTarget || confirmName !== deleteTarget.name || deleteBusy) return;
+        setDeleteBusy(true);
+        try {
+            await onDelete(deleteTarget.id);
+            setDeleteTarget(null);
+            setConfirmName('');
+        } catch {
+            // Parent error state renders below; keep the confirmation open.
+        } finally {
+            setDeleteBusy(false);
+        }
+    };
+
     return (
         <div className="auth-panel auth-panel--wide">
             <div className="auth-panel__title">{t('auth.characters')}</div>
@@ -197,13 +249,43 @@ function CharacterSelect({ characters, lastSelectedCharacterId, error, onSelect,
             )}
             <div className="auth-character-grid">
                 {characters.map((character) => (
-                    <button key={character.id} className="auth-character-card" onClick={() => onSelect(character.id)}>
-                        <span className="auth-character-card__slot">{t('auth.slot')} {character.slotNo + 1}</span>
-                        <strong>{character.name}</strong>
-                        <span>{classLabel(character.classKey)} · Lv {character.level}</span>
-                    </button>
+                    <div key={character.id} className="auth-character-card">
+                        <button type="button" className="auth-character-card__select" onClick={() => onSelect(character.id)}>
+                            <span className="auth-character-card__slot">{t('auth.slot')} {character.slotNo + 1}</span>
+                            <strong>{character.name}</strong>
+                            <span>{classLabel(character.classKey)} · Lv {character.level}</span>
+                        </button>
+                        <button type="button" className="auth-character-card__delete" onClick={() => openDeleteConfirm(character)}>
+                            {t('auth.deleteCharacter')}
+                        </button>
+                    </div>
                 ))}
             </div>
+            {deleteTarget && (
+                <form className="auth-delete-confirm" onSubmit={submitDelete}>
+                    <div className="auth-delete-confirm__title">{t('auth.deleteConfirmTitle')}</div>
+                    <p>
+                        {t('auth.deleteConfirmBody')} <strong>{deleteTarget.name}</strong>
+                    </p>
+                    <label className="auth-field">
+                        <span>{t('auth.deleteConfirmName')}</span>
+                        <input
+                            value={confirmName}
+                            maxLength={24}
+                            autoComplete="off"
+                            placeholder={t('auth.deleteConfirmPlaceholder')}
+                            onChange={(event) => setConfirmName(event.target.value)}
+                            disabled={deleteBusy}
+                        />
+                    </label>
+                    <div className="auth-delete-confirm__actions">
+                        <button type="button" onClick={closeDeleteConfirm} disabled={deleteBusy}>{t('auth.cancel')}</button>
+                        <button type="submit" className="auth-danger" disabled={confirmName !== deleteTarget.name || deleteBusy}>
+                            {deleteBusy ? t('auth.busy') : t('auth.deleteConfirmAction')}
+                        </button>
+                    </div>
+                </form>
+            )}
             {error && <div className="auth-error">{error}</div>}
             <div className="auth-actions">
                 <button type="button" onClick={onCreate}>{t('auth.createCharacter')}</button>

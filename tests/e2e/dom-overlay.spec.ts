@@ -80,6 +80,48 @@ test('dev town renders the React town overlay with embedded inventory', async ({
     await expect(page.locator('#ui-overlay .ds-shop')).toBeVisible();
 });
 
+test('auth character select deletes the last character after exact-name confirmation', async ({ page, request, isMobile }) => {
+    test.skip(isMobile, 'Auth account creation and deletion flow is covered on the desktop browser project.');
+
+    const loginName = `delete_${Date.now().toString(36)}`;
+    const password = 'password-1234';
+    const characterName = 'DeleteMe';
+
+    const registered = await request.post('http://127.0.0.1:8765/auth/register', {
+        data: { loginName, password },
+    });
+    expect(registered.ok()).toBe(true);
+    const session = await registered.json() as { accessToken: string };
+    const created = await request.post('http://127.0.0.1:8765/characters', {
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+        data: { name: characterName, classKey: 'infantry', gender: 'M' },
+    });
+    expect(created.ok()).toBe(true);
+
+    await page.goto('/');
+    await expect(page.locator('#auth-overlay .auth-panel')).toBeVisible({ timeout: 20_000 });
+    await page.getByLabel(/계정 이름|Login Name/).fill(loginName);
+    await page.getByLabel(/비밀번호|Password/).fill(password);
+    await page.locator('#auth-overlay .auth-primary').click();
+
+    await expect(page.locator('#auth-overlay .auth-panel__title')).toHaveText(/캐릭터 선택|Select Character/, { timeout: 20_000 });
+    const characterCard = page.locator('#auth-overlay .auth-character-card').filter({ hasText: characterName });
+    await expect(characterCard).toBeVisible();
+    await characterCard.getByRole('button', { name: /^(삭제|Delete)$/ }).click();
+
+    await expect(page.locator('#auth-overlay .auth-delete-confirm')).toBeVisible();
+    const confirmAction = page.getByRole('button', { name: /영구 삭제|Delete Permanently/ });
+    await page.getByPlaceholder(/캐릭터 이름|Character name/).fill('WrongName');
+    await expect(confirmAction).toBeDisabled();
+
+    await page.getByPlaceholder(/캐릭터 이름|Character name/).fill(characterName);
+    await expect(confirmAction).toBeEnabled();
+    await confirmAction.click();
+
+    await expect(characterCard).toBeHidden();
+    await expect(page.locator('#auth-overlay .auth-panel__title')).toHaveText(/캐릭터 생성|Create Character/);
+});
+
 test('dev tutorial can open and close the standalone inventory overlay', async ({ page }) => {
     await page.goto('/?devStart=tutorial');
     await expect(page.locator('#gameCanvas')).toBeVisible();
