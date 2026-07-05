@@ -297,6 +297,9 @@ async function routeAuthRequest(context: HandlerContext, options: AuthHttpOption
         const characterId = decodeURIComponent(characterMatch[1]);
         const action = characterMatch[2] ?? '';
         if (request.method === 'DELETE' && action === '') {
+            if (options.isHubPatchBlocked?.(auth.account.id, characterId)) {
+                throw new HttpError(409, 'character_delete_blocked_during_raid', 'Character cannot be deleted during an active raid session.');
+            }
             const deleted = await options.store.deleteCharacter(auth.account.id, characterId);
             if (!deleted) throw new HttpError(404, 'character_not_found', 'Character was not found.');
             writeJson(response, 200, { ok: true }, origin, options);

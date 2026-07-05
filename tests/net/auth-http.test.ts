@@ -373,6 +373,37 @@ test('character save HTTP blocks hub patch during active raid session', async ()
     }
 });
 
+test('character delete HTTP blocks deletion during active raid session', async () => {
+    const harness = await createHarness({ isHubPatchBlocked: () => true });
+    try {
+        const registered = await harness.request('/auth/register', {
+            method: 'POST',
+            body: { loginName: 'raiddelete01', password: 'password-1234' },
+        });
+        const created = await harness.request('/characters', {
+            method: 'POST',
+            accessToken: String(registered.body.accessToken),
+            body: { name: 'RaidDelete', classKey: 'infantry', gender: 'M' },
+        });
+        const characterId = String(asRecord(created.body.character).id);
+        const blocked = await harness.request(`/characters/${characterId}`, {
+            method: 'DELETE',
+            accessToken: String(registered.body.accessToken),
+        });
+        assert.equal(blocked.status, 409);
+        assert.equal(blocked.body.error, 'character_delete_blocked_during_raid');
+
+        const selected = await harness.request(`/characters/${characterId}/select`, {
+            method: 'POST',
+            accessToken: String(registered.body.accessToken),
+        });
+        assert.equal(selected.status, 200);
+        assert.equal(asRecord(selected.body.character).id, characterId);
+    } finally {
+        await harness.close();
+    }
+});
+
 test('character save HTTP preserves authoritative roster fields', async () => {
     const harness = await createHarness();
     try {

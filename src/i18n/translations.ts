@@ -307,6 +307,7 @@ export const I18N_STRINGS: TranslationTable = {
         'auth.error.invalid_character_name': '캐릭터 이름은 1~24자로 입력하십시오.',
         'auth.error.access_invalid': '로그인이 만료되었습니다. 다시 로그인하십시오.',
         'auth.error.character_not_found': '캐릭터를 찾을 수 없습니다.',
+        'auth.error.character_delete_blocked_during_raid': '진행 중인 원정이 있어 캐릭터를 삭제할 수 없습니다.',
 
         // Intro tutorial
         'tutorial.world.title': '실내 대련장',
@@ -2327,6 +2328,7 @@ export const I18N_STRINGS: TranslationTable = {
         'auth.error.invalid_character_name': 'Enter a character name between 1 and 24 characters.',
         'auth.error.access_invalid': 'Your login expired. Log in again.',
         'auth.error.character_not_found': 'Character was not found.',
+        'auth.error.character_delete_blocked_during_raid': 'Finish the active expedition before deleting this character.',
 
         // Intro tutorial
         'tutorial.world.title': 'Indoor Training Hall',
