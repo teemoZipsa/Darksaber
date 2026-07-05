@@ -191,11 +191,7 @@ export class WorldRaidLifecycleController {
                 this.context.setPhase('town');
                 this.context.townSession.show(town);
                 this.context.townSession.setDeployError(t('mp.devAuthRefreshing'));
-                try {
-                    localStorage.removeItem('darksaber_world_resume_token');
-                } catch {
-                    // Ignore storage failures during dev recovery.
-                }
+                NetworkRaidClient.clearStoredResumeTokens();
                 window.setTimeout(() => window.location.reload(), 250);
                 return;
             }
@@ -326,7 +322,7 @@ export class WorldRaidLifecycleController {
         if (!import.meta.env.DEV) return false;
         if (!(error instanceof WorldServerError) || error.code !== 'AUTH_FAILED') return false;
         const devStart = new URLSearchParams(window.location.search).get('devStart');
-        return devStart === '1' || devStart === 'town';
+        return devStart === '1' || devStart === 'town' || devStart === 'raid';
     }
 
     private async connectNetworkRaid(

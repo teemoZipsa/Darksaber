@@ -80,12 +80,16 @@ type DevWorldEngine = {
     readyQueue: string[];
 };
 
-export function applyDevRaidScenario(manager: GameManager, scenario: DevRaidScenario): void {
+export function applyDevRaidScenario(
+    manager: GameManager,
+    scenario: DevRaidScenario,
+    options: { warn?: boolean } = {}
+): boolean {
     const world = getDevWorldEngine(manager);
     const actor = world?.partyActors[0];
     if (!world || !actor) {
-        console.warn(`[Darksaber] Dev raid scenario '${scenario}' could not find a controlled actor.`);
-        return;
+        if (options.warn ?? true) console.warn(`[Darksaber] Dev raid scenario '${scenario}' could not find a controlled actor.`);
+        return false;
     }
 
     deactivateDevNetworkRaid(world);
@@ -94,7 +98,8 @@ export function applyDevRaidScenario(manager: GameManager, scenario: DevRaidScen
 
     if (scenario === 'aggro') applyDevAggroScenario(world, actor);
     else if (scenario === 'loot') applyDevLootScenario(manager, world, actor);
-    else applyDevStoryScenario(world, scenario);
+    else return applyDevStoryScenario(world, scenario);
+    return true;
 }
 
 function getDevWorldEngine(manager: GameManager): DevWorldEngine | null {
@@ -188,7 +193,7 @@ function applyDevLootScenario(manager: GameManager, world: DevWorldEngine, actor
     setDevScenarioStatus('loot', 'loot-open');
 }
 
-function applyDevStoryScenario(world: DevWorldEngine, scenarioId: DevStoryScenario): void {
+function applyDevStoryScenario(world: DevWorldEngine, scenarioId: DevStoryScenario): boolean {
     deactivateDevNetworkRaid(world);
     const episode = Number(scenarioId.replace('story', ''));
     const scenario = STORY_SCENARIOS.find((candidate) => candidate.episode === episode);
@@ -197,7 +202,7 @@ function applyDevStoryScenario(world: DevWorldEngine, scenarioId: DevStoryScenar
     const storyScenarioController = world.scenarioNetworkControllers?.storyScenarioController;
     if (!scenario || !dungeon || !quest || !storyScenarioController) {
         console.warn(`[Darksaber] Dev ${scenarioId} scenario could not find the dungeon, quest, or controller.`);
-        return;
+        return false;
     }
 
     if (storyScenarioController.startLocalStoryScenarioDungeon) {
@@ -207,6 +212,7 @@ function applyDevStoryScenario(world: DevWorldEngine, scenarioId: DevStoryScenar
     }
     world.addCombatLog?.(formatT('dev.scenario.storyReady', { episode, dungeon: dungeon.nameKr }));
     setDevScenarioStatus(scenarioId, scenario.missionKind === 'soloInterior' ? 'interior-ready' : 'scenario-ready');
+    return true;
 }
 
 function createDevLootClient(): unknown {

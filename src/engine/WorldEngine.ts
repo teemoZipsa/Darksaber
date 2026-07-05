@@ -406,6 +406,7 @@ export class WorldEngine {
         this.getNetworkState().isRaid = false;
         this.getNetworkState().isConnecting = false;
         this.getNetworkState().playerId = null;
+        this.getRuntimeState().currentPhase = 'raid';
         this.raidSession.beginRaidFromTown(town.id);
         this.party.resetForNewRaid();
         this.townSession.applyPendingRestForRaidStart();

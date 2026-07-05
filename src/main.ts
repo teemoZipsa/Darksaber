@@ -138,11 +138,10 @@ function scheduleDevRaidScenario(manager: GameManager, scenario: DevRaidScenario
         const raidSession = manager.getRaidSession();
         const townSession = manager.getTownSession();
         if (raidSession?.active && !townSession?.isVisible()) {
-            applyDevRaidScenario(manager, scenario);
-            return;
+            if (applyDevRaidScenario(manager, scenario, { warn: false })) return;
         }
         if (performance.now() - startedAt < 10000) window.setTimeout(attempt, 160);
-        else console.warn(`[Darksaber] Dev raid scenario '${scenario}' timed out before raid became active.`);
+        else console.warn(`[Darksaber] Dev raid scenario '${scenario}' timed out before raid was ready.`);
     };
     window.setTimeout(attempt, 450);
 }

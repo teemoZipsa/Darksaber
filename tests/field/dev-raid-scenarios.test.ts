@@ -301,7 +301,7 @@ test('dev story scenarios launch local starts through episode 31', () => {
 test('dev loot scenario enables the raid loot client path without getNetworkRaidState', () => {
     const { actor, inventory, manager, selected, world } = createManagerHarness();
 
-    applyDevRaidScenario(manager, 'loot');
+    assert.equal(applyDevRaidScenario(manager, 'loot'), true);
 
     assert.equal(world.currentPhase, 'raid');
     assert.equal(world.isNetworkRaid, true);
@@ -317,4 +317,13 @@ test('dev loot scenario enables the raid loot client path without getNetworkRaid
 
     const client = world.networkRaidClient as { sendLootPickup: (lootId: string, gridX: number, gridY: number) => string };
     assert.match(client.sendLootPickup('dev_raid_loot', 0, 0), /^dev-loot-/);
+});
+
+test('dev raid scenario reports not-ready before the controlled actor exists', () => {
+    const { inventory, manager, world } = createManagerHarness();
+    world.partyActors = [];
+
+    assert.equal(applyDevRaidScenario(manager, 'loot', { warn: false }), false);
+    assert.equal(world.worldMap.loot.length, 0);
+    assert.equal(inventory.toggleCalls, 0);
 });

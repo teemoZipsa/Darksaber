@@ -102,6 +102,8 @@ export function AuthGate({ client, gameManager }: AuthGateProps) {
     const logout = async () => {
         try {
             await client.logout();
+        } catch {
+            // Local logout should still complete if the auth server is unavailable.
         } finally {
             NetworkRaidClient.clearStoredResumeTokens();
         }
