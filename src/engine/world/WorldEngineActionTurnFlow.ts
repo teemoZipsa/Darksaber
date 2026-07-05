@@ -42,6 +42,7 @@ export class WorldEngineActionTurnFlow {
 
         if (!this.context.getActiveTurnActorId() && actor.entity.actionGauge >= FIELD_MAX_ACTION_GAUGE) {
             this.context.beginActorTurn(actor);
+            return;
         }
 
         if (actor.id !== this.context.getActiveTurnActorId()) {
@@ -55,7 +56,7 @@ export class WorldEngineActionTurnFlow {
         }
 
         this.context.closeTacticalMenu();
-        this.context.updateActionMenuStates(this.context.getActionMenuStates(actor));
+        this.context.openActionMenu(this.context.getActionMenuStates(actor));
     }
 
     public refreshOpenActionMenuState(): void {

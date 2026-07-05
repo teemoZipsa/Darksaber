@@ -36,6 +36,7 @@ function makeActor(id: string): FieldActor {
 function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } {
     const calls: string[] = [];
     const engine = Object.create(WorldEngine.prototype) as any;
+    let activePartyIndex = 0;
     engine.turnStateController = new WorldTurnStateController();
     engine.turnStateController.setActiveTurn(actor.id, 6);
     engine.turnStateController.readyQueue = [];
@@ -55,7 +56,13 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
     };
     engine.party = {
         getCharacters: () => [actor.character],
-        getActiveIndex: () => 0,
+        getActiveIndex: () => activePartyIndex,
+        switchTo: (index: number) => {
+            if (index < 0 || index >= 1 || actor.character.isDead) return false;
+            activePartyIndex = index;
+            calls.push(`switchTo:${index}`);
+            return true;
+        },
     };
     engine.worldMap = { loot: [] };
     engine.combatLog = [];
@@ -478,6 +485,96 @@ test('network snapshot treats local player actorIds as owned and prefers actor r
     assert.equal(engine.remotePartyActors.size, 0);
     assert.equal(engine.turnStateController.getActiveTurnActorId(), 'server-hero');
     assert.equal(engine.turnStateController.getRemainingActionPoints(), 30);
+});
+
+test('network snapshot reattaches owned solo actor when legacy local actor id changed', () => {
+    const actor = makeActor('darkmaster');
+    const { engine } = makeEngineHarness(actor);
+    engine.networkPlayerId = 'client-1';
+
+    const snapshot: WorldSnapshot = {
+        seq: 1,
+        serverTime: 1000,
+        players: [
+            {
+                playerId: 'client-1',
+                originHubId: 'central_castle',
+                isGhost: false,
+                actorIds: ['server-darkmaster'],
+            },
+        ],
+        partyActors: [
+            makeActorSnapshot({
+                id: 'server-darkmaster',
+                ownerPlayerId: 'client-1',
+                localActorId: 'legacy-darkmaster',
+                name: actor.character.name,
+                classLineId: actor.character.classLineId,
+                remainingAp: 40,
+            }),
+        ],
+        enemies: [],
+        loot: [],
+        readyActors: ['server-darkmaster'],
+        remainingApByActor: {},
+        raidTimer: {
+            active: true,
+            elapsedSeconds: 12,
+            limitSeconds: 900,
+            departureTownId: 'central_castle',
+            modifier: null,
+        },
+        scenario: {
+            enteredDungeonIds: [],
+            activeDungeonId: null,
+            completedDungeonIds: [],
+        },
+    };
+
+    engine.applyNetworkSnapshot(snapshot);
+
+    assert.equal(engine.partyActors.length, 1);
+    assert.equal(engine.partyActors[0].id, 'server-darkmaster');
+    assert.equal(engine.partyActors[0].character, actor.character);
+    assert.equal(engine.remotePartyActors.size, 0);
+    assert.equal(engine.turnStateController.getActiveTurnActorId(), 'server-darkmaster');
+    assert.equal(engine.turnStateController.getRemainingActionPoints(), 40);
+});
+
+test('switching a clicked party actor maps network actor index back to the local party index', () => {
+    const lead = makeActor('lead');
+    const second = makeActor('second');
+    const remote = makeActor('remote');
+    const { engine, calls } = makeEngineHarness(lead);
+    const partyCharacters = [lead.character, second.character];
+    const switchCalls: number[] = [];
+    let activeIndex = 1;
+    engine.party = {
+        getCharacters: () => partyCharacters,
+        getActiveIndex: () => activeIndex,
+        switchTo: (index: number) => {
+            if (index < 0 || index >= partyCharacters.length || partyCharacters[index].isDead) return false;
+            switchCalls.push(index);
+            activeIndex = index;
+            return true;
+        },
+    };
+    engine.partyActors = [remote, second, lead];
+
+    const switched = engine.switchToPartyMember(2);
+
+    assert.equal(switched, true);
+    assert.deepEqual(switchCalls, [0]);
+    assert.equal(engine.player, lead.entity);
+    assert.ok(calls.includes('clearTargeting'));
+    assert.ok(calls.includes('closeActionMenu'));
+    assert.ok(calls.includes('closeTacticalMenu'));
+
+    const remoteSwitched = engine.switchToPartyMember(0);
+
+    assert.equal(remoteSwitched, false);
+    assert.deepEqual(switchCalls, [0]);
+    assert.ok(engine.combatLog.some((message: string) => message.includes('표시 전용')));
 });
 
 test('network move reopens the action menu when the server confirms the moved tile and ATB remains', () => {

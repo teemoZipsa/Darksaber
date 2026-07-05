@@ -685,10 +685,13 @@ export class WorldEngine {
     }
 
     private switchToNextAliveActor(): void {
+        const characters = this.party.getCharacters();
         const current = this.party.getActiveIndex();
-        for (let offset = 1; offset <= this.getFieldState().partyActors.length; offset++) {
-            const next = (current + offset) % this.getFieldState().partyActors.length;
-            if (this.switchToPartyMember(next)) return;
+        for (let offset = 1; offset <= characters.length; offset++) {
+            const character = characters[(current + offset) % characters.length];
+            if (!character || character.isDead) continue;
+            const next = this.getFieldState().partyActors.findIndex((actor) => actor.character === character);
+            if (next >= 0 && this.switchToPartyMember(next)) return;
         }
     }
 
@@ -704,7 +707,8 @@ export class WorldEngine {
             this.addCombatLog(formatT('field.log.remoteDisplayOnly', { name: actor.character.name }));
             return false;
         }
-        if (!this.party.switchTo(index)) return false;
+        const localIndex = this.party.getCharacters().findIndex((character) => character === actor.character);
+        if (!this.party.switchTo(localIndex)) return false;
         this.player = actor.entity;
         this.actionControllers.selectionController.selectActor(actor.id);
         this.actionControllers.playerActionController.clearTargeting();

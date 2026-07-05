@@ -1073,11 +1073,17 @@ function countActivePlayers(): number {
 }
 
 function isCharacterInActiveWorldSession(accountId: string, characterId: string): boolean {
-    for (const tracker of saveTrackers.values()) {
-        if (tracker.accountId === accountId && tracker.characterId === characterId) return true;
-    }
     for (const session of sessions.values()) {
         if (session.hasActiveCharacter(accountId, characterId)) return true;
+    }
+    for (const tracker of saveTrackers.values()) {
+        if (
+            tracker.accountId === accountId
+            && tracker.characterId === characterId
+            && (tracker.dirty || tracker.saving)
+        ) {
+            return true;
+        }
     }
     return false;
 }

@@ -176,11 +176,19 @@ export class WorldNetworkSyncController {
             snapshot,
         });
         const ownByLocalId = new Map(ownSnapshots.map((actor) => [actor.localActorId ?? actor.id, actor]));
+        const claimedOwnSnapshots = new Set<ActorSnapshot>();
         const nextLocalActors: FieldActor[] = [];
 
         for (const character of localCharacters) {
-            const actorSnapshot = ownByLocalId.get(character.id);
             const existing = partyActors.find((actor) => actor.character === character);
+            const actorSnapshot = this.takeOwnSnapshotForCharacter(
+                character,
+                existing,
+                ownSnapshots,
+                ownByLocalId,
+                claimedOwnSnapshots,
+                localCharacters.length
+            );
             if (!actorSnapshot) continue;
             const actor = existing ?? {
                 id: actorSnapshot.id,
@@ -276,6 +284,41 @@ export class WorldNetworkSyncController {
         }
         this.reopenPendingMoveMenu(ownSnapshots);
         this.context.storyScenarioController.applyNetworkScenarioSnapshot(snapshot.scenario);
+    }
+
+    private takeOwnSnapshotForCharacter(
+        character: Character,
+        existing: FieldActor | undefined,
+        ownSnapshots: readonly ActorSnapshot[],
+        ownByLocalId: ReadonlyMap<string, ActorSnapshot>,
+        claimedOwnSnapshots: Set<ActorSnapshot>,
+        localCharacterCount: number
+    ): ActorSnapshot | undefined {
+        const claim = (snapshot: ActorSnapshot | undefined): ActorSnapshot | undefined => {
+            if (!snapshot || claimedOwnSnapshots.has(snapshot)) return undefined;
+            claimedOwnSnapshots.add(snapshot);
+            return snapshot;
+        };
+
+        const exact = claim(ownByLocalId.get(character.id));
+        if (exact) return exact;
+
+        const existingMatch = claim(existing
+            ? ownSnapshots.find((snapshot) => snapshot.id === existing.id && !claimedOwnSnapshots.has(snapshot))
+            : undefined);
+        if (existingMatch) return existingMatch;
+
+        const identityMatches = ownSnapshots.filter((snapshot) =>
+            !claimedOwnSnapshots.has(snapshot)
+            && snapshot.name === character.name
+            && snapshot.classLineId === character.classLineId
+        );
+        if (identityMatches.length === 1) return claim(identityMatches[0]);
+
+        // Legacy restored sessions can carry an obsolete localActorId for a solo character.
+        if (localCharacterCount === 1 && ownSnapshots.length === 1) return claim(ownSnapshots[0]);
+
+        return undefined;
     }
 
     public openLoot(grant: LootGrantMessage): void {
