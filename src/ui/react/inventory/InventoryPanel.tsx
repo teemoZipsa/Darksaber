@@ -61,7 +61,6 @@ type DragState = {
 } | null;
 type DragPreview = { placed: PlacedItem; x: number; y: number } | null;
 type DropHint = { kind: InvGridKind; gx: number; gy: number; valid: boolean } | null;
-type TownStorageView = 'storage' | 'equipment';
 
 const RARITY_CLASS: Record<ItemRarity, string> = {
     common: 'is-rarity-common',
@@ -180,7 +179,6 @@ export function InventoryPanel({
     const [dropHint, setDropHint] = useState<DropHint>(null);
     const [equipHint, setEquipHint] = useState<ItemSlot | null>(null);
     const [mutationSeq, setMutationSeq] = useState(0);
-    const [townStorageView, setTownStorageView] = useState<TownStorageView>('storage');
 
     const bag = inv.getBag();
     const ext = inv.getExternalGrid();
@@ -417,8 +415,6 @@ export function InventoryPanel({
     );
 
     const panelStyle = { '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
-    const storageFocus = townStorage && townStorageView === 'storage';
-    const equipmentFocus = !townStorage || townStorageView === 'equipment';
     const panelTitle = townStorage ? t('inv.storageTitle') : t('inv.title');
     const panelClass = [
         'ds-panel',
@@ -429,102 +425,91 @@ export function InventoryPanel({
     const bodyClass = [
         'ds-inv__body',
         townStorage ? 'is-town-storage' : '',
-        storageFocus ? 'is-storage-focus' : '',
     ].filter(Boolean).join(' ');
+    const renderExternal = () => ext ? (
+        <div className="ds-inv__col">
+            <div className="ds-inv__coltitle">{inv.getExternalTitle()}</div>
+            {renderGrid(ext, 'ext')}
+            {inv.isExternalRaidLoot() && (
+                <button className="ds-btn ds-inv__action" onClick={() => mutateInventory(() => setFeedback(inv.takeAll()))}>
+                    {t('inv.takeAll')}
+                </button>
+            )}
+        </div>
+    ) : null;
+    const renderEquipment = () => (
+        <div className="ds-inv__col ds-inv__equipcol">
+            <div className="ds-inv__coltitle">{t('inv.equipment')}</div>
+            <div className="inv-equip">
+                {EQUIP_SLOT_LIST.map(({ slot, labelKey }) => {
+                    const equipped = char?.equipment.get(slot);
+                    return (
+                        <div
+                            key={slot}
+                            className={`inv-eqslot inv-eqslot--${slot}${equipHint === slot ? ' is-drop-target' : ''}`}
+                            data-inv-equip={slot}
+                            title={t(labelKey)}
+                        >
+                            {equipped ? (
+                                <InvItem
+                                    placed={equipped}
+                                    key={`equip-${slot}-${placedItemKey(equipped)}`}
+                                    spanned={false}
+                                    dragging={dragPreview?.placed === equipped}
+                                    onPointerDown={beginPointerDrag(equipped, { kind: 'equip', slot })}
+                                    onHoverEnter={tip.show(tipFor(equipped, true))}
+                                    onHoverMove={tip.move}
+                                    onHoverLeave={tip.hide}
+                                />
+                            ) : (
+                                <span className="inv-eqslot__label">{t(labelKey)}</span>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+    const renderBackpack = () => (
+        <div className="ds-inv__col">
+            <div className="ds-inv__coltitle">
+                <span>{t('inv.backpack')}</span>
+                <span className="ds-inv__weight">
+                    {formatT('inv.weightSummary', { weight: carryWeight.toFixed(1), percent: carryAtbPercent })}
+                </span>
+                <button className="ds-btn ds-inv__sortbtn" onClick={() => mutateInventory(() => setFeedback(inv.sortBag()))}>
+                    {t('inv.sort')}
+                </button>
+            </div>
+            {renderGrid(bag, 'bag')}
+        </div>
+    );
 
     return (
         <div className={panelClass} style={panelStyle} onClick={(e) => e.stopPropagation()}>
             <div className="ds-panel__header">
                 <span className="ds-panel__title">{panelTitle}</span>
-                {townStorage && (
-                    <div className="ds-inv__view-tabs" role="tablist" aria-label={t('inv.storageTitle')}>
-                        <button
-                            type="button"
-                            role="tab"
-                            aria-selected={townStorageView === 'storage'}
-                            className={`ds-inv__view-tab${townStorageView === 'storage' ? ' is-active' : ''}`}
-                            onClick={() => { setTownStorageView('storage'); AudioManager.playUi('ui.hover'); }}
-                        >
-                            {t('town.tab.storage')}
-                        </button>
-                        <button
-                            type="button"
-                            role="tab"
-                            aria-selected={townStorageView === 'equipment'}
-                            className={`ds-inv__view-tab${townStorageView === 'equipment' ? ' is-active' : ''}`}
-                            onClick={() => { setTownStorageView('equipment'); AudioManager.playUi('ui.hover'); }}
-                        >
-                            {t('inv.equipment')}
-                        </button>
-                    </div>
-                )}
                 {!embedded && (
                     <button className="ds-close-btn" onClick={() => store.closeInventory()} aria-label={t('ui.close')} title={t('ui.close')}>✕</button>
                 )}
             </div>
 
             <div className={bodyClass}>
-                {/* External grid (stash / loot) */}
-                {ext && (!townStorage || storageFocus) && (
-                    <div className="ds-inv__col">
-                        <div className="ds-inv__coltitle">{inv.getExternalTitle()}</div>
-                        {renderGrid(ext, 'ext')}
-                        {inv.isExternalRaidLoot() && (
-                            <button className="ds-btn ds-inv__action" onClick={() => mutateInventory(() => setFeedback(inv.takeAll()))}>
-                                {t('inv.takeAll')}
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {/* Equipment */}
-                {equipmentFocus && (
-                    <div className="ds-inv__col ds-inv__equipcol">
-                        <div className="ds-inv__coltitle">{t('inv.equipment')}</div>
-                        <div className="inv-equip">
-                            {EQUIP_SLOT_LIST.map(({ slot, labelKey }) => {
-                                const equipped = char?.equipment.get(slot);
-                                return (
-                                    <div
-                                        key={slot}
-                                        className={`inv-eqslot inv-eqslot--${slot}${equipHint === slot ? ' is-drop-target' : ''}`}
-                                        data-inv-equip={slot}
-                                        title={t(labelKey)}
-                                    >
-                                        {equipped ? (
-                                            <InvItem
-                                                placed={equipped}
-                                                key={`equip-${slot}-${placedItemKey(equipped)}`}
-                                                spanned={false}
-                                                dragging={dragPreview?.placed === equipped}
-                                                onPointerDown={beginPointerDrag(equipped, { kind: 'equip', slot })}
-                                                onHoverEnter={tip.show(tipFor(equipped, true))}
-                                                onHoverMove={tip.move}
-                                                onHoverLeave={tip.hide}
-                                            />
-                                        ) : (
-                                            <span className="inv-eqslot__label">{t(labelKey)}</span>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                {townStorage ? (
+                    <>
+                        {renderExternal()}
+                        <div className="ds-inv__town-side">
+                            {renderEquipment()}
+                            {renderBackpack()}
                         </div>
-                    </div>
+                    </>
+                ) : (
+                    <>
+                        {renderExternal()}
+                        {renderEquipment()}
+                        {renderBackpack()}
+                    </>
                 )}
-
-                {/* Backpack */}
-                <div className="ds-inv__col">
-                    <div className="ds-inv__coltitle">
-                        <span>{t('inv.backpack')}</span>
-                        <span className="ds-inv__weight">
-                            {formatT('inv.weightSummary', { weight: carryWeight.toFixed(1), percent: carryAtbPercent })}
-                        </span>
-                        <button className="ds-btn ds-inv__sortbtn" onClick={() => mutateInventory(() => setFeedback(inv.sortBag()))}>
-                            {t('inv.sort')}
-                        </button>
-                    </div>
-                    {renderGrid(bag, 'bag')}
-                </div>
             </div>
 
             <div className="ds-inv__feedback">{feedback}</div>
