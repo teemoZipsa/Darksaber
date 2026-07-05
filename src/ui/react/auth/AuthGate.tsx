@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { t } from '../../../i18n/LanguageManager';
 import { CHAR_CLASSES, type StartingClassId } from '../../../data/characterClasses';
 import { AuthApiError, AuthClient, type AccountMeResponse, type AuthCharacter, type AuthSessionResponse } from '../../../net/AuthClient';
+import { NetworkRaidClient } from '../../../net/NetworkRaidClient';
 import type { GameManager } from '../../../engine/GameManager';
 
 type Screen = 'loading' | 'auth' | 'select' | 'create' | 'playing';
@@ -99,7 +100,11 @@ export function AuthGate({ client, gameManager }: AuthGateProps) {
     };
 
     const logout = async () => {
-        await client.logout();
+        try {
+            await client.logout();
+        } finally {
+            NetworkRaidClient.clearStoredResumeTokens();
+        }
         setAccount(null);
         setError('');
         setScreen('auth');

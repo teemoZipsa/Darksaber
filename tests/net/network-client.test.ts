@@ -73,6 +73,14 @@ class MockWebSocket {
 class MemoryStorage {
     private readonly values = new Map<string, string>();
 
+    public get length(): number {
+        return this.values.size;
+    }
+
+    public key(index: number): string | null {
+        return [...this.values.keys()][index] ?? null;
+    }
+
     public getItem(key: string): string | null {
         return this.values.get(key) ?? null;
     }
@@ -218,6 +226,26 @@ test('client ignores legacy global resume token when joining a scoped character'
     } finally {
         restoreStorage();
         restoreSocket();
+    }
+});
+
+test('clearing stored resume tokens removes legacy and all scoped tokens only', () => {
+    const storage = new MemoryStorage();
+    const restoreStorage = installMemoryStorage(storage);
+    storage.setItem('darksaber_world_resume_token', 'legacy_resume');
+    storage.setItem(resumeTokenKey('character_a'), 'resume_a');
+    storage.setItem(resumeTokenKey('character_b'), 'resume_b');
+    storage.setItem('darksaber_other_setting', 'keep');
+
+    try {
+        NetworkRaidClient.clearStoredResumeTokens();
+
+        assert.equal(storage.getItem('darksaber_world_resume_token'), null);
+        assert.equal(storage.getItem(resumeTokenKey('character_a')), null);
+        assert.equal(storage.getItem(resumeTokenKey('character_b')), null);
+        assert.equal(storage.getItem('darksaber_other_setting'), 'keep');
+    } finally {
+        restoreStorage();
     }
 });
 

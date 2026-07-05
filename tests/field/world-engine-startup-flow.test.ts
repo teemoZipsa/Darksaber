@@ -173,3 +173,42 @@ test('world startup flow source adapter wires shared ports and action controller
         i18n.lang = previousLang;
     }
 });
+
+test('world startup flow source adapter does not resume without an explicit resume source', () => {
+    const calls: string[] = [];
+    const actor = makeActor('hero', 2, 3);
+    let player = new Player(0, 0);
+    const camera = {
+        followTile: (x: number, y: number) => calls.push(`follow:${x},${y}`),
+        snapToTarget: () => calls.push('snap'),
+    } as unknown as Camera;
+    const ports = {
+        getControlledActor: () => actor,
+        setPlayer: (nextPlayer: Player) => {
+            player = nextPlayer;
+            calls.push(`set-player:${nextPlayer.gridX},${nextPlayer.gridY}`);
+        },
+        getPlayer: () => player,
+        getCurrentHubTown: () => ({ id: 'central_castle' }),
+        openTown: (town: { id: string }) => calls.push(`open-town:${town.id}`),
+        addCombatLog: (message: string) => calls.push(`log:${message}`),
+    } as unknown as WorldEngineSharedControllerPorts;
+    const actionControllers = {
+        selectionController: {
+            selectActor: (actorId: string | null) => calls.push(`select:${actorId ?? 'none'}`),
+        },
+    } as unknown as WorldEngineActionControllers;
+
+    runWorldEngineStartupFlowFromSources({
+        camera,
+        options: {},
+        ports,
+        getActionControllers: () => actionControllers,
+        spawnPartyAtCurrentHub: () => calls.push('spawn-party'),
+        startIntroTutorial: () => calls.push('start-tutorial'),
+        beginRaidFromCurrentHub: () => calls.push('begin-raid'),
+    });
+
+    assert.equal(calls.includes('begin-raid'), false);
+    assert.equal(calls.includes('open-town:central_castle'), true);
+});

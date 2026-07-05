@@ -125,6 +125,19 @@ export class NetworkRaidClient {
         }
     }
 
+    public static clearStoredResumeTokens(): void {
+        try {
+            localStorage.removeItem(RESUME_TOKEN_KEY);
+            const scopedPrefix = `${RESUME_TOKEN_KEY}:`;
+            for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+                const key = localStorage.key(i);
+                if (key?.startsWith(scopedPrefix)) localStorage.removeItem(key);
+            }
+        } catch {
+            // Storage may be unavailable in restricted browser contexts.
+        }
+    }
+
     public async connectAndJoin(input: NetworkRaidJoinInput): Promise<WorldWelcomeMessage> {
         if (!input.accessToken || !input.characterId) {
             throw new Error('Network join requires an access token and selected character.');

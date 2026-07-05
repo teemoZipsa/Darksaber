@@ -102,6 +102,7 @@
 - [x] 캐릭터 삭제 UI 추가. 캐릭터 선택 화면에서 이름 입력 확인을 거쳐 기존 `DELETE /characters/:id` API로 삭제하고, 마지막 캐릭터 삭제 후 캐릭터 생성 화면으로 이동한다.
 - [x] 레이드 중 캐릭터 삭제 차단. 진행 중인 원정 세션이 보유한 캐릭터는 `DELETE /characters/:id`에서 409로 막아 월드 저장 flush와 계정 캐릭터 목록이 어긋나지 않게 한다.
 - [x] 네트워크 세션 경계 안정화. resumeToken을 캐릭터별로 저장하고 서버 resume 소유권을 검증하며, 복구된 active raid 세션 삭제 차단과 원격 actor 소유권 분류를 보강한다.
+- [x] 로그아웃/배포 세션 후속 정리. 로그아웃 시 모든 network resume token을 제거하고 캐릭터 ID 없는 startup resume 기본값과 production SameSite 예시를 배포 문서 기준에 맞춘다.
 
 ---
 

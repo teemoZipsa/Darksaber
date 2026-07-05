@@ -2,7 +2,6 @@ import { Player } from '../../entity/Player';
 import type { Camera } from '../Camera';
 import type { FieldActor } from '../../field/FieldTypes';
 import { t } from '../../i18n/LanguageManager';
-import { NetworkRaidClient } from '../../net/NetworkRaidClient';
 import type { WorldEngineActionControllers } from './WorldEngineActionControllers';
 import type { WorldEngineSharedControllerPorts } from './WorldEngineSharedControllerPorts';
 
@@ -67,7 +66,7 @@ export function runWorldEngineStartupFlowFromSources(sources: WorldEngineStartup
         getPlayer: () => sources.ports.getPlayer(),
         selectActor: (actorId) => sources.getActionControllers().selectionController.selectActor(actorId),
         startIntroTutorial: () => sources.startIntroTutorial(),
-        hasStoredNetworkResumeToken: sources.hasStoredNetworkResumeToken ?? (() => NetworkRaidClient.hasStoredResumeToken()),
+        hasStoredNetworkResumeToken: sources.hasStoredNetworkResumeToken ?? (() => false),
         beginRaidFromCurrentHub: () => sources.beginRaidFromCurrentHub(),
         openCurrentHubTown: () => sources.ports.openTown(sources.ports.getCurrentHubTown()),
         addCombatLog: (message) => sources.ports.addCombatLog(message),
