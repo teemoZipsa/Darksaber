@@ -82,10 +82,12 @@ test('world session snapshot store reloads reconnectable active raid snapshots',
 
         const restored = WorldSession.restorePersistentSnapshot(entries[0]!.snapshot);
         restored.disconnectActivePlayersForServerRestart(5_000);
+        assert.equal(restored.hasActiveCharacter(character.accountId, character.id), true);
         const reconnect = restored.reconnect(joined.welcome.resumeToken, 6_000);
         assert.ok(reconnect);
         assert.equal(reconnect.playerId, joined.playerId);
         assert.equal(reconnect.welcome.sessionEpoch, 77_777);
+        assert.equal(restored.hasActiveCharacter(character.accountId, character.id), true);
 
         await reloadedStore.remove(sessionKey);
         assert.equal((await new WorldSessionSnapshotStore({ persistPath }).list()).length, 0);

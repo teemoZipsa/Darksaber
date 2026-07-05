@@ -17,10 +17,11 @@ export function classifyNetworkActorSnapshots(input: NetworkActorSnapshotOwnersh
     const localPlayerActorIds = new Set(
         input.snapshot.players.find((player) => player.playerId === input.playerId)?.actorIds ?? []
     );
-    const isOwnActorSnapshot = (actor: ActorSnapshot): boolean =>
-        actor.ownerPlayerId === input.playerId
-        || localPlayerActorIds.has(actor.id)
-        || (actor.localActorId ? input.localCharacterIds.has(actor.localActorId) : false);
+    const isOwnActorSnapshot = (actor: ActorSnapshot): boolean => {
+        if (actor.ownerPlayerId) return actor.ownerPlayerId === input.playerId;
+        return localPlayerActorIds.has(actor.id)
+            || (actor.localActorId ? input.localCharacterIds.has(actor.localActorId) : false);
+    };
     const liveActorSnapshots = input.snapshot.partyActors.filter((actor) => !actor.isGhost);
     return {
         localPlayerActorIds,

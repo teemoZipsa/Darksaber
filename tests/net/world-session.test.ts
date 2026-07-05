@@ -663,6 +663,30 @@ test('disconnect grace resumes same actor before expiry and starts fresh after e
     );
 });
 
+test('disconnect grace rejects resume token for a different account or character', () => {
+    const session = new WorldSession({ ghostGraceMs: 1_000 });
+    const first = session.join(joinMessage('central_castle', 'hero-a'), 0, {
+        accountId: 'account-a',
+        characterId: 'hero-a',
+    });
+
+    session.disconnect(first.playerId, 100);
+
+    assert.throws(
+        () => session.join(joinMessage('central_castle', 'hero-b', first.welcome.resumeToken), 500, {
+            accountId: 'account-b',
+            characterId: 'hero-b',
+        }),
+        WorldResumeFailedError,
+    );
+
+    const resumed = session.join(joinMessage('central_castle', 'hero-a', first.welcome.resumeToken), 600, {
+        accountId: 'account-a',
+        characterId: 'hero-a',
+    });
+    assert.equal(resumed.playerId, first.playerId);
+});
+
 test('loot contention grants one occupant and rejects the other', () => {
     const session = new WorldSession();
     const a = session.join({

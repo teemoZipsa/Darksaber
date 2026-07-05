@@ -149,6 +149,13 @@ export class WorldResumeFailedError extends Error {
         super(message);
     }
 }
+
+function canResumePlayerWithContext(player: ServerPlayer, context: WorldJoinContext): boolean {
+    if (context.accountId !== undefined && player.accountId !== context.accountId) return false;
+    if (context.characterId !== undefined && player.characterId !== context.characterId) return false;
+    return true;
+}
+
 export class WorldSession {
     public readonly sessionEpoch: number;
     private readonly worldMap: WorldMap;
@@ -370,6 +377,10 @@ export class WorldSession {
     public join(message: WorldJoinMessage, now: number = Date.now(), context: WorldJoinContext = {}): { playerId: string; welcome: WorldWelcomeMessage } {
         const resumed = message.resumeToken ? this.findResumablePlayer(message.resumeToken, now) : null;
         if (resumed) {
+            if (!canResumePlayerWithContext(resumed, context)) {
+                this.log(`resume denied reason=owner_mismatch player=${resumed.id}`);
+                throw new WorldResumeFailedError('Resume token does not belong to this account or character.');
+            }
             resumed.ghost = false;
             resumed.disconnectedAt = null;
             resumed.saveSnapshot ??= cloneCharacterSave(context.saveSnapshot);
@@ -667,6 +678,14 @@ export class WorldSession {
 
     public getPlayerByResumeToken(resumeToken: string): ServerPlayer | null {
         return [...this.players.values()].find((player) => player.resumeToken === resumeToken) ?? null;
+    }
+
+    public hasActiveCharacter(accountId: string, characterId: string): boolean {
+        return [...this.players.values()].some((player) =>
+            player.active
+            && player.accountId === accountId
+            && player.characterId === characterId
+        );
     }
 
     public consumeSaveDirtyPlayerIds(): string[] {

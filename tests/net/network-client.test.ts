@@ -132,6 +132,10 @@ function welcomeMessage(resumeToken = 'resume_1', sessionEpoch = 1): string {
     });
 }
 
+function resumeTokenKey(characterId = 'character_test'): string {
+    return `darksaber_world_resume_token:${characterId}`;
+}
+
 test('client rejects network join when the server URL is not configured', async () => {
     const restoreSocket = installMockWebSocket();
 
@@ -171,9 +175,10 @@ test('client uses stored resume token when joining after refresh', async () => {
     const restoreSocket = installMockWebSocket();
     const storage = new MemoryStorage();
     const restoreStorage = installMemoryStorage(storage);
-    storage.setItem('darksaber_world_resume_token', 'stored_resume');
+    storage.setItem(resumeTokenKey(), 'stored_resume');
 
     try {
+        assert.equal(NetworkRaidClient.hasStoredResumeToken('character_test'), true);
         const client = new NetworkRaidClient({ url: 'ws://test' });
         const join = client.connectAndJoin(joinInput());
         const socket = MockWebSocket.instances[0];
@@ -185,6 +190,66 @@ test('client uses stored resume token when joining after refresh', async () => {
         socket.emitMessage(welcomeMessage('stored_resume'));
         await join;
         assert.equal(client.getResumeToken(), 'stored_resume');
+    } finally {
+        restoreStorage();
+        restoreSocket();
+    }
+});
+
+test('client ignores legacy global resume token when joining a scoped character', async () => {
+    const restoreSocket = installMockWebSocket();
+    const storage = new MemoryStorage();
+    const restoreStorage = installMemoryStorage(storage);
+    storage.setItem('darksaber_world_resume_token', 'legacy_resume');
+
+    try {
+        const client = new NetworkRaidClient({ url: 'ws://test' });
+        const join = client.connectAndJoin(joinInput());
+        const socket = MockWebSocket.instances[0];
+        assert.ok(socket);
+
+        socket.emitOpen();
+        assert.equal(JSON.parse(socket.sent[0]).resumeToken, undefined);
+        assert.equal(storage.getItem('darksaber_world_resume_token'), null);
+
+        socket.emitMessage(welcomeMessage('fresh_resume'));
+        await join;
+        assert.equal(storage.getItem(resumeTokenKey()), 'fresh_resume');
+    } finally {
+        restoreStorage();
+        restoreSocket();
+    }
+});
+
+test('client does not reuse in-memory resume token for another character', async () => {
+    const restoreSocket = installMockWebSocket();
+    const storage = new MemoryStorage();
+    const restoreStorage = installMemoryStorage(storage);
+
+    try {
+        const client = new NetworkRaidClient({ url: 'ws://test' });
+        const firstJoin = client.connectAndJoin(joinInput());
+        const firstSocket = MockWebSocket.instances[0];
+        assert.ok(firstSocket);
+
+        firstSocket.emitOpen();
+        firstSocket.emitMessage(welcomeMessage('resume_character_test'));
+        await firstJoin;
+
+        const secondJoin = client.connectAndJoin({
+            ...joinInput(),
+            characterId: 'character_other',
+        });
+        const secondSocket = MockWebSocket.instances[1];
+        assert.ok(secondSocket);
+
+        secondSocket.emitOpen();
+        assert.equal(JSON.parse(secondSocket.sent[0]).resumeToken, undefined);
+
+        secondSocket.emitMessage(welcomeMessage('resume_character_other'));
+        await secondJoin;
+        assert.equal(storage.getItem(resumeTokenKey()), 'resume_character_test');
+        assert.equal(storage.getItem(resumeTokenKey('character_other')), 'resume_character_other');
     } finally {
         restoreStorage();
         restoreSocket();
@@ -552,7 +617,7 @@ test('raid result clears resume state and disconnects without grace expiry', asy
 
         assert.equal(client.getPlayerId(), null);
         assert.equal(client.getResumeToken(), null);
-        assert.equal(storage.getItem('darksaber_world_resume_token'), null);
+        assert.equal(storage.getItem(resumeTokenKey()), null);
         assert.equal(client.getStatus(), 'disconnected');
         assert.equal(graceExpired, false);
         assert.ok(statuses.includes('connected'));
@@ -564,14 +629,40 @@ test('raid result clears resume state and disconnects without grace expiry', asy
     }
 });
 
-test('resume failure clears stored resume state', async () => {
+test('client leave clears stored scoped resume state before closing', async () => {
     const restoreSocket = installMockWebSocket();
     const storage = new MemoryStorage();
-    storage.setItem('darksaber_world_resume_token', 'stale_resume');
     const restoreStorage = installMemoryStorage(storage);
 
     try {
-        assert.equal(NetworkRaidClient.hasStoredResumeToken(), true);
+        const client = new NetworkRaidClient({ url: 'ws://test' });
+        const join = client.connectAndJoin(joinInput());
+        const socket = MockWebSocket.instances[0];
+        assert.ok(socket);
+
+        socket.emitOpen();
+        socket.emitMessage(welcomeMessage('resume_leave'));
+        await join;
+        assert.equal(storage.getItem(resumeTokenKey()), 'resume_leave');
+
+        client.leave('manual');
+        assert.equal(JSON.parse(socket.sent[socket.sent.length - 1] ?? '{}').type, 'WORLD_LEAVE');
+        assert.equal(client.getResumeToken(), null);
+        assert.equal(storage.getItem(resumeTokenKey()), null);
+    } finally {
+        restoreStorage();
+        restoreSocket();
+    }
+});
+
+test('resume failure clears stored resume state', async () => {
+    const restoreSocket = installMockWebSocket();
+    const storage = new MemoryStorage();
+    storage.setItem(resumeTokenKey(), 'stale_resume');
+    const restoreStorage = installMemoryStorage(storage);
+
+    try {
+        assert.equal(NetworkRaidClient.hasStoredResumeToken('character_test'), true);
         const client = new NetworkRaidClient({ url: 'ws://test' });
         const join = client.connectAndJoin(joinInput());
         const socket = MockWebSocket.instances[0];
@@ -587,8 +678,8 @@ test('resume failure clears stored resume state', async () => {
 
         await assert.rejects(join, /RESUME_FAILED/);
         assert.equal(client.getResumeToken(), null);
-        assert.equal(storage.getItem('darksaber_world_resume_token'), null);
-        assert.equal(NetworkRaidClient.hasStoredResumeToken(), false);
+        assert.equal(storage.getItem(resumeTokenKey()), null);
+        assert.equal(NetworkRaidClient.hasStoredResumeToken('character_test'), false);
     } finally {
         restoreStorage();
         restoreSocket();
@@ -598,7 +689,7 @@ test('resume failure clears stored resume state', async () => {
 test('recovered resume failure clears stored resume state', async () => {
     const restoreSocket = installMockWebSocket();
     const storage = new MemoryStorage();
-    storage.setItem('darksaber_world_resume_token', 'recovered_resume');
+    storage.setItem(resumeTokenKey(), 'recovered_resume');
     const restoreStorage = installMemoryStorage(storage);
 
     try {
@@ -617,7 +708,7 @@ test('recovered resume failure clears stored resume state', async () => {
 
         await assert.rejects(join, /RESUME_RECOVERED/);
         assert.equal(client.getResumeToken(), null);
-        assert.equal(storage.getItem('darksaber_world_resume_token'), null);
+        assert.equal(storage.getItem(resumeTokenKey()), null);
     } finally {
         restoreStorage();
         restoreSocket();

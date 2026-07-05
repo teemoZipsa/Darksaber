@@ -5,7 +5,7 @@ import { createPostgresPool } from './PostgresConnection';
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
-    console.error('DATABASE_URL is not set. Copy .env.example to .env or set DATABASE_URL in the environment.');
+    console.error('DATABASE_URL is not set. Copy .env.production.example to .env or set DATABASE_URL in the environment.');
     process.exit(1);
 }
 

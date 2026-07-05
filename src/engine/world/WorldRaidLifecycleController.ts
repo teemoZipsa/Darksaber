@@ -127,7 +127,7 @@ export class WorldRaidLifecycleController {
         }
         this.context.setIsNetworkRaidConnecting(true);
         this.context.log(t('mp.deployConnecting'));
-        const isResumeJoin = NetworkRaidClient.hasStoredResumeToken();
+        const isResumeJoin = NetworkRaidClient.hasStoredResumeToken(authContext.characterId);
 
         try {
             if (!isResumeJoin) {

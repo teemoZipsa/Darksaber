@@ -69,3 +69,23 @@ test('network snapshot ownership falls back to owner id and local character id',
     assert.deepEqual(ownership.remoteSnapshots.map((actor) => actor.id), ['remote-local-id']);
     assert.equal(ownership.isOwnActorSnapshot(makeActorSnapshot({ id: 'late-owned', ownerPlayerId: 'client-1' })), true);
 });
+
+test('network snapshot ownership does not claim explicit remote owners by local id', () => {
+    const ownership = classifyNetworkActorSnapshots({
+        playerId: 'client-1',
+        localCharacterIds: new Set(['story_cleric_ep02']),
+        snapshot: {
+            players: [
+                makePlayer('client-1', ['own-hero']),
+                makePlayer('client-2', ['remote-cleric']),
+            ],
+            partyActors: [
+                makeActorSnapshot({ id: 'own-hero', ownerPlayerId: 'client-1', localActorId: 'hero-a' }),
+                makeActorSnapshot({ id: 'remote-cleric', ownerPlayerId: 'client-2', localActorId: 'story_cleric_ep02' }),
+            ],
+        },
+    });
+
+    assert.deepEqual(ownership.ownSnapshots.map((actor) => actor.id), ['own-hero']);
+    assert.deepEqual(ownership.remoteSnapshots.map((actor) => actor.id), ['remote-cleric']);
+});

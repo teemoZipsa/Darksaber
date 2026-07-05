@@ -25,6 +25,7 @@ import type {
 } from '../../net/WorldProtocol';
 import type { CombatFeedbackKind } from './CombatFeedback';
 import type { WorldStoryScenarioController } from './WorldStoryScenarioController';
+import { classifyNetworkActorSnapshots } from './NetworkSnapshotOwnership';
 
 interface PendingNetworkMoveReopen {
     intentId: string;
@@ -169,16 +170,11 @@ export class WorldNetworkSyncController {
         const worldMap = this.context.getWorldMap();
         const localCharacters = this.context.party.getCharacters();
         const localCharacterIds = new Set(localCharacters.map((character) => character.id));
-        const localPlayerActorIds = new Set(
-            snapshot.players.find((player) => player.playerId === this.context.getNetworkPlayerId())?.actorIds ?? []
-        );
-        const isOwnActorSnapshot = (actor: ActorSnapshot): boolean =>
-            actor.ownerPlayerId === this.context.getNetworkPlayerId()
-            || localPlayerActorIds.has(actor.id)
-            || (actor.localActorId ? localCharacterIds.has(actor.localActorId) : false);
-        const liveActorSnapshots = snapshot.partyActors.filter((actor) => !actor.isGhost);
-        const ownSnapshots = liveActorSnapshots.filter(isOwnActorSnapshot);
-        const remoteSnapshots = liveActorSnapshots.filter((actor) => !isOwnActorSnapshot(actor));
+        const { ownSnapshots, remoteSnapshots } = classifyNetworkActorSnapshots({
+            playerId: this.context.getNetworkPlayerId(),
+            localCharacterIds,
+            snapshot,
+        });
         const ownByLocalId = new Map(ownSnapshots.map((actor) => [actor.localActorId ?? actor.id, actor]));
         const nextLocalActors: FieldActor[] = [];
 

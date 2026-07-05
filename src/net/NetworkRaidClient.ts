@@ -80,6 +80,7 @@ export class NetworkRaidClient {
     private latestSeq = -1;
     private playerId: string | null = null;
     private resumeToken: string | null = null;
+    private resumeTokenCharacterId: string | null = null;
     private manualClose = false;
     private reconnecting = false;
     private reconnectTimer: number | null = null;
@@ -95,7 +96,6 @@ export class NetworkRaidClient {
     constructor(options: NetworkRaidClientOptions = {}) {
         this.url = options.url ?? DEFAULT_WORLD_SERVER_URL;
         this.options = options;
-        this.resumeToken = this.readStoredResumeToken();
         this.clearLegacyAccountCredentials();
     }
 
@@ -115,9 +115,11 @@ export class NetworkRaidClient {
         return this.status;
     }
 
-    public static hasStoredResumeToken(): boolean {
+    public static hasStoredResumeToken(characterId?: string): boolean {
         try {
-            return Boolean(localStorage.getItem(RESUME_TOKEN_KEY));
+            return characterId
+                ? Boolean(localStorage.getItem(scopedResumeTokenKey(characterId)))
+                : Boolean(localStorage.getItem(RESUME_TOKEN_KEY));
         } catch {
             return false;
         }
@@ -134,7 +136,8 @@ export class NetworkRaidClient {
             this.socket.close();
         }
 
-        const resumeToken = input.resumeToken ?? this.resumeToken ?? undefined;
+        const inMemoryResumeToken = this.resumeTokenCharacterId === input.characterId ? this.resumeToken : null;
+        const resumeToken = input.resumeToken ?? inMemoryResumeToken ?? this.readStoredResumeToken(input.characterId) ?? undefined;
 
         this.socket = null;
         this.playerId = null;
@@ -142,6 +145,7 @@ export class NetworkRaidClient {
         this.sessionEpoch = null;
         this.manualClose = false;
         this.resumeToken = resumeToken ?? null;
+        this.resumeTokenCharacterId = resumeToken ? input.characterId : null;
         this.joinInput = { ...input, resumeToken };
         this.clearReconnect();
         this.setStatus('connecting');
@@ -276,6 +280,7 @@ export class NetworkRaidClient {
 
     public leave(reason: WorldLeaveMessage['reason']): void {
         this.send({ type: 'WORLD_LEAVE', reason });
+        this.clearStoredResumeToken(this.joinInput?.characterId);
         this.close();
     }
 
@@ -319,7 +324,8 @@ export class NetworkRaidClient {
                 this.sessionEpoch = message.sessionEpoch;
                 this.playerId = message.playerId;
                 this.resumeToken = message.resumeToken;
-                this.storeResumeToken(message.resumeToken);
+                this.resumeTokenCharacterId = this.joinInput?.characterId ?? null;
+                this.storeResumeToken(message.resumeToken, this.joinInput?.characterId);
                 this.clearReconnect();
                 this.setStatus('connected');
                 this.pendingWelcome?.resolve(message);
@@ -372,7 +378,7 @@ export class NetworkRaidClient {
                     this.reportBadMessage('Malformed RAID_RESULT message.');
                     return;
                 }
-                this.clearStoredResumeToken();
+                this.clearStoredResumeToken(this.joinInput?.characterId);
                 this.manualClose = true;
                 this.clearReconnect();
                 this.stopHeartbeat();
@@ -457,7 +463,7 @@ export class NetworkRaidClient {
         const wasReconnecting = this.reconnecting || this.graceDeadline !== 0;
         this.clearReconnect();
         this.manualClose = true;
-        this.clearStoredResumeToken();
+        this.clearStoredResumeToken(this.joinInput?.characterId);
         this.stopHeartbeat();
         if (this.socket && this.socket.readyState <= WebSocket.OPEN) this.socket.close();
         this.socket = null;
@@ -520,26 +526,31 @@ export class NetworkRaidClient {
         this.options.onStatusChange?.(status);
     }
 
-    private readStoredResumeToken(): string | null {
+    private readStoredResumeToken(characterId: string): string | null {
         try {
-            return localStorage.getItem(RESUME_TOKEN_KEY);
+            localStorage.removeItem(RESUME_TOKEN_KEY);
+            return localStorage.getItem(scopedResumeTokenKey(characterId));
         } catch {
             return null;
         }
     }
 
-    private storeResumeToken(token: string): void {
+    private storeResumeToken(token: string, characterId: string | undefined): void {
+        if (!characterId) return;
         try {
-            localStorage.setItem(RESUME_TOKEN_KEY, token);
+            localStorage.removeItem(RESUME_TOKEN_KEY);
+            localStorage.setItem(scopedResumeTokenKey(characterId), token);
         } catch {
             // Ignore storage failures; reconnect just starts fresh.
         }
     }
 
-    private clearStoredResumeToken(): void {
+    private clearStoredResumeToken(characterId: string | undefined): void {
         this.resumeToken = null;
+        this.resumeTokenCharacterId = null;
         try {
             localStorage.removeItem(RESUME_TOKEN_KEY);
+            if (characterId) localStorage.removeItem(scopedResumeTokenKey(characterId));
         } catch {
             // Ignore storage failures.
         }
@@ -557,6 +568,10 @@ export class NetworkRaidClient {
 
 function createIntentId(): string {
     return `intent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function scopedResumeTokenKey(characterId: string): string {
+    return `${RESUME_TOKEN_KEY}:${characterId}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

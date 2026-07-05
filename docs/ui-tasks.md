@@ -101,6 +101,7 @@
 - [x] 브라우저 e2e 모델 검증 보강. 레이드 전리품 포인터 드래그 스모크가 DOM 변화뿐 아니라 backpack/external/world loot 모델 수량과 DEV 획득 ledger까지 함께 검증하게 한다.
 - [x] 캐릭터 삭제 UI 추가. 캐릭터 선택 화면에서 이름 입력 확인을 거쳐 기존 `DELETE /characters/:id` API로 삭제하고, 마지막 캐릭터 삭제 후 캐릭터 생성 화면으로 이동한다.
 - [x] 레이드 중 캐릭터 삭제 차단. 진행 중인 원정 세션이 보유한 캐릭터는 `DELETE /characters/:id`에서 409로 막아 월드 저장 flush와 계정 캐릭터 목록이 어긋나지 않게 한다.
+- [x] 네트워크 세션 경계 안정화. resumeToken을 캐릭터별로 저장하고 서버 resume 소유권을 검증하며, 복구된 active raid 세션 삭제 차단과 원격 actor 소유권 분류를 보강한다.
 
 ---
 
