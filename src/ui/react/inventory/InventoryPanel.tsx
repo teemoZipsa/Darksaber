@@ -61,6 +61,12 @@ type DragState = {
 } | null;
 type DragPreview = { placed: PlacedItem; x: number; y: number } | null;
 type DropHint = { kind: InvGridKind; gx: number; gy: number; valid: boolean } | null;
+type GridMetrics = {
+    originX: number;
+    originY: number;
+    cellW: number;
+    cellH: number;
+};
 
 const RARITY_CLASS: Record<ItemRarity, string> = {
     common: 'is-rarity-common',
@@ -107,6 +113,36 @@ function placedItemKey(placed: PlacedItem): number {
         placedItemKeys.set(placed, key);
     }
     return key;
+}
+
+function gridMetrics(gridEl: HTMLElement, grid: GridInventory): GridMetrics {
+    const rect = gridEl.getBoundingClientRect();
+    const style = window.getComputedStyle(gridEl);
+    const borderLeft = Number.parseFloat(style.borderLeftWidth) || 0;
+    const borderTop = Number.parseFloat(style.borderTopWidth) || 0;
+    const borderRight = Number.parseFloat(style.borderRightWidth) || 0;
+    const borderBottom = Number.parseFloat(style.borderBottomWidth) || 0;
+    return {
+        originX: rect.left + borderLeft,
+        originY: rect.top + borderTop,
+        cellW: (rect.width - borderLeft - borderRight) / grid.width,
+        cellH: (rect.height - borderTop - borderBottom) / grid.height,
+    };
+}
+
+function gridCellFromPoint(
+    gridEl: HTMLElement,
+    grid: GridInventory,
+    clientX: number,
+    clientY: number,
+    offsetX: number,
+    offsetY: number,
+): { gx: number; gy: number } {
+    const metrics = gridMetrics(gridEl, grid);
+    return {
+        gx: Math.floor((clientX - offsetX - metrics.originX) / metrics.cellW),
+        gy: Math.floor((clientY - offsetY - metrics.originY) / metrics.cellH),
+    };
 }
 
 function InvItem({
@@ -249,9 +285,7 @@ export function InventoryPanel({
                 const kind = gridEl.dataset.invGrid as InvGridKind | undefined;
                 const grid = kind === 'bag' ? inv.getBag() : kind === 'ext' ? inv.getExternalGrid() : null;
                 if (kind && grid) {
-                    const rect = gridEl.getBoundingClientRect();
-                    const gx = Math.floor((clientX - d.offsetX - rect.left) / CELL);
-                    const gy = Math.floor((clientY - d.offsetY - rect.top) / CELL);
+                    const { gx, gy } = gridCellFromPoint(gridEl, grid, clientX, clientY, d.offsetX, d.offsetY);
                     setDropHint({ kind, gx, gy, valid: canDropAt(grid, d.placed, gx, gy) });
                     setEquipHint(null);
                     return;
@@ -274,9 +308,9 @@ export function InventoryPanel({
             if (gridEl) {
                 const kind = gridEl.dataset.invGrid as InvGridKind | undefined;
                 if (!kind) return null;
-                const rect = gridEl.getBoundingClientRect();
-                const gx = Math.floor((clientX - d.offsetX - rect.left) / CELL);
-                const gy = Math.floor((clientY - d.offsetY - rect.top) / CELL);
+                const grid = kind === 'bag' ? inv.getBag() : kind === 'ext' ? inv.getExternalGrid() : null;
+                if (!grid) return null;
+                const { gx, gy } = gridCellFromPoint(gridEl, grid, clientX, clientY, d.offsetX, d.offsetY);
                 if (!inv.moveToCell(d.placed, d.source, kind, gx, gy)) return null;
                 return d.source.kind === 'equip' ? 'unequip' : 'move';
             }
