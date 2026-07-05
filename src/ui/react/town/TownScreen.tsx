@@ -84,7 +84,7 @@ export function TownScreen() {
                 {tab === 'storage' && townInv && (
                     <div className="ds-town__storage">
                         <FacilityUpgradePanel />
-                        <InventoryPanel inv={townInv} embedded />
+                        <InventoryPanel inv={townInv} embedded townStorage />
                     </div>
                 )}
                 {isShopFacilityId(tab) && <ShopPanel />}

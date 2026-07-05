@@ -155,6 +155,7 @@ export const I18N_STRINGS: TranslationTable = {
 
         // Inventory
         'inv.title': '⚔️ 장비 및 소지품',
+        'inv.storageTitle': '📦 창고 정리',
         'inv.backpack': '공용 배낭',
         'inv.weightSummary': '무게 {weight} / 행동력 {percent}%',
         'inv.equipment': '장비',
@@ -2176,6 +2177,7 @@ export const I18N_STRINGS: TranslationTable = {
 
         // Inventory
         'inv.title': '⚔️ Equipment & Inventory',
+        'inv.storageTitle': '📦 Storage',
         'inv.backpack': 'Shared Backpack',
         'inv.weightSummary': 'Weight {weight} / ATB {percent}%',
         'inv.equipment': 'Equipment',

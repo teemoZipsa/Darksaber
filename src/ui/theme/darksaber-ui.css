@@ -813,6 +813,8 @@
     min-height: 0;
     box-sizing: border-box;
     padding: 0 12px;
+    overflow: auto;
+    scrollbar-gutter: stable both-edges;
 }
 #ui-overlay .ds-town__footer {
     transform: scale(var(--ds-scale));
@@ -874,10 +876,10 @@
 
 /* ─── Town storage + facility upgrades ─────────────────────── */
 #ui-overlay .ds-town__storage {
-    width: min(1180px, 96vw);
+    width: min(1500px, 96vw);
     max-height: 100%;
     display: grid;
-    grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
     gap: 14px;
     align-items: start;
 }
@@ -1330,10 +1332,57 @@
     flex: 1;
     min-height: 0;
 }
+#ui-overlay .ds-inv.is-town-storage {
+    width: 100%;
+    min-width: 0;
+}
+#ui-overlay .ds-inv.is-town-storage .ds-panel__header {
+    gap: 14px;
+}
+#ui-overlay .ds-inv__view-tabs {
+    display: inline-flex;
+    gap: 4px;
+    margin-left: auto;
+    padding: 2px;
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+    background: rgba(0, 0, 0, 0.18);
+}
+#ui-overlay .ds-inv__view-tab {
+    font-family: inherit;
+    font-size: 11px;
+    line-height: 1;
+    min-width: 70px;
+    padding: 6px 10px;
+    color: var(--ds-text-dim);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--ds-radius-sm);
+    cursor: pointer;
+}
+#ui-overlay .ds-inv__view-tab:hover {
+    color: var(--ds-text-muted);
+    border-color: var(--ds-border-shadow);
+}
+#ui-overlay .ds-inv__view-tab.is-active {
+    color: var(--ds-accent-bright);
+    border-color: var(--ds-accent);
+    background: var(--ds-accent-soft);
+}
 #ui-overlay .ds-inv__body {
     display: flex; align-items: flex-start; gap: 18px;
     padding: 16px 20px; overflow: auto;
     max-width: calc(100vw - 32px);
+}
+#ui-overlay .ds-inv__body.is-town-storage {
+    max-width: none;
+}
+#ui-overlay .ds-inv__body.is-storage-focus {
+    display: grid;
+    grid-template-columns: max-content max-content;
+    justify-content: start;
+    align-items: start;
+    gap: 20px;
 }
 #ui-overlay .ds-inv__col { display: flex; flex-direction: column; gap: 8px; flex: none; }
 #ui-overlay .ds-inv__equipcol { align-items: center; }
@@ -1571,10 +1620,21 @@
         width: calc(100vw - 16px);
         max-height: calc(100vh - 16px);
     }
+    #ui-overlay .ds-inv.is-town-storage .ds-panel__header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    #ui-overlay .ds-inv__view-tabs {
+        margin-left: 0;
+        flex-wrap: wrap;
+    }
     #ui-overlay .ds-inv__body {
         gap: 12px;
         padding: 12px;
         max-width: none;
+    }
+    #ui-overlay .ds-inv__body.is-storage-focus {
+        display: flex;
     }
     #ui-overlay .ds-inv__coltitle {
         align-items: flex-start;
