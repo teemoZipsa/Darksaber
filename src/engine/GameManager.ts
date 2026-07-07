@@ -494,6 +494,7 @@ export class GameManager {
         if (!this.networkAuthContext) return;
         this.networkAuthContext = { ...this.networkAuthContext, accessToken };
         this.authClient?.setAccessToken(accessToken);
+        this.worldEngine?.networkRaidClient?.updateAccessToken(accessToken);
     }
 
     public getNetworkAuthContext(): { accessToken: string; characterId: string } | null {

@@ -115,6 +115,11 @@ export class NetworkRaidClient {
         return this.status;
     }
 
+    public updateAccessToken(accessToken: string): void {
+        if (!accessToken || !this.joinInput) return;
+        this.joinInput = { ...this.joinInput, accessToken };
+    }
+
     public static hasStoredResumeToken(characterId?: string): boolean {
         try {
             return characterId

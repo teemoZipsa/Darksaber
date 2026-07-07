@@ -318,6 +318,47 @@ test('client includes access token, character id, requested realm, raid instance
     }
 });
 
+test('client uses refreshed access token for reconnect payloads', async () => {
+    const restoreSocket = installMockWebSocket();
+    const originalWindow = (globalThis as unknown as { window?: unknown }).window;
+    const reconnectTimers: Array<() => void> = [];
+    (globalThis as unknown as { window?: unknown }).window = {
+        setTimeout: (callback: () => void) => {
+            reconnectTimers.push(callback);
+            return reconnectTimers.length;
+        },
+        clearTimeout: () => undefined,
+    };
+
+    try {
+        const client = new NetworkRaidClient({ url: 'ws://test' });
+        const join = client.connectAndJoin(joinInput());
+        const firstSocket = MockWebSocket.instances[0];
+        assert.ok(firstSocket);
+
+        firstSocket.emitOpen();
+        firstSocket.emitMessage(welcomeMessage('resume_refresh'));
+        await join;
+
+        client.updateAccessToken('fresh_access');
+        firstSocket.emitClose();
+        assert.equal(reconnectTimers.length, 1);
+        reconnectTimers[0]();
+
+        const reconnectSocket = MockWebSocket.instances[1];
+        assert.ok(reconnectSocket);
+        reconnectSocket.emitOpen();
+        const reconnectPayload = JSON.parse(reconnectSocket.sent[0]);
+        assert.equal(reconnectPayload.type, 'RECONNECT');
+        assert.equal(reconnectPayload.resumeToken, 'resume_refresh');
+        assert.equal(reconnectPayload.accessToken, 'fresh_access');
+    } finally {
+        if (originalWindow === undefined) Reflect.deleteProperty(globalThis, 'window');
+        else (globalThis as unknown as { window?: unknown }).window = originalWindow;
+        restoreSocket();
+    }
+});
+
 test('client sends world heartbeat while the socket is open and clears the timer on close', async () => {
     const restoreSocket = installMockWebSocket();
     const originalSetInterval = globalThis.setInterval;
