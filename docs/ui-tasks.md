@@ -116,6 +116,7 @@
 - [x] 인벤토리 드래그 좌표 보정. 드롭 셀 계산을 실제 grid content 좌표와 렌더된 cell 크기 기준으로 바꿔 UI 스케일/테두리에서 하이라이트와 드롭 위치가 어긋나지 않게 한다.
 - [x] 장시간 레이드 재접속 토큰 갱신. 로그인 세션 refresh가 이미 열린 `NetworkRaidClient`의 reconnect payload까지 갱신하도록 연결해 access token TTL 이후 네트워크 드롭 복구 실패를 막는다.
 - [x] production 서버 DB 설정 fail-fast. `NODE_ENV=production`에서 `DATABASE_URL`이 없으면 메모리 auth store로 뜨지 않고 시작을 중단하도록 runtime config guard와 테스트를 추가한다.
+- [x] 배포 설정 drift guard. `render.yaml`의 `autoDeployTrigger`를 배포 문서와 같은 `commit`으로 맞추고 문서/config 테스트를 추가한다.
 
 ---
 
