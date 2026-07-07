@@ -120,6 +120,7 @@
 - [x] Vercel production client env guard. Vercel 또는 명시 검증 빌드에서 `VITE_AUTH_SERVER_URL`/`VITE_WORLD_SERVER_URL` 누락 시 빌드가 실패하도록 Vite 설정 테스트를 추가한다.
 - [x] 모바일 DOM overlay e2e 보강. 모바일에서 launcher/readiness, 전리품 이동, 반복 오버레이 토글을 검증하고 마법 장착 패널의 작은 화면 overflow를 수정한다.
 - [x] production auth origin 설정 fail-fast. `NODE_ENV=production`에서 `AUTH_ALLOWED_ORIGINS`가 없으면 서버 시작을 중단해 빈 CORS allowlist로 배포되지 않게 한다.
+- [x] production refresh cookie secure guard. `NODE_ENV=production`에서 `AUTH_REFRESH_COOKIE_SECURE=0`이면 서버 시작을 중단해 refresh cookie가 insecure로 배포되지 않게 한다.
 
 ---
 

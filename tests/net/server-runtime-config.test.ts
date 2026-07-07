@@ -25,12 +25,29 @@ test('production server requires AUTH_ALLOWED_ORIGINS', () => {
     );
 });
 
+test('production server rejects insecure refresh cookies', () => {
+    assert.throws(
+        () => resolveServerRuntimeConfig({
+            NODE_ENV: 'production',
+            DATABASE_URL: 'postgres://db',
+            AUTH_ALLOWED_ORIGINS: 'https://game.example',
+            AUTH_REFRESH_COOKIE_SECURE: '0',
+        }),
+        /AUTH_REFRESH_COOKIE_SECURE=0 is not allowed/
+    );
+});
+
 test('server runtime config chooses postgres only when DATABASE_URL is set', () => {
     assert.deepEqual(resolveServerRuntimeConfig({ NODE_ENV: 'development' }), {
         databaseUrl: null,
         authStoreKind: 'memory',
         allowedOrigins: [...DEFAULT_DEV_ALLOWED_ORIGINS],
+        refreshCookieSecure: true,
     });
+    assert.equal(resolveServerRuntimeConfig({
+        NODE_ENV: 'development',
+        AUTH_REFRESH_COOKIE_SECURE: '0',
+    }).refreshCookieSecure, false);
     assert.deepEqual(resolveServerRuntimeConfig({
         NODE_ENV: 'production',
         DATABASE_URL: ' postgres://db ',
@@ -39,5 +56,6 @@ test('server runtime config chooses postgres only when DATABASE_URL is set', () 
         databaseUrl: 'postgres://db',
         authStoreKind: 'postgres',
         allowedOrigins: ['https://game.example', 'http://localhost:5173'],
+        refreshCookieSecure: true,
     });
 });

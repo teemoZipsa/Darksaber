@@ -101,7 +101,7 @@ const handleAuthHttpRequest = createAuthHttpHandler({
     store: authStore,
     jwt: jwtOptions,
     allowedOrigins,
-    refreshCookieSecure: process.env.AUTH_REFRESH_COOKIE_SECURE !== '0',
+    refreshCookieSecure: runtimeConfig.refreshCookieSecure,
     sameSite: parseSameSite(process.env.AUTH_REFRESH_COOKIE_SAMESITE),
     isHubPatchBlocked: (accountId, characterId) => isCharacterInActiveWorldSession(accountId, characterId),
 });
