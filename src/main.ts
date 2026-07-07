@@ -194,7 +194,7 @@ function mountDevLauncher(): void {
 }
 
 async function loginOrRegisterDevAccount(client: AuthClient): Promise<AuthSessionResponse> {
-    const loginName = 'dev-town';
+    const loginName = getDevLoginName();
     const password = 'dev-password-123';
     try {
         return await client.login(loginName, password);
@@ -202,6 +202,12 @@ async function loginOrRegisterDevAccount(client: AuthClient): Promise<AuthSessio
         if (!(error instanceof AuthApiError) || error.status !== 401) throw error;
         return client.register(loginName, password);
     }
+}
+
+function getDevLoginName(): string {
+    const configured = new URLSearchParams(window.location.search).get('devAccount')?.trim();
+    if (configured && /^[A-Za-z0-9_.-]{3,32}$/.test(configured)) return configured;
+    return 'dev-town';
 }
 
 async function createDevCharacter(client: AuthClient, session: AuthSessionResponse) {

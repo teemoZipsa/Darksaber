@@ -117,9 +117,7 @@ test('dev launcher buttons are readable and enter dev modes', async ({ page, isM
     await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
 });
 
-test('auth character select deletes the last character after exact-name confirmation', async ({ page, request, isMobile }) => {
-    test.skip(isMobile, 'Auth account creation and deletion flow is covered on the desktop browser project.');
-
+test('auth character select deletes the last character after exact-name confirmation', async ({ page, request }) => {
     const loginName = `delete_${Date.now().toString(36)}`;
     const password = 'password-1234';
     const characterName = 'DeleteMe';
@@ -265,9 +263,8 @@ test('dev raid loot can be transferred into the backpack with pointer input', as
     expect(after.status).toMatch(/picked:dev_raid_loot:\d+,\d+/);
 });
 
-test('network raid logs reconnect UX after a transport drop', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'Network reconnect UX is covered on the desktop browser project.');
-    test.setTimeout(45_000);
+test('network raid logs reconnect UX after a transport drop', async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
 
     const clientErrors: string[] = [];
     page.on('pageerror', (error) => clientErrors.push(error.message));
@@ -276,7 +273,8 @@ test('network raid logs reconnect UX after a transport drop', async ({ page, isM
         if (message.type() === 'error') clientErrors.push(message.text());
     });
 
-    await page.goto('/?devStart=raid');
+    const devAccount = `reconnect-${testInfo.project.name.replace(/[^a-z0-9]/gi, '').slice(0, 10)}-${Date.now().toString(36)}`;
+    await page.goto(`/?devStart=raid&devAccount=${devAccount}`);
     await expect(page.locator('#gameCanvas')).toBeVisible();
     await expect.poll(() => getNetworkRaidDebug(page), { timeout: 30_000 }).toMatchObject({
         state: 'WORLD',
