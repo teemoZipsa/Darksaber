@@ -125,6 +125,7 @@
 - [x] SettingsManager storage 예외 내성. `localStorage` 접근이 차단되거나 quota 오류가 나도 설정 초기화/변경/키바인딩 저장이 앱을 중단하지 않게 한다.
 - [x] 모바일 auth/reconnect e2e skip 제거. 캐릭터 삭제 확인과 네트워크 재접속 UX 테스트를 mobile-chrome 프로젝트에서도 실행하고, reconnect e2e는 dev 계정을 격리해 순서 의존을 없앤다.
 - [x] auth origin hardening. `AUTH_ALLOWED_ORIGINS`를 URL origin으로 검증하고 production missing Origin 기본값을 차단하되 명시 env로만 허용하게 한다.
+- [x] Playwright runtime spool 격리. e2e 서버가 전용 world save spool/session snapshot 파일을 쓰고 시작 시 지워 stale local runtime 로그가 섞이지 않게 한다.
 
 ---
 

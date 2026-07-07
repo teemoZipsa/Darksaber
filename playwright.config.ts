@@ -1,6 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
+import { rmSync } from 'node:fs';
 
 const reuseExistingServer = !process.env.CI;
+const playwrightRuntimeFiles = [
+    'server/.runtime/playwright-world-save-spool.json',
+    'server/.runtime/playwright-world-save-spool.json.bak',
+    'server/.runtime/playwright-world-session-snapshots.json',
+    'server/.runtime/playwright-world-session-snapshots.json.bak',
+];
+for (const file of playwrightRuntimeFiles) rmSync(file, { force: true });
 
 export default defineConfig({
     testDir: './tests/e2e',
@@ -33,6 +41,8 @@ export default defineConfig({
             timeout: 30_000,
             env: {
                 NODE_ENV: 'development',
+                WORLD_SAVE_SPOOL_PATH: 'server/.runtime/playwright-world-save-spool.json',
+                WORLD_SESSION_SNAPSHOT_PATH: 'server/.runtime/playwright-world-session-snapshots.json',
             },
         },
         {
