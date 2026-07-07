@@ -1987,6 +1987,14 @@
 #ui-overlay .ds-tier-chart .is-magic { --tier-branch: #b28ad6; }
 
 @media (max-width: 760px) {
+    #ui-overlay .ds-magic-loadout__body {
+        flex-direction: column;
+        max-height: calc(100vh - 140px);
+        overflow: auto;
+    }
+    #ui-overlay .ds-magic-loadout__slots {
+        width: 100% !important;
+    }
     #ui-overlay .ds-pause {
         width: calc(100vw - 18px);
         max-height: calc(100vh - 18px);

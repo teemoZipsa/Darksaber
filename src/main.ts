@@ -50,11 +50,12 @@ async function init(): Promise<void> {
 
     const devStartMode = getDevStartMode();
     const devRaidScenario = getDevRaidScenario();
+    const devForceLocal = getDevForceLocal();
     if (devStartMode) {
         clearDevWorldResumeToken();
         runAfterInitialTransition(manager, () => {
             if (devStartMode === 'tutorial') enterDevTutorial(manager);
-            else void enterDevTown(manager, devStartMode, devRaidScenario);
+            else void enterDevTown(manager, devStartMode, devRaidScenario, devForceLocal);
         });
     } else {
         mountAuthGate(manager);
@@ -83,6 +84,11 @@ function getDevRaidScenario(): DevRaidScenario | null {
     return parseDevRaidScenario(value);
 }
 
+function getDevForceLocal(): boolean {
+    if (!import.meta.env.DEV) return false;
+    return new URLSearchParams(window.location.search).get('devLocal') === '1';
+}
+
 function clearDevWorldResumeToken(): void {
     NetworkRaidClient.clearStoredResumeTokens();
 }
@@ -99,7 +105,17 @@ function runAfterInitialTransition(manager: GameManager, callback: () => void): 
     window.setTimeout(attempt, 80);
 }
 
-async function enterDevTown(manager: GameManager, mode: Extract<DevStartMode, 'town' | 'raid'>, scenario: DevRaidScenario | null): Promise<void> {
+async function enterDevTown(
+    manager: GameManager,
+    mode: Extract<DevStartMode, 'town' | 'raid'>,
+    scenario: DevRaidScenario | null,
+    forceLocal: boolean
+): Promise<void> {
+    if (forceLocal) {
+        manager.enterLocalDevCharacter('Dev Hero', 'infantry', 'M');
+        if (mode === 'raid') scheduleDevRaidDeploy(manager, scenario, true);
+        return;
+    }
     try {
         const client = new AuthClient();
         const session = await loginOrRegisterDevAccount(client);

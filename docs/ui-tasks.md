@@ -118,6 +118,7 @@
 - [x] production 서버 DB 설정 fail-fast. `NODE_ENV=production`에서 `DATABASE_URL`이 없으면 메모리 auth store로 뜨지 않고 시작을 중단하도록 runtime config guard와 테스트를 추가한다.
 - [x] 배포 설정 drift guard. `render.yaml`의 `autoDeployTrigger`를 배포 문서와 같은 `commit`으로 맞추고 문서/config 테스트를 추가한다.
 - [x] Vercel production client env guard. Vercel 또는 명시 검증 빌드에서 `VITE_AUTH_SERVER_URL`/`VITE_WORLD_SERVER_URL` 누락 시 빌드가 실패하도록 Vite 설정 테스트를 추가한다.
+- [x] 모바일 DOM overlay e2e 보강. 모바일에서 launcher/readiness, 전리품 이동, 반복 오버레이 토글을 검증하고 마법 장착 패널의 작은 화면 overflow를 수정한다.
 
 ---
 

@@ -81,8 +81,6 @@ test('dev town renders the React town overlay with embedded inventory', async ({
 });
 
 test('dev launcher buttons are readable and enter dev modes', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'Launcher navigation coverage is exercised on the desktop browser project.');
-
     await page.goto('/');
     const launcher = page.locator('.dev-launcher');
     await expect(launcher).toBeVisible({ timeout: 20_000 });
@@ -108,9 +106,11 @@ test('dev launcher buttons are readable and enter dev modes', async ({ page, isM
     await page.locator('.dev-launcher a[href="/?devStart=town"]').click();
     await expect(page.locator('#ui-overlay .ds-town')).toBeVisible({ timeout: 20_000 });
 
-    await page.goto('/');
-    await page.locator('.dev-launcher a[href="/?devStart=raid&devScenario=loot"]').click();
-    await expect(page.locator('#ui-overlay [data-inv-grid="ext"] .inv-item').first()).toBeVisible({ timeout: 25_000 });
+    if (!isMobile) {
+        await page.goto('/');
+        await page.locator('.dev-launcher a[href="/?devStart=raid&devScenario=loot"]').click();
+        await expect(page.locator('#ui-overlay [data-inv-grid="ext"] .inv-item').first()).toBeVisible({ timeout: 25_000 });
+    }
 
     await page.goto('/');
     await page.locator('.dev-launcher a[href="/?devStart=tutorial"]').click();
@@ -223,10 +223,8 @@ test('dev tutorial can swap magic loadout slots from the world hotkey overlay', 
     await expect(reopened.locator('[data-magic-slot="0"]')).toHaveAttribute('data-magic-slot-skill', secondSkill!);
 });
 
-test('dev raid loot can be dragged into the backpack with real pointer input', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'Pointer drag coverage is exercised on the desktop browser project.');
-
-    await page.goto('/?devStart=raid&devScenario=loot');
+test('dev raid loot can be transferred into the backpack with pointer input', async ({ page, isMobile }) => {
+    await page.goto(isMobile ? '/?devStart=raid&devScenario=loot&devLocal=1' : '/?devStart=raid&devScenario=loot');
 
     const externalItem = page.locator('#ui-overlay [data-inv-grid="ext"] .inv-item').first();
     const backpack = page.locator('#ui-overlay [data-inv-grid="bag"]');
@@ -244,10 +242,14 @@ test('dev raid loot can be dragged into the backpack with real pointer input', a
     expect(before.external.quantity).toBeGreaterThan(0);
     expect(before.worldLoot).toEqual(before.external);
 
-    await page.mouse.move(itemBox!.x + itemBox!.width / 2, itemBox!.y + itemBox!.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(bagBox!.x + bagBox!.width - 20, bagBox!.y + bagBox!.height - 20, { steps: 12 });
-    await page.mouse.up();
+    if (isMobile) {
+        await externalItem.click();
+    } else {
+        await page.mouse.move(itemBox!.x + itemBox!.width / 2, itemBox!.y + itemBox!.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(bagBox!.x + bagBox!.width - 20, bagBox!.y + bagBox!.height - 20, { steps: 12 });
+        await page.mouse.up();
+    }
 
     await expect(page.locator('.dev-scenario-status')).toContainText(/picked:dev_raid_loot:\d+,\d+/);
     await expect(page.locator('#ui-overlay [data-inv-grid="ext"] .inv-item')).toHaveCount(0);
@@ -322,8 +324,7 @@ test('mobile viewport keeps town and standalone inventory overlays within the sc
     await expectFitsViewport(page, inventory);
 });
 
-test('dev tutorial remains stable through repeated overlay toggles', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'Sustained overlay churn is covered on the desktop browser project.');
+test('dev tutorial remains stable through repeated overlay toggles', async ({ page }) => {
     test.setTimeout(45_000);
 
     const clientErrors: string[] = [];

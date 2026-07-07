@@ -37,7 +37,7 @@ export function MagicLoadoutPanel() {
     const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
     const [toast, setToast] = useState<string | null>(null);
 
-    const panelStyle = { width: 640, '--ds-scale': uiScale } as CSSProperties;
+    const panelStyle = { width: 'min(640px, calc(100vw - 18px))', '--ds-scale': uiScale } as CSSProperties;
 
     const showToast = (msg: string) => {
         setToast(msg);
@@ -88,9 +88,9 @@ export function MagicLoadoutPanel() {
 
             <PartyTabs party={party} activeIndex={activeIndex} />
 
-            <div style={{ display: 'flex', gap: 16, padding: '0 16px 16px' }}>
+            <div className="ds-magic-loadout__body" style={{ display: 'flex', gap: 16, padding: '0 16px 16px' }}>
                 {/* Left: 8 equip slots */}
-                <div style={{ width: 280 }}>
+                <div className="ds-magic-loadout__slots" style={{ width: 280 }}>
                     <div style={{ color: 'var(--ds-text-muted)', marginBottom: 8, fontSize: 13 }}>
                         {t('magic.loadout.slots')}
                     </div>
