@@ -1,7 +1,20 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
+export function validateProductionClientEnv(env: Record<string, string | undefined>): void {
+    if (env.VERCEL !== '1' && env.DARKSABER_REQUIRE_PROD_CLIENT_ENV !== '1') return;
+    const missing = ['VITE_AUTH_SERVER_URL', 'VITE_WORLD_SERVER_URL']
+        .filter((key) => !env[key]?.trim());
+    if (missing.length > 0) {
+        throw new Error(`Missing required production client env: ${missing.join(', ')}`);
+    }
+}
+
+export default defineConfig(({ mode }) => {
+    const env = { ...process.env, ...loadEnv(mode, process.cwd(), '') };
+    validateProductionClientEnv(env);
+
+    return {
     root: '.',
     publicDir: 'public',
     plugins: [react()],
@@ -64,5 +77,6 @@ export default defineConfig({
                 },
             },
         },
-    }
+    },
+    };
 });
