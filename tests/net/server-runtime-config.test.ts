@@ -42,6 +42,7 @@ test('server runtime config chooses postgres only when DATABASE_URL is set', () 
         databaseUrl: null,
         authStoreKind: 'memory',
         allowedOrigins: [...DEFAULT_DEV_ALLOWED_ORIGINS],
+        allowMissingOrigin: true,
         refreshCookieSecure: true,
     });
     assert.equal(resolveServerRuntimeConfig({
@@ -56,6 +57,38 @@ test('server runtime config chooses postgres only when DATABASE_URL is set', () 
         databaseUrl: 'postgres://db',
         authStoreKind: 'postgres',
         allowedOrigins: ['https://game.example', 'http://localhost:5173'],
+        allowMissingOrigin: false,
         refreshCookieSecure: true,
     });
+});
+
+test('server runtime config can explicitly allow missing Origin', () => {
+    assert.equal(resolveServerRuntimeConfig({
+        NODE_ENV: 'production',
+        DATABASE_URL: 'postgres://db',
+        AUTH_ALLOWED_ORIGINS: 'https://game.example',
+        AUTH_ALLOW_MISSING_ORIGIN: '1',
+    }).allowMissingOrigin, true);
+    assert.equal(resolveServerRuntimeConfig({
+        NODE_ENV: 'development',
+        AUTH_ALLOW_MISSING_ORIGIN: '0',
+    }).allowMissingOrigin, false);
+});
+
+test('server runtime config rejects invalid origin and boolean env values', () => {
+    assert.throws(
+        () => resolveServerRuntimeConfig({
+            NODE_ENV: 'production',
+            DATABASE_URL: 'postgres://db',
+            AUTH_ALLOWED_ORIGINS: 'https://game.example/path',
+        }),
+        /without paths/
+    );
+    assert.throws(
+        () => resolveServerRuntimeConfig({
+            NODE_ENV: 'development',
+            AUTH_ALLOW_MISSING_ORIGIN: 'maybe',
+        }),
+        /Invalid boolean env value/
+    );
 });

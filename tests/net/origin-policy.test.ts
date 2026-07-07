@@ -33,9 +33,16 @@ test('origin policy can reject missing Origin when a deployment requires browser
 });
 
 test('allowed origin parser trims configured origins and falls back to local dev clients', () => {
-    assert.deepEqual(parseAllowedOrigins(' http://a.test, ,http://b.test '), [
+    assert.deepEqual(parseAllowedOrigins(' http://a.test, ,http://b.test/, http://a.test '), [
         'http://a.test',
         'http://b.test',
     ]);
     assert.ok(parseAllowedOrigins(undefined).includes('http://127.0.0.1:5731'));
+});
+
+test('allowed origin parser rejects non-origin values', () => {
+    assert.throws(() => parseAllowedOrigins('not-an-origin'), /Invalid AUTH_ALLOWED_ORIGINS origin/);
+    assert.throws(() => parseAllowedOrigins('ftp://client.test'), /origin protocol/);
+    assert.throws(() => parseAllowedOrigins('https://client.test/path'), /without paths/);
+    assert.throws(() => parseAllowedOrigins('https://client.test?debug=1'), /without paths/);
 });

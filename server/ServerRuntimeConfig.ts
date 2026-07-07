@@ -6,6 +6,7 @@ export interface ServerRuntimeConfig {
     databaseUrl: string | null;
     authStoreKind: AuthStoreKind;
     allowedOrigins: string[];
+    allowMissingOrigin: boolean;
     refreshCookieSecure: boolean;
 }
 
@@ -25,6 +26,15 @@ export function resolveServerRuntimeConfig(env: NodeJS.ProcessEnv = process.env)
         databaseUrl,
         authStoreKind: databaseUrl ? 'postgres' : 'memory',
         allowedOrigins,
+        allowMissingOrigin: parseBooleanEnv(env.AUTH_ALLOW_MISSING_ORIGIN, !isProduction),
         refreshCookieSecure: env.AUTH_REFRESH_COOKIE_SECURE !== '0',
     };
+}
+
+function parseBooleanEnv(value: string | undefined, defaultValue: boolean): boolean {
+    const normalized = value?.trim().toLowerCase();
+    if (!normalized) return defaultValue;
+    if (normalized === '1' || normalized === 'true') return true;
+    if (normalized === '0' || normalized === 'false') return false;
+    throw new Error(`Invalid boolean env value: ${value}`);
 }

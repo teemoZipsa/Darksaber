@@ -12,7 +12,11 @@ test('Render deployment config matches the documented auto-deploy mode', () => {
 
 test('production deployment docs require durable database-backed auth', () => {
     const deploymentDocs = readFileSync('docs/deployment.md', 'utf8');
+    const renderYaml = readFileSync('render.yaml', 'utf8');
 
     assert.match(deploymentDocs, /DATABASE_URL=<Neon pooled connection string>/);
     assert.match(deploymentDocs, /\/healthz` returns `authStore: "postgres"`/);
+    assert.match(deploymentDocs, /AUTH_ALLOW_MISSING_ORIGIN=0/);
+    assert.match(deploymentDocs, /without paths,\s*queries, or fragments/);
+    assert.match(renderYaml, /key: AUTH_ALLOW_MISSING_ORIGIN\s*\r?\n\s*value: "0"/);
 });

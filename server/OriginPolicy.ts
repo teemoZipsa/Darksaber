@@ -17,8 +17,24 @@ export function parseAllowedOrigins(value: string | undefined): string[] {
         ?.split(',')
         .map((origin) => origin.trim())
         .filter((origin) => origin.length > 0);
-    if (configured && configured.length > 0) return configured;
+    if (configured && configured.length > 0) return [...new Set(configured.map(parseAllowedOrigin))];
     return [...DEFAULT_DEV_ALLOWED_ORIGINS];
+}
+
+function parseAllowedOrigin(value: string): string {
+    let url: URL;
+    try {
+        url = new URL(value);
+    } catch {
+        throw new Error(`Invalid AUTH_ALLOWED_ORIGINS origin: ${value}`);
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        throw new Error(`Invalid AUTH_ALLOWED_ORIGINS origin protocol: ${value}`);
+    }
+    if (url.pathname !== '/' || url.search || url.hash) {
+        throw new Error(`AUTH_ALLOWED_ORIGINS entries must be origins without paths: ${value}`);
+    }
+    return url.origin;
 }
 
 export function createOriginPolicy(options: {
