@@ -121,6 +121,7 @@
 - [x] 모바일 DOM overlay e2e 보강. 모바일에서 launcher/readiness, 전리품 이동, 반복 오버레이 토글을 검증하고 마법 장착 패널의 작은 화면 overflow를 수정한다.
 - [x] production auth origin 설정 fail-fast. `NODE_ENV=production`에서 `AUTH_ALLOWED_ORIGINS`가 없으면 서버 시작을 중단해 빈 CORS allowlist로 배포되지 않게 한다.
 - [x] production refresh cookie secure guard. `NODE_ENV=production`에서 `AUTH_REFRESH_COOKIE_SECURE=0`이면 서버 시작을 중단해 refresh cookie가 insecure로 배포되지 않게 한다.
+- [x] refresh token rotation race 완화. 막 교체된 refresh token 재사용은 stale 응답으로 처리해 동시 요청이 세션 패밀리 전체를 폐기하지 않게 한다.
 
 ---
 

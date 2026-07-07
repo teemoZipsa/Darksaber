@@ -47,7 +47,7 @@ test('auth HTTP register stores argon2id hash and returns secure refresh cookie'
     }
 });
 
-test('refresh token rotation rejects reused tokens and revokes the family', async () => {
+test('refresh token rotation treats immediate stale tokens as harmless', async () => {
     const harness = await createHarness();
     try {
         const registered = await harness.request('/auth/register', {
@@ -63,6 +63,40 @@ test('refresh token rotation rejects reused tokens and revokes the family', asyn
         assert.equal(refreshed.status, 200);
         const secondCookie = extractRefreshCookie(refreshed.setCookie);
         assert.notEqual(firstCookie, secondCookie);
+
+        const reused = await harness.request('/auth/refresh', {
+            method: 'POST',
+            cookie: firstCookie,
+        });
+        assert.equal(reused.status, 409);
+        assert.equal(reused.body.error, 'refresh_stale');
+        assert.equal(reused.setCookie, '');
+
+        const familyPreserved = await harness.request('/auth/refresh', {
+            method: 'POST',
+            cookie: secondCookie,
+        });
+        assert.equal(familyPreserved.status, 200);
+    } finally {
+        await harness.close();
+    }
+});
+
+test('refresh token rotation revokes the family outside the stale-token grace window', async () => {
+    const harness = await createHarness({ refreshReuseGraceMs: 0 });
+    try {
+        const registered = await harness.request('/auth/register', {
+            method: 'POST',
+            body: { loginName: 'rotate02', password: 'password-1234' },
+        });
+        const firstCookie = extractRefreshCookie(registered.setCookie);
+
+        const refreshed = await harness.request('/auth/refresh', {
+            method: 'POST',
+            cookie: firstCookie,
+        });
+        assert.equal(refreshed.status, 200);
+        const secondCookie = extractRefreshCookie(refreshed.setCookie);
 
         const reused = await harness.request('/auth/refresh', {
             method: 'POST',
@@ -585,6 +619,7 @@ test('auth HTTP allows requests without Origin for non-browser clients', async (
 
 async function createHarness(options: {
     trustProxy?: boolean;
+    refreshReuseGraceMs?: number;
     registerRateLimiter?: MemoryRateLimiter;
     loginIpRateLimiter?: MemoryRateLimiter;
     isHubPatchBlocked?: (accountId: string, characterId: string) => boolean;
@@ -607,6 +642,7 @@ async function createHarness(options: {
         jwt,
         allowedOrigins: ['http://client.test'],
         refreshCookieSecure: true,
+        refreshReuseGraceMs: options.refreshReuseGraceMs,
         sameSite: 'Lax',
         trustProxy: options.trustProxy,
         registerRateLimiter: options.registerRateLimiter,

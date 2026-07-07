@@ -37,6 +37,7 @@ export interface AuthHttpOptions {
     allowedOrigins: string[];
     allowMissingOrigin?: boolean;
     refreshTtlMs?: number;
+    refreshReuseGraceMs?: number;
     refreshCookieSecure?: boolean;
     sameSite?: 'Lax' | 'Strict' | 'None';
     trustProxy?: boolean;
@@ -75,6 +76,7 @@ interface AuthHttpRuntime {
 
 const REFRESH_COOKIE = 'ds_refresh';
 const DEFAULT_REFRESH_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+const DEFAULT_REFRESH_REUSE_GRACE_MS = 30_000;
 const JSON_LIMIT_BYTES = 1024 * 256;
 const AUTH_RATE_LIMIT_WINDOW_MS = 1000 * 60 * 10;
 const REGISTER_IP_LIMIT = 8;
@@ -200,8 +202,17 @@ async function routeAuthRequest(context: HandlerContext, options: AuthHttpOption
             clearRefreshCookie(response, options);
             throw new HttpError(401, 'refresh_invalid', 'Refresh token is invalid.');
         }
-        if (session.revokedAt || Date.parse(session.expiresAt) <= Date.now()) {
-            await options.store.revokeTokenFamily(session.tokenFamilyId, new Date().toISOString());
+        const nowMs = Date.now();
+        if (session.revokedAt) {
+            if (isRecentlyReplacedSession(session, nowMs, options)) {
+                throw new HttpError(409, 'refresh_stale', 'Refresh token was already rotated. Retry with the latest refresh cookie.');
+            }
+            await options.store.revokeTokenFamily(session.tokenFamilyId, new Date(nowMs).toISOString());
+            clearRefreshCookie(response, options);
+            throw new HttpError(401, 'refresh_reused', 'Refresh token is expired or has already been used.');
+        }
+        if (Date.parse(session.expiresAt) <= nowMs) {
+            await options.store.revokeTokenFamily(session.tokenFamilyId, new Date(nowMs).toISOString());
             clearRefreshCookie(response, options);
             throw new HttpError(401, 'refresh_reused', 'Refresh token is expired or has already been used.');
         }
@@ -216,7 +227,7 @@ async function routeAuthRequest(context: HandlerContext, options: AuthHttpOption
             accountId: account.id,
             refreshTokenHash: hashRefreshToken(nextRefreshToken),
             tokenFamilyId: session.tokenFamilyId,
-            expiresAt: new Date(Date.now() + getRefreshTtlMs(options)).toISOString(),
+            expiresAt: new Date(nowMs + getRefreshTtlMs(options)).toISOString(),
             userAgent: userAgent(context),
             ipHash: ipHash(context, runtime.trustProxy),
         });
@@ -577,6 +588,19 @@ function ipHash(context: HandlerContext, trustProxy: boolean): string {
 
 function getRefreshTtlMs(options: AuthHttpOptions): number {
     return options.refreshTtlMs ?? DEFAULT_REFRESH_TTL_MS;
+}
+
+function getRefreshReuseGraceMs(options: AuthHttpOptions): number {
+    return options.refreshReuseGraceMs ?? DEFAULT_REFRESH_REUSE_GRACE_MS;
+}
+
+function isRecentlyReplacedSession(session: AuthSession, nowMs: number, options: AuthHttpOptions): boolean {
+    if (!session.revokedAt || !session.replacedBySessionId) return false;
+    const graceMs = getRefreshReuseGraceMs(options);
+    if (graceMs <= 0) return false;
+    const revokedMs = Date.parse(session.revokedAt);
+    if (!Number.isFinite(revokedMs)) return false;
+    return nowMs - revokedMs <= graceMs;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
