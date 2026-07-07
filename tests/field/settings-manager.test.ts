@@ -12,6 +12,15 @@ class MemoryStorage {
     public key(index: number): string | null { return Array.from(this.values.keys())[index] ?? null; }
 }
 
+class ThrowingStorage {
+    public get length(): number { throw new Error('storage blocked'); }
+    public getItem(_key: string): string | null { throw new Error('storage blocked'); }
+    public setItem(_key: string, _value: string): void { throw new Error('storage blocked'); }
+    public removeItem(_key: string): void { throw new Error('storage blocked'); }
+    public clear(): void { throw new Error('storage blocked'); }
+    public key(_index: number): string | null { throw new Error('storage blocked'); }
+}
+
 const storage = new MemoryStorage();
 (globalThis as unknown as { localStorage: Storage }).localStorage = storage as unknown as Storage;
 
@@ -43,4 +52,21 @@ test('settings keybindings swap conflicting keys and ignore reserved keys', () =
     SettingsManager.resetKeybindings();
     assert.equal(SettingsManager.getKeybinding('world.inventory'), 'KeyI');
     assert.equal(SettingsManager.getKeybinding('world.party'), 'KeyP');
+});
+
+test('settings manager tolerates blocked localStorage', () => {
+    (globalThis as unknown as { localStorage: Storage }).localStorage = new ThrowingStorage() as unknown as Storage;
+    try {
+        assert.doesNotThrow(() => SettingsManager.init());
+        assert.doesNotThrow(() => SettingsManager.setGrid(true));
+        assert.doesNotThrow(() => SettingsManager.setBgmVolume(0.25));
+        assert.doesNotThrow(() => SettingsManager.setKeybinding('world.inventory', 'KeyP'));
+        assert.equal(SettingsManager.getGrid(), true);
+        assert.equal(SettingsManager.getBgmVolume(), 0.25);
+        assert.equal(SettingsManager.getKeybinding('world.inventory'), 'KeyP');
+    } finally {
+        (globalThis as unknown as { localStorage: Storage }).localStorage = storage as unknown as Storage;
+        storage.clear();
+        SettingsManager.init();
+    }
 });

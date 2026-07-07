@@ -122,6 +122,7 @@
 - [x] production auth origin 설정 fail-fast. `NODE_ENV=production`에서 `AUTH_ALLOWED_ORIGINS`가 없으면 서버 시작을 중단해 빈 CORS allowlist로 배포되지 않게 한다.
 - [x] production refresh cookie secure guard. `NODE_ENV=production`에서 `AUTH_REFRESH_COOKIE_SECURE=0`이면 서버 시작을 중단해 refresh cookie가 insecure로 배포되지 않게 한다.
 - [x] refresh token rotation race 완화. 막 교체된 refresh token 재사용은 stale 응답으로 처리해 동시 요청이 세션 패밀리 전체를 폐기하지 않게 한다.
+- [x] SettingsManager storage 예외 내성. `localStorage` 접근이 차단되거나 quota 오류가 나도 설정 초기화/변경/키바인딩 저장이 앱을 중단하지 않게 한다.
 
 ---
 
