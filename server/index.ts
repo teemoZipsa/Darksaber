@@ -38,6 +38,7 @@ import { createWorldServerMetrics, errorToLogValue, formatWorldServerMetrics, lo
 import { createOriginPolicy, isAllowedOrigin, parseAllowedOrigins } from './OriginPolicy';
 import { createWorldShardConfig } from './WorldShardConfig';
 import { createPartyCompositionFromSave } from './WorldJoinSave';
+import { resolveServerRuntimeConfig } from './ServerRuntimeConfig';
 
 const PORT = Number(process.env.PORT ?? 8765);
 const HOST = process.env.HOST;
@@ -56,7 +57,8 @@ const WORLD_SAVE_RETRY_BASE_MS = Math.max(100, Math.floor(Number(process.env.WOR
 const WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS = Math.max(1_000, Math.floor(Number(process.env.WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS ?? 8_000)));
 const allowedOrigins = parseAllowedOrigins(process.env.AUTH_ALLOWED_ORIGINS);
 const originPolicy = createOriginPolicy({ allowedOrigins });
-const authStoreKind = process.env.DATABASE_URL ? 'postgres' : 'memory';
+const runtimeConfig = resolveServerRuntimeConfig();
+const authStoreKind = runtimeConfig.authStoreKind;
 const jwtSecret = process.env.AUTH_JWT_SECRET ?? process.env.JWT_SECRET ?? (process.env.NODE_ENV === 'production' ? '' : 'darksaber-dev-jwt-secret-change-me');
 if (!jwtSecret) throw new Error('AUTH_JWT_SECRET is required when NODE_ENV=production.');
 const jwtOptions: JwtOptions = {
@@ -65,8 +67,8 @@ const jwtOptions: JwtOptions = {
     audience: process.env.AUTH_JWT_AUDIENCE ?? 'darksaber-client',
     ttlSeconds: Math.max(60, Math.floor(Number(process.env.AUTH_ACCESS_TOKEN_TTL_SECONDS ?? 900))),
 };
-const authStore: AuthStore = process.env.DATABASE_URL
-    ? new PostgresAuthStore(process.env.DATABASE_URL)
+const authStore: AuthStore = runtimeConfig.databaseUrl
+    ? new PostgresAuthStore(runtimeConfig.databaseUrl)
     : new InMemoryAuthStore();
 await authStore.initialize();
 const metrics = createWorldServerMetrics();
@@ -628,8 +630,8 @@ async function getOrCreateSession(route: WorldSessionRoute): Promise<{ sessionKe
 }
 
 function createWorldSessionSnapshotStore(): WorldSessionSnapshotStoreBackend {
-    if (process.env.DATABASE_URL && process.env.WORLD_SESSION_SNAPSHOT_STORE !== 'file') {
-        return new PostgresWorldSessionSnapshotStore({ connectionString: process.env.DATABASE_URL });
+    if (runtimeConfig.databaseUrl && process.env.WORLD_SESSION_SNAPSHOT_STORE !== 'file') {
+        return new PostgresWorldSessionSnapshotStore({ connectionString: runtimeConfig.databaseUrl });
     }
     return new WorldSessionSnapshotStore({
         persistPath: resolveServerPersistPath(process.env.WORLD_SESSION_SNAPSHOT_PATH, './.runtime/world-session-snapshots.json'),
