@@ -30,4 +30,4 @@ jobs:
       - name: Build Server
         run: npm run build:server
       - name: Story Verify
-        run: npm run verify:story
+        run: npm run verify:story:ci

@@ -23,6 +23,7 @@
     "render:wait": "node scripts/render-deploy.mjs wait",
     "deploy:prod": "node scripts/deploy-production.mjs",
     "verify:story": "npm run verify:assets && npm run verify:story-sources && npm run verify:late-story",
+    "verify:story:ci": "npm run verify:assets",
     "verify:assets": "node scripts/check-assets.mjs --quiet",
     "verify:late-story": "npm run verify:late-story-items && npm run verify:late-story-mrc && npm run verify:late-story-hmaps && npm run verify:late-story-set-arc && npm run verify:late-story-source-files",
     "verify:late-story-items": "node scripts/generate-late-story-item-defs.mjs --check",
