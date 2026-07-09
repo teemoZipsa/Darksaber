@@ -35,10 +35,11 @@ import {
 } from './WorldSessionSnapshotStore';
 import { createWorldSessionKey, resolveWorldSessionRoute, type WorldSessionRoute } from './WorldSessionRouter';
 import { createWorldServerMetrics, errorToLogValue, formatWorldServerMetrics, logServerEvent } from './WorldServerObservability';
-import { createOriginPolicy, isAllowedOrigin } from './OriginPolicy';
+import { isAllowedOrigin } from './OriginPolicy';
 import { createWorldShardConfig } from './WorldShardConfig';
 import { createPartyCompositionFromSave } from './WorldJoinSave';
 import { resolveServerRuntimeConfig } from './ServerRuntimeConfig';
+import { createWorldServerOriginPolicy } from './WorldServerOriginPolicy';
 
 const PORT = Number(process.env.PORT ?? 8765);
 const HOST = process.env.HOST;
@@ -57,7 +58,7 @@ const WORLD_SAVE_RETRY_BASE_MS = Math.max(100, Math.floor(Number(process.env.WOR
 const WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS = Math.max(1_000, Math.floor(Number(process.env.WORLD_SHUTDOWN_FLUSH_TIMEOUT_MS ?? 8_000)));
 const runtimeConfig = resolveServerRuntimeConfig();
 const allowedOrigins = runtimeConfig.allowedOrigins;
-const originPolicy = createOriginPolicy({ allowedOrigins });
+const originPolicy = createWorldServerOriginPolicy(runtimeConfig);
 const authStoreKind = runtimeConfig.authStoreKind;
 const jwtSecret = process.env.AUTH_JWT_SECRET ?? process.env.JWT_SECRET ?? (process.env.NODE_ENV === 'production' ? '' : 'darksaber-dev-jwt-secret-change-me');
 if (!jwtSecret) throw new Error('AUTH_JWT_SECRET is required when NODE_ENV=production.');
