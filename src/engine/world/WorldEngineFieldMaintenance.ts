@@ -1,4 +1,5 @@
 import { removeStatusesFromCarrier } from '../../combat/StatusEffects';
+import type { InputManager } from '../InputManager';
 import type { Camera } from '../Camera';
 import type { GameManager } from '../GameManager';
 import type { WorldEngineActionControllers } from './WorldEngineActionControllers';
@@ -88,4 +89,36 @@ export function updateWorldEngineStoryPresentation(
 export function updateWorldEngineFieldEntities(fieldState: WorldEngineFieldState, dt: number): void {
     for (const actor of fieldState.partyActors) actor.entity.update(dt);
     for (const entry of fieldState.fieldEnemies) entry.enemy.update(dt);
+}
+
+export interface WorldEngineNetworkRaidUpdatePorts {
+    camera: Camera;
+    fieldState: WorldEngineFieldState;
+    input: InputManager;
+    presentationControllers: WorldEnginePresentationControllers;
+    scenarioNetworkControllers: WorldEngineScenarioNetworkControllers;
+    uiState: WorldEngineUiState;
+    followPlayerCamera(camera: Camera, dt: number): void;
+    refreshLootState(): void;
+    refreshOpenActionMenuState(): void;
+    syncControlledPlayer(): void;
+    updateAttackCues(dt: number): void;
+    updateStoryPresentation(dt: number, camera: Camera): boolean;
+}
+
+export function updateWorldEngineNetworkRaid(ports: WorldEngineNetworkRaidUpdatePorts, dt: number): void {
+    if (ports.updateStoryPresentation(dt, ports.camera)) return;
+
+    ports.refreshOpenActionMenuState();
+    ports.presentationControllers.inputController.process(ports.input, ports.camera);
+    updateWorldEngineFieldEntities(ports.fieldState, dt);
+    ports.scenarioNetworkControllers.networkSyncController.refreshMovePathPreview();
+    ports.uiState.effectManager.update(dt);
+    ports.uiState.floatingText.update(dt);
+    ports.updateAttackCues(dt);
+    ports.refreshLootState();
+    ports.scenarioNetworkControllers.storyScenarioController.checkDungeonArrival();
+    ports.refreshOpenActionMenuState();
+    ports.syncControlledPlayer();
+    ports.followPlayerCamera(ports.camera, dt);
 }

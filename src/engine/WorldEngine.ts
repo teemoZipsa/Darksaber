@@ -11,7 +11,7 @@ import { PartyManager } from '../character/PartyManager';
 import type { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
-import { formatT, i18n } from '../i18n/LanguageManager';
+import { formatT } from '../i18n/LanguageManager';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
@@ -105,9 +105,10 @@ import {
 import {
     clearWorldEngineFieldTurnState,
     closeWorldEngineFieldOverlays,
-    updateWorldEngineFieldEntities,
+    updateWorldEngineNetworkRaid,
     updateWorldEngineStoryPresentation,
 } from './world/WorldEngineFieldMaintenance';
+import { beginWorldEngineLocalDevRaidFromCurrentHub } from './world/WorldEngineLocalDevRaid';
 import { resolveWorldEngineFieldHitAt } from './world/WorldEngineFieldHitResolver';
 import {
     applyWorldEngineNetworkSnapshot,
@@ -418,26 +419,23 @@ export class WorldEngine {
     public getRaidSession(): WorldRaidSession { return this.raidSession; }
 
     public beginLocalDevRaidFromCurrentHub(): boolean {
-        if (!import.meta.env.DEV) return false;
-        const town = this.getCurrentHubTown();
-        this.closeFieldOverlays();
-        this.townSession.hide();
-        this.getNetworkState().isRaid = false;
-        this.getNetworkState().isConnecting = false;
-        this.getNetworkState().playerId = null;
-        this.getRuntimeState().currentPhase = 'raid';
-        this.raidSession.beginRaidFromTown(town.id);
-        this.party.resetForNewRaid();
-        this.townSession.applyPendingRestForRaidStart();
-        this.scenarioNetworkControllers.storyScenarioController.resetVisitState();
-        this.scenarioNetworkControllers.storyScenarioController.resetNetworkState();
-        this.placePartyNear(this.worldMap.getTownSpawnTile(town));
-        const controlled = this.getControlledActor();
-        if (controlled) this.player = controlled.entity;
-        this.actionControllers.selectionController.selectActor(controlled?.id ?? null);
-        this.clearFieldTurnState();
-        this.addCombatLog(formatT('mp.deployStarted', { town: i18n.lang === 'ko' ? town.nameKr : town.name, world: this.worldMap.getDisplayName() }));
-        return true;
+        return beginWorldEngineLocalDevRaidFromCurrentHub({
+            actionControllers: this.actionControllers,
+            networkState: this.getNetworkState(),
+            party: this.party,
+            raidSession: this.raidSession,
+            runtimeState: this.getRuntimeState(),
+            scenarioNetworkControllers: this.scenarioNetworkControllers,
+            town: this.getCurrentHubTown(),
+            townSession: this.townSession,
+            worldMap: this.worldMap,
+            addCombatLog: (message) => this.addCombatLog(message),
+            clearFieldTurnState: () => this.clearFieldTurnState(),
+            closeFieldOverlays: () => this.closeFieldOverlays(),
+            getControlledActor: () => this.getControlledActor(),
+            placePartyNearTown: (town) => this.placePartyNear(this.worldMap.getTownSpawnTile(town)),
+            syncControlledPlayer: () => this.syncControlledPlayer(),
+        });
     }
 
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
@@ -507,23 +505,20 @@ export class WorldEngine {
     }
 
     private updateNetworkRaid(dt: number, input: InputManager, camera: Camera): void {
-        if (this.updateStoryPresentation(dt, camera)) return;
-
-        this.refreshOpenActionMenuState();
-        this.presentationControllers.inputController.process(input, camera);
-        updateWorldEngineFieldEntities(this.getFieldState(), dt);
-        this.scenarioNetworkControllers.networkSyncController.refreshMovePathPreview();
-        this.getUiState().effectManager.update(dt);
-        this.getUiState().floatingText.update(dt);
-        this.updateAttackCues(dt);
-        this.refreshLootState();
-        this.scenarioNetworkControllers.storyScenarioController.checkDungeonArrival();
-        this.refreshOpenActionMenuState();
-
-        const controlled = this.getControlledActor();
-        if (controlled) this.player = controlled.entity;
-        camera.followTile(this.player.gridX, this.player.gridY);
-        camera.update(dt);
+        updateWorldEngineNetworkRaid({
+            camera,
+            fieldState: this.getFieldState(),
+            input,
+            presentationControllers: this.presentationControllers,
+            scenarioNetworkControllers: this.scenarioNetworkControllers,
+            uiState: this.getUiState(),
+            followPlayerCamera: (targetCamera, elapsed) => this.followPlayerCamera(targetCamera, elapsed),
+            refreshLootState: () => this.refreshLootState(),
+            refreshOpenActionMenuState: () => this.refreshOpenActionMenuState(),
+            syncControlledPlayer: () => this.syncControlledPlayer(),
+            updateAttackCues: (elapsed) => this.updateAttackCues(elapsed),
+            updateStoryPresentation: (elapsed, targetCamera) => this.updateStoryPresentation(elapsed, targetCamera),
+        }, dt);
     }
 
     private updateStoryPresentation(dt: number, camera: Camera): boolean {
@@ -847,181 +842,52 @@ export class WorldEngine {
         this.worldControllers.combatFeedbackController.flush(feedbackGroupId);
     }
 
-    public isNetworkRaidActive(): boolean {
-        return this.getNetworkState().isRaid;
-    }
+    public isNetworkRaidActive(): boolean { return this.getNetworkState().isRaid; }
+    public get networkRaidClient(): NetworkRaidClient | null { return this.getNetworkState().raidClient; }
+    public set networkRaidClient(client: NetworkRaidClient | null) { this.getNetworkState().raidClient = client; }
+    public get isNetworkRaid(): boolean { return this.getNetworkState().isRaid; }
+    public set isNetworkRaid(isRaid: boolean) { this.getNetworkState().isRaid = isRaid; }
+    public get partyActors(): FieldActor[] { return this.getFieldState().partyActors; }
+    public set partyActors(actors: FieldActor[]) { this.getFieldState().partyActors = actors; }
+    public get fieldEnemies(): FieldEnemy[] { return this.getFieldState().fieldEnemies; }
+    public set fieldEnemies(enemies: FieldEnemy[]) { this.getFieldState().fieldEnemies = enemies; }
+    public get remotePartyActors(): Map<string, FieldActor> { return this.getFieldState().remotePartyActors; }
+    public set remotePartyActors(actors: Map<string, FieldActor>) { this.getFieldState().remotePartyActors = actors; }
+    public get turnStateController(): WorldTurnStateController { return this.getFlowState().turnStateController; }
+    public set turnStateController(controller: WorldTurnStateController) { this.getFlowState().turnStateController = controller; }
+    public get fieldFeedback(): WorldEngineUiState['fieldFeedback'] { return this.getUiState().fieldFeedback; }
 
-    public get networkRaidClient(): NetworkRaidClient | null {
-        return this.getNetworkState().raidClient;
-    }
+    private get canvas(): HTMLCanvasElement { return this.getCoreState().canvas!; }
+    private set canvas(canvas: HTMLCanvasElement) { this.getCoreState().canvas = canvas; }
+    private get camera(): Camera { return this.getCoreState().camera!; }
+    private set camera(camera: Camera) { this.getCoreState().camera = camera; }
+    private get party(): PartyManager { return this.getCoreState().party!; }
+    private set party(party: PartyManager) { this.getCoreState().party = party; }
+    private get playerData(): PlayerData { return this.getCoreState().playerData!; }
+    private set playerData(playerData: PlayerData) { this.getCoreState().playerData = playerData; }
+    private get gameManager(): GameManager { return this.getCoreState().gameManager!; }
+    private set gameManager(gameManager: GameManager) { this.getCoreState().gameManager = gameManager; }
+    private get worldMap(): WorldMap { return this.getCoreState().worldMap; }
+    private set worldMap(worldMap: WorldMap) { this.getCoreState().worldMap = worldMap; }
+    private get player(): Player { return this.getCoreState().player!; }
+    private set player(player: Player) { this.getCoreState().player = player; }
+    private get townSession(): WorldTownSession { return this.getCoreState().townSession!; }
+    private set townSession(townSession: WorldTownSession) { this.getCoreState().townSession = townSession; }
+    private get raidSession(): WorldRaidSession { return this.getCoreState().raidSession!; }
+    private set raidSession(raidSession: WorldRaidSession) { this.getCoreState().raidSession = raidSession; }
 
-    public set networkRaidClient(client: NetworkRaidClient | null) {
-        this.getNetworkState().raidClient = client;
-    }
-
-    public get isNetworkRaid(): boolean {
-        return this.getNetworkState().isRaid;
-    }
-
-    public set isNetworkRaid(isRaid: boolean) {
-        this.getNetworkState().isRaid = isRaid;
-    }
-
-    public get partyActors(): FieldActor[] {
-        return this.getFieldState().partyActors;
-    }
-
-    public set partyActors(actors: FieldActor[]) {
-        this.getFieldState().partyActors = actors;
-    }
-
-    public get fieldEnemies(): FieldEnemy[] {
-        return this.getFieldState().fieldEnemies;
-    }
-
-    public set fieldEnemies(enemies: FieldEnemy[]) {
-        this.getFieldState().fieldEnemies = enemies;
-    }
-
-    public get remotePartyActors(): Map<string, FieldActor> {
-        return this.getFieldState().remotePartyActors;
-    }
-
-    public set remotePartyActors(actors: Map<string, FieldActor>) {
-        this.getFieldState().remotePartyActors = actors;
-    }
-
-    public get turnStateController(): WorldTurnStateController {
-        return this.getFlowState().turnStateController;
-    }
-
-    public set turnStateController(controller: WorldTurnStateController) {
-        this.getFlowState().turnStateController = controller;
-    }
-
-    public get fieldFeedback(): WorldEngineUiState['fieldFeedback'] {
-        return this.getUiState().fieldFeedback;
-    }
-
-    private get canvas(): HTMLCanvasElement {
-        return this.getCoreState().canvas!;
-    }
-
-    private set canvas(canvas: HTMLCanvasElement) {
-        this.getCoreState().canvas = canvas;
-    }
-
-    private get camera(): Camera {
-        return this.getCoreState().camera!;
-    }
-
-    private set camera(camera: Camera) {
-        this.getCoreState().camera = camera;
-    }
-
-    private get party(): PartyManager {
-        return this.getCoreState().party!;
-    }
-
-    private set party(party: PartyManager) {
-        this.getCoreState().party = party;
-    }
-
-    private get playerData(): PlayerData {
-        return this.getCoreState().playerData!;
-    }
-
-    private set playerData(playerData: PlayerData) {
-        this.getCoreState().playerData = playerData;
-    }
-
-    private get gameManager(): GameManager {
-        return this.getCoreState().gameManager!;
-    }
-
-    private set gameManager(gameManager: GameManager) {
-        this.getCoreState().gameManager = gameManager;
-    }
-
-    private get worldMap(): WorldMap {
-        return this.getCoreState().worldMap;
-    }
-
-    private set worldMap(worldMap: WorldMap) {
-        this.getCoreState().worldMap = worldMap;
-    }
-
-    private get player(): Player {
-        return this.getCoreState().player!;
-    }
-
-    private set player(player: Player) {
-        this.getCoreState().player = player;
-    }
-
-    private get townSession(): WorldTownSession {
-        return this.getCoreState().townSession!;
-    }
-
-    private set townSession(townSession: WorldTownSession) {
-        this.getCoreState().townSession = townSession;
-    }
-
-    private get raidSession(): WorldRaidSession {
-        return this.getCoreState().raidSession!;
-    }
-
-    private set raidSession(raidSession: WorldRaidSession) {
-        this.getCoreState().raidSession = raidSession;
-    }
-
-    private get combatControllers(): WorldEngineCombatControllers {
-        return this.getControllerState().combatControllers!;
-    }
-
-    private set combatControllers(controllers: WorldEngineCombatControllers) {
-        this.getControllerState().combatControllers = controllers;
-    }
-
-    private get actionControllers(): WorldEngineActionControllers {
-        return this.getControllerState().actionControllers!;
-    }
-
-    private set actionControllers(controllers: WorldEngineActionControllers) {
-        this.getControllerState().actionControllers = controllers;
-    }
-
-    private get raidLifecycleControllers(): WorldEngineRaidLifecycleControllers {
-        return this.getControllerState().raidLifecycleControllers!;
-    }
-
-    private set raidLifecycleControllers(controllers: WorldEngineRaidLifecycleControllers) {
-        this.getControllerState().raidLifecycleControllers = controllers;
-    }
-
-    private get presentationControllers(): WorldEnginePresentationControllers {
-        return this.getControllerState().presentationControllers!;
-    }
-
-    private set presentationControllers(controllers: WorldEnginePresentationControllers) {
-        this.getControllerState().presentationControllers = controllers;
-    }
-
-    private get scenarioNetworkControllers(): WorldEngineScenarioNetworkControllers {
-        return this.getControllerState().scenarioNetworkControllers!;
-    }
-
-    private set scenarioNetworkControllers(controllers: WorldEngineScenarioNetworkControllers) {
-        this.getControllerState().scenarioNetworkControllers = controllers;
-    }
-
-    private get worldControllers(): WorldEngineWorldControllers {
-        return this.getControllerState().worldControllers!;
-    }
-
-    private set worldControllers(controllers: WorldEngineWorldControllers) {
-        this.getControllerState().worldControllers = controllers;
-    }
+    private get combatControllers(): WorldEngineCombatControllers { return this.getControllerState().combatControllers!; }
+    private set combatControllers(controllers: WorldEngineCombatControllers) { this.getControllerState().combatControllers = controllers; }
+    private get actionControllers(): WorldEngineActionControllers { return this.getControllerState().actionControllers!; }
+    private set actionControllers(controllers: WorldEngineActionControllers) { this.getControllerState().actionControllers = controllers; }
+    private get raidLifecycleControllers(): WorldEngineRaidLifecycleControllers { return this.getControllerState().raidLifecycleControllers!; }
+    private set raidLifecycleControllers(controllers: WorldEngineRaidLifecycleControllers) { this.getControllerState().raidLifecycleControllers = controllers; }
+    private get presentationControllers(): WorldEnginePresentationControllers { return this.getControllerState().presentationControllers!; }
+    private set presentationControllers(controllers: WorldEnginePresentationControllers) { this.getControllerState().presentationControllers = controllers; }
+    private get scenarioNetworkControllers(): WorldEngineScenarioNetworkControllers { return this.getControllerState().scenarioNetworkControllers!; }
+    private set scenarioNetworkControllers(controllers: WorldEngineScenarioNetworkControllers) { this.getControllerState().scenarioNetworkControllers = controllers; }
+    private get worldControllers(): WorldEngineWorldControllers { return this.getControllerState().worldControllers!; }
+    private set worldControllers(controllers: WorldEngineWorldControllers) { this.getControllerState().worldControllers = controllers; }
 
     private getNetworkState(): WorldEngineNetworkState {
         this.networkState ??= createWorldEngineNetworkState();

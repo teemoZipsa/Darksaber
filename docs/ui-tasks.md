@@ -137,6 +137,7 @@
 - [x] WorldSession tick processor 추출. 플레이어 ATB/ghost expiry/nest refresh/enemy turn/wipe 처리 루프를 전용 processor로 옮겨 세션 본문을 더 줄인다.
 - [x] WorldSession message dispatcher 추출. client message switch와 actor intent validation/dispatch를 전용 dispatcher로 옮겨 세션 본문을 더 줄인다.
 - [x] WorldSession combat attack resolution 추출. actor attack damage/guard/kill 결과 연결을 combat resolution helper로 옮겨 세션 본문을 더 줄인다.
+- [x] WorldEngine dev/network update 흐름 축소. local dev raid 시작과 network raid update 루프를 helper로 옮기고 compatibility accessor를 압축해 엔진 본문을 1000줄 아래로 줄인다.
 
 ---
 
