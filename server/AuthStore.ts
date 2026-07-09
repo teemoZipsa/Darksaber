@@ -7,7 +7,7 @@ import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM
 import { createBaseStats, getBaseStatsForClass, type CharacterStats } from '../src/data/Stats';
 import type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
 import { createDefaultStashSnapshot } from '../src/shared/CharacterSaveDefaults';
-import { FIRST_SURVIVAL_QUEST_ID } from '../src/shared/FirstSurvivalReward';
+import { FIRST_SURVIVAL_GOLD_REWARD, FIRST_SURVIVAL_QUEST_ID } from '../src/shared/FirstSurvivalReward';
 import { createPostgresPool } from './PostgresConnection';
 import { applyStoryQuestRewardsToSaveState } from './StoryRewardSave';
 export type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
@@ -1008,17 +1008,21 @@ function buildRaidSurvivalSave(
     const existingQuestIds = Array.isArray(save.questState.completedQuestIds)
         ? (save.questState.completedQuestIds as unknown[]).filter((entry): entry is string => typeof entry === 'string')
         : [];
-    const preservedQuestIds = existingQuestIds.includes(FIRST_SURVIVAL_QUEST_ID)
-        ? [...mergedQuestIds, FIRST_SURVIVAL_QUEST_ID]
-        : mergedQuestIds;
-    const questState = {
+    const firstSurvivalAlreadyClaimed = existingQuestIds.includes(FIRST_SURVIVAL_QUEST_ID)
+        || mergedQuestIds.includes(FIRST_SURVIVAL_QUEST_ID);
+    const preservedQuestIds = [...mergedQuestIds, FIRST_SURVIVAL_QUEST_ID];
+    const completedQuestIds = uniqueStrings(preservedQuestIds);
+    const questState: Record<string, unknown> = {
         ...clone(save.questState),
-        completedQuestIds: uniqueStrings(preservedQuestIds),
+        completedQuestIds,
     };
+    if (!firstSurvivalAlreadyClaimed) {
+        questState.gold = normalizeGold(save.questState.gold) + FIRST_SURVIVAL_GOLD_REWARD;
+    }
     const inventory = normalizeInventorySnapshot(save.inventory);
     const rosterSnapshot = clone(save.rosterSnapshot);
     const blockedQuestIds = applyStoryQuestRewardsToSaveState(
-        new Set(questState.completedQuestIds),
+        new Set(completedQuestIds),
         questState,
         inventory,
         rosterSnapshot,
@@ -1036,6 +1040,10 @@ function buildRaidSurvivalSave(
         },
         blockedQuestIds,
     };
+}
+
+function normalizeGold(value: unknown): number {
+    return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
 }
 
 export function normalizeInventorySnapshot(snapshot: InventorySaveSnapshot): InventorySaveSnapshot {

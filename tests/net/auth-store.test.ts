@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { InMemoryAuthStore, normalizeLoginName } from '../../server/AuthStore';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import { getItemDef } from '../../src/data/ItemDB';
-import { FIRST_SURVIVAL_QUEST_ID } from '../../src/shared/FirstSurvivalReward';
+import { FIRST_SURVIVAL_GOLD_REWARD, FIRST_SURVIVAL_QUEST_ID } from '../../src/shared/FirstSurvivalReward';
 
 test('auth store raid survival persists story inventory and companion rewards', async () => {
     const store = new InMemoryAuthStore();
@@ -107,7 +107,7 @@ test('auth store raid survival cannot persist episode 31 without prior story cle
     assert.equal(progress.completedQuests.includes(scenario.questId), false);
 });
 
-test('auth store raid survival preserves the per-character first-survival marker', async () => {
+test('auth store raid survival grants and preserves the per-character first-survival marker', async () => {
     const store = new InMemoryAuthStore();
     await store.initialize();
     const account = await store.createAccount({
@@ -123,11 +123,17 @@ test('auth store raid survival preserves the per-character first-survival marker
     const save = await store.getCharacterSave(account.id, character.id);
     assert.ok(save);
 
+    await store.recordRaidSurvival(account.id, character.id, [], 'w_forest_village');
+    const firstSave = await store.getCharacterSave(account.id, character.id);
+    assert.ok(firstSave);
+    assert.ok((firstSave.questState.completedQuestIds as string[]).includes(FIRST_SURVIVAL_QUEST_ID));
+    assert.equal(firstSave.questState.gold, 500 + FIRST_SURVIVAL_GOLD_REWARD);
+
     // Simulate the survival flush having already recorded the first-survival marker.
     await store.updateCharacterSave(account.id, character.id, {
-        expectedRevision: save.revision,
+        expectedRevision: firstSave.revision,
         patch: {
-            questState: { ...save.questState, completedQuestIds: [FIRST_SURVIVAL_QUEST_ID] },
+            questState: { ...firstSave.questState, completedQuestIds: [FIRST_SURVIVAL_QUEST_ID] },
         },
     });
 
@@ -137,6 +143,7 @@ test('auth store raid survival preserves the per-character first-survival marker
     const updatedSave = await store.getCharacterSave(account.id, character.id);
     assert.ok(updatedSave);
     assert.ok((updatedSave.questState.completedQuestIds as string[]).includes(FIRST_SURVIVAL_QUEST_ID));
+    assert.equal(updatedSave.questState.gold, 500 + FIRST_SURVIVAL_GOLD_REWARD);
 });
 
 function fullInventory(width: number, height: number) {

@@ -41,6 +41,7 @@ export default defineConfig({
             timeout: 30_000,
             env: {
                 NODE_ENV: 'development',
+                PLAYWRIGHT: '1',
                 WORLD_SAVE_SPOOL_PATH: 'server/.runtime/playwright-world-save-spool.json',
                 WORLD_SESSION_SNAPSHOT_PATH: 'server/.runtime/playwright-world-session-snapshots.json',
             },

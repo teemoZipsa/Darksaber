@@ -7,7 +7,7 @@
 import 'dotenv/config';
 import { WebSocketServer, WebSocket, type RawData } from 'ws';
 import { fileURLToPath } from 'node:url';
-import { createServer } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
 import { isMarketClientMessage, WORLD_PROTOCOL_VERSION } from '../src/net/WorldProtocol';
@@ -44,6 +44,7 @@ import { createWorldServerOriginPolicy } from './WorldServerOriginPolicy';
 const PORT = Number(process.env.PORT ?? 8765);
 const HOST = process.env.HOST;
 const ENABLE_DEBUG_COUNTS = process.env.WORLD_DEBUG_COUNTS === '1';
+const ENABLE_PLAYWRIGHT_TEST_API = process.env.PLAYWRIGHT === '1';
 const WORLD_SHARD_CONFIG = createWorldShardConfig(process.env.WORLD_SHARD_COUNT);
 const WORLD_SHARD_COUNT = WORLD_SHARD_CONFIG.count;
 const MAX_WS_PAYLOAD_BYTES = Math.max(1024, Math.floor(Number(process.env.WORLD_WS_MAX_PAYLOAD_BYTES ?? 64 * 1024)));
@@ -109,6 +110,7 @@ const handleAuthHttpRequest = createAuthHttpHandler({
 });
 const server = createServer(async (request, response) => {
     if (await handleAuthHttpRequest(request, response)) return;
+    if (await handlePlaywrightHttpRequest(request, response)) return;
 
     if (request.url === '/healthz') {
         response.writeHead(200, { 'Content-Type': 'application/json' });
@@ -726,6 +728,96 @@ async function releaseWorldSessionLease(sessionKey: string): Promise<void> {
 
 async function releaseAllWorldSessionLeases(): Promise<void> {
     await Promise.allSettled([...ownedSessionKeys].map((sessionKey) => releaseWorldSessionLease(sessionKey)));
+}
+
+async function handlePlaywrightHttpRequest(request: IncomingMessage, response: ServerResponse): Promise<boolean> {
+    if (!ENABLE_PLAYWRIGHT_TEST_API) return false;
+    const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
+    if (!url.pathname.startsWith('/__playwright/')) return false;
+
+    if (request.method !== 'POST' || url.pathname !== '/__playwright/world/place-player-at-town') {
+        writePlaywrightJson(response, request.method === 'POST' ? 404 : 405, { error: 'not_found' });
+        return true;
+    }
+
+    const accessToken = readBearerToken(request);
+    const auth = accessToken ? await authenticateAccessToken(authStore, accessToken, jwtOptions) : null;
+    if (!auth) {
+        writePlaywrightJson(response, 401, { error: 'access_invalid' });
+        return true;
+    }
+
+    let body: unknown;
+    try {
+        body = await readJsonBody(request);
+    } catch {
+        writePlaywrightJson(response, 400, { error: 'bad_json' });
+        return true;
+    }
+
+    if (!isRecord(body) || typeof body.characterId !== 'string' || typeof body.townId !== 'string') {
+        writePlaywrightJson(response, 400, { error: 'bad_request' });
+        return true;
+    }
+
+    const placed = placeActiveCharacterAtTownForPlaywright(auth.account.id, body.characterId, body.townId);
+    if (!placed) {
+        writePlaywrightJson(response, 404, { error: 'active_player_not_found' });
+        return true;
+    }
+
+    writePlaywrightJson(response, 200, { ok: true, ...placed });
+    return true;
+}
+
+function placeActiveCharacterAtTownForPlaywright(
+    accountId: string,
+    characterId: string,
+    townId: string
+): { sessionKey: string; playerId: string; townId: string; tile: { x: number; y: number } } | null {
+    for (const [sessionKey, session] of sessions) {
+        const player = [...session.getDebugState().players.values()].find((candidate) =>
+            candidate.active
+            && !candidate.ghost
+            && candidate.accountId === accountId
+            && candidate.characterId === characterId
+        );
+        if (!player) continue;
+        const placed = session.placePlayerAtTownForTest(player.id, townId);
+        if (!placed) return null;
+        queueImmediateSnapshots(sessionKey);
+        return { sessionKey, playerId: player.id, ...placed };
+    }
+    return null;
+}
+
+function readBearerToken(request: IncomingMessage): string | null {
+    const authorization = request.headers.authorization;
+    if (typeof authorization !== 'string') return null;
+    const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
+    return match?.[1] ?? null;
+}
+
+async function readJsonBody(request: IncomingMessage): Promise<unknown> {
+    const chunks: Buffer[] = [];
+    let total = 0;
+    for await (const chunk of request) {
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+        total += buffer.byteLength;
+        if (total > 16 * 1024) throw new Error('request body too large');
+        chunks.push(buffer);
+    }
+    const text = Buffer.concat(chunks).toString('utf8');
+    return text ? JSON.parse(text) as unknown : {};
+}
+
+function writePlaywrightJson(response: ServerResponse, status: number, body: unknown): void {
+    response.writeHead(status, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify(body));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
 }
 
 function findReconnectSession(resumeToken: string, accountId: string): {

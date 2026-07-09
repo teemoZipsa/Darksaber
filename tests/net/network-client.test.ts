@@ -724,6 +724,53 @@ test('client leave clears stored scoped resume state before closing', async () =
     }
 });
 
+test('town leave waits for the authoritative raid result before closing', async () => {
+    const restoreSocket = installMockWebSocket();
+    const storage = new MemoryStorage();
+    const restoreStorage = installMemoryStorage(storage);
+    const results: string[] = [];
+
+    try {
+        const client = new NetworkRaidClient({
+            url: 'ws://test',
+            onRaidResult: (message) => results.push(message.result),
+        });
+        const join = client.connectAndJoin(joinInput());
+        const socket = MockWebSocket.instances[0];
+        assert.ok(socket);
+
+        socket.emitOpen();
+        socket.emitMessage(welcomeMessage('resume_town_leave'));
+        await join;
+        assert.equal(storage.getItem(resumeTokenKey()), 'resume_town_leave');
+
+        client.leave('town');
+        assert.equal(JSON.parse(socket.sent[socket.sent.length - 1] ?? '{}').type, 'WORLD_LEAVE');
+        assert.equal(JSON.parse(socket.sent[socket.sent.length - 1] ?? '{}').reason, 'town');
+        assert.equal(client.getResumeToken(), null);
+        assert.equal(storage.getItem(resumeTokenKey()), null);
+        assert.equal(socket.readyState, MockWebSocket.OPEN);
+
+        socket.emitMessage(JSON.stringify({
+            type: 'RAID_RESULT',
+            playerId: 'player_1',
+            result: 'SURVIVED',
+            elapsedSeconds: 10,
+            kills: 1,
+            departureTownId: 'central_castle',
+            extractionTownId: 'w_forest_village',
+            completedDungeonIds: [],
+        }));
+
+        assert.deepEqual(results, ['SURVIVED']);
+        assert.equal(client.getStatus(), 'disconnected');
+        assert.equal(socket.readyState, MockWebSocket.CLOSED);
+    } finally {
+        restoreStorage();
+        restoreSocket();
+    }
+});
+
 test('resume failure clears stored resume state', async () => {
     const restoreSocket = installMockWebSocket();
     const storage = new MemoryStorage();

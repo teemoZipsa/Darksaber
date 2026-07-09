@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
+import { FIRST_SURVIVAL_QUEST_ID } from '../../src/shared/FirstSurvivalReward';
 
 async function expectFitsViewport(page: Page, locator: Locator) {
     const box = await locator.boundingBox();
@@ -66,6 +67,21 @@ async function getRaidLootModelDebug(page: Page) {
             status: document.querySelector('.dev-scenario-status')?.textContent ?? '',
         };
     });
+}
+
+async function getCharacterSaveSnapshot(
+    request: APIRequestContext,
+    accessToken: string,
+    characterId: string
+) {
+    const response = await request.get(`http://127.0.0.1:8765/characters/${encodeURIComponent(characterId)}/save`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok()) {
+        return { ok: false, status: response.status(), save: null };
+    }
+    const parsed = await response.json() as { save: any };
+    return { ok: true, status: response.status(), save: parsed.save };
 }
 
 test('dev town renders the React town overlay with embedded inventory', async ({ page }) => {
@@ -155,6 +171,111 @@ test('auth character select deletes the last character after exact-name confirma
 
     await expect(characterCard).toBeHidden();
     await expect(page.locator('#auth-overlay .auth-panel__title')).toHaveText(/캐릭터 생성|Create Character/);
+});
+
+test('authenticated network raid survival returns to town and persists the server save', async ({ page, request, isMobile }) => {
+    test.skip(isMobile, 'mobile network raid coverage is tracked as a separate e2e task');
+    test.setTimeout(60_000);
+
+    const clientErrors: string[] = [];
+    page.on('pageerror', (error) => clientErrors.push(error.message));
+    page.on('console', (message) => {
+        if (/Failed to load resource: the server responded with a status of 401 \(Unauthorized\)/.test(message.text())) return;
+        if (message.type() === 'error') clientErrors.push(message.text());
+    });
+
+    const loginName = `survive_${Date.now().toString(36)}`;
+    const password = 'password-1234';
+    const characterName = 'Survivor';
+    const extractionTownId = 'w_forest_village';
+
+    const registered = await request.post('http://127.0.0.1:8765/auth/register', {
+        data: { loginName, password },
+    });
+    expect(registered.ok()).toBe(true);
+    const session = await registered.json() as { accessToken: string };
+
+    const created = await request.post('http://127.0.0.1:8765/characters', {
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+        data: { name: characterName, classKey: 'infantry', gender: 'M' },
+    });
+    expect(created.ok()).toBe(true);
+    const createdBody = await created.json() as { character: { id: string }; save: any };
+    const characterId = createdBody.character.id;
+    const initialGold = Number(createdBody.save.questState.gold);
+
+    await page.goto('/');
+    await expect(page.locator('#auth-overlay .auth-panel')).toBeVisible({ timeout: 20_000 });
+    await page.getByLabel(/계정 이름|Login Name/).fill(loginName);
+    await page.getByLabel(/비밀번호|Password/).fill(password);
+    await page.locator('#auth-overlay .auth-primary').click();
+
+    await expect(page.locator('#auth-overlay .auth-panel__title')).toHaveText(/캐릭터 선택|Select Character/, { timeout: 20_000 });
+    const characterCard = page.locator('#auth-overlay .auth-character-card').filter({ hasText: characterName });
+    await expect(characterCard).toBeVisible();
+    await characterCard.locator('.auth-character-card__select').click();
+
+    await expect(page.locator('#ui-overlay .ds-town')).toBeVisible({ timeout: 20_000 });
+    const deployButton = page.getByRole('button', { name: /출격|Deploy/ });
+    await page.waitForTimeout(500);
+    await expect(deployButton).toBeEnabled();
+    await deployButton.click();
+    await expect.poll(() => getNetworkRaidDebug(page), { timeout: 30_000 }).toMatchObject({
+        state: 'WORLD',
+        raidActive: true,
+        networkRaidActive: true,
+        networkStatus: 'connected',
+    });
+
+    const placed = await request.post('http://127.0.0.1:8765/__playwright/world/place-player-at-town', {
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+        data: { characterId, townId: extractionTownId },
+    });
+    expect(placed.ok()).toBe(true);
+
+    await page.evaluate(() => {
+        const client = (window as unknown as { __gm?: any }).__gm?.worldEngine?.networkRaidClient;
+        if (!client) throw new Error('missing network raid client');
+        client.leave('town');
+    });
+
+    await expect.poll(() => getNetworkRaidDebug(page), { timeout: 20_000 }).toMatchObject({
+        state: 'WORLD',
+        raidActive: false,
+        networkRaidActive: false,
+    });
+
+    await expect.poll(async () => {
+        const snapshot = await getCharacterSaveSnapshot(request, session.accessToken, characterId);
+        if (!snapshot.ok || !snapshot.save) {
+            return {
+                ok: false,
+                townId: null,
+                goldIncreased: false,
+                firstSurvival: false,
+            };
+        }
+        const save = snapshot.save;
+        const completed = Array.isArray(save.questState?.completedQuestIds)
+            ? save.questState.completedQuestIds
+            : [];
+        return {
+            ok: true,
+            townId: save.hubLocation?.townId ?? null,
+            goldIncreased: Number(save.questState?.gold) > initialGold,
+            firstSurvival: completed.includes(FIRST_SURVIVAL_QUEST_ID),
+        };
+    }, { timeout: 20_000 }).toMatchObject({
+        ok: true,
+        townId: extractionTownId,
+        goldIncreased: true,
+        firstSurvival: true,
+    });
+
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#ui-overlay .ds-town')).toBeVisible({ timeout: 10_000 });
+
+    expect(clientErrors).toEqual([]);
 });
 
 test('dev tutorial can open and close the standalone inventory overlay', async ({ page }) => {

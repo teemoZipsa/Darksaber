@@ -297,9 +297,9 @@ export class NetworkRaidClient {
     }
 
     public leave(reason: WorldLeaveMessage['reason']): void {
-        this.send({ type: 'WORLD_LEAVE', reason });
+        const sent = this.send({ type: 'WORLD_LEAVE', reason });
         this.clearStoredResumeToken(this.joinInput?.characterId);
-        this.close();
+        if (reason === 'manual' || !sent) this.close();
     }
 
     public close(): void {

@@ -544,6 +544,23 @@ export class WorldSession {
         );
     }
 
+    public placePlayerAtTownForTest(playerId: string, townId: string): { townId: string; tile: TilePoint } | null {
+        const player = this.players.get(playerId);
+        const town = this.getTownById(townId);
+        if (!player || !town) return null;
+
+        const tile = this.worldMap.getTownSpawnTile(town);
+        for (const actorId of player.actorIds) {
+            const actor = this.actors.get(actorId);
+            if (!actor) continue;
+            actor.tile = { ...tile };
+            actor.actionGauge = 0;
+            actor.remainingAp = 0;
+            actor.facing = 'down';
+        }
+        return { townId: town.id, tile };
+    }
+
     public consumeSaveDirtyPlayerIds(): string[] {
         return this.saveState.consumeDirtyPlayerIds();
     }
