@@ -2,26 +2,17 @@ import {
     applyGuardToDamage,
     getEffectiveStats,
     getEffectiveStatsForEnemy,
-    removeActionStanceStatusesFromCarrier,
 } from '../src/combat/StatusEffects';
 import { CombatFormulas } from '../src/combat/CombatFormulas';
-import { getItemDef } from '../src/data/ItemDB';
 import {
     normalizeLoadout,
     normalizeUpgradeLevels,
 } from '../src/magic/MagicLoadout';
-import {
-    getStoryInteriorLayout,
-    getStoryInteriorTileAt,
-    type StoryInteriorLayout,
-} from '../src/data/StoryInteriorData';
 import type { FieldNestState } from '../src/field/SpawnResolver';
 import { LootObject } from '../src/entity/LootObject';
 import { getCarryAtbMultiplier } from '../src/inventory/CarryWeight';
 import {
-    countCursedArtifactsInItemCounts,
     getCursedArtifactAtbMultiplier,
-    getCursedArtifactTurnDamage,
 } from '../src/raid/CursedArtifact';
 import {
     getRaidModifierEffects,
@@ -38,11 +29,6 @@ import {
     type FieldPassableQuery,
     type TilePoint,
 } from '../src/field/FieldPathing';
-import { hasLineOfSight } from '../src/field/LineOfSight';
-import {
-    isTerrainLineOfSightBlocking,
-    isTerrainPassable,
-} from '../src/field/TerrainRules';
 import { WorldMap } from '../src/map/WorldMap';
 import type { TownInfo } from '../src/map/BiomeMask';
 import {
@@ -102,16 +88,33 @@ import {
     type WorldSessionDebugState,
 } from './WorldSessionDebugState';
 import {
-    updateRestingActorResources,
-} from './WorldSessionSkillState';
-import {
     cloneStatuses,
-    createActorEvent,
     createToken,
     formationOffset,
     reject,
     syncStatsMovementToClass,
 } from './WorldSessionHelpers';
+import {
+    applyWorldSessionCursedArtifactTurnDamage,
+    endWorldSessionActorTurn,
+    finishWorldSessionActorIfSpent,
+    getWorldSessionPlayerCursedArtifactCount,
+    spendWorldSessionActorGauge,
+    updateWorldSessionRestingActor,
+} from './WorldSessionActorLifecycle';
+import {
+    completeWorldSessionEnemyKill,
+    type WorldSessionEnemyKillContext,
+} from './WorldSessionCombatResolution';
+import {
+    findNearbyWorldSessionWalkableTile,
+    getWorldSessionServerBoundsForOwner,
+    getWorldSessionServerTileAt,
+    hasWorldSessionFieldLineOfSight,
+    isWorldSessionFieldPassable,
+    isWorldSessionFieldPassableForOwner,
+    type WorldSessionTerrainQueryContext,
+} from './WorldSessionTerrainQueries';
 import type {
     CompleteEnemyKillResult,
     ServerActor,
@@ -820,17 +823,7 @@ export class WorldSession {
     }
 
     private completeEnemyKill(actor: ServerActor, target: ServerEnemy, now: number): CompleteEnemyKillResult {
-        const enemy = target.enemy;
-        const scenarioKillResult = this.scenarioRuntime.completeEnemyKill(target, enemy.id);
-        this.enemies.delete(enemy.id);
-        if (target.nestKey) this.fieldNests.markNestEnemyKilled(target.nestKey, enemy.id, now);
-        const player = this.players.get(actor.ownerPlayerId);
-        if (player) player.kills += 1;
-        const autoLootGrant = enemy.isBoss
-            ? undefined
-            : this.contentSpawner.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
-        if (enemy.isBoss || !autoLootGrant) this.contentSpawner.spawnEnemyLoot(enemy, scenarioKillResult.bossLootTile);
-        return { autoLootGrant, scenarioEnemyDefeatEvent: scenarioKillResult.scenarioEnemyDefeatEvent };
+        return completeWorldSessionEnemyKill(this.getEnemyKillContext(), actor, target, now);
     }
 
     private removePlayer(playerId: string): void {
@@ -842,114 +835,67 @@ export class WorldSession {
         this.lootResolver.releaseLocksForPlayer(playerId);
     }
 
+    private getTerrainQueryContext(): WorldSessionTerrainQueryContext {
+        return {
+            worldMap: this.worldMap,
+            players: this.players,
+            actors: this.actors,
+            enemies: this.enemies,
+        };
+    }
+
+    private getEnemyKillContext(): WorldSessionEnemyKillContext {
+        return {
+            scenarioRuntime: this.scenarioRuntime,
+            enemies: this.enemies,
+            fieldNests: this.fieldNests,
+            players: this.players,
+            contentSpawner: this.contentSpawner,
+        };
+    }
+
     private isFieldPassable(query: FieldPassableQuery): boolean {
-        return this.isFieldPassableForOwner(query);
+        return isWorldSessionFieldPassable(this.getTerrainQueryContext(), query);
     }
 
     private isFieldPassableForOwner(query: FieldPassableQuery, ownerPlayerId?: string): boolean {
-        const queryOwnerPlayerId = ownerPlayerId ?? this.getEntityOwnerPlayerId(query.actorId);
-        const queryScenarioPlayerId = ownerPlayerId ?? this.getScenarioOwnerPlayerId(query.actorId);
-        const tile = this.getServerTileAt(query, queryScenarioPlayerId ?? queryOwnerPlayerId ?? undefined);
-        if (!isTerrainPassable(tile)) return false;
-        for (const actor of this.actors.values()) {
-            if (actor.id === query.actorId || actor.isDead) continue;
-            const actorOwner = this.players.get(actor.ownerPlayerId);
-            if (actorOwner?.activeDungeonId && actor.ownerPlayerId !== queryOwnerPlayerId) continue;
-            if (queryScenarioPlayerId && actor.ownerPlayerId !== queryScenarioPlayerId) continue;
-            if (actor.tile.x === query.x && actor.tile.y === query.y) return false;
-        }
-        for (const entry of this.enemies.values()) {
-            const enemy = entry.enemy;
-            if (enemy.id === query.actorId || enemy.stats.hp <= 0) continue;
-            if (entry.scenarioPlayerId && entry.scenarioPlayerId !== queryOwnerPlayerId) continue;
-            if (queryScenarioPlayerId && entry.scenarioPlayerId !== queryScenarioPlayerId) continue;
-            if (enemy.gridX === query.x && enemy.gridY === query.y) return false;
-        }
-        return true;
+        return isWorldSessionFieldPassableForOwner(this.getTerrainQueryContext(), query, ownerPlayerId);
     }
 
     private getServerTileAt(tile: TilePoint, ownerPlayerId?: string | null): ReturnType<WorldMap['getTileAt']> {
-        const layout = this.getActiveInteriorLayoutForOwner(ownerPlayerId);
-        return layout ? getStoryInteriorTileAt(layout, tile.x, tile.y) : this.worldMap.getTileAt(tile.x, tile.y);
+        return getWorldSessionServerTileAt(this.getTerrainQueryContext(), tile, ownerPlayerId);
     }
 
     private getServerBoundsForOwner(ownerPlayerId?: string | null): ReturnType<WorldMap['getBoundsTiles']> {
-        const layout = this.getActiveInteriorLayoutForOwner(ownerPlayerId);
-        return layout ? { width: layout.width, height: layout.height } : this.worldMap.getBoundsTiles();
-    }
-
-    private getActiveInteriorLayoutForOwner(ownerPlayerId?: string | null): StoryInteriorLayout | null {
-        if (!ownerPlayerId) return null;
-        const player = this.players.get(ownerPlayerId);
-        return player?.activeDungeonId ? getStoryInteriorLayout(player.activeDungeonId) : null;
-    }
-
-    private getEntityOwnerPlayerId(entityId?: string): string | null {
-        if (!entityId) return null;
-        const actor = this.actors.get(entityId);
-        if (actor) return actor.ownerPlayerId;
-        return this.getScenarioOwnerPlayerId(entityId);
-    }
-
-    private getScenarioOwnerPlayerId(entityId?: string): string | null {
-        if (!entityId) return null;
-        return this.enemies.get(entityId)?.scenarioPlayerId ?? null;
+        return getWorldSessionServerBoundsForOwner(this.getTerrainQueryContext(), ownerPlayerId);
     }
 
     private hasFieldLineOfSight(from: TilePoint, to: TilePoint, ownerPlayerId?: string): boolean {
-        return hasLineOfSight(from, to, (tile) => isTerrainLineOfSightBlocking(this.getServerTileAt(tile, ownerPlayerId)));
+        return hasWorldSessionFieldLineOfSight(this.getTerrainQueryContext(), from, to, ownerPlayerId);
     }
 
     private finishActorIfSpent(actor: ServerActor): void {
-        if (actor.remainingAp >= MIN_FIELD_ACTION_GAUGE_COST) return;
-        this.endActorTurn(actor);
+        finishWorldSessionActorIfSpent(actor);
     }
 
     private applyCursedArtifactTurnDamage(player: ServerPlayer, actor: ServerActor): CombatEventMessage | null {
-        const damage = Math.min(
-            actor.stats.hp,
-            getCursedArtifactTurnDamage(actor.stats, this.getPlayerCursedArtifactCount(player))
-        );
-        if (damage <= 0) return null;
-
-        actor.stats.hp = Math.max(0, actor.stats.hp - damage);
-        removeActionStanceStatusesFromCarrier(actor);
-        if (actor.stats.hp <= 0) {
-            actor.isDead = true;
-            actor.remainingAp = 0;
-            actor.actionGauge = 0;
-            actor.majorActionUsed = false;
-        }
-        return createActorEvent(actor.isDead ? 'down' : 'curse', actor, actor, damage);
+        return applyWorldSessionCursedArtifactTurnDamage(player, actor);
     }
 
     private getPlayerCursedArtifactCount(player: ServerPlayer): number {
-        return countCursedArtifactsInItemCounts(player.carriedItems, (itemId) => getItemDef(itemId));
+        return getWorldSessionPlayerCursedArtifactCount(player);
     }
 
     private endActorTurn(actor: ServerActor): void {
-        actor.actionGauge = Math.max(0, Math.min(FIELD_MAX_ACTION_GAUGE, actor.remainingAp));
-        actor.remainingAp = 0;
-        actor.majorActionUsed = false;
+        endWorldSessionActorTurn(actor);
     }
 
     private spendActorGauge(actor: ServerActor, cost: number): void {
-        actor.remainingAp = Math.max(0, actor.remainingAp - cost);
-        actor.actionGauge = actor.remainingAp;
+        spendWorldSessionActorGauge(actor, cost);
     }
 
     private findNearbyWalkableTile(tile: TilePoint, actorId: string, ownerPlayerId?: string): TilePoint {
-        if (this.isFieldPassableForOwner({ ...tile, actorId, intent: 'move' }, ownerPlayerId)) return tile;
-        for (let radius = 1; radius <= 8; radius++) {
-            for (let dy = -radius; dy <= radius; dy++) {
-                for (let dx = -radius; dx <= radius; dx++) {
-                    if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
-                    const candidate = { x: tile.x + dx, y: tile.y + dy };
-                    if (this.isFieldPassableForOwner({ ...candidate, actorId, intent: 'move' }, ownerPlayerId)) return candidate;
-                }
-            }
-        }
-        return tile;
+        return findNearbyWorldSessionWalkableTile(this.getTerrainQueryContext(), tile, actorId, ownerPlayerId);
     }
 
     private getOriginExitTile(originHubId: string): TilePoint {
@@ -977,14 +923,7 @@ export class WorldSession {
     }
 
     private updateRestingActor(actor: ServerActor, dt: number): void {
-        const timerUpdate = updateRestingActorResources(actor, this.restingRecoveryTimers.get(actor.id), dt);
-        if (timerUpdate.type === 'delete') {
-            this.restingRecoveryTimers.delete(actor.id);
-            return;
-        }
-        if (timerUpdate.type === 'set') {
-            this.restingRecoveryTimers.set(actor.id, timerUpdate.timer);
-        }
+        updateWorldSessionRestingActor(actor, this.restingRecoveryTimers, dt);
     }
 
     private consumeTickDelta(now: number): number {

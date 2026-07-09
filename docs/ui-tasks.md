@@ -129,6 +129,7 @@
 - [x] WS origin policy runtime 설정 일관화. WebSocket origin 검증도 auth HTTP와 같은 `AUTH_ALLOW_MISSING_ORIGIN` runtime config를 쓰게 해 production missing Origin 기본 차단을 고정한다.
 - [x] world shard 운영 계약 문서화. `WORLD_SHARD_COUNT=1`을 현재 지원되는 운영 계약으로 고정하고, `requestedRaidInstanceId`/lease가 multi-shard 지원을 의미하지 않음을 배포/아키텍처 문서와 테스트로 고정한다.
 - [x] WorldSession net 테스트 debug boundary 추가. `world-session.test.ts`의 직접 `getDebugState()` 호출과 반복 `as any` 콜백을 typed harness로 옮겨 내부 Map 접근 결합을 줄인다.
+- [x] WorldSession 저위험 helper 추출. terrain/LOS query, actor lifecycle, enemy kill resolution을 전용 모듈로 분리해 세션 본문을 orchestration 중심으로 축소한다.
 
 ---
 
