@@ -61,7 +61,7 @@ process.on('SIGTERM', () => {
 process.on('exit', shutdown);
 
 export function normalizeDevScenarioArg(scenarioArg) {
-    if (scenarioArg === 'aggro' || scenarioArg === 'loot') return scenarioArg;
+    if (scenarioArg === 'aggro' || scenarioArg === 'loot' || scenarioArg === 'combat') return scenarioArg;
     const match = /^story(\d+)$/.exec(scenarioArg ?? '');
     if (!match) return null;
     const episode = Number(match[1]);

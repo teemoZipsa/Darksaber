@@ -60,7 +60,7 @@ export class WorldEngineCombatFlow {
         if (this.context.isNetworkRaid()) {
             return this.context.submitNetworkAttack(actor, enemy);
         }
-        if (!this.context.isTutorialActive()) {
+        if (!this.context.isTutorialActive() && !isDevLocalCombatEnabled()) {
             this.context.log(t('field.log.serverCombatOnly'));
             return false;
         }
@@ -177,4 +177,8 @@ export class WorldEngineCombatFlow {
         const isMaster = isMasterClassLineId(character.classLineId) || character.currentTier >= 8;
         return this.context.getWorldMap().getRealm() === 'master' ? isMaster : !isMaster;
     }
+}
+
+function isDevLocalCombatEnabled(): boolean {
+    return Boolean(import.meta.env?.DEV);
 }

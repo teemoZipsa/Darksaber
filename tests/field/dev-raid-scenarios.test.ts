@@ -54,6 +54,37 @@ function withMockDocument<T>(run: (getStatus: () => MockDevStatusElement | null)
 }
 
 function createActor() {
+    const character = {
+        id: 'dev-hero-character',
+        name: 'Dev Hero',
+        classLineId: 'infantry',
+        currentTier: 1,
+        level: 1,
+        stats: {
+            maxHp: 220,
+            hp: 110,
+            maxMp: 80,
+            mp: 80,
+            atk: 24,
+            def: 8,
+            magAtk: 20,
+            magDef: 8,
+            spd: 8,
+            mov: 4,
+            hitRate: 100,
+            evasion: 0,
+            critRate: 0,
+        },
+        equipment: new Map(),
+        statuses: [],
+        isDead: false,
+        magicLoadout: [] as string[],
+        skillUpgradeLevels: {} as Record<string, number>,
+        syncOriginalBaseStats() {
+            this.stats.maxHp = 220;
+            this.stats.maxMp = 80;
+        },
+    };
     const entity = {
         gridX: 14,
         gridY: 32,
@@ -69,7 +100,7 @@ function createActor() {
     };
     return {
         id: 'dev-hero',
-        character: { stats: { hp: 110 }, isDead: false },
+        character,
         entity,
         path: [{ x: 13, y: 32 }],
         queuedIntent: { type: 'move' },
@@ -78,6 +109,68 @@ function createActor() {
 
 function createManagerHarness() {
     const actor = createActor();
+    const followerCharacter = {
+        ...actor.character,
+        id: 'dev_combat_follower',
+        name: 'DEV Support',
+        stats: { ...actor.character.stats },
+        statuses: [],
+        magicLoadout: [],
+        skillUpgradeLevels: {},
+    };
+    const activeParty = [actor.character];
+    const roster = [actor.character, followerCharacter];
+    const party = {
+        MAX_ACTIVE_PARTY_SIZE: 3,
+        getCharacters: () => activeParty,
+        getRoster: () => roster,
+        addToRoster: (character: typeof actor.character) => { roster.push(character); },
+        deployCharacter: (character: typeof actor.character) => {
+            if (activeParty.length >= 3 || activeParty.includes(character)) return false;
+            activeParty.push(character);
+            return true;
+        },
+        replaceActiveSlot: (index: number, character: typeof actor.character) => {
+            activeParty[index] = character;
+        },
+        switchTo: () => true,
+    };
+    const bagItems: Array<{ item: { id: string }; quantity: number }> = [];
+    const fieldEnemies: Array<{
+        enemy: { id: string; isAggro: boolean; stats: { spd: number; evasion: number } };
+        home: { x: number; y: number };
+        path: unknown[];
+    }> = [];
+    const turnStateController: {
+        activeTurnActorId: string | null;
+        remainingActionPoints: number;
+        clear(): void;
+        setActiveTurn(actorId: string, remainingActionPoints: number): void;
+        setRemainingActionPoints(points: number): void;
+    } = {
+        activeTurnActorId: 'stale-turn',
+        remainingActionPoints: 0,
+        clear() {
+            this.activeTurnActorId = null;
+            this.remainingActionPoints = 0;
+        },
+        setActiveTurn(actorId: string, remainingActionPoints: number) {
+            this.activeTurnActorId = actorId;
+            this.remainingActionPoints = remainingActionPoints;
+        },
+        setRemainingActionPoints(points: number) {
+            this.remainingActionPoints = points;
+        },
+    };
+    const bag = {
+        items: bagItems,
+        clear: () => { bagItems.length = 0; },
+        autoPlace: (item: { id: string }) => {
+            const placed = { item, quantity: 1 };
+            bagItems.push(placed);
+            return placed;
+        },
+    };
     const logs: string[] = [];
     const selected: { actorId?: string | null; lootId?: string } = {};
     const inventory = {
@@ -105,7 +198,7 @@ function createManagerHarness() {
     };
     const world = {
         partyActors: [actor],
-        fieldEnemies: [],
+        fieldEnemies,
         worldMap: {
             loot: [] as Array<{ id: string; inventory: unknown }>,
             isWalkable: () => true,
@@ -160,9 +253,10 @@ function createManagerHarness() {
         player: actor.entity,
         activeTurnActorId: 'stale-turn',
         readyQueue: ['stale-enemy'],
+        turnStateController,
     };
-    const manager = { worldEngine: world, inventoryUI: inventory };
-    return { actor, inventory, logs, manager: manager as unknown as GameManager, selected, world };
+    const manager = { worldEngine: world, inventoryUI: inventory, inventory: bag, party };
+    return { actor, bag, inventory, logs, manager: manager as unknown as GameManager, party, selected, world };
 }
 
 test('dev raid scenario parser accepts implemented story episodes through episode 31 only', () => {
@@ -173,6 +267,7 @@ test('dev raid scenario parser accepts implemented story episodes through episod
     assert.deepEqual([...DEV_LATE_STORY_EPISODES], [23, 24, 25, 26, 27, 28, 29, 30, 31]);
     assert.equal(parseDevRaidScenario('aggro'), 'aggro');
     assert.equal(parseDevRaidScenario('loot'), 'loot');
+    assert.equal(parseDevRaidScenario('combat'), 'combat');
     for (const episode of DEV_STORY_EPISODES) {
         assert.equal(parseDevRaidScenario(`story${episode}`), `story${episode}`);
     }
@@ -199,6 +294,7 @@ test('dev town launcher forwards each implemented story scenario to the open URL
     assert.equal(helper.buildDevOpenPath('tutorial', 'loot'), '/?devStart=tutorial');
     assert.equal(helper.buildDevOpenPath('raid', 'aggro'), '/?devStart=raid&devScenario=aggro');
     assert.equal(helper.buildDevOpenPath('raid', 'loot'), '/?devStart=raid&devScenario=loot');
+    assert.equal(helper.buildDevOpenPath('raid', 'combat'), '/?devStart=raid&devScenario=combat');
     for (const episode of DEV_STORY_EPISODES) {
         assert.equal(helper.normalizeDevScenarioArg(`story${episode}`), `story${episode}`);
         assert.equal(
@@ -317,6 +413,40 @@ test('dev loot scenario enables the raid loot client path without getNetworkRaid
 
     const client = world.networkRaidClient as { sendLootPickup: (lootId: string, gridX: number, gridY: number) => string };
     assert.match(client.sendLootPickup('dev_raid_loot', 0, 0), /^dev-loot-/);
+});
+
+test('dev combat scenario creates a local browser combat fixture with party, tool, magic, and active turn', () => {
+    withMockDocument((getStatus) => {
+        const { actor, bag, inventory, logs, manager, party, selected, world } = createManagerHarness();
+
+        assert.equal(applyDevRaidScenario(manager, 'combat'), true);
+
+        assert.equal(world.currentPhase, 'raid');
+        assert.equal(world.isNetworkRaid, false);
+        assert.equal(world.networkRaidClient, null);
+        assert.equal(inventory.activeCharacter, actor.character);
+        assert.equal(world.partyActors.length, 2);
+        assert.deepEqual(party.getCharacters().map((character) => character.id), ['dev-hero-character', 'dev_combat_follower']);
+        assert.equal(world.fieldEnemies.length, 1);
+        assert.equal(world.fieldEnemies[0].enemy.id, 'dev_combat_dummy');
+        assert.equal(world.fieldEnemies[0].enemy.isAggro, true);
+        assert.equal(world.fieldEnemies[0].enemy.stats.spd, 0);
+        assert.equal(world.fieldEnemies[0].enemy.stats.evasion, 0);
+        assert.equal(actor.entity.actionGauge, 160);
+        assert.equal(world.turnStateController.activeTurnActorId, actor.id);
+        assert.equal(world.turnStateController.remainingActionPoints, 160);
+        assert.equal(actor.character.magicLoadout[0], 'inf_t3');
+        assert.equal(actor.character.stats.hitRate, 100);
+        assert.ok((actor.character.stats.hp ?? 0) < (actor.character.stats.maxHp ?? 0));
+        assert.deepEqual(bag.items.map((entry) => entry.item.id), ['herb_common']);
+        assert.equal(selected.actorId, actor.id);
+        assert.equal(logs.length, 1);
+
+        const status = getStatus();
+        assert.ok(status);
+        assert.equal(status.dataset.scenario, 'combat');
+        assert.equal(status.dataset.state, 'combat-ready');
+    });
 });
 
 test('dev raid scenario reports not-ready before the controlled actor exists', () => {

@@ -1,8 +1,11 @@
 import { getStoryQuestByDungeonId } from '../data/StoryQuestData';
 import { STORY_SCENARIOS } from '../data/StoryScenarioData';
 import { getItemDef } from '../data/ItemDB';
+import { Character } from '../character/Character';
+import { getEffectiveStatsForCharacter } from '../combat/StatusEffects';
 import { Enemy } from '../entity/Enemy';
 import { LootObject } from '../entity/LootObject';
+import { Player } from '../entity/Player';
 import type { GameManager } from '../engine/GameManager';
 import { formatT, t } from '../i18n/LanguageManager';
 
@@ -15,10 +18,14 @@ export const DEV_LATE_STORY_EPISODES = STORY_SCENARIOS
     .map((scenario) => scenario.episode);
 type DevStoryScenario = `story${number}`;
 
-export type DevRaidScenario = 'aggro' | 'loot' | DevStoryScenario;
+export type DevRaidScenario = 'aggro' | 'loot' | 'combat' | DevStoryScenario;
+
+const DEV_COMBAT_AP = 160;
+const DEV_COMBAT_ENEMY_ID = 'dev_combat_dummy';
+const DEV_COMBAT_FOLLOWER_ID = 'dev_combat_follower';
 
 export function parseDevRaidScenario(value: string | null): DevRaidScenario | null {
-    if (value === 'aggro' || value === 'loot') return value;
+    if (value === 'aggro' || value === 'loot' || value === 'combat') return value;
     const match = value?.match(/^story(\d+)$/);
     if (!match) return null;
     const episode = Number(match[1]);
@@ -38,7 +45,7 @@ type DevEntity = {
 };
 type DevFieldActor = {
     id: string;
-    character: { isDead?: boolean; stats?: { hp?: number } };
+    character: { isDead?: boolean; stats?: { hp?: number; mp?: number; maxHp?: number; maxMp?: number }; magicLoadout?: string[] };
     entity: DevEntity;
     path: DevTile[];
     queuedIntent: unknown;
@@ -78,6 +85,11 @@ type DevWorldEngine = {
     player: DevEntity;
     activeTurnActorId: string | null;
     readyQueue: string[];
+    turnStateController?: {
+        clear?: () => void;
+        setActiveTurn?: (actorId: string, remainingActionPoints: number, majorActionUsed?: boolean) => void;
+        setRemainingActionPoints?: (points: number) => void;
+    };
 };
 
 export function applyDevRaidScenario(
@@ -98,6 +110,7 @@ export function applyDevRaidScenario(
 
     if (scenario === 'aggro') applyDevAggroScenario(world, actor);
     else if (scenario === 'loot') applyDevLootScenario(manager, world, actor);
+    else if (scenario === 'combat') applyDevCombatScenario(manager, world, actor);
     else return applyDevStoryScenario(world, scenario);
     return true;
 }
@@ -193,6 +206,58 @@ function applyDevLootScenario(manager: GameManager, world: DevWorldEngine, actor
     setDevScenarioStatus('loot', 'loot-open');
 }
 
+function applyDevCombatScenario(manager: GameManager, world: DevWorldEngine, actor: DevFieldActor): void {
+    deactivateDevNetworkRaid(world);
+
+    const activeCharacter = actor.character as Character;
+    configureDevCombatCharacter(activeCharacter);
+    const follower = ensureDevCombatFollower(manager);
+
+    const actorTile = findWalkableTile(world, { x: actor.entity.gridX, y: actor.entity.gridY });
+    setDevEntityTile(actor.entity, actorTile);
+    actor.path = [];
+    actor.queuedIntent = null;
+    actor.character.isDead = false;
+    actor.entity.actionGauge = DEV_COMBAT_AP;
+
+    const followerTile = findWalkableUnoccupiedTileAtDistance(world, actorTile, 1, [actorTile])
+        ?? findWalkableUnoccupiedTileAtDistance(world, actorTile, 2, [actorTile])
+        ?? { x: actorTile.x, y: actorTile.y + 1 };
+    const followerActor = createDevCombatFollowerActor(follower, followerTile);
+
+    const enemyTile = findWalkableUnoccupiedTileAtDistance(world, actorTile, 1, [actorTile, followerTile])
+        ?? findWalkableUnoccupiedTileAtDistance(world, actorTile, 2, [actorTile, followerTile])
+        ?? { x: actorTile.x + 1, y: actorTile.y };
+    const enemy = new Enemy(DEV_COMBAT_ENEMY_ID, enemyTile.x, enemyTile.y, t('dev.scenario.combatEnemy'), 8, '#c86a4a', 'tank');
+    enemy.isAggro = true;
+    enemy.aggroRange = 8;
+    enemy.stats.maxHp = 999;
+    enemy.stats.hp = 999;
+    enemy.stats.def = 0;
+    enemy.stats.magDef = 0;
+    enemy.stats.spd = 0;
+    enemy.stats.evasion = 0;
+    enemy.stats.magEva = 0;
+    enemy.stats.hitRate = 100;
+    enemy.stats.atk = 1;
+    enemy.setGridPosition(enemyTile.x, enemyTile.y, true);
+
+    const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
+    manager.inventory.clear();
+    if (herb) manager.inventory.autoPlace(herb);
+    manager.inventoryUI.setActiveCharacter(activeCharacter);
+
+    world.partyActors = [actor, followerActor];
+    world.fieldEnemies = [{ enemy, home: { ...enemyTile }, path: [] }];
+    world.worldMap.loot = [];
+    world.player = actor.entity;
+    world.actionControllers.selectionController.selectActor(actor.id);
+    world.clearFieldTurnState();
+    setDevActiveTurn(world, actor.id, DEV_COMBAT_AP);
+    world.addCombatLog?.(t('dev.scenario.combatReady'));
+    setDevScenarioStatus('combat', 'combat-ready');
+}
+
 function applyDevStoryScenario(world: DevWorldEngine, scenarioId: DevStoryScenario): boolean {
     deactivateDevNetworkRaid(world);
     const episode = Number(scenarioId.replace('story', ''));
@@ -213,6 +278,63 @@ function applyDevStoryScenario(world: DevWorldEngine, scenarioId: DevStoryScenar
     world.addCombatLog?.(formatT('dev.scenario.storyReady', { episode, dungeon: dungeon.nameKr }));
     setDevScenarioStatus(scenarioId, scenario.missionKind === 'soloInterior' ? 'interior-ready' : 'scenario-ready');
     return true;
+}
+
+function configureDevCombatCharacter(character: Character): void {
+    character.currentTier = Math.max(character.currentTier, 3);
+    character.level = Math.max(character.level, 3);
+    character.magicLoadout = ['inf_t3'];
+    character.skillUpgradeLevels = {};
+    character.isDead = false;
+    character.syncOriginalBaseStats();
+    const effective = getEffectiveStatsForCharacter(character);
+    character.stats.mp = Math.max(40, effective.maxMp);
+    character.stats.hp = Math.max(1, Math.min(effective.maxHp - 30, effective.maxHp - 1));
+    character.stats.hitRate = 100;
+    character.stats.magHit = 100;
+}
+
+function ensureDevCombatFollower(manager: GameManager): Character {
+    const party = manager.party;
+    let follower = party.getRoster().find((character) => character.id === DEV_COMBAT_FOLLOWER_ID);
+    if (!follower) {
+        follower = new Character(DEV_COMBAT_FOLLOWER_ID, t('dev.scenario.combatFollower'), 'cleric');
+        party.addToRoster(follower);
+    }
+    follower.isDead = false;
+    const effective = getEffectiveStatsForCharacter(follower);
+    follower.stats.hp = effective.maxHp;
+    follower.stats.mp = effective.maxMp;
+
+    if (!party.getCharacters().includes(follower)) {
+        if (party.getCharacters().length < party.MAX_ACTIVE_PARTY_SIZE) {
+            party.deployCharacter(follower);
+        } else {
+            party.replaceActiveSlot(1, follower);
+        }
+    }
+    return follower;
+}
+
+function createDevCombatFollowerActor(character: Character, tile: DevTile): DevFieldActor {
+    const entity = new Player(tile.x, tile.y);
+    entity.id = DEV_COMBAT_FOLLOWER_ID;
+    entity.setGridPosition(tile.x, tile.y, true);
+    entity.actionGauge = 0;
+    return {
+        id: DEV_COMBAT_FOLLOWER_ID,
+        character,
+        entity,
+        path: [],
+        queuedIntent: null,
+    };
+}
+
+function setDevActiveTurn(world: DevWorldEngine, actorId: string, actionPoints: number): void {
+    world.activeTurnActorId = actorId;
+    world.readyQueue = [];
+    world.turnStateController?.setActiveTurn?.(actorId, actionPoints, false);
+    world.turnStateController?.setRemainingActionPoints?.(actionPoints);
 }
 
 function createDevLootClient(): unknown {
@@ -260,6 +382,26 @@ function findWalkableTileAtDistance(world: DevWorldEngine, origin: DevTile, dist
             : [{ x: origin.x + dx, y: origin.y + dy }, { x: origin.x + dx, y: origin.y - dy }];
         for (const tile of candidates) {
             if (world.worldMap.isWalkable(tile.x, tile.y)) return tile;
+        }
+    }
+    return null;
+}
+
+function findWalkableUnoccupiedTileAtDistance(
+    world: DevWorldEngine,
+    origin: DevTile,
+    distance: number,
+    occupied: DevTile[]
+): DevTile | null {
+    for (let dx = -distance; dx <= distance; dx++) {
+        const dy = distance - Math.abs(dx);
+        const candidates = dy === 0
+            ? [{ x: origin.x + dx, y: origin.y }]
+            : [{ x: origin.x + dx, y: origin.y + dy }, { x: origin.x + dx, y: origin.y - dy }];
+        for (const tile of candidates) {
+            if (!world.worldMap.isWalkable(tile.x, tile.y)) continue;
+            if (occupied.some((entry) => entry.x === tile.x && entry.y === tile.y)) continue;
+            return tile;
         }
     }
     return null;

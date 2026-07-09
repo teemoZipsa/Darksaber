@@ -187,6 +187,7 @@ function mountDevLauncher(): void {
         <a href="/?devStart=raid">${t('dev.launcher.raid')}</a>
         <a href="/?devStart=raid&devScenario=aggro">${t('dev.launcher.raidAggro')}</a>
         <a href="/?devStart=raid&devScenario=loot">${t('dev.launcher.raidLoot')}</a>
+        <a href="/?devStart=raid&devScenario=combat">${t('dev.launcher.raidCombat')}</a>
         ${storyLinks}
         <a href="/?devStart=tutorial">${t('dev.launcher.tutorial')}</a>
     `;

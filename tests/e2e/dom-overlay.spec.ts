@@ -69,6 +69,92 @@ async function getRaidLootModelDebug(page: Page) {
     });
 }
 
+async function getCombatUxDebug(page: Page) {
+    return page.evaluate(() => {
+        const tileSize = 48;
+        const gm = (window as unknown as { __gm?: any }).__gm;
+        const engine = gm?.worldEngine;
+        const canvas = document.querySelector<HTMLCanvasElement>('#gameCanvas');
+        const rect = canvas?.getBoundingClientRect();
+        const camera = gm?.camera ?? engine?.getCoreState?.()?.camera;
+        const uiState = engine?.getUiState?.();
+        const runtimeState = engine?.getRuntimeState?.();
+        const actionControllers = engine?.actionControllers ?? engine?.getControllerState?.()?.actionControllers;
+        const turnState = engine?.turnStateController;
+        const actor = engine?.partyActors?.[0] ?? null;
+        const enemyEntry = engine?.fieldEnemies?.find((entry: any) => entry.enemy?.id === 'dev_combat_dummy')
+            ?? engine?.fieldEnemies?.[0]
+            ?? null;
+        const enemy = enemyEntry?.enemy ?? null;
+        const uiScale = Number.parseFloat(window.localStorage.getItem('setting_uiScale') ?? '1') || 1;
+        const canvasW = canvas?.width ?? window.innerWidth;
+        const canvasH = canvas?.height ?? window.innerHeight;
+        const toScreen = (entity: any) => {
+            if (!rect || !camera || !entity) return null;
+            const cameraX = typeof camera.baseX === 'number' ? camera.baseX : camera.x;
+            const cameraY = typeof camera.baseY === 'number' ? camera.baseY : camera.y;
+            return {
+                x: rect.left + ((entity.gridX * tileSize + tileSize / 2) - cameraX) * camera.zoom,
+                y: rect.top + ((entity.gridY * tileSize + tileSize / 2) - cameraY) * camera.zoom,
+            };
+        };
+        const toolOptionScreen = rect
+            ? {
+                x: rect.left + (((canvasW / uiScale) - 256) / 2 + 72) * uiScale,
+                y: rect.top + (((canvasH / uiScale) - (34 + 38 + 12)) / 2 + 34 + 19) * uiScale,
+            }
+            : null;
+        const summarizeItems = (items: any[] | undefined) => (items ?? []).reduce<Record<string, number>>((acc, placed) => {
+            const id = placed?.item?.id ?? placed?.itemId;
+            if (!id) return acc;
+            acc[id] = (acc[id] ?? 0) + Math.max(1, placed?.quantity ?? 1);
+            return acc;
+        }, {});
+        const logs = engine?.fieldFeedback?.combatLog ?? [];
+        const actionStates = Array.from(uiState?.actionMenuUI?.slotStates ?? []).map(([type, state]: any) => ({
+            type,
+            enabled: Boolean(state?.enabled),
+            disabledReason: state?.disabledReason ?? null,
+            highlighted: Boolean(state?.highlighted),
+        }));
+        return {
+            state: gm?.state,
+            status: document.querySelector('.dev-scenario-status')?.textContent ?? '',
+            partyCount: engine?.partyActors?.length ?? 0,
+            partyCharacterIds: gm?.party?.getCharacters?.().map((character: any) => character.id) ?? [],
+            partyActorCharacterIds: (engine?.partyActors ?? []).map((entry: any) => entry.character?.id ?? null),
+            isNetworkRaid: engine?.isNetworkRaidActive?.() ?? engine?.isNetworkRaid ?? null,
+            actionMenuOpen: uiState?.actionMenuUI?.getIsOpen?.() ?? false,
+            playerActionMode: actionControllers?.playerActionController?.getMode?.() ?? null,
+            magicMode: actionControllers?.magicController?.getState?.().mode ?? null,
+            toolVisible: actionControllers?.toolController?.isVisible?.() ?? false,
+            hoverTile: runtimeState?.hoverTile ?? null,
+            remainingActionPoints: turnState?.getRemainingActionPoints?.() ?? null,
+            fanfareLeaderId: runtimeState?.fanfareLeaderActorId ?? null,
+            actor: actor ? {
+                id: actor.id,
+                hp: actor.character?.stats?.hp ?? null,
+                maxHp: actor.character?.stats?.maxHp ?? null,
+                mp: actor.character?.stats?.mp ?? null,
+                statuses: (actor.character?.statuses ?? []).map((status: any) => status.kind),
+                tile: { x: actor.entity?.gridX ?? null, y: actor.entity?.gridY ?? null },
+                screen: toScreen(actor.entity),
+            } : null,
+            enemy: enemy ? {
+                id: enemy.id,
+                hp: enemy.stats?.hp ?? null,
+                maxHp: enemy.stats?.maxHp ?? null,
+                tile: { x: enemy.gridX, y: enemy.gridY },
+                screen: toScreen(enemy),
+            } : null,
+            inventory: summarizeItems(gm?.inventory?.items),
+            logs,
+            actionStates,
+            toolOptionScreen,
+        };
+    });
+}
+
 async function getCharacterSaveSnapshot(
     request: APIRequestContext,
     accessToken: string,
@@ -82,6 +168,39 @@ async function getCharacterSaveSnapshot(
     }
     const parsed = await response.json() as { save: any };
     return { ok: true, status: response.status(), save: parsed.save };
+}
+
+async function openCombatActionMenu(page: Page): Promise<void> {
+    const current = await getCombatUxDebug(page);
+    if (!current.actionMenuOpen) {
+        const actorScreen = current.actor?.screen;
+        expect(actorScreen).toBeTruthy();
+        await page.mouse.click(actorScreen!.x, actorScreen!.y);
+    }
+    await expect.poll(() => getCombatUxDebug(page), { timeout: 10_000 }).toMatchObject({
+        actionMenuOpen: true,
+    });
+}
+
+async function clickCombatEnemy(page: Page): Promise<void> {
+    const current = await getCombatUxDebug(page);
+    const enemyScreen = current.enemy?.screen;
+    const enemyTile = current.enemy?.tile;
+    if (!enemyScreen || !enemyTile) throw new Error('dev combat enemy screen position is unavailable');
+    await page.mouse.move(enemyScreen.x, enemyScreen.y);
+    await expect.poll(async () => {
+        const debug = await getCombatUxDebug(page);
+        return debug.hoverTile;
+    }, { timeout: 5000 }).toMatchObject(enemyTile);
+    await page.mouse.click(enemyScreen.x, enemyScreen.y);
+}
+
+async function clickCombatToolOption(page: Page): Promise<void> {
+    const current = await getCombatUxDebug(page);
+    const option = current.toolOptionScreen;
+    expect(option).toBeTruthy();
+    await page.mouse.move(option!.x, option!.y);
+    await page.mouse.click(option!.x, option!.y);
 }
 
 test('dev town renders the React town overlay with embedded inventory', async ({ page }) => {
@@ -382,6 +501,132 @@ test('dev raid loot can be transferred into the backpack with pointer input', as
     const after = await getRaidLootModelDebug(page);
     expect(after.bag.quantity).toBe(before.bag.quantity + before.external.quantity);
     expect(after.status).toMatch(/picked:dev_raid_loot:\d+,\d+/);
+});
+
+test('dev raid combat UX supports attack, magic, tool, defend, rest, and fanfare inputs', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'desktop canvas combat UX coverage; mobile network raid is tracked separately');
+    test.setTimeout(60_000);
+
+    const clientErrors: string[] = [];
+    page.on('pageerror', (error) => clientErrors.push(error.message));
+    page.on('console', (message) => {
+        if (message.type() === 'error') clientErrors.push(message.text());
+    });
+
+    await page.goto('/?devStart=raid&devScenario=combat&devLocal=1');
+    await expect(page.locator('.dev-scenario-status')).toContainText(/combat \/ combat-ready/, { timeout: 25_000 });
+    await expect.poll(() => getCombatUxDebug(page), { timeout: 20_000 }).toMatchObject({
+        state: 'WORLD',
+        partyCount: 2,
+        remainingActionPoints: 160,
+        enemy: { id: 'dev_combat_dummy', hp: 999 },
+        inventory: { herb_common: 1 },
+    });
+    const fixture = await getCombatUxDebug(page);
+    expect(fixture.partyCharacterIds).toContain('dev_combat_follower');
+    expect(fixture.partyActorCharacterIds).toContain('dev_combat_follower');
+    expect(fixture.isNetworkRaid).toBe(false);
+
+    await openCombatActionMenu(page);
+
+    await page.keyboard.press('KeyD');
+    await expect.poll(async () => {
+        const debug = await getCombatUxDebug(page);
+        return debug.actionMenuOpen
+            && debug.fanfareLeaderId === debug.actor?.id
+            && /집결|rally/i.test(debug.logs.join('\n'));
+    }, { timeout: 10_000 }).toBe(true);
+    const afterFanfare = await getCombatUxDebug(page);
+    expect(afterFanfare.fanfareLeaderId).toBe(afterFanfare.actor?.id);
+    expect(afterFanfare.logs.join('\n')).toMatch(/집결|rally/i);
+
+    const enemyHpBeforeAttack = afterFanfare.enemy!.hp;
+    await page.keyboard.press('KeyE');
+    await expect.poll(() => getCombatUxDebug(page)).toMatchObject({ playerActionMode: 'attack' });
+    await clickCombatEnemy(page);
+    await expect.poll(async () => {
+        const debug = await getCombatUxDebug(page);
+        return {
+            hpDropped: Number(debug.enemy?.hp) < Number(enemyHpBeforeAttack),
+            actionMenuOpen: debug.actionMenuOpen,
+        };
+    }, { timeout: 10_000 }).toMatchObject({
+        hpDropped: true,
+        actionMenuOpen: true,
+    });
+
+    const beforeMagic = await getCombatUxDebug(page);
+    await page.keyboard.press('KeyR');
+    await expect.poll(() => getCombatUxDebug(page)).toMatchObject({ magicMode: 'menu' });
+    await page.keyboard.press('Digit1');
+    await expect.poll(() => getCombatUxDebug(page)).toMatchObject({ magicMode: 'targeting' });
+    await clickCombatEnemy(page);
+    await expect.poll(async () => {
+        const debug = await getCombatUxDebug(page);
+        return {
+            hpDropped: Number(debug.enemy?.hp) < Number(beforeMagic.enemy?.hp),
+            mpSpent: Number(debug.actor?.mp) < Number(beforeMagic.actor?.mp),
+            actionMenuOpen: debug.actionMenuOpen,
+            magicMode: debug.magicMode,
+        };
+    }, { timeout: 10_000 }).toMatchObject({
+        hpDropped: true,
+        mpSpent: true,
+        actionMenuOpen: true,
+        magicMode: 'idle',
+    });
+
+    const beforeTool = await getCombatUxDebug(page);
+    await page.keyboard.press('KeyW');
+    await expect.poll(() => getCombatUxDebug(page)).toMatchObject({ toolVisible: true });
+    await clickCombatToolOption(page);
+    await expect.poll(async () => {
+        const debug = await getCombatUxDebug(page);
+        return {
+            healed: Number(debug.actor?.hp) > Number(beforeTool.actor?.hp),
+            herbCount: debug.inventory.herb_common ?? 0,
+            actionMenuOpen: debug.actionMenuOpen,
+            toolVisible: debug.toolVisible,
+        };
+    }, { timeout: 10_000 }).toMatchObject({
+        healed: true,
+        herbCount: 0,
+        actionMenuOpen: true,
+        toolVisible: false,
+    });
+
+    await page.keyboard.press('KeyA');
+    await expect.poll(async () => {
+        const debug = await getCombatUxDebug(page);
+        return {
+            guarded: debug.actor?.statuses.includes('guard') ?? false,
+            counterReady: debug.actor?.statuses.includes('counterReady') ?? false,
+            actionMenuOpen: debug.actionMenuOpen,
+        };
+    }).toMatchObject({
+        guarded: true,
+        counterReady: true,
+        actionMenuOpen: true,
+    });
+
+    await page.keyboard.press('KeyS');
+    await expect.poll(async () => {
+        const debug = await getCombatUxDebug(page);
+        return {
+            resting: debug.actor?.statuses.includes('resting') ?? false,
+            actionMenuOpen: debug.actionMenuOpen,
+            remainingActionPoints: debug.remainingActionPoints,
+            logs: debug.logs.join('\n'),
+        };
+    }, { timeout: 10_000 }).toMatchObject({
+        resting: true,
+        actionMenuOpen: true,
+        remainingActionPoints: 40,
+    });
+
+    const finalDebug = await getCombatUxDebug(page);
+    expect(finalDebug.logs.join('\n')).toMatch(/방어|guard|휴식|rest/i);
+    expect(clientErrors).toEqual([]);
 });
 
 test('network raid logs reconnect UX after a transport drop', async ({ page }, testInfo) => {

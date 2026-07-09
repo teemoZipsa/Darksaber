@@ -149,6 +149,9 @@ export function createWorldEngineActionControllersFromSources(
 export function createWorldEngineActionControllers(
     ports: WorldEngineActionControllerPorts
 ): WorldEngineActionControllers {
+    const canUseFieldCombatActions = () => ports.isNetworkRaid()
+        || ports.tutorialController.isActive()
+        || isDevLocalCombatEnabled();
     const selectionController = new WorldSelectionController({
         getPartyActors: () => ports.getPartyActors(),
         getEnemyById: (enemyId) => ports.getEnemyById(enemyId),
@@ -269,7 +272,7 @@ export function createWorldEngineActionControllers(
             tryActorAttack: (actor, enemy) => ports.tryActorAttack(actor, enemy),
             openLoot: (loot) => lootController.openLoot(loot),
             openMagic: (actor) => {
-                if (!ports.isNetworkRaid() && !ports.tutorialController.isActive()) {
+                if (!canUseFieldCombatActions()) {
                     ports.addCombatLog(t('field.log.serverMagicOnly'));
                     ports.reopenActionMenu(actor);
                     return;
@@ -277,16 +280,16 @@ export function createWorldEngineActionControllers(
                 magicController.open(actor);
             },
             openTool: (actor) => {
-                if (!ports.isNetworkRaid() && !ports.tutorialController.isActive()) {
+                if (!canUseFieldCombatActions()) {
                     ports.addCombatLog(t('field.log.serverToolOnly'));
                     ports.reopenActionMenu(actor);
                     return;
                 }
                 toolController.open(actor);
             },
-            hasCastableFieldSkill: (actor) => (ports.isNetworkRaid() || ports.tutorialController.isActive()) && magicController.hasCastableFieldSkill(actor.character),
-            hasUsableCombatTool: (actor) => (ports.isNetworkRaid() || ports.tutorialController.isActive()) && toolController.hasUsableCombatTool(actor),
-            getCombatToolAvailability: (actor) => (ports.isNetworkRaid() || ports.tutorialController.isActive())
+            hasCastableFieldSkill: (actor) => canUseFieldCombatActions() && magicController.hasCastableFieldSkill(actor.character),
+            hasUsableCombatTool: (actor) => canUseFieldCombatActions() && toolController.hasUsableCombatTool(actor),
+            getCombatToolAvailability: (actor) => canUseFieldCombatActions()
                 ? toolController.getCombatToolAvailability(actor)
                 : { hasRecoveryConsumable: false, hasEffectiveRecovery: false },
             reopenActionMenu: (actor) => ports.reopenActionMenu(actor),
@@ -319,4 +322,8 @@ export function createWorldEngineActionControllers(
         toolController,
         playerActionController,
     };
+}
+
+function isDevLocalCombatEnabled(): boolean {
+    return Boolean(import.meta.env?.DEV);
 }
