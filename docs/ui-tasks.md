@@ -132,6 +132,7 @@
 - [x] WorldSession 저위험 helper 추출. terrain/LOS query, actor lifecycle, enemy kill resolution을 전용 모듈로 분리해 세션 본문을 orchestration 중심으로 축소한다.
 - [x] WorldEngine field 테스트 prototype harness 추가. `Object.create(WorldEngine.prototype)` 직접 사용을 공통 테스트 harness로 모아 private state 기반 테스트 표면을 한 곳으로 격리한다.
 - [x] WorldEngine field/network helper 추가 추출. overlay/turn reset/story presentation/field hit/network event forwarding을 전용 helper로 분리해 엔진 본문을 더 줄인다.
+- [x] WorldSession join builder 추출. 신규 player/actor 구성과 welcome message 생성을 전용 builder로 옮겨 `join()` 본문을 재접속/등록/스폰 흐름 중심으로 줄인다.
 
 ---
 

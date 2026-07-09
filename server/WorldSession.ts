@@ -4,10 +4,6 @@ import {
     getEffectiveStatsForEnemy,
 } from '../src/combat/StatusEffects';
 import { CombatFormulas } from '../src/combat/CombatFormulas';
-import {
-    normalizeLoadout,
-    normalizeUpgradeLevels,
-} from '../src/magic/MagicLoadout';
 import type { FieldNestState } from '../src/field/SpawnResolver';
 import { LootObject } from '../src/entity/LootObject';
 import { getCarryAtbMultiplier } from '../src/inventory/CarryWeight';
@@ -77,22 +73,12 @@ import {
 import { buildWorldSessionPersistentSnapshot } from './WorldSessionPersistentSnapshotBuilder';
 import { buildWorldSessionSnapshot } from './WorldSessionSnapshotBuilder';
 import {
-    createFallbackActorSnapshot,
-    sanitizeCarriedItems,
-    sanitizeCarriedWeight,
-    sanitizeStringArray,
-    sanitizeTier,
-} from './WorldSessionInput';
-import {
     createWorldSessionDebugState,
     type WorldSessionDebugState,
 } from './WorldSessionDebugState';
 import {
-    cloneStatuses,
     createToken,
-    formationOffset,
     reject,
-    syncStatsMovementToClass,
 } from './WorldSessionHelpers';
 import {
     applyWorldSessionCursedArtifactTurnDamage,
@@ -115,6 +101,10 @@ import {
     isWorldSessionFieldPassableForOwner,
     type WorldSessionTerrainQueryContext,
 } from './WorldSessionTerrainQueries';
+import {
+    buildWorldSessionJoinedPlayer,
+    buildWorldSessionWelcome,
+} from './WorldSessionJoinBuilder';
 import type {
     CompleteEnemyKillResult,
     ServerActor,
@@ -391,18 +381,14 @@ export class WorldSession {
             this.log(`reconnect player=${resumed.id} origin=${resumed.originHubId}`);
             return {
                 playerId: resumed.id,
-                welcome: {
-                    type: 'WORLD_WELCOME',
-                    playerId: resumed.id,
+                welcome: buildWorldSessionWelcome({
+                    player: resumed,
                     sessionEpoch: this.sessionEpoch,
-                    resumeToken: resumed.resumeToken,
                     spawnTile,
                     accountId: context.accountId,
                     shardId: context.shardId ?? this.shardId,
                     realm: this.worldMap.getRealm(),
-                    completedQuestIds: [...resumed.completedQuestIds],
-                    raidModifier: resumed.raidModifier,
-                },
+                }),
             };
         }
         if (message.resumeToken) {
@@ -415,62 +401,18 @@ export class WorldSession {
         const originHubId = this.getTownById(message.originHubId)?.id ?? 'central_castle';
         const spawnTile = this.getOriginExitTile(originHubId);
         const raidModifier = rollRaidModifier(`${this.sessionEpoch}:${this.shardId}:${originHubId}:${playerId}`);
-        const player: ServerPlayer = {
-            id: playerId,
-            accountId: context.accountId,
-            characterId: context.characterId,
+        const { player, actors } = buildWorldSessionJoinedPlayer({
+            message,
+            context,
+            playerId,
             resumeToken,
             originHubId,
-            departureTownId: originHubId,
-            elapsedSeconds: 0,
-            kills: 0,
-            carriedWeight: sanitizeCarriedWeight(message.carriedWeight),
-            carriedItems: sanitizeCarriedItems(message.carriedItems),
-            raidGoldReward: 0,
+            spawnTile,
             raidModifier,
-            completedQuestIds: new Set(sanitizeStringArray(context.completedQuestIds ?? message.completedQuestIds)),
-            enteredDungeonIds: new Set(),
-            completedDungeonIds: new Set(),
-            fieldEventFlagsByDungeonId: new Map(),
-            activeDungeonId: null,
-            active: true,
-            ghost: false,
-            disconnectedAt: null,
-            actorIds: [],
-            saveSnapshot: cloneCharacterSave(context.saveSnapshot),
-        };
-        this.players.set(playerId, player);
-
-        const composition = message.partyComposition.length > 0 ? message.partyComposition : [createFallbackActorSnapshot()];
-        composition.forEach((snapshot, index) => {
-            const tile = this.findNearbyWalkableTile({
-                x: spawnTile.x + formationOffset(index).x,
-                y: spawnTile.y + formationOffset(index).y,
-            }, `${playerId}:${snapshot.id}`);
-            const actorId = `${playerId}:${snapshot.id}`;
-            const tier = sanitizeTier(snapshot.currentTier);
-            const actor: ServerActor = {
-                id: actorId,
-                ownerPlayerId: playerId,
-                localActorId: snapshot.id,
-                name: snapshot.name,
-                classLineId: snapshot.classLineId,
-                currentTier: tier,
-                level: snapshot.level,
-                tile,
-                stats: syncStatsMovementToClass(snapshot.stats, snapshot.classLineId),
-                statuses: cloneStatuses(snapshot.statuses),
-                actionGauge: 0,
-                remainingAp: 0,
-                majorActionUsed: false,
-                facing: 'down',
-                isDead: snapshot.isDead,
-                magicLoadout: normalizeLoadout(snapshot.magicLoadout, { classLineId: snapshot.classLineId, currentTier: tier }),
-                skillUpgradeLevels: normalizeUpgradeLevels(snapshot.skillUpgradeLevels),
-            };
-            this.actors.set(actorId, actor);
-            player.actorIds.push(actorId);
+            findNearbyWalkableTile: (tile, actorId) => this.findNearbyWalkableTile(tile, actorId),
         });
+        this.players.set(playerId, player);
+        for (const actor of actors) this.actors.set(actor.id, actor);
 
         this.contentSpawner.ensureContentNear(spawnTile, player.departureTownId, now);
         this.contentSpawner.spawnRaidModifierSupplyDrop(player, spawnTile);
@@ -478,18 +420,14 @@ export class WorldSession {
         this.log(`join player=${playerId} origin=${originHubId} actors=${player.actorIds.length}`);
         return {
             playerId,
-            welcome: {
-                type: 'WORLD_WELCOME',
-                playerId,
+            welcome: buildWorldSessionWelcome({
+                player,
                 sessionEpoch: this.sessionEpoch,
-                resumeToken,
                 spawnTile,
                 accountId: context.accountId,
                 shardId: context.shardId ?? this.shardId,
                 realm: this.worldMap.getRealm(),
-                completedQuestIds: [...player.completedQuestIds],
-                raidModifier: player.raidModifier,
-            },
+            }),
         };
     }
 
