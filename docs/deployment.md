@@ -325,10 +325,12 @@ Docker/local Postgres as a production path.
 
 ## World Session Routing
 
-Keep `WORLD_SHARD_COUNT=1` in production until session placement uses shared
-durable raid-instance storage. The server no longer hashes account IDs into
-session keys. Default solo joins keep the legacy `realm:primary` key for local
-snapshot/spool compatibility, while explicit party/raid joins can pass
-`requestedRaidInstanceId` and route to `realm:raid:<id>`. The server
-intentionally refuses to start with `WORLD_SHARD_COUNT > 1` until these
-raid-instance keys are backed by shared storage across processes.
+Keep `WORLD_SHARD_COUNT=1` in production. This is an intentional operating
+contract, not a tuning knob: the server refuses to start with
+`WORLD_SHARD_COUNT > 1` until multi-process raid placement is implemented and
+validated end to end. The server no longer hashes account IDs into session keys.
+Default solo joins keep the legacy `realm:primary` key for local snapshot/spool
+compatibility, while explicit party/raid joins can pass `requestedRaidInstanceId`
+and route to `realm:raid:<id>`. Postgres-backed deployments use
+`world_session_leases` to keep one process as the writer for a raid-instance key,
+but that lease boundary does not make `WORLD_SHARD_COUNT > 1` supported yet.

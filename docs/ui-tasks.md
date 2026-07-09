@@ -127,6 +127,7 @@
 - [x] auth origin hardening. `AUTH_ALLOWED_ORIGINS`를 URL origin으로 검증하고 production missing Origin 기본값을 차단하되 명시 env로만 허용하게 한다.
 - [x] Playwright runtime spool 격리. e2e 서버가 전용 world save spool/session snapshot 파일을 쓰고 시작 시 지워 stale local runtime 로그가 섞이지 않게 한다.
 - [x] WS origin policy runtime 설정 일관화. WebSocket origin 검증도 auth HTTP와 같은 `AUTH_ALLOW_MISSING_ORIGIN` runtime config를 쓰게 해 production missing Origin 기본 차단을 고정한다.
+- [x] world shard 운영 계약 문서화. `WORLD_SHARD_COUNT=1`을 현재 지원되는 운영 계약으로 고정하고, `requestedRaidInstanceId`/lease가 multi-shard 지원을 의미하지 않음을 배포/아키텍처 문서와 테스트로 고정한다.
 
 ---
 
