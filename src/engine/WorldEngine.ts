@@ -11,7 +11,7 @@ import { PartyManager } from '../character/PartyManager';
 import type { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
-import { formatT, i18n, t } from '../i18n/LanguageManager';
+import { formatT, i18n } from '../i18n/LanguageManager';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
@@ -117,6 +117,12 @@ import {
     handleWorldEngineNetworkInventoryConsumed,
     openWorldEngineNetworkLoot,
 } from './world/WorldEngineNetworkEventHandlers';
+import {
+    beginWorldEngineActorTurn,
+    refreshWorldEngineEnemyIntentPreviews,
+    startWorldEngineNextReadyTurn,
+    type WorldEngineReadyTurnFlowContext,
+} from './world/WorldEngineReadyTurnFlow';
 import { NetworkRaidClient } from '../net/NetworkRaidClient';
 import {
     type ActionRejectedMessage,
@@ -748,91 +754,35 @@ export class WorldEngine {
         this.getActionTurnFlow().endActorTurn(actor, reason, atbCarryover);
     }
 
-    private endEnemyTurn(enemy: Enemy): void {
-        enemy.actionGauge = 0;
-        this.getFlowState().turnStateController.endActiveTurn();
-    }
-
     private startNextReadyTurn(): void {
-        this.clearInvalidActiveTurn();
-        if (this.getFlowState().turnStateController.isReadyTurnBlocked()) return;
-
-        while (this.getFlowState().turnStateController.hasReadyActors()) {
-            const actorId = this.getFlowState().turnStateController.shiftReadyActorId();
-            if (!actorId) return;
-            const actor = this.getFieldState().partyActors.find((candidate) => candidate.id === actorId);
-            if (actor) {
-                if (actor.character.isDead) continue;
-                this.beginActorTurn(actor);
-                return;
-            }
-
-            const enemyEntry = this.getFieldState().fieldEnemies.find((entry) => entry.enemy.id === actorId);
-            if (!enemyEntry || enemyEntry.enemy.stats.hp <= 0) continue;
-            this.beginEnemyTurn(enemyEntry);
-            if (this.getFlowState().turnStateController.getActiveTurnActorId()) return;
-        }
-    }
-
-    private clearInvalidActiveTurn(): void {
-        const cleared = this.getFlowState().turnStateController.clearInvalidActiveTurn((actorId) => {
-            const activePartyActor = this.getFieldState().partyActors.find((actor) => actor.id === actorId);
-            if (activePartyActor && !activePartyActor.character.isDead && activePartyActor.character.stats.hp > 0) return true;
-
-            const activeEnemy = this.getFieldState().fieldEnemies.find((entry) => entry.enemy.id === actorId)?.enemy;
-            return activeEnemy !== undefined && activeEnemy.stats.hp > 0;
-        });
-        if (!cleared) return;
-
-        this.closeActionMenu();
-        this.closeTacticalMenu();
-        this.actionControllers.playerActionController.clearTargeting();
-        this.actionControllers.magicController.reset();
-        this.actionControllers.toolController?.reset();
+        startWorldEngineNextReadyTurn(this.getReadyTurnFlowContext());
     }
 
     private beginActorTurn(actor: FieldActor): void {
-        const index = this.getFieldState().partyActors.indexOf(actor);
-        if (index >= 0) this.switchToPartyMember(index);
-        actor.entity.actionGauge = this.getFlowState().turnStateController.beginActorTurn(actor.id);
-        this.actionControllers.selectionController.selectActor(actor.id);
-        if (!this.combatControllers.turnStartResolver.processActorTurnStart(actor)) {
-            this.endActorTurn(actor, 'statusBlocked');
-            return;
-        }
-        this.getUiState().floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'READY');
-        this.addCombatLog(formatT('field.log.turnStart', {
-            name: actor.character.name,
-            gauge: t('ui.actionGauge'),
-            value: this.getFlowState().turnStateController.getRemainingActionPoints(),
-        }));
-        if (!this.actionControllers.playerActionController.hasExecutableAction(actor)) this.endActorTurn(actor, 'noExecutableAction');
-        else {
-            this.closeTacticalMenu();
-            this.getUiState().actionMenuUI.open(this.scenarioNetworkControllers.tutorialController.getActionMenuStates(actor));
-        }
-    }
-
-    private beginEnemyTurn(entry: FieldEnemy): void {
-        const enemy = entry.enemy;
-        this.getFlowState().turnStateController.beginEnemyTurn(enemy.id);
-        this.getUiState().floatingText.spawnStatus(enemy.gridX, enemy.gridY, 'READY');
-
-        if (!this.combatControllers.turnStartResolver.processEnemyTurnStart(entry)) {
-            this.endEnemyTurn(enemy);
-            return;
-        }
-
-        const beforeHpByActorId = this.snapshotPartyHp();
-        this.applyCombatResult(this.combatControllers.enemyTurnController.beginEnemyTurn(entry));
-        this.interruptRestingForDamage(beforeHpByActorId);
-        this.endEnemyTurn(enemy);
+        beginWorldEngineActorTurn(this.getReadyTurnFlowContext(), actor);
     }
 
     private refreshEnemyIntentPreviews(): void {
-        for (const entry of this.getFieldState().fieldEnemies) {
-            entry.previewIntent = this.combatControllers.enemyTurnController.previewEnemyIntent(entry);
-        }
+        refreshWorldEngineEnemyIntentPreviews(this.getReadyTurnFlowContext());
+    }
+
+    private getReadyTurnFlowContext(): WorldEngineReadyTurnFlowContext {
+        return {
+            actionControllers: this.actionControllers,
+            combatControllers: this.combatControllers,
+            fieldState: this.getFieldState(),
+            flowState: this.getFlowState(),
+            scenarioNetworkControllers: this.scenarioNetworkControllers,
+            uiState: this.getUiState(),
+            switchToPartyMember: (index) => this.switchToPartyMember(index),
+            closeActionMenu: () => this.closeActionMenu(),
+            closeTacticalMenu: () => this.closeTacticalMenu(),
+            endActorTurn: (actor, reason) => this.endActorTurn(actor, reason),
+            snapshotPartyHp: () => this.snapshotPartyHp(),
+            applyCombatResult: (result) => this.applyCombatResult(result),
+            interruptRestingForDamage: (beforeHpByActorId) => this.interruptRestingForDamage(beforeHpByActorId),
+            addCombatLog: (message) => this.addCombatLog(message),
+        };
     }
 
     private getActorById(actorId: string): FieldActor | null {
