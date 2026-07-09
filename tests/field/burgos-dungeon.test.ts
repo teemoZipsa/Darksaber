@@ -43,7 +43,6 @@ import { getStoryScenarioMonsterLayout } from '../../src/data/StoryScenarioMonst
 import { Enemy } from '../../src/entity/Enemy';
 import { LootObject } from '../../src/entity/LootObject';
 import { Player } from '../../src/entity/Player';
-import { WorldEngine } from '../../src/engine/WorldEngine';
 import { AudioManager } from '../../src/engine/AudioManager';
 import { WorldRaidSession } from '../../src/engine/world/WorldRaidSession';
 import { WorldLootController } from '../../src/engine/world/WorldLootController';
@@ -59,6 +58,7 @@ import { StoryInteriorMap, type StoryInteriorInspectMarker } from '../../src/map
 import { NEUTRAL_BIRD_SPRITE_SRC, WorldMap } from '../../src/map/WorldMap';
 import { TileType } from '../../src/map/Tile';
 import type { ScenarioFieldEventRewardResult } from '../../src/net/WorldProtocol';
+import { createWorldEnginePrototypeHarness } from './world-engine-harness';
 
 class ImageStub {
     public src = '';
@@ -456,7 +456,7 @@ test('sealed reliquary loot comes only from non-quest rare tables', () => {
 test('Burgos boss corpse loot includes a guaranteed rune', () => {
     const bossDef = getMonsterDefinition(BURGOS_BOSS_MONSTER_ID);
     const boss = new Enemy('burgos_boss', 100, 100, bossDef.name, bossDef.level, bossDef.color, bossDef.role);
-    const engine = Object.create(WorldEngine.prototype) as any;
+    const engine = createWorldEnginePrototypeHarness<any>();
     engine.worldMap = { loot: [] };
     engine.scenarioNetworkControllers = {
         storyScenarioController: { getActiveInterior: () => null },
@@ -497,7 +497,7 @@ test('story interior boss loot returns to the original world entrance through ep
         const interiorMap = new StoryInteriorMap(layout);
         interiorMap.loot = [];
         const logs: string[] = [];
-        const engine = Object.create(WorldEngine.prototype) as any;
+        const engine = createWorldEnginePrototypeHarness<any>();
         engine.worldMap = interiorMap;
         engine.scenarioNetworkControllers = {
             storyScenarioController: {
@@ -1547,7 +1547,7 @@ test('normal enemy loot is auto-collected into the backpack', () => {
     const bag = new GridInventory(4, 4);
     const logs: string[] = [];
     const enemy = new Enemy('field_enemy_1', 10, 10, '부르고스 추격병', 1, '#d98a5a', 'bruiser');
-    const engine = Object.create(WorldEngine.prototype) as any;
+    const engine = createWorldEnginePrototypeHarness<any>();
     engine.worldMap = { loot: [] };
     installLootController(engine, { bag, logs });
 
@@ -1566,7 +1566,7 @@ test('normal enemy loot drops to the field when the backpack is full', () => {
     bag.autoPlace(herb);
     const logs: string[] = [];
     const enemy = new Enemy('field_enemy_2', 11, 10, '부르고스 추격병', 1, '#d98a5a', 'bruiser');
-    const engine = Object.create(WorldEngine.prototype) as any;
+    const engine = createWorldEnginePrototypeHarness<any>();
     engine.worldMap = { loot: [] };
     installLootController(engine, { bag, logs });
 

@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { GameManager } from '../../src/engine/GameManager';
-import { WorldEngine } from '../../src/engine/WorldEngine';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import {
     applyDevRaidScenario,
@@ -13,6 +12,7 @@ import {
     DEV_STORY_INTERIOR_EPISODES,
     parseDevRaidScenario,
 } from '../../src/dev/DevRaidScenarios';
+import { createWorldEnginePrototypeHarness } from './world-engine-harness';
 
 type MockDevStatusElement = {
     className: string;
@@ -213,14 +213,14 @@ test('dev town launcher forwards each implemented story scenario to the open URL
 
 test('WorldEngine close hook delegates to the raid lifecycle controller', () => {
     const calls: Array<{ sendLeave: boolean; reason: string | undefined }> = [];
-    const engine = Object.create(WorldEngine.prototype) as unknown as {
+    const engine = createWorldEnginePrototypeHarness<{
         closeNetworkRaidClient: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => void;
         raidLifecycleControllers: {
             raidLifecycleController: {
                 closeNetworkRaidClient: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => void;
             };
         };
-    };
+    }>();
     engine.raidLifecycleControllers = {
         raidLifecycleController: {
             closeNetworkRaidClient: (sendLeave: boolean, reason?: 'town' | 'wipe' | 'manual') => {

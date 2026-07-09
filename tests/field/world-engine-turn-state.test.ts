@@ -5,7 +5,6 @@ import { createStatus, hasStatus } from '../../src/combat/StatusEffects';
 import { Player } from '../../src/entity/Player';
 import { getActionApCost } from '../../src/field/FieldActionEconomy';
 import type { FieldActor } from '../../src/field/FieldTypes';
-import { WorldEngine } from '../../src/engine/WorldEngine';
 import { WorldNetworkSyncController } from '../../src/engine/world/WorldNetworkSyncController';
 import { WorldNetworkIntentController } from '../../src/engine/world/WorldNetworkIntentController';
 import { WorldRestingController } from '../../src/engine/world/WorldRestingController';
@@ -13,6 +12,7 @@ import { WorldTurnStateController } from '../../src/engine/world/WorldTurnStateC
 import { WorldTutorialController } from '../../src/engine/world/WorldTutorialController';
 import { i18n, type Language } from '../../src/i18n/LanguageManager';
 import type { ActorSnapshot, AutoLootGrantMessage, GridSnapshot, WorldSnapshot } from '../../src/net/WorldProtocol';
+import { createWorldEnginePrototypeHarness } from './world-engine-harness';
 
 class ImageStub {
     public src = '';
@@ -35,7 +35,7 @@ function makeActor(id: string): FieldActor {
 
 function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } {
     const calls: string[] = [];
-    const engine = Object.create(WorldEngine.prototype) as any;
+    const engine = createWorldEnginePrototypeHarness<any>();
     let activePartyIndex = 0;
     engine.turnStateController = new WorldTurnStateController();
     engine.turnStateController.setActiveTurn(actor.id, 6);
@@ -356,7 +356,7 @@ test('network raid AP uses server remaining points instead of local actor gauge'
 
 test('world update freezes field simulation while story presentation is active', () => {
     const actor = makeActor('hero');
-    const engine = Object.create(WorldEngine.prototype) as any;
+    const engine = createWorldEnginePrototypeHarness<any>();
     const calls: string[] = [];
     engine.worldTime = 0;
     engine.player = actor.entity;
