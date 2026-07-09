@@ -1,23 +1,14 @@
-import {
-    applyGuardToDamage,
-    getEffectiveStats,
-    getEffectiveStatsForEnemy,
-} from '../src/combat/StatusEffects';
-import { CombatFormulas } from '../src/combat/CombatFormulas';
 import type { FieldNestState } from '../src/field/SpawnResolver';
 import { LootObject } from '../src/entity/LootObject';
 import { rollRaidModifier } from '../src/raid/RaidModifiers';
 import {
-    manhattan,
     type FieldPassableQuery,
     type TilePoint,
 } from '../src/field/FieldPathing';
 import { WorldMap } from '../src/map/WorldMap';
 import type { TownInfo } from '../src/map/BiomeMask';
 import {
-    type AutoLootGrantMessage,
     type CombatEventMessage,
-    type ScenarioEnemyDefeatEventMessage,
     type WorldClientMessage,
     type WorldJoinMessage,
     type WorldServerMessage,
@@ -75,6 +66,7 @@ import {
 } from './WorldSessionActorLifecycle';
 import {
     completeWorldSessionEnemyKill,
+    resolveWorldSessionActorAttack,
     type WorldSessionEnemyKillContext,
 } from './WorldSessionCombatResolution';
 import {
@@ -606,37 +598,10 @@ export class WorldSession {
         target: ServerEnemy,
         now: number
     ): WorldSessionActorAttackResult {
-        const enemy = target.enemy;
-        const result = CombatFormulas.calcPhysicalDamage(
-            getEffectiveStats(actor.stats, actor.statuses),
-            getEffectiveStatsForEnemy(enemy),
-            this.getServerTileAt({ x: enemy.gridX, y: enemy.gridY }, actor.ownerPlayerId),
-            { isRanged: manhattan(actor.tile, { x: enemy.gridX, y: enemy.gridY }) > 1 }
-        );
-        const event: CombatEventMessage = {
-            type: 'COMBAT_EVENT',
-            kind: result.isMiss ? 'miss' : 'damage',
-            sourceId: actor.id,
-            targetId: enemy.id,
-            sourceName: actor.name,
-            targetName: enemy.name,
-            value: result.damage,
-        };
-        let autoLootGrant: AutoLootGrantMessage | undefined;
-        let scenarioEnemyDefeatEvent: ScenarioEnemyDefeatEventMessage | undefined;
-        if (!result.isMiss) {
-            const guarded = applyGuardToDamage(enemy.statuses, result.damage);
-            enemy.statuses = guarded.statuses;
-            enemy.takeDamage(guarded.damage);
-            event.value = guarded.damage;
-            if (enemy.stats.hp <= 0) {
-                event.kind = 'kill';
-                const killResult = this.completeEnemyKill(actor, target, now);
-                autoLootGrant = killResult.autoLootGrant;
-                scenarioEnemyDefeatEvent = killResult.scenarioEnemyDefeatEvent;
-            }
-        }
-        return { event, autoLootGrant, scenarioEnemyDefeatEvent };
+        return resolveWorldSessionActorAttack({
+            enemyKillContext: this.getEnemyKillContext(),
+            getServerTileAt: (tile, ownerPlayerId) => this.getServerTileAt(tile, ownerPlayerId),
+        }, actor, target, now);
     }
 
     private completeEnemyKill(actor: ServerActor, target: ServerEnemy, now: number): CompleteEnemyKillResult {
