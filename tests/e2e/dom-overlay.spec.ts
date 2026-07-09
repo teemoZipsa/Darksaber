@@ -292,8 +292,7 @@ test('auth character select deletes the last character after exact-name confirma
     await expect(page.locator('#auth-overlay .auth-panel__title')).toHaveText(/캐릭터 생성|Create Character/);
 });
 
-test('authenticated network raid survival returns to town and persists the server save', async ({ page, request, isMobile }) => {
-    test.skip(isMobile, 'mobile network raid coverage is tracked as a separate e2e task');
+test('authenticated network raid survival returns to town and persists the server save', async ({ page, request }) => {
     test.setTimeout(60_000);
 
     const clientErrors: string[] = [];

@@ -90,6 +90,7 @@ export class GameManager {
     private questJournalOpen = false;
     private magicLoadoutOpen = false;
     private startIntroTutorialOnWorldInit = false;
+    private pendingTransition: { next: GameState; prepare: (() => void) | undefined } | null = null;
     private networkAuthContext: { accessToken: string; characterId: string } | null = null;
     private authClient: AuthClient | null = null;
     private networkSaveRevision = 0;
@@ -173,12 +174,17 @@ export class GameManager {
      * heavy init) runs while the screen is fully black so the user never sees a flash.
      */
     public transitionTo(next: GameState, prepare?: () => void): void {
-        this.transitions.requestTransition({
+        const started = this.transitions.requestTransition({
             midCallback: () => {
                 if (prepare) prepare();
                 this.state = next;
             },
         });
+        if (started) {
+            this.pendingTransition = null;
+        } else {
+            this.pendingTransition = { next, prepare };
+        }
     }
 
     public isTransitionActive(): boolean {
@@ -657,6 +663,7 @@ export class GameManager {
         const dt = rawDt * HitStop.timeScale;
 
         this.transitions.update(timestamp);
+        this.flushPendingTransition();
         this.update(dt);
         this.render();
         this.input.endFrame();
@@ -664,6 +671,13 @@ export class GameManager {
         // freshly-updated game state (gold, HP/MP, active character, etc.).
         this.uiStore?.tick();
         this.scheduleFrame();
+    }
+
+    private flushPendingTransition(): void {
+        if (!this.pendingTransition || this.transitions.isActive()) return;
+        const pending = this.pendingTransition;
+        this.pendingTransition = null;
+        this.transitionTo(pending.next, pending.prepare);
     }
 
     // ═══════════════════════════════════════════════════════════
