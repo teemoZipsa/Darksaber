@@ -135,6 +135,7 @@
 - [x] WorldSession join builder 추출. 신규 player/actor 구성과 welcome message 생성을 전용 builder로 옮겨 `join()` 본문을 재접속/등록/스폰 흐름 중심으로 줄인다.
 - [x] WorldEngine ready-turn flow 추출. ready queue 처리, invalid active turn cleanup, actor/enemy turn start, enemy intent preview를 전용 helper로 옮겨 엔진 본문을 더 줄인다.
 - [x] WorldSession tick processor 추출. 플레이어 ATB/ghost expiry/nest refresh/enemy turn/wipe 처리 루프를 전용 processor로 옮겨 세션 본문을 더 줄인다.
+- [x] WorldSession message dispatcher 추출. client message switch와 actor intent validation/dispatch를 전용 dispatcher로 옮겨 세션 본문을 더 줄인다.
 
 ---
 

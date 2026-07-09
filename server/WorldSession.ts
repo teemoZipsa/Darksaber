@@ -7,7 +7,6 @@ import { CombatFormulas } from '../src/combat/CombatFormulas';
 import type { FieldNestState } from '../src/field/SpawnResolver';
 import { LootObject } from '../src/entity/LootObject';
 import { rollRaidModifier } from '../src/raid/RaidModifiers';
-import { MIN_FIELD_ACTION_GAUGE_COST } from '../src/field/FieldActionEconomy';
 import {
     manhattan,
     type FieldPassableQuery,
@@ -65,7 +64,6 @@ import {
 } from './WorldSessionDebugState';
 import {
     createToken,
-    reject,
 } from './WorldSessionHelpers';
 import {
     applyWorldSessionCursedArtifactTurnDamage,
@@ -93,6 +91,7 @@ import {
     buildWorldSessionWelcome,
 } from './WorldSessionJoinBuilder';
 import { tickWorldSession } from './WorldSessionTickProcessor';
+import { handleWorldSessionMessage } from './WorldSessionMessageDispatcher';
 import type {
     CompleteEnemyKillResult,
     ServerActor,
@@ -479,26 +478,17 @@ export class WorldSession {
     }
 
     public handleMessage(playerId: string, message: WorldClientMessage, now: number = Date.now()): WorldSessionMessageResult {
-        switch (message.type) {
-            case 'PLAYER_INTENT':
-                return this.handleIntent(playerId, message, now);
-            case 'LOOT_PICKUP':
-                return this.lootResolver.handleLootPickup(playerId, message.intentId, message.lootId, message.gridX, message.gridY, now);
-            case 'AUTO_LOOT_RESOLVE':
-                return this.lootResolver.handleAutoLootResolve(playerId, message.lootId, message.acceptedCells);
-            case 'SCENARIO_ENTER':
-                return this.scenarioRuntime.handleEnter(playerId, message, now);
-            case 'SCENARIO_FIELD_EVENT_INTERACT':
-                return this.scenarioRuntime.handleFieldEventInteract(playerId, message);
-            case 'WORLD_LEAVE':
-                this.log(`leave player=${playerId} reason=${message.reason}`);
-                return {
-                    replies: [this.raidResults.finishPlayer(playerId, this.raidResults.resolveRequestedRaidResult(playerId, message.reason))],
-                    broadcasts: [],
-                };
-            default:
-                return { replies: [], broadcasts: [] };
-        }
+        return handleWorldSessionMessage({
+            players: this.players,
+            actors: this.actors,
+            lootResolver: this.lootResolver,
+            playerIntentResolver: this.playerIntentResolver,
+            raidResults: this.raidResults,
+            scenarioRuntime: this.scenarioRuntime,
+            skillResolver: this.skillResolver,
+            endActorTurn: (actor) => this.endActorTurn(actor),
+            log: (entry) => this.log(entry),
+        }, playerId, message, now);
     }
 
     public tick(now: number = Date.now()): WorldSessionTickResult {
@@ -609,50 +599,6 @@ export class WorldSession {
             scenarioStates: this.scenarioStates,
             loot: this.loot,
         });
-    }
-
-    private handleIntent(
-        playerId: string,
-        message: Extract<WorldClientMessage, { type: 'PLAYER_INTENT' }>,
-        now: number
-    ): WorldSessionMessageResult {
-        const actor = this.actors.get(message.actorId);
-        const player = this.players.get(playerId);
-        if (message.kind === 'endTurn' && actor && player?.active && actor.ownerPlayerId === player.id) {
-            this.endActorTurn(actor);
-            return { replies: [], broadcasts: [] };
-        }
-        const validationError = this.validateActorIntent(player, actor);
-        if (validationError) return reject(message.intentId, validationError);
-
-        switch (message.kind) {
-            case 'move':
-                return this.playerIntentResolver.handleMove(actor!, message.intentId, message.payload);
-            case 'attack':
-                return this.playerIntentResolver.handleAttack(actor!, message.intentId, message.payload, now);
-            case 'interact':
-                return this.lootResolver.handleLootInspect(playerId, actor!, message.intentId, message.payload, now);
-            case 'defend':
-                return this.playerIntentResolver.handleDefend(actor!, message.intentId);
-            case 'rest':
-                return this.playerIntentResolver.handleRest(actor!, message.intentId);
-            case 'endTurn':
-                return { replies: [], broadcasts: [] };
-            case 'useItem':
-                return this.playerIntentResolver.handleUseItem(player!, actor!, message.intentId, message.payload);
-            case 'castSkill':
-                return this.skillResolver.handleCastSkill(player!, actor!, message.intentId, message.payload, now);
-        }
-    }
-
-    private validateActorIntent(player: ServerPlayer | undefined, actor: ServerActor | undefined): string | null {
-        if (!player || !player.active) return 'Player is not in an active raid.';
-        if (player.ghost) return 'Ghost players cannot act.';
-        if (!actor) return 'Actor does not exist.';
-        if (actor.ownerPlayerId !== player.id) return 'Actor is not owned by this player.';
-        if (actor.isDead || actor.stats.hp <= 0) return 'Actor is down.';
-        if (actor.remainingAp < MIN_FIELD_ACTION_GAUGE_COST) return 'Actor action gauge is not ready.';
-        return null;
     }
 
     private resolveActorAttack(
