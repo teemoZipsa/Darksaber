@@ -131,6 +131,7 @@
 - [x] WorldSession net 테스트 debug boundary 추가. `world-session.test.ts`의 직접 `getDebugState()` 호출과 반복 `as any` 콜백을 typed harness로 옮겨 내부 Map 접근 결합을 줄인다.
 - [x] WorldSession 저위험 helper 추출. terrain/LOS query, actor lifecycle, enemy kill resolution을 전용 모듈로 분리해 세션 본문을 orchestration 중심으로 축소한다.
 - [x] WorldEngine field 테스트 prototype harness 추가. `Object.create(WorldEngine.prototype)` 직접 사용을 공통 테스트 harness로 모아 private state 기반 테스트 표면을 한 곳으로 격리한다.
+- [x] WorldEngine field/network helper 추가 추출. overlay/turn reset/story presentation/field hit/network event forwarding을 전용 helper로 분리해 엔진 본문을 더 줄인다.
 
 ---
 

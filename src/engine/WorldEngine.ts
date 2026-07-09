@@ -12,13 +12,11 @@ import type { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
 import { formatT, i18n, t } from '../i18n/LanguageManager';
-import { removeStatusesFromCarrier } from '../combat/StatusEffects';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
-import { resolveFieldHit } from '../field/FieldInteraction';
 import type { TilePoint } from '../field/FieldPathing';
-import type { FieldActor, FieldEnemy, FieldHitParty, FieldTurnEndReason } from '../field/FieldTypes';
+import type { FieldActor, FieldEnemy, FieldTurnEndReason } from '../field/FieldTypes';
 import { WorldRaidSession } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
 import type { CombatResult } from './world/WorldCombatController';
@@ -104,6 +102,21 @@ import type { CombatFeedbackKind } from './world/CombatFeedback';
 import {
     syncCharacterMovementToClass,
 } from './world/WorldEngineFieldHelpers';
+import {
+    clearWorldEngineFieldTurnState,
+    closeWorldEngineFieldOverlays,
+    updateWorldEngineFieldEntities,
+    updateWorldEngineStoryPresentation,
+} from './world/WorldEngineFieldMaintenance';
+import { resolveWorldEngineFieldHitAt } from './world/WorldEngineFieldHitResolver';
+import {
+    applyWorldEngineNetworkSnapshot,
+    handleWorldEngineNetworkActionRejected,
+    handleWorldEngineNetworkAutoLootGrant,
+    handleWorldEngineNetworkCombatEvent,
+    handleWorldEngineNetworkInventoryConsumed,
+    openWorldEngineNetworkLoot,
+} from './world/WorldEngineNetworkEventHandlers';
 import { NetworkRaidClient } from '../net/NetworkRaidClient';
 import {
     type ActionRejectedMessage,
@@ -468,37 +481,23 @@ export class WorldEngine {
     }
 
     private closeFieldOverlays(): void {
-        if (this.gameManager.inventoryUI.isVisible()) this.gameManager.inventoryUI.toggle();
-        if (this.gameManager.partyUI.isVisible()) this.gameManager.partyUI.toggle();
-        if (this.gameManager.charUI.isVisible()) this.gameManager.charUI.toggle();
-        this.gameManager.closeQuestJournal();
-        this.gameManager.closePauseMenu();
-        this.closeActionMenu();
-        this.closeTacticalMenu();
-        this.actionControllers.magicController.reset();
-        this.actionControllers.toolController?.reset();
-        this.actionControllers.playerActionController.clearTargeting();
+        closeWorldEngineFieldOverlays({
+            gameManager: this.gameManager,
+            actionControllers: this.actionControllers,
+            presentationControllers: this.presentationControllers,
+            closeActionMenu: () => this.closeActionMenu(),
+        });
     }
 
     private clearFieldTurnState(): void {
-        this.getFlowState().turnStateController.clear();
-        this.getRuntimeState().fanfareLeaderActorId = null;
-        this.worldControllers.restingController.clearTimers();
-        this.closeActionMenu();
-        this.actionControllers.magicController.reset();
-        this.actionControllers.toolController?.reset();
-        for (const actor of this.getFieldState().partyActors) {
-            actor.path = [];
-            actor.queuedIntent = null;
-            actor.entity.actionGauge = 0;
-            removeStatusesFromCarrier(actor.character, (status) => status.kind === 'resting');
-        }
-        for (const entry of this.getFieldState().fieldEnemies) {
-            entry.path = [];
-            entry.previewIntent = null;
-            entry.enemy.actionGauge = 0;
-            entry.enemy.isAggro = false;
-        }
+        clearWorldEngineFieldTurnState({
+            actionControllers: this.actionControllers,
+            fieldState: this.getFieldState(),
+            flowState: this.getFlowState(),
+            runtimeState: this.getRuntimeState(),
+            worldControllers: this.worldControllers,
+            closeActionMenu: () => this.closeActionMenu(),
+        });
     }
 
     private updateNetworkRaid(dt: number, input: InputManager, camera: Camera): void {
@@ -506,8 +505,7 @@ export class WorldEngine {
 
         this.refreshOpenActionMenuState();
         this.presentationControllers.inputController.process(input, camera);
-        for (const actor of this.getFieldState().partyActors) actor.entity.update(dt);
-        for (const entry of this.getFieldState().fieldEnemies) entry.enemy.update(dt);
+        updateWorldEngineFieldEntities(this.getFieldState(), dt);
         this.scenarioNetworkControllers.networkSyncController.refreshMovePathPreview();
         this.getUiState().effectManager.update(dt);
         this.getUiState().floatingText.update(dt);
@@ -523,50 +521,37 @@ export class WorldEngine {
     }
 
     private updateStoryPresentation(dt: number, camera: Camera): boolean {
-        if (!this.scenarioNetworkControllers.storyScenarioController.isPresentationActive()) return false;
-        this.scenarioNetworkControllers.storyScenarioController.updatePresentation(dt);
-        this.getUiState().effectManager.update(dt);
-        this.getUiState().floatingText.update(dt);
-        this.updateAttackCues(dt);
-        const controlled = this.getControlledActor();
-        if (controlled) this.player = controlled.entity;
-        camera.update(dt);
-        return true;
+        return updateWorldEngineStoryPresentation({
+            camera,
+            scenarioNetworkControllers: this.scenarioNetworkControllers,
+            uiState: this.getUiState(),
+            updateAttackCues: (elapsed) => this.updateAttackCues(elapsed),
+            syncControlledPlayer: () => this.syncControlledPlayer(),
+        }, dt);
     }
 
     private applyNetworkSnapshot(snapshot: WorldSnapshot): void {
-        if (this.scenarioNetworkControllers.networkEvents) {
-            this.scenarioNetworkControllers.networkEvents.applySnapshot(snapshot);
-            return;
-        }
-        this.raidSession.elapsedSeconds = snapshot.raidTimer.elapsedSeconds;
-        this.raidSession.setRaidModifier(snapshot.raidTimer.modifier ?? null);
-        this.scenarioNetworkControllers.networkSyncController.applySnapshot(snapshot);
+        applyWorldEngineNetworkSnapshot(this.scenarioNetworkControllers, this.raidSession, snapshot);
     }
 
     private openNetworkLoot(grant: LootGrantMessage): void {
-        if (this.scenarioNetworkControllers.networkEvents) this.scenarioNetworkControllers.networkEvents.openLoot(grant);
-        else this.scenarioNetworkControllers.networkSyncController.openLoot(grant);
+        openWorldEngineNetworkLoot(this.scenarioNetworkControllers, grant);
     }
 
     private handleNetworkAutoLootGrant(grant: AutoLootGrantMessage): void {
-        if (this.scenarioNetworkControllers.networkEvents) this.scenarioNetworkControllers.networkEvents.handleAutoLootGrant(grant);
-        else this.scenarioNetworkControllers.networkSyncController.handleAutoLootGrant(grant);
+        handleWorldEngineNetworkAutoLootGrant(this.scenarioNetworkControllers, grant);
     }
 
     private handleNetworkInventoryConsumed(message: InventoryConsumedMessage): void {
-        if (this.scenarioNetworkControllers.networkEvents) this.scenarioNetworkControllers.networkEvents.handleInventoryConsumed(message);
-        else this.scenarioNetworkControllers.networkSyncController.handleInventoryConsumed(message);
+        handleWorldEngineNetworkInventoryConsumed(this.scenarioNetworkControllers, message);
     }
 
     private handleNetworkActionRejected(rejection: ActionRejectedMessage): void {
-        if (this.scenarioNetworkControllers.networkEvents) this.scenarioNetworkControllers.networkEvents.handleActionRejected(rejection);
-        else this.scenarioNetworkControllers.networkSyncController.handleActionRejected(rejection);
+        handleWorldEngineNetworkActionRejected(this.scenarioNetworkControllers, rejection);
     }
 
     private handleNetworkCombatEvent(event: CombatEventMessage): void {
-        if (this.scenarioNetworkControllers.networkEvents) this.scenarioNetworkControllers.networkEvents.handleCombatEvent(event);
-        else this.scenarioNetworkControllers.networkSyncController.handleCombatEvent(event);
+        handleWorldEngineNetworkCombatEvent(this.scenarioNetworkControllers, event);
     }
 
     private getPathPreviewTiles(actor: FieldActor | null): TilePoint[] {
@@ -574,17 +559,7 @@ export class WorldEngine {
     }
 
     private resolveFieldHitAt(tile: TilePoint) {
-        const partyTargets: FieldHitParty[] = this.getFieldState().partyActors.map((actor) => ({
-            ...actor,
-            gridX: actor.entity.gridX,
-            gridY: actor.entity.gridY,
-        }));
-        return resolveFieldHit(tile, {
-            party: partyTargets,
-            enemies: this.getFieldState().fieldEnemies.map((entry) => entry.enemy),
-            loot: this.worldMap.loot,
-            isGroundWalkable: (x, y) => this.worldMap.isWalkable(x, y),
-        });
+        return resolveWorldEngineFieldHitAt(tile, this.getFieldState(), this.worldMap);
     }
 
     private closeTacticalMenu(): void {
