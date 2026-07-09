@@ -128,6 +128,7 @@
 - [x] Playwright runtime spool 격리. e2e 서버가 전용 world save spool/session snapshot 파일을 쓰고 시작 시 지워 stale local runtime 로그가 섞이지 않게 한다.
 - [x] WS origin policy runtime 설정 일관화. WebSocket origin 검증도 auth HTTP와 같은 `AUTH_ALLOW_MISSING_ORIGIN` runtime config를 쓰게 해 production missing Origin 기본 차단을 고정한다.
 - [x] world shard 운영 계약 문서화. `WORLD_SHARD_COUNT=1`을 현재 지원되는 운영 계약으로 고정하고, `requestedRaidInstanceId`/lease가 multi-shard 지원을 의미하지 않음을 배포/아키텍처 문서와 테스트로 고정한다.
+- [x] WorldSession net 테스트 debug boundary 추가. `world-session.test.ts`의 직접 `getDebugState()` 호출과 반복 `as any` 콜백을 typed harness로 옮겨 내부 Map 접근 결합을 줄인다.
 
 ---
 
