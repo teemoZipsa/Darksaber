@@ -6,20 +6,8 @@ import {
 import { CombatFormulas } from '../src/combat/CombatFormulas';
 import type { FieldNestState } from '../src/field/SpawnResolver';
 import { LootObject } from '../src/entity/LootObject';
-import { getCarryAtbMultiplier } from '../src/inventory/CarryWeight';
-import {
-    getCursedArtifactAtbMultiplier,
-} from '../src/raid/CursedArtifact';
-import {
-    getRaidModifierEffects,
-    rollRaidModifier,
-} from '../src/raid/RaidModifiers';
-import {
-    FIELD_MAX_ACTION_GAUGE,
-    MIN_FIELD_ACTION_GAUGE_COST,
-} from '../src/field/FieldActionEconomy';
-import { FIELD_ATB_SCALE } from '../src/field/FieldConfig';
-import { advanceAtb } from '../src/field/FieldCombat';
+import { rollRaidModifier } from '../src/raid/RaidModifiers';
+import { MIN_FIELD_ACTION_GAUGE_COST } from '../src/field/FieldActionEconomy';
 import {
     manhattan,
     type FieldPassableQuery,
@@ -60,7 +48,6 @@ import {
 } from './WorldSessionSpatialQueries';
 import {
     getTargetableActors,
-    isPlayerWiped,
 } from './WorldSessionVisibility';
 import {
     clonePersistentActor,
@@ -105,6 +92,7 @@ import {
     buildWorldSessionJoinedPlayer,
     buildWorldSessionWelcome,
 } from './WorldSessionJoinBuilder';
+import { tickWorldSession } from './WorldSessionTickProcessor';
 import type {
     CompleteEnemyKillResult,
     ServerActor,
@@ -515,84 +503,29 @@ export class WorldSession {
 
     public tick(now: number = Date.now()): WorldSessionTickResult {
         const dt = this.consumeTickDelta(now);
-        const events: CombatEventMessage[] = [];
-        const perPlayerMessages: Array<{ playerId: string; message: WorldServerMessage }> = [];
-
-        for (const player of [...this.players.values()]) {
-            if (!player.active) continue;
-            if (player.ghost && player.disconnectedAt !== null && now - player.disconnectedAt >= this.ghostGraceMs) {
-                this.log(`despawn player=${player.id} reason=ghost_expired`);
-                this.saveState.captureFinalPatch(player);
-                this.saveState.markDirty(player.id);
-                this.removePlayer(player.id);
-                continue;
-            }
-            if (player.ghost) continue;
-
-            player.elapsedSeconds = Math.min(RAID_LIMIT_SECONDS, player.elapsedSeconds + dt);
-            if (player.elapsedSeconds >= RAID_LIMIT_SECONDS) {
-                perPlayerMessages.push({ playerId: player.id, message: this.raidResults.finishPlayer(player.id, 'MIA') });
-                continue;
-            }
-
-            for (const actorId of player.actorIds) {
-                const actor = this.actors.get(actorId);
-                if (!actor || actor.isDead) continue;
-                this.updateRestingActor(actor, dt);
-                if (actor.actionGauge >= FIELD_MAX_ACTION_GAUGE && actor.remainingAp <= 0) {
-                    const event = this.applyCursedArtifactTurnDamage(player, actor);
-                    if (event) events.push(event);
-                    if (!actor.isDead && actor.stats.hp > 0) {
-                        actor.remainingAp = FIELD_MAX_ACTION_GAUGE;
-                        actor.majorActionUsed = false;
-                    }
-                } else if (actor.actionGauge < FIELD_MAX_ACTION_GAUGE) {
-                    actor.actionGauge = advanceAtb(
-                        actor.actionGauge,
-                        getEffectiveStats(actor.stats, actor.statuses).spd,
-                        dt,
-                        FIELD_ATB_SCALE
-                        * getCarryAtbMultiplier(player.carriedWeight)
-                        * getCursedArtifactAtbMultiplier(this.getPlayerCursedArtifactCount(player))
-                        * getRaidModifierEffects(player.raidModifier).partyAtbMultiplier
-                    );
-                    if (actor.actionGauge >= FIELD_MAX_ACTION_GAUGE) {
-                        actor.actionGauge = FIELD_MAX_ACTION_GAUGE;
-                        const event = this.applyCursedArtifactTurnDamage(player, actor);
-                        if (event) events.push(event);
-                        if (!actor.isDead && actor.stats.hp > 0) {
-                            actor.remainingAp = FIELD_MAX_ACTION_GAUGE;
-                            actor.majorActionUsed = false;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (now - this.lastNestRefreshAt >= FIELD_NEST_REFRESH_INTERVAL_MS) {
-            this.lastNestRefreshAt = now;
-            this.fieldNests.refreshFieldNests(now);
-        }
-
-        for (const entry of this.enemies.values()) {
-            const enemy = entry.enemy;
-            if (enemy.stats.hp <= 0) continue;
-            if (this.enemyState.advanceEnemy(entry, dt) === 'ready') {
-                events.push(...this.enemyTurnResolver.resolveEnemyTurn(entry, now));
-                enemy.actionGauge = 0;
-            }
-        }
-
-        this.lootResolver.releaseExpiredAutoLoot(now);
-        this.lootResolver.releaseExpiredLootLocks(now);
-        for (const player of [...this.players.values()]) {
-            if (!player.active || player.ghost) continue;
-            if (isPlayerWiped(player, this.actors)) {
-                perPlayerMessages.push({ playerId: player.id, message: this.raidResults.finishPlayer(player.id, 'DEAD') });
-            }
-        }
-
-        return { events, perPlayerMessages };
+        return tickWorldSession({
+            now,
+            dt,
+            raidLimitSeconds: RAID_LIMIT_SECONDS,
+            fieldNestRefreshIntervalMs: FIELD_NEST_REFRESH_INTERVAL_MS,
+            ghostGraceMs: this.ghostGraceMs,
+            lastNestRefreshAt: this.lastNestRefreshAt,
+            players: this.players,
+            actors: this.actors,
+            enemies: this.enemies,
+            saveState: this.saveState,
+            fieldNests: this.fieldNests,
+            enemyState: this.enemyState,
+            enemyTurnResolver: this.enemyTurnResolver,
+            lootResolver: this.lootResolver,
+            raidResults: this.raidResults,
+            setLastNestRefreshAt: (value) => { this.lastNestRefreshAt = value; },
+            removePlayer: (playerId) => this.removePlayer(playerId),
+            updateRestingActor: (actor, elapsed) => this.updateRestingActor(actor, elapsed),
+            applyCursedArtifactTurnDamage: (player, actor) => this.applyCursedArtifactTurnDamage(player, actor),
+            getPlayerCursedArtifactCount: (player) => this.getPlayerCursedArtifactCount(player),
+            log: (message) => this.log(message),
+        });
     }
 
     public createSnapshot(viewerPlayerId: string | null = null, now: number = Date.now()): WorldSnapshot {
