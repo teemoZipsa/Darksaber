@@ -284,7 +284,6 @@ export function applyGuardToDamage(statuses: StatusEffect[] | undefined, damage:
 }
 
 export function resolveTurnStartStatuses(stats: CharacterStats, statuses: StatusEffect[] | undefined): TurnStartStatusResult {
-    let hpDelta = 0;
     let poisonDamage = 0;
     let regenHealing = 0;
     let poisonMagnitude: number | undefined;
@@ -330,7 +329,7 @@ export function resolveTurnStartStatuses(stats: CharacterStats, statuses: Status
 
     if (poisonMagnitude !== undefined) poisonDamage = Math.max(1, Math.floor(stats.maxHp * poisonMagnitude));
     if (regenMagnitude !== undefined) regenHealing = Math.max(1, Math.floor(stats.maxHp * regenMagnitude));
-    hpDelta = regenHealing - poisonDamage;
+    const hpDelta = regenHealing - poisonDamage;
     return { statuses: nextStatuses, hpDelta, poisonDamage, regenHealing, expiredReaction };
 }
 

@@ -706,7 +706,7 @@ export class GameManager {
         if (this.transitions.isInputLocked()) return;
 
         switch (this.state) {
-            case GameState.TITLE:
+            case GameState.TITLE: {
                 // Hover detection for terms link
                 const termsBounds = this.getTermsLinkBounds(scale);
                 this.termsHovered = (
@@ -732,6 +732,7 @@ export class GameManager {
                     }
                 }
                 break;
+            }
 
             case GameState.CHARACTER_CREATION:
                 // Rendered & handled by the React DOM overlay (CharacterCreation).

@@ -820,7 +820,7 @@ export class EffectManager {
             let y = cy + (Math.random() - 0.5) * 14;
             let vx = Math.cos(angle) * speed;
             let vy = Math.sin(angle) * speed;
-            let kind: Particle['kind'] = 'circle';
+            let kind: Particle['kind'];
             let size = (3 + Math.random() * 4) * scale;
             let life = 0.32 + Math.random() * 0.38;
 

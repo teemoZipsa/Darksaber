@@ -34,6 +34,7 @@
     "verify:late-story-set-arc": "node scripts/verify-late-story-set-arc-facts.mjs",
     "verify:late-story-source-files": "node --import tsx scripts/verify-story-source-files.ts --start 23 --end 31",
     "verify:story-sources": "node --import tsx scripts/verify-story-source-files.ts",
+    "lint": "eslint . --max-warnings 0",
     "typecheck": "npm run typecheck:client && npm run typecheck:server && npm run typecheck:test",
     "typecheck:client": "tsc --noEmit",
     "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
@@ -51,7 +52,11 @@
   ],
   "author": "teemoZipsa",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.15",
@@ -59,8 +64,11 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.2",
     "esbuild": "^0.28.0",
+    "eslint": "^10.6.0",
+    "globals": "^17.7.0",
     "tsx": "^4.22.4",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.63.0",
     "vite": "^8.0.16"
   },
   "dependencies": {

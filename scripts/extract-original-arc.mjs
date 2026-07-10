@@ -65,17 +65,6 @@ function parseArcArchive(path) {
   };
 }
 
-function walkFiles(root) {
-  const results = [];
-  for (const name of readdirSync(root)) {
-    const path = join(root, name);
-    const stat = statSync(path);
-    if (stat.isDirectory()) results.push(...walkFiles(path));
-    else results.push(path);
-  }
-  return results;
-}
-
 function collectDefaultArcs(source) {
   const stat = statSync(source);
   if (stat.isFile()) return [source];

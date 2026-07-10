@@ -92,13 +92,6 @@ function iconFor(row, slot) {
     return '🗡️';
 }
 
-function itemCategoryFor(slot) {
-    if (slot === 'weapon') return 'normal_weapon';
-    if (slot === 'accessory') return 'accessory';
-    if (slot === 'material') return 'material';
-    return 'armor';
-}
-
 function decodeItemRows() {
     const rows = new Map();
     const text = decoder.decode(readFileSync(ITEMTBL_PATH));

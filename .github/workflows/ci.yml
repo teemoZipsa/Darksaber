@@ -41,6 +41,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify:story:ci
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm test
       - name: Build production client

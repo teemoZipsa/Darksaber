@@ -995,11 +995,11 @@ export function normalizeInventorySnapshot(snapshot: InventorySaveSnapshot): Inv
     };
 }
 
-function withOptionalUid(value: unknown): { uid: string } | {} {
+function withOptionalUid(value: unknown): { uid?: string } {
     return typeof value === 'string' && value.length > 0 ? { uid: value.slice(0, 80) } : {};
 }
 
-function withOptionalSockets(value: unknown): { sockets: string[] } | {} {
+function withOptionalSockets(value: unknown): { sockets?: string[] } {
     if (!Array.isArray(value)) return {};
     const sockets = value.filter((entry): entry is string => {
         return typeof entry === 'string' && ITEMS.some((candidate) => candidate.id === entry);

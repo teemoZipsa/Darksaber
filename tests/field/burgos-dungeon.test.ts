@@ -1636,7 +1636,7 @@ test('Burgos boss defeat clears only the dungeon encounter, not raid success', (
     raidSession.beginRaidFromTown('central_castle');
     raidSession.startDungeonEncounter(BURGOS_CASTLE_DUNGEON_ID);
 
-    let raidSuccessShown = false;
+    const raidSuccessShown = false;
     const worldMap = new WorldMap();
     worldMap.loot = [{ id: 'preexisting_loot' } as any, { id: 'corpse_burgos_boss' } as any];
     const harness = createStoryScenarioHarness({
@@ -1647,8 +1647,6 @@ test('Burgos boss defeat clears only the dungeon encounter, not raid success', (
             { enemy: guard, home: { x: guard.gridX, y: guard.gridY }, path: [] },
         ],
     });
-    void raidSuccessShown;
-
     harness.controller.completeDungeonIfBossDefeated(boss);
     drainStoryPresentation(harness.controller);
 
@@ -1671,7 +1669,7 @@ test('Zamora Fenris defeat clears only the dungeon encounter, not raid success',
     raidSession.beginRaidFromTown('central_castle');
     raidSession.startDungeonEncounter(ZAMORA_FORTRESS_DUNGEON_ID);
 
-    let raidSuccessShown = false;
+    const raidSuccessShown = false;
     const worldMap = new WorldMap();
     worldMap.loot = [{ id: 'preexisting_loot' } as any, { id: 'corpse_zamora_fenris' } as any];
     const harness = createStoryScenarioHarness({
@@ -1682,8 +1680,6 @@ test('Zamora Fenris defeat clears only the dungeon encounter, not raid success',
             { enemy: guard, home: { x: guard.gridX, y: guard.gridY }, path: [] },
         ],
     });
-    void raidSuccessShown;
-
     harness.controller.completeDungeonIfBossDefeated(boss);
     drainStoryPresentation(harness.controller);
 
