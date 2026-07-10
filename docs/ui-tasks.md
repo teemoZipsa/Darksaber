@@ -137,6 +137,7 @@
 - [x] 모바일 캔버스 입력·고해상도 렌더링 보강. 마우스 전용 입력을 primary Pointer Events로 통합하고, DPR 2 상한의 backing store와 CSS 논리 좌표를 분리하며, 모바일 전투 E2E skip을 제거해 터치로 전체 행동 흐름을 검증한다.
 - [x] 1280×720 마을 창고 가로 넘침 수정. 시설 업그레이드와 창고 인벤토리를 중간 폭에서도 한 열로 배치해 콘텐츠 수평 스크롤을 제거하고, 1280×720 E2E에서 실제 scroll width와 grid 열 수를 고정한다.
 - [x] 차단형 DOM 모달 접근성 보강. 공통 focus lifecycle로 초기 포커스·Tab/Shift+Tab 순환·닫힘 후 포커스 복원을 제공하고, 독립 패널에 `role=dialog`·`aria-modal`·번역된 accessible name을 추가한다. 마을에 내장된 창고 패널은 중첩 dialog에서 제외한다.
+- [x] 언어 설정 영속화·문서 언어 동기화. 선택 언어를 예외 안전한 `localStorage`에 저장하고 앱 초기화 때 복원하며, 변경·새로고침 시 `<html lang>`과 React/Canvas 번역 상태가 같은 언어를 가리키도록 한다.
 - [x] world shard 운영 계약 문서화. `WORLD_SHARD_COUNT=1`을 현재 지원되는 운영 계약으로 고정하고, `requestedRaidInstanceId`/lease가 multi-shard 지원을 의미하지 않음을 배포/아키텍처 문서와 테스트로 고정한다.
 - [x] WorldSession net 테스트 debug boundary 추가. `world-session.test.ts`의 직접 `getDebugState()` 호출과 반복 `as any` 콜백을 typed harness로 옮겨 내부 Map 접근 결합을 줄인다.
 - [x] WorldSession 저위험 helper 추출. terrain/LOS query, actor lifecycle, enemy kill resolution을 전용 모듈로 분리해 세션 본문을 orchestration 중심으로 축소한다.

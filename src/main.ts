@@ -11,12 +11,13 @@ import { mountUiOverlay } from './ui/react/mountOverlay';
 import { mountAuthGate } from './ui/react/auth/mountAuthGate';
 import { AuthApiError, AuthClient, type AuthSessionResponse } from './net/AuthClient';
 import { NetworkRaidClient } from './net/NetworkRaidClient';
-import { formatT, t } from './i18n/LanguageManager';
+import { formatT, i18n, t } from './i18n/LanguageManager';
 import { applyDevRaidScenario, DEV_STORY_EPISODES, parseDevRaidScenario, type DevRaidScenario } from './dev/DevRaidScenarios';
 
 type DevStartMode = 'town' | 'raid' | 'tutorial';
 
 function init(): void {
+    i18n.init();
     SettingsManager.init();
 
     const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;

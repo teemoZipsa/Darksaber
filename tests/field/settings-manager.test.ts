@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SettingsManager } from '../../src/engine/SettingsManager';
+import { i18n } from '../../src/i18n/LanguageManager';
 
 class MemoryStorage {
     private readonly values = new Map<string, string>();
@@ -68,5 +69,44 @@ test('settings manager tolerates blocked localStorage', () => {
         (globalThis as unknown as { localStorage: Storage }).localStorage = storage as unknown as Storage;
         storage.clear();
         SettingsManager.init();
+    }
+});
+
+test('language preference restores, persists, and synchronizes the document language', () => {
+    storage.clear();
+    storage.setItem('setting_language', 'en');
+    const documentStub = { documentElement: { lang: '' } };
+    (globalThis as unknown as { document: Document }).document = documentStub as unknown as Document;
+    try {
+        i18n.init();
+        assert.equal(i18n.lang, 'en');
+        assert.equal(documentStub.documentElement.lang, 'en');
+
+        i18n.setLanguage('ko');
+        assert.equal(storage.getItem('setting_language'), 'ko');
+        assert.equal(documentStub.documentElement.lang, 'ko');
+
+        storage.setItem('setting_language', 'unsupported');
+        i18n.init();
+        assert.equal(i18n.lang, 'ko');
+        assert.equal(documentStub.documentElement.lang, 'ko');
+    } finally {
+        delete (globalThis as unknown as { document?: Document }).document;
+        storage.clear();
+        i18n.lang = 'ko';
+    }
+});
+
+test('language changes tolerate blocked localStorage', () => {
+    (globalThis as unknown as { localStorage: Storage }).localStorage = new ThrowingStorage() as unknown as Storage;
+    try {
+        assert.doesNotThrow(() => i18n.init());
+        assert.equal(i18n.lang, 'ko');
+        assert.doesNotThrow(() => i18n.setLanguage('en'));
+        assert.equal(i18n.lang, 'en');
+    } finally {
+        (globalThis as unknown as { localStorage: Storage }).localStorage = storage as unknown as Storage;
+        storage.clear();
+        i18n.lang = 'ko';
     }
 });

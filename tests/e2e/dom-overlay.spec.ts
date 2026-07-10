@@ -477,7 +477,7 @@ test('dev tutorial can open and close the standalone inventory overlay', async (
     await expect(page.locator('#modal-focus-sentinel')).toBeFocused();
 });
 
-test('pause menu hands off to the React settings panel', async ({ page }) => {
+test('pause settings expose modal focus and persist the document language', async ({ page }) => {
     await page.goto('/?devStart=tutorial');
     await expect(page.locator('#gameCanvas')).toBeVisible();
     await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
@@ -499,8 +499,18 @@ test('pause menu hands off to the React settings panel', async ({ page }) => {
     await expect(settingsDialog).toBeVisible();
     await expect(settingsDialog).toHaveAttribute('aria-modal', 'true');
 
+    await settingsDialog.getByRole('button', { name: /언어: 한국어|Language: English/ }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('setting_language'))).toBe('en');
+
     await page.getByRole('button', { name: /닫기|Close/ }).click();
     await expect(page.locator('#ui-overlay .ds-settings')).toBeHidden();
+
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
+    await page.evaluate(() => (window as unknown as { __gm?: { openPauseMenu: () => void } }).__gm?.openPauseMenu());
+    await expect(page.getByRole('dialog', { name: 'Paused' })).toBeVisible({ timeout: 10_000 });
 });
 
 test('dev tutorial can swap magic loadout slots from the world hotkey overlay', async ({ page }) => {
