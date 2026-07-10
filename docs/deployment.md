@@ -209,17 +209,20 @@ After deployment, copy the Vercel production origin back into Render's
 
 Render server deploys are automatic after the Blueprint is synced:
 
-- Render: `render.yaml` uses `autoDeployTrigger: 'commit'`
+- Render: `render.yaml` uses `autoDeployTrigger: 'checksPass'`
 - Vercel: `vercel.json` uses `git.deploymentEnabled: false`
 
 After this setting is active in Render, pushing to the service's linked branch
-triggers a Render rebuild/deploy. No local `RENDER_API_KEY` is needed for normal
-deploys. You still need a Render API key only for local status checks or manual
-deploys with `npm run render:*`.
+runs `.github/workflows/ci.yml`. Render rebuilds and deploys only after every CI
+check for that commit passes; a type, test, build, asset, or browser E2E failure
+blocks the deploy. No local `RENDER_API_KEY` is needed for normal deploys. You
+still need a Render API key only for local status checks or manual deploys with
+`npm run render:*`.
 
 If the existing Render Blueprint has Auto Sync disabled, open the Render
 Dashboard once and run **Manual Sync** on the Blueprint, or turn Blueprint Auto
-Sync on. After that, future pushes to `main` deploy automatically.
+Sync on. Confirm the service's Auto-Deploy setting reads **After CI Checks Pass**.
+After that, future pushes to `main` deploy automatically only after CI succeeds.
 
 When you want explicit preflight checks plus manual Render/Vercel deployment,
 set local secrets outside git:

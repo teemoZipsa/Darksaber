@@ -5,7 +5,7 @@ services:
     buildCommand: npm ci --include=dev && npm run build:server && npm prune --omit=dev
     startCommand: npm run server:prod
     healthCheckPath: /healthz
-    autoDeployTrigger: 'commit'
+    autoDeployTrigger: 'checksPass'
     envVars:
       - key: NODE_ENV
         value: production

@@ -5,9 +5,20 @@ import { readFileSync } from 'node:fs';
 test('Render deployment config matches the documented auto-deploy mode', () => {
     const renderYaml = readFileSync('render.yaml', 'utf8');
     const deploymentDocs = readFileSync('docs/deployment.md', 'utf8');
+    const ciWorkflow = readFileSync('.github/workflows/ci.yml', 'utf8');
 
-    assert.match(renderYaml, /autoDeployTrigger:\s*['"]commit['"]/);
-    assert.match(deploymentDocs, /autoDeployTrigger:\s*'commit'/);
+    assert.match(renderYaml, /autoDeployTrigger:\s*['"]checksPass['"]/);
+    assert.match(deploymentDocs, /autoDeployTrigger:\s*'checksPass'/);
+    for (const command of [
+        'npm run verify:story:ci',
+        'npm run typecheck',
+        'npm test',
+        'npm run build',
+        'npm run build:server',
+        'npm run test:e2e',
+    ]) {
+        assert.match(ciWorkflow, new RegExp(command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    }
 });
 
 test('production deployment docs require durable database-backed auth', () => {

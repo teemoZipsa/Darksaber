@@ -1,33 +1,60 @@
-name: Darksaber CI
+name: ci
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [main]
   pull_request:
-    branches: [ "main", "master" ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  quality-gate:
+  quality:
+    name: typecheck-test-build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - name: Install
-        run: npm ci
-      - name: Type Check
-        run: npm run typecheck
-      - name: Test
-        run: npm test
-      - name: Install Browser
-        run: npx playwright install --with-deps chromium
-      - name: Browser Smoke
-        run: npm run test:e2e
-      - name: Build
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run verify:story:ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build production client
         run: npm run build
-      - name: Build Server
-        run: npm run build:server
-      - name: Story Verify
-        run: npm run verify:story:ci
+        env:
+          DARKSABER_REQUIRE_PROD_CLIENT_ENV: "1"
+          VITE_AUTH_SERVER_URL: https://ci-auth.example.test
+          VITE_WORLD_SERVER_URL: wss://ci-world.example.test
+      - run: npm run build:server
+
+  e2e:
+    name: browser-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Upload Playwright diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-diagnostics
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
