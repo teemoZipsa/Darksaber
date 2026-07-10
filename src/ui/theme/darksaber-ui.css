@@ -978,7 +978,7 @@
 }
 #ui-overlay .ds-facility__feedback { min-height: 16px; text-align: center; color: var(--ds-accent); font-size: 12px; }
 
-@media (max-width: 980px) {
+@media (max-width: 1480px) {
     #ui-overlay .ds-town__storage {
         grid-template-columns: 1fr;
         overflow-y: auto;

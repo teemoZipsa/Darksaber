@@ -135,6 +135,7 @@
 - [x] CI 배포 게이트 추가. GitHub Actions에서 story asset guard·타입체크·전체 테스트·클라이언트/서버 빌드·데스크톱/모바일 E2E를 실행하고, Render `checksPass`가 모든 체크 성공 커밋만 자동 배포하도록 고정한다.
 - [x] Postgres migration·실DB CI 보강. 시작 시 raw DDL을 버전 migration+advisory lock으로 교체하고, 독립 migrate CLI·migration 상태 db:check·PostgreSQL 16 CI service에서 auth/save/world snapshot 왕복 통합 테스트를 추가한다.
 - [x] 모바일 캔버스 입력·고해상도 렌더링 보강. 마우스 전용 입력을 primary Pointer Events로 통합하고, DPR 2 상한의 backing store와 CSS 논리 좌표를 분리하며, 모바일 전투 E2E skip을 제거해 터치로 전체 행동 흐름을 검증한다.
+- [x] 1280×720 마을 창고 가로 넘침 수정. 시설 업그레이드와 창고 인벤토리를 중간 폭에서도 한 열로 배치해 콘텐츠 수평 스크롤을 제거하고, 1280×720 E2E에서 실제 scroll width와 grid 열 수를 고정한다.
 - [x] world shard 운영 계약 문서화. `WORLD_SHARD_COUNT=1`을 현재 지원되는 운영 계약으로 고정하고, `requestedRaidInstanceId`/lease가 multi-shard 지원을 의미하지 않음을 배포/아키텍처 문서와 테스트로 고정한다.
 - [x] WorldSession net 테스트 debug boundary 추가. `world-session.test.ts`의 직접 `getDebugState()` 호출과 반복 `as any` 콜백을 typed harness로 옮겨 내부 Map 접근 결합을 줄인다.
 - [x] WorldSession 저위험 helper 추출. terrain/LOS query, actor lifecycle, enemy kill resolution을 전용 모듈로 분리해 세션 본문을 orchestration 중심으로 축소한다.

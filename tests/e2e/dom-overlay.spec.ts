@@ -728,6 +728,26 @@ test('network raid logs reconnect UX after a transport drop', async ({ page }, t
 });
 
 test('mobile viewport keeps town and standalone inventory overlays within the screen', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/?devStart=town');
+
+    const desktopStorage = page.locator('#ui-overlay .ds-town__storage');
+    await expect(desktopStorage).toBeVisible({ timeout: 20_000 });
+    const desktopLayout = await desktopStorage.evaluate((storage) => {
+        const content = storage.closest('.ds-town__content');
+        const columns = window.getComputedStyle(storage).gridTemplateColumns.trim().split(/\s+/);
+        return {
+            columns: columns.length,
+            storageRight: storage.getBoundingClientRect().right,
+            contentRight: content?.getBoundingClientRect().right ?? 0,
+            contentScrollWidth: content?.scrollWidth ?? 0,
+            contentClientWidth: content?.clientWidth ?? 0,
+        };
+    });
+    expect(desktopLayout.columns).toBe(1);
+    expect(desktopLayout.storageRight).toBeLessThanOrEqual(desktopLayout.contentRight);
+    expect(desktopLayout.contentScrollWidth).toBeLessThanOrEqual(desktopLayout.contentClientWidth);
+
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/?devStart=town');
 
