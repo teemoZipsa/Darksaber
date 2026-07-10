@@ -16,24 +16,8 @@ import { applyDevRaidScenario, DEV_STORY_EPISODES, parseDevRaidScenario, type De
 
 type DevStartMode = 'town' | 'raid' | 'tutorial';
 
-async function init(): Promise<void> {
+function init(): void {
     SettingsManager.init();
-
-    // Explicitly preload DOSMyungjo for Canvas (Canvas doesn't trigger @font-face)
-    const dosFont = new FontFace(
-        'DOSMyungjo',
-        "url('/assets/fonts/DOSMyungjo.ttf') format('truetype')"
-    );
-    try {
-        const loaded = await dosFont.load();
-        document.fonts.add(loaded);
-        console.log('✅ DOSMyungjo font loaded');
-    } catch (e) {
-        console.warn('⚠️ DOSMyungjo font load failed, using fallback', e);
-    }
-
-    await TileAssetManager.init();
-    await DarksaberSpriteAtlas.init();
 
     const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
     if (!canvas) {
@@ -48,14 +32,21 @@ async function init(): Promise<void> {
     const uiStore = mountUiOverlay(manager);
     manager.attachUiStore(uiStore);
 
+    // First paint and auth controls must not wait for large game assets. The
+    // compact terrain sheets, sprite atlases, and Canvas font warm in parallel;
+    // painted terrain fallbacks and world decorations load when first rendered.
+    const coreAssetsReady = preloadCoreAssets();
+
     const devStartMode = getDevStartMode();
     const devRaidScenario = getDevRaidScenario();
     const devForceLocal = getDevForceLocal();
     if (devStartMode) {
         clearDevWorldResumeToken();
         runAfterInitialTransition(manager, () => {
-            if (devStartMode === 'tutorial') enterDevTutorial(manager);
-            else void enterDevTown(manager, devStartMode, devRaidScenario, devForceLocal);
+            void coreAssetsReady.then(() => {
+                if (devStartMode === 'tutorial') enterDevTutorial(manager);
+                else void enterDevTown(manager, devStartMode, devRaidScenario, devForceLocal);
+            });
         });
     } else {
         mountAuthGate(manager);
@@ -67,6 +58,28 @@ async function init(): Promise<void> {
     if (import.meta.env.DEV) (window as unknown as { __gm: GameManager }).__gm = manager;
 
     console.log('🎮 Darksaber : Extraction started');
+}
+
+async function preloadCoreAssets(): Promise<void> {
+    await Promise.all([
+        loadCanvasFont(),
+        TileAssetManager.init(),
+        DarksaberSpriteAtlas.init(),
+    ]);
+}
+
+async function loadCanvasFont(): Promise<void> {
+    const dosFont = new FontFace(
+        'DOSMyungjo',
+        "url('/assets/fonts/DOSMyungjo.ttf') format('truetype')"
+    );
+    try {
+        const loaded = await dosFont.load();
+        document.fonts.add(loaded);
+        console.log('✅ DOSMyungjo font loaded');
+    } catch (error) {
+        console.warn('⚠️ DOSMyungjo font load failed, using fallback', error);
+    }
 }
 
 function getDevStartMode(): DevStartMode | null {

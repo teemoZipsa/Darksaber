@@ -243,20 +243,10 @@ class TileAssetManagerClass {
     private cornerCellsCache: Map<string, readonly number[]> = new Map();
 
     public init(): Promise<void[]> {
-        for (const texturePath of Object.values(DARKSABER_TERRAIN_TEXTURES)) {
-            if (texturePath) this.queueTilesetLoad(texturePath);
-        }
+        // The compact original autotile sheets are the primary terrain source.
+        // Large painted terrain textures are fallback-only and load on demand.
         for (const [key, sheetPath] of Object.entries(ORIGINAL_AUTOTILE_SHEETS)) {
             this.queueImageLoad(`autotile:${key}`, `/assets/images/tilesets/${sheetPath}`);
-        }
-        for (const [key, src] of Object.entries(DARKSABER_LANDMARK_SPRITES)) {
-            this.queueImageLoad(`landmark:${key}`, src);
-        }
-        for (const [key, src] of Object.entries(DARKSABER_TREE_SPRITES)) {
-            this.queueImageLoad(`tree:${key}`, src);
-        }
-        for (const [key, src] of Object.entries(DARKSABER_BRIDGE_SPRITES)) {
-            this.queueImageLoad(`bridge:${key}`, src);
         }
         return Promise.all(this.loadPromises);
     }
@@ -351,7 +341,9 @@ class TileAssetManagerClass {
         width: number,
         height: number
     ): boolean {
-        const img = this.getSheet(`landmark:${spriteId}`);
+        const key = `landmark:${spriteId}`;
+        const img = this.getSheet(key);
+        if (!img) this.queueImageLoad(key, DARKSABER_LANDMARK_SPRITES[spriteId]);
         if (!img) return false;
 
         const prevSmoothing = ctx.imageSmoothingEnabled;
@@ -370,7 +362,9 @@ class TileAssetManagerClass {
         height: number,
         source?: { x: number; y: number; width: number; height: number }
     ): boolean {
-        const img = this.getSheet(`tree:${spriteId}`);
+        const key = `tree:${spriteId}`;
+        const img = this.getSheet(key);
+        if (!img) this.queueImageLoad(key, DARKSABER_TREE_SPRITES[spriteId]);
         if (!img) return false;
 
         const srcX = source ? source.x * img.naturalWidth : 0;
@@ -397,7 +391,9 @@ class TileAssetManagerClass {
         width: number,
         height: number
     ): boolean {
-        const img = this.getSheet(`bridge:${spriteId}`);
+        const key = `bridge:${spriteId}`;
+        const img = this.getSheet(key);
+        if (!img) this.queueImageLoad(key, DARKSABER_BRIDGE_SPRITES[spriteId]);
         if (!img) return false;
 
         const prevSmoothing = ctx.imageSmoothingEnabled;
@@ -417,6 +413,7 @@ class TileAssetManagerClass {
         const texturePath = DARKSABER_TERRAIN_TEXTURES[type];
         if (!texturePath) return false;
         const img = this.getSheet(texturePath);
+        if (!img) this.queueTilesetLoad(texturePath);
         if (!img) return false;
 
         const prevSmoothing = ctx.imageSmoothingEnabled;
