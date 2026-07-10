@@ -40,6 +40,7 @@
     "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "test": "node --import tsx --test tests/raid/*.test.ts tests/field/*.test.ts tests/net/*.test.ts",
+    "test:coverage": "node --import tsx --test --experimental-test-coverage --test-coverage-include=\"src/**/*.ts\" --test-coverage-include=\"src/**/*.tsx\" --test-coverage-include=\"server/**/*.ts\" --test-coverage-lines=82 --test-coverage-branches=80 --test-coverage-functions=68 tests/raid/*.test.ts tests/field/*.test.ts tests/net/*.test.ts",
     "test:e2e": "playwright test",
     "test:raid": "node --import tsx --test tests/raid/*.test.ts",
     "test:field": "node --import tsx --test tests/field/*.test.ts"
