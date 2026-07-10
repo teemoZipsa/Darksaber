@@ -13,7 +13,7 @@ test('Render deployment config matches the documented auto-deploy mode', () => {
     for (const command of [
         'npm run verify:story:ci',
         'npm run typecheck',
-        'npm test',
+        'npm run test:coverage',
         'npm run build',
         'npm run build:server',
         'npm run test:e2e',
