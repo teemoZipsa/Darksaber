@@ -1,21 +1,27 @@
 # Architecture Document
 
-## 1. Client Engine Architecture
-- **Rendering**: HTML5 Canvas Application. We will use `requestAnimationFrame` for a smooth game loop decoupled from game logic ticks.
-- **Map Streaming (Chunk System)**:
-  - The world is divided into chunks (e.g., 20x20 or 50x50 tiles per chunk).
-  - The client keeps exactly a `3x3` chunk grid loaded in memory centered around the player's current chunk.
-  - As the player steps over a chunk boundary, old furthest chunks are garbage collected and new ones are requested from the server/storage.
+**As-built baseline**: 2026-07-10. 미래 구상과 현재 구현이 충돌하면 코드와 이 문서의
+명시적 운영 계약을 우선하고, 게임 규칙은 `docs/GDD.md`를 따른다.
 
-## 2. Server Architecture (Phase 4)
+## 1. Client Engine Architecture
+- **Rendering**: DPR-aware HTML5 Canvas field plus a React DOM overlay for blocking panels. The client uses `requestAnimationFrame` for the field loop.
+- **Map Streaming (Chunk System)**:
+  - The world is divided into 32x32-tile chunks.
+  - `WorldMap.updateLoadedChunks` derives the loaded rectangle from the logical viewport plus a preload margin; it is not fixed to exactly `3x3`.
+  - Chunks outside the required rectangle are discarded and deterministic chunks entering it are generated on demand.
+
+## 2. Server Architecture (Current)
 - **Node.js**: The central lightweight game server.
-- **WebSockets (`ws`)**: Crucial for real-time grid positioning, chat, and Action Point synchronization without HTTP overhead.
+- **WebSockets (`ws`)**: Carries authoritative world snapshots, intents, combat, loot, market, scenario, reconnect, and raid-result messages. Chat is not currently implemented.
 - **Authoritative Server**: The server independently verifies pathfinding, line-of-sight, and combat formulas to prevent client-side memory manipulation or cheating.
+- **Persistence**: Versioned Postgres migrations cover auth/save/stash and active world snapshots/leases. Local recovery spools protect pending writes.
 
 ## 3. Core Data Structures
-- `Player Entity`: `{ id, x, y, hp, ap, class, inventory }`
-- `Chunk Header`: `{ id (x_y), tilesMatrix, staticCollisionMap }`
-- `Event Queue`: Client will maintain an event queue to process turn animations smoothly without desyncing from absolute server states.
+- `ServerPlayer`: ownership/resume identity, raid origin, elapsed time, kills, carried loot, modifier, scenario progress, actor ids, and save snapshot.
+- `ServerActor`: authoritative tile/facing/stats/status/AP state for one deployed character.
+- `WorldSessionPersistentSnapshot`: players, actors, enemies, nests, scenario flags, loot, generated chunks, sequencing, and dirty-save ids.
+- `Chunk`: deterministic 32x32 tile/collision/render cache unit.
+- Client presentation controllers consume absolute snapshots and transient combat/events without becoming the save authority.
 
 ## 4. Monster Data and Balance
 - Original monster rows are exposed through `src/data/original/originalMonsters.ts`.
