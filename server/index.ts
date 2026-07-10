@@ -34,7 +34,7 @@ import {
     type WorldSessionSnapshotStoreBackend,
 } from './WorldSessionSnapshotStore';
 import { createWorldSessionKey, resolveWorldSessionRoute, type WorldSessionRoute } from './WorldSessionRouter';
-import { createWorldServerMetrics, errorToLogValue, formatWorldServerMetrics, logServerEvent } from './WorldServerObservability';
+import { createWorldServerMetrics, errorToLogValue, formatWorldServerMetrics, logServerEvent, recordWorldServerRaidResult } from './WorldServerObservability';
 import { isAllowedOrigin } from './OriginPolicy';
 import { createWorldShardConfig } from './WorldShardConfig';
 import { createPartyCompositionFromSave } from './WorldJoinSave';
@@ -433,6 +433,7 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
         }
         throw error;
     }
+    if (!message.resumeToken) metrics.raidsStartedTotal += 1;
     bindPlayer(ws, sessionKey, result.playerId, auth.account, character.id, result.welcome.resumeToken, auth.session.id);
     ensureSaveTracker(sessionKey, result.playerId, auth.account.id, character.id, result.welcome.resumeToken, save.revision);
     void persistWorldSessionSnapshot(sessionKey, session, 'join');
@@ -840,6 +841,7 @@ function findReconnectSession(resumeToken: string, accountId: string): {
 
 function persistRaidResult(binding: SocketBinding, message: WorldServerMessage): void {
     if (message.type !== 'RAID_RESULT') return;
+    recordWorldServerRaidResult(metrics, message.result, message.elapsedSeconds, message.kills);
     if (message.result !== 'SURVIVED') return;
     const questIds = completedDungeonIdsToQuestIds(message);
     void withRetry(() => authStore.recordRaidSurvival(binding.accountId, binding.characterId, questIds, message.extractionTownId)).catch((error) => {

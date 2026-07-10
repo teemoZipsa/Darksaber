@@ -140,6 +140,7 @@
 - [x] 언어 설정 영속화·문서 언어 동기화. 선택 언어를 예외 안전한 `localStorage`에 저장하고 앱 초기화 때 복원하며, 변경·새로고침 시 `<html lang>`과 React/Canvas 번역 상태가 같은 언어를 가리키도록 한다.
 - [x] ESLint 품질 게이트 도입. ESLint 10 flat config와 typescript-eslint 권장 규칙을 전체 client/server/test/script에 적용하고, 발견된 미사용 코드·불필요 대입·case scope 문제를 정리한 뒤 CI에서 warning 없이 통과하도록 고정한다.
 - [x] 단위 테스트 커버리지 기준선 추가. Node 22+ 내장 V8 coverage로 `src` TS/TSX와 `server` TS를 측정하고, 현재 83.45% lines·81.74% branches·69.63% functions 기준에서 CI 하한을 각각 82%·80%·68%로 고정한다.
+- [x] 서버 권위 게임플레이 퍼널 지표 추가. `/metrics`에서 신규 레이드 시작 수, 생환/사망/MIA/이탈 결과 수, 확정 레이드 누적 시간과 처치 수를 노출해 기술 장애뿐 아니라 플레이 결과·평균 길이·생환율도 관측할 수 있게 한다.
 - [x] world shard 운영 계약 문서화. `WORLD_SHARD_COUNT=1`을 현재 지원되는 운영 계약으로 고정하고, `requestedRaidInstanceId`/lease가 multi-shard 지원을 의미하지 않음을 배포/아키텍처 문서와 테스트로 고정한다.
 - [x] WorldSession net 테스트 debug boundary 추가. `world-session.test.ts`의 직접 `getDebugState()` 호출과 반복 `as any` 콜백을 typed harness로 옮겨 내부 Map 접근 결합을 줄인다.
 - [x] WorldSession 저위험 helper 추출. terrain/LOS query, actor lifecycle, enemy kill resolution을 전용 모듈로 분리해 세션 본문을 orchestration 중심으로 축소한다.

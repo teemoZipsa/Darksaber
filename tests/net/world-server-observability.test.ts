@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createWorldServerMetrics, formatServerLogEvent, formatWorldServerMetrics } from '../../server/WorldServerObservability';
+import { createWorldServerMetrics, formatServerLogEvent, formatWorldServerMetrics, recordWorldServerRaidResult } from '../../server/WorldServerObservability';
 
 test('world server metrics render gauges and operational counters', () => {
     const metrics = createWorldServerMetrics();
@@ -15,6 +15,9 @@ test('world server metrics render gauges and operational counters', () => {
     metrics.sessionLeaseLostTotal = 5;
     metrics.shutdownPreservedRaidPlayersTotal = 1;
     metrics.worldTickDurationMs = 7;
+    metrics.raidsStartedTotal = 4;
+    recordWorldServerRaidResult(metrics, 'SURVIVED', 125.5, 3);
+    recordWorldServerRaidResult(metrics, 'DEAD', 44.5, 1);
 
     const output = formatWorldServerMetrics(metrics, {
         serverStartedAtMs: 1_000,
@@ -36,6 +39,12 @@ test('world server metrics render gauges and operational counters', () => {
     assert.match(output, /darksaber_world_dirty_save_trackers 8/);
     assert.match(output, /darksaber_world_saving_save_trackers 1/);
     assert.match(output, /darksaber_world_tick_duration_ms 7/);
+    assert.match(output, /darksaber_world_raids_started_total 4/);
+    assert.match(output, /darksaber_world_raid_results_total\{result="survived"\} 1/);
+    assert.match(output, /darksaber_world_raid_results_total\{result="dead"\} 1/);
+    assert.match(output, /darksaber_world_raid_results_total\{result="mia"\} 0/);
+    assert.match(output, /darksaber_world_raid_duration_seconds_total 170/);
+    assert.match(output, /darksaber_world_raid_kills_total 4/);
     assert.match(output, /darksaber_world_action_rejected_total 3/);
     assert.match(output, /darksaber_world_save_conflicts_total 2/);
     assert.match(output, /darksaber_world_save_spool_replay_applied_total 9/);
@@ -46,6 +55,16 @@ test('world server metrics render gauges and operational counters', () => {
     assert.match(output, /darksaber_world_session_lease_acquire_failures_total 4/);
     assert.match(output, /darksaber_world_session_lease_lost_total 5/);
     assert.match(output, /darksaber_world_shutdown_preserved_raid_players_total 1/);
+});
+
+test('gameplay raid metrics clamp malformed cumulative values', () => {
+    const metrics = createWorldServerMetrics();
+    recordWorldServerRaidResult(metrics, 'MIA', Number.NaN, -4);
+    recordWorldServerRaidResult(metrics, 'LEFT', -10, 2.9);
+
+    assert.deepEqual(metrics.raidResultsTotal, { SURVIVED: 0, DEAD: 0, MIA: 1, LEFT: 1 });
+    assert.equal(metrics.raidDurationSecondsTotal, 0);
+    assert.equal(metrics.raidKillsTotal, 2);
 });
 
 test('world server structured logs include level, event, time, fields, and errors', () => {

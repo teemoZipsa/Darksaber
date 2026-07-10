@@ -1,4 +1,8 @@
 export interface WorldServerMetrics {
+    raidsStartedTotal: number;
+    raidResultsTotal: Record<WorldRaidResult, number>;
+    raidDurationSecondsTotal: number;
+    raidKillsTotal: number;
     wsConnectionsTotal: number;
     malformedMessagesTotal: number;
     oversizedPayloadsTotal: number;
@@ -22,6 +26,8 @@ export interface WorldServerMetrics {
     worldTickDurationMs: number;
 }
 
+export type WorldRaidResult = 'SURVIVED' | 'DEAD' | 'MIA' | 'LEFT';
+
 export interface WorldServerMetricGauges {
     serverStartedAtMs: number;
     sessions: number;
@@ -35,6 +41,10 @@ export interface WorldServerMetricGauges {
 
 export function createWorldServerMetrics(): WorldServerMetrics {
     return {
+        raidsStartedTotal: 0,
+        raidResultsTotal: { SURVIVED: 0, DEAD: 0, MIA: 0, LEFT: 0 },
+        raidDurationSecondsTotal: 0,
+        raidKillsTotal: 0,
         wsConnectionsTotal: 0,
         malformedMessagesTotal: 0,
         oversizedPayloadsTotal: 0,
@@ -57,6 +67,17 @@ export function createWorldServerMetrics(): WorldServerMetrics {
         shutdownsTotal: 0,
         worldTickDurationMs: 0,
     };
+}
+
+export function recordWorldServerRaidResult(
+    metrics: WorldServerMetrics,
+    result: WorldRaidResult,
+    elapsedSeconds: number,
+    kills: number
+): void {
+    metrics.raidResultsTotal[result] += 1;
+    metrics.raidDurationSecondsTotal += Math.max(0, Number.isFinite(elapsedSeconds) ? elapsedSeconds : 0);
+    metrics.raidKillsTotal += Math.max(0, Number.isFinite(kills) ? Math.floor(kills) : 0);
 }
 
 export function formatWorldServerMetrics(metrics: WorldServerMetrics, gauges: WorldServerMetricGauges, nowMs: number = Date.now()): string {
@@ -89,6 +110,21 @@ export function formatWorldServerMetrics(metrics: WorldServerMetrics, gauges: Wo
         '# HELP darksaber_world_tick_duration_ms Last world tick duration in milliseconds.',
         '# TYPE darksaber_world_tick_duration_ms gauge',
         `darksaber_world_tick_duration_ms ${metrics.worldTickDurationMs}`,
+        '# HELP darksaber_world_raids_started_total Total new authoritative raid runs started by players.',
+        '# TYPE darksaber_world_raids_started_total counter',
+        `darksaber_world_raids_started_total ${metrics.raidsStartedTotal}`,
+        '# HELP darksaber_world_raid_results_total Total finalized raid results by outcome.',
+        '# TYPE darksaber_world_raid_results_total counter',
+        `darksaber_world_raid_results_total{result="survived"} ${metrics.raidResultsTotal.SURVIVED}`,
+        `darksaber_world_raid_results_total{result="dead"} ${metrics.raidResultsTotal.DEAD}`,
+        `darksaber_world_raid_results_total{result="mia"} ${metrics.raidResultsTotal.MIA}`,
+        `darksaber_world_raid_results_total{result="left"} ${metrics.raidResultsTotal.LEFT}`,
+        '# HELP darksaber_world_raid_duration_seconds_total Cumulative elapsed seconds across finalized raid results.',
+        '# TYPE darksaber_world_raid_duration_seconds_total counter',
+        `darksaber_world_raid_duration_seconds_total ${metrics.raidDurationSecondsTotal}`,
+        '# HELP darksaber_world_raid_kills_total Cumulative enemy kills across finalized raid results.',
+        '# TYPE darksaber_world_raid_kills_total counter',
+        `darksaber_world_raid_kills_total ${metrics.raidKillsTotal}`,
         '# HELP darksaber_world_ws_connections_total Total accepted WebSocket connection attempts.',
         '# TYPE darksaber_world_ws_connections_total counter',
         `darksaber_world_ws_connections_total ${metrics.wsConnectionsTotal}`,

@@ -132,7 +132,11 @@ The metrics include live sessions, active players, WebSocket clients, tick
 duration, rejected actions, save conflicts/failures, pending world-save recovery
 spool entries, pending active-raid session snapshots, dirty/saving save
 trackers, startup save-spool replay results, and startup active-raid snapshot
-restore results.
+restore results. Gameplay funnel counters expose new raids started, finalized
+results by `survived`/`dead`/`mia`/`left`, cumulative finalized raid duration,
+and cumulative enemy kills. For example, average finalized raid duration is
+`rate(darksaber_world_raid_duration_seconds_total[1h]) / sum(rate(darksaber_world_raid_results_total[1h]))`.
+These are process-local Prometheus counters and reset when the server restarts.
 
 Set these Render environment variables:
 
