@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Saver_Files\\Saver';
+const DEFAULT_ROOT = process.env.DARKSABER_ORIGINAL_SOURCE_ROOT?.trim() ?? '';
 
 function readInt32Words(bytes) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -106,7 +106,8 @@ function createMapManifest(fileNames) {
   return [...entries.values()].sort((a, b) => Number(a.mapId) - Number(b.mapId));
 }
 
-const root = process.argv[2] ?? DEFAULT_ROOT;
+const root = process.argv[2]?.trim() || DEFAULT_ROOT;
+if (!root) throw new Error('Original source root is required. Set DARKSABER_ORIGINAL_SOURCE_ROOT or pass [sourceRoot].');
 const files = walkFiles(root);
 const scripts = files
   .filter((file) => file.toLowerCase().endsWith('.lsc'))

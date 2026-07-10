@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { basename, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Saver_Files\\Saver';
+const DEFAULT_ROOT = process.env.DARKSABER_ORIGINAL_SOURCE_ROOT?.trim() ?? '';
 const DEFAULT_OUT_ROOT = 'outputs\\original_story_map_analysis';
 
 function readAscii(bytes, offset, length) {
@@ -75,6 +75,7 @@ function parseArgs(argv) {
   }
 
   if (!options.episode) throw new Error('Missing --episode <number>');
+  if (!options.sourceRoot) throw new Error('Original source root is required. Set DARKSABER_ORIGINAL_SOURCE_ROOT or pass --source-root <Saver>.');
   const numeric = Number.parseInt(options.episode, 10);
   if (!Number.isInteger(numeric) || numeric < 1 || numeric > 99) throw new Error(`Invalid episode: ${options.episode}`);
   return { ...options, episode: String(numeric).padStart(2, '0') };

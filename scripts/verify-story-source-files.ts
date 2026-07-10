@@ -39,7 +39,7 @@ import {
     type StoryScenarioMissionKind,
 } from '../src/data/StoryScenarioData';
 
-const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Saver_Files\\Saver';
+const DEFAULT_ROOT = process.env.DARKSABER_ORIGINAL_SOURCE_ROOT?.trim() ?? '';
 const DEFAULT_START = 1;
 const DEFAULT_END = 31;
 const RESOLVABLE_PRESENTATION_ACTOR_IDS = new Set(['hero', 'player', 'controlled', 'boss']);
@@ -154,6 +154,9 @@ function parseArgs(argv: string[]): Options {
 
     if (!Number.isInteger(options.start) || !Number.isInteger(options.end) || options.start < 1 || options.end < options.start) {
         throw new Error(`Invalid episode range: ${options.start}-${options.end}`);
+    }
+    if (!options.sourceRoot.trim()) {
+        throw new Error('Original source root is required. Set DARKSABER_ORIGINAL_SOURCE_ROOT or pass --source-root <Saver>.');
     }
     return options;
 }

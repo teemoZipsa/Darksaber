@@ -3,7 +3,7 @@ import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 
-const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Saver_Files\\Saver';
+const DEFAULT_ROOT = process.env.DARKSABER_ORIGINAL_SOURCE_ROOT?.trim() ?? '';
 const DEFAULT_OUT = 'outputs\\original_arc_unpacked';
 const ARC_SIGNATURE = '0901';
 const TABLE_OFFSET = 5;
@@ -14,7 +14,7 @@ function usage() {
   return [
     'Usage: node scripts/extract-original-arc.mjs [sourceRootOrArc] [outDir] [--all] [--manifest-only] [--match=.evt,.deo]',
     '',
-    `Default source: ${DEFAULT_ROOT}`,
+    `Default source: ${DEFAULT_ROOT || '<DARKSABER_ORIGINAL_SOURCE_ROOT required>'}`,
     `Default out:    ${DEFAULT_OUT}`,
   ].join('\n');
 }
@@ -131,6 +131,7 @@ function parseArgs(argv) {
 
   if (positionals[0]) options.source = positionals[0];
   if (positionals[1]) options.outDir = positionals[1];
+  if (!options.source) throw new Error('Original source is required. Set DARKSABER_ORIGINAL_SOURCE_ROOT or pass [sourceRootOrArc].');
   return options;
 }
 

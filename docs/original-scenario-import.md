@@ -2,7 +2,12 @@
 
 ## Source Root
 
-- Local source root: `C:\Users\Seonkyu\Downloads\saver200010_extracted\Saver_Files\Saver`
+- Source root is intentionally outside the repository. Set `DARKSABER_ORIGINAL_SOURCE_ROOT`
+  to the extracted `Saver` directory or pass `--source-root <Saver>` to
+  `scripts/verify-story-source-files.ts`.
+- Set `DARKSABER_ORIGINAL_SET_DIR` to the extracted `gameres/set` directory (or pass
+  the script-specific `SET_DIR`/`--set-dir` argument) when regenerating `.atr` ledgers.
+- Do not commit developer-specific absolute source paths or the copyrighted extracted source tree.
 - Event/script candidates: `Glib/gscene*.lsc`, `Wlib/scene*.lsc`
 - Map candidates: `MAP/*.mrc`, `MAP/*t.mrc`, `MAP/*hmap.bmp`, `MAP/*set.arc`
 - Text/name candidates: `MAP/*set.arc` members (`*.DEO`, `*.evt`, `*.srf`), `gameres/duty.arc`, `Glib/GameLib.ltn`, `Glib/GameLib.lnm`, `Glib/GameLib.lce`

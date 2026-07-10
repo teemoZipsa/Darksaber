@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Saver_Files\\Saver';
+const DEFAULT_ROOT = process.env.DARKSABER_ORIGINAL_SOURCE_ROOT?.trim() ?? '';
 const DEFAULT_OUT = 'outputs\\original_burgos_map_analysis';
 
 function readAscii(bytes, offset, length) {
@@ -104,7 +104,9 @@ function summarizeScript(text) {
   };
 }
 
-const sourceRoot = resolve(process.argv[2] ?? DEFAULT_ROOT);
+const sourceArg = process.argv[2]?.trim() || DEFAULT_ROOT;
+if (!sourceArg) throw new Error('Original source root is required. Set DARKSABER_ORIGINAL_SOURCE_ROOT or pass [sourceRoot].');
+const sourceRoot = resolve(sourceArg);
 const outDir = resolve(process.argv[3] ?? DEFAULT_OUT);
 const mapDir = join(sourceRoot, 'MAP');
 const mapArc = join(mapDir, '01set.arc');

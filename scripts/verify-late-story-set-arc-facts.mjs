@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Saver_Files\\Saver';
+const DEFAULT_ROOT = process.env.DARKSABER_ORIGINAL_SOURCE_ROOT?.trim() ?? '';
 const FACTS_PATH = 'src\\data\\content\\original-late-story-facts.json';
 const ARC_SIGNATURE = '0901';
 const TABLE_OFFSET = 5;
@@ -23,6 +23,7 @@ function parseArgs(argv) {
     }
   }
 
+  if (!options.sourceRoot) throw new Error('Original source root is required. Set DARKSABER_ORIGINAL_SOURCE_ROOT or pass --source-root <Saver>.');
   return options;
 }
 

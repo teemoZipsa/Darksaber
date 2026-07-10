@@ -1,7 +1,7 @@
 // Generate the late-story reward item ledger from the original Dark Saver item table.
 //
 // Usage: node scripts/generate-late-story-item-defs.mjs [SET_DIR] [--check]
-// SET_DIR defaults to the extracted gameres `set` folder used by decode-original-atr.
+// SET_DIR may also be supplied through DARKSABER_ORIGINAL_SET_DIR.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -9,13 +9,14 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..');
-const DEFAULT_SET = 'C:/Users/Seonkyu/Documents/Codex/2026-06-03/c-users-seonkyu-downloads-saver200010-extracted/outputs/gameres_unpacked/set';
+const DEFAULT_SET = process.env.DARKSABER_ORIGINAL_SET_DIR?.trim() ?? '';
 
 function parseArgs(argv) {
     const options = {
         setDir: DEFAULT_SET,
         check: false,
     };
+    let positionalSetDir = false;
 
     for (let index = 0; index < argv.length; index++) {
         const arg = argv[index];
@@ -23,16 +24,21 @@ function parseArgs(argv) {
             options.check = true;
         } else if (arg === '--set-dir') {
             options.setDir = argv[++index] ?? '';
+            positionalSetDir = true;
         } else if (arg === '--help' || arg === '-h') {
             console.log('Usage: node scripts/generate-late-story-item-defs.mjs [SET_DIR] [--set-dir <dir>] [--check]');
             process.exit(0);
-        } else if (!arg.startsWith('--') && options.setDir === DEFAULT_SET) {
+        } else if (!arg.startsWith('--') && !positionalSetDir) {
             options.setDir = arg;
+            positionalSetDir = true;
         } else {
             throw new Error(`Unknown argument: ${arg}`);
         }
     }
 
+    if (!options.setDir.trim()) {
+        throw new Error('Original set directory is required. Set DARKSABER_ORIGINAL_SET_DIR or pass --set-dir <dir>.');
+    }
     return options;
 }
 

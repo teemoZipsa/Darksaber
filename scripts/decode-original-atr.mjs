@@ -8,7 +8,7 @@
 //   sangsung  — class × class affinity matrix
 //
 // Usage:  node scripts/decode-original-atr.mjs [SET_DIR]
-// SET_DIR defaults to the extracted gameres `set` folder. Output → src/data/original/*.json
+// SET_DIR may also be supplied through DARKSABER_ORIGINAL_SET_DIR. Output → src/data/original/*.json
 //
 // The source `.atr` files live outside the repo; the emitted JSON is the in-repo
 // artifact. Re-run this when the source tables change.
@@ -19,9 +19,12 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..');
-const DEFAULT_SET = 'C:/Users/Seonkyu/Documents/Codex/2026-06-03/c-users-seonkyu-downloads-saver200010-extracted/outputs/gameres_unpacked/set';
+const DEFAULT_SET = process.env.DARKSABER_ORIGINAL_SET_DIR?.trim() ?? '';
 
-const SET_DIR = process.argv[2] ?? DEFAULT_SET;
+const SET_DIR = process.argv[2]?.trim() || DEFAULT_SET;
+if (!SET_DIR) {
+    throw new Error('Original set directory is required. Set DARKSABER_ORIGINAL_SET_DIR or pass [SET_DIR].');
+}
 const OUT_DIR = join(REPO, 'src', 'data', 'original');
 
 const decoder = new TextDecoder('euc-kr');

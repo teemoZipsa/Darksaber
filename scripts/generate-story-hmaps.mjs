@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-const DEFAULT_ROOT = 'C:\\Users\\Seonkyu\\Downloads\\saver200010_extracted\\Saver_Files\\Saver';
+const DEFAULT_ROOT = process.env.DARKSABER_ORIGINAL_SOURCE_ROOT?.trim() ?? '';
 const DEFAULT_OUT = 'src\\data\\content\\story-hmaps.json';
 const DEFAULT_EPISODES = [23, 24, 25, 26, 27, 28, 29, 30, 31];
 const DEFAULT_CLASSIFIER_EPISODES = Array.from({ length: 19 }, (_, index) => index + 2);
@@ -49,6 +49,7 @@ function parseArgs(argv) {
   if (options.classifierEpisodes.some((episode) => !Number.isInteger(episode) || episode < 1 || episode > 99)) {
     throw new Error(`Invalid classifier episodes: ${options.classifierEpisodes.join(',')}`);
   }
+  if (!options.sourceRoot) throw new Error('Original source root is required. Set DARKSABER_ORIGINAL_SOURCE_ROOT or pass --source-root <Saver>.');
   return options;
 }
 
