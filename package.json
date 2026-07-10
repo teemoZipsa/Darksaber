@@ -16,6 +16,8 @@
     "build:server": "npm run typecheck:server && node scripts/build-server.mjs",
     "preview": "vite preview",
     "db:check": "npx tsx server/check-db.ts",
+    "db:migrate": "npx tsx server/migrate-db.ts",
+    "db:migrate:prod": "node server-dist/server/migrate-db.js",
     "server": "npx tsx server/index.ts",
     "server:prod": "node server-dist/server/index.js",
     "render:status": "node scripts/render-deploy.mjs status",

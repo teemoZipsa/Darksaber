@@ -14,12 +14,17 @@ const pool = createPostgresPool(connectionString);
 
 try {
     await store.initialize();
-    const [accounts, sessions, characters, saves, progress] = await Promise.all([
+    const [accounts, sessions, characters, saves, progress, worldSnapshots, worldLeases, migrations] = await Promise.all([
         countRows('accounts'),
         countRows('account_sessions'),
         countRows('characters'),
         countRows('character_saves'),
         countRows('account_progress'),
+        countRows('world_session_snapshots'),
+        countRows('world_session_leases'),
+        pool.query<{ version: number; name: string }>(
+            'SELECT version, name FROM schema_migrations ORDER BY version ASC'
+        ),
     ]);
     console.log(JSON.stringify({
         ok: true,
@@ -31,7 +36,10 @@ try {
             characters,
             characterSaves: saves,
             accountProgress: progress,
+            worldSessionSnapshots: worldSnapshots,
+            worldSessionLeases: worldLeases,
         },
+        migrations: migrations.rows,
     }, null, 2));
 } finally {
     await Promise.all([

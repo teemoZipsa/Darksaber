@@ -9,6 +9,7 @@ import type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySav
 import { createDefaultStashSnapshot } from '../src/shared/CharacterSaveDefaults';
 import { FIRST_SURVIVAL_GOLD_REWARD, FIRST_SURVIVAL_QUEST_ID } from '../src/shared/FirstSurvivalReward';
 import { createPostgresPool } from './PostgresConnection';
+import { runPostgresMigrations, type PostgresMigrationPool } from './PostgresMigrations';
 import { applyStoryQuestRewardsToSaveState } from './StoryRewardSave';
 export type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from '../src/shared/CharacterSave';
 
@@ -394,87 +395,7 @@ export class PostgresAuthStore implements AuthStore {
     }
 
     public async initialize(): Promise<void> {
-        await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS accounts (
-                id uuid PRIMARY KEY,
-                login_name text NOT NULL UNIQUE,
-                login_name_normalized text NOT NULL UNIQUE,
-                password_hash text NOT NULL,
-                last_selected_character_id uuid NULL,
-                created_at timestamptz NOT NULL,
-                updated_at timestamptz NOT NULL,
-                disabled_at timestamptz NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS account_sessions (
-                id uuid PRIMARY KEY,
-                account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-                refresh_token_hash text NOT NULL,
-                token_family_id uuid NOT NULL,
-                created_at timestamptz NOT NULL,
-                expires_at timestamptz NOT NULL,
-                last_used_at timestamptz NOT NULL,
-                revoked_at timestamptz NULL,
-                replaced_by_session_id uuid NULL,
-                user_agent text NULL,
-                ip_hash text NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS account_sessions_refresh_hash_idx ON account_sessions(refresh_token_hash);
-            CREATE INDEX IF NOT EXISTS account_sessions_account_idx ON account_sessions(account_id);
-            CREATE INDEX IF NOT EXISTS account_sessions_family_idx ON account_sessions(token_family_id);
-
-            CREATE TABLE IF NOT EXISTS characters (
-                id uuid PRIMARY KEY,
-                account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-                slot_no int NOT NULL,
-                name text NOT NULL,
-                class_key text NOT NULL,
-                tier int NOT NULL DEFAULT 1,
-                level int NOT NULL DEFAULT 1,
-                exp bigint NOT NULL DEFAULT 0,
-                base_stats jsonb NOT NULL,
-                created_at timestamptz NOT NULL,
-                updated_at timestamptz NOT NULL,
-                deleted_at timestamptz NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS character_saves (
-                character_id uuid PRIMARY KEY REFERENCES characters(id) ON DELETE CASCADE,
-                save_version int NOT NULL,
-                revision bigint NOT NULL DEFAULT 1,
-                hub_location jsonb NOT NULL,
-                quest_state jsonb NOT NULL,
-                inventory jsonb NOT NULL,
-                equipment jsonb NOT NULL,
-                party_snapshot jsonb NOT NULL,
-                roster_snapshot jsonb NOT NULL,
-                updated_at timestamptz NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS account_progress (
-                account_id uuid PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
-                completed_quests jsonb NOT NULL,
-                unlocks jsonb NOT NULL,
-                flags jsonb NOT NULL,
-                updated_at timestamptz NOT NULL
-            );
-        `);
-        await this.pool.query(`
-            ALTER TABLE character_saves
-            ADD COLUMN IF NOT EXISTS stash_snapshot jsonb NOT NULL
-            DEFAULT '{"width":15,"height":10,"items":[]}'::jsonb
-        `);
-        await this.pool.query(`
-            ALTER TABLE characters DROP CONSTRAINT IF EXISTS characters_account_id_slot_no_key;
-            ALTER TABLE characters DROP CONSTRAINT IF EXISTS characters_account_id_name_key;
-            CREATE UNIQUE INDEX IF NOT EXISTS characters_active_slot_idx
-                ON characters(account_id, slot_no)
-                WHERE deleted_at IS NULL;
-            CREATE UNIQUE INDEX IF NOT EXISTS characters_active_name_idx
-                ON characters(account_id, lower(name))
-                WHERE deleted_at IS NULL;
-        `);
+        await runPostgresMigrations(this.pool as unknown as PostgresMigrationPool);
     }
 
     public async createAccount(input: NewAccountInput): Promise<AuthAccount> {

@@ -99,11 +99,23 @@ test('world session snapshot store reloads reconnectable active raid snapshots',
 test('postgres world session snapshot store persists shared raid snapshots', async () => {
     const rows = new Map<string, { session_key: string; snapshot: unknown; updated_at: Date }>();
     const leases = new Map<string, { session_key: string; owner_id: string; lease_expires_at: Date; updated_at: Date }>();
+    const appliedMigrations = new Map<number, string>();
     const queries: string[] = [];
     const pool: PostgresWorldSessionSnapshotPool = {
         async query<T>(text: string, values?: readonly unknown[]): Promise<{ rows: T[] }> {
             queries.push(text);
-            if (text.includes('CREATE TABLE')) return { rows: [] };
+            if (text === 'BEGIN' || text === 'COMMIT' || text === 'ROLLBACK') return { rows: [] };
+            if (text.includes('pg_advisory_xact_lock')) return { rows: [] };
+            if (text.startsWith('SELECT version FROM schema_migrations')) {
+                return { rows: [...appliedMigrations.keys()].map((version) => ({ version })) as T[] };
+            }
+            if (text.startsWith('INSERT INTO schema_migrations')) {
+                appliedMigrations.set(Number(values?.[0]), String(values?.[1]));
+                return { rows: [] };
+            }
+            if (text.includes('CREATE TABLE') || text.includes('ALTER TABLE') || text.includes('CREATE UNIQUE INDEX')) {
+                return { rows: [] };
+            }
             if (text.startsWith('INSERT INTO world_session_leases')) {
                 const sessionKey = String(values?.[0]);
                 const ownerId = String(values?.[1]);

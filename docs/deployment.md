@@ -64,15 +64,29 @@ snapshots. During play, the world server keeps the authoritative state in
 memory; important save changes are marked dirty and flushed by autosave or
 final session cleanup.
 
-The server creates the database tables on startup when `DATABASE_URL` is
-present. For an explicit managed DB readiness check, run:
+The server runs ordered, advisory-lock-protected migrations recorded in
+`schema_migrations` on startup when `DATABASE_URL` is present. Existing
+pre-migration databases are adopted idempotently. To apply the same migrations
+explicitly before a manual deployment, run:
+
+```bash
+DATABASE_URL=<Neon pooled connection string> npm run db:migrate
+```
+
+Render Free web services do not support pre-deploy commands, so the Blueprint
+keeps startup migration as the portable path. Paid services may point a
+pre-deploy command at `npm run db:migrate:prod` because `build:server` emits the
+compiled migration entry alongside the server.
+
+For an explicit managed DB readiness check, run:
 
 ```bash
 DATABASE_URL=<Neon pooled connection string> npm run db:check
 ```
 
-`db:check` creates the schema if needed and prints row counts for the auth and
-character tables. This is a manual readiness check, not a production keepalive.
+`db:check` applies pending migrations and prints their versions plus row counts
+for auth, character, and world-session recovery tables. This is a manual
+readiness check, not a production keepalive.
 
 ## Render Server
 

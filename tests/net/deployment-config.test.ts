@@ -6,6 +6,7 @@ test('Render deployment config matches the documented auto-deploy mode', () => {
     const renderYaml = readFileSync('render.yaml', 'utf8');
     const deploymentDocs = readFileSync('docs/deployment.md', 'utf8');
     const ciWorkflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+    const packageJson = readFileSync('package.json', 'utf8');
 
     assert.match(renderYaml, /autoDeployTrigger:\s*['"]checksPass['"]/);
     assert.match(deploymentDocs, /autoDeployTrigger:\s*'checksPass'/);
@@ -19,6 +20,9 @@ test('Render deployment config matches the documented auto-deploy mode', () => {
     ]) {
         assert.match(ciWorkflow, new RegExp(command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     }
+    assert.match(ciWorkflow, /image:\s*postgres:16/);
+    assert.match(ciWorkflow, /TEST_DATABASE_URL:/);
+    assert.match(packageJson, /"db:migrate:prod"/);
 });
 
 test('production deployment docs require durable database-backed auth', () => {

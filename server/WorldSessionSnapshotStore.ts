@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { writeFileAtomically } from './AtomicFile';
 import { createPostgresPool } from './PostgresConnection';
+import { runPostgresMigrations, type PostgresMigrationPool } from './PostgresMigrations';
 import type { WorldSessionPersistentSnapshot } from './WorldSession';
 
 export interface PendingWorldSessionSnapshot {
@@ -129,20 +130,7 @@ export class PostgresWorldSessionSnapshotStore implements WorldSessionSnapshotSt
     }
 
     public async initialize(): Promise<void> {
-        await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS world_session_snapshots (
-                session_key text PRIMARY KEY,
-                snapshot jsonb NOT NULL,
-                updated_at timestamptz NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS world_session_leases (
-                session_key text PRIMARY KEY,
-                owner_id text NOT NULL,
-                lease_expires_at timestamptz NOT NULL,
-                updated_at timestamptz NOT NULL
-            );
-        `);
+        await runPostgresMigrations(this.pool as unknown as PostgresMigrationPool);
     }
 
     public async list(): Promise<PendingWorldSessionSnapshot[]> {

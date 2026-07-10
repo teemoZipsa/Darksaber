@@ -1,18 +1,21 @@
 import { mkdirSync, rmSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
 
 const rootDir = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const outfile = resolve(rootDir, 'server-dist/server/index.js');
+const outdir = resolve(rootDir, 'server-dist/server');
 
 rmSync(resolve(rootDir, 'server-dist'), { recursive: true, force: true });
-mkdirSync(dirname(outfile), { recursive: true });
+mkdirSync(outdir, { recursive: true });
 
 await esbuild.build({
     absWorkingDir: rootDir,
-    entryPoints: ['server/index.ts'],
-    outfile,
+    entryPoints: {
+        index: 'server/index.ts',
+        'migrate-db': 'server/migrate-db.ts',
+    },
+    outdir,
     bundle: true,
     platform: 'node',
     format: 'esm',
@@ -23,4 +26,4 @@ await esbuild.build({
     logLevel: 'info',
 });
 
-console.log(`Built ${outfile}`);
+console.log(`Built server entries in ${outdir}`);
