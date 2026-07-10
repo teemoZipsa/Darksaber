@@ -155,11 +155,11 @@ not a public keepalive policy. The server's internal world tick, snapshot, save,
 and WebSocket maintenance timers also return immediately when there are no
 sessions, pending saves, or clients.
 
-During graceful shutdown, the world server rejects new joins, force-extracts
-active raids as `SURVIVED` to the departure town, emits a final `RAID_RESULT`,
-and flushes the resulting character save patches before closing sockets. This
-prevents deploy shutdowns from silently dropping raid loot and dirty character
-state.
+During graceful shutdown, the world server rejects new joins, marks active raid
+players disconnected, writes a final durable world-session snapshot, and flushes
+only recovery-safe dirty save patches before closing sockets. Restart restores
+the raid as reconnectable state; shutdown never emits `SURVIVED`, secures raid
+loot, completes quests, or grants the first-survival bonus.
 
 During active raids, dirty save events also write a local recovery spool that
 includes raid-acquired inventory but does not commit survival-only rewards such

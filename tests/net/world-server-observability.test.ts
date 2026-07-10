@@ -13,7 +13,7 @@ test('world server metrics render gauges and operational counters', () => {
     metrics.sessionSnapshotRestoreFailedTotal = 3;
     metrics.sessionLeaseAcquireFailuresTotal = 4;
     metrics.sessionLeaseLostTotal = 5;
-    metrics.shutdownForcedRaidResultsTotal = 1;
+    metrics.shutdownPreservedRaidPlayersTotal = 1;
     metrics.worldTickDurationMs = 7;
 
     const output = formatWorldServerMetrics(metrics, {
@@ -45,7 +45,7 @@ test('world server metrics render gauges and operational counters', () => {
     assert.match(output, /darksaber_world_session_snapshot_restore_failed_total 3/);
     assert.match(output, /darksaber_world_session_lease_acquire_failures_total 4/);
     assert.match(output, /darksaber_world_session_lease_lost_total 5/);
-    assert.match(output, /darksaber_world_shutdown_forced_raid_results_total 1/);
+    assert.match(output, /darksaber_world_shutdown_preserved_raid_players_total 1/);
 });
 
 test('world server structured logs include level, event, time, fields, and errors', () => {

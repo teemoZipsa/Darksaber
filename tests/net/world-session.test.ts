@@ -185,7 +185,7 @@ test('server town leave only survives at a non-departure town', () => {
     }
 });
 
-test('server shutdown force-extracts active raids and preserves raid loot in the final patch', () => {
+test('server shutdown preserves active raids for resume without granting survival', () => {
     const session = new WorldSession();
     const character = authCharacter('hero-shutdown');
     const joined = session.join(joinMessage('central_castle', character.id), 0, {
@@ -206,23 +206,24 @@ test('server shutdown force-extracts active raids and preserves raid loot in the
         acquiredInRaid: true,
     });
 
-    const result = session.finishActivePlayersForShutdown(1_000);
-    assert.equal(result.events.length, 0);
-    assert.equal(result.perPlayerMessages.length, 1);
-    assert.equal(result.perPlayerMessages[0]?.playerId, joined.playerId);
-    const message = result.perPlayerMessages[0]?.message;
-    assert.equal(message?.type, 'RAID_RESULT');
-    if (message?.type === 'RAID_RESULT') {
-        assert.equal(message.result, 'SURVIVED');
-        assert.equal(message.extractionTownId, 'central_castle');
-    }
-    assert.deepEqual(session.getActivePlayerIds(), []);
-    assert.ok(session.hasFinalCharacterSavePatch(joined.playerId));
-    const patch = session.createCharacterSavePatch(joined.playerId);
-    assert.ok(patch);
-    const savedRaidItem = patch.inventory?.items.find((item) => item.itemId === raidItem.id);
-    assert.ok(savedRaidItem);
-    assert.equal(savedRaidItem.acquiredInRaid, undefined);
+    assert.equal(session.prepareActivePlayersForShutdown(1_000), 1);
+    assert.equal(session.getDebugCounts().ghostPlayers, 1);
+    assert.equal(session.hasFinalCharacterSavePatch(joined.playerId), false);
+
+    const snapshot = session.createPersistentSnapshot();
+    const savedPlayer = snapshot.players.find((player) => player.id === joined.playerId);
+    assert.ok(savedPlayer);
+    assert.ok(savedPlayer.saveSnapshot);
+    assert.equal(savedPlayer.ghost, true);
+    assert.equal(savedPlayer.disconnectedAt, 1_000);
+    assert.ok(savedPlayer.saveSnapshot.inventory.items.some((item) => (
+        item.itemId === raidItem.id && item.acquiredInRaid === true
+    )));
+
+    const restored = WorldSession.restorePersistentSnapshot(snapshot);
+    const resumed = restored.reconnect(joined.welcome.resumeToken, 2_000);
+    assert.ok(resumed);
+    assert.equal(restored.hasFinalCharacterSavePatch(joined.playerId), false);
 });
 
 test('persistent world session snapshots restore active raid reconnect state', () => {

@@ -43,20 +43,6 @@ export class WorldSessionRaidResults {
         return message;
     }
 
-    public finishPlayerForShutdown(playerId: string): RaidResultMessage {
-        const player = this.context.players.get(playerId);
-        const extractionTownId = player?.departureTownId ?? this.resolveExtractionTownId(player);
-        const message = this.createRaidResultMessage(playerId, 'SURVIVED', player, extractionTownId);
-        this.context.log(`raid result player=${playerId} result=SURVIVED reason=server_shutdown kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
-        if (player) {
-            message.firstSurvivalBonusGranted = this.context.saveState.grantsFirstSurvivalBonus(player);
-            this.context.saveState.captureFinalPatch(player, extractionTownId, true);
-            this.context.saveState.markDirty(playerId);
-        }
-        this.context.removePlayer(playerId);
-        return message;
-    }
-
     public resolveRequestedRaidResult(
         playerId: string,
         reason: Extract<WorldClientMessage, { type: 'WORLD_LEAVE' }>['reason']

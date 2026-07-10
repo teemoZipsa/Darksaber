@@ -1019,7 +1019,7 @@ async function shutdownWorldServer(signal: NodeJS.Signals): Promise<void> {
     shutdownStarted = true;
     metrics.shutdownsTotal += 1;
     logServerEvent('info', 'server_shutdown_started', { signal, sessions: sessions.size, sockets: wss.clients.size });
-    finishActiveRaidsForShutdown();
+    prepareActiveRaidsForShutdown();
     await persistAllWorldSessionSnapshots('shutdown');
     for (const ws of wss.clients) send(ws, { type: 'ERROR', code: 'SERVER_SHUTTING_DOWN', message: 'World server is shutting down.' });
     for (const ws of wss.clients) ws.close(1001, 'server shutting down');
@@ -1034,20 +1034,11 @@ async function shutdownWorldServer(signal: NodeJS.Signals): Promise<void> {
     process.exit(0);
 }
 
-function finishActiveRaidsForShutdown(): void {
+function prepareActiveRaidsForShutdown(): void {
+    const now = Date.now();
     for (const [sessionKey, session] of sessions) {
-        const result = session.finishActivePlayersForShutdown(Date.now());
-        for (const entry of result.perPlayerMessages) {
-            metrics.shutdownForcedRaidResultsTotal += 1;
-            const ws = socketByPlayer.get(socketPlayerKey(sessionKey, entry.playerId));
-            if (ws) send(ws, entry.message);
-            const binding = findBinding(sessionKey, entry.playerId);
-            if (binding) persistRaidResult(binding, entry.message);
-        }
+        metrics.shutdownPreservedRaidPlayersTotal += session.prepareActivePlayersForShutdown(now);
         consumeSessionSaveDirtyPlayers(sessionKey, session);
-        if (result.events.length > 0 || result.perPlayerMessages.length > 0) {
-            void persistWorldSessionSnapshot(sessionKey, session, 'shutdown_force_extract');
-        }
     }
 }
 

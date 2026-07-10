@@ -200,11 +200,19 @@ export function cloneCharacterSave(save: CharacterSave | undefined): CharacterSa
         ...save,
         hubLocation: cloneRecord(save.hubLocation),
         questState: cloneRecord(save.questState),
-        inventory: cloneInventorySnapshot(save.inventory, { includeAcquiredRaidItems: true }),
-        stashSnapshot: cloneInventorySnapshot(save.stashSnapshot, { includeAcquiredRaidItems: true }),
+        inventory: cloneInventorySnapshotWithRaidState(save.inventory),
+        stashSnapshot: cloneInventorySnapshotWithRaidState(save.stashSnapshot),
         equipment: cloneRecord(save.equipment),
         partySnapshot: cloneRecord(save.partySnapshot),
         rosterSnapshot: cloneRecord(save.rosterSnapshot),
+    };
+}
+
+function cloneInventorySnapshotWithRaidState(inventory: InventorySaveSnapshot): InventorySaveSnapshot {
+    return {
+        width: inventory.width,
+        height: inventory.height,
+        items: inventory.items.map((item) => ({ ...item })),
     };
 }
 

@@ -11,7 +11,6 @@ import {
     type CombatEventMessage,
     type WorldClientMessage,
     type WorldJoinMessage,
-    type WorldServerMessage,
     type WorldSnapshot,
     type WorldWelcomeMessage,
 } from '../src/net/WorldProtocol';
@@ -446,6 +445,17 @@ export class WorldSession {
     }
 
     public disconnectActivePlayersForServerRestart(now: number = Date.now()): void {
+        this.disconnectActivePlayers(now, 'server_restart');
+    }
+
+    public prepareActivePlayersForShutdown(now: number = Date.now()): number {
+        const activePlayerCount = this.getActivePlayerIds().length;
+        this.disconnectActivePlayers(now, 'server_shutdown');
+        this.lastTickAt = now;
+        return activePlayerCount;
+    }
+
+    private disconnectActivePlayers(now: number, reason: 'server_restart' | 'server_shutdown'): void {
         for (const player of this.players.values()) {
             if (!player.active) continue;
             player.ghost = true;
@@ -455,18 +465,8 @@ export class WorldSession {
                 if (actor) actor.remainingAp = 0;
             }
             this.lootResolver.releaseLocksForPlayer(player.id);
-            this.log(`ghost start player=${player.id} reason=server_restart graceMs=${this.ghostGraceMs}`);
+            this.log(`ghost start player=${player.id} reason=${reason} graceMs=${this.ghostGraceMs}`);
         }
-    }
-
-    public finishActivePlayersForShutdown(now: number = Date.now()): WorldSessionTickResult {
-        const perPlayerMessages: Array<{ playerId: string; message: WorldServerMessage }> = [];
-        for (const playerId of this.getActivePlayerIds()) {
-            this.log(`force extract player=${playerId} reason=server_shutdown`);
-            perPlayerMessages.push({ playerId, message: this.raidResults.finishPlayerForShutdown(playerId) });
-        }
-        this.lastTickAt = now;
-        return { events: [], perPlayerMessages };
     }
 
     public handleMessage(playerId: string, message: WorldClientMessage, now: number = Date.now()): WorldSessionMessageResult {
