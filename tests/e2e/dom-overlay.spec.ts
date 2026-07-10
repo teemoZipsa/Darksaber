@@ -87,8 +87,8 @@ async function getCombatUxDebug(page: Page) {
             ?? null;
         const enemy = enemyEntry?.enemy ?? null;
         const uiScale = Number.parseFloat(window.localStorage.getItem('setting_uiScale') ?? '1') || 1;
-        const canvasW = canvas?.width ?? window.innerWidth;
-        const canvasH = canvas?.height ?? window.innerHeight;
+        const canvasW = rect?.width ?? window.innerWidth;
+        const canvasH = rect?.height ?? window.innerHeight;
         const toScreen = (entity: any) => {
             if (!rect || !camera || !entity) return null;
             const cameraX = typeof camera.baseX === 'number' ? camera.baseX : camera.x;
@@ -170,37 +170,90 @@ async function getCharacterSaveSnapshot(
     return { ok: true, status: response.status(), save: parsed.save };
 }
 
-async function openCombatActionMenu(page: Page): Promise<void> {
+async function tapOrClick(page: Page, isMobile: boolean, x: number, y: number): Promise<void> {
+    if (isMobile) {
+        await page.touchscreen.tap(x, y);
+    } else {
+        await page.mouse.click(x, y);
+    }
+}
+
+async function openCombatActionMenu(page: Page, isMobile = false): Promise<void> {
     const current = await getCombatUxDebug(page);
     if (!current.actionMenuOpen) {
         const actorScreen = current.actor?.screen;
         expect(actorScreen).toBeTruthy();
-        await page.mouse.click(actorScreen!.x, actorScreen!.y);
+        await tapOrClick(page, isMobile, actorScreen!.x, actorScreen!.y);
     }
     await expect.poll(() => getCombatUxDebug(page), { timeout: 10_000 }).toMatchObject({
         actionMenuOpen: true,
     });
 }
 
-async function clickCombatEnemy(page: Page): Promise<void> {
+async function clickCombatEnemy(page: Page, isMobile = false): Promise<void> {
     const current = await getCombatUxDebug(page);
     const enemyScreen = current.enemy?.screen;
     const enemyTile = current.enemy?.tile;
     if (!enemyScreen || !enemyTile) throw new Error('dev combat enemy screen position is unavailable');
-    await page.mouse.move(enemyScreen.x, enemyScreen.y);
-    await expect.poll(async () => {
-        const debug = await getCombatUxDebug(page);
-        return debug.hoverTile;
-    }, { timeout: 5000 }).toMatchObject(enemyTile);
-    await page.mouse.click(enemyScreen.x, enemyScreen.y);
+    if (!isMobile) {
+        await page.mouse.move(enemyScreen.x, enemyScreen.y);
+        await expect.poll(async () => {
+            const debug = await getCombatUxDebug(page);
+            return debug.hoverTile;
+        }, { timeout: 5000 }).toMatchObject(enemyTile);
+    }
+    await tapOrClick(page, isMobile, enemyScreen.x, enemyScreen.y);
 }
 
-async function clickCombatToolOption(page: Page): Promise<void> {
+async function clickCombatToolOption(page: Page, isMobile = false): Promise<void> {
     const current = await getCombatUxDebug(page);
     const option = current.toolOptionScreen;
     expect(option).toBeTruthy();
-    await page.mouse.move(option!.x, option!.y);
-    await page.mouse.click(option!.x, option!.y);
+    if (!isMobile) await page.mouse.move(option!.x, option!.y);
+    await tapOrClick(page, isMobile, option!.x, option!.y);
+}
+
+type CombatAction = 'tool' | 'attack' | 'rest' | 'defend' | 'magic' | 'fanfare';
+
+const COMBAT_ACTION_OFFSETS: Record<CombatAction, readonly [number, number]> = {
+    tool: [0, -1],
+    attack: [1, -1],
+    magic: [-1, 0],
+    defend: [1, 0],
+    rest: [-1, 1],
+    fanfare: [0, 1],
+};
+
+const COMBAT_ACTION_KEYS: Record<CombatAction, string> = {
+    tool: 'KeyW',
+    attack: 'KeyE',
+    magic: 'KeyR',
+    defend: 'KeyA',
+    rest: 'KeyS',
+    fanfare: 'KeyD',
+};
+
+async function chooseCombatAction(page: Page, isMobile: boolean, action: CombatAction): Promise<void> {
+    if (!isMobile) {
+        await page.keyboard.press(COMBAT_ACTION_KEYS[action]);
+        return;
+    }
+    const current = await getCombatUxDebug(page);
+    const actorScreen = current.actor?.screen;
+    expect(actorScreen).toBeTruthy();
+    const [gridX, gridY] = COMBAT_ACTION_OFFSETS[action];
+    await page.touchscreen.tap(actorScreen!.x + gridX * 48, actorScreen!.y + gridY * 48);
+}
+
+async function chooseFirstMagic(page: Page, isMobile: boolean): Promise<void> {
+    if (!isMobile) {
+        await page.keyboard.press('Digit1');
+        return;
+    }
+    const current = await getCombatUxDebug(page);
+    const actorScreen = current.actor?.screen;
+    expect(actorScreen).toBeTruthy();
+    await page.touchscreen.tap(actorScreen!.x - 48, actorScreen!.y - 48);
 }
 
 test('dev town renders the React town overlay with embedded inventory', async ({ page }) => {
@@ -503,7 +556,6 @@ test('dev raid loot can be transferred into the backpack with pointer input', as
 });
 
 test('dev raid combat UX supports attack, magic, tool, defend, rest, and fanfare inputs', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'desktop canvas combat UX coverage; mobile network raid is tracked separately');
     test.setTimeout(60_000);
 
     const clientErrors: string[] = [];
@@ -525,10 +577,19 @@ test('dev raid combat UX supports attack, magic, tool, defend, rest, and fanfare
     expect(fixture.partyCharacterIds).toContain('dev_combat_follower');
     expect(fixture.partyActorCharacterIds).toContain('dev_combat_follower');
     expect(fixture.isNetworkRaid).toBe(false);
+    const canvasMetrics = await page.locator('#gameCanvas').evaluate((canvas: HTMLCanvasElement) => ({
+        backingWidth: canvas.width,
+        backingHeight: canvas.height,
+        cssWidth: canvas.getBoundingClientRect().width,
+        cssHeight: canvas.getBoundingClientRect().height,
+        expectedRatio: Math.min(2, Math.max(1, window.devicePixelRatio || 1)),
+    }));
+    expect(canvasMetrics.backingWidth / canvasMetrics.cssWidth).toBeCloseTo(canvasMetrics.expectedRatio, 1);
+    expect(canvasMetrics.backingHeight / canvasMetrics.cssHeight).toBeCloseTo(canvasMetrics.expectedRatio, 1);
 
-    await openCombatActionMenu(page);
+    await openCombatActionMenu(page, isMobile);
 
-    await page.keyboard.press('KeyD');
+    await chooseCombatAction(page, isMobile, 'fanfare');
     await expect.poll(async () => {
         const debug = await getCombatUxDebug(page);
         return debug.actionMenuOpen
@@ -540,9 +601,9 @@ test('dev raid combat UX supports attack, magic, tool, defend, rest, and fanfare
     expect(afterFanfare.logs.join('\n')).toMatch(/집결|rally/i);
 
     const enemyHpBeforeAttack = afterFanfare.enemy!.hp;
-    await page.keyboard.press('KeyE');
+    await chooseCombatAction(page, isMobile, 'attack');
     await expect.poll(() => getCombatUxDebug(page)).toMatchObject({ playerActionMode: 'attack' });
-    await clickCombatEnemy(page);
+    await clickCombatEnemy(page, isMobile);
     await expect.poll(async () => {
         const debug = await getCombatUxDebug(page);
         return {
@@ -555,11 +616,11 @@ test('dev raid combat UX supports attack, magic, tool, defend, rest, and fanfare
     });
 
     const beforeMagic = await getCombatUxDebug(page);
-    await page.keyboard.press('KeyR');
+    await chooseCombatAction(page, isMobile, 'magic');
     await expect.poll(() => getCombatUxDebug(page)).toMatchObject({ magicMode: 'menu' });
-    await page.keyboard.press('Digit1');
+    await chooseFirstMagic(page, isMobile);
     await expect.poll(() => getCombatUxDebug(page)).toMatchObject({ magicMode: 'targeting' });
-    await clickCombatEnemy(page);
+    await clickCombatEnemy(page, isMobile);
     await expect.poll(async () => {
         const debug = await getCombatUxDebug(page);
         return {
@@ -576,9 +637,9 @@ test('dev raid combat UX supports attack, magic, tool, defend, rest, and fanfare
     });
 
     const beforeTool = await getCombatUxDebug(page);
-    await page.keyboard.press('KeyW');
+    await chooseCombatAction(page, isMobile, 'tool');
     await expect.poll(() => getCombatUxDebug(page)).toMatchObject({ toolVisible: true });
-    await clickCombatToolOption(page);
+    await clickCombatToolOption(page, isMobile);
     await expect.poll(async () => {
         const debug = await getCombatUxDebug(page);
         return {
@@ -594,7 +655,7 @@ test('dev raid combat UX supports attack, magic, tool, defend, rest, and fanfare
         toolVisible: false,
     });
 
-    await page.keyboard.press('KeyA');
+    await chooseCombatAction(page, isMobile, 'defend');
     await expect.poll(async () => {
         const debug = await getCombatUxDebug(page);
         return {
@@ -608,7 +669,7 @@ test('dev raid combat UX supports attack, magic, tool, defend, rest, and fanfare
         actionMenuOpen: true,
     });
 
-    await page.keyboard.press('KeyS');
+    await chooseCombatAction(page, isMobile, 'rest');
     await expect.poll(async () => {
         const debug = await getCombatUxDebug(page);
         return {

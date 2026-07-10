@@ -3,6 +3,7 @@ import { SettingsManager } from './SettingsManager';
 export class InputManager {
     private keysDown: Set<string> = new Set();
     private keysJustPressed: Set<string> = new Set();
+    private activePrimaryPointerId: number | null = null;
 
     public mouseScreenX: number = 0;
     public mouseScreenY: number = 0;
@@ -35,17 +36,22 @@ export class InputManager {
             this.keysDown.delete(e.code);
         });
 
-        const updateMousePos = (e: MouseEvent) => {
+        const updatePointerPos = (e: PointerEvent) => {
             const rect = canvas.getBoundingClientRect();
             this.mouseScreenX = e.clientX - rect.left;
             this.mouseScreenY = e.clientY - rect.top;
         };
 
-        canvas.addEventListener('mousemove', updateMousePos);
+        canvas.addEventListener('pointermove', (e) => {
+            if (!e.isPrimary) return;
+            updatePointerPos(e);
+        });
 
-        canvas.addEventListener('mousedown', (e) => {
-            updateMousePos(e);
+        canvas.addEventListener('pointerdown', (e) => {
+            if (!e.isPrimary) return;
+            updatePointerPos(e);
             if (e.button === 0) {
+                this.activePrimaryPointerId = e.pointerId;
                 this.mouseJustDown = true;
                 this.mouseIsDown = true;
             } else if (e.button === 2) {
@@ -57,19 +63,20 @@ export class InputManager {
             e.preventDefault();
         });
 
-        window.addEventListener('mouseup', (e) => {
-            if (e.button === 0) {
-                const rect = canvas.getBoundingClientRect();
-                this.mouseScreenX = e.clientX - rect.left;
-                this.mouseScreenY = e.clientY - rect.top;
-                
-                this.mouseJustUp = true;
-                this.mouseIsDown = false;
-            }
+        window.addEventListener('pointerup', (e) => {
+            if (!e.isPrimary || e.button !== 0 || e.pointerId !== this.activePrimaryPointerId) return;
+            updatePointerPos(e);
+            this.activePrimaryPointerId = null;
+            this.mouseJustUp = true;
+            this.mouseIsDown = false;
+            this.mouseClicked = true;
         });
 
-        canvas.addEventListener('click', () => {
-            this.mouseClicked = true;
+        window.addEventListener('pointercancel', (e) => {
+            if (e.pointerId !== this.activePrimaryPointerId) return;
+            this.activePrimaryPointerId = null;
+            this.mouseIsDown = false;
+            this.mouseJustUp = true;
         });
 
         canvas.addEventListener('wheel', (e) => {

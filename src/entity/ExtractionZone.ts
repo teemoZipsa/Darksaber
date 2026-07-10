@@ -31,8 +31,8 @@ export class ExtractionZone {
         const minY = this.y - this.radius;
         const maxY = this.y + this.radius;
 
-        const canvasWidth = ctx.canvas.width;
-        const canvasHeight = ctx.canvas.height;
+        const canvasWidth = ctx.canvas.clientWidth || ctx.canvas.width;
+        const canvasHeight = ctx.canvas.clientHeight || ctx.canvas.height;
 
         ctx.save();
         try {

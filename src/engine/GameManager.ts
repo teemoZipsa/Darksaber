@@ -55,10 +55,14 @@ export interface AuthenticatedCharacterSession {
 }
 
 export class GameManager {
+    private static readonly MAX_PIXEL_RATIO = 2;
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D;
     private input: InputManager;
     private camera: Camera;
+    private viewportWidth = 1;
+    private viewportHeight = 1;
+    private pixelRatio = 1;
 
     private state: GameState = GameState.TITLE;
     private isRunning: boolean = false;
@@ -134,9 +138,17 @@ export class GameManager {
 
         // Resize handler
         const resize = () => {
-            this.canvas.width = window.innerWidth;
-            this.canvas.height = window.innerHeight;
-            this.camera.setViewSize(this.canvas.width, this.canvas.height);
+            this.viewportWidth = Math.max(1, window.innerWidth);
+            this.viewportHeight = Math.max(1, window.innerHeight);
+            this.pixelRatio = Math.min(
+                GameManager.MAX_PIXEL_RATIO,
+                Math.max(1, window.devicePixelRatio || 1)
+            );
+            this.canvas.style.width = `${this.viewportWidth}px`;
+            this.canvas.style.height = `${this.viewportHeight}px`;
+            this.canvas.width = Math.round(this.viewportWidth * this.pixelRatio);
+            this.canvas.height = Math.round(this.viewportHeight * this.pixelRatio);
+            this.camera.setViewSize(this.viewportWidth, this.viewportHeight);
         };
         window.addEventListener('resize', resize);
         resize();
@@ -788,10 +800,12 @@ export class GameManager {
     // ═══════════════════════════════════════════════════════════
 
     private render(): void {
-        const w = this.canvas.width;
-        const h = this.canvas.height;
+        const w = this.viewportWidth;
+        const h = this.viewportHeight;
 
-        this.ctx.clearRect(0, 0, w, h);
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
 
         switch (this.state) {
             case GameState.TITLE:
@@ -837,7 +851,7 @@ export class GameManager {
         this.ctx.restore();
 
         const height = 16;
-        const bottom = Math.floor(this.canvas.height / scale) - 8;
+        const bottom = Math.floor(this.viewportHeight / scale) - 8;
         return { x: 12, y: bottom - height, w: width, h: height };
     }
 

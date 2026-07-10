@@ -208,7 +208,10 @@ export function createWorldEnginePresentationControllers(
         playerActionController: ports.playerActionController,
         selectionController: ports.selectionController,
         tacticalController,
-        getCanvasSize: () => ({ width: ports.canvas.width, height: ports.canvas.height }),
+        getCanvasSize: () => ({
+            width: ports.canvas.clientWidth || ports.canvas.width,
+            height: ports.canvas.clientHeight || ports.canvas.height,
+        }),
         getActivePartyTurnActor: () => ports.getActivePartyTurnActor(),
         getActiveTurnActorId: () => ports.turnStateController.getActiveTurnActorId(),
         getReservedAction: () => ports.turnStateController.getReservedAction(),
