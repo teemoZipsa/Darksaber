@@ -12,6 +12,7 @@ import { SettingsManager, type KeybindingDefinition, type KeybindingId } from '.
 import { AudioManager } from '../../../engine/AudioManager';
 import { i18n, t } from '../../../i18n/LanguageManager';
 import { useStore, useUiVersion } from '../UiContext';
+import { useModalDialog } from '../useModalDialog';
 
 const S = SettingsManager;
 
@@ -159,6 +160,7 @@ function KeybindingSection({ capturing, setCapturing }: { capturing: KeybindingI
 export function SettingsPanel() {
     useUiVersion(); // keep control values live
     const store = useStore();
+    const dialogRef = useModalDialog<HTMLDivElement>();
     const [capturing, setCapturing] = useState<KeybindingId | null>(null);
     const panelStyle = { width: 520, maxHeight: 'min(760px, 92vh)', overflowY: 'auto', '--ds-scale': S.getUIScale() } as CSSProperties;
 
@@ -184,7 +186,7 @@ export function SettingsPanel() {
     }, [capturing]);
 
     return (
-        <div className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('pause.settings')} tabIndex={-1} className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
             <div className="ds-panel__header">
                 <span className="ds-panel__title">{t('pause.settings')}</span>
                 <button className="ds-close-btn" onClick={() => store.closeSettings()} aria-label={t('ui.close')} title={t('ui.close')}>✕</button>

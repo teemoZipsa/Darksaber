@@ -5,14 +5,16 @@ import { SettingsManager } from '../../engine/SettingsManager';
 import { t } from '../../i18n/LanguageManager';
 import { ClassTierChart } from './ClassTierChart';
 import { useStore } from './UiContext';
+import { useModalDialog } from './useModalDialog';
 
 export function PauseMenu() {
     const store = useStore();
+    const dialogRef = useModalDialog<HTMLDivElement>();
     const panelStyle = { '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
     const btn: CSSProperties = { width: '100%', padding: '11px 0', fontSize: 14 };
 
     return (
-        <div className="ds-panel ds-pause" style={panelStyle} onClick={(e) => e.stopPropagation()}>
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('pause.title')} tabIndex={-1} className="ds-panel ds-pause" style={panelStyle} onClick={(e) => e.stopPropagation()}>
             <div className="ds-panel__header">
                 <span className="ds-panel__title">{t('pause.title')}</span>
             </div>

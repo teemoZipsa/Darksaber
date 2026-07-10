@@ -261,7 +261,9 @@ test('dev town renders the React town overlay with embedded inventory', async ({
 
     await expect(page.locator('#ui-overlay .ds-town')).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('#ui-overlay .ds-town__tabs[role="tablist"]')).toBeVisible();
-    await expect(page.locator('#ui-overlay .ds-inv.is-embedded')).toBeVisible();
+    const embeddedInventory = page.locator('#ui-overlay .ds-inv.is-embedded');
+    await expect(embeddedInventory).toBeVisible();
+    await expect(embeddedInventory).not.toHaveAttribute('role', 'dialog');
     await expect(page.locator('#ui-overlay [data-inv-grid="bag"]')).toBeVisible();
 
     await page.getByRole('tab', { name: /무기점|Weapon Shop/ }).click();
@@ -454,13 +456,25 @@ test('dev tutorial can open and close the standalone inventory overlay', async (
     await expect(page.locator('#gameCanvas')).toBeVisible();
     await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
 
+    await page.evaluate(() => {
+        const sentinel = document.createElement('button');
+        sentinel.id = 'modal-focus-sentinel';
+        sentinel.textContent = 'sentinel';
+        document.body.appendChild(sentinel);
+        sentinel.focus();
+    });
     await page.keyboard.press('KeyI');
 
-    await expect(page.locator('#ui-overlay .ds-scrim .ds-inv:not(.is-embedded)')).toBeVisible({ timeout: 10_000 });
+    const inventoryDialog = page.getByRole('dialog', { name: /장비 및 소지품|Inventory/ });
+    await expect(inventoryDialog).toBeVisible({ timeout: 10_000 });
+    await expect(inventoryDialog).toHaveAttribute('aria-modal', 'true');
     await expect(page.locator('#ui-overlay .ds-scrim [data-inv-grid="bag"]')).toBeVisible();
 
-    await page.getByRole('button', { name: /닫기|Close/ }).click();
+    const closeButton = inventoryDialog.getByRole('button', { name: /닫기|Close/ });
+    await expect(closeButton).toBeFocused();
+    await closeButton.click();
     await expect(page.locator('#ui-overlay .ds-scrim .ds-inv:not(.is-embedded)')).toBeHidden();
+    await expect(page.locator('#modal-focus-sentinel')).toBeFocused();
 });
 
 test('pause menu hands off to the React settings panel', async ({ page }) => {
@@ -469,10 +483,21 @@ test('pause menu hands off to the React settings panel', async ({ page }) => {
     await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
 
     await page.evaluate(() => (window as unknown as { __gm?: { openPauseMenu: () => void } }).__gm?.openPauseMenu());
-    await expect(page.locator('#ui-overlay .ds-pause')).toBeVisible({ timeout: 10_000 });
+    const pauseDialog = page.getByRole('dialog', { name: /일시정지|Paused/ });
+    await expect(pauseDialog).toBeVisible({ timeout: 10_000 });
+    await expect(pauseDialog).toHaveAttribute('aria-modal', 'true');
+    const resumeButton = pauseDialog.getByRole('button', { name: /이어하기|Resume/ });
+    const titleButton = pauseDialog.getByRole('button', { name: /타이틀|Title/ });
+    await expect(resumeButton).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(titleButton).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(resumeButton).toBeFocused();
 
     await page.getByRole('button', { name: /설정|Settings/ }).click();
-    await expect(page.locator('#ui-overlay .ds-settings')).toBeVisible();
+    const settingsDialog = page.getByRole('dialog', { name: /설정|Settings/ });
+    await expect(settingsDialog).toBeVisible();
+    await expect(settingsDialog).toHaveAttribute('aria-modal', 'true');
 
     await page.getByRole('button', { name: /닫기|Close/ }).click();
     await expect(page.locator('#ui-overlay .ds-settings')).toBeHidden();
@@ -505,7 +530,7 @@ test('dev tutorial can swap magic loadout slots from the world hotkey overlay', 
     await expect(slot1).toHaveAttribute('data-magic-slot-skill', firstSkill!);
     await expect(panel.locator('[data-magic-detail]')).toHaveAttribute('data-magic-detail', secondSkill!);
 
-    await page.getByRole('button', { name: /Close/ }).click();
+    await page.getByRole('button', { name: /닫기|Close/ }).click();
     await expect(panel).toBeHidden();
 
     await page.keyboard.press('KeyK');
@@ -798,7 +823,7 @@ test('dev tutorial remains stable through repeated overlay toggles', async ({ pa
         await expectFitsViewport(page, magic);
         await expectOverlayState(page, { magic: true });
         await page.waitForTimeout(250);
-        await page.getByRole('button', { name: /Close/ }).click();
+        await page.getByRole('button', { name: /닫기|Close/ }).click();
         await expect(magic).toBeHidden();
         await expectOverlayState(page, { magic: false });
 

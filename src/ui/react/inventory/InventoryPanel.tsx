@@ -33,6 +33,7 @@ import {
 } from '../../../inventory/InventoryUI';
 import type { ItemRarity, ItemSlot } from '../../../data/ItemDB';
 import { useStore, useUiVersion } from '../UiContext';
+import { useModalDialog } from '../useModalDialog';
 import {
     ItemCompareTooltip,
     ItemGlyph,
@@ -209,6 +210,7 @@ export function InventoryPanel({
 }) {
     useUiVersion();
     const store = useStore();
+    const dialogRef = useModalDialog<HTMLDivElement>(!embedded);
     const tip = useItemTooltip();
     const drag = useRef<DragState>(null);
     const [dragPreview, setDragPreview] = useState<DragPreview>(null);
@@ -520,7 +522,16 @@ export function InventoryPanel({
     );
 
     return (
-        <div className={panelClass} style={panelStyle} onClick={(e) => e.stopPropagation()}>
+        <div
+            ref={dialogRef}
+            role={embedded ? undefined : 'dialog'}
+            aria-modal={embedded ? undefined : 'true'}
+            aria-label={embedded ? undefined : panelTitle}
+            tabIndex={embedded ? undefined : -1}
+            className={panelClass}
+            style={panelStyle}
+            onClick={(e) => e.stopPropagation()}
+        >
             <div className="ds-panel__header">
                 <span className="ds-panel__title">{panelTitle}</span>
                 {!embedded && (

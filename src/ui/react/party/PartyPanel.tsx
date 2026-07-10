@@ -13,6 +13,7 @@ import type { Character } from '../../../character/Character';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { t } from '../../../i18n/LanguageManager';
 import { useStore, useUiVersion } from '../UiContext';
+import { useModalDialog } from '../useModalDialog';
 
 type DragInfo = { source: 'roster' | 'active'; index: number; charId: string };
 
@@ -35,6 +36,7 @@ function Portrait({ char }: { char: Character }) {
 export function PartyPanel() {
     useUiVersion();
     const store = useStore();
+    const dialogRef = useModalDialog<HTMLDivElement>();
     const drag = useRef<DragInfo | null>(null);
     const errorTimer = useRef<number | undefined>(undefined);
     const [error, setError] = useState('');
@@ -101,7 +103,7 @@ export function PartyPanel() {
     const rosterEmptyStyle: CSSProperties = { gridColumn: '1 / -1', textAlign: 'center', color: 'var(--ds-text-dim)', fontSize: 12, padding: '12px 0' };
 
     return (
-        <div className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('party.title')} tabIndex={-1} className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
             <div className="ds-panel__header">
                 <span className="ds-panel__title">{t('party.title')}</span>
                 <button className="ds-close-btn" onClick={() => store.closeParty()} aria-label={t('ui.close')} title={t('ui.close')}>✕</button>

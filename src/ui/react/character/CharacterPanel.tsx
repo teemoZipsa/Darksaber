@@ -15,10 +15,12 @@ import { PartyTabs } from './PartyTabs';
 import { ResourceBars } from './ResourceBars';
 import { EquipmentSlots } from './EquipmentSlots';
 import { StatGrid } from './StatGrid';
+import { useModalDialog } from '../useModalDialog';
 
 export function CharacterPanel() {
     useUiVersion(); // keep live game state in sync when UiStore observes changes
     const store = useStore();
+    const dialogRef = useModalDialog<HTMLDivElement>();
 
     const char = store.getActiveCharacter();
     const party = store.getActiveParty();
@@ -29,7 +31,7 @@ export function CharacterPanel() {
     const panelStyle = { width: 560, '--ds-scale': uiScale } as CSSProperties;
 
     return (
-        <div className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('info.title')} tabIndex={-1} className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
             <PanelHeader onClose={() => store.closeCharPanel()} />
 
             {!char ? (

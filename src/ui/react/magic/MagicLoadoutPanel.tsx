@@ -18,6 +18,7 @@ import {
 } from '../../../magic/MagicLoadout';
 import { useStore, useUiVersion } from '../UiContext';
 import { PartyTabs } from '../character/PartyTabs';
+import { useModalDialog } from '../useModalDialog';
 
 function skillTags(skill: Skill): string {
     return `T${skill.tier} · ${t(`magic.type.${skill.type}`)} · ${t(`magic.element.${skill.element}`)}`;
@@ -26,6 +27,7 @@ function skillTags(skill: Skill): string {
 export function MagicLoadoutPanel() {
     useUiVersion();
     const store = useStore();
+    const dialogRef = useModalDialog<HTMLDivElement>();
 
     const char = store.getActiveCharacter();
     const party = store.getActiveParty();
@@ -46,10 +48,10 @@ export function MagicLoadoutPanel() {
 
     if (!char) {
         return (
-            <div className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('magic.loadout.title')} tabIndex={-1} className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
                 <div className="ds-panel__header">
                     <span className="ds-panel__title">{t('magic.loadout.title')}</span>
-                    <button className="ds-close-btn" onClick={() => store.closeMagicLoadout()} aria-label="Close">✕</button>
+                    <button className="ds-close-btn" onClick={() => store.closeMagicLoadout()} aria-label={t('ui.close')}>✕</button>
                 </div>
                 <div style={{ padding: 40, textAlign: 'center', color: 'var(--ds-text-muted)' }}>
                     {t('magic.loadout.none')}
@@ -79,11 +81,11 @@ export function MagicLoadoutPanel() {
     const detailNextCost = detail && detailLevel < MAX_UPGRADE_LEVEL ? getUpgradeCost(detail, detailLevel + 1) : 0;
 
     return (
-        <div className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('magic.loadout.title')} tabIndex={-1} className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
             <div className="ds-panel__header">
                 <span className="ds-panel__title">{t('magic.loadout.title')}</span>
                 <span style={{ marginLeft: 'auto', marginRight: 12, color: 'var(--ds-accent)' }}>{gold} G</span>
-                <button className="ds-close-btn" onClick={() => store.closeMagicLoadout()} aria-label="Close">✕</button>
+                <button className="ds-close-btn" onClick={() => store.closeMagicLoadout()} aria-label={t('ui.close')}>✕</button>
             </div>
 
             <PartyTabs party={party} activeIndex={activeIndex} />
