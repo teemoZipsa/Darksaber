@@ -23,6 +23,7 @@
 
 ## 현재 후속 점검
 
+- [x] 운영 Vercel alias·Render CORS 정합성 보정. 실제 production canonical인 `darksaber-azure.vercel.app`과 활성 별칭들을 exact origin allowlist에 함께 고정해 어느 운영 진입 주소에서도 인증·출격이 막히지 않게 한다.
 - [x] 캐릭터 생성·선택 중복 요청 차단. 서버 응답 대기 중 생성/선택 액션을 즉시 single-flight 잠금하고 관련 버튼을 비활성화해 중복 캐릭터와 WorldEngine 이중 초기화를 막는다.
 - [x] 서버 auth 세션 sweep 오류 격리. 연결된 소켓의 세션 폐기 검사 중 Postgres 조회가 실패해도 rejection을 내부에서 기록·격리하고 나머지 클라이언트 검사를 계속해 서버 프로세스 종료를 막는다.
 - [x] 레이드 타이틀 복귀 연결 정리. 일시정지 메뉴에서 타이틀로 나가기 전에 활성 월드 WebSocket에 manual leave를 보내고 클라이언트를 닫아 이전 레이드 연결과 heartbeat가 고아로 남지 않게 한다.
