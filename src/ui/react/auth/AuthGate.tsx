@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { t } from '../../../i18n/LanguageManager';
 import { CHAR_CLASSES, type StartingClassId } from '../../../data/characterClasses';
 import { AuthApiError, AuthClient, type AccountMeResponse, type AuthCharacter, type AuthSessionResponse } from '../../../net/AuthClient';
 import { NetworkRaidClient } from '../../../net/NetworkRaidClient';
 import type { GameManager } from '../../../engine/GameManager';
+import { AsyncActionLock } from './AsyncActionLock';
 
 type Screen = 'loading' | 'auth' | 'select' | 'create' | 'playing';
 
@@ -201,7 +202,7 @@ function CharacterSelect({ characters, lastSelectedCharacterId, error, onSelect,
     characters: AuthCharacter[];
     lastSelectedCharacterId: string | null;
     error: string;
-    onSelect: (characterId: string) => void;
+    onSelect: (characterId: string) => Promise<void>;
     onDelete: (characterId: string) => Promise<void>;
     onCreate: () => void;
     onLogout: () => void;
@@ -209,6 +210,8 @@ function CharacterSelect({ characters, lastSelectedCharacterId, error, onSelect,
     const [deleteTarget, setDeleteTarget] = useState<AuthCharacter | null>(null);
     const [confirmName, setConfirmName] = useState('');
     const [deleteBusy, setDeleteBusy] = useState(false);
+    const [selectBusy, setSelectBusy] = useState(false);
+    const selectLock = useRef(new AsyncActionLock()).current;
     const lastSelected = useMemo(
         () => characters.find((character) => character.id === lastSelectedCharacterId) ?? characters[0],
         [characters, lastSelectedCharacterId]
@@ -232,6 +235,16 @@ function CharacterSelect({ characters, lastSelectedCharacterId, error, onSelect,
         setConfirmName('');
     };
 
+    const select = async (characterId: string) => {
+        if (selectLock.isPending()) return;
+        setSelectBusy(true);
+        try {
+            await selectLock.run(() => onSelect(characterId));
+        } finally {
+            setSelectBusy(false);
+        }
+    };
+
     const submitDelete = async (event: FormEvent) => {
         event.preventDefault();
         if (!deleteTarget || confirmName !== deleteTarget.name || deleteBusy) return;
@@ -251,7 +264,7 @@ function CharacterSelect({ characters, lastSelectedCharacterId, error, onSelect,
         <div className="auth-panel auth-panel--wide">
             <div className="auth-panel__title">{t('auth.characters')}</div>
             {lastSelected && (
-                <button className="auth-continue" onClick={() => onSelect(lastSelected.id)}>
+                <button className="auth-continue" disabled={selectBusy} onClick={() => { void select(lastSelected.id); }}>
                     <span>{t('auth.continue')}</span>
                     <strong>{lastSelected.name}</strong>
                 </button>
@@ -259,12 +272,12 @@ function CharacterSelect({ characters, lastSelectedCharacterId, error, onSelect,
             <div className="auth-character-grid">
                 {characters.map((character) => (
                     <div key={character.id} className="auth-character-card">
-                        <button type="button" className="auth-character-card__select" onClick={() => onSelect(character.id)}>
+                        <button type="button" className="auth-character-card__select" disabled={selectBusy} onClick={() => { void select(character.id); }}>
                             <span className="auth-character-card__slot">{t('auth.slot')} {character.slotNo + 1}</span>
                             <strong>{character.name}</strong>
                             <span>{classLabel(character.classKey)} · Lv {character.level}</span>
                         </button>
-                        <button type="button" className="auth-character-card__delete" onClick={() => openDeleteConfirm(character)}>
+                        <button type="button" className="auth-character-card__delete" disabled={selectBusy} onClick={() => openDeleteConfirm(character)}>
                             {t('auth.deleteCharacter')}
                         </button>
                     </div>
@@ -297,8 +310,8 @@ function CharacterSelect({ characters, lastSelectedCharacterId, error, onSelect,
             )}
             {error && <div className="auth-error">{error}</div>}
             <div className="auth-actions">
-                <button type="button" onClick={onCreate}>{t('auth.createCharacter')}</button>
-                <button type="button" onClick={onLogout}>{t('auth.logout')}</button>
+                <button type="button" disabled={selectBusy} onClick={onCreate}>{t('auth.createCharacter')}</button>
+                <button type="button" disabled={selectBusy} onClick={onLogout}>{t('auth.logout')}</button>
             </div>
         </div>
     );
@@ -306,21 +319,32 @@ function CharacterSelect({ characters, lastSelectedCharacterId, error, onSelect,
 
 function CharacterCreate({ error, onCreate, onBack, onLogout }: {
     error: string;
-    onCreate: (name: string, classKey: StartingClassId, gender: 'M' | 'F') => void;
+    onCreate: (name: string, classKey: StartingClassId, gender: 'M' | 'F') => Promise<void>;
     onBack?: () => void;
     onLogout: () => void;
 }) {
     const [name, setName] = useState(() => t('create.defaultName'));
     const [classKey, setClassKey] = useState<StartingClassId>('infantry');
     const [gender, setGender] = useState<'M' | 'F'>('M');
+    const [busy, setBusy] = useState(false);
+    const createLock = useRef(new AsyncActionLock()).current;
     const selectedClass = CHAR_CLASSES.find((entry) => entry.id === classKey) ?? CHAR_CLASSES[0];
+    const create = async () => {
+        if (createLock.isPending()) return;
+        setBusy(true);
+        try {
+            await createLock.run(() => onCreate(name, classKey, gender));
+        } finally {
+            setBusy(false);
+        }
+    };
     return (
         <div className="auth-panel auth-panel--wide">
             <div className="auth-panel__title">{t('auth.createCharacter')}</div>
             <div className="auth-create-layout">
                 <div className="auth-class-list">
                     {CHAR_CLASSES.map((entry) => (
-                        <button key={entry.id} className={entry.id === classKey ? 'is-active' : ''} onClick={() => setClassKey(entry.id)}>
+                        <button key={entry.id} disabled={busy} className={entry.id === classKey ? 'is-active' : ''} onClick={() => setClassKey(entry.id)}>
                             <img src={entry.imageSrc} alt="" />
                             <span>{t(entry.labelKey)}</span>
                         </button>
@@ -329,20 +353,22 @@ function CharacterCreate({ error, onCreate, onBack, onLogout }: {
                 <div className="auth-create-fields">
                     <label className="auth-field">
                         <span>{t('create.namePrompt')}</span>
-                        <input value={name} maxLength={24} onChange={(event) => setName(event.target.value)} />
+                        <input value={name} maxLength={24} disabled={busy} onChange={(event) => setName(event.target.value)} />
                     </label>
                     <div className="auth-tabs" role="radiogroup" aria-label={t('create.genderPrompt')}>
-                        <button type="button" className={gender === 'M' ? 'is-active' : ''} onClick={() => setGender('M')}>{t('create.male')}</button>
-                        <button type="button" className={gender === 'F' ? 'is-active' : ''} onClick={() => setGender('F')}>{t('create.female')}</button>
+                        <button type="button" disabled={busy} className={gender === 'M' ? 'is-active' : ''} onClick={() => setGender('M')}>{t('create.male')}</button>
+                        <button type="button" disabled={busy} className={gender === 'F' ? 'is-active' : ''} onClick={() => setGender('F')}>{t('create.female')}</button>
                     </div>
                     <div className="auth-selected-class">{t(selectedClass.labelKey)}</div>
                     {error && <div className="auth-error">{error}</div>}
-                    <button className="auth-primary" onClick={() => onCreate(name, classKey, gender)}>{t('create.confirm')}</button>
+                    <button className="auth-primary" disabled={busy} onClick={() => { void create(); }}>
+                        {busy ? t('auth.busy') : t('create.confirm')}
+                    </button>
                 </div>
             </div>
             <div className="auth-actions">
-                {onBack && <button type="button" onClick={onBack}>{t('auth.back')}</button>}
-                <button type="button" onClick={onLogout}>{t('auth.logout')}</button>
+                {onBack && <button type="button" disabled={busy} onClick={onBack}>{t('auth.back')}</button>}
+                <button type="button" disabled={busy} onClick={onLogout}>{t('auth.logout')}</button>
             </div>
         </div>
     );
