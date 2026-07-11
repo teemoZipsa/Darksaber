@@ -24,7 +24,7 @@ services:
       - key: AUTH_REFRESH_COOKIE_SAMESITE
         value: None
       - key: AUTH_ALLOWED_ORIGINS
-        sync: false
+        value: https://darksaber.vercel.app
       - key: AUTH_ALLOW_MISSING_ORIGIN
         value: "0"
       - key: WORLD_SHARD_COUNT

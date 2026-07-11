@@ -33,6 +33,8 @@ test('production deployment docs require durable database-backed auth', () => {
     assert.match(deploymentDocs, /\/healthz` returns `authStore: "postgres"`/);
     assert.match(deploymentDocs, /AUTH_ALLOW_MISSING_ORIGIN=0/);
     assert.match(deploymentDocs, /without paths,\s*queries, or fragments/);
+    assert.match(deploymentDocs, /https:\/\/darksaber\.vercel\.app/);
+    assert.match(renderYaml, /key: AUTH_ALLOWED_ORIGINS\s*\r?\n\s*value: https:\/\/darksaber\.vercel\.app/);
     assert.match(renderYaml, /key: AUTH_ALLOW_MISSING_ORIGIN\s*\r?\n\s*value: "0"/);
 });
 

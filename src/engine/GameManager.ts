@@ -818,7 +818,15 @@ export class GameManager {
                 break;
 
             case GameState.WORLD:
-                this.worldEngine.render(this.ctx, this.camera, w, h);
+                if (this.getTownSession()?.isVisible()) {
+                    // Town is a full-screen DOM scene. Keep the canvas opaque and
+                    // neutral underneath it so its entrance animation can never
+                    // reveal the outdoor field for a frame.
+                    this.ctx.fillStyle = '#07060a';
+                    this.ctx.fillRect(0, 0, w, h);
+                } else {
+                    this.worldEngine.render(this.ctx, this.camera, w, h);
+                }
                 // inventoryUI + charUI + pauseMenu + settingsUI + partyUI are all
                 // rendered by the React DOM overlay now.
                 break;

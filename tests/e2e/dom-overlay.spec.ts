@@ -391,6 +391,21 @@ test('authenticated network raid survival returns to town and persists the serve
     await expect(page.locator('#ui-overlay .ds-town')).toBeVisible({ timeout: 20_000 });
     const deployButton = page.getByRole('button', { name: /출격|Deploy/ });
     await page.waitForTimeout(500);
+    const townCanvasSamples = await page.locator('#gameCanvas').evaluate((canvas: HTMLCanvasElement) => {
+        const context = canvas.getContext('2d');
+        if (!context) return [];
+        const points = [
+            [0, 0],
+            [Math.floor(canvas.width / 2), Math.floor(canvas.height / 2)],
+            [Math.max(0, canvas.width - 1), Math.max(0, canvas.height - 1)],
+        ];
+        return points.map(([x, y]) => Array.from(context.getImageData(x, y, 1, 1).data));
+    });
+    expect(townCanvasSamples).toEqual([
+        [7, 6, 10, 255],
+        [7, 6, 10, 255],
+        [7, 6, 10, 255],
+    ]);
     await expect(deployButton).toBeEnabled();
     await deployButton.click();
     await expect.poll(() => getNetworkRaidDebug(page), { timeout: 30_000 }).toMatchObject({
