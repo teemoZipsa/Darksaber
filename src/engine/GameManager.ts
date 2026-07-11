@@ -130,10 +130,7 @@ export class GameManager {
 
         this.pauseMenu.onResume = () => undefined;
         this.pauseMenu.onOpenSettings = () => this.settingsUI.open();
-        this.pauseMenu.onReturnToTitle = () => {
-            this.pauseMenu.close();
-            this.transitionTo(GameState.TITLE);
-        };
+        this.pauseMenu.onReturnToTitle = () => this.pauseReturnToTitle();
         this.settingsUI.onClose = () => this.pauseMenu.open();
 
         // Resize handler
@@ -651,6 +648,9 @@ export class GameManager {
     public pauseReturnToTitle(): void {
         AudioManager.playUi('ui.confirm');
         this.pauseMenu.close();
+        if (this.state === GameState.WORLD && this.worldEngine) {
+            this.worldEngine.closeNetworkRaidClient(true, 'manual');
+        }
         this.transitionTo(GameState.TITLE);
     }
 

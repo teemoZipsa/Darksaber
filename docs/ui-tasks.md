@@ -23,6 +23,7 @@
 
 ## 현재 후속 점검
 
+- [x] 레이드 타이틀 복귀 연결 정리. 일시정지 메뉴에서 타이틀로 나가기 전에 활성 월드 WebSocket에 manual leave를 보내고 클라이언트를 닫아 이전 레이드 연결과 heartbeat가 고아로 남지 않게 한다.
 - [x] 인증 토큰 갱신 경쟁 안정화. AuthClient refresh를 single-flight로 통합하고 stale rotation은 한 번 재시도하며, 플레이 중 일시적·만료 refresh 실패가 기존 레이드 위에 로그인 화면을 덮지 않게 한다.
 - [x] 허브 저장 revision 충돌 재시도 안정화. 최신 서버 revision만 받아 원래 로컬 patch를 재전송하고, 충돌 처리 중 골드·인벤토리 등 실행 중인 로컬 상태를 이전 서버 snapshot으로 되돌리지 않는다.
 - [x] 캐릭터 생성 직후 마을 진입·운영 출격 복구. 마을이 열린 동안 필드 캔버스를 그리지 않아 DOM 입장 효과 아래로 야외가 비치지 않게 하고, Render CORS 허용 주소를 실제 Vercel 운영 origin으로 고정한다.
