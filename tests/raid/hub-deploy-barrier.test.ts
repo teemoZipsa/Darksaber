@@ -54,6 +54,13 @@ function createLifecycleHarness(options: {
         updateNetworkAccessToken: (accessToken: string) => {
             authContext = { ...authContext, accessToken };
         },
+        refreshNetworkAuthContext: async () => {
+            const response = await fetch('http://auth.test/auth/refresh', { method: 'POST' });
+            if (!response.ok) return null;
+            const body = await response.json() as { accessToken: string };
+            authContext = { ...authContext, accessToken: body.accessToken };
+            return authContext;
+        },
         flushHubSaveToServer: async () => {
             flushCalls.push(Date.now());
             flushTokens.push(authContext.accessToken);

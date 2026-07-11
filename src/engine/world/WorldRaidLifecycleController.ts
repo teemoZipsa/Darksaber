@@ -11,7 +11,7 @@ import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
 import { AudioManager } from '../AudioManager';
 import type { GameManager, HubFlushResult } from '../GameManager';
 import type { Player } from '../../entity/Player';
-import { DEFAULT_AUTH_SERVER_URL } from '../../net/AuthClient';
+import { AuthApiError } from '../../net/AuthClient';
 import { NetworkRaidClient, WorldServerError, type NetworkRaidStatus } from '../../net/NetworkRaidClient';
 import {
     DEFAULT_WORLD_SERVER_URL,
@@ -377,27 +377,18 @@ export class WorldRaidLifecycleController {
         logFailure = false
     ): Promise<{ accessToken: string; characterId: string } | null> {
         try {
-            const response = await fetch(`${DEFAULT_AUTH_SERVER_URL}/auth/refresh`, {
-                method: 'POST',
-                credentials: 'include',
-            });
-            if (!response.ok) {
-                if (logFailure) this.context.log(formatT('mp.authRefreshFailedHttp', { status: response.status }));
-                return null;
-            }
-            const parsed = await response.json() as unknown;
-            const accessToken = typeof parsed === 'object' && parsed !== null && 'accessToken' in parsed
-                && typeof (parsed as { accessToken?: unknown }).accessToken === 'string'
-                ? (parsed as { accessToken: string }).accessToken
-                : null;
-            if (!accessToken) return null;
-            this.context.gameManager.updateNetworkAccessToken(accessToken);
-            return { ...authContext, accessToken };
+            const refreshed = await this.context.gameManager.refreshNetworkAuthContext();
+            if (!refreshed || refreshed.characterId !== authContext.characterId) return null;
+            return refreshed;
         } catch (error) {
             if (logFailure) {
-                this.context.log(formatT('mp.authRefreshFailed', {
-                    message: error instanceof Error ? error.message : t('mp.error.unknown'),
-                }));
+                if (error instanceof AuthApiError) {
+                    this.context.log(formatT('mp.authRefreshFailedHttp', { status: error.status }));
+                } else {
+                    this.context.log(formatT('mp.authRefreshFailed', {
+                        message: error instanceof Error ? error.message : t('mp.error.unknown'),
+                    }));
+                }
             }
             return null;
         }

@@ -518,6 +518,16 @@ export class GameManager {
         this.worldEngine?.networkRaidClient?.updateAccessToken(accessToken);
     }
 
+    public async refreshNetworkAuthContext(): Promise<{ accessToken: string; characterId: string } | null> {
+        const client = this.authClient;
+        const context = this.networkAuthContext;
+        if (!client || !context) return null;
+        const session = await client.refresh();
+        if (this.networkAuthContext?.characterId !== context.characterId) return null;
+        this.updateNetworkAccessToken(session.accessToken);
+        return { ...context, accessToken: session.accessToken };
+    }
+
     public getNetworkAuthContext(): { accessToken: string; characterId: string } | null {
         return this.networkAuthContext;
     }

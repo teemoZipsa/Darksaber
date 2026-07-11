@@ -41,7 +41,9 @@ export function AuthGate({ client, gameManager }: AuthGateProps) {
                     gameManager.updateNetworkAccessToken(session.accessToken);
                     setAccount((current) => current ? { ...current, accountProgress: session.accountProgress } : session);
                 })
-                .catch(() => setScreen('auth'));
+                .catch((nextError) => {
+                    if (shouldReturnToAuthAfterRefreshFailure(screen, nextError)) setScreen('auth');
+                });
         }, 10 * 60 * 1000);
         return () => window.clearInterval(id);
     }, [client, gameManager, screen]);
@@ -355,4 +357,11 @@ function errorText(code: string): string {
     const key = `auth.error.${code}`;
     const translated = t(key);
     return translated === key ? t('auth.error.generic') : translated;
+}
+
+export function shouldReturnToAuthAfterRefreshFailure(screen: Screen, error: unknown): boolean {
+    if (screen === 'playing') return false;
+    return error instanceof AuthApiError
+        && error.status === 401
+        && error.code !== 'refresh_stale';
 }

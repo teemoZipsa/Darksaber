@@ -72,6 +72,7 @@ export class AuthApiError extends Error {
 
 export class AuthClient {
     private accessToken: string | null = null;
+    private refreshInflight: Promise<AuthSessionResponse> | null = null;
 
     public constructor(private readonly baseUrl: string = DEFAULT_AUTH_SERVER_URL) {}
 
@@ -101,10 +102,12 @@ export class AuthClient {
         return response;
     }
 
-    public async refresh(): Promise<AuthSessionResponse> {
-        const response = await this.request<AuthSessionResponse>('/auth/refresh', { method: 'POST' });
-        this.accessToken = response.accessToken;
-        return response;
+    public refresh(): Promise<AuthSessionResponse> {
+        if (this.refreshInflight) return this.refreshInflight;
+        this.refreshInflight = this.performRefresh().finally(() => {
+            this.refreshInflight = null;
+        });
+        return this.refreshInflight;
     }
 
     public async logout(): Promise<void> {
@@ -174,6 +177,22 @@ export class AuthClient {
         return response.save;
     }
 
+    private async performRefresh(retryStale = true): Promise<AuthSessionResponse> {
+        try {
+            const response = await this.request<AuthSessionResponse>('/auth/refresh', { method: 'POST' });
+            this.accessToken = response.accessToken;
+            return response;
+        } catch (error) {
+            if (retryStale && error instanceof AuthApiError && error.code === 'refresh_stale') {
+                // Another tab may have rotated the cookie just before this request.
+                // Let its Set-Cookie settle, then retry once with the latest cookie.
+                await new Promise((resolve) => globalThis.setTimeout(resolve, 100));
+                return this.performRefresh(false);
+            }
+            throw error;
+        }
+    }
+
     private async request<T = unknown>(path: string, options: { method: string; body?: unknown; auth?: boolean }): Promise<T> {
         const headers: Record<string, string> = {};
         let body: string | undefined;
@@ -221,6 +240,7 @@ function readAuthServerUrl(): string {
         const host = hostname.includes(':') ? `[${hostname}]` : hostname;
         return `http://${host}:8765`;
     }
+
     if (typeof window === 'undefined') return 'http://localhost:8765';
     return window.location.origin;
 }
