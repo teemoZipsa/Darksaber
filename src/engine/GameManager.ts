@@ -389,7 +389,10 @@ export class GameManager {
             if (retryOnConflict && error instanceof AuthApiError && error.code === 'revision_conflict') {
                 try {
                     const current = await client.getCharacterSave(ctx.characterId);
-                    this.applyServerSave(current, ctx.characterId);
+                    // The local patch is still the source of truth for this retry.
+                    // Only advance the optimistic-lock revision; applying `current`
+                    // here would roll the live client back to the stale server state.
+                    this.networkSaveRevision = current.revision;
                     const save = await client.updateCharacterSave(ctx.characterId, patch, this.networkSaveRevision);
                     this.networkSaveRevision = save.revision;
                     return { ok: true };
