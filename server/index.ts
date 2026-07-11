@@ -40,6 +40,7 @@ import { createWorldShardConfig } from './WorldShardConfig';
 import { createPartyCompositionFromSave } from './WorldJoinSave';
 import { resolveServerRuntimeConfig } from './ServerRuntimeConfig';
 import { createWorldServerOriginPolicy } from './WorldServerOriginPolicy';
+import { sweepRevokedSockets } from './WorldAuthSocketSweep';
 
 const PORT = Number(process.env.PORT ?? 8765);
 const HOST = process.env.HOST;
@@ -612,12 +613,21 @@ function broadcastToAll(message: WorldServerMessage): void {
 }
 
 async function closeRevokedSockets(_now: number): Promise<void> {
-    for (const [ws, binding] of playerBySocket) {
-        const session = await authStore.getSession(binding.sessionId);
-        if (session && !session.revokedAt && Date.parse(session.expiresAt) > Date.now()) continue;
-        send(ws, { type: 'ERROR', code: 'AUTH_REVOKED', message: 'Account session is no longer active.' });
-        ws.close(1008, 'auth revoked');
-    }
+    await sweepRevokedSockets({
+        bindings: playerBySocket,
+        getSession: (sessionId) => authStore.getSession(sessionId),
+        revokeSocket: (ws) => {
+            send(ws, { type: 'ERROR', code: 'AUTH_REVOKED', message: 'Account session is no longer active.' });
+            ws.close(1008, 'auth revoked');
+        },
+        onError: (error, sessionId) => {
+            logServerEvent('error', 'auth_revocation_sweep_failed', {
+                sessionId,
+                error: errorToLogValue(error),
+            });
+        },
+        now: _now,
+    });
 }
 
 async function getOrCreateSession(route: WorldSessionRoute): Promise<{ sessionKey: string; session: WorldSession } | null> {
