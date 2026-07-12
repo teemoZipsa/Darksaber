@@ -41,8 +41,8 @@ const RAW_BASELINE = {
 } as const;
 
 const LOW_LEVEL_CURVE_EASE: Record<number, number> = {
-    1: 0.88,
-    2: 0.94,
+    1: 0.78,
+    2: 0.88,
 };
 
 function levelCurveEase(level: number): number {

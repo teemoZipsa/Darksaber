@@ -27,6 +27,14 @@ export function clampHitChance(raw: number): number {
     return Math.max(5, Math.min(95, raw));
 }
 
+export function getPhysicalHitChance(
+    attacker: CharacterStats,
+    defender: CharacterStats,
+    modifier = 0,
+): number {
+    return clampHitChance(attacker.hitRate - Math.max(0, defender.evasion ?? 0) + modifier);
+}
+
 export class CombatFormulas {
     /**
      * Calculate physical attack damage.
@@ -43,8 +51,7 @@ export class CombatFormulas {
         // Hit check
         const profile = getTerrainProfile(defenderTile);
         const rangedPenalty = terrainContext.isRanged ? profile.rangedHitPenalty : 0;
-        const evasionBonus = Math.max(0, (defender.evasion ?? 10) - 10);
-        const hitChance = clampHitChance(attacker.hitRate - (defender.spd * 2) - evasionBonus + rangedPenalty);
+        const hitChance = getPhysicalHitChance(attacker, defender, rangedPenalty);
         const hitRoll = random() * 100;
         if (hitRoll > hitChance) {
             return { damage: 0, isCrit: false, isHit: false, isMiss: true, hitChance };

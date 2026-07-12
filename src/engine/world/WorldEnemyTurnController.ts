@@ -9,7 +9,7 @@ import {
 } from '../../combat/StatusEffects';
 import type { Enemy } from '../../entity/Enemy';
 import type { TileType } from '../../map/Tile';
-import { ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, ENEMY_LEASH_RANGE } from '../../field/FieldConfig';
+import { ENEMY_LEASH_RANGE, getEnemyAggroRanges } from '../../field/FieldConfig';
 import { resolveAggroState } from '../../field/FieldCombat';
 import {
     decideEnemyAction,
@@ -135,7 +135,8 @@ export class WorldEnemyTurnController {
         const enemyTile = this.enemyTile(enemy);
         const distanceToTarget = manhattan(enemyTile, this.actorTile(closest));
         const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
-        let isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
+        const aggroRanges = getEnemyAggroRanges(enemy.aggroRange);
+        let isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, aggroRanges.enter, aggroRanges.exit, leashExceeded);
         if (!isAggro && this.movement.hasAggroAllyNear(entry, enemy.aiProfile.assistRange)) isAggro = true;
         if (mutate) enemy.isAggro = isAggro;
         return isAggro;

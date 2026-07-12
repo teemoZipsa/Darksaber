@@ -255,12 +255,12 @@ function weightedPick(pool: WeightedMonster[], rng: () => number): MonsterId {
 // ── Pack + nest generation ─────────────────────────────────────────────────────
 
 const NEST_CHANCE = 0.85; // share of land chunks that hold a nest
-const STARTER_NEST_CHANCE = 0.55; // lighter encounter density near the first town
+const STARTER_NEST_CHANCE = 0.85; // frequent but forgiving encounters near the first town
 const PACK_MIN = 4;
 const PACK_MAX = 6;
 const STARTER_DANGER_MAX = 2;
-const STARTER_PACK_MIN = 1;
-const STARTER_PACK_MAX = 2;
+const STARTER_PACK_MIN = 3;
+const STARTER_PACK_MAX = 4;
 const LOW_DANGER_MAX = 4;
 const LOW_DANGER_PACK_MIN = 3;
 const LOW_DANGER_PACK_MAX = 5;

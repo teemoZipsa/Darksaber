@@ -60,3 +60,17 @@ test('scaled classes and monsters keep the infantry vs ratman early duel shape',
     assert.ok(Math.ceil(monster.stats.maxHp / playerHit.damage) <= 2);
     assert.ok(Math.ceil(fighter.stats.maxHp / monsterHit.damage) >= 20);
 });
+
+test('starter characters have dependable physical accuracy against starter monsters', () => {
+    const monster = getNormalizedMonsterBalance('304R', 1);
+    for (const classLineId of ['infantry', 'cavalry', 'cleric', 'mage']) {
+        const character = new Character(classLineId, classLineId, classLineId);
+        const result = CombatFormulas.calcPhysicalDamage(
+            character.stats,
+            monster.stats,
+            TileType.GRASS,
+            { random: () => 0 },
+        );
+        assert.ok((result.hitChance ?? 0) >= 80, `${classLineId} starter hit chance`);
+    }
+});

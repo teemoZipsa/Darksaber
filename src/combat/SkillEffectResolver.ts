@@ -3,7 +3,7 @@ import type { CharacterStats } from '../data/Stats';
 import type { Skill } from '../data/SkillDB';
 import { getMagicTerrainMultiplier, getTerrainProfile } from '../field/TerrainRules';
 import type { TileType } from '../map/Tile';
-import { clampHitChance, type RandomSource } from './CombatFormulas';
+import { clampHitChance, getPhysicalHitChance, type RandomSource } from './CombatFormulas';
 import { StatusEffect, getStatusEffectsForSkill } from './StatusEffects';
 import { formatT, t } from '../i18n/LanguageManager';
 
@@ -319,8 +319,7 @@ function getSkillHitChance(
         const rangedTerrainPenalty = skill.range > 1 && targetTile !== undefined
             ? getTerrainProfile(targetTile).rangedHitPenalty
             : 0;
-        const evasionBonus = Math.max(0, (enemy.stats.evasion ?? 10) - 10);
-        return clampHitChance(casterCombatStats.hitRate - (enemy.stats.spd * 2) - evasionBonus + rangedTerrainPenalty + hitBonus);
+        return getPhysicalHitChance(casterCombatStats, enemy.stats, rangedTerrainPenalty + hitBonus);
     }
 
     return clampHitChance(casterCombatStats.magHit - enemy.stats.magEva + hitBonus);

@@ -121,13 +121,13 @@ test('forced nest generation keeps the same layout as normal generation', () => 
     assert.deepEqual(forced, normal);
 });
 
-test('starter danger nests use level 1 small packs near Kaosia', () => {
+test('starter danger nests use level 1 hunting packs near Kaosia', () => {
     const ctx: SpawnContext = { realm: 'mortal', chunkX: 37, chunkY: 41, biome: 'grass', seed: 'server:start' };
     assert.ok(getFieldDanger(ctx.chunkX, ctx.chunkY, ctx.realm) <= 2);
 
     const nest = pickNestForChunk(ctx, true);
     assert.ok(nest);
-    assert.ok(nest.monsters.length >= 1 && nest.monsters.length <= 2, 'starter pack size 1-2');
+    assert.ok(nest.monsters.length >= 3 && nest.monsters.length <= 4, 'starter pack size 3-4');
     assert.deepEqual([...new Set(nest.monsters.map((monster) => monster.level))], [1]);
 });
 

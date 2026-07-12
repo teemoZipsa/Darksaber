@@ -5,7 +5,6 @@ import {
     type FieldNest,
     type FieldNestState,
 } from '../src/field/SpawnResolver';
-import { ENEMY_AGGRO_RANGE } from '../src/field/FieldConfig';
 import { Enemy } from '../src/entity/Enemy';
 import { getMonsterDefinition } from '../src/data/MonsterCatalog';
 import type { WorldMap } from '../src/map/WorldMap';
@@ -32,7 +31,7 @@ const FIELD_NEST_DEPARTURE_RADIUS_CHUNKS = 4;
 const FIELD_NEST_DEPARTURE_MAX_ENEMIES = 18;
 const FIELD_NEST_REFRESH_MAX_ENEMIES = 28;
 export const FIELD_NEST_NEARBY_ENEMY_DISTANCE = 24;
-const FIELD_NEST_SPAWN_SAFE_DISTANCE = ENEMY_AGGRO_RANGE;
+const FIELD_NEST_SPAWN_SAFE_DISTANCE = 10;
 
 export interface WorldSessionFieldNestContext {
     worldMap: WorldMap;

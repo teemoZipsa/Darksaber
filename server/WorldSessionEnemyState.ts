@@ -1,12 +1,12 @@
 import { getEffectiveStatsForEnemy } from '../src/combat/StatusEffects';
 import type { Enemy } from '../src/entity/Enemy';
 import {
-    ENEMY_AGGRO_RANGE,
     ENEMY_COMBAT_SIMULATION_RANGE,
-    ENEMY_EXIT_RANGE,
     ENEMY_LEASH_RANGE,
     ENEMY_SIMULATION_ACTIVE_RANGE,
     FIELD_ATB_SCALE,
+    getEnemyAggroRanges,
+    getEnemyAtbMultiplier,
 } from '../src/field/FieldConfig';
 import { advanceAtb, resolveAggroState } from '../src/field/FieldCombat';
 import { manhattan, type TilePoint } from '../src/field/FieldPathing';
@@ -49,7 +49,12 @@ export class WorldSessionEnemyState<
             return 'idle';
         }
 
-        enemy.actionGauge = advanceAtb(enemy.actionGauge, getEffectiveStatsForEnemy(enemy).spd, dt, FIELD_ATB_SCALE * 0.7);
+        enemy.actionGauge = advanceAtb(
+            enemy.actionGauge,
+            getEffectiveStatsForEnemy(enemy).spd,
+            dt,
+            FIELD_ATB_SCALE * getEnemyAtbMultiplier(enemy.level, enemy.isBoss),
+        );
         if (enemy.actionGauge < 100) return 'idle';
         enemy.actionGauge = 100;
         return 'ready';
@@ -65,7 +70,8 @@ export class WorldSessionEnemyState<
         const enemyTile = this.enemyTile(enemy);
         const distanceToTarget = manhattan(enemyTile, closest.tile);
         const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
-        enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
+        const aggroRanges = getEnemyAggroRanges(enemy.aggroRange);
+        enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, aggroRanges.enter, aggroRanges.exit, leashExceeded);
         return enemy.isAggro;
     }
 

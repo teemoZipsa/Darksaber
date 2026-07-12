@@ -10,13 +10,13 @@ import type { Enemy } from '../../entity/Enemy';
 import type { Player } from '../../entity/Player';
 import { TILE_PROPERTIES, type TileType } from '../../map/Tile';
 import {
-    ENEMY_AGGRO_RANGE,
     ENEMY_COMBAT_SIMULATION_RANGE,
-    ENEMY_EXIT_RANGE,
     ENEMY_LEASH_RANGE,
     ENEMY_SIMULATION_ACTIVE_RANGE,
     FIELD_ATB_SCALE,
     FORMATION_OFFSETS,
+    getEnemyAggroRanges,
+    getEnemyAtbMultiplier,
     MOVEMENT_REPATH_INTERVAL,
 } from '../../field/FieldConfig';
 import { advanceAtb, resolveAggroState } from '../../field/FieldCombat';
@@ -137,7 +137,8 @@ export class WorldMovementController {
             const enemyTile = this.enemyTile(enemy);
             const distanceToTarget = manhattan(enemyTile, this.actorTile(closest));
             const leashExceeded = manhattan(enemyTile, entry.home) > ENEMY_LEASH_RANGE;
-            enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, leashExceeded);
+            const aggroRanges = getEnemyAggroRanges(enemy.aggroRange);
+            enemy.isAggro = resolveAggroState(enemy.isAggro, distanceToTarget, aggroRanges.enter, aggroRanges.exit, leashExceeded);
             if (!enemy.isAggro && this.hasAggroAllyNear(entry, enemy.aiProfile.assistRange)) enemy.isAggro = true;
             if (!enemy.isAggro) {
                 enemy.actionGauge = 0;
@@ -145,7 +146,12 @@ export class WorldMovementController {
             }
 
             if (enemy.id !== input.activeTurnActorId) {
-                enemy.actionGauge = advanceAtb(enemy.actionGauge, getEffectiveStatsForEnemy(enemy).spd, input.dt, FIELD_ATB_SCALE * 0.7);
+                enemy.actionGauge = advanceAtb(
+                    enemy.actionGauge,
+                    getEffectiveStatsForEnemy(enemy).spd,
+                    input.dt,
+                    FIELD_ATB_SCALE * getEnemyAtbMultiplier(enemy.level, enemy.isBoss),
+                );
                 if (enemy.actionGauge >= 100) {
                     enemy.actionGauge = 100;
                     readyEnemyIds.push(enemy.id);

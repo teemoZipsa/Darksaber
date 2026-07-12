@@ -24,7 +24,12 @@ import {
 } from '../../src/field/TerrainRules';
 import { TileType } from '../../src/map/Tile';
 import { MINIMAP_LOOT_REVEAL_RANGE, MinimapUI, isLootVisibleOnMinimap } from '../../src/ui/MinimapUI';
-import { ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE } from '../../src/field/FieldConfig';
+import {
+    ENEMY_AGGRO_RANGE,
+    ENEMY_EXIT_RANGE,
+    getEnemyAggroRanges,
+    getEnemyAtbMultiplier,
+} from '../../src/field/FieldConfig';
 
 class ImageStub {
     public src = '';
@@ -158,6 +163,13 @@ test('enemy aggro enters and exits with hysteresis', () => {
     assert.equal(resolveAggroState(true, ENEMY_EXIT_RANGE - 1, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE), true);
     assert.equal(resolveAggroState(true, ENEMY_EXIT_RANGE + 1, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE), false);
     assert.equal(resolveAggroState(true, 4, ENEMY_AGGRO_RANGE, ENEMY_EXIT_RANGE, true), false);
+});
+
+test('field enemies use authored detection ranges and slower starter ATB', () => {
+    assert.deepEqual(getEnemyAggroRanges(5), { enter: 5, exit: 13 });
+    assert.equal(getEnemyAtbMultiplier(1, false), 0.52);
+    assert.equal(getEnemyAtbMultiplier(3, false), 0.7);
+    assert.equal(getEnemyAtbMultiplier(1, true), 0.7);
 });
 
 test('assist AI only helps controlled targets inside leash', () => {
@@ -524,8 +536,8 @@ test('skill effect resolver applies target hit rolls and aimed shot bonus', () =
         terrainContext: { targetTiles: { e1: TileType.FOREST } },
         random: () => 0.54,
     });
-    assert.equal(aimedResult.enemyResults[0].hitChance, 55);
-    assert.equal(aimedResult.enemyResults[0].isHit, true);
+    assert.equal(aimedResult.enemyResults[0].hitChance, 45);
+    assert.equal(aimedResult.enemyResults[0].isMiss, true);
 });
 
 test('magic terrain multipliers remain clamped to tactical bounds', () => {

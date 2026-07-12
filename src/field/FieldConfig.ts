@@ -17,6 +17,21 @@ export const ENEMY_SIMULATION_ACTIVE_RANGE = 48;
 export const ENEMY_COMBAT_SIMULATION_RANGE = 64;
 export const MOVEMENT_REPATH_INTERVAL = 0.35;
 
+const STARTER_ENEMY_MAX_LEVEL = 2;
+const STARTER_ENEMY_ATB_MULTIPLIER = 0.52;
+const STANDARD_ENEMY_ATB_MULTIPLIER = 0.7;
+
+export function getEnemyAggroRanges(configuredRange: number): { enter: number; exit: number } {
+    const enter = Math.max(1, Math.floor(Number.isFinite(configuredRange) ? configuredRange : ENEMY_AGGRO_RANGE));
+    return { enter, exit: enter + (ENEMY_EXIT_RANGE - ENEMY_AGGRO_RANGE) };
+}
+
+export function getEnemyAtbMultiplier(level: number, isBoss: boolean): number {
+    return !isBoss && level <= STARTER_ENEMY_MAX_LEVEL
+        ? STARTER_ENEMY_ATB_MULTIPLIER
+        : STANDARD_ENEMY_ATB_MULTIPLIER;
+}
+
 export const ENEMY_ROLE_GLYPHS: Record<EnemyRole, string> = {
     bruiser: 'M',
     tank: 'T',
