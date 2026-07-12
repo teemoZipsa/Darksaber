@@ -74,6 +74,48 @@ test('ground details densely and deterministically fill walkable biome tiles wit
     assert.ok(total >= 40, `expected dense ground detail coverage, received ${total}`);
 });
 
+test('ambient roadside sites are deterministic, visible from routes, and keep paths open', () => {
+    const first = new WorldMap();
+    const second = new WorldMap();
+    const routeChunks = new Map<string, { x: number; y: number }>();
+    const segments = [
+        [{ x: 16, y: 11 }, { x: 37, y: 44 }],
+        [{ x: 10, y: 52 }, { x: 37, y: 44 }],
+        [{ x: 37, y: 44 }, { x: 41, y: 80 }],
+    ] as const;
+    for (const [start, end] of segments) {
+        const steps = Math.max(Math.abs(end.x - start.x), Math.abs(end.y - start.y));
+        for (let step = 0; step <= steps; step++) {
+            const chunk = {
+                x: Math.round(start.x + (end.x - start.x) * step / steps),
+                y: Math.round(start.y + (end.y - start.y) * step / steps),
+            };
+            routeChunks.set(`${chunk.x},${chunk.y}`, chunk);
+        }
+    }
+
+    const sites = [...routeChunks.values()].flatMap((chunk) => first.getAmbientSitesForChunk(chunk.x, chunk.y));
+    const repeated = [...routeChunks.values()].flatMap((chunk) => second.getAmbientSitesForChunk(chunk.x, chunk.y));
+    assert.deepEqual(sites, repeated);
+    assert.ok(sites.length >= 4, `expected roadside discoveries, received ${sites.length}`);
+
+    for (const site of sites) {
+        assert.notEqual(first.getTileAt(site.anchorTile.x, site.anchorTile.y), TileType.ROAD);
+        assert.equal(first.isDecorationBlocked(site.anchorTile.x, site.anchorTile.y), false);
+        assert.equal(first.isWalkable(site.anchorTile.x, site.anchorTile.y), true);
+        let roadVisible = false;
+        for (let dy = -7; dy <= 7 && !roadVisible; dy++) {
+            for (let dx = -7; dx <= 7; dx++) {
+                if (first.getTileAt(site.anchorTile.x + dx, site.anchorTile.y + dy) === TileType.ROAD) {
+                    roadVisible = true;
+                    break;
+                }
+            }
+        }
+        assert.equal(roadVisible, true);
+    }
+});
+
 test('tree decorations stay on eligible terrain by sprite family', () => {
     const world = new WorldMap();
     const decorations = getAllDecorations(world).filter(isTreeDecoration);

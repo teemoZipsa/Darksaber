@@ -81,6 +81,15 @@ export interface WorldMapGroundDetail {
     mirrored: boolean;
 }
 
+export type WorldMapAmbientSiteKind = 'abandonedCamp' | 'roadsideRuins' | 'brokenWaystone' | 'swampTotem';
+
+export interface WorldMapAmbientSite {
+    kind: WorldMapAmbientSiteKind;
+    anchorTile: TilePoint;
+    bounds: WorldMapDecorationBounds;
+    mirrored: boolean;
+}
+
 export interface WorldInspectMarker {
     id: string;
     tile: TilePoint;
@@ -353,6 +362,8 @@ interface BridgeDecorationConfig {
 const NORMAL_TREE_CHUNK_CHANCE = 0.035;
 const SCARY_TREE_CHUNK_CHANCE = 0.18;
 const GROUND_DETAIL_ATTEMPTS_PER_CHUNK = 32;
+const AMBIENT_SITE_CHUNK_CHANCE = 0.46;
+const AMBIENT_SITE_ROAD_SEARCH_RADIUS = 7;
 const DECORATION_LOOKUP_MARGIN_TILES = 8;
 const NORMAL_TREE_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST]);
 const SCARY_TREE_TILES = new Set<TileType>([TileType.POISON_SWAMP]);
@@ -433,6 +444,7 @@ export class WorldMap {
     private chunks: Map<string, Chunk> = new Map();
     private decorationChunks: Map<string, WorldMapDecoration[]> = new Map();
     private groundDetailChunks: Map<string, WorldMapGroundDetail[]> = new Map();
+    private ambientSiteChunks: Map<string, WorldMapAmbientSite[]> = new Map();
     private townExitTileCache: Map<string, TilePoint> = new Map();
     private preloadChunkMargin: number = 1;
     private biomeMask: BiomeMask;
@@ -467,6 +479,7 @@ export class WorldMap {
         this.chunks.clear();
         this.decorationChunks.clear();
         this.groundDetailChunks.clear();
+        this.ambientSiteChunks.clear();
         this.townExitTileCache.clear();
         this.loot = [];
         this.extractionZones = [];
@@ -866,6 +879,82 @@ export class WorldMap {
         return null;
     }
 
+    public getAmbientSitesForChunk(chunkX: number, chunkY: number): readonly WorldMapAmbientSite[] {
+        if (!this.isChunkInBounds(chunkX, chunkY) || this.isOceanChunk(chunkX, chunkY)) return [];
+        const chunkKey = this.chunkKey(chunkX, chunkY);
+        const cached = this.ambientSiteChunks.get(chunkKey);
+        if (cached) return cached;
+
+        const sites: WorldMapAmbientSite[] = [];
+        if (this.hash(chunkX, chunkY, 951) < AMBIENT_SITE_CHUNK_CHANCE) {
+            const baseX = chunkX * CHUNK_SIZE;
+            const baseY = chunkY * CHUNK_SIZE;
+            for (let attempt = 0; attempt < 28; attempt++) {
+                const tx = baseX + 3 + Math.floor(this.hash(chunkX * 43 + attempt, chunkY * 17, 952) * (CHUNK_SIZE - 6));
+                const ty = baseY + 3 + Math.floor(this.hash(chunkX * 13, chunkY * 47 + attempt, 953) * (CHUNK_SIZE - 6));
+                if (!this.canPlaceAmbientSite(tx, ty)) continue;
+                const tile = this.getTileAt(tx, ty);
+                sites.push({
+                    kind: this.pickAmbientSiteKind(tile, this.hash(tx, ty, 954)),
+                    anchorTile: { x: tx, y: ty },
+                    bounds: { minX: tx - 1, minY: ty - 1, maxX: tx + 1, maxY: ty + 1 },
+                    mirrored: this.hash(tx, ty, 955) < 0.5,
+                });
+                break;
+            }
+        }
+
+        this.ambientSiteChunks.set(chunkKey, sites);
+        return sites;
+    }
+
+    private pickAmbientSiteKind(tile: TileType, roll: number): WorldMapAmbientSiteKind {
+        if (tile === TileType.POISON_SWAMP) return 'swampTotem';
+        if (tile === TileType.STONE || tile === TileType.SNOW) return 'brokenWaystone';
+        if (tile === TileType.SAND) return roll < 0.7 ? 'abandonedCamp' : 'roadsideRuins';
+        return roll < 0.52 ? 'abandonedCamp' : 'roadsideRuins';
+    }
+
+    private canPlaceAmbientSite(tx: number, ty: number): boolean {
+        const anchorTile = this.getTileAt(tx, ty);
+        if (![
+            TileType.GRASS,
+            TileType.FOREST,
+            TileType.STONE,
+            TileType.SAND,
+            TileType.SNOW,
+            TileType.POISON_SWAMP,
+        ].includes(anchorTile)) return false;
+        if (!this.hasRoadNearTile(tx, ty, AMBIENT_SITE_ROAD_SEARCH_RADIUS)) return false;
+
+        for (let y = ty - 1; y <= ty + 1; y++) {
+            for (let x = tx - 1; x <= tx + 1; x++) {
+                const tile = this.getTileAt(x, y);
+                if (!TILE_PROPERTIES[tile]?.walkable || tile === TileType.ROAD || tile === TileType.TOWN || tile === TileType.DUNGEON_ENTRANCE) {
+                    return false;
+                }
+                if (this.getTownAtTile(x, y) || this.getTempleAtTile(x, y) || this.getDungeonAtTile(x, y)) return false;
+                if (this.isDecorationBlocked(x, y)) return false;
+            }
+        }
+        return true;
+    }
+
+    private hasRoadNearTile(tx: number, ty: number, radius: number): boolean {
+        for (let distance = 2; distance <= radius; distance++) {
+            for (let offset = -distance; offset <= distance; offset++) {
+                const candidates = [
+                    { x: tx + offset, y: ty - distance },
+                    { x: tx + offset, y: ty + distance },
+                    { x: tx - distance, y: ty + offset },
+                    { x: tx + distance, y: ty + offset },
+                ];
+                if (candidates.some((candidate) => this.getTileAt(candidate.x, candidate.y) === TileType.ROAD)) return true;
+            }
+        }
+        return false;
+    }
+
     private pickDecorationAnchorTile(chunkX: number, chunkY: number, salt: number): TilePoint {
         const localSpan = CHUNK_SIZE - 8;
         return {
@@ -1103,6 +1192,7 @@ export class WorldMap {
         }
 
         this.renderGroundDetails(ctx, cameraX, cameraY, vw, vh);
+        this.renderAmbientSites(ctx, cameraX, cameraY, vw, vh);
         this.renderDecorations(ctx, cameraX, cameraY, vw, vh, false);
         this.renderTownLandmarks(ctx, cameraX, cameraY, vw, vh);
         this.renderTempleLandmarks(ctx, cameraX, cameraY, vw, vh);
@@ -1789,6 +1879,91 @@ export class WorldMap {
         ctx.fillRect(sx + unit * 3, sy - unit * 6, unit, unit * 7);
         ctx.fillStyle = '#858439';
         ctx.fillRect(sx - direction * unit * 2, sy - unit * 4, unit, unit * 4);
+    }
+
+    private renderAmbientSites(
+        ctx: CanvasRenderingContext2D,
+        cameraX: number,
+        cameraY: number,
+        vw: number,
+        vh: number
+    ): void {
+        const chunkPixelSize = CHUNK_SIZE * TILE_SIZE;
+        const minChunkX = Math.floor(cameraX / chunkPixelSize) - 1;
+        const maxChunkX = Math.floor((cameraX + vw) / chunkPixelSize) + 1;
+        const minChunkY = Math.floor(cameraY / chunkPixelSize) - 1;
+        const maxChunkY = Math.floor((cameraY + vh) / chunkPixelSize) + 1;
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        for (let chunkY = minChunkY; chunkY <= maxChunkY; chunkY++) {
+            for (let chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+                for (const site of this.getAmbientSitesForChunk(chunkX, chunkY)) {
+                    const sx = (site.anchorTile.x + 0.5) * TILE_SIZE - cameraX;
+                    const sy = (site.anchorTile.y + 0.62) * TILE_SIZE - cameraY;
+                    if (sx < -TILE_SIZE * 2 || sx > vw + TILE_SIZE * 2 || sy < -TILE_SIZE * 2 || sy > vh + TILE_SIZE * 2) continue;
+                    this.renderAmbientSite(ctx, site, Math.round(sx), Math.round(sy));
+                }
+            }
+        }
+        ctx.restore();
+    }
+
+    private renderAmbientSite(ctx: CanvasRenderingContext2D, site: WorldMapAmbientSite, sx: number, sy: number): void {
+        const u = Math.max(2, Math.round(TILE_SIZE / 16));
+        const direction = site.mirrored ? -1 : 1;
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = 'rgba(22, 18, 13, 0.34)';
+        ctx.fillRect(sx - u * 13, sy + u * 3, u * 26, u * 4);
+
+        if (site.kind === 'abandonedCamp') {
+            ctx.fillStyle = '#40352a';
+            ctx.fillRect(sx - u * 5, sy, u * 10, u * 4);
+            ctx.fillStyle = '#8b8170';
+            ctx.fillRect(sx - u * 6, sy - u, u * 3, u * 2);
+            ctx.fillRect(sx + u * 3, sy - u, u * 3, u * 2);
+            ctx.fillRect(sx - u, sy - u * 3, u * 2, u * 2);
+            ctx.fillStyle = '#5d3826';
+            ctx.fillRect(sx - u * 4, sy + u, u * 9, u * 2);
+            ctx.fillStyle = '#705c3d';
+            ctx.fillRect(sx + direction * u * 8, sy - u * 5, u * 7, u * 7);
+            ctx.fillStyle = '#3a2b22';
+            ctx.fillRect(sx + direction * u * 9, sy - u * 4, u * 5, u);
+            return;
+        }
+        if (site.kind === 'roadsideRuins') {
+            ctx.fillStyle = '#373733';
+            ctx.fillRect(sx - u * 12, sy + u, u * 24, u * 4);
+            ctx.fillStyle = '#716f63';
+            ctx.fillRect(sx - direction * u * 11, sy - u * 8, u * 5, u * 10);
+            ctx.fillRect(sx - direction * u * 7, sy - u * 4, u * 8, u * 5);
+            ctx.fillRect(sx + direction * u * 4, sy - u * 2, u * 7, u * 3);
+            ctx.fillStyle = '#969080';
+            ctx.fillRect(sx - direction * u * 10, sy - u * 7, u * 3, u);
+            return;
+        }
+        if (site.kind === 'brokenWaystone') {
+            ctx.fillStyle = '#403f3a';
+            ctx.fillRect(sx - u * 8, sy + u, u * 16, u * 4);
+            ctx.fillStyle = '#777870';
+            ctx.fillRect(sx - direction * u * 3, sy - u * 12, u * 7, u * 13);
+            ctx.fillRect(sx - direction * u * 5, sy - u * 4, u * 11, u * 5);
+            ctx.fillStyle = '#adafa5';
+            ctx.fillRect(sx - direction * u * 2, sy - u * 11, u * 4, u * 2);
+            ctx.fillStyle = '#343634';
+            ctx.fillRect(sx + direction * u, sy - u * 7, u * 2, u * 5);
+            return;
+        }
+
+        ctx.fillStyle = '#302b20';
+        ctx.fillRect(sx - u * 7, sy + u, u * 14, u * 3);
+        ctx.fillRect(sx - direction * u * 5, sy - u * 11, u * 2, u * 12);
+        ctx.fillRect(sx + direction * u * 4, sy - u * 8, u * 2, u * 9);
+        ctx.fillStyle = '#a9976b';
+        ctx.fillRect(sx - direction * u * 7, sy - u * 7, u * 7, u * 2);
+        ctx.fillRect(sx, sy - u * 5, u * 7, u * 2);
+        ctx.fillStyle = '#676326';
+        ctx.fillRect(sx - u * 3, sy - u * 13, u * 7, u * 3);
     }
 
     private renderWorldInspectMarker(ctx: CanvasRenderingContext2D, marker: WorldInspectMarker, sx: number, sy: number): void {
