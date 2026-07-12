@@ -39,6 +39,13 @@ export class WorldSessionScenarioRewards {
         return this.applyRewards(player, event.rewards);
     }
 
+    public applyAmbientSiteRewards(
+        player: ServerPlayer,
+        rewards: ScenarioFieldEventRewardResult[]
+    ): ScenarioFieldEventRewardResult[] {
+        return this.applyRewards(player, rewards);
+    }
+
     public applyFieldEventTrapMagic(
         actor: ServerActor,
         event: StoryScenarioFieldEvent
@@ -48,6 +55,17 @@ export class WorldSessionScenarioRewards {
         const damage = getStoryScenarioFieldEventTrapDamage(event, actor.stats.hp, actor.stats.maxHp);
         if (damage <= 0) return undefined;
 
+        actor.stats.hp = Math.max(1, actor.stats.hp - damage);
+        removeActionStanceStatusesFromCarrier(actor);
+        return { actorId: actor.id, damage };
+    }
+
+    public applyAmbientSiteTrap(
+        actor: ServerActor,
+        maxHpRatio: number | undefined
+    ): ScenarioFieldEventResultMessage['trapDamage'] {
+        if (!maxHpRatio || actor.isDead || actor.stats.hp <= 1) return undefined;
+        const damage = Math.min(actor.stats.hp - 1, Math.max(1, Math.floor(actor.stats.maxHp * maxHpRatio)));
         actor.stats.hp = Math.max(1, actor.stats.hp - damage);
         removeActionStanceStatusesFromCarrier(actor);
         return { actorId: actor.id, damage };
@@ -118,6 +136,10 @@ export class WorldSessionScenarioRewards {
             return item ? [{ item, durability: item.maxDurability, quantity: 1 }] : [];
         });
         return this.context.saveState.canAddPlacedItems(player, placedItems);
+    }
+
+    public canApplyAmbientSiteRewards(player: ServerPlayer, rewards: ScenarioFieldEventRewardResult[]): boolean {
+        return this.canApplyRewards(player, rewards);
     }
 
     private getRequiredItems(event: StoryScenarioFieldEvent): ItemDef[] {

@@ -34,6 +34,7 @@ export function toPersistentPlayer(player: ServerPlayer): WorldSessionPersistent
         completedDungeonIds: [...player.completedDungeonIds],
         fieldEventFlagsByDungeonId: [...player.fieldEventFlagsByDungeonId.entries()]
             .map(([dungeonId, flags]) => [dungeonId, [...flags]]),
+        inspectedAmbientSiteIds: [...player.inspectedAmbientSiteIds],
         activeDungeonId: player.activeDungeonId,
         active: player.active,
         ghost: player.ghost,
@@ -63,6 +64,7 @@ export function restorePersistentPlayer(player: WorldSessionPersistentPlayer): S
         fieldEventFlagsByDungeonId: new Map(
             player.fieldEventFlagsByDungeonId.map(([dungeonId, flags]) => [dungeonId, new Set(flags)])
         ),
+        inspectedAmbientSiteIds: new Set(player.inspectedAmbientSiteIds ?? []),
         activeDungeonId: player.activeDungeonId,
         active: player.active,
         ghost: player.ghost,

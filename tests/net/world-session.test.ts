@@ -269,6 +269,65 @@ test('persistent world session snapshots restore active raid reconnect state', (
     assert.ok(recoveryPatch.inventory?.items.some((item) => item.itemId === raidItem.id));
 });
 
+test('roadside ambient sites are validated, rewarded, and completed by the server', () => {
+    const world = new WorldMap();
+    let site = null as ReturnType<WorldMap['getAmbientSitesForChunk']>[number] | null;
+    for (let chunkY = 8; chunkY <= 85 && !site; chunkY++) {
+        for (let chunkX = 8; chunkX <= 45 && !site; chunkX++) {
+            site = world.getAmbientSitesForChunk(chunkX, chunkY)[0] ?? null;
+        }
+    }
+    assert.ok(site);
+
+    const character = authCharacter('ambient-site');
+    const session = new WorldSession({ sessionEpoch: 44 });
+    const joined = session.join(joinMessage('central_castle', character.id), 0, {
+        characterId: character.id,
+        saveSnapshot: createDefaultCharacterSave(character),
+    });
+    const serverActor = getActorForPlayer(session, joined.playerId);
+    serverActor.remainingAp = 80;
+    const distant = session.handleMessage(joined.playerId, {
+        type: 'AMBIENT_SITE_INTERACT',
+        intentId: 'ambient-far',
+        actorId: serverActor.id,
+        siteId: site.id,
+    }, 998);
+    assert.equal(distant.replies[0]?.type, 'ACTION_REJECTED');
+
+    readyActorAt(session, joined.playerId, site.anchorTile, 14);
+    const undercharged = session.handleMessage(joined.playerId, {
+        type: 'AMBIENT_SITE_INTERACT',
+        intentId: 'ambient-low-ap',
+        actorId: serverActor.id,
+        siteId: site.id,
+    }, 999);
+    assert.equal(undercharged.replies[0]?.type, 'ACTION_REJECTED');
+
+    readyActorAt(session, joined.playerId, site.anchorTile);
+    const first = session.handleMessage(joined.playerId, {
+        type: 'AMBIENT_SITE_INTERACT',
+        intentId: 'ambient-1',
+        actorId: serverActor.id,
+        siteId: site.id,
+    }, 1_000);
+
+    const result = first.replies[0];
+    assert.equal(result?.type, 'AMBIENT_SITE_RESULT');
+    assert.ok(result && result.type === 'AMBIENT_SITE_RESULT');
+    assert.equal(result.siteId, site.id);
+    assert.equal(serverActor.remainingAp, 65);
+    assert.deepEqual(session.createSnapshot(joined.playerId, 1_001).scenario.inspectedAmbientSiteIds, [site.id]);
+
+    const duplicate = session.handleMessage(joined.playerId, {
+        type: 'AMBIENT_SITE_INTERACT',
+        intentId: 'ambient-2',
+        actorId: serverActor.id,
+        siteId: site.id,
+    }, 1_002);
+    assert.equal(duplicate.replies[0]?.type, 'ACTION_REJECTED');
+});
+
 test('default character saves start with the shared no-shield basic kit', () => {
     const save = createDefaultCharacterSave(authCharacter('starter'));
     const equipment = save.equipment as Record<string, { itemId?: string }>;

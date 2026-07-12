@@ -37,6 +37,8 @@ export function handleWorldSessionMessage(
             return context.scenarioRuntime.handleEnter(playerId, message, now);
         case 'SCENARIO_FIELD_EVENT_INTERACT':
             return context.scenarioRuntime.handleFieldEventInteract(playerId, message);
+        case 'AMBIENT_SITE_INTERACT':
+            return context.scenarioRuntime.handleAmbientSiteInteract(playerId, message);
         case 'WORLD_LEAVE':
             context.log(`leave player=${playerId} reason=${message.reason}`);
             return {

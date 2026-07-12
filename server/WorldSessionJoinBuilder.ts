@@ -42,6 +42,7 @@ export function buildWorldSessionJoinedPlayer(input: WorldSessionJoinedPlayerInp
         enteredDungeonIds: new Set(),
         completedDungeonIds: new Set(),
         fieldEventFlagsByDungeonId: new Map(),
+        inspectedAmbientSiteIds: new Set(),
         activeDungeonId: null,
         active: true,
         ghost: false,

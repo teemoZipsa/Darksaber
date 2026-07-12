@@ -106,6 +106,7 @@ export function buildWorldSessionSnapshot(input: {
                 ? scenarioFlagSnapshot(fallbackPlayer.fieldEventFlagsByDungeonId)
                 : {},
             sharedFieldEventFlagsByDungeonId: scenarioFlagSnapshot(input.sharedScenarioFieldEventFlags),
+            inspectedAmbientSiteIds: fallbackPlayer ? [...fallbackPlayer.inspectedAmbientSiteIds] : [],
         },
     };
 }

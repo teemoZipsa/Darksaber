@@ -586,6 +586,7 @@ function shouldSendImmediateSnapshots(message: WorldClientMessage, replies: read
         && message.type !== 'AUTO_LOOT_RESOLVE'
         && message.type !== 'SCENARIO_ENTER'
         && message.type !== 'SCENARIO_FIELD_EVENT_INTERACT'
+        && message.type !== 'AMBIENT_SITE_INTERACT'
     ) {
         return false;
     }

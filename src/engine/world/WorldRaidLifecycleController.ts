@@ -413,6 +413,7 @@ export class WorldRaidLifecycleController {
             onAutoLootGrant: (grant) => this.context.handleNetworkAutoLootGrant(grant),
             onInventoryConsumed: (message) => this.context.handleNetworkInventoryConsumed(message),
             onScenarioFieldEventResult: (message) => this.context.storyScenarioController.applyNetworkScenarioFieldEventResult(message),
+            onAmbientSiteResult: (message) => this.context.storyScenarioController.applyNetworkAmbientSiteResult(message),
             onScenarioFieldEventBroadcast: (message) => this.context.storyScenarioController.applyNetworkScenarioFieldEventBroadcast(message),
             onScenarioEnemyDefeatEvent: (message) => this.context.storyScenarioController.applyNetworkScenarioEnemyDefeatEvent(message),
             onRaidResult: (result) => this.handleNetworkRaidResult(result),

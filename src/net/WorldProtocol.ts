@@ -4,6 +4,7 @@ import type { CharacterStats } from '../data/Stats';
 import type { StoryScenarioEventStep } from '../data/StoryScenarioEventData';
 import type { EnemyRole } from '../field/EnemyAI';
 import type { WorldLootContainerType } from '../loot/WorldLootTypes';
+import type { WorldMapAmbientSiteKind } from '../map/WorldMap';
 import type { RaidModifier } from '../raid/RaidModifiers';
 import type { ItemSlot } from '../data/ItemDB';
 
@@ -134,6 +135,7 @@ export interface ScenarioSnapshot {
     completedDungeonIds: string[];
     playerFieldEventFlagsByDungeonId?: Record<string, string[]>;
     sharedFieldEventFlagsByDungeonId?: Record<string, string[]>;
+    inspectedAmbientSiteIds?: string[];
 }
 
 export interface WorldSnapshot {
@@ -224,6 +226,13 @@ export interface ScenarioFieldEventInteractMessage {
     eventId: string;
 }
 
+export interface AmbientSiteInteractMessage {
+    type: 'AMBIENT_SITE_INTERACT';
+    intentId: string;
+    actorId: string;
+    siteId: string;
+}
+
 export interface MarketHelloMessage {
     type: 'MARKET_HELLO';
     clientId: string;
@@ -274,6 +283,7 @@ export type WorldClientMessage =
     | AutoLootResolveMessage
     | ScenarioEnterMessage
     | ScenarioFieldEventInteractMessage
+    | AmbientSiteInteractMessage
     | MarketClientMessage;
 
 export interface WorldWelcomeMessage {
@@ -382,6 +392,15 @@ export interface ScenarioFieldEventResultMessage {
     trapDamage?: { actorId: string; damage: number };
 }
 
+export interface AmbientSiteResultMessage {
+    type: 'AMBIENT_SITE_RESULT';
+    intentId: string;
+    siteId: string;
+    kind: WorldMapAmbientSiteKind;
+    rewards: ScenarioFieldEventRewardResult[];
+    trapDamage?: { actorId: string; damage: number };
+}
+
 export interface ScenarioFieldEventBroadcastMessage {
     type: 'SCENARIO_FIELD_EVENT_BROADCAST';
     dungeonId: string;
@@ -438,6 +457,7 @@ export type WorldServerMessage =
     | InventoryConsumedMessage
     | CombatEventMessage
     | ScenarioFieldEventResultMessage
+    | AmbientSiteResultMessage
     | ScenarioFieldEventBroadcastMessage
     | ScenarioEnemyDefeatEventMessage
     | RaidResultMessage

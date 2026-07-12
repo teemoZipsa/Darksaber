@@ -209,6 +209,8 @@ export class WorldSession {
             },
             findNearbyWalkableTile: (tile, actorId, ownerPlayerId) => this.findNearbyWalkableTile(tile, actorId, ownerPlayerId),
             log: (message) => this.log(message),
+            spendActorGauge: (actor, cost) => this.spendActorGauge(actor, cost),
+            finishActorIfSpent: (actor) => this.finishActorIfSpent(actor),
         });
         this.contentSpawner = new WorldSessionContentSpawner({
             worldMap: this.worldMap,

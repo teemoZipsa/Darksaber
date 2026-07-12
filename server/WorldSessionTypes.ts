@@ -56,6 +56,7 @@ export interface ServerPlayer {
     enteredDungeonIds: Set<string>;
     completedDungeonIds: Set<string>;
     fieldEventFlagsByDungeonId: Map<string, Set<string>>;
+    inspectedAmbientSiteIds: Set<string>;
     activeDungeonId: string | null;
     active: boolean;
     ghost: boolean;
@@ -139,6 +140,7 @@ export interface WorldSessionPersistentPlayer {
     enteredDungeonIds: string[];
     completedDungeonIds: string[];
     fieldEventFlagsByDungeonId: Array<[string, string[]]>;
+    inspectedAmbientSiteIds?: string[];
     activeDungeonId: string | null;
     active: boolean;
     ghost: boolean;

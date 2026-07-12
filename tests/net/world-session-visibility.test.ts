@@ -50,6 +50,7 @@ function createPlayer(id: string, actorIds: string[], overrides: Partial<ServerP
         enteredDungeonIds: new Set(),
         completedDungeonIds: new Set(),
         fieldEventFlagsByDungeonId: new Map(),
+        inspectedAmbientSiteIds: new Set(),
         activeDungeonId: null,
         active: true,
         ghost: false,

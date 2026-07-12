@@ -18,8 +18,11 @@ import {
 } from '../src/data/StoryInteriorData';
 import { Enemy } from '../src/entity/Enemy';
 import { manhattan, type TilePoint } from '../src/field/FieldPathing';
+import { INTERACT_ACTION_GAUGE_COST } from '../src/field/FieldActionEconomy';
 import { WorldMap } from '../src/map/WorldMap';
+import { getAmbientSiteOutcome } from '../src/raid/AmbientSiteRules';
 import type {
+    AmbientSiteResultMessage,
     ScenarioEnemyDefeatEventMessage,
     ScenarioFieldEventResultMessage,
     WorldClientMessage,
@@ -49,6 +52,8 @@ export interface WorldSessionScenarioRuntimeContext {
     allocateScenarioEnemyId: () => { id: string; seedOrdinal: number };
     findNearbyWalkableTile: (tile: TilePoint, actorId: string, ownerPlayerId?: string) => TilePoint;
     log: (message: string) => void;
+    spendActorGauge: (actor: ServerActor, cost: number) => void;
+    finishActorIfSpent: (actor: ServerActor) => void;
 }
 
 export interface WorldSessionScenarioEnemyKillResult {
@@ -168,6 +173,45 @@ export class WorldSessionScenarioRuntime {
             : [];
         this.context.log(`scenario field event player=${playerId} dungeon=${dungeonId} event=${event.id} scope=${scope}`);
         return { replies: [result], broadcasts };
+    }
+
+    public handleAmbientSiteInteract(
+        playerId: string,
+        message: Extract<WorldClientMessage, { type: 'AMBIENT_SITE_INTERACT' }>
+    ): WorldSessionMessageResult {
+        const player = this.context.players.get(playerId);
+        const actor = this.context.actors.get(message.actorId);
+        const validationError = this.validateScenarioActor(player, actor);
+        if (validationError) return reject(message.intentId, validationError);
+        if (actor!.remainingAp < INTERACT_ACTION_GAUGE_COST) return reject(message.intentId, 'Actor action gauge is not ready.');
+        if (player!.activeDungeonId) return reject(message.intentId, 'Ambient sites are unavailable inside a scenario.');
+
+        const siteId = typeof message.siteId === 'string' ? message.siteId.trim() : '';
+        const site = siteId ? this.context.worldMap.getAmbientSiteById(siteId) : null;
+        if (!site) return reject(message.intentId, 'Ambient site does not exist.');
+        if (player!.inspectedAmbientSiteIds.has(site.id)) return reject(message.intentId, 'Ambient site is already inspected.');
+        if (manhattan(actor!.tile, site.anchorTile) > 1) return reject(message.intentId, 'Ambient site is too far away.');
+
+        const outcome = getAmbientSiteOutcome(site.kind, site.id);
+        if (!this.context.rewards.canApplyAmbientSiteRewards(player!, outcome.rewards)) {
+            return reject(message.intentId, 'Ambient site reward storage is full.');
+        }
+
+        player!.inspectedAmbientSiteIds.add(site.id);
+        const rewards = this.context.rewards.applyAmbientSiteRewards(player!, outcome.rewards);
+        const trapDamage = this.context.rewards.applyAmbientSiteTrap(actor!, outcome.trapMaxHpRatio);
+        this.context.spendActorGauge(actor!, INTERACT_ACTION_GAUGE_COST);
+        this.context.finishActorIfSpent(actor!);
+        const result: AmbientSiteResultMessage = {
+            type: 'AMBIENT_SITE_RESULT',
+            intentId: message.intentId,
+            siteId: site.id,
+            kind: site.kind,
+            rewards,
+            ...(trapDamage ? { trapDamage } : {}),
+        };
+        this.context.log(`ambient site player=${playerId} site=${site.id} kind=${site.kind}`);
+        return { replies: [result], broadcasts: [] };
     }
 
     public completeEnemyKill(target: ServerEnemy, enemyId: string): WorldSessionScenarioEnemyKillResult {

@@ -84,6 +84,7 @@ export interface WorldMapGroundDetail {
 export type WorldMapAmbientSiteKind = 'abandonedCamp' | 'roadsideRuins' | 'brokenWaystone' | 'swampTotem';
 
 export interface WorldMapAmbientSite {
+    id: string;
     kind: WorldMapAmbientSiteKind;
     anchorTile: TilePoint;
     bounds: WorldMapDecorationBounds;
@@ -445,6 +446,7 @@ export class WorldMap {
     private decorationChunks: Map<string, WorldMapDecoration[]> = new Map();
     private groundDetailChunks: Map<string, WorldMapGroundDetail[]> = new Map();
     private ambientSiteChunks: Map<string, WorldMapAmbientSite[]> = new Map();
+    private inspectedAmbientSiteIds: Set<string> = new Set();
     private townExitTileCache: Map<string, TilePoint> = new Map();
     private preloadChunkMargin: number = 1;
     private biomeMask: BiomeMask;
@@ -480,6 +482,7 @@ export class WorldMap {
         this.decorationChunks.clear();
         this.groundDetailChunks.clear();
         this.ambientSiteChunks.clear();
+        this.inspectedAmbientSiteIds.clear();
         this.townExitTileCache.clear();
         this.loot = [];
         this.extractionZones = [];
@@ -895,6 +898,7 @@ export class WorldMap {
                 if (!this.canPlaceAmbientSite(tx, ty)) continue;
                 const tile = this.getTileAt(tx, ty);
                 sites.push({
+                    id: `${this.getRealm()}:${chunkX},${chunkY}:${tx},${ty}`,
                     kind: this.pickAmbientSiteKind(tile, this.hash(tx, ty, 954)),
                     anchorTile: { x: tx, y: ty },
                     bounds: { minX: tx - 1, minY: ty - 1, maxX: tx + 1, maxY: ty + 1 },
@@ -906,6 +910,44 @@ export class WorldMap {
 
         this.ambientSiteChunks.set(chunkKey, sites);
         return sites;
+    }
+
+    public getAmbientSitesNearTile(tile: TilePoint, radius: number = 1): WorldMapAmbientSite[] {
+        const minChunkX = Math.floor((tile.x - radius) / CHUNK_SIZE);
+        const maxChunkX = Math.floor((tile.x + radius) / CHUNK_SIZE);
+        const minChunkY = Math.floor((tile.y - radius) / CHUNK_SIZE);
+        const maxChunkY = Math.floor((tile.y + radius) / CHUNK_SIZE);
+        const sites: WorldMapAmbientSite[] = [];
+        for (let chunkY = minChunkY; chunkY <= maxChunkY; chunkY++) {
+            for (let chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+                for (const site of this.getAmbientSitesForChunk(chunkX, chunkY)) {
+                    if (Math.abs(site.anchorTile.x - tile.x) + Math.abs(site.anchorTile.y - tile.y) <= radius) {
+                        sites.push(site);
+                    }
+                }
+            }
+        }
+        return sites;
+    }
+
+    public getAmbientSiteById(siteId: string): WorldMapAmbientSite | null {
+        const match = /^([^:]+):(-?\d+),(-?\d+):(-?\d+),(-?\d+)$/.exec(siteId);
+        if (!match || match[1] !== this.getRealm()) return null;
+        const chunkX = Number(match[2]);
+        const chunkY = Number(match[3]);
+        return this.getAmbientSitesForChunk(chunkX, chunkY).find((site) => site.id === siteId) ?? null;
+    }
+
+    public setInspectedAmbientSiteIds(siteIds: readonly string[]): void {
+        this.inspectedAmbientSiteIds = new Set(siteIds);
+    }
+
+    public markAmbientSiteInspected(siteId: string): void {
+        this.inspectedAmbientSiteIds.add(siteId);
+    }
+
+    public isAmbientSiteInspected(siteId: string): boolean {
+        return this.inspectedAmbientSiteIds.has(siteId);
     }
 
     private pickAmbientSiteKind(tile: TileType, roll: number): WorldMapAmbientSiteKind {
@@ -1903,9 +1945,21 @@ export class WorldMap {
                     const sy = (site.anchorTile.y + 0.62) * TILE_SIZE - cameraY;
                     if (sx < -TILE_SIZE * 2 || sx > vw + TILE_SIZE * 2 || sy < -TILE_SIZE * 2 || sy > vh + TILE_SIZE * 2) continue;
                     this.renderAmbientSite(ctx, site, Math.round(sx), Math.round(sy));
+                    if (!this.isAmbientSiteInspected(site.id)) this.renderAmbientSitePrompt(ctx, Math.round(sx), Math.round(sy));
                 }
             }
         }
+        ctx.restore();
+    }
+
+    private renderAmbientSitePrompt(ctx: CanvasRenderingContext2D, sx: number, sy: number): void {
+        const pulse = 0.58 + Math.sin(performance.now() / 360) * 0.18;
+        ctx.save();
+        ctx.globalAlpha = pulse;
+        ctx.fillStyle = '#f2cf73';
+        ctx.fillRect(sx - 2, sy - TILE_SIZE * 0.72, 4, 8);
+        ctx.fillRect(sx - 5, sy - TILE_SIZE * 0.61, 10, 3);
+        ctx.fillRect(sx - 2, sy - TILE_SIZE * 0.5, 4, 4);
         ctx.restore();
     }
 

@@ -3,6 +3,7 @@ import {
     WORLD_PROTOCOL_VERSION,
     type ActorSnapshot,
     type ActionRejectedMessage,
+    type AmbientSiteResultMessage,
     type AutoLootCell,
     type AutoLootGrantMessage,
     type CombatEventMessage,
@@ -49,6 +50,7 @@ export interface NetworkRaidClientOptions {
     onAutoLootGrant?: (grant: AutoLootGrantMessage) => void;
     onInventoryConsumed?: (message: InventoryConsumedMessage) => void;
     onScenarioFieldEventResult?: (message: ScenarioFieldEventResultMessage) => void;
+    onAmbientSiteResult?: (message: AmbientSiteResultMessage) => void;
     onScenarioFieldEventBroadcast?: (message: ScenarioFieldEventBroadcastMessage) => void;
     onScenarioEnemyDefeatEvent?: (message: ScenarioEnemyDefeatEventMessage) => void;
     onRaidResult?: (result: RaidResultMessage) => void;
@@ -296,6 +298,16 @@ export class NetworkRaidClient {
         return intentId;
     }
 
+    public sendAmbientSiteInteract(actorId: string, siteId: string, intentId: string = createIntentId()): string {
+        this.send({
+            type: 'AMBIENT_SITE_INTERACT',
+            intentId,
+            actorId,
+            siteId,
+        });
+        return intentId;
+    }
+
     public leave(reason: WorldLeaveMessage['reason']): void {
         const sent = this.send({ type: 'WORLD_LEAVE', reason });
         this.clearStoredResumeToken(this.joinInput?.characterId);
@@ -376,6 +388,13 @@ export class NetworkRaidClient {
                     return;
                 }
                 this.options.onScenarioFieldEventResult?.(message);
+                break;
+            case 'AMBIENT_SITE_RESULT':
+                if (!isAmbientSiteResultMessage(message)) {
+                    this.reportBadMessage('Malformed AMBIENT_SITE_RESULT message.');
+                    return;
+                }
+                this.options.onAmbientSiteResult?.(message);
                 break;
             case 'SCENARIO_FIELD_EVENT_BROADCAST':
                 if (!isScenarioFieldEventBroadcastMessage(message)) {
@@ -664,6 +683,26 @@ function isScenarioFieldEventRewardResult(value: unknown): value is ScenarioFiel
         && (
             value.originalItemId === undefined
             || (typeof value.originalItemId === 'number' && Number.isInteger(value.originalItemId) && value.originalItemId > 0)
+        );
+}
+
+function isAmbientSiteResultMessage(message: unknown): message is AmbientSiteResultMessage {
+    if (!isRecord(message)) return false;
+    return message.type === 'AMBIENT_SITE_RESULT'
+        && typeof message.intentId === 'string'
+        && typeof message.siteId === 'string'
+        && ['abandonedCamp', 'roadsideRuins', 'brokenWaystone', 'swampTotem'].includes(String(message.kind))
+        && Array.isArray(message.rewards)
+        && message.rewards.every(isScenarioFieldEventRewardResult)
+        && (
+            message.trapDamage === undefined
+            || (
+                isRecord(message.trapDamage)
+                && typeof message.trapDamage.actorId === 'string'
+                && typeof message.trapDamage.damage === 'number'
+                && Number.isInteger(message.trapDamage.damage)
+                && message.trapDamage.damage > 0
+            )
         );
 }
 

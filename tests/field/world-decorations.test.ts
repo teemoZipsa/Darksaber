@@ -100,6 +100,11 @@ test('ambient roadside sites are deterministic, visible from routes, and keep pa
     assert.ok(sites.length >= 4, `expected roadside discoveries, received ${sites.length}`);
 
     for (const site of sites) {
+        assert.equal(first.getAmbientSiteById(site.id)?.id, site.id);
+        assert.deepEqual(first.getAmbientSitesNearTile(site.anchorTile, 0).map((candidate) => candidate.id), [site.id]);
+        assert.equal(first.isAmbientSiteInspected(site.id), false);
+        first.markAmbientSiteInspected(site.id);
+        assert.equal(first.isAmbientSiteInspected(site.id), true);
         assert.notEqual(first.getTileAt(site.anchorTile.x, site.anchorTile.y), TileType.ROAD);
         assert.equal(first.isDecorationBlocked(site.anchorTile.x, site.anchorTile.y), false);
         assert.equal(first.isWalkable(site.anchorTile.x, site.anchorTile.y), true);

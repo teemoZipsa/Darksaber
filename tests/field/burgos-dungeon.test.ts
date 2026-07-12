@@ -1560,10 +1560,10 @@ test('normal enemy loot is auto-collected into the backpack', () => {
 });
 
 test('normal enemy loot drops to the field when the backpack is full', () => {
-    const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
-    assert.ok(herb);
+    const filler = getItemDef('rune_el');
+    assert.ok(filler);
     const bag = new GridInventory(1, 1);
-    bag.autoPlace(herb);
+    bag.autoPlace(filler);
     const logs: string[] = [];
     const enemy = new Enemy('field_enemy_2', 11, 10, '부르고스 추격병', 1, '#d98a5a', 'bruiser');
     const engine = createWorldEnginePrototypeHarness<any>();

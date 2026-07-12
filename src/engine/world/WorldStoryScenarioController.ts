@@ -31,7 +31,9 @@ import {
     getStoryScenarioFieldEventTrapDamage,
 } from '../../raid/StoryScenarioFieldEventRules';
 import type { WorldDungeonInfo, WorldInspectMarker, WorldMap } from '../../map/WorldMap';
+import { getAmbientSiteOutcome } from '../../raid/AmbientSiteRules';
 import type {
+    AmbientSiteResultMessage,
     ScenarioEnemyDefeatEventMessage,
     ScenarioFieldEventBroadcastMessage,
     ScenarioFieldEventResultMessage,
@@ -50,6 +52,7 @@ export interface WorldStoryInteriorState {
 export interface WorldStoryScenarioNetworkClient {
     sendScenarioEnter(actorId: string, dungeonId: string): string;
     sendScenarioFieldEventInteract(actorId: string, dungeonId: string, eventId: string): string;
+    sendAmbientSiteInteract?(actorId: string, siteId: string): string;
 }
 
 export interface WorldStoryScenarioPendingEnter {
@@ -97,6 +100,8 @@ export class WorldStoryScenarioController {
     private dismissedDungeonVisitKey: string | null = null;
     private pendingNetworkScenarioEnter: WorldStoryScenarioPendingEnter | null = null;
     private readonly pendingNetworkFieldEventIntentIds: Set<string> = new Set();
+    private readonly pendingNetworkAmbientSiteIntentIds: Map<string, string> = new Map();
+    private readonly completedAmbientSiteIds: Set<string> = new Set();
     private readonly networkScenarioEnteredDungeonIds: Set<string> = new Set();
     private readonly completedFieldEventKeys: Set<string> = new Set();
     private readonly presentationQueue: StoryScenarioEventStep[] = [];
@@ -135,6 +140,7 @@ export class WorldStoryScenarioController {
     public resetNetworkState(): void {
         this.pendingNetworkScenarioEnter = null;
         this.pendingNetworkFieldEventIntentIds.clear();
+        this.pendingNetworkAmbientSiteIntentIds.clear();
         this.networkScenarioEnteredDungeonIds.clear();
     }
 
@@ -144,8 +150,11 @@ export class WorldStoryScenarioController {
         this.dismissedDungeonVisitKey = null;
         this.pendingNetworkScenarioEnter = null;
         this.pendingNetworkFieldEventIntentIds.clear();
+        this.pendingNetworkAmbientSiteIntentIds.clear();
         this.networkScenarioEnteredDungeonIds.clear();
         this.completedFieldEventKeys.clear();
+        this.completedAmbientSiteIds.clear();
+        this.context.getWorldMap().setInspectedAmbientSiteIds([]);
         this.context.getWorldMap().setInspectMarkers([]);
     }
 
@@ -178,16 +187,22 @@ export class WorldStoryScenarioController {
         if (!actor) return result;
 
         const dungeonId = this.getFieldEventDungeonId();
-        if (!dungeonId) return result;
-
-        const sequence = getStoryScenarioEventSequence(dungeonId);
-        if (!sequence) return result;
-
         const actorTile = this.context.actorTile(actor);
-        for (const event of sequence.fieldEvents) {
-            if (this.isFieldEventCompleted(dungeonId, event)) continue;
-            for (const tile of this.getScenarioFieldEventTiles(dungeonId, event)) {
-                if (manhattan(actorTile, tile) <= 1) result.add(`${tile.x},${tile.y}`);
+        const sequence = dungeonId ? getStoryScenarioEventSequence(dungeonId) : null;
+        if (dungeonId && sequence) {
+            for (const event of sequence.fieldEvents) {
+                if (this.isFieldEventCompleted(dungeonId, event)) continue;
+                for (const tile of this.getScenarioFieldEventTiles(dungeonId, event)) {
+                    if (manhattan(actorTile, tile) <= 1) result.add(`${tile.x},${tile.y}`);
+                }
+            }
+        }
+
+        if (!this.activeInterior && !this.context.raidSession.activeDungeonId) {
+            for (const site of this.context.getWorldMap().getAmbientSitesNearTile(actorTile, 1)) {
+                if (!this.completedAmbientSiteIds.has(site.id)) {
+                    result.add(`${site.anchorTile.x},${site.anchorTile.y}`);
+                }
             }
         }
         return result;
@@ -243,24 +258,54 @@ export class WorldStoryScenarioController {
 
     public playFieldEventAt(tile: TilePoint, actor: FieldActor | null = this.context.getControlledActor()): boolean {
         const dungeonId = this.getFieldEventDungeonId();
-        if (!dungeonId || !actor) return false;
+        if (!actor || manhattan(this.context.actorTile(actor), tile) > 1) return false;
 
-        const sequence = getStoryScenarioEventSequence(dungeonId);
-        if (!sequence || manhattan(this.context.actorTile(actor), tile) > 1) return false;
+        const sequence = dungeonId ? getStoryScenarioEventSequence(dungeonId) : null;
+        const event = dungeonId && sequence
+            ? sequence.fieldEvents.find((candidate) =>
+                !this.isFieldEventCompleted(dungeonId, candidate)
+                && this.getScenarioFieldEventTiles(dungeonId, candidate).some((triggerTile) => triggerTile.x === tile.x && triggerTile.y === tile.y)
+            )
+            : null;
+        if (event && dungeonId) {
+            if (this.context.isNetworkRaid()) {
+                const client = this.context.getNetworkRaidClient();
+                if (!client) return false;
+                const intentId = client.sendScenarioFieldEventInteract(actor.id, dungeonId, event.id);
+                this.pendingNetworkFieldEventIntentIds.add(intentId);
+                return true;
+            }
+            return this.playFieldEvent(dungeonId, event.id, actor);
+        }
+        return this.playAmbientSiteAt(tile, actor);
+    }
 
-        const event = sequence.fieldEvents.find((candidate) =>
-            !this.isFieldEventCompleted(dungeonId, candidate)
-            && this.getScenarioFieldEventTiles(dungeonId, candidate).some((triggerTile) => triggerTile.x === tile.x && triggerTile.y === tile.y)
-        );
-        if (!event) return false;
+    private playAmbientSiteAt(tile: TilePoint, actor: FieldActor): boolean {
+        if (this.activeInterior || this.context.raidSession.activeDungeonId) return false;
+        const site = this.context.getWorldMap().getAmbientSitesNearTile(tile, 0)[0];
+        if (!site || this.completedAmbientSiteIds.has(site.id)) return false;
+
         if (this.context.isNetworkRaid()) {
             const client = this.context.getNetworkRaidClient();
-            if (!client) return false;
-            const intentId = client.sendScenarioFieldEventInteract(actor.id, dungeonId, event.id);
-            this.pendingNetworkFieldEventIntentIds.add(intentId);
+            if (!client?.sendAmbientSiteInteract) return false;
+            const intentId = client.sendAmbientSiteInteract(actor.id, site.id);
+            this.pendingNetworkAmbientSiteIntentIds.set(intentId, site.id);
             return true;
         }
-        return this.playFieldEvent(dungeonId, event.id, actor);
+
+        this.completedAmbientSiteIds.add(site.id);
+        this.context.getWorldMap().markAmbientSiteInspected(site.id);
+        this.logAmbientSiteInspection(site.kind);
+        const outcome = getAmbientSiteOutcome(site.kind, site.id);
+        for (const reward of outcome.rewards) this.applyNetworkFieldEventReward(reward);
+        if (outcome.trapMaxHpRatio && actor.character.stats.hp > 1) {
+            const damage = Math.min(
+                actor.character.stats.hp - 1,
+                Math.max(1, Math.floor(actor.character.stats.maxHp * outcome.trapMaxHpRatio))
+            );
+            this.applyNetworkTrapMagicDamage({ actorId: actor.id, damage });
+        }
+        return true;
     }
 
     public exitActiveInterior(options: { placePartyAtReturn?: boolean } = {}): void {
@@ -567,11 +612,15 @@ export class WorldStoryScenarioController {
         completedDungeonIds?: readonly string[];
         playerFieldEventFlagsByDungeonId?: Record<string, readonly string[]>;
         sharedFieldEventFlagsByDungeonId?: Record<string, readonly string[]>;
+        inspectedAmbientSiteIds?: readonly string[];
     } | undefined): void {
         if (!scenarioSnapshot) return;
 
         this.applyNetworkScenarioFieldEventFlags(scenarioSnapshot.playerFieldEventFlagsByDungeonId);
         this.applyNetworkScenarioFieldEventFlags(scenarioSnapshot.sharedFieldEventFlagsByDungeonId);
+        this.completedAmbientSiteIds.clear();
+        for (const siteId of scenarioSnapshot.inspectedAmbientSiteIds ?? []) this.completedAmbientSiteIds.add(siteId);
+        this.context.getWorldMap().setInspectedAmbientSiteIds([...this.completedAmbientSiteIds]);
 
         const enteredDungeonIds = scenarioSnapshot.enteredDungeonIds ?? [];
         const completedDungeonIds = scenarioSnapshot.completedDungeonIds ?? [];
@@ -653,6 +702,15 @@ export class WorldStoryScenarioController {
         this.syncActiveWorldScenarioMarkers();
     }
 
+    public applyNetworkAmbientSiteResult(result: AmbientSiteResultMessage): void {
+        this.pendingNetworkAmbientSiteIntentIds.delete(result.intentId);
+        this.completedAmbientSiteIds.add(result.siteId);
+        this.context.getWorldMap().markAmbientSiteInspected(result.siteId);
+        this.logAmbientSiteInspection(result.kind);
+        for (const reward of result.rewards) this.applyNetworkFieldEventReward(reward);
+        this.applyNetworkTrapMagicDamage(result.trapDamage);
+    }
+
     public applyNetworkScenarioFieldEventBroadcast(message: ScenarioFieldEventBroadcastMessage): void {
         const event = getStoryScenarioEventSequence(message.dungeonId)?.fieldEvents
             .find((candidate) => candidate.id === message.eventId);
@@ -678,6 +736,10 @@ export class WorldStoryScenarioController {
         }
         if (this.pendingNetworkFieldEventIntentIds.delete(intentId)) {
             this.context.log(`시나리오 이벤트 실패: ${reason}`);
+            return true;
+        }
+        if (this.pendingNetworkAmbientSiteIntentIds.delete(intentId)) {
+            this.context.log(formatT('field.ambient.failed', { reason }));
             return true;
         }
         return false;
@@ -1068,5 +1130,9 @@ export class WorldStoryScenarioController {
         } else {
             this.context.log(formatT('story.event.reward.itemFull', { item: label }));
         }
+    }
+
+    private logAmbientSiteInspection(kind: AmbientSiteResultMessage['kind']): void {
+        this.context.log(formatT('field.ambient.inspected', { site: t(`field.ambient.${kind}`) }));
     }
 }
