@@ -125,6 +125,56 @@ test('failed final world save patch still drops raid inventory after recovery sn
     assert.equal(finalPatch.inventory?.items.some((item) => item.itemId === 'herb_cheap' && item.gridX === 4), false);
 });
 
+test('failed final world save patch authoritatively applies backpack loss, equipment loss, insurance, and recovery', () => {
+    const save = createDefaultCharacterSave(authCharacter('hero-failed-authoritative'));
+    save.questState = { ...save.questState, raidInsuranceActive: true };
+    save.partySnapshot = { activeCharacterIds: ['hero-failed-authoritative', 'companion-a'] };
+    save.rosterSnapshot = {
+        characters: [
+            ...(save.rosterSnapshot.characters as Array<Record<string, unknown>>),
+            {
+                id: 'companion-a',
+                name: 'Companion A',
+                classKey: 'cleric',
+                tier: 1,
+                level: 1,
+                baseStats: {},
+                equipment: {
+                    weapon: { itemId: 'short_sword', gridX: 0, gridY: 0, quantity: 1, durability: 100 },
+                    body: { itemId: 'magic_t1_body', gridX: 0, gridY: 0, quantity: 1, durability: 100 },
+                },
+            },
+        ],
+    };
+    const player: WorldSessionSavePlayer = {
+        id: 'hero-failed-authoritative',
+        completedQuestIds: new Set(),
+        raidGoldReward: 0,
+        saveSnapshot: save,
+    };
+    const saveState = new WorldSessionSaveState();
+
+    const summary = saveState.captureFinalPatch(player, 'central_castle', false);
+    const finalPatch = saveState.consumeFinalPatch(player.id);
+
+    assert.ok(summary);
+    assert.ok(finalPatch?.inventory);
+    assert.equal(summary.backpackLost.reduce((total, item) => total + item.quantity, 0), 3);
+    assert.equal(summary.equipmentLost.length, 1);
+    assert.ok(summary.protectedEquipment);
+    assert.equal(summary.recoveryBackpack, 3);
+    assert.ok(summary.recoveryEquipped >= 1);
+    assert.deepEqual(finalPatch.inventory.items.map((item) => item.itemId), ['herb_cheap', 'herb_cheap', 'mp_potion']);
+    assert.equal(finalPatch.questState?.raidInsuranceActive, false);
+    const roster = finalPatch.rosterSnapshot?.characters as Array<Record<string, unknown>>;
+    const primary = roster.find((entry) => entry.id === 'hero-failed-authoritative');
+    const companion = roster.find((entry) => entry.id === 'companion-a');
+    assert.ok((primary?.equipment as Record<string, unknown>).weapon);
+    assert.ok((primary?.equipment as Record<string, unknown>).body);
+    assert.ok((companion?.equipment as Record<string, unknown>).weapon);
+    assert.ok((companion?.equipment as Record<string, unknown>).body);
+});
+
 test('final world save patch with full inventory does not persist incomplete story completion', () => {
     const scenario = STORY_SCENARIOS.find((entry) => entry.episode === 3);
     assert.ok(scenario);

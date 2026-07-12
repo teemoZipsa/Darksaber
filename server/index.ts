@@ -163,6 +163,7 @@ interface PlayerSaveTracker {
     expectedRevision: number;
     dirty: boolean;
     saving: boolean;
+    inflightSave: Promise<void> | null;
     lastDirtyAt: number;
     lastSavedAt: number;
 }
@@ -241,13 +242,12 @@ startServerInterval(() => {
         const result = session.tick(now);
         for (const event of result.events) broadcastToSession(sessionKey, event);
         for (const entry of result.perPlayerMessages) {
+            if (entry.message.type === 'RAID_RESULT') {
+                void deliverRaidResultAfterSave(sessionKey, entry.playerId, entry.message);
+                continue;
+            }
             const ws = socketByPlayer.get(socketPlayerKey(sessionKey, entry.playerId));
             if (ws) send(ws, entry.message);
-            const binding = findBinding(sessionKey, entry.playerId);
-            if (binding) persistRaidResult(binding, entry.message);
-            if (entry.message.type === 'RAID_RESULT') {
-                void flushCharacterSave(sessionKey, entry.playerId, 'raid_result', true);
-            }
         }
         consumeSessionSaveDirtyPlayers(sessionKey, session);
         if (result.events.length > 0 || result.perPlayerMessages.length > 0) {
@@ -357,7 +357,9 @@ async function handleSocketMessage(ws: WebSocket, data: RawData): Promise<void> 
     }
 
     const result = session.handleMessage(binding.playerId, message);
+    const raidResults = result.replies.filter((reply): reply is RaidResultMessage => reply.type === 'RAID_RESULT');
     for (const reply of result.replies) {
+        if (reply.type === 'RAID_RESULT') continue;
         send(ws, reply);
         persistRaidResult(binding, reply);
     }
@@ -368,6 +370,10 @@ async function handleSocketMessage(ws: WebSocket, data: RawData): Promise<void> 
     void persistWorldSessionSnapshot(binding.sessionKey, session, message.type);
     if (message.type === 'WORLD_LEAVE') {
         await flushCharacterSave(binding.sessionKey, binding.playerId, 'world_leave', true);
+        for (const resultMessage of raidResults) {
+            send(ws, resultMessage);
+            persistRaidResult(binding, resultMessage);
+        }
         cleanupJoinedSocket(ws, binding);
     }
 }
@@ -884,6 +890,7 @@ function ensureSaveTracker(sessionKey: string, playerId: string, accountId: stri
         expectedRevision,
         dirty: false,
         saving: false,
+        inflightSave: null,
         lastDirtyAt: 0,
         lastSavedAt: 0,
     };
@@ -908,8 +915,29 @@ function consumeSessionSaveDirtyPlayers(sessionKey: string, session: WorldSessio
 async function flushCharacterSave(sessionKey: string, playerId: string, reason: string, force: boolean): Promise<void> {
     const key = socketPlayerKey(sessionKey, playerId);
     const tracker = saveTrackers.get(key);
-    if (!tracker || tracker.saving) return;
+    if (!tracker) return;
+    if (tracker.inflightSave) {
+        if (!force) return;
+        await tracker.inflightSave;
+        return flushCharacterSave(sessionKey, playerId, reason, force);
+    }
     if (!force && !tracker.dirty) return;
+    const operation = performCharacterSaveFlush(sessionKey, playerId, reason, tracker);
+    tracker.inflightSave = operation;
+    try {
+        await operation;
+    } finally {
+        if (tracker.inflightSave === operation) tracker.inflightSave = null;
+    }
+}
+
+async function performCharacterSaveFlush(
+    sessionKey: string,
+    playerId: string,
+    reason: string,
+    tracker: PlayerSaveTracker
+): Promise<void> {
+    const key = socketPlayerKey(sessionKey, playerId);
     const session = sessions.get(sessionKey);
     const isFinalPatch = Boolean(session?.hasFinalCharacterSavePatch(playerId));
     const patch = session?.createCharacterSavePatch(playerId);
@@ -919,7 +947,6 @@ async function flushCharacterSave(sessionKey: string, playerId: string, reason: 
         return;
     }
 
-    // Non-final recovery patches stay in the spool; DB autosaves keep raid rewards uncommitted.
     if (isFinalPatch) spoolPendingCharacterSave(tracker, patch, reason);
     tracker.saving = true;
     tracker.dirty = false;
@@ -943,6 +970,18 @@ async function flushCharacterSave(sessionKey: string, playerId: string, reason: 
     } finally {
         tracker.saving = false;
     }
+}
+
+async function deliverRaidResultAfterSave(
+    sessionKey: string,
+    playerId: string,
+    message: RaidResultMessage
+): Promise<void> {
+    await flushCharacterSave(sessionKey, playerId, 'raid_result', true);
+    const ws = socketByPlayer.get(socketPlayerKey(sessionKey, playerId));
+    if (ws) send(ws, message);
+    const binding = findBinding(sessionKey, playerId);
+    if (binding) persistRaidResult(binding, message);
 }
 
 function spoolPendingCharacterSave(tracker: PlayerSaveTracker, patch: WorldCharacterSavePatch, reason: string): void {

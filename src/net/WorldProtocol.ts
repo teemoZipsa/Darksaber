@@ -5,6 +5,7 @@ import type { StoryScenarioEventStep } from '../data/StoryScenarioEventData';
 import type { EnemyRole } from '../field/EnemyAI';
 import type { WorldLootContainerType } from '../loot/WorldLootTypes';
 import type { RaidModifier } from '../raid/RaidModifiers';
+import type { ItemSlot } from '../data/ItemDB';
 
 const configuredWorldServerUrl = import.meta.env?.VITE_WORLD_SERVER_URL?.trim();
 const configuredAuthServerUrl = import.meta.env?.VITE_AUTH_SERVER_URL?.trim();
@@ -340,6 +341,27 @@ export interface RaidResultMessage {
     completedDungeonIds: string[];
     /** Set when this survival granted the one-time first-survival gold bonus. */
     firstSurvivalBonusGranted?: boolean;
+    /** Server-authoritative losses and recovery applied for DEAD/MIA/LEFT. */
+    failure?: RaidFailureSummary;
+}
+
+export interface RaidFailureItemSummary {
+    itemId: string;
+    quantity: number;
+}
+
+export interface RaidFailureEquipmentSummary extends RaidFailureItemSummary {
+    characterId: string;
+    characterName: string;
+    slot: ItemSlot;
+}
+
+export interface RaidFailureSummary {
+    backpackLost: RaidFailureItemSummary[];
+    equipmentLost: RaidFailureEquipmentSummary[];
+    protectedEquipment?: RaidFailureEquipmentSummary;
+    recoveryEquipped: number;
+    recoveryBackpack: number;
 }
 
 export type ScenarioFieldEventScope = 'player' | 'shared';

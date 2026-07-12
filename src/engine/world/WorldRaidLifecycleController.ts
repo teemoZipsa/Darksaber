@@ -282,6 +282,7 @@ export class WorldRaidLifecycleController {
         } else if (result.result === 'DEAD' || result.result === 'MIA') {
             this.context.raidOutcomeController.completeFailure(result.result, {
                 serverAuthoritativeState: syncResult.ok,
+                serverFailure: result.failure,
             });
         } else {
             this.context.raidSession.failBackToTown(this.context.raidSession.currentHubTownId);

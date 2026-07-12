@@ -2246,6 +2246,10 @@ test('server-authoritative field scenario gold rewards are lost on failed raids'
     const leave = session.handleMessage(joined.playerId, { type: 'WORLD_LEAVE', reason: 'wipe' }, 1_200);
     assert.equal(leave.replies[0]?.type, 'RAID_RESULT');
     assert.equal(leave.replies[0]?.type === 'RAID_RESULT' ? leave.replies[0].result : '', 'DEAD');
+    assert.ok(leave.replies[0]?.type === 'RAID_RESULT' && leave.replies[0].failure);
+    assert.equal(leave.replies[0]?.type === 'RAID_RESULT'
+        ? leave.replies[0].failure?.recoveryBackpack
+        : undefined, 3);
     const finalPatch = session.createCharacterSavePatch(joined.playerId);
     assert.ok(finalPatch?.questState);
     assert.equal(finalPatch.questState.gold, 500);

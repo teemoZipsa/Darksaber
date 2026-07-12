@@ -24,6 +24,9 @@ import {
     type RaidOutcome,
     type RaidOutcomeMissionReport,
     type RaidResultType,
+    type RaidLossPlan,
+    type EquipmentLoss,
+    snapshotItem,
     snapshotPlacedItem,
 } from '../../raid/RaidOutcome';
 import { applyRaidInsurance } from '../../raid/RaidInsurance';
@@ -33,6 +36,7 @@ import type { GameManager } from '../GameManager';
 import type { InputManager } from '../InputManager';
 import type { WorldPhase, WorldRaidSession } from './WorldRaidSession';
 import type { WorldTownSession } from './WorldTownSession';
+import type { RaidFailureSummary } from '../../net/WorldProtocol';
 
 function displayTownName(town: TownInfo): string {
     return i18n.lang === 'ko' ? town.nameKr : town.name;
@@ -82,6 +86,7 @@ export interface CompleteFailureOptions {
      * second time, or the next hub save will look like free item creation.
      */
     serverAuthoritativeState?: boolean;
+    serverFailure?: RaidFailureSummary;
 }
 
 export class WorldRaidOutcomeController {
@@ -188,7 +193,7 @@ export class WorldRaidOutcomeController {
         const serverAuthoritativeState = options.serverAuthoritativeState === true;
         const insuranceActive = !serverAuthoritativeState && this.context.playerData.raidInsuranceActive;
         const insurance = serverAuthoritativeState
-            ? { loss: { backpackLost: [], equipmentLost: [] }, protectedEquipment: null }
+            ? this.mapServerFailure(options.serverFailure)
             : applyRaidInsurance(
                 computeRaidFailureLoss(this.context.gameManager.inventory.items, this.context.party.getCharacters()),
                 insuranceActive
@@ -203,6 +208,11 @@ export class WorldRaidOutcomeController {
                 character?.unequip(lost.slot);
             }
             recoveryNotes = this.applyRaidFailureRecoveryKit();
+        } else if (options.serverFailure && (options.serverFailure.recoveryEquipped > 0 || options.serverFailure.recoveryBackpack > 0)) {
+            recoveryNotes = [formatT('raid.outcome.recoveryKit', {
+                equipped: options.serverFailure.recoveryEquipped,
+                backpack: options.serverFailure.recoveryBackpack,
+            })];
         }
 
         const returnTown = this.context.getTownById(raidSession.departureTownId) ?? this.context.getCurrentHubTown();
@@ -242,6 +252,40 @@ export class WorldRaidOutcomeController {
         this.showRaidResult(outcome, returnTown);
         this.context.log(result === 'MIA' ? t('raid.outcome.miaLog') : t('raid.outcome.deadLog'));
         if (recoveryNotes.length > 0) this.context.log(t('raid.outcome.recoveryGranted'));
+    }
+
+    private mapServerFailure(summary?: RaidFailureSummary): { loss: RaidLossPlan; protectedEquipment: EquipmentLoss | null } {
+        if (!summary) return { loss: { backpackLost: [], equipmentLost: [] }, protectedEquipment: null };
+        const equipmentLost = summary.equipmentLost.flatMap((entry): EquipmentLoss[] => {
+            const item = getItemDef(entry.itemId);
+            return item ? [{
+                characterId: entry.characterId,
+                characterName: entry.characterName,
+                slot: entry.slot,
+                item: snapshotItem(item, entry.quantity),
+            }] : [];
+        });
+        const protectedEquipment = summary.protectedEquipment
+            ? (() => {
+                const item = getItemDef(summary.protectedEquipment.itemId);
+                return item ? {
+                    characterId: summary.protectedEquipment.characterId,
+                    characterName: summary.protectedEquipment.characterName,
+                    slot: summary.protectedEquipment.slot,
+                    item: snapshotItem(item, summary.protectedEquipment.quantity),
+                } : null;
+            })()
+            : null;
+        return {
+            loss: {
+                backpackLost: summary.backpackLost.flatMap((entry) => {
+                    const item = getItemDef(entry.itemId);
+                    return item ? [snapshotItem(item, entry.quantity)] : [];
+                }),
+                equipmentLost,
+            },
+            protectedEquipment,
+        };
     }
 
     private applyRaidFailureRecoveryKit(): string[] {

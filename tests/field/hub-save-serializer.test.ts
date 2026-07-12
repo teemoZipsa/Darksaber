@@ -20,6 +20,7 @@ test('buildHubSavePatch round-trips grid inventory dimensions and item ids', () 
     playerData.gold = 900;
     playerData.currentHubTownId = 'central_castle';
     playerData.facilityUpgrades.infirmary = 1;
+    playerData.raidInsuranceActive = true;
     const inventory = new GridInventory(10, 6);
     const stash = new GridInventory(15, 10);
     const potion = ITEMS.find((item) => item.id === 'herb_cheap');
@@ -37,6 +38,7 @@ test('buildHubSavePatch round-trips grid inventory dimensions and item ids', () 
 
     assert.equal((patch.questState as Record<string, unknown>).gold, 900);
     assert.deepEqual((patch.questState as Record<string, unknown>).facilityUpgrades, { infirmary: 1 });
+    assert.equal((patch.questState as Record<string, unknown>).raidInsuranceActive, true);
     assert.equal(patch.inventory?.width, 10);
     assert.equal(patch.stashSnapshot?.width, 15);
     assert.equal(patch.inventory?.items[0]?.itemId, 'herb_cheap');

@@ -1,4 +1,6 @@
-import { getItemDef } from '../src/data/ItemDB';
+import { getItemDef, type ItemSlot } from '../src/data/ItemDB';
+import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../src/data/StarterKitData';
+import type { RaidFailureEquipmentSummary, RaidFailureSummary } from '../src/net/WorldProtocol';
 import { FIRST_SURVIVAL_GOLD_REWARD, FIRST_SURVIVAL_QUEST_ID } from '../src/shared/FirstSurvivalReward';
 import type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from './AuthStore';
 import { applyStoryQuestRewardsToSaveState } from './StoryRewardSave';
@@ -62,13 +64,23 @@ export class WorldSessionSaveState {
             : this.finalPatches.get(playerId) ?? null;
     }
 
-    public captureFinalPatch(player: WorldSessionSavePlayer, hubTownId?: string, includeRaidRewards: boolean = false): void {
+    public captureFinalPatch(
+        player: WorldSessionSavePlayer,
+        hubTownId?: string,
+        includeRaidRewards: boolean = false
+    ): RaidFailureSummary | null {
+        if (!includeRaidRewards) {
+            const failure = this.buildFailurePatch(player, hubTownId);
+            if (failure) this.finalPatches.set(player.id, failure.patch);
+            return failure?.summary ?? null;
+        }
         const patch = this.buildPatch(player, {
             hubTownId,
-            includeAcquiredRaidItems: includeRaidRewards,
-            includeSurvivalRewards: includeRaidRewards,
+            includeAcquiredRaidItems: true,
+            includeSurvivalRewards: true,
         });
         if (patch) this.finalPatches.set(player.id, patch);
+        return null;
     }
 
     public hasFinalPatch(playerId: string): boolean {
@@ -154,6 +166,112 @@ export class WorldSessionSaveState {
             rosterSnapshot,
         };
     }
+
+    private buildFailurePatch(
+        player: WorldSessionSavePlayer,
+        hubTownId?: string
+    ): { patch: WorldCharacterSavePatch; summary: RaidFailureSummary } | null {
+        const save = player.saveSnapshot;
+        if (!save) return null;
+
+        const questState = cloneRecord(save.questState);
+        const insuranceActive = questState.raidInsuranceActive === true;
+        if (insuranceActive) questState.raidInsuranceActive = false;
+        const inventory: InventorySaveSnapshot = {
+            width: save.inventory.width,
+            height: save.inventory.height,
+            items: [],
+        };
+        const backpackLost = mergeFailureItems(save.inventory.items.map((item) => ({
+            itemId: item.itemId,
+            quantity: Math.max(1, Math.floor(item.quantity)),
+        })));
+        const equipment = cloneRecord(save.equipment);
+        const rosterSnapshot = cloneRecord(save.rosterSnapshot);
+        const rosterCharacters = readRosterCharacters(rosterSnapshot);
+        const activeCharacterIds = uniqueStrings([
+            save.characterId,
+            ...normalizeStringArray(save.partySnapshot.activeCharacterIds),
+        ]).slice(0, 3);
+        const plannedLosses: Array<RaidFailureEquipmentSummary & { record: Record<string, unknown> }> = [];
+
+        for (const characterId of activeCharacterIds) {
+            const rosterCharacter = rosterCharacters.get(characterId);
+            const record = characterId === save.characterId
+                ? equipment
+                : isRecord(rosterCharacter?.equipment) ? cloneRecord(rosterCharacter.equipment) : {};
+            if (characterId !== save.characterId && rosterCharacter) rosterCharacter.equipment = record;
+            const candidates = readEquipmentCandidates(record);
+            if (candidates.length === 0) continue;
+            const selected = candidates[stableIndex(`${player.id}:${characterId}:raid-failure`, candidates.length)];
+            plannedLosses.push({
+                characterId,
+                characterName: typeof rosterCharacter?.name === 'string' ? rosterCharacter.name : characterId,
+                slot: selected.slot,
+                itemId: selected.itemId,
+                quantity: selected.quantity,
+                record,
+            });
+        }
+
+        const protectedLoss = insuranceActive
+            ? [...plannedLosses].sort((a, b) => failureEquipmentValue(b) - failureEquipmentValue(a))[0]
+            : undefined;
+        const equipmentLost: RaidFailureEquipmentSummary[] = [];
+        for (const loss of plannedLosses) {
+            if (loss === protectedLoss) continue;
+            loss.record[loss.slot] = null;
+            equipmentLost.push(stripFailureRecord(loss));
+        }
+
+        let recoveryEquipped = 0;
+        for (const characterId of activeCharacterIds) {
+            const rosterCharacter = rosterCharacters.get(characterId);
+            const record = characterId === save.characterId
+                ? equipment
+                : isRecord(rosterCharacter?.equipment) ? rosterCharacter.equipment : {};
+            if (characterId !== save.characterId && rosterCharacter) rosterCharacter.equipment = record;
+            const classLineId = readClassLineId(rosterCharacter);
+            recoveryEquipped += addStarterEquipmentIfEmpty(record, 'weapon', STARTER_WEAPON_ITEM_ID);
+            recoveryEquipped += addStarterEquipmentIfEmpty(record, 'body', getStarterBodyArmorId(classLineId));
+        }
+        const primaryRosterCharacter = rosterCharacters.get(save.characterId);
+        if (primaryRosterCharacter) primaryRosterCharacter.equipment = cloneRecord(equipment);
+
+        let recoveryBackpack = 0;
+        for (const itemId of STARTER_CONSUMABLE_ITEM_IDS) {
+            const item = getItemDef(itemId);
+            if (!item) continue;
+            if (tryAddPlacedItemToInventory(inventory, {
+                item,
+                durability: item.maxDurability,
+                quantity: 1,
+            }, false)) recoveryBackpack += 1;
+        }
+
+        const hubLocation = {
+            ...cloneRecord(save.hubLocation),
+            ...(hubTownId ? { townId: hubTownId } : {}),
+        };
+        return {
+            patch: {
+                saveVersion: save.saveVersion,
+                hubLocation,
+                questState,
+                inventory,
+                equipment,
+                partySnapshot: cloneRecord(save.partySnapshot),
+                rosterSnapshot,
+            },
+            summary: {
+                backpackLost,
+                equipmentLost,
+                ...(protectedLoss ? { protectedEquipment: stripFailureRecord(protectedLoss) } : {}),
+                recoveryEquipped,
+                recoveryBackpack,
+            },
+        };
+    }
 }
 
 function hasClaimedFirstSurvival(player: WorldSessionSavePlayer): boolean {
@@ -171,6 +289,95 @@ function grantFirstSurvivalReward(
     const completed = new Set(normalizeStringArray(questState.completedQuestIds));
     completed.add(FIRST_SURVIVAL_QUEST_ID);
     questState.completedQuestIds = [...completed];
+}
+
+const FAILURE_EQUIPMENT_SLOTS: ItemSlot[] = ['weapon', 'shield', 'head', 'body', 'boots', 'accessory', 'accessory2'];
+
+function readRosterCharacters(rosterSnapshot: Record<string, unknown>): Map<string, Record<string, unknown>> {
+    const result = new Map<string, Record<string, unknown>>();
+    if (!Array.isArray(rosterSnapshot.characters)) return result;
+    for (const raw of rosterSnapshot.characters) {
+        if (isRecord(raw) && typeof raw.id === 'string') result.set(raw.id, raw);
+    }
+    return result;
+}
+
+function readEquipmentCandidates(record: Record<string, unknown>): Array<{ slot: ItemSlot; itemId: string; quantity: number }> {
+    return FAILURE_EQUIPMENT_SLOTS.flatMap((slot) => {
+        const raw = record[slot];
+        if (!isRecord(raw) || typeof raw.itemId !== 'string' || !getItemDef(raw.itemId)) return [];
+        return [{
+            slot,
+            itemId: raw.itemId,
+            quantity: typeof raw.quantity === 'number' && Number.isFinite(raw.quantity)
+                ? Math.max(1, Math.floor(raw.quantity))
+                : 1,
+        }];
+    });
+}
+
+function addStarterEquipmentIfEmpty(
+    record: Record<string, unknown>,
+    slot: ItemSlot,
+    itemId: string
+): number {
+    if (isRecord(record[slot])) return 0;
+    const item = getItemDef(itemId);
+    if (!item || item.slot !== slot) return 0;
+    record[slot] = {
+        itemId: item.id,
+        gridX: 0,
+        gridY: 0,
+        quantity: 1,
+        durability: item.maxDurability,
+    };
+    return 1;
+}
+
+function readClassLineId(character: Record<string, unknown> | undefined): string {
+    if (!character) return 'infantry';
+    if (typeof character.classKey === 'string') return character.classKey;
+    if (typeof character.classLineId === 'string') return character.classLineId;
+    return 'infantry';
+}
+
+function stableIndex(seed: string, length: number): number {
+    let hash = 2166136261;
+    for (let index = 0; index < seed.length; index++) {
+        hash ^= seed.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+    }
+    return Math.abs(hash >>> 0) % Math.max(1, length);
+}
+
+function failureEquipmentValue(loss: RaidFailureEquipmentSummary): number {
+    return (getItemDef(loss.itemId)?.baseValue ?? 0) * Math.max(1, loss.quantity);
+}
+
+function stripFailureRecord(
+    loss: RaidFailureEquipmentSummary & { record: Record<string, unknown> }
+): RaidFailureEquipmentSummary {
+    return {
+        characterId: loss.characterId,
+        characterName: loss.characterName,
+        slot: loss.slot,
+        itemId: loss.itemId,
+        quantity: loss.quantity,
+    };
+}
+
+function mergeFailureItems(items: Array<{ itemId: string; quantity: number }>): Array<{ itemId: string; quantity: number }> {
+    const totals = new Map<string, number>();
+    for (const item of items) totals.set(item.itemId, (totals.get(item.itemId) ?? 0) + Math.max(1, item.quantity));
+    return [...totals].map(([itemId, quantity]) => ({ itemId, quantity }));
+}
+
+function uniqueStrings(values: readonly string[]): string[] {
+    return [...new Set(values.filter((value) => value.length > 0))];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function tryAddPlacedItemToInventory(

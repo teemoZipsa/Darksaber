@@ -35,8 +35,11 @@ export class WorldSessionRaidResults {
             const survived = finalResult === 'SURVIVED';
             if (survived) {
                 message.firstSurvivalBonusGranted = this.context.saveState.grantsFirstSurvivalBonus(player);
+                this.context.saveState.captureFinalPatch(player, extractionTownId, true);
+            } else {
+                const failure = this.context.saveState.captureFinalPatch(player);
+                if (failure) message.failure = failure;
             }
-            this.context.saveState.captureFinalPatch(player, survived ? extractionTownId : undefined, survived);
             this.context.saveState.markDirty(playerId);
         }
         this.context.removePlayer(playerId);
