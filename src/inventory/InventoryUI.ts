@@ -145,6 +145,17 @@ export class InventoryUI {
             return true;
         }
 
+        const isUnconfirmedRaidTransfer = source.kind === 'grid'
+            && source.grid === 'ext'
+            && this.externalGridIsRaidLoot
+            && targetKind === 'bag';
+        if (occupant && occupant !== placed && !isUnconfirmedRaidTransfer && target.canMergeStacks(placed, occupant)) {
+            this.detach(placed, source);
+            if (target.mergeStacksPreservingIncoming(placed, occupant)) return true;
+            this.restore(placed, source);
+            return false;
+        }
+
         this.detach(placed, source);
         if (target.placeExisting(placed, gx, gy)) {
             this.markRaidLoot(placed, source, targetKind);
@@ -187,8 +198,12 @@ export class InventoryUI {
         const target = this.gridOf(targetKind);
         if (!target) return false;
 
+        const isUnconfirmedRaidTransfer = source.kind === 'grid'
+            && source.grid === 'ext'
+            && this.externalGridIsRaidLoot
+            && targetKind === 'bag';
         this.detach(placed, source);
-        if (target.autoPlaceExisting(placed)) {
+        if (isUnconfirmedRaidTransfer ? target.autoPlaceExistingWithoutMerge(placed) : target.autoPlaceExisting(placed)) {
             this.markRaidLoot(placed, source, targetKind);
             return true;
         }
@@ -204,7 +219,10 @@ export class InventoryUI {
             const source = placed.gridX;
             const sourceY = placed.gridY;
             this.externalGrid.remove(placed);
-            if (!this.inventory.autoPlaceExisting(placed)) {
+            const placedInBag = this.externalGridIsRaidLoot
+                ? this.inventory.autoPlaceExistingWithoutMerge(placed)
+                : this.inventory.autoPlaceExisting(placed);
+            if (!placedInBag) {
                 this.externalGrid.placeExisting(placed, source, sourceY); // put it back
                 const msg = moved > 0
                     ? formatT('inventory.feedback.partialTakeAll', { count: moved })

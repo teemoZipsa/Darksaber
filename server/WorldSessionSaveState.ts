@@ -386,6 +386,20 @@ function tryAddPlacedItemToInventory(
     acquiredInRaid: boolean
 ): boolean {
     if (placed.quantity <= 0) return false;
+    const itemDef = getItemDef(placed.item.id);
+    if (!itemDef) return false;
+    const quantity = Math.max(1, Math.floor(placed.quantity));
+    const existing = inventory.items.find((item) => (
+        item.itemId === placed.item.id
+        && item.quantity + quantity <= itemDef.maxStack
+        && (item.sockets?.length ?? 0) === 0
+        && (placed.sockets?.length ?? 0) === 0
+    ));
+    if (existing) {
+        existing.quantity += quantity;
+        if (acquiredInRaid) existing.acquiredInRaid = true;
+        return true;
+    }
     const slot = findFreeInventorySlot(inventory, placed.item.id);
     if (!slot) return false;
     const item: InventorySaveItem = {
@@ -393,7 +407,7 @@ function tryAddPlacedItemToInventory(
         gridX: slot.x,
         gridY: slot.y,
         durability: Number.isFinite(placed.durability) ? placed.durability : placed.item.maxDurability,
-        quantity: Math.max(1, Math.floor(placed.quantity)),
+        quantity: Math.min(itemDef.maxStack, quantity),
     };
     if (acquiredInRaid) item.acquiredInRaid = true;
     if (placed.sockets) item.sockets = placed.sockets.map((socket) => socket.id);

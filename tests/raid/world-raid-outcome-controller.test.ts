@@ -222,7 +222,10 @@ test('raid failure grants a basic recovery set instead of leaving the party empt
     assert.equal(hero.equipment.get('weapon')?.item.id, 'short_sword');
     assert.equal(hero.equipment.has('shield'), false);
     assert.equal(hero.equipment.get('body')?.item.id, 'battle_t1_body');
-    assert.deepEqual(gameManager.inventory.items.map((placed) => placed.item.id), ['herb_cheap', 'herb_cheap', 'mp_potion']);
+    assert.deepEqual(
+        gameManager.inventory.items.map((placed) => [placed.item.id, placed.quantity]),
+        [['herb_cheap', 2], ['mp_potion', 1]]
+    );
     assert.ok(getOutcome()?.notes?.some((note) => note.includes('기본 보급품 지급')));
 });
 
@@ -414,7 +417,7 @@ test('Zamora objective does not grant episode 2 reward on raid failure', () => {
 test('episode 3 sacred sword falls back to stash when backpack is full', () => {
     const { controller, playerData, raidSession, gameManager, getOutcome } = createController();
     const episode3 = STORY_QUESTS.find((quest) => quest.episode === 3);
-    const filler = getItemDef('herb_cheap');
+    const filler = getItemDef('rune_el');
     assert.ok(episode3);
     assert.ok(filler);
     playerData.markCleared(MAIN_QUEST_EPISODE_01_ID);
@@ -438,7 +441,7 @@ test('episode 3 sacred sword falls back to stash when backpack is full', () => {
 test('episode 3 sacred sword blocks quest completion when all reward storage is full', () => {
     const { controller, playerData, raidSession, party, gameManager, getOutcome } = createController();
     const episode3 = STORY_QUESTS.find((quest) => quest.episode === 3);
-    const filler = getItemDef('herb_cheap');
+    const filler = getItemDef('rune_el');
     assert.ok(episode3);
     assert.ok(filler);
     playerData.markCleared(MAIN_QUEST_EPISODE_01_ID);

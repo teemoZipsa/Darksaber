@@ -848,6 +848,11 @@ function createStarterInventoryItems(): InventorySaveItem[] {
     for (const itemId of STARTER_CONSUMABLE_ITEM_IDS) {
         const item = ITEMS.find((candidate) => candidate.id === itemId);
         if (!item) continue;
+        const existing = items.find((entry) => entry.itemId === item.id && entry.quantity < item.maxStack);
+        if (existing) {
+            existing.quantity += 1;
+            continue;
+        }
         const slot = findOpenInventorySlot(occupied, item.gridW, item.gridH);
         if (!slot) continue;
         for (let y = slot.gridY; y < slot.gridY + item.gridH; y++) {
@@ -985,7 +990,7 @@ export function normalizeInventorySnapshot(snapshot: InventorySaveSnapshot): Inv
                 itemId: item.id,
                 gridX,
                 gridY,
-                quantity: clampInt(entry.quantity, 1, 999, 1),
+                quantity: clampInt(entry.quantity, 1, item.maxStack, 1),
                 durability: clampInt(entry.durability, 0, item.maxDurability, item.maxDurability),
                 ...(entry.acquiredInRaid ? { acquiredInRaid: true } : {}),
                 ...withOptionalUid(entry.uid),

@@ -29,6 +29,7 @@ export interface ItemDef {
     icon: string;     // emoji/text icon
     iconSprite?: ItemIconSprite; // 32x32 cell in the original item atlas
     maxDurability: number;
+    maxStack: number;
     stats?: Partial<CharacterStats>;
     attackRange?: number;
     magicRange?: number;
@@ -52,7 +53,8 @@ export interface ItemDef {
     socketEffects?: Partial<Record<SocketHostKind, Partial<CharacterStats>>>;
 }
 
-export type RawItemDef = Omit<ItemDef, 'rarity' | 'weight' | 'baseValue'> & Partial<Pick<ItemDef, 'rarity' | 'weight' | 'baseValue'>>;
+export type RawItemDef = Omit<ItemDef, 'rarity' | 'weight' | 'baseValue' | 'maxStack'>
+    & Partial<Pick<ItemDef, 'rarity' | 'weight' | 'baseValue' | 'maxStack'>>;
 
 function inferRarity(item: RawItemDef): ItemRarity {
     if (item.rarity) return item.rarity;
@@ -112,9 +114,16 @@ export function normalizeItemDef(item: RawItemDef): ItemDef {
         rarity,
         weight: inferWeight(item),
         baseValue: inferBaseValue(item),
+        maxStack: item.maxStack ?? inferMaxStack(item.slot),
         ...(maxSockets !== undefined ? { maxSockets } : {}),
         ...(maxSockets ? { socketTypes: item.socketTypes ?? ['rune', 'gem'] } : {}),
     };
+}
+
+function inferMaxStack(slot: ItemSlot): number {
+    if (slot === 'consumable') return 10;
+    if (slot === 'material') return 20;
+    return 1;
 }
 
 function inferMaxSockets(item: RawItemDef, rarity: ItemRarity): number | undefined {

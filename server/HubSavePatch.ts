@@ -184,7 +184,7 @@ function sanitizeEquipment(value: Record<string, unknown>): Record<string, unkno
             itemId: item.id,
             gridX: finiteFloor(raw.gridX, 0),
             gridY: finiteFloor(raw.gridY, 0),
-            quantity: Math.max(1, finiteFloor(raw.quantity, 1)),
+            quantity: Math.max(1, Math.min(item.maxStack, finiteFloor(raw.quantity, 1))),
             durability: Math.max(0, Math.min(item.maxDurability, finiteFloor(raw.durability, item.maxDurability))),
             ...(Array.isArray(raw.sockets)
                 ? {

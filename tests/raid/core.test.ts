@@ -71,6 +71,7 @@ test('item metadata is normalized once for every item definition', () => {
         assert.equal(typeof item.baseValue, 'number');
         assert.ok(item.weight > 0);
         assert.ok(item.baseValue > 0);
+        assert.ok(item.maxStack >= 1);
     }
 });
 
@@ -92,6 +93,7 @@ test('normalizeItemDef applies stable defaults to raw items', () => {
     assert.equal(normalized.rarity, 'common');
     assert.equal(normalized.weight, 2.3);
     assert.ok(normalized.baseValue > 0);
+    assert.equal(normalized.maxStack, 1);
 });
 
 test('carry weight totals backpack, sockets, and equipment for ATB penalty', () => {

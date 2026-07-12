@@ -276,7 +276,10 @@ test('default character saves start with the shared no-shield basic kit', () => 
     assert.equal(equipment.weapon?.itemId, 'short_sword');
     assert.equal(equipment.body?.itemId, 'battle_t1_body');
     assert.equal(Object.prototype.hasOwnProperty.call(equipment, 'shield'), false);
-    assert.deepEqual(save.inventory.items.map((item) => item.itemId), ['herb_cheap', 'herb_cheap', 'mp_potion']);
+    assert.deepEqual(
+        save.inventory.items.map((item) => [item.itemId, item.quantity]),
+        [['herb_cheap', 2], ['mp_potion', 1]]
+    );
 });
 
 test('default character saves use class-branch body armor', () => {

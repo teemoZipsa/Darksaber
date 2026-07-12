@@ -324,7 +324,7 @@ function normalizeInventorySaveItem(value: unknown, index: number): InventoryIte
         gridX,
         gridY,
         durability: normalizeDurability(value.itemId, value.durability),
-        quantity: normalizeQuantity(value.quantity),
+        quantity: normalizeQuantity(value.itemId, value.quantity),
         acquiredInRaid: value.acquiredInRaid === true,
         sockets: normalizeStringArray(value.sockets),
     };
@@ -349,16 +349,17 @@ function toInventorySaveItem(item: InventoryItem): InventorySaveItem {
         itemId: item.itemId,
         gridX: finiteFloor(item.gridX, 0),
         gridY: finiteFloor(item.gridY, 0),
-        quantity: normalizeQuantity(item.quantity),
+        quantity: normalizeQuantity(item.itemId, item.quantity),
         durability: normalizeDurability(item.itemId, item.durability),
         ...(item.acquiredInRaid ? { acquiredInRaid: true } : {}),
         ...(item.sockets.length > 0 ? { sockets: item.sockets } : {}),
     };
 }
 
-function normalizeQuantity(value: unknown): number {
+function normalizeQuantity(itemId: string, value: unknown): number {
+    const maxStack = getItemDef(itemId)?.maxStack ?? 1;
     return typeof value === 'number' && Number.isFinite(value)
-        ? Math.max(1, Math.floor(value))
+        ? Math.max(1, Math.min(maxStack, Math.floor(value)))
         : 1;
 }
 

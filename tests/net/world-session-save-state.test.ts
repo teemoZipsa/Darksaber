@@ -164,7 +164,10 @@ test('failed final world save patch authoritatively applies backpack loss, equip
     assert.ok(summary.protectedEquipment);
     assert.equal(summary.recoveryBackpack, 3);
     assert.ok(summary.recoveryEquipped >= 1);
-    assert.deepEqual(finalPatch.inventory.items.map((item) => item.itemId), ['herb_cheap', 'herb_cheap', 'mp_potion']);
+    assert.deepEqual(finalPatch.inventory.items.map((item) => [item.itemId, item.quantity]), [
+        ['herb_cheap', 2],
+        ['mp_potion', 1],
+    ]);
     assert.equal(finalPatch.questState?.raidInsuranceActive, false);
     const roster = finalPatch.rosterSnapshot?.characters as Array<Record<string, unknown>>;
     const primary = roster.find((entry) => entry.id === 'hero-failed-authoritative');

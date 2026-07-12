@@ -629,11 +629,16 @@ export class GameManager {
     private placeSavedInventoryItemOnGrid(grid: GridInventory, entry: InventorySaveItem): void {
         const item = ITEMS.find((candidate) => candidate.id === entry.itemId);
         if (!item) return;
-        const placed = grid.place(item, entry.gridX, entry.gridY) ?? grid.autoPlace(item);
-        if (!placed) return;
-        placed.quantity = Math.max(1, Math.floor(entry.quantity));
-        placed.durability = Math.max(0, Math.min(item.maxDurability, Math.floor(entry.durability)));
-        placed.acquiredInRaid = entry.acquiredInRaid;
+        const placed: PlacedItem = {
+            item,
+            gridX: entry.gridX,
+            gridY: entry.gridY,
+            quantity: Math.max(1, Math.min(item.maxStack, Math.floor(entry.quantity))),
+            durability: Math.max(0, Math.min(item.maxDurability, Math.floor(entry.durability))),
+            acquiredInRaid: entry.acquiredInRaid,
+            sockets: entry.sockets?.flatMap((socketId) => ITEMS.find((candidate) => candidate.id === socketId) ?? []),
+        };
+        if (!grid.placeExisting(placed, entry.gridX, entry.gridY)) grid.autoPlaceExisting(placed);
     }
 
     private createPlacedItem(item: ItemDef, entry: SavedEquipmentEntry | null): PlacedItem {

@@ -83,6 +83,14 @@ export class GridInventory {
 
     /** Auto-place an existing PlacedItem instance in the first free slot. */
     public autoPlaceExisting(placed: PlacedItem): boolean {
+        for (const target of this.items) {
+            if (this.canMergeStacks(placed, target) && this.mergeStacksPreservingIncoming(placed, target)) return true;
+        }
+        return this.autoPlaceExistingWithoutMerge(placed);
+    }
+
+    /** Auto-place while preserving a distinct instance (pending server-confirmed loot). */
+    public autoPlaceExistingWithoutMerge(placed: PlacedItem): boolean {
         for (let y = 0; y <= this.height - placed.item.gridH; y++) {
             for (let x = 0; x <= this.width - placed.item.gridW; x++) {
                 if (this.canPlace(placed.item, x, y)) return this.placeExisting(placed, x, y);
@@ -121,6 +129,11 @@ export class GridInventory {
 
     /** Auto-place an item in the first available slot */
     public autoPlace(item: ItemDef): PlacedItem | null {
+        const stack = this.items.find((placed) => placed.item.id === item.id && placed.quantity < item.maxStack);
+        if (stack) {
+            stack.quantity += 1;
+            return stack;
+        }
         for (let y = 0; y <= this.height - item.gridH; y++) {
             for (let x = 0; x <= this.width - item.gridW; x++) {
                 if (this.canPlace(item, x, y)) {
@@ -131,9 +144,35 @@ export class GridInventory {
         return null; // no space
     }
 
-    /** Repack items by size and value without changing their instances. */
+    public canMergeStacks(incoming: PlacedItem, target: PlacedItem): boolean {
+        return incoming !== target
+            && incoming.item.id === target.item.id
+            && incoming.item.maxStack > 1
+            && incoming.quantity + target.quantity <= incoming.item.maxStack
+            && (incoming.sockets?.length ?? 0) === 0
+            && (target.sockets?.length ?? 0) === 0;
+    }
+
+    public mergeStacksPreservingIncoming(incoming: PlacedItem, target: PlacedItem): boolean {
+        if (!this.items.includes(target) || !this.canMergeStacks(incoming, target)) return false;
+        const targetX = target.gridX;
+        const targetY = target.gridY;
+        const targetQuantity = target.quantity;
+        const targetAcquiredInRaid = target.acquiredInRaid === true;
+        const incomingAcquiredInRaid = incoming.acquiredInRaid === true;
+        this.remove(target);
+        incoming.quantity += targetQuantity;
+        if (targetAcquiredInRaid) incoming.acquiredInRaid = true;
+        if (this.placeExisting(incoming, targetX, targetY)) return true;
+        incoming.quantity -= targetQuantity;
+        incoming.acquiredInRaid = incomingAcquiredInRaid;
+        this.placeExisting(target, targetX, targetY);
+        return false;
+    }
+
+    /** Repack items by size and value, consolidating compatible legacy stacks first. */
     public sort(): void {
-        const items = [...this.items].sort((a, b) => {
+        const items = this.consolidateStacks([...this.items]).sort((a, b) => {
             const areaDiff = (b.item.gridW * b.item.gridH) - (a.item.gridW * a.item.gridH);
             if (areaDiff !== 0) return areaDiff;
             return b.item.baseValue - a.item.baseValue;
@@ -163,6 +202,28 @@ export class GridInventory {
                 }
             }
         }
+    }
+
+    private consolidateStacks(items: PlacedItem[]): PlacedItem[] {
+        const consolidated: PlacedItem[] = [];
+        for (const incoming of items) {
+            const target = consolidated.find((placed) => placed.item.id === incoming.item.id
+                && placed.item.maxStack > 1
+                && placed.quantity < placed.item.maxStack
+                && (placed.acquiredInRaid === true) === (incoming.acquiredInRaid === true)
+                && (placed.sockets?.length ?? 0) === 0
+                && (incoming.sockets?.length ?? 0) === 0);
+            if (!target) {
+                consolidated.push(incoming);
+                continue;
+            }
+
+            const moved = Math.min(incoming.quantity, target.item.maxStack - target.quantity);
+            target.quantity += moved;
+            incoming.quantity -= moved;
+            if (incoming.quantity > 0) consolidated.push(incoming);
+        }
+        return consolidated;
     }
 
     /** Check if inventory is full (no 1x1 space available) */
