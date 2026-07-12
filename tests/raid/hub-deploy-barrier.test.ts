@@ -35,6 +35,8 @@ function restoreFetch(): void {
 
 function createLifecycleHarness(options: {
     flushResult?: { ok: boolean; code?: string; message?: string };
+    flushResults?: Array<{ ok: boolean; code?: string; message?: string }>;
+    syncResult?: { ok: boolean; code?: string; message?: string };
     accessToken?: string;
 } = {}) {
     const raidSession = new WorldRaidSession(HUB_TOWN.id);
@@ -48,6 +50,7 @@ function createLifecycleHarness(options: {
     const logs: string[] = [];
     const flushCalls: number[] = [];
     const flushTokens: string[] = [];
+    let syncCalls = 0;
 
     const gameManager = {
         getNetworkAuthContext: () => authContext,
@@ -64,7 +67,13 @@ function createLifecycleHarness(options: {
         flushHubSaveToServer: async () => {
             flushCalls.push(Date.now());
             flushTokens.push(authContext.accessToken);
+            const sequenced = options.flushResults?.[flushCalls.length - 1];
+            if (sequenced) return sequenced;
             return options.flushResult ?? { ok: false, code: 'hub_flush_failed', message: 'save rejected' };
+        },
+        syncHubSaveFromServer: async () => {
+            syncCalls += 1;
+            return options.syncResult ?? { ok: true };
         },
         setHubFlushEnabled: () => undefined,
     } as unknown as GameManager;
@@ -131,6 +140,7 @@ function createLifecycleHarness(options: {
         controller,
         flushCalls,
         flushTokens,
+        getSyncCalls: () => syncCalls,
         logs,
         getAuthContext: () => authContext,
         getNetworkRaid: () => isNetworkRaid,
@@ -165,6 +175,27 @@ test('deploy refreshes auth before flushing the hub save', async () => {
         assert.equal(harness.getNetworkRaid(), false);
         assert.equal(harness.getNetworkClientSet(), false);
         assert.ok(harness.getDeployError());
+    } finally {
+        restoreFetch();
+    }
+});
+
+test('deploy reloads the authoritative save once after an invalid hub economy patch', async () => {
+    stubRefreshResponse('fresh-token');
+    try {
+        const harness = createLifecycleHarness({
+            flushResults: [
+                { ok: false, code: 'invalid_hub_economy_patch', message: 'invalid recovery state' },
+                { ok: false, code: 'hub_flush_failed', message: 'retry stopped for test' },
+            ],
+        });
+
+        await harness.controller.beginRaidFromCurrentHub();
+
+        assert.equal(harness.getSyncCalls(), 1);
+        assert.equal(harness.flushCalls.length, 2);
+        assert.ok(harness.logs.some((line) => line.includes('출격 준비 상태를 복구')));
+        assert.ok(harness.getDeployError()?.includes('retry stopped for test'));
     } finally {
         restoreFetch();
     }

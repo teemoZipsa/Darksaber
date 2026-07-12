@@ -144,6 +144,13 @@ export class WorldRaidLifecycleController {
                     this.reloadDevAutoStartAuth(town);
                     return;
                 }
+                if (!flushResult.ok && flushResult.code === 'invalid_hub_economy_patch') {
+                    const syncResult = await this.context.gameManager.syncHubSaveFromServer();
+                    if (syncResult.ok) {
+                        this.context.log(t('mp.hubSaveRecovered'));
+                        flushResult = await this.context.gameManager.flushHubSaveToServer();
+                    }
+                }
                 if (!flushResult.ok) {
                     this.context.log(t('mp.deployUnavailable'));
                     this.context.setPhase('town');
@@ -273,7 +280,9 @@ export class WorldRaidLifecycleController {
                 firstSurvivalBonus: result.firstSurvivalBonusGranted === true,
             });
         } else if (result.result === 'DEAD' || result.result === 'MIA') {
-            this.context.raidOutcomeController.completeFailure(result.result);
+            this.context.raidOutcomeController.completeFailure(result.result, {
+                serverAuthoritativeState: syncResult.ok,
+            });
         } else {
             this.context.raidSession.failBackToTown(this.context.raidSession.currentHubTownId);
             this.openTown(this.context.getCurrentHubTown());

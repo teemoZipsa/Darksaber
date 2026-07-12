@@ -75,6 +75,15 @@ export interface CompleteSuccessOptions {
     firstSurvivalBonus?: boolean;
 }
 
+export interface CompleteFailureOptions {
+    /**
+     * The world server has already committed the failed raid state and the
+     * client has reloaded it. Do not apply the local-only loss/recovery pass a
+     * second time, or the next hub save will look like free item creation.
+     */
+    serverAuthoritativeState?: boolean;
+}
+
 export class WorldRaidOutcomeController {
     private readonly context: WorldRaidOutcomeContext;
     private readonly raidResultUI = new RaidResultUI();
@@ -168,29 +177,38 @@ export class WorldRaidOutcomeController {
         this.context.log(formatT('raid.outcome.survivedLog', { town: displayTownName(destination) }));
     }
 
-    public completeFailure(result: Exclude<RaidResultType, 'SURVIVED'>): void {
+    public completeFailure(
+        result: Exclude<RaidResultType, 'SURVIVED'>,
+        options: CompleteFailureOptions = {},
+    ): void {
         const raidSession = this.context.raidSession;
         if (!raidSession.active) return;
 
         const heroStatuses = this.createHeroStatuses();
-        const insuranceActive = this.context.playerData.raidInsuranceActive;
-        const insurance = applyRaidInsurance(
-            computeRaidFailureLoss(this.context.gameManager.inventory.items, this.context.party.getCharacters()),
-            insuranceActive
-        );
+        const serverAuthoritativeState = options.serverAuthoritativeState === true;
+        const insuranceActive = !serverAuthoritativeState && this.context.playerData.raidInsuranceActive;
+        const insurance = serverAuthoritativeState
+            ? { loss: { backpackLost: [], equipmentLost: [] }, protectedEquipment: null }
+            : applyRaidInsurance(
+                computeRaidFailureLoss(this.context.gameManager.inventory.items, this.context.party.getCharacters()),
+                insuranceActive
+            );
         const loss = insurance.loss;
-        if (insuranceActive) this.context.playerData.raidInsuranceActive = false;
-        this.context.gameManager.inventory.clear();
-        for (const lost of loss.equipmentLost) {
-            const character = this.context.party.getCharacters().find((candidate) => candidate.id === lost.characterId);
-            character?.unequip(lost.slot);
+        let recoveryNotes: string[] = [];
+        if (!serverAuthoritativeState) {
+            if (insuranceActive) this.context.playerData.raidInsuranceActive = false;
+            this.context.gameManager.inventory.clear();
+            for (const lost of loss.equipmentLost) {
+                const character = this.context.party.getCharacters().find((candidate) => candidate.id === lost.characterId);
+                character?.unequip(lost.slot);
+            }
+            recoveryNotes = this.applyRaidFailureRecoveryKit();
         }
-        const recoveryNotes = this.applyRaidFailureRecoveryKit();
 
         const returnTown = this.context.getTownById(raidSession.departureTownId) ?? this.context.getCurrentHubTown();
         raidSession.failBackToTown(returnTown.id);
         this.context.playerData.currentHubTownId = returnTown.id;
-        this.context.playerData.save();
+        if (!serverAuthoritativeState) this.context.playerData.save();
 
         this.context.townSession.clearRestStatusesFromParty();
         this.context.townSession.applyRaidInjuries(raidSession.downedCharacterIds);
@@ -211,6 +229,7 @@ export class WorldRaidOutcomeController {
             equipmentLost: loss.equipmentLost,
             notes: [
                 result === 'MIA' ? t('raid.outcome.miaNote') : t('raid.outcome.deadNote'),
+                ...(serverAuthoritativeState ? [t('raid.outcome.serverFailureState')] : []),
                 ...(insurance.protectedEquipment
                     ? [formatT('insurance.protectedNote', {
                         character: insurance.protectedEquipment.characterName,

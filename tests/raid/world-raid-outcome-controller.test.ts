@@ -226,6 +226,31 @@ test('raid failure grants a basic recovery set instead of leaving the party empt
     assert.ok(getOutcome()?.notes?.some((note) => note.includes('기본 보급품 지급')));
 });
 
+test('server-authoritative raid failure does not duplicate local loss or recovery items', () => {
+    const { controller, playerData, raidSession, party, gameManager, getOutcome } = createController();
+    const hero = new Character('hero', 'Hero', 'infantry');
+    const sword = getItemDef('short_sword');
+    const herb = getItemDef('herb_cheap');
+    assert.ok(sword);
+    assert.ok(herb);
+    hero.equip({ item: sword, gridX: 0, gridY: 0, durability: sword.maxDurability, quantity: 1 });
+    party.addToRoster(hero);
+    party.deployCharacter(hero);
+    assert.ok(gameManager.inventory.autoPlace(herb));
+    playerData.raidInsuranceActive = true;
+    raidSession.beginRaidFromTown('central_castle');
+
+    controller.completeFailure('DEAD', { serverAuthoritativeState: true });
+
+    assert.deepEqual(gameManager.inventory.items.map((placed) => placed.item.id), ['herb_cheap']);
+    assert.equal(hero.equipment.get('weapon')?.item.id, 'short_sword');
+    assert.equal(hero.equipment.has('body'), false);
+    assert.equal(playerData.raidInsuranceActive, true);
+    assert.deepEqual(getOutcome()?.lost, []);
+    assert.deepEqual(getOutcome()?.equipmentLost, []);
+    assert.ok(getOutcome()?.notes?.some((note) => note.includes('출발 장비와 소지품은 유지')));
+});
+
 test('raid insurance protects one equipment loss and is consumed on failure', () => {
     const { controller, playerData, raidSession, party, getOutcome } = createController();
     const hero = new Character('hero', 'Hero', 'infantry');
