@@ -5,7 +5,10 @@ import { createStatus, hasStatus } from '../../src/combat/StatusEffects';
 import { Enemy } from '../../src/entity/Enemy';
 import { Player } from '../../src/entity/Player';
 import type { FieldActor, FieldEnemy } from '../../src/field/FieldTypes';
-import { WorldMovementController } from '../../src/engine/world/WorldMovementController';
+import {
+    EXPLORATION_ROAD_SPEED_MULTIPLIER,
+    WorldMovementController,
+} from '../../src/engine/world/WorldMovementController';
 import { TileType } from '../../src/map/Tile';
 import { ENEMY_AGGRO_RANGE, ENEMY_SIMULATION_ACTIVE_RANGE } from '../../src/field/FieldConfig';
 
@@ -90,6 +93,28 @@ test('party followers only repath when a fanfare leader is supplied', () => {
     assert.ok(follower.path.length > 0);
     assert.ok(follower.queuedIntent);
     assert.equal((follower.queuedIntent as NonNullable<FieldActor['queuedIntent']>).kind, 'move');
+});
+
+test('roads speed up exploration movement but never active combat movement', () => {
+    const actor = makeActor('hero', 0, 0);
+    const enemy = makeEnemyEntry('enemy', 20, 20);
+    const controller = new WorldMovementController({
+        getPartyActors: () => [actor],
+        getFieldEnemies: () => [enemy],
+        getTileAt: () => TileType.ROAD,
+        getTerrainTraitsForActorId: () => ({}),
+    });
+
+    controller.updatePartyActors({ dt: 0, controlled: actor, activeTurnActorId: null, followRepathTimer: 1 });
+    assert.equal(actor.entity.getMovementSpeedMultiplier(), EXPLORATION_ROAD_SPEED_MULTIPLIER);
+
+    enemy.enemy.isAggro = true;
+    controller.updatePartyActors({ dt: 0, controlled: actor, activeTurnActorId: null, followRepathTimer: 1 });
+    assert.equal(actor.entity.getMovementSpeedMultiplier(), 1);
+
+    enemy.enemy.isAggro = false;
+    controller.updatePartyActors({ dt: 0, controlled: actor, activeTurnActorId: actor.id, followRepathTimer: 1 });
+    assert.equal(actor.entity.getMovementSpeedMultiplier(), 1);
 });
 
 test('party ATB charge combines carry and cursed artifact multipliers', () => {

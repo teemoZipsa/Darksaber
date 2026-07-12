@@ -64,6 +64,8 @@ export class Entity {
     private stepping: boolean = false;
     /** Brief pause timer after arriving at a tile (seconds) */
     private settlePause: number = 0;
+    /** Exploration-only interpolation multiplier (roads, mounts, etc.). */
+    private movementSpeedMultiplier: number = 1;
 
     /** Hop speed: tiles per second for the single-tile movement */
     private static readonly HOP_SPEED = 8;
@@ -156,6 +158,16 @@ export class Entity {
         }
     }
 
+    public setMovementSpeedMultiplier(multiplier: number): void {
+        this.movementSpeedMultiplier = Number.isFinite(multiplier)
+            ? Math.max(0.25, Math.min(3, multiplier))
+            : 1;
+    }
+
+    public getMovementSpeedMultiplier(): number {
+        return this.movementSpeedMultiplier;
+    }
+
     public getActionSpriteFrame(): { row: number; frame: number } | null {
         const sprite = this.walkSprite;
         const motion = this.actionMotion;
@@ -189,7 +201,7 @@ export class Entity {
 
         // ── Settle pause: brief stop at each tile ──
         if (this.settlePause > 0) {
-            this.settlePause -= dt;
+            this.settlePause -= dt * this.movementSpeedMultiplier;
             return;
         }
 
@@ -200,7 +212,7 @@ export class Entity {
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (dist > 0.02) {
-                const move = Entity.HOP_SPEED * dt;
+                const move = Entity.HOP_SPEED * this.movementSpeedMultiplier * dt;
                 if (move >= dist) {
                     // Arrived at step target
                     this.pixelX = this.stepTargetX;

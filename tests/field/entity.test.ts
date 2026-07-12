@@ -142,6 +142,23 @@ test('entity faces the actual step direction while interpolating to a grid targe
     assert.equal(entity.facing, 'down');
 });
 
+test('entity movement speed multipliers shorten tile interpolation without changing the grid target', () => {
+    const normal = new Entity('normal', 0, 0, '#fff');
+    const road = new Entity('road', 0, 0, '#fff');
+    normal.setGridPosition(1, 0);
+    road.setGridPosition(1, 0);
+    road.setMovementSpeedMultiplier(1.25);
+
+    normal.update(0);
+    road.update(0);
+    normal.update(0.05);
+    road.update(0.05);
+
+    assert.ok(road.pixelX > normal.pixelX);
+    assert.equal(road.gridX, normal.gridX);
+    assert.equal(road.gridY, normal.gridY);
+});
+
 test('loot objects retain overflow items and sanitize grid sizes', () => {
     const sword = getItemDef('short_sword');
     assert.ok(sword);

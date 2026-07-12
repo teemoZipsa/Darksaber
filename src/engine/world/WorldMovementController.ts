@@ -8,7 +8,7 @@ import {
 } from '../../combat/StatusEffects';
 import type { Enemy } from '../../entity/Enemy';
 import type { Player } from '../../entity/Player';
-import { TILE_PROPERTIES, type TileType } from '../../map/Tile';
+import { TILE_PROPERTIES, TileType } from '../../map/Tile';
 import {
     ENEMY_COMBAT_SIMULATION_RANGE,
     ENEMY_LEASH_RANGE,
@@ -34,6 +34,9 @@ import {
     type TerrainActorTraits,
     type TerrainEntryHazard,
 } from '../../field/TerrainRules';
+
+export const EXPLORATION_ROAD_SPEED_MULTIPLIER = 1.25;
+export const EXPLORATION_TOWN_SPEED_MULTIPLIER = 1.15;
 
 export interface PartyTerrainHazardEvent {
     actorId: string;
@@ -90,9 +93,13 @@ export class WorldMovementController {
         const carryAtbMultiplier = this.context.getPartyCarryAtbMultiplier?.() ?? 1;
         const cursedAtbMultiplier = this.context.getPartyCursedAtbMultiplier?.() ?? 1;
         const raidAtbMultiplier = this.context.getPartyRaidAtbMultiplier?.() ?? 1;
+        const combatEngaged = input.activeTurnActorId !== null || this.context.getFieldEnemies().some((entry) => (
+            entry.enemy.stats.hp > 0 && entry.enemy.isAggro
+        ));
 
         for (const actor of this.context.getPartyActors()) {
             if (actor.character.isDead) continue;
+            actor.entity.setMovementSpeedMultiplier(this.getExplorationMovementSpeedMultiplier(actor, combatEngaged));
             if (actor.id !== input.activeTurnActorId) {
                 actor.entity.actionGauge = advanceAtb(
                     actor.entity.actionGauge,
@@ -115,6 +122,14 @@ export class WorldMovementController {
         }
 
         return { readyActorIds, followRepathTimer };
+    }
+
+    private getExplorationMovementSpeedMultiplier(actor: FieldActor, combatEngaged: boolean): number {
+        if (combatEngaged) return 1;
+        const tile = this.context.getTileAt(actor.entity.gridX, actor.entity.gridY);
+        if (tile === TileType.ROAD) return EXPLORATION_ROAD_SPEED_MULTIPLIER;
+        if (tile === TileType.TOWN) return EXPLORATION_TOWN_SPEED_MULTIPLIER;
+        return 1;
     }
 
     public updateEnemies(input: EnemyMovementInput): EnemyMovementResult {
