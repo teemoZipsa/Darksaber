@@ -587,7 +587,15 @@ test('dev raid loot can be transferred into the backpack with pointer input', as
     } else {
         await page.mouse.move(itemBox!.x + itemBox!.width / 2, itemBox!.y + itemBox!.height / 2);
         await page.mouse.down();
-        await page.mouse.move(bagBox!.x + bagBox!.width - 20, bagBox!.y + bagBox!.height - 20, { steps: 12 });
+        const dropX = bagBox!.x + bagBox!.width - 20;
+        const dropY = bagBox!.y + bagBox!.height - 20;
+        await page.mouse.move(dropX, dropY, { steps: 12 });
+        const dragGhost = page.locator('#ui-overlay > .inv-drag-ghost');
+        await expect(dragGhost).toBeVisible();
+        const ghostBox = await dragGhost.boundingBox();
+        expect(ghostBox).not.toBeNull();
+        expect(Math.abs(ghostBox!.x - (dropX - itemBox!.width / 2))).toBeLessThanOrEqual(2);
+        expect(Math.abs(ghostBox!.y - (dropY - itemBox!.height / 2))).toBeLessThanOrEqual(2);
         await page.mouse.up();
     }
 

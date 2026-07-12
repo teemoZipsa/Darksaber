@@ -10,6 +10,7 @@ import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
 import type { TilePoint } from '../../field/FieldPathing';
 import { GridInventory, type PlacedItem } from '../../inventory/GridInventory';
 import { formatT, i18n, t } from '../../i18n/LanguageManager';
+import { getLootSourceLabelForDisplay } from '../../loot/LootLabels';
 import type { WorldMap } from '../../map/WorldMap';
 import type {
     ActionRejectedMessage,
@@ -323,9 +324,10 @@ export class WorldNetworkSyncController {
 
     public openLoot(grant: LootGrantMessage): void {
         const grid = this.gridFromSnapshot(grant.gridSnapshot);
+        const loot = this.context.getWorldMap().loot.find((entry) => entry.id === grant.lootId);
         this.context.gameManager.inventoryUI.setExternalGrid(
             grid,
-            formatT('mp.lootGridTitle', { lootId: grant.lootId }),
+            formatT('mp.lootGridTitle', { source: getLootSourceLabelForDisplay(loot) }),
             { isRaidLoot: true },
         );
         if (!this.context.gameManager.inventoryUI.isVisible()) this.context.gameManager.inventoryUI.toggle();

@@ -2026,7 +2026,7 @@ export const I18N_STRINGS: TranslationTable = {
         'mp.lootRejected': '전리품 획득 실패: {reason}',
         'mp.actionRejected': '서버 거부: {reason}',
         'mp.lootPending': '전리품 획득 응답 지연: 서버 응답을 기다리는 중입니다.',
-        'mp.lootGridTitle': '전리품 {lootId}',
+        'mp.lootGridTitle': '전리품 · {source}',
     },
 
     en: {
@@ -4052,6 +4052,6 @@ export const I18N_STRINGS: TranslationTable = {
         'mp.lootRejected': 'Loot pickup failed: {reason}',
         'mp.actionRejected': 'Server rejected action: {reason}',
         'mp.lootPending': 'Loot pickup delayed: waiting for server response.',
-        'mp.lootGridTitle': 'Loot {lootId}',
+        'mp.lootGridTitle': 'Loot · {source}',
     }
 };

@@ -17,6 +17,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { formatT, t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
@@ -58,9 +59,11 @@ type DragState = {
     y: number;
     offsetX: number;
     offsetY: number;
+    previewW: number;
+    previewH: number;
     isDragging: boolean;
 } | null;
-type DragPreview = { placed: PlacedItem; x: number; y: number } | null;
+type DragPreview = { placed: PlacedItem; x: number; y: number; width: number; height: number } | null;
 type DropHint = { kind: InvGridKind; gx: number; gy: number; valid: boolean } | null;
 type GridMetrics = {
     originX: number;
@@ -254,6 +257,7 @@ export function InventoryPanel({
         const offsetY = source.kind === 'grid'
             ? e.clientY - rect.top
             : (placed.item.gridH * CELL) / 2;
+        const uiScale = SettingsManager.getUIScale();
         drag.current = {
             placed,
             source,
@@ -264,6 +268,8 @@ export function InventoryPanel({
             y: e.clientY - offsetY,
             offsetX,
             offsetY,
+            previewW: source.kind === 'grid' ? rect.width : placed.item.gridW * CELL * uiScale,
+            previewH: source.kind === 'grid' ? rect.height : placed.item.gridH * CELL * uiScale,
             isDragging: false,
         };
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -353,7 +359,13 @@ export function InventoryPanel({
             const dist = Math.hypot(e.clientX - d.startX, e.clientY - d.startY);
             if (!d.isDragging && dist >= DRAG_THRESHOLD) d.isDragging = true;
             if (d.isDragging) {
-                setDragPreview({ placed: d.placed, x: d.x, y: d.y });
+                setDragPreview({
+                    placed: d.placed,
+                    x: d.x,
+                    y: d.y,
+                    width: d.previewW,
+                    height: d.previewH,
+                });
                 updateHints(d, e.clientX, e.clientY);
                 e.preventDefault();
             }
@@ -462,6 +474,7 @@ export function InventoryPanel({
         'ds-inv__body',
         townStorage ? 'is-town-storage' : '',
     ].filter(Boolean).join(' ');
+    const dragLayer = typeof document === 'undefined' ? null : document.getElementById('ui-overlay');
     const renderExternal = () => ext ? (
         <div className="ds-inv__col">
             <div className="ds-inv__coltitle">{inv.getExternalTitle()}</div>
@@ -558,15 +571,15 @@ export function InventoryPanel({
             </div>
 
             <div className="ds-inv__feedback">{feedback}</div>
-            {dragPreview && (
+            {dragPreview && dragLayer && createPortal(
                 <div
                     className={`inv-drag-ghost ${itemRarityClass(dragPreview.placed)}`}
                     style={{
                         left: dragPreview.x,
                         top: dragPreview.y,
                         transform: 'none',
-                        width: dragPreview.placed.item.gridW * CELL,
-                        height: dragPreview.placed.item.gridH * CELL,
+                        width: dragPreview.width,
+                        height: dragPreview.height,
                         '--inv-item-color': dragPreview.placed.item.color,
                     } as CSSProperties}
                 >
@@ -574,7 +587,8 @@ export function InventoryPanel({
                     <span className="inv-item__shine" aria-hidden />
                     <ItemGlyph item={dragPreview.placed.item} className="inv-drag-ghost__icon" />
                     <span className="inv-drag-ghost__label">{itemName(dragPreview.placed.item)}</span>
-                </div>
+                </div>,
+                dragLayer,
             )}
             {tip.node}
         </div>

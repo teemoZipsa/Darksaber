@@ -7,6 +7,7 @@ import { i18n } from '../../src/i18n/LanguageManager';
 import {
     getDefaultLootSourceLabel,
     getEnemyLootSourceLabel,
+    getLootSourceLabelForDisplay,
     getWorldLootSourceLabel,
 } from '../../src/loot/LootLabels';
 
@@ -32,4 +33,23 @@ test('loot source labels are localized at creation time', () => {
 test('field loot chest uses a shipped pixel-art sprite', () => {
     assert.equal(LOOT_CHEST_SPRITE_SRC, '/assets/images/decor/loot_chest.png');
     assert.equal(existsSync(`public${LOOT_CHEST_SPRITE_SRC}`), true);
+});
+
+test('network loot titles prefer the localized container name over internal ids', () => {
+    const previousLang = i18n.lang;
+    try {
+        i18n.lang = 'ko';
+        assert.equal(getLootSourceLabelForDisplay({
+            sourceLabel: 'loot_supply_cache_8',
+            containerType: 'supply_cache',
+        }), '버려진 보급 상자');
+
+        i18n.lang = 'en';
+        assert.equal(getLootSourceLabelForDisplay({
+            sourceLabel: 'loot_supply_cache_8',
+            containerType: 'supply_cache',
+        }), 'Abandoned supply cache');
+    } finally {
+        i18n.lang = previousLang;
+    }
 });
