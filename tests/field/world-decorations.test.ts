@@ -3,6 +3,16 @@ import assert from 'node:assert/strict';
 import { WorldMap, type WorldMapDecoration } from '../../src/map/WorldMap';
 import { TutorialTrainingMap } from '../../src/map/TutorialTrainingMap';
 import { TileType, TILE_PROPERTIES } from '../../src/map/Tile';
+import { CHUNK_SIZE, TILE_SIZE } from '../../src/map/Chunk';
+
+class OffscreenCanvasStub {
+    public constructor(public width: number, public height: number) {}
+    public getContext(): OffscreenCanvasRenderingContext2D {
+        return {} as OffscreenCanvasRenderingContext2D;
+    }
+}
+
+(globalThis as unknown as { OffscreenCanvas: typeof OffscreenCanvasStub }).OffscreenCanvas = OffscreenCanvasStub;
 
 type TreeDecoration = Extract<WorldMapDecoration, { kind: 'tree' }>;
 type BridgeDecoration = Extract<WorldMapDecoration, { kind: 'bridge' }>;
@@ -119,6 +129,34 @@ test('ambient roadside sites are deterministic, visible from routes, and keep pa
         }
         assert.equal(roadVisible, true);
     }
+});
+
+test('world streaming evicts decoration detail and ambient caches after long travel', () => {
+    const world = new WorldMap();
+    for (let step = 0; step < 24; step++) {
+        const chunkX = 8 + step * 2;
+        const chunkY = 10 + step * 2;
+        world.getDecorationsInTileRect(
+            chunkX * CHUNK_SIZE,
+            chunkY * CHUNK_SIZE,
+            (chunkX + 1) * CHUNK_SIZE - 1,
+            (chunkY + 1) * CHUNK_SIZE - 1
+        );
+        world.getGroundDetailsForChunk(chunkX, chunkY);
+        world.getAmbientSitesForChunk(chunkX, chunkY);
+        world.updateLoadedChunks(
+            (chunkX + 0.5) * CHUNK_SIZE * TILE_SIZE,
+            (chunkY + 0.5) * CHUNK_SIZE * TILE_SIZE,
+            CHUNK_SIZE * TILE_SIZE,
+            CHUNK_SIZE * TILE_SIZE
+        );
+    }
+
+    const counts = world.getStreamingCacheCounts();
+    assert.ok(counts.chunks <= 16, `chunk cache grew to ${counts.chunks}`);
+    assert.ok(counts.decorations <= counts.chunks, `decoration cache grew to ${counts.decorations}`);
+    assert.ok(counts.groundDetails <= counts.chunks, `ground detail cache grew to ${counts.groundDetails}`);
+    assert.ok(counts.ambientSites <= counts.chunks, `ambient site cache grew to ${counts.ambientSites}`);
 });
 
 test('tree decorations stay on eligible terrain by sprite family', () => {

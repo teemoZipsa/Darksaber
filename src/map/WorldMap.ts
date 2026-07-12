@@ -1204,6 +1204,25 @@ export class WorldMap {
         for (const key of this.chunks.keys()) {
             if (!needed.has(key)) this.chunks.delete(key);
         }
+        for (const cache of [this.decorationChunks, this.groundDetailChunks, this.ambientSiteChunks]) {
+            for (const key of cache.keys()) {
+                if (!needed.has(key)) cache.delete(key);
+            }
+        }
+    }
+
+    public getStreamingCacheCounts(): {
+        chunks: number;
+        decorations: number;
+        groundDetails: number;
+        ambientSites: number;
+    } {
+        return {
+            chunks: this.chunks.size,
+            decorations: this.decorationChunks.size,
+            groundDetails: this.groundDetailChunks.size,
+            ambientSites: this.ambientSiteChunks.size,
+        };
     }
 
     public markAllDirty(): void {
