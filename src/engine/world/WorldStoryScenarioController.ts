@@ -1133,6 +1133,13 @@ export class WorldStoryScenarioController {
     }
 
     private logAmbientSiteInspection(kind: AmbientSiteResultMessage['kind']): void {
-        this.context.log(formatT('field.ambient.inspected', { site: t(`field.ambient.${kind}`) }));
+        const site = kind === 'abandonedCamp'
+            ? t('field.ambient.abandonedCamp')
+            : kind === 'roadsideRuins'
+                ? t('field.ambient.roadsideRuins')
+                : kind === 'brokenWaystone'
+                    ? t('field.ambient.brokenWaystone')
+                    : t('field.ambient.swampTotem');
+        this.context.log(formatT('field.ambient.inspected', { site }));
     }
 }
