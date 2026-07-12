@@ -311,6 +311,7 @@ test('dynamic UI translation key calls are reviewed by the guard allowlist', () 
         "src/field/FieldDisplay.ts: t(key)",
         "src/field/TerrainRules.ts: t(hazard.hoverKey)",
         "src/field/TerrainRules.ts: t(props.labelKey)",
+        "src/i18n/TownMessages.ts: t(key)",
         "src/map/StoryInteriorMap.ts: formatT(this.layout.displayNameKey)",
         "src/map/StoryInteriorMap.ts: t(marker.labelKey)",
         "src/map/StoryInteriorMap.ts: t(prop.labelKey)",

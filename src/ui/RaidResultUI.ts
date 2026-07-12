@@ -1,6 +1,7 @@
 import { InputManager } from '../engine/InputManager';
 import { RaidOutcome, type RaidOutcomeMissionLineKind } from '../raid/RaidOutcome';
 import { formatT, i18n, t } from '../i18n/LanguageManager';
+import { formatTownName } from '../i18n/TownMessages';
 import { UI, Parchment, drawParchmentPanel, drawParchmentButton, renderGameTitle } from './UITheme';
 
 function formatTime(totalSeconds: number): string {
@@ -99,10 +100,13 @@ export class RaidResultUI {
 
         ctx.font = `bold 14px ${UI.fontPrimary}`;
         ctx.fillStyle = Parchment.textDark;
-        const destination = this.outcome.extractionTownId ?? '-';
+        const departure = formatTownName(this.outcome.departureTownId);
+        const destination = this.outcome.extractionTownId
+            ? formatTownName(this.outcome.extractionTownId)
+            : '-';
         ctx.fillText(
             formatT('raid.result.summary', {
-                from: this.outcome.departureTownId,
+                from: departure,
                 to: destination,
                 time: formatTime(this.outcome.elapsedSeconds),
                 kills: this.outcome.kills,

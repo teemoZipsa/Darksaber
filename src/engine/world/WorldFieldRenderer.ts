@@ -9,7 +9,7 @@ import type { TacticalMarker } from '../../field/TacticalMarkers';
 import type { EnemyAIDecision } from '../../field/EnemyAI';
 import type { FieldIntent } from '../../field/FieldTypes';
 import type { WorldRenderModel } from './WorldRenderModel';
-import { formatRaidModifierName } from '../../raid/RaidModifierMessages';
+import { formatRaidBannerSubtitle } from '../../raid/RaidModifierMessages';
 import { tileKey } from '../../field/FieldPathing';
 import { getSkillIconCell } from '../../ui/DarksaberIconRegistry';
 import { DarksaberSpriteAtlas } from '../../ui/DarksaberSpriteAtlas';
@@ -703,9 +703,7 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
     // Route subtitle
     ctx.fillStyle = Parchment.textMid;
     ctx.font = `12px ${UI.fontPrimary}`;
-    const subtitle = model.raid.modifier
-        ? `${formatRaidModifierName(model.raid.modifier)}  |  ${model.raid.departureTownId}  →  다른 마을 생환`
-        : `${model.raid.departureTownId}  →  다른 마을 생환`;
+    const subtitle = formatRaidBannerSubtitle(model.raid.departureTownId, model.raid.modifier);
     ctx.fillText(subtitle, x + bannerW / 2, y + bannerH - 14);
 
     ctx.textAlign = 'start';
