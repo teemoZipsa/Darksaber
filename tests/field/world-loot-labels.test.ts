@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { getItemDef } from '../../src/data/ItemDB';
-import { LootObject } from '../../src/entity/LootObject';
+import { LOOT_CHEST_SPRITE_SRC, LootObject } from '../../src/entity/LootObject';
 import { i18n } from '../../src/i18n/LanguageManager';
 import {
     getDefaultLootSourceLabel,
@@ -26,4 +27,9 @@ test('loot source labels are localized at creation time', () => {
     } finally {
         i18n.lang = previousLang;
     }
+});
+
+test('field loot chest uses a shipped pixel-art sprite', () => {
+    assert.equal(LOOT_CHEST_SPRITE_SRC, '/assets/images/decor/loot_chest.png');
+    assert.equal(existsSync(`public${LOOT_CHEST_SPRITE_SRC}`), true);
 });

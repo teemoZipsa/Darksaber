@@ -11,6 +11,10 @@ export interface LootObjectOptions {
     gridH?: number;
 }
 
+export const LOOT_CHEST_SPRITE_SRC = '/assets/images/decor/loot_chest.png';
+
+let cachedLootChestImage: HTMLImageElement | null = null;
+
 /**
  * Loot on the ground or in a chest in the Raid map.
  */
@@ -52,6 +56,21 @@ export class LootObject {
 
         ctx.save();
         try {
+            const chestImage = this.kind === 'chest' ? getLootChestImage() : null;
+            if (chestImage?.complete && chestImage.naturalWidth > 0) {
+                const spriteSize = size * 1.2;
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(
+                    chestImage,
+                    cx - spriteSize / 2,
+                    screenY + size - spriteSize + size * 0.06,
+                    spriteSize,
+                    spriteSize,
+                );
+                renderRareChestAccent(ctx, cx, screenY, size, this.containerType);
+                return;
+            }
+
             // Draw Chest/Loot pile footprint
             ctx.fillStyle = getLootFillColor(this.kind, this.containerType);
             ctx.beginPath();
@@ -70,6 +89,37 @@ export class LootObject {
             ctx.restore();
         }
     }
+}
+
+function getLootChestImage(): HTMLImageElement | null {
+    if (typeof Image === 'undefined') return null;
+    if (!cachedLootChestImage) {
+        cachedLootChestImage = new Image();
+        cachedLootChestImage.src = LOOT_CHEST_SPRITE_SRC;
+    }
+    return cachedLootChestImage;
+}
+
+function renderRareChestAccent(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    screenY: number,
+    size: number,
+    containerType?: WorldLootContainerType,
+): void {
+    const accent = containerType === 'marked_cache'
+        ? '#ffcf6b'
+        : containerType === 'sealed_reliquary'
+            ? '#cda4ff'
+            : null;
+    if (!accent) return;
+
+    ctx.fillStyle = accent;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = size * 0.18;
+    ctx.beginPath();
+    ctx.arc(cx - size * 0.03, screenY + size * 0.61, Math.max(1.5, size * 0.055), 0, Math.PI * 2);
+    ctx.fill();
 }
 
 function getLootFillColor(kind: 'chest' | 'corpse', containerType?: WorldLootContainerType): string {
