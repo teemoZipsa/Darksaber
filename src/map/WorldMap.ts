@@ -63,6 +63,24 @@ export interface WorldMapBridgeDecoration {
 
 export type WorldMapDecoration = WorldMapTreeDecoration | WorldMapBridgeDecoration;
 
+export type WorldMapGroundDetailKind =
+    | 'grassTuft'
+    | 'wildflowers'
+    | 'forestMushrooms'
+    | 'pebbles'
+    | 'dryBrush'
+    | 'snowShrub'
+    | 'swampReeds';
+
+export interface WorldMapGroundDetail {
+    kind: WorldMapGroundDetailKind;
+    tile: TilePoint;
+    offsetX: number;
+    offsetY: number;
+    scale: number;
+    mirrored: boolean;
+}
+
 export interface WorldInspectMarker {
     id: string;
     tile: TilePoint;
@@ -334,6 +352,7 @@ interface BridgeDecorationConfig {
 
 const NORMAL_TREE_CHUNK_CHANCE = 0.035;
 const SCARY_TREE_CHUNK_CHANCE = 0.18;
+const GROUND_DETAIL_ATTEMPTS_PER_CHUNK = 32;
 const DECORATION_LOOKUP_MARGIN_TILES = 8;
 const NORMAL_TREE_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST]);
 const SCARY_TREE_TILES = new Set<TileType>([TileType.POISON_SWAMP]);
@@ -413,6 +432,7 @@ const BRIDGE_DECORATION_CONFIGS: Record<BridgeSpriteId, BridgeDecorationConfig> 
 export class WorldMap {
     private chunks: Map<string, Chunk> = new Map();
     private decorationChunks: Map<string, WorldMapDecoration[]> = new Map();
+    private groundDetailChunks: Map<string, WorldMapGroundDetail[]> = new Map();
     private townExitTileCache: Map<string, TilePoint> = new Map();
     private preloadChunkMargin: number = 1;
     private biomeMask: BiomeMask;
@@ -446,6 +466,7 @@ export class WorldMap {
         this.biomeMask = new BiomeMask(realm);
         this.chunks.clear();
         this.decorationChunks.clear();
+        this.groundDetailChunks.clear();
         this.townExitTileCache.clear();
         this.loot = [];
         this.extractionZones = [];
@@ -801,6 +822,50 @@ export class WorldMap {
         return decorations;
     }
 
+    public getGroundDetailsForChunk(chunkX: number, chunkY: number): readonly WorldMapGroundDetail[] {
+        if (!this.isChunkInBounds(chunkX, chunkY) || this.isOceanChunk(chunkX, chunkY)) return [];
+        const chunkKey = this.chunkKey(chunkX, chunkY);
+        const cached = this.groundDetailChunks.get(chunkKey);
+        if (cached) return cached;
+
+        const details: WorldMapGroundDetail[] = [];
+        const occupied = new Set<string>();
+        const baseX = chunkX * CHUNK_SIZE;
+        const baseY = chunkY * CHUNK_SIZE;
+        for (let attempt = 0; attempt < GROUND_DETAIL_ATTEMPTS_PER_CHUNK; attempt++) {
+            const tx = baseX + 1 + Math.floor(this.hash(chunkX * 37 + attempt, chunkY * 19, 901) * (CHUNK_SIZE - 2));
+            const ty = baseY + 1 + Math.floor(this.hash(chunkX * 23, chunkY * 41 + attempt, 902) * (CHUNK_SIZE - 2));
+            const key = `${tx},${ty}`;
+            if (occupied.has(key)) continue;
+            occupied.add(key);
+
+            if (this.getTownAtTile(tx, ty) || this.getTempleAtTile(tx, ty) || this.getDungeonAtTile(tx, ty)) continue;
+            const kind = this.pickGroundDetailKind(this.getTileAt(tx, ty), this.hash(tx, ty, 903));
+            if (!kind) continue;
+
+            details.push({
+                kind,
+                tile: { x: tx, y: ty },
+                offsetX: (this.hash(tx, ty, 904) - 0.5) * 0.5,
+                offsetY: (this.hash(tx, ty, 905) - 0.5) * 0.36,
+                scale: 0.72 + this.hash(tx, ty, 906) * 0.5,
+                mirrored: this.hash(tx, ty, 907) < 0.5,
+            });
+        }
+        this.groundDetailChunks.set(chunkKey, details);
+        return details;
+    }
+
+    private pickGroundDetailKind(tile: TileType, roll: number): WorldMapGroundDetailKind | null {
+        if (tile === TileType.GRASS) return roll < 0.62 ? 'grassTuft' : roll < 0.86 ? 'wildflowers' : 'pebbles';
+        if (tile === TileType.FOREST) return roll < 0.58 ? 'grassTuft' : roll < 0.82 ? 'forestMushrooms' : 'pebbles';
+        if (tile === TileType.STONE) return roll < 0.76 ? 'pebbles' : 'dryBrush';
+        if (tile === TileType.SAND) return roll < 0.68 ? 'dryBrush' : 'pebbles';
+        if (tile === TileType.SNOW) return roll < 0.72 ? 'snowShrub' : 'pebbles';
+        if (tile === TileType.POISON_SWAMP) return roll < 0.72 ? 'swampReeds' : 'forestMushrooms';
+        return null;
+    }
+
     private pickDecorationAnchorTile(chunkX: number, chunkY: number, salt: number): TilePoint {
         const localSpan = CHUNK_SIZE - 8;
         return {
@@ -1037,6 +1102,7 @@ export class WorldMap {
             chunk.render(ctx, sx, sy, (nx, ny) => this.getTileAt(nx, ny), renderScale);
         }
 
+        this.renderGroundDetails(ctx, cameraX, cameraY, vw, vh);
         this.renderDecorations(ctx, cameraX, cameraY, vw, vh, false);
         this.renderTownLandmarks(ctx, cameraX, cameraY, vw, vh);
         this.renderTempleLandmarks(ctx, cameraX, cameraY, vw, vh);
@@ -1619,6 +1685,110 @@ export class WorldMap {
             if (sx + TILE_SIZE < 0 || sx > vw || sy + TILE_SIZE < 0 || sy > vh) continue;
             this.renderWorldInspectMarker(ctx, marker, sx, sy);
         }
+    }
+
+    private renderGroundDetails(
+        ctx: CanvasRenderingContext2D,
+        cameraX: number,
+        cameraY: number,
+        vw: number,
+        vh: number
+    ): void {
+        const chunkPixelSize = CHUNK_SIZE * TILE_SIZE;
+        const minChunkX = Math.floor(cameraX / chunkPixelSize) - 1;
+        const maxChunkX = Math.floor((cameraX + vw) / chunkPixelSize) + 1;
+        const minChunkY = Math.floor(cameraY / chunkPixelSize) - 1;
+        const maxChunkY = Math.floor((cameraY + vh) / chunkPixelSize) + 1;
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        for (let chunkY = minChunkY; chunkY <= maxChunkY; chunkY++) {
+            for (let chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+                for (const detail of this.getGroundDetailsForChunk(chunkX, chunkY)) {
+                    const sx = (detail.tile.x + 0.5 + detail.offsetX) * TILE_SIZE - cameraX;
+                    const sy = (detail.tile.y + 0.58 + detail.offsetY) * TILE_SIZE - cameraY;
+                    if (sx < -TILE_SIZE || sx > vw + TILE_SIZE || sy < -TILE_SIZE || sy > vh + TILE_SIZE) continue;
+                    this.renderGroundDetail(ctx, detail, Math.round(sx), Math.round(sy));
+                }
+            }
+        }
+        ctx.restore();
+    }
+
+    private renderGroundDetail(
+        ctx: CanvasRenderingContext2D,
+        detail: WorldMapGroundDetail,
+        sx: number,
+        sy: number
+    ): void {
+        const direction = detail.mirrored ? -1 : 1;
+        const unit = Math.max(1, Math.round(2 * detail.scale));
+        ctx.globalAlpha = 0.76;
+
+        if (detail.kind === 'grassTuft') {
+            ctx.fillStyle = '#173f20';
+            ctx.fillRect(sx - unit * 4, sy + unit * 2, unit * 8, unit);
+            ctx.fillRect(sx - unit * 3, sy - unit * 2, unit, unit * 4);
+            ctx.fillRect(sx, sy - unit * 4, unit, unit * 6);
+            ctx.fillRect(sx + unit * 3, sy - unit, unit, unit * 3);
+            ctx.fillStyle = '#638a39';
+            ctx.fillRect(sx - direction * unit * 2, sy - unit * 3, unit, unit * 3);
+            return;
+        }
+        if (detail.kind === 'wildflowers') {
+            ctx.fillStyle = '#244a23';
+            ctx.fillRect(sx - unit * 3, sy - unit * 2, unit, unit * 4);
+            ctx.fillRect(sx + unit * 2, sy - unit * 4, unit, unit * 6);
+            ctx.fillStyle = '#e2b84e';
+            ctx.fillRect(sx - unit * 4, sy - unit * 4, unit * 3, unit * 2);
+            ctx.fillStyle = '#d7d0df';
+            ctx.fillRect(sx + unit, sy - unit * 6, unit * 3, unit * 2);
+            return;
+        }
+        if (detail.kind === 'forestMushrooms') {
+            ctx.fillStyle = '#eee0bf';
+            ctx.fillRect(sx - unit * 3, sy, unit, unit * 3);
+            ctx.fillRect(sx + unit * 2, sy - unit, unit, unit * 4);
+            ctx.fillStyle = '#9b4931';
+            ctx.fillRect(sx - unit * 5, sy - unit * 2, unit * 5, unit * 2);
+            ctx.fillRect(sx, sy - unit * 3, unit * 5, unit * 2);
+            return;
+        }
+        if (detail.kind === 'pebbles') {
+            ctx.fillStyle = '#282c2b';
+            ctx.fillRect(sx - unit * 5, sy, unit * 4, unit * 2);
+            ctx.fillRect(sx + unit, sy - unit * 2, unit * 5, unit * 3);
+            ctx.fillStyle = '#77756d';
+            ctx.fillRect(sx - unit * 4, sy - unit, unit * 2, unit);
+            ctx.fillRect(sx + unit * 2, sy - unit * 3, unit * 3, unit);
+            return;
+        }
+        if (detail.kind === 'dryBrush') {
+            ctx.fillStyle = '#705331';
+            ctx.fillRect(sx - unit * 4, sy + unit, unit * 8, unit);
+            ctx.fillRect(sx - direction * unit * 3, sy - unit * 4, unit, unit * 5);
+            ctx.fillRect(sx + direction * unit, sy - unit * 2, unit, unit * 3);
+            ctx.fillStyle = '#b38a4d';
+            ctx.fillRect(sx - direction * unit * 4, sy - unit * 3, unit * 3, unit);
+            return;
+        }
+        if (detail.kind === 'snowShrub') {
+            ctx.fillStyle = '#3b403e';
+            ctx.fillRect(sx - unit * 3, sy - unit * 3, unit, unit * 5);
+            ctx.fillRect(sx + unit * 2, sy - unit * 2, unit, unit * 4);
+            ctx.fillStyle = '#d7e3df';
+            ctx.fillRect(sx - unit * 5, sy - unit * 4, unit * 4, unit * 2);
+            ctx.fillRect(sx, sy - unit * 3, unit * 5, unit * 2);
+            return;
+        }
+
+        ctx.fillStyle = '#41451f';
+        ctx.fillRect(sx - unit * 4, sy + unit, unit * 8, unit);
+        ctx.fillRect(sx - unit * 3, sy - unit * 5, unit, unit * 6);
+        ctx.fillRect(sx, sy - unit * 3, unit, unit * 4);
+        ctx.fillRect(sx + unit * 3, sy - unit * 6, unit, unit * 7);
+        ctx.fillStyle = '#858439';
+        ctx.fillRect(sx - direction * unit * 2, sy - unit * 4, unit, unit * 4);
     }
 
     private renderWorldInspectMarker(ctx: CanvasRenderingContext2D, marker: WorldInspectMarker, sx: number, sy: number): void {

@@ -38,6 +38,42 @@ test('world map tree decorations are deterministic and sparse', () => {
     assert.deepEqual(firstDecorations.map(decorationSignature), secondDecorations.map(decorationSignature));
 });
 
+test('ground details densely and deterministically fill walkable biome tiles without blocking movement', () => {
+    const first = new WorldMap();
+    const second = new WorldMap();
+    const sampledChunks = [
+        { x: 37, y: 42 },
+        { x: 39, y: 38 },
+        { x: 31, y: 34 },
+        { x: 18, y: 20 },
+        { x: 68, y: 12 },
+        { x: 57, y: 31 },
+    ];
+
+    let total = 0;
+    for (const chunk of sampledChunks) {
+        const firstDetails = first.getGroundDetailsForChunk(chunk.x, chunk.y);
+        const secondDetails = second.getGroundDetailsForChunk(chunk.x, chunk.y);
+        assert.deepEqual(firstDetails, secondDetails);
+        total += firstDetails.length;
+        for (const detail of firstDetails) {
+            const tile = first.getTileAt(detail.tile.x, detail.tile.y);
+            assert.ok([
+                TileType.GRASS,
+                TileType.FOREST,
+                TileType.STONE,
+                TileType.SAND,
+                TileType.SNOW,
+                TileType.POISON_SWAMP,
+            ].includes(tile));
+            assert.equal(first.isDecorationBlocked(detail.tile.x, detail.tile.y), false);
+            assert.equal(first.isWalkable(detail.tile.x, detail.tile.y), true);
+        }
+    }
+
+    assert.ok(total >= 40, `expected dense ground detail coverage, received ${total}`);
+});
+
 test('tree decorations stay on eligible terrain by sprite family', () => {
     const world = new WorldMap();
     const decorations = getAllDecorations(world).filter(isTreeDecoration);
