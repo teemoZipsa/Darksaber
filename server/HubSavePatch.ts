@@ -257,6 +257,9 @@ function mergeClientRosterCharacter(
         }
         next.skillUpgradeLevels = upgrades;
     }
+    if (isRecord(incoming.equipment)) {
+        next.equipment = sanitizeEquipment(incoming.equipment);
+    }
     return next;
 }
 
@@ -316,11 +319,19 @@ function assertNoFreeHubEconomyGain(patch: CharacterSavePatch, currentSave: Char
     const nextQuestState = isRecord(patch.questState) ? patch.questState : currentSave.questState;
     const currentGold = readGold(currentSave.questState);
     const nextGold = readGold(nextQuestState);
-    const currentCounts = countSaveItems(currentSave.inventory, currentSave.stashSnapshot, currentSave.equipment);
+    const currentCounts = countSaveItems(
+        currentSave.inventory,
+        currentSave.stashSnapshot,
+        currentSave.equipment,
+        currentSave.rosterSnapshot,
+        currentSave.characterId,
+    );
     const nextCounts = countSaveItems(
         patch.inventory ?? currentSave.inventory,
         patch.stashSnapshot ?? currentSave.stashSnapshot,
         isRecord(patch.equipment) ? patch.equipment : currentSave.equipment,
+        isRecord(patch.rosterSnapshot) ? patch.rosterSnapshot : currentSave.rosterSnapshot,
+        currentSave.characterId,
     );
 
     let requiredSpend = 0;
@@ -350,10 +361,23 @@ function countSaveItems(
     inventory: InventorySaveSnapshot,
     stash: InventorySaveSnapshot,
     equipment: Record<string, unknown>,
+    rosterSnapshot: Record<string, unknown>,
+    primaryCharacterId: string,
 ): Map<string, number> {
     const counts = new Map<string, number>();
     addInventoryCounts(counts, inventory);
     addInventoryCounts(counts, stash);
+    addEquipmentCounts(counts, equipment);
+    if (Array.isArray(rosterSnapshot.characters)) {
+        for (const raw of rosterSnapshot.characters) {
+            if (!isRecord(raw) || raw.id === primaryCharacterId || !isRecord(raw.equipment)) continue;
+            addEquipmentCounts(counts, raw.equipment);
+        }
+    }
+    return counts;
+}
+
+function addEquipmentCounts(counts: Map<string, number>, equipment: Record<string, unknown>): void {
     for (const raw of Object.values(equipment)) {
         if (!isRecord(raw) || typeof raw.itemId !== 'string') continue;
         addItemCount(counts, raw.itemId, 1);
@@ -363,7 +387,6 @@ function countSaveItems(
             }
         }
     }
-    return counts;
 }
 
 function addInventoryCounts(counts: Map<string, number>, snapshot: InventorySaveSnapshot): void {

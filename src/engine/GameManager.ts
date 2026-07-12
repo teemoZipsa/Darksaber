@@ -310,13 +310,7 @@ export class GameManager {
         this.loadInventoryFromSave(save);
         this.loadStashFromSave(save);
         const characterId = selectedCharacterId ?? this.networkAuthContext?.characterId;
-        const character = characterId
-            ? this.party.getRoster().find((entry) => entry.id === characterId) ?? this.party.getActive()
-            : this.party.getActive();
-        if (character) {
-            character.equipment.clear();
-            this.loadEquipmentFromSave(save, character);
-        }
+        this.loadRosterEquipmentFromSave(save, characterId);
     }
 
     public persistHubSaveToServer(options: { force?: boolean } = {}): void {
@@ -377,6 +371,7 @@ export class GameManager {
             stash: this.stash,
             party: this.party,
             hubTownId: this.playerData.currentHubTownId,
+            primaryCharacterId: ctx.characterId,
         });
         try {
             const save = await client.updateCharacterSave(ctx.characterId, patch, this.networkSaveRevision);
@@ -559,7 +554,13 @@ export class GameManager {
             characters.set(character.id, character);
         }
         const selected = characters.get(selectedCharacter.id);
-        if (selected) this.loadEquipmentFromSave(save, selected);
+        for (const entry of rosterEntries) {
+            const character = characters.get(entry.id);
+            if (character && entry.equipment) this.loadEquipmentRecord(entry.equipment, character);
+        }
+        if (selected && !rosterEntries.some((entry) => entry.id === selected.id && entry.equipment)) {
+            this.loadEquipmentFromSave(save, selected);
+        }
 
         const deployIds = [selectedCharacter.id, ...activeIds.filter((id) => id !== selectedCharacter.id)];
         for (const id of deployIds.slice(0, this.party.MAX_ACTIVE_PARTY_SIZE)) {
@@ -584,13 +585,30 @@ export class GameManager {
     }
 
     private loadEquipmentFromSave(save: CharacterSave, character: Character): void {
-        const entries = readSavedEquipmentEntries(save.equipment);
+        this.loadEquipmentRecord(save.equipment, character);
+    }
+
+    private loadEquipmentRecord(equipment: Record<string, unknown>, character: Character): void {
+        const entries = readSavedEquipmentEntries(equipment);
         for (const entry of entries) {
             const item = ITEMS.find((candidate) => candidate.id === entry.itemId);
             if (!item || item.slot !== entry.slot) continue;
             const placed = this.createPlacedItem(item, entry);
             character.equipment.set(item.slot, placed);
         }
+    }
+
+    private loadRosterEquipmentFromSave(save: CharacterSave, primaryCharacterId?: string): void {
+        const equipmentByCharacterId = readRosterEquipmentByCharacterId(save.rosterSnapshot);
+        for (const character of this.party.getRoster()) {
+            character.equipment.clear();
+            const equipment = equipmentByCharacterId.get(character.id);
+            if (equipment) this.loadEquipmentRecord(equipment, character);
+        }
+        const primary = primaryCharacterId
+            ? this.party.getRoster().find((character) => character.id === primaryCharacterId)
+            : this.party.getActive();
+        if (primary && !equipmentByCharacterId.has(primary.id)) this.loadEquipmentFromSave(save, primary);
     }
 
     private applyStarterEquipment(character: Character): void {
@@ -943,6 +961,7 @@ interface SavedRosterEntry {
     baseStats: Partial<AuthCharacter['baseStats']>;
     magicLoadout: string[];
     skillUpgradeLevels: Record<string, number>;
+    equipment: Record<string, unknown> | null;
 }
 
 interface SavedEquipmentEntry {
@@ -977,6 +996,7 @@ function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter
             baseStats: isRecord(raw.baseStats) ? raw.baseStats : {},
             magicLoadout: readStringArray(raw.magicLoadout),
             skillUpgradeLevels: readNumberRecord(raw.skillUpgradeLevels),
+            equipment: isRecord(raw.equipment) ? raw.equipment : null,
         }];
     });
     if (!entries.some((entry) => entry.id === selectedCharacter.id)) {
@@ -991,9 +1011,20 @@ function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter
             baseStats: selectedCharacter.baseStats,
             magicLoadout: [],
             skillUpgradeLevels: {},
+            equipment: null,
         });
     }
     return entries;
+}
+
+function readRosterEquipmentByCharacterId(rosterSnapshot: Record<string, unknown>): Map<string, Record<string, unknown>> {
+    const result = new Map<string, Record<string, unknown>>();
+    if (!Array.isArray(rosterSnapshot.characters)) return result;
+    for (const raw of rosterSnapshot.characters) {
+        if (!isRecord(raw) || typeof raw.id !== 'string' || !isRecord(raw.equipment)) continue;
+        result.set(raw.id, raw.equipment);
+    }
+    return result;
 }
 
 function readSavedEquipmentEntries(equipment: Record<string, unknown>): SavedEquipmentEntry[] {

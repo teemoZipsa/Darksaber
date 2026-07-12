@@ -152,3 +152,45 @@ test('buildHubSavePatch persists normalized learned skill upgrade levels', () =>
     const character = (roster.characters as Array<Record<string, unknown>>)[0];
     assert.deepEqual(character.skillUpgradeLevels, { inf_t1: 5 });
 });
+
+test('buildHubSavePatch moves owned inventory equipment onto a companion without treating it as free creation', () => {
+    const current = createDefaultCharacterSave(authCharacter());
+    current.rosterSnapshot = {
+        characters: [
+            ...(current.rosterSnapshot.characters as Array<Record<string, unknown>>),
+            { id: 'companion-1', name: 'Companion', classKey: 'cleric', tier: 1, level: 1, baseStats: {} },
+        ],
+    };
+    current.inventory.items.push({
+        itemId: 'magic_t1_body',
+        gridX: 4,
+        gridY: 0,
+        quantity: 1,
+        durability: 100,
+    });
+
+    const patch = buildHubSavePatch({
+        inventory: {
+            ...current.inventory,
+            items: current.inventory.items.filter((item) => item.itemId !== 'magic_t1_body'),
+        },
+        rosterSnapshot: {
+            characters: [{
+                id: 'companion-1',
+                equipment: {
+                    body: {
+                        itemId: 'magic_t1_body',
+                        gridX: 0,
+                        gridY: 0,
+                        quantity: 1,
+                        durability: 100,
+                    },
+                },
+            }],
+        },
+    }, current);
+
+    const roster = patch.rosterSnapshot as Record<string, unknown>;
+    const companion = (roster.characters as Array<Record<string, unknown>>).find((entry) => entry.id === 'companion-1');
+    assert.equal(((companion?.equipment as Record<string, Record<string, unknown>>).body).itemId, 'magic_t1_body');
+});

@@ -11,10 +11,13 @@ export interface HubSaveSerializerInput {
     stash: GridInventory;
     party: PartyManager;
     hubTownId: string;
+    /** CharacterSave owner whose legacy top-level equipment must be mirrored. */
+    primaryCharacterId?: string;
 }
 
 export function buildHubSavePatch(input: HubSaveSerializerInput): CharacterSavePatch {
-    const activeCharacter = input.party.getActive();
+    const primaryCharacter = input.party.getRoster().find((character) => character.id === input.primaryCharacterId)
+        ?? input.party.getActive();
     return {
         hubLocation: {
             realm: 'mortal',
@@ -32,7 +35,7 @@ export function buildHubSavePatch(input: HubSaveSerializerInput): CharacterSaveP
         },
         inventory: serializeGridInventory(input.inventory),
         stashSnapshot: serializeGridInventory(input.stash),
-        equipment: activeCharacter ? serializeEquipment(activeCharacter) : {},
+        equipment: primaryCharacter ? serializeEquipment(primaryCharacter) : {},
         partySnapshot: {
             activeCharacterIds: input.party.getCharacters().map((character) => character.id),
         },
@@ -49,6 +52,7 @@ export function buildHubSavePatch(input: HubSaveSerializerInput): CharacterSaveP
                 baseStats: character.stats,
                 magicLoadout: normalizeLoadout(character.magicLoadout, character),
                 skillUpgradeLevels: { ...character.skillUpgradeLevels },
+                equipment: serializeEquipment(character),
             })),
         },
     };
