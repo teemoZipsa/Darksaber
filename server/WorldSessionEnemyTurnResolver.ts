@@ -42,6 +42,8 @@ export interface WorldSessionEnemyTurnContext {
     getServerTileAt: (tile: TilePoint, ownerPlayerId?: string | null) => ReturnType<WorldMap['getTileAt']>;
     isFieldPassable: (query: FieldPassableQuery) => boolean;
     hasFieldLineOfSight: (from: TilePoint, to: TilePoint, ownerPlayerId?: string) => boolean;
+    onActorDown?: (actor: ServerActor, cause: 'enemy') => void;
+    onCombatActivity?: (actor: ServerActor) => void;
 }
 
 export class WorldSessionEnemyTurnResolver {
@@ -126,6 +128,7 @@ export class WorldSessionEnemyTurnResolver {
     }
 
     private resolveEnemyAttack(enemy: Enemy, actor: ServerActor, range: number): CombatEventMessage {
+        this.context.onCombatActivity?.(actor);
         const result = CombatFormulas.calcPhysicalDamage(
             getEffectiveStatsForEnemy(enemy),
             getEffectiveStats(actor.stats, actor.statuses),
@@ -145,6 +148,7 @@ export class WorldSessionEnemyTurnResolver {
                 actor.remainingAp = 0;
                 actor.actionGauge = 0;
                 actor.majorActionUsed = false;
+                this.context.onActorDown?.(actor, 'enemy');
             }
         }
         return {

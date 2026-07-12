@@ -21,6 +21,7 @@ import type {
     ServerEnemy,
     ServerPlayer,
 } from './WorldSessionTypes';
+import { recordPlayerKillDangerBand } from './WorldSessionBalanceTelemetry';
 
 export interface WorldSessionEnemyKillContext {
     scenarioRuntime: WorldSessionScenarioRuntime;
@@ -28,6 +29,7 @@ export interface WorldSessionEnemyKillContext {
     fieldNests: WorldSessionFieldNests;
     players: Map<string, ServerPlayer>;
     contentSpawner: WorldSessionContentSpawner;
+    worldMap: WorldMap;
 }
 
 export interface WorldSessionActorAttackContext {
@@ -91,7 +93,10 @@ export function completeWorldSessionEnemyKill(
     context.enemies.delete(enemy.id);
     if (target.nestKey) context.fieldNests.markNestEnemyKilled(target.nestKey, enemy.id, now);
     const player = context.players.get(actor.ownerPlayerId);
-    if (player) player.kills += 1;
+    if (player) {
+        player.kills += 1;
+        recordPlayerKillDangerBand(player, target, context.worldMap);
+    }
     const autoLootGrant: AutoLootGrantMessage | undefined = enemy.isBoss
         ? undefined
         : context.contentSpawner.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);

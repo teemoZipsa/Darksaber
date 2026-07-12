@@ -57,6 +57,8 @@ export interface ServerPlayer {
     completedDungeonIds: Set<string>;
     fieldEventFlagsByDungeonId: Map<string, Set<string>>;
     inspectedAmbientSiteIds: Set<string>;
+    balanceTelemetry?: ServerRaidBalanceState;
+    lastDamageCause?: 'enemy' | 'curse';
     activeDungeonId: string | null;
     active: boolean;
     ghost: boolean;
@@ -141,12 +143,23 @@ export interface WorldSessionPersistentPlayer {
     completedDungeonIds: string[];
     fieldEventFlagsByDungeonId: Array<[string, string[]]>;
     inspectedAmbientSiteIds?: string[];
+    balanceTelemetry?: ServerRaidBalanceState;
+    lastDamageCause?: 'enemy' | 'curse';
     activeDungeonId: string | null;
     active: boolean;
     ghost: boolean;
     disconnectedAt: number | null;
     actorIds: string[];
     saveSnapshot?: CharacterSave;
+}
+
+export interface ServerRaidBalanceState {
+    firstEngagementSeconds?: number;
+    lastEngagementStartSeconds?: number;
+    lastCombatActivitySeconds?: number;
+    engagementCount: number;
+    engagementGapSecondsTotal: number;
+    killsByDangerBand: Record<'starter' | 'low' | 'mid' | 'high' | 'scenario', number>;
 }
 
 export interface WorldSessionPersistentEnemy {

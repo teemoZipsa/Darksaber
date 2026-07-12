@@ -96,6 +96,7 @@ import type {
     WorldSessionOptions,
     WorldSessionTickResult,
 } from './WorldSessionTypes';
+import { recordPlayerCombatActivity } from './WorldSessionBalanceTelemetry';
 
 export const WORLD_TICK_MS = 100;
 export const DISCONNECT_GRACE_MS = 30_000;
@@ -180,6 +181,14 @@ export class WorldSession {
             getServerTileAt: (tile, ownerPlayerId) => this.getServerTileAt(tile, ownerPlayerId),
             isFieldPassable: (query) => this.isFieldPassable(query),
             hasFieldLineOfSight: (from, to, ownerPlayerId) => this.hasFieldLineOfSight(from, to, ownerPlayerId),
+            onActorDown: (actor, cause) => {
+                const player = this.players.get(actor.ownerPlayerId);
+                if (player) player.lastDamageCause = cause;
+            },
+            onCombatActivity: (actor) => {
+                const player = this.players.get(actor.ownerPlayerId);
+                if (player) recordPlayerCombatActivity(player);
+            },
         });
         this.fieldNests = new WorldSessionFieldNests({
             worldMap: this.worldMap,
@@ -264,6 +273,7 @@ export class WorldSession {
             spendActorGauge: (actor, cost) => this.spendActorGauge(actor, cost),
             finishActorIfSpent: (actor) => this.finishActorIfSpent(actor),
             completeEnemyKill: (actor, target, now) => this.completeEnemyKill(actor, target, now),
+            recordCombatActivity: (player) => recordPlayerCombatActivity(player),
         });
     }
 
@@ -617,6 +627,8 @@ export class WorldSession {
         target: ServerEnemy,
         now: number
     ): WorldSessionActorAttackResult {
+        const player = this.players.get(actor.ownerPlayerId);
+        if (player) recordPlayerCombatActivity(player);
         return resolveWorldSessionActorAttack({
             enemyKillContext: this.getEnemyKillContext(),
             getServerTileAt: (tile, ownerPlayerId) => this.getServerTileAt(tile, ownerPlayerId),
@@ -652,6 +664,7 @@ export class WorldSession {
             fieldNests: this.fieldNests,
             players: this.players,
             contentSpawner: this.contentSpawner,
+            worldMap: this.worldMap,
         };
     }
 
@@ -680,7 +693,9 @@ export class WorldSession {
     }
 
     private applyCursedArtifactTurnDamage(player: ServerPlayer, actor: ServerActor): CombatEventMessage | null {
-        return applyWorldSessionCursedArtifactTurnDamage(player, actor);
+        const event = applyWorldSessionCursedArtifactTurnDamage(player, actor);
+        if (event?.kind === 'down') player.lastDamageCause = 'curse';
+        return event;
     }
 
     private getPlayerCursedArtifactCount(player: ServerPlayer): number {

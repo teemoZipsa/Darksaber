@@ -858,7 +858,7 @@ function findReconnectSession(resumeToken: string, accountId: string): {
 
 function persistRaidResult(binding: SocketBinding, message: WorldServerMessage): void {
     if (message.type !== 'RAID_RESULT') return;
-    recordWorldServerRaidResult(metrics, message.result, message.elapsedSeconds, message.kills);
+    recordWorldServerRaidResult(metrics, message.result, message.elapsedSeconds, message.kills, message.telemetry);
     if (message.result !== 'SURVIVED') return;
     const questIds = completedDungeonIdsToQuestIds(message);
     void withRetry(() => authStore.recordRaidSurvival(binding.accountId, binding.characterId, questIds, message.extractionTownId)).catch((error) => {

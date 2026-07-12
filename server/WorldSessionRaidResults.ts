@@ -12,6 +12,7 @@ import type {
     ServerActor,
     ServerPlayer,
 } from './WorldSessionTypes';
+import { buildRaidBalanceTelemetry } from './WorldSessionBalanceTelemetry';
 
 export interface WorldSessionRaidResultsContext {
     players: ReadonlyMap<string, ServerPlayer>;
@@ -74,6 +75,7 @@ export class WorldSessionRaidResults {
             departureTownId: player?.departureTownId ?? 'central_castle',
             extractionTownId,
             completedDungeonIds: player ? [...player.completedDungeonIds] : [],
+            ...(player ? { telemetry: buildRaidBalanceTelemetry(player, result) } : {}),
         };
     }
 

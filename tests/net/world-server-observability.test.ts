@@ -17,7 +17,15 @@ test('world server metrics render gauges and operational counters', () => {
     metrics.worldTickDurationMs = 7;
     metrics.raidsStartedTotal = 4;
     recordWorldServerRaidResult(metrics, 'SURVIVED', 125.5, 3);
-    recordWorldServerRaidResult(metrics, 'DEAD', 44.5, 1);
+    recordWorldServerRaidResult(metrics, 'DEAD', 44.5, 1, {
+        firstEngagementSeconds: 12,
+        engagementCount: 3,
+        engagementGapSecondsTotal: 42,
+        lootItemsAcquired: 7,
+        lootItemsSecured: 0,
+        killsByDangerBand: { starter: 1, low: 0, mid: 0, high: 0, scenario: 0 },
+        deathCause: 'enemy',
+    });
 
     const output = formatWorldServerMetrics(metrics, {
         serverStartedAtMs: 1_000,
@@ -45,6 +53,14 @@ test('world server metrics render gauges and operational counters', () => {
     assert.match(output, /darksaber_world_raid_results_total\{result="mia"\} 0/);
     assert.match(output, /darksaber_world_raid_duration_seconds_total 170/);
     assert.match(output, /darksaber_world_raid_kills_total 4/);
+    assert.match(output, /darksaber_world_raid_first_engagement_seconds_total 12/);
+    assert.match(output, /darksaber_world_raid_first_engagement_samples_total 1/);
+    assert.match(output, /darksaber_world_raid_engagements_total 3/);
+    assert.match(output, /darksaber_world_raid_engagement_gap_seconds_total 42/);
+    assert.match(output, /darksaber_world_raid_loot_items_total\{disposition="acquired"\} 7/);
+    assert.match(output, /darksaber_world_raid_loot_items_total\{disposition="secured"\} 0/);
+    assert.match(output, /darksaber_world_raid_kills_by_danger_total\{band="starter"\} 1/);
+    assert.match(output, /darksaber_world_raid_deaths_by_cause_total\{cause="enemy"\} 1/);
     assert.match(output, /darksaber_world_action_rejected_total 3/);
     assert.match(output, /darksaber_world_save_conflicts_total 2/);
     assert.match(output, /darksaber_world_save_spool_replay_applied_total 9/);

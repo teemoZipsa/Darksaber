@@ -1011,6 +1011,9 @@ test('server-owned scenario entry spawns objective enemies and records completio
     const result = leave.replies.find((message) => message.type === 'RAID_RESULT');
     assert.equal(result?.type, 'RAID_RESULT');
     assert.deepEqual(result?.completedDungeonIds, ['burgos_castle']);
+    assert.equal(result?.telemetry?.engagementCount, 1);
+    assert.equal(result?.telemetry?.killsByDangerBand.scenario, 1);
+    assert.equal(result?.telemetry?.deathCause, 'manual');
 });
 
 test('server burgos cain side event records raid flag and gold without persisting before survival', () => {

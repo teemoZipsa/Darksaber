@@ -6,6 +6,7 @@ import { createFallbackActorSnapshot, sanitizeCarriedItems, sanitizeCarriedWeigh
 import { cloneStatuses, formationOffset, syncStatsMovementToClass } from './WorldSessionHelpers';
 import { cloneCharacterSave } from './WorldSessionSaveState';
 import type { ServerActor, ServerPlayer, WorldJoinContext } from './WorldSessionTypes';
+import { createServerRaidBalanceState } from './WorldSessionBalanceTelemetry';
 
 export interface WorldSessionJoinedPlayerInput {
     message: WorldJoinMessage;
@@ -43,6 +44,7 @@ export function buildWorldSessionJoinedPlayer(input: WorldSessionJoinedPlayerInp
         completedDungeonIds: new Set(),
         fieldEventFlagsByDungeonId: new Map(),
         inspectedAmbientSiteIds: new Set(),
+        balanceTelemetry: createServerRaidBalanceState(),
         activeDungeonId: null,
         active: true,
         ghost: false,

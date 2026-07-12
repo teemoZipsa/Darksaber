@@ -1,8 +1,18 @@
+import type { RaidBalanceTelemetry, RaidDangerBand, RaidDeathCause } from '../src/net/WorldProtocol';
+
 export interface WorldServerMetrics {
     raidsStartedTotal: number;
     raidResultsTotal: Record<WorldRaidResult, number>;
     raidDurationSecondsTotal: number;
     raidKillsTotal: number;
+    raidFirstEngagementSecondsTotal: number;
+    raidFirstEngagementSamplesTotal: number;
+    raidEngagementsTotal: number;
+    raidEngagementGapSecondsTotal: number;
+    raidLootItemsAcquiredTotal: number;
+    raidLootItemsSecuredTotal: number;
+    raidKillsByDangerBand: Record<RaidDangerBand, number>;
+    raidDeathsByCause: Record<Exclude<RaidDeathCause, 'none'>, number>;
     wsConnectionsTotal: number;
     malformedMessagesTotal: number;
     oversizedPayloadsTotal: number;
@@ -45,6 +55,14 @@ export function createWorldServerMetrics(): WorldServerMetrics {
         raidResultsTotal: { SURVIVED: 0, DEAD: 0, MIA: 0, LEFT: 0 },
         raidDurationSecondsTotal: 0,
         raidKillsTotal: 0,
+        raidFirstEngagementSecondsTotal: 0,
+        raidFirstEngagementSamplesTotal: 0,
+        raidEngagementsTotal: 0,
+        raidEngagementGapSecondsTotal: 0,
+        raidLootItemsAcquiredTotal: 0,
+        raidLootItemsSecuredTotal: 0,
+        raidKillsByDangerBand: { starter: 0, low: 0, mid: 0, high: 0, scenario: 0 },
+        raidDeathsByCause: { enemy: 0, curse: 0, timeout: 0, manual: 0, unknown: 0 },
         wsConnectionsTotal: 0,
         malformedMessagesTotal: 0,
         oversizedPayloadsTotal: 0,
@@ -73,11 +91,25 @@ export function recordWorldServerRaidResult(
     metrics: WorldServerMetrics,
     result: WorldRaidResult,
     elapsedSeconds: number,
-    kills: number
+    kills: number,
+    telemetry?: RaidBalanceTelemetry
 ): void {
     metrics.raidResultsTotal[result] += 1;
     metrics.raidDurationSecondsTotal += Math.max(0, Number.isFinite(elapsedSeconds) ? elapsedSeconds : 0);
     metrics.raidKillsTotal += Math.max(0, Number.isFinite(kills) ? Math.floor(kills) : 0);
+    if (!telemetry) return;
+    if (telemetry.firstEngagementSeconds !== undefined && Number.isFinite(telemetry.firstEngagementSeconds)) {
+        metrics.raidFirstEngagementSecondsTotal += Math.max(0, telemetry.firstEngagementSeconds);
+        metrics.raidFirstEngagementSamplesTotal += 1;
+    }
+    metrics.raidEngagementsTotal += Math.max(0, Math.floor(telemetry.engagementCount));
+    metrics.raidEngagementGapSecondsTotal += Math.max(0, telemetry.engagementGapSecondsTotal);
+    metrics.raidLootItemsAcquiredTotal += Math.max(0, Math.floor(telemetry.lootItemsAcquired));
+    metrics.raidLootItemsSecuredTotal += Math.max(0, Math.floor(telemetry.lootItemsSecured));
+    for (const band of ['starter', 'low', 'mid', 'high', 'scenario'] as const) {
+        metrics.raidKillsByDangerBand[band] += Math.max(0, Math.floor(telemetry.killsByDangerBand[band] ?? 0));
+    }
+    if (telemetry.deathCause !== 'none') metrics.raidDeathsByCause[telemetry.deathCause] += 1;
 }
 
 export function formatWorldServerMetrics(metrics: WorldServerMetrics, gauges: WorldServerMetricGauges, nowMs: number = Date.now()): string {
@@ -125,6 +157,32 @@ export function formatWorldServerMetrics(metrics: WorldServerMetrics, gauges: Wo
         '# HELP darksaber_world_raid_kills_total Cumulative enemy kills across finalized raid results.',
         '# TYPE darksaber_world_raid_kills_total counter',
         `darksaber_world_raid_kills_total ${metrics.raidKillsTotal}`,
+        '# HELP darksaber_world_raid_first_engagement_seconds_total Cumulative seconds from deployment to first engagement.',
+        '# TYPE darksaber_world_raid_first_engagement_seconds_total counter',
+        `darksaber_world_raid_first_engagement_seconds_total ${metrics.raidFirstEngagementSecondsTotal}`,
+        '# HELP darksaber_world_raid_first_engagement_samples_total Raids with a recorded first engagement.',
+        '# TYPE darksaber_world_raid_first_engagement_samples_total counter',
+        `darksaber_world_raid_first_engagement_samples_total ${metrics.raidFirstEngagementSamplesTotal}`,
+        '# HELP darksaber_world_raid_engagements_total Distinct combat engagements separated by at least fifteen seconds.',
+        '# TYPE darksaber_world_raid_engagements_total counter',
+        `darksaber_world_raid_engagements_total ${metrics.raidEngagementsTotal}`,
+        '# HELP darksaber_world_raid_engagement_gap_seconds_total Cumulative seconds between engagement starts.',
+        '# TYPE darksaber_world_raid_engagement_gap_seconds_total counter',
+        `darksaber_world_raid_engagement_gap_seconds_total ${metrics.raidEngagementGapSecondsTotal}`,
+        '# HELP darksaber_world_raid_loot_items_total Raid-acquired item quantities by disposition.',
+        '# TYPE darksaber_world_raid_loot_items_total counter',
+        `darksaber_world_raid_loot_items_total{disposition="acquired"} ${metrics.raidLootItemsAcquiredTotal}`,
+        `darksaber_world_raid_loot_items_total{disposition="secured"} ${metrics.raidLootItemsSecuredTotal}`,
+        '# HELP darksaber_world_raid_kills_by_danger_total Enemy kills grouped into stable regional danger bands.',
+        '# TYPE darksaber_world_raid_kills_by_danger_total counter',
+        ...(['starter', 'low', 'mid', 'high', 'scenario'] as const).map((band) =>
+            `darksaber_world_raid_kills_by_danger_total{band="${band}"} ${metrics.raidKillsByDangerBand[band]}`
+        ),
+        '# HELP darksaber_world_raid_deaths_by_cause_total Failed raids grouped by terminal cause.',
+        '# TYPE darksaber_world_raid_deaths_by_cause_total counter',
+        ...(['enemy', 'curse', 'timeout', 'manual', 'unknown'] as const).map((cause) =>
+            `darksaber_world_raid_deaths_by_cause_total{cause="${cause}"} ${metrics.raidDeathsByCause[cause]}`
+        ),
         '# HELP darksaber_world_ws_connections_total Total accepted WebSocket connection attempts.',
         '# TYPE darksaber_world_ws_connections_total counter',
         `darksaber_world_ws_connections_total ${metrics.wsConnectionsTotal}`,

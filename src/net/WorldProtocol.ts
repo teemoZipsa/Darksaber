@@ -353,6 +353,20 @@ export interface RaidResultMessage {
     firstSurvivalBonusGranted?: boolean;
     /** Server-authoritative losses and recovery applied for DEAD/MIA/LEFT. */
     failure?: RaidFailureSummary;
+    telemetry?: RaidBalanceTelemetry;
+}
+
+export type RaidDangerBand = 'starter' | 'low' | 'mid' | 'high' | 'scenario';
+export type RaidDeathCause = 'enemy' | 'curse' | 'timeout' | 'manual' | 'unknown' | 'none';
+
+export interface RaidBalanceTelemetry {
+    firstEngagementSeconds?: number;
+    engagementCount: number;
+    engagementGapSecondsTotal: number;
+    lootItemsAcquired: number;
+    lootItemsSecured: number;
+    killsByDangerBand: Record<RaidDangerBand, number>;
+    deathCause: RaidDeathCause;
 }
 
 export interface RaidFailureItemSummary {

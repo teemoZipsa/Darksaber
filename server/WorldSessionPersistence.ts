@@ -35,6 +35,11 @@ export function toPersistentPlayer(player: ServerPlayer): WorldSessionPersistent
         fieldEventFlagsByDungeonId: [...player.fieldEventFlagsByDungeonId.entries()]
             .map(([dungeonId, flags]) => [dungeonId, [...flags]]),
         inspectedAmbientSiteIds: [...player.inspectedAmbientSiteIds],
+        balanceTelemetry: player.balanceTelemetry ? {
+            ...player.balanceTelemetry,
+            killsByDangerBand: { ...player.balanceTelemetry.killsByDangerBand },
+        } : undefined,
+        lastDamageCause: player.lastDamageCause,
         activeDungeonId: player.activeDungeonId,
         active: player.active,
         ghost: player.ghost,
@@ -65,6 +70,11 @@ export function restorePersistentPlayer(player: WorldSessionPersistentPlayer): S
             player.fieldEventFlagsByDungeonId.map(([dungeonId, flags]) => [dungeonId, new Set(flags)])
         ),
         inspectedAmbientSiteIds: new Set(player.inspectedAmbientSiteIds ?? []),
+        balanceTelemetry: player.balanceTelemetry ? {
+            ...player.balanceTelemetry,
+            killsByDangerBand: { ...player.balanceTelemetry.killsByDangerBand },
+        } : undefined,
+        lastDamageCause: player.lastDamageCause,
         activeDungeonId: player.activeDungeonId,
         active: player.active,
         ghost: player.ghost,

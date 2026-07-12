@@ -50,6 +50,7 @@ export interface WorldSessionSkillResolverContext {
     spendActorGauge: (actor: ServerActor, cost: number) => void;
     finishActorIfSpent: (actor: ServerActor) => void;
     completeEnemyKill: (actor: ServerActor, target: ServerEnemy, now: number) => CompleteEnemyKillResult;
+    recordCombatActivity?: (player: ServerPlayer) => void;
 }
 
 export class WorldSessionSkillResolver {
@@ -119,6 +120,7 @@ export class WorldSessionSkillResolver {
             }),
         });
 
+        if (effect.enemyResults.length > 0) this.context.recordCombatActivity?.(player);
         this.context.spendActorGauge(actor, MAGIC_ACTION_GAUGE_COST);
         const result = this.applySkillEffect(player, actor, effectiveSkill, effect, now);
         this.context.finishActorIfSpent(actor);
