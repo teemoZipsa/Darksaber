@@ -96,6 +96,31 @@ test('buildHubSavePatch allows paid item additions', () => {
     assert.equal(patch.stashSnapshot?.items[0]?.itemId, 'herb_cheap');
 });
 
+test('buildHubSavePatch requires a valid paid rest reservation in the current town', () => {
+    const current = createDefaultCharacterSave(authCharacter());
+    assert.throws(
+        () => buildHubSavePatch({
+            hubLocation: { pendingRestMenuId: 'meat_plate' },
+            questState: { gold: 500 },
+        }, current),
+        (error: unknown) => error instanceof HttpError && error.code === 'invalid_hub_economy_patch',
+    );
+    assert.throws(
+        () => buildHubSavePatch({
+            hubLocation: { pendingRestMenuId: 'hearty_breakfast' },
+            questState: { gold: 475 },
+        }, current),
+        (error: unknown) => error instanceof HttpError && error.code === 'invalid_rest_menu',
+    );
+
+    const patch = buildHubSavePatch({
+        hubLocation: { pendingRestMenuId: 'meat_plate' },
+        questState: { gold: 470 },
+    }, current);
+    assert.equal(patch.hubLocation?.pendingRestMenuId, 'meat_plate');
+    assert.equal(patch.questState?.gold, 470);
+});
+
 test('buildHubSavePatch preserves existing market contracts instead of accepting forged ones', () => {
     const current = createDefaultCharacterSave(authCharacter());
     const patch = buildHubSavePatch({

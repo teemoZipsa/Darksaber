@@ -29,6 +29,8 @@ export interface ServerActor {
     level: number;
     tile: TilePoint;
     stats: CharacterStats;
+    /** Server-authoritative equipment/socket bonuses, kept separate so client snapshots retain base stats. */
+    equipmentStatBonus?: Partial<CharacterStats>;
     statuses: StatusEffect[];
     actionGauge: number;
     remainingAp: number;
@@ -123,6 +125,7 @@ export interface WorldJoinContext {
     completedQuestIds?: string[];
     shardId?: string;
     saveSnapshot?: CharacterSave;
+    equipmentStatBonuses?: Record<string, Partial<CharacterStats>>;
 }
 
 export interface WorldSessionPersistentPlayer {

@@ -24,6 +24,7 @@ import {
 } from './WorldSessionCarryState';
 import type { WorldSessionSaveState } from './WorldSessionSaveState';
 import type { ServerActor, ServerPlayer } from './WorldSessionTypes';
+import { getEffectiveServerActorStats } from './WorldSessionHelpers';
 
 export interface WorldSessionScenarioRewardsContext {
     saveState: WorldSessionSaveState;
@@ -52,7 +53,11 @@ export class WorldSessionScenarioRewards {
     ): ScenarioFieldEventResultMessage['trapDamage'] {
         if (actor.isDead || actor.stats.hp <= 1) return undefined;
 
-        const damage = getStoryScenarioFieldEventTrapDamage(event, actor.stats.hp, actor.stats.maxHp);
+        const damage = getStoryScenarioFieldEventTrapDamage(
+            event,
+            actor.stats.hp,
+            getEffectiveServerActorStats(actor).maxHp,
+        );
         if (damage <= 0) return undefined;
 
         actor.stats.hp = Math.max(1, actor.stats.hp - damage);
@@ -65,7 +70,8 @@ export class WorldSessionScenarioRewards {
         maxHpRatio: number | undefined
     ): ScenarioFieldEventResultMessage['trapDamage'] {
         if (!maxHpRatio || actor.isDead || actor.stats.hp <= 1) return undefined;
-        const damage = Math.min(actor.stats.hp - 1, Math.max(1, Math.floor(actor.stats.maxHp * maxHpRatio)));
+        const maxHp = getEffectiveServerActorStats(actor).maxHp;
+        const damage = Math.min(actor.stats.hp - 1, Math.max(1, Math.floor(maxHp * maxHpRatio)));
         actor.stats.hp = Math.max(1, actor.stats.hp - damage);
         removeActionStanceStatusesFromCarrier(actor);
         return { actorId: actor.id, damage };

@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBaseStats } from '../../src/data/Stats';
+import { getItemDef } from '../../src/data/ItemDB';
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
-import { createPartyCompositionFromSave } from '../../server/WorldJoinSave';
+import { createPartyCompositionFromSave, createWorldJoinSaveState } from '../../server/WorldJoinSave';
+import { buildWorldSessionJoinedPlayer } from '../../server/WorldSessionJoinBuilder';
+import { getEffectiveServerActorStats } from '../../server/WorldSessionHelpers';
 
 test('world join save composition keeps the selected character as the controllable leader', () => {
     const selected = authCharacter('selected-hero', 'Selected Hero');
@@ -55,6 +58,107 @@ test('world join save composition falls back to selected character when old rost
     assert.equal(composition[0]?.id, selected.id);
     assert.equal(composition[0]?.name, selected.name);
     assert.equal(composition[1]?.id, 'companion-only');
+});
+
+test('world join save state restores authoritative equipment, sockets, magic, rest, and carried weight', () => {
+    const selected = authCharacter('prepared-hero', 'Prepared Hero');
+    const save = createDefaultCharacterSave(selected);
+    save.hubLocation.pendingRestMenuId = 'meat_plate';
+    save.inventory.items = [{
+        itemId: 'herb_cheap',
+        gridX: 0,
+        gridY: 0,
+        quantity: 2,
+        durability: 1,
+    }];
+    save.equipment = {
+        weapon: {
+            itemId: 'short_sword',
+            gridX: 0,
+            gridY: 0,
+            quantity: 1,
+            durability: 100,
+            sockets: ['rune_el'],
+        },
+    };
+    save.partySnapshot = { activeCharacterIds: [selected.id, 'prepared-companion'] };
+    save.rosterSnapshot = {
+        characters: [
+            {
+                id: selected.id,
+                name: selected.name,
+                classKey: selected.classKey,
+                tier: selected.tier,
+                level: selected.level,
+                baseStats: selected.baseStats,
+                magicLoadout: ['inf_t1'],
+                skillUpgradeLevels: { inf_t1: 3 },
+            },
+            {
+                id: 'prepared-companion',
+                name: 'Prepared Companion',
+                classKey: 'cleric',
+                tier: 1,
+                level: 1,
+                baseStats: createBaseStats(),
+                equipment: {
+                    body: {
+                        itemId: 'magic_t1_body',
+                        gridX: 0,
+                        gridY: 0,
+                        quantity: 1,
+                        durability: 100,
+                    },
+                },
+            },
+        ],
+    };
+
+    const state = createWorldJoinSaveState(selected, save);
+    const snapshot = state.partyComposition[0];
+    const sword = getItemDef('short_sword')!;
+    const rune = getItemDef('rune_el')!;
+    const herb = getItemDef('herb_cheap')!;
+    const companionBody = getItemDef('magic_t1_body')!;
+    const expectedWeight = Math.round((sword.weight + rune.weight + companionBody.weight + herb.weight * 2) * 10) / 10;
+
+    assert.ok(snapshot);
+    assert.deepEqual(snapshot.magicLoadout, ['inf_t1']);
+    assert.deepEqual(snapshot.skillUpgradeLevels, { inf_t1: 3 });
+    assert.equal(snapshot.statuses[0]?.kind, 'attackUp');
+    assert.equal(snapshot.statuses[0]?.remainingSeconds, 300);
+    assert.equal(state.equipmentStatBonuses[selected.id]?.atk, 4);
+    assert.ok((state.equipmentStatBonuses['prepared-companion']?.def ?? 0) > 0);
+    assert.equal(state.carriedWeight, expectedWeight);
+    assert.equal(save.hubLocation.pendingRestMenuId, 'meat_plate');
+    assert.equal(state.saveSnapshot.hubLocation.pendingRestMenuId, null);
+
+    const joined = buildWorldSessionJoinedPlayer({
+        message: {
+            type: 'WORLD_JOIN',
+            originHubId: 'central_castle',
+            partyComposition: state.partyComposition,
+            clientVersion: 'test',
+            carriedWeight: state.carriedWeight,
+        },
+        context: {
+            equipmentStatBonuses: state.equipmentStatBonuses,
+            saveSnapshot: state.saveSnapshot,
+        },
+        playerId: 'p1',
+        resumeToken: 'resume-1',
+        originHubId: 'central_castle',
+        spawnTile: { x: 10, y: 10 },
+        raidModifier: { id: 'night_raid' },
+        findNearbyWalkableTile: (tile) => tile,
+    });
+    const actor = joined.actors[0]!;
+    assert.deepEqual(actor.equipmentStatBonus, state.equipmentStatBonuses[selected.id]);
+    assert.equal(
+        getEffectiveServerActorStats(actor).atk,
+        Math.floor((actor.stats.atk + 4) * 1.1),
+    );
+    assert.equal(joined.player.carriedWeight, expectedWeight);
 });
 
 function authCharacter(id: string, name: string): AuthCharacter {

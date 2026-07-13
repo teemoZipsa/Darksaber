@@ -1,9 +1,9 @@
 import type { LootObject } from '../src/entity/LootObject';
 import type { ActorSnapshot, LootSnapshot } from '../src/net/WorldProtocol';
-import { cloneStats, cloneStatuses, gridToSnapshot } from './WorldSessionHelpers';
+import { cloneStats, cloneStatuses, getEquipmentAdjustedServerActorStats, gridToSnapshot } from './WorldSessionHelpers';
 import type { ServerActor } from './WorldSessionTypes';
 
-export function toActorSnapshot(actor: ServerActor, isGhost: boolean): ActorSnapshot {
+export function toActorSnapshot(actor: ServerActor, isGhost: boolean, includeEquipmentStats: boolean = false): ActorSnapshot {
     return {
         id: actor.id,
         ownerPlayerId: actor.ownerPlayerId,
@@ -13,7 +13,7 @@ export function toActorSnapshot(actor: ServerActor, isGhost: boolean): ActorSnap
         currentTier: actor.currentTier,
         level: actor.level,
         tile: { ...actor.tile },
-        stats: cloneStats(actor.stats),
+        stats: cloneStats(includeEquipmentStats ? getEquipmentAdjustedServerActorStats(actor) : actor.stats),
         statuses: cloneStatuses(actor.statuses),
         actionGauge: actor.actionGauge,
         remainingAp: actor.remainingAp,

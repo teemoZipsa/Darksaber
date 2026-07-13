@@ -1,4 +1,4 @@
-import { getEffectiveStats } from '../src/combat/StatusEffects';
+import { advanceTimedStatuses } from '../src/combat/StatusEffects';
 import { FIELD_MAX_ACTION_GAUGE } from '../src/field/FieldActionEconomy';
 import { FIELD_ATB_SCALE } from '../src/field/FieldConfig';
 import { advanceAtb } from '../src/field/FieldCombat';
@@ -14,6 +14,7 @@ import type { WorldSessionLootResolver } from './WorldSessionLootResolver';
 import type { WorldSessionRaidResults } from './WorldSessionRaidResults';
 import type { WorldSessionSaveState } from './WorldSessionSaveState';
 import type { ServerActor, ServerEnemy, ServerPlayer, WorldSessionTickResult } from './WorldSessionTypes';
+import { getEffectiveServerActorStats } from './WorldSessionHelpers';
 
 export interface WorldSessionTickProcessorContext {
     now: number;
@@ -97,13 +98,20 @@ function advancePlayerActors(
     for (const actorId of player.actorIds) {
         const actor = context.actors.get(actorId);
         if (!actor || actor.isDead) continue;
+        const statusCount = actor.statuses.length;
+        actor.statuses = advanceTimedStatuses(actor.statuses, context.dt);
+        if (actor.statuses.length !== statusCount) {
+            const effective = getEffectiveServerActorStats(actor);
+            actor.stats.hp = Math.min(actor.stats.hp, effective.maxHp);
+            actor.stats.mp = Math.min(actor.stats.mp, effective.maxMp);
+        }
         context.updateRestingActor(actor, context.dt);
         if (actor.actionGauge >= FIELD_MAX_ACTION_GAUGE && actor.remainingAp <= 0) {
             readyActor(context, player, actor, events);
         } else if (actor.actionGauge < FIELD_MAX_ACTION_GAUGE) {
             actor.actionGauge = advanceAtb(
                 actor.actionGauge,
-                getEffectiveStats(actor.stats, actor.statuses).spd,
+                getEffectiveServerActorStats(actor).spd,
                 context.dt,
                 FIELD_ATB_SCALE
                 * getCarryAtbMultiplier(player.carriedWeight)

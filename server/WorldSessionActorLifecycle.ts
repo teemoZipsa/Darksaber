@@ -11,7 +11,7 @@ import {
     getCursedArtifactTurnDamage,
 } from '../src/raid/CursedArtifact';
 import type { CombatEventMessage } from '../src/net/WorldProtocol';
-import { createActorEvent } from './WorldSessionHelpers';
+import { createActorEvent, getEffectiveServerActorStats } from './WorldSessionHelpers';
 import {
     updateRestingActorResources,
 } from './WorldSessionSkillState';
@@ -28,7 +28,7 @@ export function applyWorldSessionCursedArtifactTurnDamage(
 ): CombatEventMessage | null {
     const damage = Math.min(
         actor.stats.hp,
-        getCursedArtifactTurnDamage(actor.stats, getWorldSessionPlayerCursedArtifactCount(player))
+        getCursedArtifactTurnDamage(getEffectiveServerActorStats(actor), getWorldSessionPlayerCursedArtifactCount(player))
     );
     if (damage <= 0) return null;
 

@@ -1,6 +1,6 @@
 import { findPathWithCost, manhattan, type FieldPassableQuery, type TilePoint } from '../src/field/FieldPathing';
-import { getEffectiveStats } from '../src/combat/StatusEffects';
 import type { ServerActor } from './WorldSessionTypes';
+import { getEffectiveServerActorStats } from './WorldSessionHelpers';
 
 export interface MoveIntentPathContext {
     actor: ServerActor;
@@ -10,7 +10,7 @@ export interface MoveIntentPathContext {
 }
 
 export function planMoveIntentPath(context: MoveIntentPathContext): TilePoint[] {
-    const movementBudget = Math.max(1, getEffectiveStats(context.actor.stats, context.actor.statuses).mov || 1);
+    const movementBudget = Math.max(1, getEffectiveServerActorStats(context.actor).mov || 1);
     const pathResult = findPathWithCost(
         context.actor.tile,
         context.targetTile,

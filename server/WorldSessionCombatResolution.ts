@@ -1,6 +1,5 @@
 import {
     applyGuardToDamage,
-    getEffectiveStats,
     getEffectiveStatsForEnemy,
 } from '../src/combat/StatusEffects';
 import { CombatFormulas } from '../src/combat/CombatFormulas';
@@ -22,6 +21,7 @@ import type {
     ServerPlayer,
 } from './WorldSessionTypes';
 import { recordPlayerKillDangerBand } from './WorldSessionBalanceTelemetry';
+import { getEffectiveServerActorStats } from './WorldSessionHelpers';
 
 export interface WorldSessionEnemyKillContext {
     scenarioRuntime: WorldSessionScenarioRuntime;
@@ -51,7 +51,7 @@ export function resolveWorldSessionActorAttack(
 ): WorldSessionActorAttackResolution {
     const enemy = target.enemy;
     const result = CombatFormulas.calcPhysicalDamage(
-        getEffectiveStats(actor.stats, actor.statuses),
+        getEffectiveServerActorStats(actor),
         getEffectiveStatsForEnemy(enemy),
         context.getServerTileAt({ x: enemy.gridX, y: enemy.gridY }, actor.ownerPlayerId),
         { isRanged: manhattan(actor.tile, { x: enemy.gridX, y: enemy.gridY }) > 1 }

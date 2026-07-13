@@ -648,6 +648,7 @@ export class GameManager {
             gridY: entry?.gridY ?? 0,
             quantity: entry?.quantity ?? 1,
             durability: Math.max(0, Math.min(item.maxDurability, Math.floor(entry?.durability ?? item.maxDurability))),
+            sockets: entry?.sockets.flatMap((socketId) => ITEMS.find((candidate) => candidate.id === socketId) ?? []),
         };
     }
 
@@ -976,6 +977,7 @@ interface SavedEquipmentEntry {
     gridY: number;
     quantity: number;
     durability: number;
+    sockets: string[];
 }
 
 function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter): SavedRosterEntry[] {
@@ -1047,6 +1049,7 @@ function readSavedEquipmentEntries(equipment: Record<string, unknown>): SavedEqu
             gridY: positiveInt(raw.gridY, 0),
             quantity: positiveInt(raw.quantity, 1),
             durability: positiveInt(raw.durability, Number.MAX_SAFE_INTEGER),
+            sockets: readStringArray(raw.sockets),
         });
     }
     return entries;

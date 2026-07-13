@@ -89,6 +89,7 @@ export function clonePersistentActor(actor: ServerActor): ServerActor {
         ...actor,
         tile: { ...actor.tile },
         stats: cloneStats(actor.stats),
+        equipmentStatBonus: { ...(actor.equipmentStatBonus ?? {}) },
         statuses: cloneStatuses(actor.statuses),
         magicLoadout: [...actor.magicLoadout],
         skillUpgradeLevels: { ...actor.skillUpgradeLevels },

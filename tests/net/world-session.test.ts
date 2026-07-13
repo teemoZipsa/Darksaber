@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBaseStats } from '../../src/data/Stats';
+import { createStatus } from '../../src/combat/StatusEffects';
 import { getNormalizedMonsterBalance } from '../../src/data/original/originalMonsterBalance';
 import { Enemy } from '../../src/entity/Enemy';
 import type { ActorSnapshot, AutoLootGrantMessage, WorldJoinMessage } from '../../src/net/WorldProtocol';
@@ -72,6 +73,45 @@ function joinWithCarriedItem(originHubId: string, id: string, itemId: string): W
         carriedItems: [{ itemId, quantity: 1 }],
     };
 }
+
+test('world session expires server-authoritative timed meal statuses', () => {
+    const session = new WorldSession();
+    const joined = session.join({
+        ...joinMessage('central_castle', 'meal-hero'),
+        partyComposition: [actor('meal-hero', {
+            statuses: [createStatus('attackUp', {
+                activation: 'on_raid_start',
+                durationSeconds: 0.1,
+                remainingSeconds: 0.1,
+                sourceType: 'rest',
+                sourceRestMenuId: 'meat_plate',
+            })],
+        })],
+    }, 0);
+
+    session.tick(0);
+    session.tick(500);
+
+    assert.deepEqual(session.createSnapshot(joined.playerId, 500).partyActors[0]?.statuses, []);
+});
+
+test('world session exposes equipment-adjusted base stats only for remote actors', () => {
+    const session = new WorldSession();
+    const first = session.join(joinMessage('central_castle', 'equipped-hero'), 0, {
+        equipmentStatBonuses: { 'equipped-hero': { maxHp: 20, atk: 5 } },
+    });
+    const second = session.join(joinMessage('central_castle', 'viewer-hero'), 0);
+
+    const ownView = session.createSnapshot(first.playerId, 100).partyActors
+        .find((entry) => entry.ownerPlayerId === first.playerId);
+    const remoteView = session.createSnapshot(second.playerId, 100).partyActors
+        .find((entry) => entry.ownerPlayerId === first.playerId);
+
+    assert.ok(ownView);
+    assert.ok(remoteView);
+    assert.equal(remoteView.stats.maxHp, ownView.stats.maxHp + 20);
+    assert.equal(remoteView.stats.atk, ownView.stats.atk + 5);
+});
 
 function withFixedRandom<T>(value: number, callback: () => T): T {
     const previousRandom = Math.random;
@@ -496,17 +536,19 @@ test('server cursed artifact slows actor ATB and damages on ready turn', () => {
         partyComposition: [actor('ready-cursed', {
             stats: createBaseStats({ hp: 100, maxHp: 100, spd: 1000, mov: 50, actionLimit: 80, hitRate: 200 }),
         })],
-    }, 0);
+    }, 0, {
+        equipmentStatBonuses: { 'ready-cursed': { maxHp: 100 } },
+    });
     const firstReadyTick = readySession.tick(0);
     const secondReadyTick = readySession.tick(1_000);
     const readyActor = readySession.createSnapshot(ready.playerId, 1_000).partyActors
         .find((entry) => entry.ownerPlayerId === ready.playerId);
 
     assert.ok(readyActor);
-    assert.equal(readyActor.stats.hp, 94);
+    assert.equal(readyActor.stats.hp, 88);
     const curseEvent = [...firstReadyTick.events, ...secondReadyTick.events].find((event) => event.kind === 'curse');
     assert.ok(curseEvent);
-    assert.equal(curseEvent.value, 6);
+    assert.equal(curseEvent.value, 12);
 });
 
 test('server tick keeps passive enemy ATB idle for every client snapshot', () => {
@@ -2071,6 +2113,7 @@ test('server-authoritative original MAGIC field traps damage the actor once', ()
         characterId: character.id,
         completedQuestIds,
         saveSnapshot: save,
+        equipmentStatBonuses: { [character.id]: { maxHp: 100 } },
     });
     const internals = getWorldSessionDebugState(session);
     const serverActor = [...internals.actors.values()].find((entry) => entry.ownerPlayerId === joined.playerId);
@@ -2102,12 +2145,12 @@ test('server-authoritative original MAGIC field traps damage the actor once', ()
     assert.equal(fieldResult?.type, 'SCENARIO_FIELD_EVENT_RESULT');
     assert.deepEqual(fieldResult?.type === 'SCENARIO_FIELD_EVENT_RESULT' ? fieldResult.trapDamage : undefined, {
         actorId: serverActor.id,
-        damage: 16,
+        damage: 24,
     });
-    assert.equal(serverActor.stats.hp, 84);
+    assert.equal(serverActor.stats.hp, 76);
     const snapshot = session.createSnapshot(joined.playerId, 1_100);
     const actorSnapshot = snapshot.partyActors.find((entry) => entry.id === serverActor.id);
-    assert.equal(actorSnapshot?.stats.hp, 84);
+    assert.equal(actorSnapshot?.stats.hp, 76);
 
     const duplicate = session.handleMessage(joined.playerId, {
         type: 'SCENARIO_FIELD_EVENT_INTERACT',
@@ -2117,7 +2160,7 @@ test('server-authoritative original MAGIC field traps damage the actor once', ()
         eventId: event.id,
     }, 1_200);
     assert.equal(duplicate.replies[0]?.type, 'ACTION_REJECTED');
-    assert.equal(serverActor.stats.hp, 84);
+    assert.equal(serverActor.stats.hp, 76);
 });
 
 test('server-authoritative RANDOM field events reject without completing until the roll succeeds', () => {

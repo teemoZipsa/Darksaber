@@ -37,7 +37,7 @@ import { createWorldSessionKey, resolveWorldSessionRoute, type WorldSessionRoute
 import { createWorldServerMetrics, errorToLogValue, formatWorldServerMetrics, logServerEvent, recordWorldServerRaidResult } from './WorldServerObservability';
 import { isAllowedOrigin } from './OriginPolicy';
 import { createWorldShardConfig } from './WorldShardConfig';
-import { createPartyCompositionFromSave } from './WorldJoinSave';
+import { createWorldJoinSaveState, type WorldJoinSaveState } from './WorldJoinSave';
 import { resolveServerRuntimeConfig } from './ServerRuntimeConfig';
 import { createWorldServerOriginPolicy } from './WorldServerOriginPolicy';
 import { sweepRevokedSockets } from './WorldAuthSocketSweep';
@@ -422,7 +422,8 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
         return;
     }
     const { sessionKey, session } = routed;
-    const serverJoinMessage = buildAuthoritativeJoinMessage(message, character, save, progress);
+    const joinSaveState = createWorldJoinSaveState(character, save);
+    const serverJoinMessage = buildAuthoritativeJoinMessage(message, character, save, progress, joinSaveState);
     let result: ReturnType<WorldSession['join']>;
     try {
         result = session.join(serverJoinMessage, Date.now(), {
@@ -430,7 +431,8 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
             characterId: character.id,
             completedQuestIds: serverJoinMessage.completedQuestIds,
             shardId: sessionKey,
-            saveSnapshot: save,
+            saveSnapshot: joinSaveState.saveSnapshot,
+            equipmentStatBonuses: joinSaveState.equipmentStatBonuses,
         });
     } catch (error) {
         if (error instanceof WorldResumeFailedError) {
@@ -443,6 +445,10 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
     if (!message.resumeToken) metrics.raidsStartedTotal += 1;
     bindPlayer(ws, sessionKey, result.playerId, auth.account, character.id, result.welcome.resumeToken, auth.session.id);
     ensureSaveTracker(sessionKey, result.playerId, auth.account.id, character.id, result.welcome.resumeToken, save.revision);
+    if (!message.resumeToken && joinSaveState.consumedPendingRestMenuId) {
+        session.markCharacterSaveDirty(result.playerId);
+        consumeSessionSaveDirtyPlayers(sessionKey, session);
+    }
     void persistWorldSessionSnapshot(sessionKey, session, 'join');
     send(ws, result.welcome);
     send(ws, { type: 'WORLD_SNAPSHOT', snapshot: session.createSnapshot(result.playerId) });
@@ -1122,7 +1128,8 @@ function buildAuthoritativeJoinMessage(
     clientMessage: WorldJoinMessage,
     character: AuthCharacter,
     save: CharacterSave,
-    progress: AccountProgress
+    progress: AccountProgress,
+    joinSaveState: WorldJoinSaveState,
 ): WorldJoinMessage {
     const completedQuestIds = uniqueStrings([
         ...progress.completedQuests,
@@ -1131,9 +1138,9 @@ function buildAuthoritativeJoinMessage(
     return {
         type: 'WORLD_JOIN',
         originHubId: readHubTownId(save),
-        partyComposition: createPartyCompositionFromSave(character, save),
+        partyComposition: joinSaveState.partyComposition,
         clientVersion: clientMessage.clientVersion,
-        carriedWeight: 0,
+        carriedWeight: joinSaveState.carriedWeight,
         resumeToken: clientMessage.resumeToken,
         completedQuestIds,
         characterId: character.id,

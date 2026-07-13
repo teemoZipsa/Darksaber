@@ -2,7 +2,6 @@ import {
     applyGuardToDamage,
     applyStatus,
     createStatus,
-    getEffectiveStats,
     getEffectiveStatsForEnemy,
     removeActionStanceStatusesFromCarrier,
 } from '../src/combat/StatusEffects';
@@ -23,6 +22,7 @@ import type { CombatEventMessage } from '../src/net/WorldProtocol';
 import { getTargetableActors } from './WorldSessionVisibility';
 import {
     directionFromTo,
+    getEffectiveServerActorStats,
     hashInt,
     toActorAIUnit,
     toEnemyAIUnit,
@@ -131,7 +131,7 @@ export class WorldSessionEnemyTurnResolver {
         this.context.onCombatActivity?.(actor);
         const result = CombatFormulas.calcPhysicalDamage(
             getEffectiveStatsForEnemy(enemy),
-            getEffectiveStats(actor.stats, actor.statuses),
+            getEffectiveServerActorStats(actor),
             this.context.getServerTileAt(actor.tile, actor.ownerPlayerId),
             { isRanged: range > 1 }
         );

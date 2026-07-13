@@ -51,7 +51,11 @@ export function buildWorldSessionSnapshot(input: {
             return owner?.active && !owner.ghost;
         })
         .filter((actor) => isActorVisibleToViewer(input.players, actor, input.viewerPlayerId))
-        .map((actor) => toActorSnapshot(actor, input.players.get(actor.ownerPlayerId)?.ghost ?? false));
+        .map((actor) => toActorSnapshot(
+            actor,
+            input.players.get(actor.ownerPlayerId)?.ghost ?? false,
+            actor.ownerPlayerId !== input.viewerPlayerId,
+        ));
     const enemies = [...input.enemies]
         .filter((entry) => entry.enemy.stats.hp > 0)
         .filter((entry) => isEnemyVisibleToViewer(input.players, entry, input.viewerPlayerId))

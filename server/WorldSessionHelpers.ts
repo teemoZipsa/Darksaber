@@ -1,4 +1,4 @@
-import type { StatusEffect } from '../src/combat/StatusEffects';
+import { getEffectiveStats, type StatusEffect } from '../src/combat/StatusEffects';
 import type { CharacterStats } from '../src/data/Stats';
 import { getClassLine } from '../src/data/ClassTree';
 import type { EnemyAIUnit } from '../src/field/EnemyAI';
@@ -12,6 +12,7 @@ import type {
 } from '../src/net/WorldProtocol';
 import type { WorldRealm } from '../src/map/BiomeMask';
 import type { ServerActor, WorldSessionMessageResult } from './WorldSessionTypes';
+import { applyStatBonus } from '../src/inventory/Socketing';
 
 export function gridToSnapshot(grid: { width: number; height: number; items: Array<{ item: { id: string }; gridX: number; gridY: number; durability: number; quantity: number; acquiredInRaid?: boolean; sockets?: Array<{ id: string }> }> }): GridSnapshot {
     return {
@@ -84,6 +85,20 @@ export function createEnemyEvent(
 
 export function cloneStats(stats: CharacterStats): CharacterStats {
     return { ...stats };
+}
+
+export function getEffectiveServerActorStats(actor: ServerActor): CharacterStats {
+    const withEquipment = getEquipmentAdjustedServerActorStats(actor);
+    return getEffectiveStats(withEquipment, actor.statuses);
+}
+
+export function getEquipmentAdjustedServerActorStats(actor: ServerActor): CharacterStats {
+    const withEquipment = applyStatBonus(actor.stats, actor.equipmentStatBonus ?? {});
+    // Current resources live on the base snapshot and may legitimately exceed its
+    // max while equipment or a rest status raises the effective maximum.
+    withEquipment.hp = actor.stats.hp;
+    withEquipment.mp = actor.stats.mp;
+    return withEquipment;
 }
 
 export function syncStatsMovementToClass(stats: CharacterStats, classLineId: string): CharacterStats {
@@ -167,12 +182,13 @@ export function toEnemyAIUnit(enemy: Enemy): EnemyAIUnit {
 }
 
 export function toActorAIUnit(actor: ServerActor): EnemyAIUnit {
+    const effective = getEffectiveServerActorStats(actor);
     return {
         id: actor.id,
         name: actor.name,
         tile: actor.tile,
         hp: actor.stats.hp,
-        maxHp: actor.stats.maxHp,
+        maxHp: effective.maxHp,
         role: 'bruiser',
         statusKinds: actor.statuses.map((status) => status.kind),
     };

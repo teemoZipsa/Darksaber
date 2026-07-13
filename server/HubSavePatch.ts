@@ -8,6 +8,7 @@ import {
 } from '../src/data/MarketData';
 import { getSellPrice, TRADE_GOOD_SELL_MULTIPLIERS } from '../src/data/ShopData';
 import { isTownId } from '../src/data/TownFacilityData';
+import { getRestFacility } from '../src/data/RestFacilityData';
 import { getLearnedSkillIdSet, normalizeLoadout, normalizeUpgradeLevels } from '../src/magic/MagicLoadout';
 import type { CharacterSave, CharacterSavePatch, InventorySaveSnapshot } from '../src/shared/CharacterSave';
 import { HttpError } from './HttpError';
@@ -89,7 +90,15 @@ function sanitizeHubLocation(
     if (incoming.pendingRestMenuId === null) {
         next.pendingRestMenuId = null;
     } else if (typeof incoming.pendingRestMenuId === 'string') {
-        next.pendingRestMenuId = incoming.pendingRestMenuId.trim() || null;
+        const menuId = incoming.pendingRestMenuId.trim();
+        if (!menuId) {
+            next.pendingRestMenuId = null;
+        } else {
+            const townId = typeof next.townId === 'string' ? next.townId : '';
+            const menu = getRestFacility(townId)?.menu.find((candidate) => candidate.id === menuId);
+            if (!menu) throw new HttpError(400, 'invalid_rest_menu', 'Rest menu is not available in the current town.');
+            next.pendingRestMenuId = menu.id;
+        }
     }
     return next;
 }
@@ -334,7 +343,7 @@ function assertNoFreeHubEconomyGain(patch: CharacterSavePatch, currentSave: Char
         currentSave.characterId,
     );
 
-    let requiredSpend = 0;
+    let requiredSpend = getNewRestReservationCost(patch, currentSave);
     let allowedEarn = 0;
     const itemIds = new Set([...currentCounts.keys(), ...nextCounts.keys()]);
     for (const itemId of itemIds) {
@@ -349,6 +358,19 @@ function assertNoFreeHubEconomyGain(patch: CharacterSavePatch, currentSave: Char
     if (goldDelta > allowedEarn - requiredSpend) {
         throw new HttpError(400, 'invalid_hub_economy_patch', 'Hub save patch creates gold or items without a matching cost.');
     }
+}
+
+function getNewRestReservationCost(patch: CharacterSavePatch, currentSave: CharacterSave): number {
+    const nextHubLocation = isRecord(patch.hubLocation) ? patch.hubLocation : currentSave.hubLocation;
+    const currentMenuId = typeof currentSave.hubLocation.pendingRestMenuId === 'string'
+        ? currentSave.hubLocation.pendingRestMenuId
+        : null;
+    const nextMenuId = typeof nextHubLocation.pendingRestMenuId === 'string'
+        ? nextHubLocation.pendingRestMenuId
+        : null;
+    if (!nextMenuId || nextMenuId === currentMenuId) return 0;
+    const townId = typeof nextHubLocation.townId === 'string' ? nextHubLocation.townId : '';
+    return getRestFacility(townId)?.menu.find((menu) => menu.id === nextMenuId)?.price ?? 0;
 }
 
 function readGold(questState: Record<string, unknown>): number {

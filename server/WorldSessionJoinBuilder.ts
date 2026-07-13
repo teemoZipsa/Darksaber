@@ -71,6 +71,7 @@ export function buildWorldSessionJoinedPlayer(input: WorldSessionJoinedPlayerInp
             level: snapshot.level,
             tile,
             stats: syncStatsMovementToClass(snapshot.stats, snapshot.classLineId),
+            equipmentStatBonus: { ...(context.equipmentStatBonuses?.[snapshot.id] ?? {}) },
             statuses: cloneStatuses(snapshot.statuses),
             actionGauge: 0,
             remainingAp: 0,

@@ -91,7 +91,7 @@ test('server save sync restores nested equipment for every roster character', ()
     save.characterId = primary.id;
     save.rosterSnapshot = {
         characters: [
-            { id: primary.id, equipment: { weapon: { itemId: 'short_sword', gridX: 0, gridY: 0, quantity: 1, durability: 100 } } },
+            { id: primary.id, equipment: { weapon: { itemId: 'short_sword', gridX: 0, gridY: 0, quantity: 1, durability: 100, sockets: ['rune_el'] } } },
             { id: companion.id, equipment: { body: { itemId: 'magic_t1_body', gridX: 0, gridY: 0, quantity: 1, durability: 100 } } },
         ],
     };
@@ -104,6 +104,7 @@ test('server save sync restores nested equipment for every roster character', ()
     manager.applyServerSave(save, primary.id);
 
     assert.equal(primary.equipment.get('weapon')?.item.id, 'short_sword');
+    assert.deepEqual(primary.equipment.get('weapon')?.sockets?.map((socket) => socket.id), ['rune_el']);
     assert.equal(companion.equipment.get('body')?.item.id, 'magic_t1_body');
     assert.equal(manager.networkSaveRevision, 7);
 });
