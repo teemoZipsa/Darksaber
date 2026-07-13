@@ -178,6 +178,72 @@ test('buildHubSavePatch persists normalized learned skill upgrade levels', () =>
     assert.deepEqual(character.skillUpgradeLevels, { inf_t1: 5 });
 });
 
+test('buildHubSavePatch rejects client-forged raid injuries', () => {
+    const current = createDefaultCharacterSave(authCharacter());
+
+    assert.throws(
+        () => buildHubSavePatch({
+            rosterSnapshot: {
+                characters: [{ id: 'char-1', injured: true }],
+            },
+        }, current),
+        (error: unknown) => error instanceof HttpError && error.code === 'forbidden_injury_state',
+    );
+});
+
+test('buildHubSavePatch requires the authoritative infirmary price to clear injuries', () => {
+    const current = createDefaultCharacterSave(authCharacter());
+    const roster = current.rosterSnapshot.characters;
+    assert.ok(Array.isArray(roster));
+    const character = roster.find((entry) => (
+        typeof entry === 'object' && entry !== null && 'id' in entry && entry.id === 'char-1'
+    ));
+    assert.ok(character && typeof character === 'object');
+    Object.assign(character, { injured: true });
+
+    const treatmentPatch = (gold: number) => ({
+        questState: { gold },
+        rosterSnapshot: {
+            characters: [{ id: 'char-1', injured: false }],
+        },
+    });
+    assert.throws(
+        () => buildHubSavePatch(treatmentPatch(500), current),
+        (error: unknown) => error instanceof HttpError && error.code === 'invalid_hub_economy_patch',
+    );
+    assert.throws(
+        () => buildHubSavePatch(treatmentPatch(451), current),
+        (error: unknown) => error instanceof HttpError && error.code === 'invalid_hub_economy_patch',
+    );
+
+    const patch = buildHubSavePatch(treatmentPatch(450), current);
+    const patchedRoster = patch.rosterSnapshot as Record<string, unknown>;
+    const patchedCharacter = (patchedRoster.characters as Array<Record<string, unknown>>)[0];
+    assert.equal(patchedCharacter.injured, undefined);
+    assert.equal(patch.questState?.gold, 450);
+});
+
+test('buildHubSavePatch applies the saved infirmary discount to injury treatment', () => {
+    const current = createDefaultCharacterSave(authCharacter());
+    current.questState.facilityUpgrades = { infirmary: 1 };
+    const roster = current.rosterSnapshot.characters;
+    assert.ok(Array.isArray(roster));
+    const character = roster.find((entry) => (
+        typeof entry === 'object' && entry !== null && 'id' in entry && entry.id === 'char-1'
+    ));
+    assert.ok(character && typeof character === 'object');
+    Object.assign(character, { injured: true });
+
+    const patch = buildHubSavePatch({
+        questState: { gold: 460 },
+        rosterSnapshot: {
+            characters: [{ id: 'char-1', injured: false }],
+        },
+    }, current);
+
+    assert.equal(patch.questState?.gold, 460);
+});
+
 test('buildHubSavePatch moves owned inventory equipment onto a companion without treating it as free creation', () => {
     const current = createDefaultCharacterSave(authCharacter());
     current.rosterSnapshot = {

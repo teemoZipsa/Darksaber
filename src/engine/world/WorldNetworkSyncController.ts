@@ -98,6 +98,7 @@ export interface WorldNetworkSyncContext {
     spawnDamage(x: number, y: number, amount: number, isCrit: boolean, isMiss: boolean): void;
     spawnHeal(x: number, y: number, amount: number): void;
     spawnStatus(x: number, y: number, text: string): void;
+    recordCharacterDown(characterId: string): void;
     log(message: string): void;
 }
 
@@ -199,6 +200,9 @@ export class WorldNetworkSyncController {
                 path: [],
                 queuedIntent: null,
             };
+            if (!character.isDead && actorSnapshot.isDead) {
+                this.context.recordCharacterDown(character.id);
+            }
             this.applyActorSnapshot(actor, actorSnapshot);
             nextLocalActors.push(actor);
         }
@@ -449,7 +453,12 @@ export class WorldNetworkSyncController {
                 this.context.spawnHitEffect(targetActor.entity.gridX, targetActor.entity.gridY);
                 this.context.registerCombatFeedback(event.kind === 'down' ? 'kill' : 'normal', feedbackGroupId);
             }
-            if (event.kind === 'down') this.context.spawnStatus(targetActor.entity.gridX, targetActor.entity.gridY, 'DOWN');
+            if (event.kind === 'down') {
+                this.context.spawnStatus(targetActor.entity.gridX, targetActor.entity.gridY, 'DOWN');
+                if (this.context.party.getCharacters().includes(targetActor.character)) {
+                    this.context.recordCharacterDown(targetActor.character.id);
+                }
+            }
         }
         if (sourceActor && targetEnemy) this.context.spawnAttackCue(this.context.actorTile(sourceActor), this.context.enemyTile(targetEnemy), '#72e8ff');
         if (sourceEnemy && targetActor) this.context.spawnAttackCue(this.context.enemyTile(sourceEnemy), this.context.actorTile(targetActor), '#ff8a55');

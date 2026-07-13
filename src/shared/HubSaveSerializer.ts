@@ -1,4 +1,5 @@
 import type { Character } from '../character/Character';
+import { hasStatus } from '../combat/StatusEffects';
 import type { PartyManager } from '../character/PartyManager';
 import type { PlayerData } from '../data/PlayerData';
 import type { GridInventory, PlacedItem } from '../inventory/GridInventory';
@@ -51,6 +52,7 @@ export function buildHubSavePatch(input: HubSaveSerializerInput): CharacterSaveP
                 level: character.level,
                 exp: character.exp,
                 hasEmblem: character.hasEmblem,
+                injured: hasStatus(character.statuses, 'injury'),
                 baseStats: character.stats,
                 magicLoadout: normalizeLoadout(character.magicLoadout, character),
                 skillUpgradeLevels: { ...character.skillUpgradeLevels },

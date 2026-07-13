@@ -155,10 +155,9 @@ export class WorldRaidOutcomeController {
 
         raidSession.completeAtTown(destination.id);
         this.context.playerData.currentHubTownId = destination.id;
-        this.context.playerData.save();
-
         this.context.townSession.clearRestStatusesFromParty();
         this.context.townSession.applyRaidInjuries(raidSession.downedCharacterIds);
+        if (!serverRewards) this.context.playerData.save();
         this.context.party.resetForNewRaid();
         this.context.resetStoryScenarioStateForRaidEnd();
         this.context.placePartyAtTown(destination);
@@ -218,10 +217,9 @@ export class WorldRaidOutcomeController {
         const returnTown = this.context.getTownById(raidSession.departureTownId) ?? this.context.getCurrentHubTown();
         raidSession.failBackToTown(returnTown.id);
         this.context.playerData.currentHubTownId = returnTown.id;
-        if (!serverAuthoritativeState) this.context.playerData.save();
-
         this.context.townSession.clearRestStatusesFromParty();
         this.context.townSession.applyRaidInjuries(raidSession.downedCharacterIds);
+        if (!serverAuthoritativeState) this.context.playerData.save();
         this.context.party.resetForNewRaid();
         this.context.resetStoryScenarioStateForRaidEnd();
         this.context.placePartyAtTown(returnTown);

@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { PartyManager } from '../../src/character/PartyManager';
 import { Character } from '../../src/character/Character';
+import { createStatus, hasStatus } from '../../src/combat/StatusEffects';
 import { PlayerData } from '../../src/data/PlayerData';
 import { GameManager, type HubFlushResult } from '../../src/engine/GameManager';
 import { GridInventory } from '../../src/inventory/GridInventory';
-import { AuthApiError, type AuthClient, type CharacterSave, type CharacterSavePatch } from '../../src/net/AuthClient';
+import { AuthApiError, type AuthCharacter, type AuthClient, type CharacterSave, type CharacterSavePatch } from '../../src/net/AuthClient';
 
 interface HubSaveHarness {
     hubFlushEnabled: boolean;
@@ -20,6 +21,7 @@ interface HubSaveHarness {
     party: PartyManager;
     flushHubSaveToServer(): Promise<HubFlushResult>;
     applyServerSave(save: CharacterSave, selectedCharacterId?: string): void;
+    loadRosterFromSave(selectedCharacter: AuthCharacter, save: CharacterSave): void;
 }
 
 class ImageStub {
@@ -107,4 +109,77 @@ test('server save sync restores nested equipment for every roster character', ()
     assert.deepEqual(primary.equipment.get('weapon')?.sockets?.map((socket) => socket.id), ['rune_el']);
     assert.equal(companion.equipment.get('body')?.item.id, 'magic_t1_body');
     assert.equal(manager.networkSaveRevision, 7);
+});
+
+test('server save sync reconciles only injury while preserving other live statuses', () => {
+    const manager = Object.create(GameManager.prototype) as HubSaveHarness;
+    const playerData = new PlayerData();
+    const party = new PartyManager();
+    const recovered = new Character('recovered', 'Recovered', 'infantry');
+    const injured = new Character('injured', 'Injured', 'cleric');
+    recovered.statuses = [createStatus('poison'), createStatus('injury')];
+    injured.statuses = [createStatus('attackUp')];
+    party.addToRoster(recovered);
+    party.addToRoster(injured);
+    party.deployCharacter(recovered);
+    party.deployCharacter(injured);
+    const save = playerData.toCharacterSave('2026-01-01T00:00:00.000Z', 8);
+    save.rosterSnapshot = {
+        characters: [
+            { id: recovered.id, injured: false },
+            { id: injured.id, injured: true },
+        ],
+    };
+    manager.playerData = playerData;
+    manager.inventory = new GridInventory(10, 6);
+    manager.stash = new GridInventory(15, 10);
+    manager.party = party;
+    manager.networkSaveRevision = 1;
+
+    manager.applyServerSave(save, recovered.id);
+
+    assert.equal(hasStatus(recovered.statuses, 'injury'), false);
+    assert.equal(hasStatus(recovered.statuses, 'poison'), true);
+    assert.equal(hasStatus(injured.statuses, 'injury'), true);
+    assert.equal(hasStatus(injured.statuses, 'attackUp'), true);
+});
+
+test('authenticated roster construction restores persisted injury state', () => {
+    const manager = Object.create(GameManager.prototype) as HubSaveHarness;
+    const party = new PartyManager();
+    const template = new Character('hero', 'Hero', 'infantry');
+    const selectedCharacter: AuthCharacter = {
+        id: template.id,
+        slotNo: 1,
+        name: template.name,
+        classKey: 'infantry',
+        tier: template.currentTier,
+        level: template.level,
+        exp: template.exp,
+        baseStats: { ...template.stats },
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    const save = new PlayerData().toCharacterSave('2026-01-01T00:00:00.000Z', 3);
+    save.characterId = selectedCharacter.id;
+    save.rosterSnapshot = {
+        characters: [{
+            id: selectedCharacter.id,
+            name: selectedCharacter.name,
+            classKey: selectedCharacter.classKey,
+            tier: selectedCharacter.tier,
+            level: selectedCharacter.level,
+            exp: selectedCharacter.exp,
+            baseStats: selectedCharacter.baseStats,
+            injured: true,
+        }],
+    };
+    save.partySnapshot = { activeCharacterIds: [selectedCharacter.id] };
+    manager.party = party;
+
+    manager.loadRosterFromSave(selectedCharacter, save);
+
+    const restored = party.getRoster()[0];
+    assert.ok(restored);
+    assert.equal(hasStatus(restored.statuses, 'injury'), true);
 });

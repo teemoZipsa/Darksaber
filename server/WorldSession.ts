@@ -187,6 +187,7 @@ export class WorldSession {
                 if (player) {
                     player.lastDamageCause = cause;
                     resetWorldSessionActorExp(actor, player, this.saveState);
+                    this.saveState.markCharacterInjured(player, actor.localActorId);
                 }
             },
             onCombatActivity: (actor) => {
@@ -702,6 +703,7 @@ export class WorldSession {
         if (event?.kind === 'down') {
             player.lastDamageCause = 'curse';
             resetWorldSessionActorExp(actor, player, this.saveState);
+            this.saveState.markCharacterInjured(player, actor.localActorId);
         }
         return event;
     }

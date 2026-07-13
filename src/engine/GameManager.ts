@@ -36,6 +36,7 @@ import { AuthApiError } from '../net/AuthClient';
 import { buildHubSavePatch as serializeHubSavePatch } from '../shared/HubSaveSerializer';
 import { normalizeLoadout, normalizeUpgradeLevels } from '../magic/MagicLoadout';
 import { getExpToNext as originalExpToNext } from '../data/original/originalProgression';
+import { applyStatusToCarrier, createStatus, removeStatusesFromCarrier } from '../combat/StatusEffects';
 
 export interface HubFlushResult {
     ok: boolean;
@@ -324,6 +325,7 @@ export class GameManager {
         this.loadStashFromSave(save);
         const characterId = selectedCharacterId ?? this.networkAuthContext?.characterId;
         this.loadRosterEquipmentFromSave(save, characterId);
+        this.reconcileRosterInjuriesFromSave(save);
     }
 
     public persistHubSaveToServer(options: { force?: boolean } = {}): void {
@@ -582,6 +584,7 @@ export class GameManager {
             character.syncOriginalBaseStats();
             character.magicLoadout = normalizeLoadout(entry.magicLoadout, character);
             character.skillUpgradeLevels = normalizeUpgradeLevels(entry.skillUpgradeLevels);
+            reconcileCharacterInjury(character, entry.injured);
             this.party.addToRoster(character);
             characters.set(character.id, character);
         }
@@ -641,6 +644,15 @@ export class GameManager {
             ? this.party.getRoster().find((character) => character.id === primaryCharacterId)
             : this.party.getActive();
         if (primary && !equipmentByCharacterId.has(primary.id)) this.loadEquipmentFromSave(save, primary);
+    }
+
+    private reconcileRosterInjuriesFromSave(save: CharacterSave): void {
+        const injuredByCharacterId = readRosterInjuriesByCharacterId(save.rosterSnapshot);
+        for (const character of this.party.getRoster()) {
+            const injured = injuredByCharacterId.get(character.id);
+            if (injured === undefined) continue;
+            reconcileCharacterInjury(character, injured);
+        }
     }
 
     private applyStarterEquipment(character: Character): void {
@@ -995,6 +1007,7 @@ interface SavedRosterEntry {
     level: number;
     exp: number;
     hasEmblem: boolean;
+    injured: boolean;
     baseStats: Partial<AuthCharacter['baseStats']>;
     magicLoadout: string[];
     skillUpgradeLevels: Record<string, number>;
@@ -1032,6 +1045,7 @@ function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter
             level: positiveInt(raw.level, 1),
             exp: positiveInt(raw.exp, 0),
             hasEmblem: raw.hasEmblem === true,
+            injured: raw.injured === true,
             baseStats: isRecord(raw.baseStats) ? raw.baseStats : {},
             magicLoadout: readStringArray(raw.magicLoadout),
             skillUpgradeLevels: readNumberRecord(raw.skillUpgradeLevels),
@@ -1048,6 +1062,7 @@ function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter
             level: selectedCharacter.level,
             exp: selectedCharacter.exp,
             hasEmblem: false,
+            injured: false,
             baseStats: selectedCharacter.baseStats,
             magicLoadout: [],
             skillUpgradeLevels: {},
@@ -1065,6 +1080,27 @@ function readRosterEquipmentByCharacterId(rosterSnapshot: Record<string, unknown
         result.set(raw.id, raw.equipment);
     }
     return result;
+}
+
+function readRosterInjuriesByCharacterId(rosterSnapshot: Record<string, unknown>): Map<string, boolean> {
+    const result = new Map<string, boolean>();
+    if (!Array.isArray(rosterSnapshot.characters)) return result;
+    for (const raw of rosterSnapshot.characters) {
+        if (!isRecord(raw) || typeof raw.id !== 'string') continue;
+        result.set(raw.id, raw.injured === true);
+    }
+    return result;
+}
+
+function reconcileCharacterInjury(character: Character, injured: boolean): void {
+    if (injured) {
+        applyStatusToCarrier(character, createStatus('injury', {
+            activation: 'immediate',
+            sourceType: 'injury',
+        }));
+        return;
+    }
+    removeStatusesFromCarrier(character, (status) => status.kind === 'injury');
 }
 
 function readSavedEquipmentEntries(equipment: Record<string, unknown>): SavedEquipmentEntry[] {

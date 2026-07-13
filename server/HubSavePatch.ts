@@ -1,5 +1,9 @@
 import { ITEMS } from '../src/data/ItemDB';
-import { normalizeFacilityUpgradeState } from '../src/data/FacilityUpgradeData';
+import {
+    applyFacilityCostMultiplier,
+    getInjuryTreatmentCostMultiplier,
+    normalizeFacilityUpgradeState,
+} from '../src/data/FacilityUpgradeData';
 import {
     type MarketContract,
     normalizeMarketContracts,
@@ -8,7 +12,7 @@ import {
 } from '../src/data/MarketData';
 import { getSellPrice, TRADE_GOOD_SELL_MULTIPLIERS } from '../src/data/ShopData';
 import { isTownId } from '../src/data/TownFacilityData';
-import { getRestFacility } from '../src/data/RestFacilityData';
+import { getRestFacility, INJURY_TREATMENT_PRICE } from '../src/data/RestFacilityData';
 import { getLearnedSkillIdSet, normalizeLoadout, normalizeUpgradeLevels } from '../src/magic/MagicLoadout';
 import type { CharacterSave, CharacterSavePatch, InventorySaveSnapshot } from '../src/shared/CharacterSave';
 import { HttpError } from './HttpError';
@@ -269,6 +273,12 @@ function mergeClientRosterCharacter(
     if (isRecord(incoming.equipment)) {
         next.equipment = sanitizeEquipment(incoming.equipment);
     }
+    if (typeof incoming.injured === 'boolean') {
+        if (incoming.injured && current.injured !== true) {
+            throw new HttpError(400, 'forbidden_injury_state', 'Raid injuries can only be applied by the server.');
+        }
+        if (!incoming.injured && current.injured === true) delete next.injured;
+    }
     return next;
 }
 
@@ -343,7 +353,8 @@ function assertNoFreeHubEconomyGain(patch: CharacterSavePatch, currentSave: Char
         currentSave.characterId,
     );
 
-    let requiredSpend = getNewRestReservationCost(patch, currentSave);
+    let requiredSpend = getNewRestReservationCost(patch, currentSave)
+        + getInjuryTreatmentCost(patch, currentSave);
     let allowedEarn = 0;
     const itemIds = new Set([...currentCounts.keys(), ...nextCounts.keys()]);
     for (const itemId of itemIds) {
@@ -358,6 +369,33 @@ function assertNoFreeHubEconomyGain(patch: CharacterSavePatch, currentSave: Char
     if (goldDelta > allowedEarn - requiredSpend) {
         throw new HttpError(400, 'invalid_hub_economy_patch', 'Hub save patch creates gold or items without a matching cost.');
     }
+}
+
+function getInjuryTreatmentCost(patch: CharacterSavePatch, currentSave: CharacterSave): number {
+    if (!isRecord(patch.rosterSnapshot)) return 0;
+    const currentCharacters = readRosterCharactersById(currentSave.rosterSnapshot);
+    const nextCharacters = readRosterCharactersById(patch.rosterSnapshot);
+    let treatedCount = 0;
+    for (const [characterId, current] of currentCharacters) {
+        if (current.injured !== true) continue;
+        if (nextCharacters.get(characterId)?.injured !== true) treatedCount += 1;
+    }
+    if (treatedCount === 0) return 0;
+    const facilityUpgrades = normalizeFacilityUpgradeState(currentSave.questState.facilityUpgrades);
+    const unitPrice = applyFacilityCostMultiplier(
+        INJURY_TREATMENT_PRICE,
+        getInjuryTreatmentCostMultiplier(facilityUpgrades),
+    );
+    return treatedCount * unitPrice;
+}
+
+function readRosterCharactersById(rosterSnapshot: Record<string, unknown>): Map<string, Record<string, unknown>> {
+    const characters = new Map<string, Record<string, unknown>>();
+    if (!Array.isArray(rosterSnapshot.characters)) return characters;
+    for (const raw of rosterSnapshot.characters) {
+        if (isRecord(raw) && typeof raw.id === 'string') characters.set(raw.id, raw);
+    }
+    return characters;
 }
 
 function getNewRestReservationCost(patch: CharacterSavePatch, currentSave: CharacterSave): number {

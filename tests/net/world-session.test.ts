@@ -585,6 +585,45 @@ test('server-authoritative down resets accumulated EXP in the final save patch',
     const patchedCharacter = patchedRoster.find((entry) => typeof entry === 'object' && entry !== null && 'id' in entry && entry.id === character.id);
     assert.ok(patchedCharacter && typeof patchedCharacter === 'object');
     assert.equal('exp' in patchedCharacter ? patchedCharacter.exp : undefined, 0);
+    assert.equal('injured' in patchedCharacter ? patchedCharacter.injured : undefined, true);
+});
+
+test('enemy-caused down persists a server-authoritative injury', () => {
+    const character = authCharacter('enemy-downed');
+    const save = createDefaultCharacterSave(character);
+    const session = new WorldSession();
+    const joined = session.join({
+        ...joinMessage('central_castle', character.id),
+        partyComposition: [actor(character.id, {
+            stats: createBaseStats({ hp: 1, maxHp: 100, def: 0, spd: 1, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        saveSnapshot: save,
+    });
+    const serverActor = getActorForPlayer(session, joined.playerId);
+    const enemyEntry = getFirstEnemy(session);
+    enemyEntry.enemy.setRole('bruiser');
+    enemyEntry.enemy.stats.atk = 999;
+    enemyEntry.enemy.stats.hitRate = 999;
+    enemyEntry.enemy.isAggro = true;
+    enemyEntry.enemy.actionGauge = 100;
+    serverActor.stats.hp = 1;
+    serverActor.stats.def = 0;
+    serverActor.tile = { x: enemyEntry.enemy.gridX + 1, y: enemyEntry.enemy.gridY };
+
+    const result = withFixedRandom(0, () => session.tick(0));
+
+    assert.ok(result.events.some((event) => event.kind === 'down'));
+    const patch = session.createCharacterSavePatch(joined.playerId);
+    const patchedRoster = patch?.rosterSnapshot?.characters;
+    assert.ok(Array.isArray(patchedRoster));
+    const patchedCharacter = patchedRoster.find((entry) => (
+        typeof entry === 'object' && entry !== null && 'id' in entry && entry.id === character.id
+    ));
+    assert.ok(patchedCharacter && typeof patchedCharacter === 'object');
+    assert.equal('injured' in patchedCharacter ? patchedCharacter.injured : undefined, true);
 });
 
 test('server tick keeps passive enemy ATB idle for every client snapshot', () => {

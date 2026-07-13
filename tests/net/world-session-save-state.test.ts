@@ -24,6 +24,28 @@ function authCharacter(id: string): AuthCharacter {
     };
 }
 
+test('markCharacterInjured writes only the roster injury flag and marks the player dirty', () => {
+    const character = authCharacter('injured-save');
+    const save = createDefaultCharacterSave(character);
+    const player: WorldSessionSavePlayer = {
+        id: 'player-injured-save',
+        completedQuestIds: new Set(),
+        raidGoldReward: 0,
+        saveSnapshot: save,
+    };
+    const saveState = new WorldSessionSaveState();
+
+    saveState.markCharacterInjured(player, character.id);
+
+    assert.deepEqual(saveState.consumeDirtyPlayerIds(), [player.id]);
+    const patch = saveState.createPatch(player, player.id);
+    const roster = patch?.rosterSnapshot?.characters;
+    assert.ok(Array.isArray(roster));
+    const savedCharacter = roster.find((entry) => entry.id === character.id);
+    assert.equal(savedCharacter?.injured, true);
+    assert.equal('statuses' in (savedCharacter ?? {}), false);
+});
+
 test('final world save patch persists story quest inventory and companion rewards only after survival', () => {
     const scenario = STORY_SCENARIOS.find((entry) => entry.episode === 3);
     assert.ok(scenario);

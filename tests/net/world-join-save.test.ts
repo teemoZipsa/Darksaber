@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { getEffectiveStats } from '../../src/combat/StatusEffects';
 import { createBaseStats } from '../../src/data/Stats';
 import { getItemDef } from '../../src/data/ItemDB';
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
@@ -58,6 +59,26 @@ test('world join save composition falls back to selected character when old rost
     assert.equal(composition[0]?.id, selected.id);
     assert.equal(composition[0]?.name, selected.name);
     assert.equal(composition[1]?.id, 'companion-only');
+});
+
+test('world join save composition restores a persisted injury alongside rest buffs', () => {
+    const selected = authCharacter('injured-hero', 'Injured Hero');
+    const save = createDefaultCharacterSave(selected);
+    save.hubLocation.pendingRestMenuId = 'meat_plate';
+    const roster = save.rosterSnapshot.characters;
+    assert.ok(Array.isArray(roster));
+    const savedCharacter = roster.find((entry) => (
+        typeof entry === 'object' && entry !== null && 'id' in entry && entry.id === selected.id
+    ));
+    assert.ok(savedCharacter && typeof savedCharacter === 'object');
+    Object.assign(savedCharacter, { injured: true });
+
+    const [snapshot] = createPartyCompositionFromSave(selected, save);
+
+    assert.ok(snapshot);
+    assert.equal(snapshot.statuses.some((status) => status.kind === 'attackUp'), true);
+    assert.equal(snapshot.statuses.some((status) => status.kind === 'injury'), true);
+    assert.equal(getEffectiveStats(snapshot.stats, snapshot.statuses).maxHp, Math.floor(snapshot.stats.maxHp * 0.9));
 });
 
 test('world join save state restores authoritative equipment, sockets, magic, rest, and carried weight', () => {

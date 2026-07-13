@@ -66,9 +66,10 @@ function createController() {
     const party = new PartyManager();
     const calls: string[] = [];
     const logs: string[] = [];
+    const persistenceCalls: string[] = [];
     const townSession = {
-        clearRestStatusesFromParty: () => undefined,
-        applyRaidInjuries: (_downedCharacterIds: Set<string>) => undefined,
+        clearRestStatusesFromParty: () => { persistenceCalls.push('clearRestStatuses'); },
+        applyRaidInjuries: (_downedCharacterIds: Set<string>) => { persistenceCalls.push('applyRaidInjuries'); },
         hide: () => undefined,
     } as unknown as WorldTownSession;
     const gameManager = {
@@ -93,8 +94,42 @@ function createController() {
     const getOutcome = (): RaidOutcome | null =>
         (controller as unknown as { raidResultUI: { outcome: RaidOutcome | null } }).raidResultUI.outcome;
 
-    return { controller, playerData, raidSession, party, gameManager, getOutcome, calls, logs };
+    return { controller, playerData, raidSession, party, gameManager, getOutcome, calls, logs, persistenceCalls };
 }
+
+test('local raid outcomes apply injuries before saving', () => {
+    for (const result of ['SURVIVED', 'DEAD'] as const) {
+        const { controller, playerData, raidSession, persistenceCalls } = createController();
+        playerData.save = () => { persistenceCalls.push('save'); };
+        raidSession.beginRaidFromTown('central_castle');
+        raidSession.recordCharacterDown('hero');
+
+        if (result === 'SURVIVED') controller.completeSuccess(DESTINATION_TOWN);
+        else controller.completeFailure(result);
+
+        assert.deepEqual(
+            persistenceCalls.slice(0, 3),
+            ['clearRestStatuses', 'applyRaidInjuries', 'save'],
+            result,
+        );
+    }
+});
+
+test('server-authoritative outcomes reapply injury state for display without resaving it', () => {
+    const survived = createController();
+    survived.playerData.save = () => { survived.persistenceCalls.push('save'); };
+    survived.raidSession.beginRaidFromTown('central_castle');
+    survived.raidSession.recordCharacterDown('hero');
+    survived.controller.completeSuccess(DESTINATION_TOWN, { serverAuthoritativeRewards: true });
+    assert.deepEqual(survived.persistenceCalls, ['clearRestStatuses', 'applyRaidInjuries']);
+
+    const failed = createController();
+    failed.playerData.save = () => { failed.persistenceCalls.push('save'); };
+    failed.raidSession.beginRaidFromTown('central_castle');
+    failed.raidSession.recordCharacterDown('hero');
+    failed.controller.completeFailure('DEAD', { serverAuthoritativeState: true });
+    assert.deepEqual(failed.persistenceCalls, ['clearRestStatuses', 'applyRaidInjuries']);
+});
 
 test('Burgos objective grants episode 1 completion and bomb only after survival', () => {
     const { controller, playerData, raidSession, getOutcome } = createController();

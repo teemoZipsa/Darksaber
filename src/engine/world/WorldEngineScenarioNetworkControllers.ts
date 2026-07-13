@@ -255,6 +255,7 @@ export function createWorldEngineScenarioNetworkControllers(
         spawnDamage: (x, y, amount, isCrit, isMiss) => ports.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
         spawnHeal: (x, y, amount) => ports.floatingText.spawnHeal(x, y, amount),
         spawnStatus: (x, y, text) => ports.floatingText.spawnStatus(x, y, text),
+        recordCharacterDown: (characterId) => ports.raidSession.recordCharacterDown(characterId),
         log: (message) => ports.addCombatLog(message),
     });
 

@@ -30,6 +30,7 @@ interface SavedRosterEntry {
     magicLoadout: string[];
     skillUpgradeLevels: Record<string, number>;
     equipment: Record<string, unknown> | null;
+    injured: boolean;
 }
 
 export interface WorldJoinSaveState {
@@ -64,6 +65,10 @@ export function createWorldJoinSaveState(character: AuthCharacter, save: Charact
         equippedItems.push(...equipment.values());
 
         const statuses = restStatuses.map((status) => ({ ...status }));
+        if (entry.injured) statuses.push(createStatus('injury', {
+            magnitude: 0.9,
+            sourceType: 'injury',
+        }));
         const stats = createRaidStartStats(entry, equipmentStatBonus, statuses);
         return {
             id: entry.id,
@@ -120,6 +125,7 @@ function createSelectedCharacterFallback(character: AuthCharacter): SavedRosterE
         magicLoadout: [],
         skillUpgradeLevels: {},
         equipment: null,
+        injured: false,
     };
 }
 
@@ -163,6 +169,7 @@ function readRosterEntries(save: CharacterSave): Map<string, SavedRosterEntry> {
             magicLoadout: readStringArray(raw.magicLoadout),
             skillUpgradeLevels: readNumberRecord(raw.skillUpgradeLevels),
             equipment: isRecord(raw.equipment) ? raw.equipment : null,
+            injured: raw.injured === true,
         });
     }
     return entries;

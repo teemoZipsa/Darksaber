@@ -44,6 +44,19 @@ export class WorldSessionSaveState {
         for (const playerId of playerIds) this.dirtyPlayerIds.add(playerId);
     }
 
+    /** Persist the server-authoritative raid injury flag on the saved roster entry. */
+    public markCharacterInjured(player: WorldSessionSavePlayer, characterId: string): void {
+        const characters = player.saveSnapshot?.rosterSnapshot.characters;
+        if (Array.isArray(characters)) {
+            const character = characters.find((entry) => (
+                isRecord(entry) && entry.id === characterId
+            ));
+            if (isRecord(character)) character.injured = true;
+        }
+        // A down is save-worthy even when an old save is missing its roster entry.
+        this.markDirty(player.id);
+    }
+
     public createPatch(player: WorldSessionSavePlayer | undefined, playerId: string, hubTownId?: string): WorldCharacterSavePatch | null {
         return player
             ? this.buildPatch(player, {

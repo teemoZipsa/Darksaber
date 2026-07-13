@@ -189,6 +189,7 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
         spawnDamage: (x, y, amount, isCrit, isMiss) => engine.floatingText.spawnDamage(x, y, amount, isCrit, isMiss),
         spawnHeal: (x, y, amount) => engine.floatingText.spawnHeal(x, y, amount),
         spawnStatus: (x, y, text) => engine.floatingText.spawnStatus(x, y, text),
+        recordCharacterDown: (characterId) => calls.push(`recordDown:${characterId}`),
         log: (message) => engine.addCombatLog(message),
     });
     const networkIntentController = new WorldNetworkIntentController({
@@ -485,6 +486,75 @@ test('network snapshot treats local player actorIds as owned and prefers actor r
     assert.equal(engine.remotePartyActors.size, 0);
     assert.equal(engine.turnStateController.getActiveTurnActorId(), 'server-hero');
     assert.equal(engine.turnStateController.getRemainingActionPoints(), 30);
+});
+
+test('network down events record injuries only for owned party characters', () => {
+    const actor = makeActor('hero');
+    const remote = makeActor('remote-hero');
+    const { engine, calls } = makeEngineHarness(actor);
+    engine.partyActors.push(remote);
+
+    engine.scenarioNetworkControllers.networkSyncController.handleCombatEvent({
+        type: 'COMBAT_EVENT',
+        kind: 'down',
+        sourceId: 'enemy-1',
+        targetId: actor.id,
+        value: 10,
+    });
+    engine.scenarioNetworkControllers.networkSyncController.handleCombatEvent({
+        type: 'COMBAT_EVENT',
+        kind: 'down',
+        sourceId: 'enemy-1',
+        targetId: remote.id,
+        value: 10,
+    });
+
+    assert.deepEqual(calls.filter((entry: string) => entry.startsWith('recordDown:')), ['recordDown:hero']);
+});
+
+test('an owned dead snapshot records a missed down transition once', () => {
+    const actor = makeActor('hero');
+    const { engine, calls } = makeEngineHarness(actor);
+    engine.networkPlayerId = 'client-1';
+    const snapshot: WorldSnapshot = {
+        seq: 1,
+        serverTime: 1000,
+        players: [{
+            playerId: 'client-1',
+            originHubId: 'central_castle',
+            isGhost: false,
+            actorIds: ['server-hero'],
+        }],
+        partyActors: [makeActorSnapshot({
+            id: 'server-hero',
+            localActorId: actor.character.id,
+            ownerPlayerId: 'client-1',
+            isDead: true,
+            stats: { ...actor.character.stats, hp: 0 },
+        })],
+        enemies: [],
+        loot: [],
+        readyActors: [],
+        remainingApByActor: {},
+        raidTimer: {
+            active: true,
+            elapsedSeconds: 12,
+            limitSeconds: 900,
+            departureTownId: 'central_castle',
+            modifier: null,
+        },
+        scenario: {
+            enteredDungeonIds: [],
+            activeDungeonId: null,
+            completedDungeonIds: [],
+        },
+    };
+
+    engine.applyNetworkSnapshot(snapshot);
+    engine.applyNetworkSnapshot({ ...snapshot, seq: 2 });
+
+    assert.equal(actor.character.isDead, true);
+    assert.deepEqual(calls.filter((entry: string) => entry.startsWith('recordDown:')), ['recordDown:hero']);
 });
 
 test('network snapshot reattaches owned solo actor when legacy local actor id changed', () => {

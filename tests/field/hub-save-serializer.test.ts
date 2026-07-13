@@ -6,6 +6,7 @@ import { buildHubSavePatch } from '../../src/shared/HubSaveSerializer';
 import { PlayerData } from '../../src/data/PlayerData';
 import { PartyManager } from '../../src/character/PartyManager';
 import { Character } from '../../src/character/Character';
+import { createStatus } from '../../src/combat/StatusEffects';
 
 class ImageStub {
     public src = '';
@@ -77,4 +78,30 @@ test('buildHubSavePatch persists equipment for every roster character and mirror
     const companionSave = roster.find((entry) => entry.id === companion.id);
     assert.equal((primarySave?.equipment as Record<string, { itemId?: string }>).weapon?.itemId, 'short_sword');
     assert.equal((companionSave?.equipment as Record<string, { itemId?: string }>).body?.itemId, 'magic_t1_body');
+});
+
+test('buildHubSavePatch persists only the durable injury flag from character statuses', () => {
+    const party = new PartyManager();
+    const injured = new Character('injured', 'Injured', 'infantry');
+    const healthy = new Character('healthy', 'Healthy', 'cleric');
+    injured.statuses = [createStatus('poison'), createStatus('injury')];
+    healthy.statuses = [createStatus('attackUp')];
+    party.addToRoster(injured);
+    party.addToRoster(healthy);
+
+    const patch = buildHubSavePatch({
+        playerData: new PlayerData(),
+        inventory: new GridInventory(10, 6),
+        stash: new GridInventory(15, 10),
+        party,
+        hubTownId: 'central_castle',
+    });
+
+    const roster = patch.rosterSnapshot?.characters;
+    assert.ok(Array.isArray(roster));
+    const injuredSave = roster.find((entry) => entry.id === injured.id);
+    const healthySave = roster.find((entry) => entry.id === healthy.id);
+    assert.equal(injuredSave?.injured, true);
+    assert.equal(healthySave?.injured, false);
+    assert.equal('statuses' in (injuredSave ?? {}), false);
 });
