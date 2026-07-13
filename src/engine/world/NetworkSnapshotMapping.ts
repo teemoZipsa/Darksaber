@@ -1,4 +1,5 @@
 import { Character } from '../../character/Character';
+import { getCharacterExpToNext } from '../../character/CharacterProgression';
 import { getMonsterDefinitionSafe } from '../../data/MonsterCatalog';
 import { Enemy } from '../../entity/Enemy';
 import { LootObject } from '../../entity/LootObject';
@@ -10,12 +11,17 @@ import { MONSTER_ROW_BY_FACING, MONSTER_SPRITE_PATH } from '../../data/MonsterCa
 import { getItemDef } from '../../data/ItemDB';
 
 export function applyNetworkActorSnapshot(actor: FieldActor, snapshot: ActorSnapshot): void {
+    const tierChanged = actor.character.currentTier !== snapshot.currentTier;
     actor.id = snapshot.id;
     actor.character.stats = { ...snapshot.stats };
     actor.character.statuses = snapshot.statuses.map((status) => ({ ...status }));
     actor.character.isDead = snapshot.isDead;
     actor.character.currentTier = snapshot.currentTier;
     actor.character.level = snapshot.level;
+    if (snapshot.exp !== undefined) actor.character.exp = snapshot.exp;
+    if (snapshot.hasEmblem !== undefined) actor.character.hasEmblem = snapshot.hasEmblem;
+    actor.character.expToNext = getCharacterExpToNext(snapshot.classLineId, snapshot.currentTier, snapshot.level);
+    if (tierChanged) actor.character.updatePortrait();
     actor.entity.gridX = snapshot.tile.x;
     actor.entity.gridY = snapshot.tile.y;
     actor.entity.actionGauge = snapshot.actionGauge;
@@ -68,7 +74,6 @@ export function reconcileNetworkRemoteActors(
                 actorSnapshot.name,
                 actorSnapshot.classLineId
             );
-            character.currentTier = actorSnapshot.currentTier;
             actor = {
                 id: actorSnapshot.id,
                 character,

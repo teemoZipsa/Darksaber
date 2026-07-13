@@ -12,6 +12,8 @@ export function toActorSnapshot(actor: ServerActor, isGhost: boolean, includeEqu
         classLineId: actor.classLineId,
         currentTier: actor.currentTier,
         level: actor.level,
+        exp: actor.exp ?? 0,
+        hasEmblem: actor.hasEmblem === true,
         tile: { ...actor.tile },
         stats: cloneStats(includeEquipmentStats ? getEquipmentAdjustedServerActorStats(actor) : actor.stats),
         statuses: cloneStatuses(actor.statuses),

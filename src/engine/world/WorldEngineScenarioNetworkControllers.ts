@@ -78,7 +78,7 @@ export interface WorldEngineScenarioNetworkControllerPorts {
     beginCombatFeedbackGroup(): string;
     registerCombatFeedback(kind: CombatFeedbackKind, feedbackGroupId?: string): void;
     flushCombatFeedbackGroup(feedbackGroupId: string): void;
-    spawnKillEffect(enemy: Enemy, feedbackGroupId?: string, actor?: FieldActor): void;
+    spawnKillEffect(enemy: Enemy, feedbackGroupId?: string, actor?: FieldActor, expOverride?: number): void;
     addCombatLog(message: string): void;
 }
 
@@ -99,8 +99,8 @@ export function createWorldEngineScenarioNetworkControllersFromSources(
 ): WorldEngineScenarioNetworkControllers {
     return createWorldEngineScenarioNetworkControllers({
         ...sources.ports,
-        spawnKillEffect: (enemy, feedbackGroupId, actor) => {
-            const exp = actor ? enemy.calcExpFor(actor.character.level) : enemy.expReward;
+        spawnKillEffect: (enemy, feedbackGroupId, actor, expOverride) => {
+            const exp = expOverride ?? (actor ? enemy.calcExpFor(actor.character.level) : enemy.expReward);
             sources.ports.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, exp, enemy);
             sources.ports.registerCombatFeedback('kill', feedbackGroupId);
         },
@@ -248,7 +248,7 @@ export function createWorldEngineScenarioNetworkControllers(
         registerCombatFeedback: (kind, feedbackGroupId) => ports.registerCombatFeedback(kind, feedbackGroupId),
         flushCombatFeedbackGroup: (feedbackGroupId) => ports.flushCombatFeedbackGroup(feedbackGroupId),
         spawnAttackCue: (from, to, color, label) => ports.fieldFeedback.spawnAttackCue(from, to, color, label),
-        spawnKillEffect: (enemy, feedbackGroupId, actor) => ports.spawnKillEffect(enemy, feedbackGroupId, actor),
+        spawnKillEffect: (enemy, feedbackGroupId, actor, expOverride) => ports.spawnKillEffect(enemy, feedbackGroupId, actor, expOverride),
         spawnDebuffEffect: (x, y) => ports.effectManager.spawnDebuffEffect(x, y),
         spawnHitEffect: (x, y) => ports.effectManager.spawnHitEffect(x, y),
         spawnHealEffect: (x, y) => ports.effectManager.spawnHealEffect(x, y),

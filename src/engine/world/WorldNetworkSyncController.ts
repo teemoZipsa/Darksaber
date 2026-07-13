@@ -1,4 +1,5 @@
 import { Character } from '../../character/Character';
+import { getCharacterExpToNext } from '../../character/CharacterProgression';
 import type { PartyManager } from '../../character/PartyManager';
 import { getItemDef } from '../../data/ItemDB';
 import type { GameManager } from '../GameManager';
@@ -90,7 +91,7 @@ export interface WorldNetworkSyncContext {
     registerCombatFeedback(kind: CombatFeedbackKind, feedbackGroupId?: string): void;
     flushCombatFeedbackGroup(feedbackGroupId: string): void;
     spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void;
-    spawnKillEffect(enemy: Enemy, feedbackGroupId?: string, actor?: FieldActor): void;
+    spawnKillEffect(enemy: Enemy, feedbackGroupId?: string, actor?: FieldActor, expOverride?: number): void;
     spawnDebuffEffect(x: number, y: number): void;
     spawnHitEffect(x: number, y: number): void;
     spawnHealEffect(x: number, y: number): void;
@@ -213,7 +214,6 @@ export class WorldNetworkSyncController {
                     actorSnapshot.name,
                     actorSnapshot.classLineId
                 );
-                character.currentTier = actorSnapshot.currentTier;
                 actor = {
                     id: actorSnapshot.id,
                     character,
@@ -421,7 +421,7 @@ export class WorldNetworkSyncController {
 
         if (targetEnemy) {
             if (event.kind === 'kill') {
-                this.context.spawnKillEffect(targetEnemy, feedbackGroupId, sourceActor);
+                this.context.spawnKillEffect(targetEnemy, feedbackGroupId, sourceActor, event.expAward);
                 this.context.registerCombatFeedback('kill', feedbackGroupId);
             } else if (event.kind === 'status') {
                 this.context.spawnStatus(targetEnemy.gridX, targetEnemy.gridY, 'WEAK');
@@ -483,12 +483,17 @@ export class WorldNetworkSyncController {
     }
 
     private applyActorSnapshot(actor: FieldActor, snapshot: ActorSnapshot): void {
+        const tierChanged = actor.character.currentTier !== snapshot.currentTier;
         actor.id = snapshot.id;
         actor.character.stats = { ...snapshot.stats };
         actor.character.statuses = snapshot.statuses.map((status) => ({ ...status }));
         actor.character.isDead = snapshot.isDead;
         actor.character.currentTier = snapshot.currentTier;
         actor.character.level = snapshot.level;
+        if (snapshot.exp !== undefined) actor.character.exp = snapshot.exp;
+        if (snapshot.hasEmblem !== undefined) actor.character.hasEmblem = snapshot.hasEmblem;
+        actor.character.expToNext = getCharacterExpToNext(snapshot.classLineId, snapshot.currentTier, snapshot.level);
+        if (tierChanged) actor.character.updatePortrait();
         actor.entity.gridX = snapshot.tile.x;
         actor.entity.gridY = snapshot.tile.y;
         actor.entity.actionGauge = snapshot.actionGauge;

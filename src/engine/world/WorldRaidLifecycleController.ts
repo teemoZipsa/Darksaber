@@ -459,6 +459,8 @@ export class WorldRaidLifecycleController {
                 classLineId: character.classLineId,
                 currentTier: character.currentTier,
                 level: character.level,
+                exp: character.exp,
+                hasEmblem: character.hasEmblem,
                 tile: {
                     x: exit.x + (index === 2 ? 1 : 0),
                     y: exit.y + (index === 1 ? 1 : 0),

@@ -50,6 +50,7 @@ export function buildHubSavePatch(input: HubSaveSerializerInput): CharacterSaveP
                 tier: character.currentTier,
                 level: character.level,
                 exp: character.exp,
+                hasEmblem: character.hasEmblem,
                 baseStats: character.stats,
                 magicLoadout: normalizeLoadout(character.magicLoadout, character),
                 skillUpgradeLevels: { ...character.skillUpgradeLevels },

@@ -27,6 +27,9 @@ export interface ServerActor {
     classLineId: string;
     currentTier: number;
     level: number;
+    /** Optional only for compatibility with version-1 persisted session snapshots. */
+    exp?: number;
+    hasEmblem?: boolean;
     tile: TilePoint;
     stats: CharacterStats;
     /** Server-authoritative equipment/socket bonuses, kept separate so client snapshots retain base stats. */
@@ -91,6 +94,7 @@ export interface ServerScenarioState {
 }
 
 export interface CompleteEnemyKillResult {
+    expAward: number;
     autoLootGrant?: AutoLootGrantMessage;
     scenarioEnemyDefeatEvent?: ScenarioEnemyDefeatEventMessage;
 }

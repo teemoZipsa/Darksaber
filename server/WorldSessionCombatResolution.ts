@@ -22,6 +22,8 @@ import type {
 } from './WorldSessionTypes';
 import { recordPlayerKillDangerBand } from './WorldSessionBalanceTelemetry';
 import { getEffectiveServerActorStats } from './WorldSessionHelpers';
+import { awardWorldSessionEnemyExp } from './WorldSessionActorProgression';
+import type { WorldSessionSaveState } from './WorldSessionSaveState';
 
 export interface WorldSessionEnemyKillContext {
     scenarioRuntime: WorldSessionScenarioRuntime;
@@ -30,6 +32,7 @@ export interface WorldSessionEnemyKillContext {
     players: Map<string, ServerPlayer>;
     contentSpawner: WorldSessionContentSpawner;
     worldMap: WorldMap;
+    saveState: WorldSessionSaveState;
 }
 
 export interface WorldSessionActorAttackContext {
@@ -75,6 +78,7 @@ export function resolveWorldSessionActorAttack(
         if (enemy.stats.hp <= 0) {
             event.kind = 'kill';
             const killResult = completeWorldSessionEnemyKill(context.enemyKillContext, actor, target, now);
+            event.expAward = killResult.expAward;
             autoLootGrant = killResult.autoLootGrant;
             scenarioEnemyDefeatEvent = killResult.scenarioEnemyDefeatEvent;
         }
@@ -93,13 +97,21 @@ export function completeWorldSessionEnemyKill(
     context.enemies.delete(enemy.id);
     if (target.nestKey) context.fieldNests.markNestEnemyKilled(target.nestKey, enemy.id, now);
     const player = context.players.get(actor.ownerPlayerId);
+    let expAward = 0;
     if (player) {
         player.kills += 1;
         recordPlayerKillDangerBand(player, target, context.worldMap);
+        expAward = awardWorldSessionEnemyExp({
+            actor,
+            enemy,
+            player,
+            realm: context.worldMap.getRealm(),
+            saveState: context.saveState,
+        });
     }
     const autoLootGrant: AutoLootGrantMessage | undefined = enemy.isBoss
         ? undefined
         : context.contentSpawner.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
     if (enemy.isBoss || !autoLootGrant) context.contentSpawner.spawnEnemyLoot(enemy, scenarioKillResult.bossLootTile);
-    return { autoLootGrant, scenarioEnemyDefeatEvent: scenarioKillResult.scenarioEnemyDefeatEvent };
+    return { expAward, autoLootGrant, scenarioEnemyDefeatEvent: scenarioKillResult.scenarioEnemyDefeatEvent };
 }

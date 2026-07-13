@@ -192,8 +192,10 @@ export class WorldSessionSkillResolver {
                 broadcasts.push(createActorEvent('status', actor, actor, enemyResult.casterMpRestore));
             }
             if (dead) {
-                broadcasts.push(createEnemyEvent('kill', actor, enemy, guarded.damage));
                 const killResult = this.context.completeEnemyKill(actor, target, now);
+                const killEvent = createEnemyEvent('kill', actor, enemy, guarded.damage);
+                killEvent.expAward = killResult.expAward;
+                broadcasts.push(killEvent);
                 if (killResult.autoLootGrant) replies.push(killResult.autoLootGrant);
                 if (killResult.scenarioEnemyDefeatEvent) replies.push(killResult.scenarioEnemyDefeatEvent);
             } else if (guarded.damage > 0 || (!enemyResult.statusEffects && enemyResult.mpDamage === undefined)) {

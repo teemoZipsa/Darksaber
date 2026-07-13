@@ -3,12 +3,17 @@
  * Each tier has levels 1-10. At level 10 with full EXP, auto-promote to next tier.
  */
 
-import { CharacterStats, createBaseStats, GrowthRates, getBaseStatsForClass } from '../data/Stats';
+import { CharacterStats, createBaseStats, getBaseStatsForClass } from '../data/Stats';
 import { ClassLine, MasterBranch, getClassLine, getMasterClassLineId } from '../data/ClassTree';
 import { ItemSlot } from '../data/ItemDB';
 import { PlacedItem } from '../inventory/GridInventory';
 import { Skill } from '../data/SkillDB';
-import { getLevelCap as originalLevelCap, getExpToNext as originalExpToNext, getOriginalStats } from '../data/original/originalProgression';
+import { getOriginalStats } from '../data/original/originalProgression';
+import {
+    applyCharacterExp,
+    getCharacterExpToNext,
+    getCharacterLevelCap,
+} from './CharacterProgression';
 import {
     StatusEffect,
     applyStatuses,
@@ -75,7 +80,7 @@ export class Character {
 
     /** Max level within the current tier (original level design; falls back to 10). */
     public levelCap(): number {
-        return originalLevelCap(this.classLineId, this.currentTier);
+        return getCharacterLevelCap(this.classLineId, this.currentTier);
     }
 
     /**
@@ -291,11 +296,7 @@ export class Character {
     /** Calculate EXP needed for next level. Uses the original level design when
      *  available (2x gain rate), else falls back to the legacy formula. */
     private calcExpToNext(): number {
-        const original = originalExpToNext(this.classLineId, this.currentTier, this.level);
-        if (original !== undefined) return original;
-        const tierMult = Math.pow(1.15, this.tierIndex);
-        const levelMult = Math.pow(1.08, this.level - 1);
-        return Math.floor(50 * tierMult * levelMult);
+        return getCharacterExpToNext(this.classLineId, this.currentTier, this.level);
     }
 
     public applyBuff(skill: Skill): void {
@@ -329,36 +330,32 @@ export class Character {
      * Returns result with leveledUp and promoted flags.
      */
     public gainExp(amount: number): ExpGainResult {
-        const result: ExpGainResult = { leveledUp: false, promoted: false };
-        this.exp += amount;
+        const previousTier = this.currentTier;
+        const progression = applyCharacterExp({
+            classLineId: this.classLineId,
+            currentTier: this.currentTier,
+            level: this.level,
+            exp: this.exp,
+            expToNext: this.expToNext,
+            stats: this.stats,
+            hasEmblem: this.hasEmblem,
+        }, amount);
 
-        while (this.exp >= this.expToNext) {
-            if (this.level >= this.levelCap()) {
-                // At max level — attempt promotion
-                if (this.hasNextTier) {
-                    this.exp -= this.expToNext;
-                    this.doPromote();
-                    result.promoted = true;
-                    result.leveledUp = true;
-                    result.newTierName = this.getTierName();
-                    if (this.tryUnlockFusionEmblem()) result.emblemUnlocked = true;
-                } else {
-                    // Max tier, max level — cap EXP
-                    this.exp = this.expToNext;
-                    if (this.tryUnlockFusionEmblem()) result.emblemUnlocked = true;
-                    break;
-                }
-            } else {
-                // Normal level up within tier
-                this.exp -= this.expToNext;
-                this.level++;
-                this.applyLevelUpGrowth();
-                this.expToNext = this.calcExpToNext();
-                result.leveledUp = true;
-                if (this.tryUnlockFusionEmblem()) result.emblemUnlocked = true;
-            }
-        }
+        this.currentTier = progression.state.currentTier;
+        this.level = progression.state.level;
+        this.exp = progression.state.exp;
+        this.expToNext = progression.state.expToNext;
+        this.stats = progression.state.stats;
+        this.hasEmblem = progression.state.hasEmblem;
 
+        if (this.currentTier !== previousTier) this.updatePortrait();
+
+        const result: ExpGainResult = {
+            leveledUp: progression.leveledUp,
+            promoted: progression.promoted,
+        };
+        if (progression.promoted) result.newTierName = this.getTierName();
+        if (progression.emblemUnlocked) result.emblemUnlocked = true;
         return result;
     }
 
@@ -409,23 +406,6 @@ export class Character {
         this.stats.hp = this.stats.maxHp;
         this.stats.mp = this.stats.maxMp;
         return true;
-    }
-
-    /** Apply stat growth on level up */
-    private applyLevelUpGrowth(): void {
-        if (this.applyOriginalClassStats()) return;
-        if (!this.classLine) return;
-        const g: GrowthRates = this.classLine.growth;
-
-        this.stats.maxHp += Math.floor(g.hp);
-        this.stats.hp = this.stats.maxHp;
-        this.stats.maxMp += Math.floor(g.mp);
-        this.stats.mp = this.stats.maxMp;
-        this.stats.atk += Math.floor(g.atk * 10) / 10;
-        this.stats.def += Math.floor(g.def * 10) / 10;
-        this.stats.magAtk += Math.floor(g.magAtk * 10) / 10;
-        this.stats.magDef += Math.floor(g.magDef * 10) / 10;
-        this.stats.spd += Math.floor(g.spd * 10) / 10;
     }
 
     /** Get current tier display name */

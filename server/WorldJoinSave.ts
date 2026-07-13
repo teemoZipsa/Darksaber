@@ -24,6 +24,8 @@ interface SavedRosterEntry {
     classKey: string;
     tier: number;
     level: number;
+    exp: number;
+    hasEmblem: boolean;
     baseStats: Partial<CharacterStats>;
     magicLoadout: string[];
     skillUpgradeLevels: Record<string, number>;
@@ -70,6 +72,8 @@ export function createWorldJoinSaveState(character: AuthCharacter, save: Charact
             classLineId: entry.classKey,
             currentTier: sanitizePositiveInt(entry.tier, 1),
             level: sanitizePositiveInt(entry.level, 1),
+            exp: sanitizeNonNegativeInt(entry.exp, 0),
+            hasEmblem: entry.hasEmblem,
             tile: { x: 0, y: 0 },
             stats,
             statuses,
@@ -110,6 +114,8 @@ function createSelectedCharacterFallback(character: AuthCharacter): SavedRosterE
         classKey: character.classKey,
         tier: character.tier,
         level: character.level,
+        exp: character.exp,
+        hasEmblem: false,
         baseStats: character.baseStats,
         magicLoadout: [],
         skillUpgradeLevels: {},
@@ -151,6 +157,8 @@ function readRosterEntries(save: CharacterSave): Map<string, SavedRosterEntry> {
             classKey,
             tier: sanitizePositiveInt(raw.tier ?? raw.currentTier, 1),
             level: sanitizePositiveInt(raw.level, 1),
+            exp: sanitizeNonNegativeInt(raw.exp, 0),
+            hasEmblem: raw.hasEmblem === true,
             baseStats: isRecord(raw.baseStats) ? raw.baseStats as Partial<CharacterStats> : {},
             magicLoadout: readStringArray(raw.magicLoadout),
             skillUpgradeLevels: readNumberRecord(raw.skillUpgradeLevels),

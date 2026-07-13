@@ -63,6 +63,7 @@ import {
     spendWorldSessionActorGauge,
     updateWorldSessionRestingActor,
 } from './WorldSessionActorLifecycle';
+import { resetWorldSessionActorExp } from './WorldSessionActorProgression';
 import {
     completeWorldSessionEnemyKill,
     resolveWorldSessionActorAttack,
@@ -183,7 +184,10 @@ export class WorldSession {
             hasFieldLineOfSight: (from, to, ownerPlayerId) => this.hasFieldLineOfSight(from, to, ownerPlayerId),
             onActorDown: (actor, cause) => {
                 const player = this.players.get(actor.ownerPlayerId);
-                if (player) player.lastDamageCause = cause;
+                if (player) {
+                    player.lastDamageCause = cause;
+                    resetWorldSessionActorExp(actor, player, this.saveState);
+                }
             },
             onCombatActivity: (actor) => {
                 const player = this.players.get(actor.ownerPlayerId);
@@ -665,6 +669,7 @@ export class WorldSession {
             players: this.players,
             contentSpawner: this.contentSpawner,
             worldMap: this.worldMap,
+            saveState: this.saveState,
         };
     }
 
@@ -694,7 +699,10 @@ export class WorldSession {
 
     private applyCursedArtifactTurnDamage(player: ServerPlayer, actor: ServerActor): CombatEventMessage | null {
         const event = applyWorldSessionCursedArtifactTurnDamage(player, actor);
-        if (event?.kind === 'down') player.lastDamageCause = 'curse';
+        if (event?.kind === 'down') {
+            player.lastDamageCause = 'curse';
+            resetWorldSessionActorExp(actor, player, this.saveState);
+        }
         return event;
     }
 

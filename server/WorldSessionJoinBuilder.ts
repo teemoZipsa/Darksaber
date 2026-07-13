@@ -69,6 +69,8 @@ export function buildWorldSessionJoinedPlayer(input: WorldSessionJoinedPlayerInp
             classLineId: snapshot.classLineId,
             currentTier: tier,
             level: snapshot.level,
+            exp: sanitizeNonNegativeInt(snapshot.exp),
+            hasEmblem: snapshot.hasEmblem === true,
             tile,
             stats: syncStatsMovementToClass(snapshot.stats, snapshot.classLineId),
             equipmentStatBonus: { ...(context.equipmentStatBonuses?.[snapshot.id] ?? {}) },
@@ -83,6 +85,12 @@ export function buildWorldSessionJoinedPlayer(input: WorldSessionJoinedPlayerInp
         };
     });
     return { player, actors };
+}
+
+function sanitizeNonNegativeInt(value: unknown): number {
+    return typeof value === 'number' && Number.isFinite(value)
+        ? Math.max(0, Math.floor(value))
+        : 0;
 }
 
 export interface WorldSessionWelcomeInput {

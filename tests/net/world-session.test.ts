@@ -551,6 +551,42 @@ test('server cursed artifact slows actor ATB and damages on ready turn', () => {
     assert.equal(curseEvent.value, 12);
 });
 
+test('server-authoritative down resets accumulated EXP in the final save patch', () => {
+    const character = authCharacter('downed-exp');
+    const save = createDefaultCharacterSave(character);
+    const roster = save.rosterSnapshot.characters;
+    assert.ok(Array.isArray(roster));
+    const savedCharacter = roster.find((entry) => typeof entry === 'object' && entry !== null && 'id' in entry && entry.id === character.id);
+    assert.ok(savedCharacter && typeof savedCharacter === 'object');
+    Object.assign(savedCharacter, { exp: 25 });
+
+    const session = new WorldSession();
+    const joined = session.join({
+        ...joinWithCarriedItem('central_castle', character.id, 'cursed_blood_reliquary'),
+        partyComposition: [actor(character.id, {
+            exp: 25,
+            stats: createBaseStats({ hp: 1, maxHp: 100, spd: 1_000, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        saveSnapshot: save,
+    });
+
+    const firstTick = session.tick(0);
+    const secondTick = session.tick(1);
+    assert.ok([...firstTick.events, ...secondTick.events].some((event) => event.kind === 'down'));
+    assert.ok([...firstTick.perPlayerMessages, ...secondTick.perPlayerMessages]
+        .some((entry) => entry.message.type === 'RAID_RESULT'));
+
+    const patch = session.createCharacterSavePatch(joined.playerId);
+    const patchedRoster = patch?.rosterSnapshot?.characters;
+    assert.ok(Array.isArray(patchedRoster));
+    const patchedCharacter = patchedRoster.find((entry) => typeof entry === 'object' && entry !== null && 'id' in entry && entry.id === character.id);
+    assert.ok(patchedCharacter && typeof patchedCharacter === 'object');
+    assert.equal('exp' in patchedCharacter ? patchedCharacter.exp : undefined, 0);
+});
+
 test('server tick keeps passive enemy ATB idle for every client snapshot', () => {
     const session = new WorldSession();
     const a = session.join(joinMessage('central_castle', 'hero-a'), 0);
@@ -901,6 +937,9 @@ test('network kills auto-grant normal enemy loot and include display names in co
     assert.equal(event?.kind, 'kill');
     assert.equal(event?.sourceName, 'Hero Alpha');
     assert.equal(event?.targetName, serverEnemyEntry.enemy.name);
+    assert.equal(event?.type === 'COMBAT_EVENT' ? event.expAward : undefined, serverEnemyEntry.enemy.calcExpFor(1));
+    const progressedActor = session.createSnapshot(joined.playerId, 1_000).partyActors.find((entry) => entry.id === serverActor.id);
+    assert.ok((progressedActor?.level ?? 1) > 1 || (progressedActor?.exp ?? 0) > 0);
     assert.ok(grant);
     assert.equal(grant.sourceName, serverEnemyEntry.enemy.name);
     assert.equal(session.createSnapshot(joined.playerId, 1_000).loot.some((loot) => loot.id === grant.lootId), false);
@@ -948,7 +987,106 @@ test('castSkill intent is resolved by server skill rules', () => {
     assert.equal(event?.type, 'COMBAT_EVENT');
     assert.equal(event?.sourceName, 'Hero Alpha');
     assert.equal(event?.targetName, serverEnemyEntry.enemy.name);
+    assert.equal(event?.type === 'COMBAT_EVENT' ? event.expAward : undefined, serverEnemyEntry.enemy.calcExpFor(1));
+    const progressedActor = session.createSnapshot(joined.playerId, 1_000).partyActors.find((entry) => entry.id === serverActor.id);
+    assert.ok((progressedActor?.level ?? 1) > 1 || (progressedActor?.exp ?? 0) > 0);
     assert.equal(session.createSnapshot(joined.playerId, 1_000).partyActors.find((entry) => entry.id === serverActor.id)?.stats.mp, 40);
+});
+
+test('network kill progression is server-authoritative, dirty, persistent, and included in save patches', () => {
+    const character = authCharacter('hero-progression');
+    const save = createDefaultCharacterSave(character);
+    const savedRoster = save.rosterSnapshot.characters;
+    assert.ok(Array.isArray(savedRoster));
+    const savedCharacter = savedRoster.find((entry) => typeof entry === 'object' && entry !== null && 'id' in entry && entry.id === character.id);
+    assert.ok(savedCharacter && typeof savedCharacter === 'object');
+    Object.assign(savedCharacter, { exp: 7, hasEmblem: false });
+
+    const session = new WorldSession();
+    const joined = session.join({
+        ...joinMessage('central_castle', character.id),
+        partyComposition: [actor(character.id, {
+            exp: 7,
+            stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        saveSnapshot: save,
+    });
+    const serverActor = getActorForPlayer(session, joined.playerId);
+    const enemyEntry = getFirstEnemy(session);
+    serverActor.actionGauge = 100;
+    serverActor.remainingAp = 80;
+    serverActor.tile = { x: enemyEntry.enemy.gridX - 1, y: enemyEntry.enemy.gridY };
+    enemyEntry.enemy.stats.hp = 1;
+    enemyEntry.enemy.stats.def = 0;
+    enemyEntry.enemy.stats.spd = 0;
+    const expectedAward = enemyEntry.enemy.calcExpFor(serverActor.level);
+
+    const result = withFixedRandom(0, () => session.handleMessage(joined.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'attack-authoritative-exp',
+        actorId: serverActor.id,
+        kind: 'attack',
+        payload: { targetId: enemyEntry.enemy.id },
+    }, 1_000));
+
+    const event = result.broadcasts.find((message) => message.type === 'COMBAT_EVENT' && message.kind === 'kill');
+    assert.equal(event?.type === 'COMBAT_EVENT' ? event.expAward : undefined, expectedAward);
+    const actorSnapshot = session.createSnapshot(joined.playerId, 1_000).partyActors.find((entry) => entry.id === serverActor.id);
+    assert.ok(actorSnapshot);
+    assert.ok(actorSnapshot.level > 1 || (actorSnapshot.exp ?? 0) > 7);
+    assert.deepEqual(session.consumeSaveDirtyPlayerIds(), [joined.playerId]);
+
+    const patch = session.createCharacterSavePatch(joined.playerId);
+    const patchedRoster = patch?.rosterSnapshot?.characters;
+    assert.ok(Array.isArray(patchedRoster));
+    const patchedCharacter = patchedRoster.find((entry) => typeof entry === 'object' && entry !== null && 'id' in entry && entry.id === character.id);
+    assert.ok(patchedCharacter && typeof patchedCharacter === 'object');
+    assert.equal('tier' in patchedCharacter ? patchedCharacter.tier : undefined, actorSnapshot.currentTier);
+    assert.equal('level' in patchedCharacter ? patchedCharacter.level : undefined, actorSnapshot.level);
+    assert.equal('exp' in patchedCharacter ? patchedCharacter.exp : undefined, actorSnapshot.exp);
+
+    const restored = WorldSession.restorePersistentSnapshot(session.createPersistentSnapshot());
+    const restoredActor = restored.createSnapshot(joined.playerId, 1_100).partyActors.find((entry) => entry.localActorId === character.id);
+    assert.equal(restoredActor?.currentTier, actorSnapshot.currentTier);
+    assert.equal(restoredActor?.level, actorSnapshot.level);
+    assert.equal(restoredActor?.exp, actorSnapshot.exp);
+});
+
+test('network kill progression obeys the local mortal/master realm gate', () => {
+    const session = new WorldSession({ realm: 'master' });
+    const joined = session.join({
+        ...joinMessage('central_castle', 'mortal-hero'),
+        partyComposition: [actor('mortal-hero', {
+            exp: 11,
+            stats: createBaseStats({ atk: 999, spd: 100, mov: 50, actionLimit: 80, hitRate: 200 }),
+        })],
+    }, 0);
+    const serverActor = getActorForPlayer(session, joined.playerId);
+    const enemyEntry = getFirstEnemy(session);
+    serverActor.actionGauge = 100;
+    serverActor.remainingAp = 80;
+    serverActor.tile = { x: enemyEntry.enemy.gridX - 1, y: enemyEntry.enemy.gridY };
+    enemyEntry.enemy.stats.hp = 1;
+    enemyEntry.enemy.stats.def = 0;
+    enemyEntry.enemy.stats.spd = 0;
+
+    const result = withFixedRandom(0, () => session.handleMessage(joined.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'attack-wrong-realm-exp',
+        actorId: serverActor.id,
+        kind: 'attack',
+        payload: { targetId: enemyEntry.enemy.id },
+    }, 1_000));
+
+    const event = result.broadcasts.find((message) => message.type === 'COMBAT_EVENT' && message.kind === 'kill');
+    assert.equal(event?.type === 'COMBAT_EVENT' ? event.expAward : undefined, 0);
+    const actorSnapshot = session.createSnapshot(joined.playerId, 1_000).partyActors.find((entry) => entry.id === serverActor.id);
+    assert.equal(actorSnapshot?.level, 1);
+    assert.equal(actorSnapshot?.exp, 11);
+    assert.deepEqual(session.consumeSaveDirtyPlayerIds(), []);
 });
 
 test('castSkill rejects a learned-but-unequipped skill', () => {

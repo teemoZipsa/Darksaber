@@ -70,6 +70,10 @@ export interface ActorSnapshot {
     classLineId: string;
     currentTier: number;
     level: number;
+    /** Server-authoritative progression. Optional for older persisted sessions/servers. */
+    exp?: number;
+    /** Fusion emblem unlocked at the final tier cap. */
+    hasEmblem?: boolean;
     tile: NetTilePoint;
     stats: CharacterStats;
     statuses: StatusEffect[];
@@ -337,6 +341,8 @@ export interface CombatEventMessage {
     sourceName?: string;
     targetName?: string;
     value?: number;
+    /** EXP actually awarded by the authoritative server for this kill. */
+    expAward?: number;
     statusEffect?: StatusEffect;
 }
 

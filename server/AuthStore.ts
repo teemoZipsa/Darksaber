@@ -166,6 +166,7 @@ export function createDefaultCharacterSave(character: AuthCharacter, gender: str
                 tier: character.tier,
                 level: character.level,
                 exp: character.exp,
+                hasEmblem: false,
                 baseStats: character.baseStats,
             }],
         },
@@ -334,9 +335,9 @@ export class InMemoryAuthStore implements AuthStore {
     }
 
     public async updateCharacterSave(accountId: string, characterId: string, input: SaveUpdateInput): Promise<SaveUpdateResult> {
-        const character = await this.getCharacter(accountId, characterId);
+        const character = this.characters.get(characterId);
         const current = this.saves.get(characterId);
-        if (!character || !current) return { status: 'not_found' };
+        if (!character || character.accountId !== accountId || character.deletedAt || !current) return { status: 'not_found' };
         if (current.revision !== input.expectedRevision) return { status: 'conflict', currentRevision: current.revision };
         const updated: CharacterSave = {
             ...current,
@@ -350,6 +351,7 @@ export class InMemoryAuthStore implements AuthStore {
                 : current.stashSnapshot,
         };
         this.saves.set(characterId, updated);
+        syncCharacterProgressionFromSave(character, updated);
         return { status: 'updated', save: clone(updated) };
     }
 
@@ -685,6 +687,27 @@ export class PostgresAuthStore implements AuthStore {
                     characterId,
                 ]
             );
+            const progression = readPrimaryCharacterProgression(updated);
+            if (progression) {
+                await client.query(
+                    `UPDATE characters
+                     SET tier = $1,
+                         level = $2,
+                         exp = $3,
+                         base_stats = $4::jsonb,
+                         updated_at = $5
+                     WHERE id = $6 AND account_id = $7 AND deleted_at IS NULL`,
+                    [
+                        progression.tier,
+                        progression.level,
+                        progression.exp,
+                        JSON.stringify(progression.baseStats),
+                        updated.updatedAt,
+                        characterId,
+                        accountId,
+                    ]
+                );
+            }
             await client.query('COMMIT');
             return { status: 'updated', save: updated };
         } catch (error) {
@@ -792,6 +815,89 @@ export class PostgresAuthStore implements AuthStore {
             client.release();
         }
     }
+}
+
+interface CharacterProgressionMetadata {
+    tier: number;
+    level: number;
+    exp: number;
+    baseStats: CharacterStats;
+}
+
+const CHARACTER_STAT_KEYS = [
+    'hp',
+    'maxHp',
+    'mp',
+    'maxMp',
+    'atk',
+    'def',
+    'magAtk',
+    'magDef',
+    'spd',
+    'mov',
+    'hitRate',
+    'critRate',
+    'actionLimit',
+    'evasion',
+    'magHit',
+    'magEva',
+    'cmdRange',
+    'atkMod',
+    'defMod',
+] as const satisfies readonly (keyof CharacterStats)[];
+
+/**
+ * Trust boundary: HTTP callers cannot pass their roster patch straight to the store;
+ * AuthHttp first merges it through buildHubSavePatch, which retains authoritative
+ * progression fields. World callers supply server-built patches. Read only the
+ * primary record from the fully merged save so companion data and rejected client
+ * fields can never become the selected character's auth metadata.
+ */
+function readPrimaryCharacterProgression(save: CharacterSave): CharacterProgressionMetadata | null {
+    const characters = Array.isArray(save.rosterSnapshot.characters)
+        ? save.rosterSnapshot.characters
+        : [];
+    const primary = characters.find((entry) => {
+        const record = toRecord(entry);
+        return record.id === save.characterId;
+    });
+    const record = toRecord(primary);
+    if (!isPositiveSafeInteger(record.tier)
+        || !isPositiveSafeInteger(record.level)
+        || !isNonNegativeSafeInteger(record.exp)) {
+        return null;
+    }
+    const rawBaseStats = toRecord(record.baseStats);
+    if (!CHARACTER_STAT_KEYS.every((key) => typeof rawBaseStats[key] === 'number' && Number.isFinite(rawBaseStats[key]))) {
+        return null;
+    }
+    const baseStats = Object.fromEntries(
+        CHARACTER_STAT_KEYS.map((key) => [key, rawBaseStats[key]])
+    ) as unknown as CharacterStats;
+    return {
+        tier: record.tier,
+        level: record.level,
+        exp: record.exp,
+        baseStats,
+    };
+}
+
+function syncCharacterProgressionFromSave(character: AuthCharacter, save: CharacterSave): void {
+    const progression = readPrimaryCharacterProgression(save);
+    if (!progression) return;
+    character.tier = progression.tier;
+    character.level = progression.level;
+    character.exp = progression.exp;
+    character.baseStats = progression.baseStats;
+    character.updatedAt = save.updatedAt;
+}
+
+function isPositiveSafeInteger(value: unknown): value is number {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1;
+}
+
+function isNonNegativeSafeInteger(value: unknown): value is number {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
 function createSessionRecord(input: NewSessionInput): AuthSession {

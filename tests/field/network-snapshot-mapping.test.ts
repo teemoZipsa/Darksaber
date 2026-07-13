@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { reconcileNetworkEnemies } from '../../src/engine/world/NetworkSnapshotMapping';
+import { applyNetworkActorSnapshot, reconcileNetworkEnemies } from '../../src/engine/world/NetworkSnapshotMapping';
+import { Character } from '../../src/character/Character';
+import { getCharacterExpToNext } from '../../src/character/CharacterProgression';
+import { Player } from '../../src/entity/Player';
 import { getMonsterDefinitionSafe, MONSTER_SPRITE_PATH } from '../../src/data/MonsterCatalog';
 import { getStoryScenarioByDungeonId } from '../../src/data/StoryScenarioData';
 import { getStoryScenarioMonsterLayout } from '../../src/data/StoryScenarioMonsterData';
 import { createBaseStats } from '../../src/data/Stats';
-import type { EnemySnapshot } from '../../src/net/WorldProtocol';
+import type { ActorSnapshot, EnemySnapshot } from '../../src/net/WorldProtocol';
 
 class ImageStub {
     public onload: (() => void) | null = null;
@@ -17,6 +20,42 @@ class ImageStub {
 }
 
 (globalThis as unknown as { Image: typeof ImageStub }).Image = ImageStub;
+
+test('network actor snapshots apply authoritative EXP and emblem progression', () => {
+    const character = new Character('hero', 'Hero', 'infantry');
+    const actor = {
+        id: 'old-id',
+        character,
+        entity: new Player(0, 0),
+        path: [],
+        queuedIntent: null,
+    };
+    const snapshot: ActorSnapshot = {
+        id: 'p1:hero',
+        localActorId: 'hero',
+        name: 'Hero',
+        classLineId: 'infantry',
+        currentTier: 2,
+        level: 3,
+        exp: 17,
+        hasEmblem: true,
+        tile: { x: 4, y: 5 },
+        stats: createBaseStats({ atk: 33 }),
+        statuses: [],
+        actionGauge: 42,
+        remainingAp: 0,
+        facing: 'left',
+        isDead: false,
+    };
+
+    applyNetworkActorSnapshot(actor, snapshot);
+
+    assert.equal(character.currentTier, 2);
+    assert.equal(character.level, 3);
+    assert.equal(character.exp, 17);
+    assert.equal(character.expToNext, getCharacterExpToNext('infantry', 2, 3));
+    assert.equal(character.hasEmblem, true);
+});
 
 test('network enemy snapshots apply original monster sprites for the episode 31 boss and guards', () => {
     const scenario = getStoryScenarioByDungeonId('demon_fixers_den');

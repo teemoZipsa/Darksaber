@@ -543,6 +543,7 @@ export class GameManager {
             character.currentTier = entry.tier;
             character.level = entry.level;
             character.exp = entry.exp;
+            character.hasEmblem = entry.hasEmblem;
             character.expToNext = calcExpToNext(character.classLineId, character.currentTier, character.level);
             character.stats = { ...character.stats, ...entry.baseStats };
             // Original-aligned classes are stat-determined by (tier, level); recompute so
@@ -964,6 +965,7 @@ interface SavedRosterEntry {
     tier: number;
     level: number;
     exp: number;
+    hasEmblem: boolean;
     baseStats: Partial<AuthCharacter['baseStats']>;
     magicLoadout: string[];
     skillUpgradeLevels: Record<string, number>;
@@ -1000,6 +1002,7 @@ function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter
             tier: positiveInt(raw.tier ?? raw.currentTier, 1),
             level: positiveInt(raw.level, 1),
             exp: positiveInt(raw.exp, 0),
+            hasEmblem: raw.hasEmblem === true,
             baseStats: isRecord(raw.baseStats) ? raw.baseStats : {},
             magicLoadout: readStringArray(raw.magicLoadout),
             skillUpgradeLevels: readNumberRecord(raw.skillUpgradeLevels),
@@ -1015,6 +1018,7 @@ function readRosterEntries(save: CharacterSave, selectedCharacter: AuthCharacter
             tier: selectedCharacter.tier,
             level: selectedCharacter.level,
             exp: selectedCharacter.exp,
+            hasEmblem: false,
             baseStats: selectedCharacter.baseStats,
             magicLoadout: [],
             skillUpgradeLevels: {},

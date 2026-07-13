@@ -109,6 +109,7 @@ function addRosterCompanion(
             tier: classLine?.tiers[0]?.tier ?? 1,
             level: 1,
             exp: 0,
+            hasEmblem: false,
             baseStats: createBaseStats(getBaseStatsForClass(reward.classId, baseMov)),
         },
     ];

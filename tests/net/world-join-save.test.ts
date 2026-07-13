@@ -90,6 +90,8 @@ test('world join save state restores authoritative equipment, sockets, magic, re
                 classKey: selected.classKey,
                 tier: selected.tier,
                 level: selected.level,
+                exp: 37,
+                hasEmblem: true,
                 baseStats: selected.baseStats,
                 magicLoadout: ['inf_t1'],
                 skillUpgradeLevels: { inf_t1: 3 },
@@ -125,6 +127,8 @@ test('world join save state restores authoritative equipment, sockets, magic, re
     assert.ok(snapshot);
     assert.deepEqual(snapshot.magicLoadout, ['inf_t1']);
     assert.deepEqual(snapshot.skillUpgradeLevels, { inf_t1: 3 });
+    assert.equal(snapshot.exp, 37);
+    assert.equal(snapshot.hasEmblem, true);
     assert.equal(snapshot.statuses[0]?.kind, 'attackUp');
     assert.equal(snapshot.statuses[0]?.remainingSeconds, 300);
     assert.equal(state.equipmentStatBonuses[selected.id]?.atk, 4);
@@ -153,6 +157,8 @@ test('world join save state restores authoritative equipment, sockets, magic, re
         findNearbyWalkableTile: (tile) => tile,
     });
     const actor = joined.actors[0]!;
+    assert.equal(actor.exp, 37);
+    assert.equal(actor.hasEmblem, true);
     assert.deepEqual(actor.equipmentStatBonus, state.equipmentStatBonuses[selected.id]);
     assert.equal(
         getEffectiveServerActorStats(actor).atk,

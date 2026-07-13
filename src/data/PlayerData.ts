@@ -230,6 +230,7 @@ export class PlayerData {
                     tier: 1,
                     level: 1,
                     exp: 0,
+                    hasEmblem: false,
                     baseStats: {},
                 }],
             },
