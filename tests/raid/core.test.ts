@@ -34,7 +34,7 @@ import { generateWorldLootNear } from '../../src/loot/WorldLootGenerator';
 import { getMarkedCacheItems } from '../../src/raid/MarkedCache';
 import { RUMOR_KEYS, TownUI } from '../../src/ui/TownUI';
 import { ShopUI } from '../../src/ui/ShopUI';
-import { i18n } from '../../src/i18n/LanguageManager';
+import { i18n, t } from '../../src/i18n/LanguageManager';
 import type { Character } from '../../src/character/Character';
 
 function placed(id: string): PlacedItem {
@@ -350,6 +350,80 @@ test('raid loot transfers mark acquired items and report original loot cells', (
         { itemId: 'mp_potion', source: { gridX: 3, gridY: 1 } },
         { itemId: 'antidote', source: { gridX: 4, gridY: 1 } },
     ]);
+});
+
+test('authoritative raid inventory lock rejects local edits without mutating items', () => {
+    const bag = new GridInventory(8, 8);
+    const ext = new GridInventory(8, 8);
+    const inv = new InventoryUI(bag, () => true);
+    const char = inventoryCharacter();
+    inv.setActiveCharacter(char);
+    inv.setExternalGrid(ext, 'raid loot', { isRaidLoot: true });
+
+    const equipped = placed('short_sword');
+    const bagArmor = bag.place(getItemDef('battle_t1_body')!, 0, 0);
+    const bagGem = bag.place(getItemDef('gem_chipped_ruby')!, 2, 0);
+    const lootGem = ext.place(getItemDef('gem_chipped_ruby')!, 2, 1);
+    assert.ok(bagArmor);
+    assert.ok(bagGem);
+    assert.ok(lootGem);
+    char.equipment.set('weapon', equipped);
+
+    assert.equal(inv.moveToEquip(bagArmor, { kind: 'grid', grid: 'bag', gridX: 0, gridY: 0 }, 'body'), false);
+    assert.equal(char.equipment.has('body'), false);
+    assert.equal(bag.getAt(0, 0), bagArmor);
+
+    assert.equal(inv.quickMove(equipped, { kind: 'equip', slot: 'weapon' }), false);
+    assert.equal(char.equipment.get('weapon'), equipped);
+
+    assert.equal(inv.moveToEquip(bagGem, { kind: 'grid', grid: 'bag', gridX: 2, gridY: 0 }, 'weapon'), false);
+    assert.deepEqual(equipped.sockets ?? [], []);
+    assert.equal(bag.items.includes(bagGem), true);
+
+    assert.equal(inv.moveToCell(bagGem, { kind: 'grid', grid: 'bag', gridX: 2, gridY: 0 }, 'bag', 3, 0), false);
+    assert.equal(bagGem.gridX, 2);
+    assert.equal(inv.quickMove(bagGem, { kind: 'grid', grid: 'bag', gridX: 2, gridY: 0 }), false);
+    assert.equal(bag.items.includes(bagGem), true);
+    assert.equal(ext.items.includes(bagGem), false);
+
+    assert.equal(inv.moveToCell(lootGem, { kind: 'grid', grid: 'ext', gridX: 2, gridY: 1 }, 'ext', 3, 1), false);
+    assert.equal(ext.getAt(2, 1), lootGem);
+    assert.equal(inv.moveToCell(lootGem, { kind: 'grid', grid: 'ext', gridX: 2, gridY: 1 }, 'bag', 0, 0), false);
+    assert.deepEqual(bagArmor.sockets ?? [], []);
+    assert.equal(ext.getAt(2, 1), lootGem);
+
+    const beforeSort = bag.items.map((item) => ({ item, x: item.gridX, y: item.gridY }));
+    assert.equal(inv.sortBag(), t('raid.editingLocked'));
+    assert.deepEqual(bag.items.map((item) => ({ item, x: item.gridX, y: item.gridY })), beforeSort);
+    assert.equal(inv.getFeedback().text, t('raid.editingLocked'));
+});
+
+test('authoritative raid inventory lock still allows collecting and reverting server loot', () => {
+    const bag = new GridInventory(8, 8);
+    const ext = new GridInventory(8, 8);
+    const inv = new InventoryUI(bag, () => true);
+    inv.setExternalGrid(ext, 'raid loot', { isRaidLoot: true });
+
+    const movedByDrop = ext.place(getItemDef('herb_cheap')!, 2, 1);
+    const movedByClick = ext.place(getItemDef('mp_potion')!, 3, 1);
+    const movedByTakeAll = ext.place(getItemDef('antidote')!, 4, 1);
+    assert.ok(movedByDrop);
+    assert.ok(movedByClick);
+    assert.ok(movedByTakeAll);
+
+    const secured: string[] = [];
+    inv.onRaidLootSecured = (placed) => secured.push(placed.item.id);
+
+    assert.equal(inv.moveToCell(movedByDrop, { kind: 'grid', grid: 'ext', gridX: 2, gridY: 1 }, 'bag', 0, 0), true);
+    assert.equal(inv.quickMove(movedByClick, { kind: 'grid', grid: 'ext', gridX: 3, gridY: 1 }), true);
+    const takeAllMessage = inv.takeAll();
+    assert.notEqual(takeAllMessage, t('raid.editingLocked'));
+    assert.deepEqual(secured, ['herb_cheap', 'mp_potion', 'antidote']);
+
+    inv.revertRaidLoot(movedByDrop, { gridX: 2, gridY: 1 });
+    assert.equal(bag.items.includes(movedByDrop), false);
+    assert.equal(ext.getAt(2, 1), movedByDrop);
+    assert.equal(movedByDrop.acquiredInRaid, false);
 });
 
 test('equipment swap fails atomically when the backpack cannot hold the old item', () => {

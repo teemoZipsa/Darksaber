@@ -68,7 +68,10 @@ export function MagicLoadoutPanel() {
     const onPickSkill = (skillId: string) => {
         setSelectedSkillId(skillId);
         if (selectedSlot !== null) {
-            store.equipMagic(selectedSlot, skillId);
+            const result = store.equipMagic(selectedSlot, skillId);
+            if (!result.ok && result.reasonKey === 'raid.editingLocked') {
+                showToast(t('raid.editingLocked'));
+            }
         }
     };
 

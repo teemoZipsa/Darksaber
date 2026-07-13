@@ -14,6 +14,7 @@ import { SettingsManager } from '../../../engine/SettingsManager';
 import { t } from '../../../i18n/LanguageManager';
 import { useStore, useUiVersion } from '../UiContext';
 import { useModalDialog } from '../useModalDialog';
+import type { UiMutationResult } from '../UiStore';
 
 type DragInfo = { source: 'roster' | 'active'; index: number; charId: string };
 
@@ -54,6 +55,12 @@ export function PartyPanel() {
         errorTimer.current = window.setTimeout(() => setError(''), 2000);
     };
 
+    const handleMutationResult = (result: UiMutationResult) => {
+        if (!result.ok && result.reasonKey === 'raid.editingLocked') {
+            showError(t('raid.editingLocked'));
+        }
+    };
+
     const startDrag = (info: DragInfo) => (e: DragEvent) => {
         drag.current = info;
         e.dataTransfer.effectAllowed = 'move';
@@ -62,7 +69,7 @@ export function PartyPanel() {
 
     const undeploy = (slotIdx: number, charId: string) => {
         if (slotIdx === 0) { showError(t('party.cannotRemoveLead')); return; }
-        store.partyUndeploy(charId);
+        handleMutationResult(store.partyUndeploy(charId));
     };
 
     const dropOnSlot = (slotIdx: number) => (e: DragEvent) => {
@@ -71,10 +78,10 @@ export function PartyPanel() {
         const d = drag.current; drag.current = null;
         if (!d) return;
         if (d.source === 'active') {
-            store.partySwapActive(d.index, slotIdx);
+            handleMutationResult(store.partySwapActive(d.index, slotIdx));
         } else {
             const ch = roster.find((c) => c.id === d.charId);
-            if (ch) store.partyReplaceActive(slotIdx, ch);
+            if (ch) handleMutationResult(store.partyReplaceActive(slotIdx, ch));
         }
     };
 
@@ -83,7 +90,7 @@ export function PartyPanel() {
         setOverRoster(null);
         const d = drag.current; drag.current = null;
         if (!d) return;
-        if (d.source === 'roster') store.partySwapRoster(d.index, targetIdx);
+        if (d.source === 'roster') handleMutationResult(store.partySwapRoster(d.index, targetIdx));
         else undeploy(d.index, d.charId);
     };
 
@@ -95,8 +102,9 @@ export function PartyPanel() {
     };
 
     const clickRoster = (ch: Character) => () => {
+        if (store.isRaidPreparationEditingLocked()) { showError(t('raid.editingLocked')); return; }
         if (store.isPartyFull()) { showError(t('party.full')); return; }
-        store.partyDeploy(ch);
+        handleMutationResult(store.partyDeploy(ch));
     };
 
     const panelStyle = { width: 660, '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;

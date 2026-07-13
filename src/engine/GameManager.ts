@@ -119,7 +119,10 @@ export class GameManager {
         this.playerData.load();
         this.syncStoryCompanionsToRoster();
 
-        this.inventoryUI = new InventoryUI(this.inventory);
+        this.inventoryUI = new InventoryUI(
+            this.inventory,
+            () => this.isRaidPreparationEditingLocked()
+        );
         this.partyUI = new PartyUI(this.party);
         this.charUI = new CharacterPanelUI(this.party);
         this.charUI.getGold = () => this.playerData.gold;
@@ -304,6 +307,16 @@ export class GameManager {
         return this.worldEngine?.isNetworkRaidActive() ?? false;
     }
 
+    /**
+     * Authoritative raids cannot accept local party/loadout mutations. The
+     * world lifecycle query intentionally outlives the network `isRaid` flag
+     * while the final server save is being synchronized.
+     */
+    public isRaidPreparationEditingLocked(): boolean {
+        return this.networkAuthContext !== null
+            && (this.worldEngine?.isRaidLifecycleActive() ?? false);
+    }
+
     public applyServerSave(save: CharacterSave, selectedCharacterId?: string): void {
         this.playerData.applyCharacterSave(save);
         this.networkSaveRevision = save.revision;
@@ -403,6 +416,10 @@ export class GameManager {
     }
 
     private toggleMagicLoadout(): void {
+        if (!this.magicLoadoutOpen && this.isRaidPreparationEditingLocked()) {
+            this.reportRaidPreparationEditingLocked();
+            return;
+        }
         if (!this.magicLoadoutOpen) {
             if (this.inventoryUI.isVisible()) this.inventoryUI.toggle();
             if (this.charUI.isVisible()) this.charUI.toggle();
@@ -410,6 +427,20 @@ export class GameManager {
             this.questJournalOpen = false;
         }
         this.magicLoadoutOpen = !this.magicLoadoutOpen;
+    }
+
+    private togglePartyPanel(): void {
+        if (!this.partyUI.isVisible() && this.isRaidPreparationEditingLocked()) {
+            this.reportRaidPreparationEditingLocked();
+            return;
+        }
+        this.partyUI.toggle();
+        if (this.partyUI.isVisible() && this.inventoryUI.isVisible()) this.inventoryUI.toggle();
+        if (this.partyUI.isVisible() && this.charUI.isVisible()) this.charUI.toggle();
+    }
+
+    private reportRaidPreparationEditingLocked(): void {
+        this.worldEngine?.addSystemLog(t('raid.editingLocked'));
     }
 
     // ─── World inventory (DOM overlay) ────────────────────────────
@@ -808,9 +839,7 @@ export class GameManager {
                     if (this.inventoryUI.isVisible() && this.partyUI.isVisible()) this.partyUI.toggle();
                 }
                 if (SettingsManager.isKeybindingJustPressed('world.party', this.input)) {
-                    this.partyUI.toggle();
-                    if (this.partyUI.isVisible() && this.inventoryUI.isVisible()) this.inventoryUI.toggle();
-                    if (this.partyUI.isVisible() && this.charUI.isVisible()) this.charUI.toggle();
+                    this.togglePartyPanel();
                 }
                 if (SettingsManager.isKeybindingJustPressed('world.character', this.input)) {
                     this.charUI.toggle();

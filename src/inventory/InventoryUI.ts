@@ -67,7 +67,10 @@ export class InventoryUI {
     private feedbackText: string = '';
     private feedbackId: number = 0;
 
-    constructor(inventory: GridInventory) {
+    constructor(
+        inventory: GridInventory,
+        private readonly isRaidPreparationEditingLocked: () => boolean = () => false
+    ) {
         this.inventory = inventory;
     }
 
@@ -109,6 +112,19 @@ export class InventoryUI {
         this.feedbackId++;
     }
 
+    private rejectLockedEdit(): boolean {
+        if (!this.isRaidPreparationEditingLocked()) return false;
+        this.setFeedback(t('raid.editingLocked'));
+        return true;
+    }
+
+    private isRaidLootCollection(source: InvDragSource, targetKind: InvGridKind): boolean {
+        return source.kind === 'grid'
+            && source.grid === 'ext'
+            && this.externalGridIsRaidLoot
+            && targetKind === 'bag';
+    }
+
     // ─── Drag-and-drop resolution (instance state preserved) ─────
     /** Detach a dragged item from its current home (grid cell or equip slot). */
     private detach(placed: PlacedItem, source: InvDragSource): void {
@@ -139,6 +155,15 @@ export class InventoryUI {
         if (!target) return false;
 
         const occupant = target.getAt(gx, gy);
+        if (this.isRaidPreparationEditingLocked()) {
+            const wouldSocket = occupant !== null
+                && occupant !== placed
+                && canSocket(placed.item, occupant);
+            if (!this.isRaidLootCollection(source, targetKind) || wouldSocket) {
+                this.setFeedback(t('raid.editingLocked'));
+                return false;
+            }
+        }
         if (occupant && occupant !== placed && canSocket(placed.item, occupant)) {
             this.detach(placed, source);
             (occupant.sockets ??= []).push(placed.item);
@@ -167,6 +192,7 @@ export class InventoryUI {
 
     /** Drop the dragged item onto an equipment slot (socket, or equip with swap-out). */
     public moveToEquip(placed: PlacedItem, source: InvDragSource, slot: ItemSlot): boolean {
+        if (this.rejectLockedEdit()) return false;
         if (!this.activeChar) return false;
         const targetEq = this.activeChar.equipment.get(slot);
         if (source.kind === 'equip' && source.slot === slot && targetEq === placed) return true;
@@ -195,6 +221,10 @@ export class InventoryUI {
     /** Click-to-transfer: equip→bag, bag→ext, ext→bag (auto-placed). */
     public quickMove(placed: PlacedItem, source: InvDragSource): boolean {
         const targetKind: InvGridKind = source.kind === 'equip' ? 'bag' : source.grid === 'bag' ? 'ext' : 'bag';
+        if (this.isRaidPreparationEditingLocked() && !this.isRaidLootCollection(source, targetKind)) {
+            this.setFeedback(t('raid.editingLocked'));
+            return false;
+        }
         const target = this.gridOf(targetKind);
         if (!target) return false;
 
@@ -214,6 +244,11 @@ export class InventoryUI {
     /** Move everything from the external grid into the backpack. Returns feedback text. */
     public takeAll(): string {
         if (!this.externalGrid) return '';
+        if (this.isRaidPreparationEditingLocked() && !this.externalGridIsRaidLoot) {
+            const msg = t('raid.editingLocked');
+            this.setFeedback(msg);
+            return msg;
+        }
         let moved = 0;
         for (const placed of [...this.externalGrid.items]) {
             const source = placed.gridX;
@@ -245,6 +280,11 @@ export class InventoryUI {
 
     /** Repack the backpack by size/value. Returns feedback text. */
     public sortBag(): string {
+        if (this.isRaidPreparationEditingLocked()) {
+            const msg = t('raid.editingLocked');
+            this.setFeedback(msg);
+            return msg;
+        }
         this.inventory.sort();
         const msg = t('inventory.feedback.sorted');
         this.setFeedback(msg);

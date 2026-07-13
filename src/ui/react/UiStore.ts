@@ -63,6 +63,13 @@ export interface FacilityUpgradeView {
     maxed: boolean;
 }
 
+export interface UiMutationResult {
+    ok: boolean;
+    reasonKey?: string;
+}
+
+const RAID_EDITING_LOCKED_REASON_KEY = 'raid.editingLocked';
+
 export class UiStore {
     private listeners = new Set<() => void>();
     private _version = 0;
@@ -209,6 +216,13 @@ export class UiStore {
     isPartyOpen = (): boolean => this.isOverlayOpen('party');
     isQuestJournalOpen = (): boolean => this.isOverlayOpen('journal');
     getStoryQuestViews = (): StoryQuestView[] => buildStoryQuestViews(this.gm.playerData, this.gm.getRaidSession());
+    isRaidPreparationEditingLocked = (): boolean => this.gm.isRaidPreparationEditingLocked();
+
+    private raidPreparationEditGuard(): UiMutationResult | null {
+        return this.isRaidPreparationEditingLocked()
+            ? { ok: false, reasonKey: RAID_EDITING_LOCKED_REASON_KEY }
+            : null;
+    }
 
     // ─── Actions (delegate to GameManager; never mutate directly) ──
     /** Switch the active party member; syncs dependent UI (e.g. inventory). */
@@ -250,21 +264,26 @@ export class UiStore {
         getUpgradeLevel(char.skillUpgradeLevels, skillId);
 
     /** Equip `skillId` into slot `slotIndex` of the active character (swap if already equipped). */
-    equipMagic = (slotIndex: number, skillId: string): void => {
+    equipMagic = (slotIndex: number, skillId: string): UiMutationResult => {
+        const blocked = this.raidPreparationEditGuard();
+        if (blocked) return blocked;
         const char = this.gm.party.getActive();
-        if (!char || !getLearnedSkillIdSet(char).has(skillId)) return;
+        if (!char || !getLearnedSkillIdSet(char).has(skillId)) return { ok: false };
         const arr = normalizeLoadout(char.magicLoadout, char);
-        if (slotIndex < 0 || slotIndex >= arr.length || arr[slotIndex] === skillId) return;
+        if (slotIndex < 0 || slotIndex >= arr.length || arr[slotIndex] === skillId) return { ok: false };
         const existing = arr.indexOf(skillId);
         if (existing >= 0) arr[existing] = arr[slotIndex]; // swap the two slots' skills
         arr[slotIndex] = skillId;                          // (otherwise the benched skill replaces)
         char.magicLoadout = arr;
         this.gm.saveActiveCharacterMagic();
         this.tick();
+        return { ok: true };
     };
 
     /** Spend gold to raise the active character's upgrade level for a skill by 1. */
     upgradeMagic = (skillId: string): { ok: boolean; reasonKey?: string } => {
+        const blocked = this.raidPreparationEditGuard();
+        if (blocked) return blocked;
         const char = this.gm.party.getActive();
         if (!char) return { ok: false };
         const skill = getSkill(skillId);
@@ -284,11 +303,29 @@ export class UiStore {
     closeParty = (): void => {
         if (this.gm.partyUI.isVisible()) { this.gm.partyUI.toggle(); this.tick(); }
     };
-    partyDeploy = (char: Character): void => { this.gm.party.deployCharacter(char); this.afterPartyChange(); };
-    partyUndeploy = (charId: string): void => { this.gm.party.unDeployCharacter(charId); this.afterPartyChange(); };
-    partySwapActive = (a: number, b: number): void => { this.gm.party.swapActiveSlots(a, b); this.afterPartyChange(); };
-    partyReplaceActive = (slot: number, char: Character): void => { this.gm.party.replaceActiveSlot(slot, char); this.afterPartyChange(); };
-    partySwapRoster = (a: number, b: number): void => { this.gm.party.swapRoster(a, b); this.tick(); };
+    partyDeploy = (char: Character): UiMutationResult =>
+        this.runPartyMutation(() => this.gm.party.deployCharacter(char));
+    partyUndeploy = (charId: string): UiMutationResult =>
+        this.runPartyMutation(() => this.gm.party.unDeployCharacter(charId));
+    partySwapActive = (a: number, b: number): UiMutationResult =>
+        this.runPartyMutation(() => this.gm.party.swapActiveSlots(a, b));
+    partyReplaceActive = (slot: number, char: Character): UiMutationResult =>
+        this.runPartyMutation(() => this.gm.party.replaceActiveSlot(slot, char));
+    partySwapRoster = (a: number, b: number): UiMutationResult => {
+        const blocked = this.raidPreparationEditGuard();
+        if (blocked) return blocked;
+        if (!this.gm.party.swapRoster(a, b)) return { ok: false };
+        this.tick();
+        return { ok: true };
+    };
+
+    private runPartyMutation = (mutation: () => boolean | void): UiMutationResult => {
+        const blocked = this.raidPreparationEditGuard();
+        if (blocked) return blocked;
+        if (mutation() === false) return { ok: false };
+        this.afterPartyChange();
+        return { ok: true };
+    };
 
     private afterPartyChange = (): void => {
         this.gm.onActiveCharacterChanged();

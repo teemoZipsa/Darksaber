@@ -418,6 +418,23 @@ export class WorldEngine {
 
     public getRaidSession(): WorldRaidSession { return this.raidSession; }
 
+    /**
+     * Covers the full raid lifecycle, including the short authoritative-save
+     * finalization window after the network connection flag has been cleared.
+     * GameManager combines this with its authenticated-session state so local
+     * DEV raids remain editable.
+     */
+    public isRaidLifecycleActive(): boolean {
+        return this.getNetworkState().isRaid
+            || this.raidSession.active
+            || this.raidLifecycleControllers.raidOutcomeController.isVisible();
+    }
+
+    /** Add a localized system message to the field log. */
+    public addSystemLog(message: string): void {
+        this.addCombatLog(message);
+    }
+
     public beginLocalDevRaidFromCurrentHub(): boolean {
         return beginWorldEngineLocalDevRaidFromCurrentHub({
             actionControllers: this.actionControllers,
