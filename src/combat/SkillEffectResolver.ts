@@ -5,6 +5,7 @@ import { getMagicTerrainMultiplier, getTerrainProfile } from '../field/TerrainRu
 import type { TileType } from '../map/Tile';
 import { clampHitChance, getPhysicalHitChance, type RandomSource } from './CombatFormulas';
 import { StatusEffect, getStatusEffectsForSkill } from './StatusEffects';
+import { formatSkillName } from '../i18n/DisplayNames';
 import { formatT, t } from '../i18n/LanguageManager';
 
 export interface SkillEffectEnemyInput {
@@ -171,7 +172,7 @@ function resolveHeal(
         const mpGain = Math.floor(casterCombatStats.magAtk * skill.power);
         result.casterHpDelta = -Math.min(Math.max(0, casterStats.hp - 1), hpCost);
         result.casterMpDelta = mpGain;
-        result.logs.push(`${skill.icon} ${skill.nameKr}: HP -${hpCost}, MP +${mpGain}`);
+        result.logs.push(`${skill.icon} ${formatSkillName(skill)}: HP -${hpCost}, MP +${mpGain}`);
         return;
     }
 
@@ -190,7 +191,7 @@ function resolveHeal(
     if (skill.id === 'alc_t6') {
         const mpGain = Math.floor(healAmt * 0.5);
         result.casterMpDelta = -skill.mpCost + Math.min(mpGain, Math.max(0, casterStats.maxMp - (casterStats.mp - skill.mpCost)));
-        result.logs.push(`${skill.icon} ${skill.nameKr}: HP +${healAmt}, MP +${mpGain}`);
+        result.logs.push(`${skill.icon} ${formatSkillName(skill)}: HP +${healAmt}, MP +${mpGain}`);
         return;
     }
 
@@ -364,7 +365,7 @@ function formatTerrainNote(result: SkillEffectEnemyResult): string {
 function formatSkillLog(key: string, skill: Skill, params: Record<string, string | number> = {}): string {
     return formatT(key, {
         icon: skill.icon,
-        skill: skill.nameKr,
+        skill: formatSkillName(skill),
         ...params,
     });
 }

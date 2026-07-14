@@ -1,12 +1,14 @@
 import { getItemDef } from '../../data/ItemDB';
 import { rollBossRune } from '../../data/SocketLoot';
 import { formatT, t } from '../../i18n/LanguageManager';
+import { formatItemName } from '../../i18n/DisplayNames';
 import { LootObject } from '../../entity/LootObject';
 import type { Enemy } from '../../entity/Enemy';
 import type { FieldActor } from '../../field/FieldTypes';
 import type { GameManager } from '../GameManager';
 import type { NetworkRaidClient } from '../../net/NetworkRaidClient';
 import { createInteractIntentPayload } from '../../net/WorldIntentPayloads';
+import { getEnemyLootSourceLabel, getLootSourceLabelForDisplay } from '../../loot/LootLabels';
 import type { WorldMap } from '../../map/WorldMap';
 import type { WorldNetworkSyncController } from './WorldNetworkSyncController';
 import type { WorldSelectionController } from './WorldSelectionController';
@@ -58,7 +60,7 @@ export class WorldLootController {
                 const placed = bag.autoPlace(item);
                 if (placed) {
                     placed.acquiredInRaid = true;
-                    acquiredNames.push(item.nameKr);
+                    acquiredNames.push(formatItemName(item));
                 } else {
                     failedItems.push(item);
                 }
@@ -70,7 +72,7 @@ export class WorldLootController {
 
             this.context.log(`${enemy.name}: ${t('raid.autoLootFull')}`);
             const loot = new LootObject(`corpse_${enemy.id}`, enemy.gridX, enemy.gridY, failedItems, {
-                sourceLabel: `${enemy.name} 전리품`,
+                sourceLabel: getEnemyLootSourceLabel(enemy.name),
                 kind: 'corpse',
             });
             this.context.getWorldMap().loot.push(loot);
@@ -78,7 +80,7 @@ export class WorldLootController {
         }
 
         const loot = new LootObject(`corpse_${enemy.id}`, lootTile.x, lootTile.y, items, {
-            sourceLabel: `${enemy.name} 전리품`,
+            sourceLabel: getEnemyLootSourceLabel(enemy.name),
             kind: 'corpse',
         });
         lootMap.loot.push(loot);
@@ -88,9 +90,10 @@ export class WorldLootController {
     }
 
     public openLoot(loot: LootObject): void {
+        const sourceLabel = getLootSourceLabelForDisplay(loot);
         if (this.context.isNetworkRaid()) {
             this.context.selectionController.selectLoot(loot.id);
-            this.context.log(`${loot.sourceLabel} 서버 점유 요청.`);
+            this.context.log(formatT('field.log.lootLockRequest', { source: sourceLabel }));
             const actor = this.context.getControlledActor();
             if (actor) {
                 this.context.getNetworkRaidClient()?.sendIntent(actor.id, 'interact', createInteractIntentPayload(loot.id));
@@ -98,16 +101,16 @@ export class WorldLootController {
             return;
         }
         if (!this.context.isLocalLootEnabled()) {
-            this.context.log('서버 세션 밖에서는 전리품을 열 수 없습니다.');
+            this.context.log(t('field.log.serverLootOnly'));
             return;
         }
         this.context.selectionController.selectLoot(loot.id);
-        this.context.log(`${loot.sourceLabel} 검색 중.`);
+        this.context.log(formatT('field.log.lootSearch', { source: sourceLabel }));
         this.context.clearControlledPath();
         const actor = this.context.getControlledActor();
         if (actor) actor.queuedIntent = null;
 
-        this.context.gameManager.inventoryUI.setExternalGrid(loot.inventory, loot.sourceLabel, { isRaidLoot: true });
+        this.context.gameManager.inventoryUI.setExternalGrid(loot.inventory, sourceLabel, { isRaidLoot: true });
         if (!this.context.gameManager.inventoryUI.isVisible()) this.context.gameManager.inventoryUI.toggle();
     }
 

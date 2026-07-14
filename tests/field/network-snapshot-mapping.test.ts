@@ -9,6 +9,7 @@ import { getStoryScenarioByDungeonId } from '../../src/data/StoryScenarioData';
 import { getStoryScenarioMonsterLayout } from '../../src/data/StoryScenarioMonsterData';
 import { createBaseStats } from '../../src/data/Stats';
 import type { ActorSnapshot, EnemySnapshot } from '../../src/net/WorldProtocol';
+import { i18n } from '../../src/i18n/LanguageManager';
 
 class ImageStub {
     public onload: (() => void) | null = null;
@@ -119,5 +120,49 @@ test('network enemy snapshots apply original monster sprites for the episode 31 
         assert.equal(entry.enemy.walkSprite?.frameWidth, definition.frameSize);
         assert.equal(entry.enemy.walkSprite?.frameHeight, definition.frameSize);
         assert.equal(entry.enemy.walkSprite?.frameCount, definition.frameCount);
+    }
+});
+
+test('network enemy names localize server Korean snapshots and refresh after a language change', () => {
+    const previousLanguage = i18n.lang;
+    const baseSnapshot: Omit<EnemySnapshot, 'id' | 'monsterId' | 'name' | 'role' | 'isBoss'> = {
+        level: 5,
+        color: '#fff',
+        tile: { x: 1, y: 2 },
+        home: { x: 1, y: 2 },
+        stats: createBaseStats(),
+        statuses: [],
+        actionGauge: 0,
+        facing: 'down',
+        isAggro: true,
+    };
+    const snapshots: EnemySnapshot[] = [
+        {
+            ...baseSnapshot,
+            id: 'skeleton',
+            name: '스켈레톤 궁수',
+            role: 'archer',
+            isBoss: false,
+        },
+        {
+            ...baseSnapshot,
+            id: 'ganomas',
+            monsterId: '466R',
+            name: '가노마스',
+            role: 'boss',
+            isBoss: true,
+        },
+    ];
+
+    try {
+        i18n.lang = 'ko';
+        const entries = reconcileNetworkEnemies([], snapshots);
+        assert.deepEqual(entries.map((entry) => entry.enemy.name), ['스켈레톤 궁수', '가노마스']);
+
+        i18n.lang = 'en';
+        entries.forEach((entry) => entry.enemy.refreshLocalizedName());
+        assert.deepEqual(entries.map((entry) => entry.enemy.name), ['Skeleton Archer', 'Ganomas']);
+    } finally {
+        i18n.lang = previousLanguage;
     }
 });

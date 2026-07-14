@@ -49,6 +49,19 @@ test('network loot titles prefer the localized container name over internal ids'
             sourceLabel: 'loot_supply_cache_8',
             containerType: 'supply_cache',
         }), 'Abandoned supply cache');
+        assert.equal(getLootSourceLabelForDisplay({
+            sourceLabel: '스켈레톤 궁수 전리품',
+        }), 'Skeleton Archer loot');
+        assert.equal(getLootSourceLabelForDisplay({
+            sourceLabel: '가노마스 전리품',
+        }), 'Ganomas loot');
+        assert.equal(getLootSourceLabelForDisplay({
+            sourceLabel: '버려진 보급 상자',
+        }), 'Abandoned supply cache');
+        assert.equal(getLootSourceLabelForDisplay({
+            sourceLabel: '봉인된 유물함',
+        }), 'Sealed reliquary');
+        assert.equal(getLootSourceLabelForDisplay({ sourceLabel: '전리품' }), 'Loot');
     } finally {
         i18n.lang = previousLang;
     }

@@ -18,7 +18,7 @@ import { getClassLine } from '../data/ClassTree';
 import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../data/StarterKitData';
 import { getStoryCompanionRewards } from '../data/StoryQuestData';
 import { renderGameTitle } from '../ui/UITheme';
-import { t } from '../i18n/LanguageManager';
+import { i18n, t } from '../i18n/LanguageManager';
 import { InventoryUI } from '../inventory/InventoryUI';
 import { PartyUI } from '../ui/PartyUI';
 import { CharacterPanelUI } from '../character/CharacterPanelUI';
@@ -118,6 +118,7 @@ export class GameManager {
         this.playerData = new PlayerData();
         this.playerData.load();
         this.syncStoryCompanionsToRoster();
+        this.subscribeToLanguageChanges();
 
         this.inventoryUI = new InventoryUI(
             this.inventory,
@@ -159,6 +160,14 @@ export class GameManager {
             else this.hubPageExitFlushArmed = false;
         });
         resize();
+    }
+
+    private subscribeToLanguageChanges(): void {
+        i18n.subscribe(() => {
+            this.syncStoryCompanionsToRoster();
+            this.worldEngine?.refreshLocalizedNames();
+            this.uiStore?.tick();
+        });
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -665,8 +674,13 @@ export class GameManager {
         const roster = this.party.getRoster();
         for (const companion of getStoryCompanionRewards()) {
             if (!this.playerData.hasStoryCompanion(companion.companionId)) continue;
-            if (roster.some((character) => character.id === companion.companionId)) continue;
-            this.party.addToRoster(new Character(companion.companionId, t(companion.nameKey), companion.classId));
+            const localizedName = t(companion.nameKey);
+            const existing = roster.find((character) => character.id === companion.companionId);
+            if (existing) {
+                existing.name = localizedName;
+                continue;
+            }
+            this.party.addToRoster(new Character(companion.companionId, localizedName, companion.classId));
         }
     }
 
@@ -674,8 +688,16 @@ export class GameManager {
         const rosterEntries = readRosterEntries(save, selectedCharacter);
         const activeIds = readStringArray(save.partySnapshot.activeCharacterIds);
         const characters = new Map<string, Character>();
+        const companionRewards = new Map(
+            getStoryCompanionRewards().map((reward) => [reward.companionId, reward]),
+        );
         for (const entry of rosterEntries) {
-            const character = new Character(entry.id, entry.name, entry.classKey);
+            const companionReward = companionRewards.get(entry.id);
+            const character = new Character(
+                entry.id,
+                companionReward ? t(companionReward.nameKey) : entry.name,
+                entry.classKey,
+            );
             character.gender = entry.gender;
             character.currentTier = entry.tier;
             character.level = entry.level;

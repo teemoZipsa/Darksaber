@@ -717,10 +717,10 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
  */
 function renderKeyHintStrip(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
     const segments: { key: string; label: string }[] = [
-        { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.nextActor')), label: '교체' },
-        { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.minimap')), label: '지도' },
-        { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.inventory')), label: '인벤' },
-        { key: 'ESC', label: '메뉴' },
+        { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.nextActor')), label: t('field.keyHint.swap') },
+        { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.minimap')), label: t('field.keyHint.map') },
+        { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.inventory')), label: t('field.keyHint.inventory') },
+        { key: 'ESC', label: t('field.keyHint.menu') },
     ];
 
     ctx.save();

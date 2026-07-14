@@ -9,6 +9,7 @@ import type { FieldActor } from '../../field/FieldTypes';
 import type { ItemDef } from '../../data/ItemDB';
 import type { PlacedItem } from '../../inventory/GridInventory';
 import { ToolUI, type ToolOptionView } from '../../ui/ToolUI';
+import { formatItemName } from '../../i18n/DisplayNames';
 import { formatT, t } from '../../i18n/LanguageManager';
 
 type ToolUseCandidate = CombatItemApplicationPreview & {
@@ -184,7 +185,7 @@ export class WorldToolController {
         }
         this.sink.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
         this.sink.log(formatT('field.log.toolUsed', {
-            item: candidate.placed.item.nameKr,
+            item: formatItemName(candidate.placed.item),
             hp: preview.effectiveHp,
             mp: preview.effectiveMp,
         }));
@@ -211,13 +212,13 @@ export class WorldToolController {
         }
 
         return [...grouped.values()]
-            .sort((a, b) => a.item.nameKr.localeCompare(b.item.nameKr, 'ko'))
+            .sort((a, b) => formatItemName(a.item).localeCompare(formatItemName(b.item), undefined))
             .map(({ item, count, hp, mp }) => ({
                 itemId: item.id,
                 icon: item.icon,
                 iconSprite: item.iconSprite,
                 color: item.color,
-                name: item.nameKr,
+                name: formatItemName(item),
                 count,
                 recoverHp: hp,
                 recoverMp: mp,

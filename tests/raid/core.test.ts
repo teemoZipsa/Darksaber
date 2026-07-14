@@ -691,6 +691,32 @@ test('town rumor keys resolve in both supported languages', () => {
     }
 });
 
+test('open town cached labels and rumor selections refresh when the language changes', () => {
+    const previousLang = i18n.lang;
+    const ui = new TownUI(new GridInventory(5, 5), new GridInventory(5, 5));
+    ui.getMarketRumor = () => i18n.lang === 'ko' ? '시장 소문' : 'Market rumor';
+
+    try {
+        i18n.lang = 'ko';
+        ui.show({ id: 'central_castle', name: 'Kaosia', nameKr: '카오시아', chunkX: 0, chunkY: 0, radius: 1 });
+        assert.equal(ui.getInventoryUI().getExternalTitle(), '🏰 창고');
+        assert.equal(ui.getRumors()[0], '시장 소문');
+
+        i18n.lang = 'en';
+        ui.refreshLocalizedText();
+
+        assert.equal(ui.getInventoryUI().getExternalTitle(), '🏰 Stash');
+        assert.equal(ui.getRumors()[0], 'Market rumor');
+        assert.equal(ui.getRumors().some((rumor) => /[\uac00-\ud7a3]/.test(rumor)), false);
+        const sellSources = (ui.getShopUI() as unknown as {
+            sellSources: Array<{ label: string }>;
+        }).sellSources;
+        assert.deepEqual(sellSources.map((source) => source.label), ['Shared Backpack', 'Stash']);
+    } finally {
+        i18n.lang = previousLang;
+    }
+});
+
 test('sellable flag blocks bound or quest items from shop sale lists', () => {
     const bound = normalizeItemDef({
         id: 'bound_test_item',

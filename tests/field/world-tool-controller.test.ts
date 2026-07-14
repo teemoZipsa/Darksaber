@@ -84,6 +84,26 @@ test('combat tool use recovers, spends AP, and removes one item atomically', () 
     assert.ok(events.some((event) => /사용: HP \+50, MP \+0/.test(event)));
 });
 
+test('combat tool use logs the English item name in English mode', () => {
+    const previousLanguage = i18n.lang;
+    const actor = makeActor();
+    const inventory = new GridInventory(4, 4);
+    const herb = getItemDef('herb_cheap');
+    assert.ok(herb);
+    inventory.autoPlace(herb);
+    const events: string[] = [];
+    const controller = makeController(actor, inventory, { value: getActionApCost('tool') }, events);
+
+    try {
+        i18n.lang = 'en';
+        controller.useTool(herb.id);
+        assert.ok(events.some((event) => event.includes(herb.name)));
+        assert.equal(events.some((event) => event.includes(herb.nameKr)), false);
+    } finally {
+        i18n.lang = previousLanguage;
+    }
+});
+
 test('combat tool can be used again while enough partial ATB and effective recovery remain', () => {
     const actor = makeActor();
     const inventory = new GridInventory(4, 4);

@@ -168,6 +168,42 @@ test('world town session completes repeat merchant contracts from backpack and s
     assert.ok(logs.some((message) => message.includes('납품 의뢰 완료')));
 });
 
+test('world town shop logs use English item names in English mode', () => {
+    const previousLanguage: Language = i18n.lang;
+    const party = new PartyManager();
+    const character = new Character('hero-1', 'Hero', 'infantry');
+    party.addToRoster(character);
+    party.deployCharacter(character);
+
+    const playerData = new PlayerData();
+    playerData.gold = 100;
+    const inventory = new GridInventory(10, 6);
+    const herb = getItemDef('herb_cheap');
+    assert.ok(herb);
+    const logs: string[] = [];
+    const session = new WorldTownSession({
+        party,
+        playerData,
+        gameManager: { inventory, stash: new GridInventory(10, 6) },
+        onDeploy: () => undefined,
+        log: (message) => logs.push(message),
+    });
+    const shop = session.ui.getShopUI();
+
+    try {
+        i18n.lang = 'en';
+        assert.equal(shop.onBuy?.(herb, 10), true);
+        const placed = inventory.items.find((entry) => entry.item.id === herb.id);
+        assert.ok(placed);
+        assert.equal(shop.onSell?.(placed, inventory, 5), true);
+        assert.ok(logs.includes(`Bought ${herb.name}`));
+        assert.ok(logs.includes(`Sold ${herb.name} +5G`));
+        assert.equal(logs.some((message) => message.includes(herb.nameKr)), false);
+    } finally {
+        i18n.lang = previousLanguage;
+    }
+});
+
 test('town deploy ignores click-through immediately after opening', () => {
     let deploys = 0;
     const ui = new TownUI(new GridInventory(10, 6), new GridInventory(10, 6));

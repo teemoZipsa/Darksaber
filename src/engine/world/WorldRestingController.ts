@@ -5,6 +5,7 @@ import {
     removeStatusesFromCarrier,
 } from '../../combat/StatusEffects';
 import type { FieldActor } from '../../field/FieldTypes';
+import { formatT } from '../../i18n/LanguageManager';
 
 export interface WorldRestingContext {
     getPartyActors(): FieldActor[];
@@ -40,7 +41,7 @@ export class WorldRestingController {
 
             const effective = getEffectiveStatsForCharacter(actor.character);
             if (resting.sourceType !== 'action' && actor.character.stats.hp >= effective.maxHp && actor.character.stats.mp >= effective.maxMp) {
-                this.stop(actor, `${actor.character.name}: 휴식 완료`);
+                this.stop(actor, formatT('field.log.restComplete', { name: actor.character.name }));
                 continue;
             }
 
@@ -67,7 +68,7 @@ export class WorldRestingController {
             if (hpGain > 0 || mpGain > 0) this.context.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
 
             if (resting.sourceType !== 'action' && actor.character.stats.hp >= effective.maxHp && actor.character.stats.mp >= effective.maxMp) {
-                this.stop(actor, `${actor.character.name}: 휴식 완료`);
+                this.stop(actor, formatT('field.log.restComplete', { name: actor.character.name }));
             }
         }
     }
@@ -89,7 +90,7 @@ export class WorldRestingController {
             const beforeHp = beforeHpByActorId.get(actor.id);
             if (beforeHp === undefined) continue;
             if (actor.character.stats.hp < beforeHp) {
-                this.stop(actor, `${actor.character.name}: 피해로 휴식 중단`);
+                this.stop(actor, formatT('field.log.restInterruptedDamage', { name: actor.character.name }));
                 removeActionStanceStatusesFromCarrier(actor.character);
             }
         }

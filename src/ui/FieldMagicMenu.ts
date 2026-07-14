@@ -13,6 +13,7 @@ import { UI, Parchment } from './UITheme';
 import { getSkillIconCell } from './DarksaberIconRegistry';
 import { DarksaberSpriteAtlas, MICON_CELL_SIZE } from './DarksaberSpriteAtlas';
 import { SettingsManager, type KeybindingId } from '../engine/SettingsManager';
+import { formatSkillName } from '../i18n/DisplayNames';
 
 export interface FieldMagicSlot {
     skill: Skill;
@@ -166,7 +167,7 @@ export class FieldMagicMenu {
         this.drawHotkeyLabel(ctx, index, x, y, r, slot.enabled);
 
         if (hovered) {
-            const label = slot.skill.nameKr;
+            const label = formatSkillName(slot.skill);
             ctx.font = `bold 13px ${UI.fontPrimary}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';

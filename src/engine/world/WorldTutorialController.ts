@@ -5,7 +5,7 @@ import { Player } from '../../entity/Player';
 import { FIELD_MAX_ACTION_GAUGE, type FieldApAction } from '../../field/FieldActionEconomy';
 import type { TilePoint } from '../../field/FieldPathing';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
-import { t } from '../../i18n/LanguageManager';
+import { i18n, t } from '../../i18n/LanguageManager';
 import { MONSTER_ROW_BY_FACING, MONSTER_SPRITE_PATH } from '../../data/MonsterCatalog';
 import type { AttackTargetFailure } from '../../field/FieldTargeting';
 import { TutorialTrainingMap } from '../../map/TutorialTrainingMap';
@@ -154,6 +154,10 @@ export class WorldTutorialController {
 
         const enemyTile = trainingMap.getPracticeEnemyTile();
         const enemy = new Enemy('intro_tutorial_enemy', enemyTile.x, enemyTile.y, t('tutorial.world.enemy'), 1, '#b64048', 'bruiser');
+        enemy.setLocalizedNames(
+            i18n.strings.ko['tutorial.world.enemy'],
+            i18n.strings.en['tutorial.world.enemy'],
+        );
         enemy.aggroRange = 0;
         enemy.expReward = 0;
         enemy.stats.maxHp = 42;
@@ -410,6 +414,15 @@ export class WorldTutorialController {
     public getIntroTutorialCharacters(): Character[] {
         const active = this.context.party.getActive() ?? this.context.party.getCharacters()[0];
         return active ? [active] : [];
+    }
+
+    public refreshLocalizedNames(): void {
+        if (this.instructor) this.instructor.label = t('tutorial.world.instructor');
+        if (!this.enemyId) return;
+        this.context.getEnemyById(this.enemyId)?.setLocalizedNames(
+            i18n.strings.ko['tutorial.world.enemy'],
+            i18n.strings.en['tutorial.world.enemy'],
+        );
     }
 
     private restoreWorldMap(): void {

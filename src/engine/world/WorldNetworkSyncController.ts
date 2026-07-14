@@ -10,7 +10,13 @@ import { MIN_FIELD_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
 import type { TilePoint } from '../../field/FieldPathing';
 import { GridInventory, type PlacedItem } from '../../inventory/GridInventory';
-import { formatT, i18n, t } from '../../i18n/LanguageManager';
+import { formatT, t } from '../../i18n/LanguageManager';
+import {
+    formatItemName,
+    formatMonsterName,
+    formatStoredEnemyName,
+    formatStoryCompanionName,
+} from '../../i18n/DisplayNames';
 import { getLootSourceLabelForDisplay } from '../../loot/LootLabels';
 import type { WorldMap } from '../../map/WorldMap';
 import type {
@@ -28,15 +34,12 @@ import type {
 import type { CombatFeedbackKind } from './CombatFeedback';
 import type { WorldStoryScenarioController } from './WorldStoryScenarioController';
 import { classifyNetworkActorSnapshots } from './NetworkSnapshotOwnership';
+import { getNetworkEnemyLocalizedNames } from './NetworkSnapshotMapping';
 
 interface PendingNetworkMoveReopen {
     intentId: string;
     actorId: string;
     tile: TilePoint;
-}
-
-function displayItemName(item: { name: string; nameKr: string }): string {
-    return i18n.lang === 'ko' ? item.nameKr : item.name;
 }
 
 interface NetworkMovePathPreview {
@@ -215,7 +218,10 @@ export class WorldNetworkSyncController {
             if (!actor) {
                 const character = new Character(
                     actorSnapshot.localActorId ?? actorSnapshot.id,
-                    actorSnapshot.name,
+                    formatStoryCompanionName(
+                        actorSnapshot.localActorId ?? actorSnapshot.id,
+                        actorSnapshot.name,
+                    ),
                     actorSnapshot.classLineId
                 );
                 actor = {
@@ -236,12 +242,14 @@ export class WorldNetworkSyncController {
 
         this.context.setPartyActors([...nextLocalActors, ...nextRemoteActors]);
         this.context.setFieldEnemies(snapshot.enemies.map((enemySnapshot) => {
+            const localizedNames = getNetworkEnemyLocalizedNames(enemySnapshot);
+            const displayName = formatMonsterName({ name: localizedNames.ko, nameEn: localizedNames.en });
             const existing = this.context.getFieldEnemies().find((entry) => entry.enemy.id === enemySnapshot.id)?.enemy;
             const enemy = existing ?? new Enemy(
                 enemySnapshot.id,
                 enemySnapshot.tile.x,
                 enemySnapshot.tile.y,
-                enemySnapshot.name,
+                displayName,
                 enemySnapshot.level,
                 enemySnapshot.color,
                 enemySnapshot.role
@@ -255,7 +263,7 @@ export class WorldNetworkSyncController {
             enemy.isAggro = enemySnapshot.isAggro;
             enemy.isBoss = enemySnapshot.isBoss;
             enemy.color = enemySnapshot.color;
-            enemy.name = enemySnapshot.name;
+            enemy.setLocalizedNames(localizedNames.ko, localizedNames.en);
             if (enemySnapshot.monsterId && !enemy.walkSprite) this.context.applyMonsterSprite(enemy, enemySnapshot.monsterId);
             return {
                 enemy,
@@ -351,7 +359,7 @@ export class WorldNetworkSyncController {
             if (bag.autoPlaceExisting(placed)) {
                 placed.acquiredInRaid = true;
                 acceptedCells.push(source);
-                acquiredNames.push(displayItemName(placed.item));
+                acquiredNames.push(formatItemName(placed.item));
             } else {
                 grid.placeExisting(placed, source.gridX, source.gridY);
                 blocked = true;
@@ -359,10 +367,11 @@ export class WorldNetworkSyncController {
         }
 
         this.context.getNetworkRaidClient()?.sendAutoLootResolve(grant.lootId, acceptedCells);
+        const sourceName = formatStoredEnemyName(grant.sourceName);
         if (acquiredNames.length > 0) {
-            this.context.log(`${grant.sourceName} ${t('raid.autoLoot')}: ${acquiredNames.join(', ')}`);
+            this.context.log(`${sourceName} ${t('raid.autoLoot')}: ${acquiredNames.join(', ')}`);
         }
-        if (blocked) this.context.log(`${grant.sourceName}: ${t('raid.autoLootFull')}`);
+        if (blocked) this.context.log(`${sourceName}: ${t('raid.autoLootFull')}`);
     }
 
     public handleInventoryConsumed(message: InventoryConsumedMessage): void {
@@ -493,7 +502,12 @@ export class WorldNetworkSyncController {
 
     private applyActorSnapshot(actor: FieldActor, snapshot: ActorSnapshot): void {
         const tierChanged = actor.character.currentTier !== snapshot.currentTier;
+        const displayName = formatStoryCompanionName(
+            snapshot.localActorId ?? actor.character.id,
+            snapshot.name,
+        );
         actor.id = snapshot.id;
+        actor.character.name = displayName;
         actor.character.stats = { ...snapshot.stats };
         actor.character.statuses = snapshot.statuses.map((status) => ({ ...status }));
         actor.character.isDead = snapshot.isDead;
@@ -507,7 +521,7 @@ export class WorldNetworkSyncController {
         actor.entity.gridY = snapshot.tile.y;
         actor.entity.actionGauge = snapshot.actionGauge;
         actor.entity.facing = snapshot.facing;
-        actor.entity.label = snapshot.name;
+        actor.entity.label = displayName;
         actor.path = [];
         actor.queuedIntent = null;
     }
@@ -553,8 +567,8 @@ export class WorldNetworkSyncController {
     }
 
     private formatCombatEvent(event: CombatEventMessage): string {
-        const sourceName = event.sourceName ?? this.getNetworkEntityName(event.sourceId);
-        const targetName = event.targetName ?? this.getNetworkEntityName(event.targetId);
+        const sourceName = this.getNetworkEntityName(event.sourceId, event.sourceName);
+        const targetName = this.getNetworkEntityName(event.targetId, event.targetName);
         const vars = { source: sourceName, target: targetName, value: event.value ?? 0 };
         if (event.kind === 'miss') return formatT('field.log.combat.miss', vars);
         if (event.kind === 'kill') return formatT('field.log.combat.kill', vars);
@@ -565,11 +579,11 @@ export class WorldNetworkSyncController {
         return formatT('field.log.combat.damage', vars);
     }
 
-    private getNetworkEntityName(entityId: string): string {
+    private getNetworkEntityName(entityId: string, fallback?: string): string {
         const actor = this.context.getPartyActors().find((candidate) => candidate.id === entityId);
         if (actor) return actor.character.name || actor.entity.label || entityId;
         const enemy = this.context.getEnemyById(entityId);
         if (enemy) return enemy.name || enemy.label || entityId;
-        return entityId;
+        return fallback || entityId;
     }
 }

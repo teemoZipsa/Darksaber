@@ -17,6 +17,7 @@ import type { WorldTacticalController } from './WorldTacticalController';
 import type { MinimapUI } from '../../ui/MinimapUI';
 import { CombatLogUI } from '../../ui/CombatLogUI';
 import { SettingsManager, type KeybindingId } from '../SettingsManager';
+import { getLootSourceLabelForDisplay } from '../../loot/LootLabels';
 
 type WorldInputFieldHit = FieldHit<FieldHitParty, Enemy, LootObject>;
 
@@ -187,7 +188,9 @@ export class WorldInputController {
             }
             case 'loot':
                 this.context.selectionController.selectLoot(hit.loot.id);
-                this.context.log(formatT('field.input.lootSelected', { name: hit.loot.sourceLabel }));
+                this.context.log(formatT('field.input.lootSelected', {
+                    name: getLootSourceLabelForDisplay(hit.loot),
+                }));
                 break;
             case 'ground':
                 this.context.closeActionMenu();

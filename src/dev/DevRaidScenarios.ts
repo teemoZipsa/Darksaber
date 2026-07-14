@@ -7,7 +7,7 @@ import { Enemy } from '../entity/Enemy';
 import { LootObject } from '../entity/LootObject';
 import { Player } from '../entity/Player';
 import type { GameManager } from '../engine/GameManager';
-import { formatT, t } from '../i18n/LanguageManager';
+import { formatT, i18n, t } from '../i18n/LanguageManager';
 
 export const DEV_STORY_EPISODES = STORY_SCENARIOS.map((scenario) => scenario.episode);
 export const DEV_STORY_INTERIOR_EPISODES = STORY_SCENARIOS
@@ -52,6 +52,7 @@ type DevFieldActor = {
 };
 type DevDungeon = {
     id: string;
+    name: string;
     nameKr: string;
     chunkX: number;
     chunkY: number;
@@ -275,7 +276,10 @@ function applyDevStoryScenario(world: DevWorldEngine, scenarioId: DevStoryScenar
     } else {
         storyScenarioController.startLocalStoryInteriorDungeon(dungeon, quest);
     }
-    world.addCombatLog?.(formatT('dev.scenario.storyReady', { episode, dungeon: dungeon.nameKr }));
+    world.addCombatLog?.(formatT('dev.scenario.storyReady', {
+        episode,
+        dungeon: i18n.lang === 'ko' ? dungeon.nameKr : dungeon.name,
+    }));
     setDevScenarioStatus(scenarioId, scenario.missionKind === 'soloInterior' ? 'interior-ready' : 'scenario-ready');
     return true;
 }

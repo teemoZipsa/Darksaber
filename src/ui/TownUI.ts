@@ -64,6 +64,7 @@ export class TownUI {
 
     // Rumors state (random selection per visit)
     private currentRumors: string[] = [];
+    private currentRumorKeys: string[] = [];
 
     // Player gold reference (updated externally)
     public playerGold: number = 0;
@@ -126,6 +127,26 @@ export class TownUI {
         ]);
     }
 
+    public refreshLocalizedText(): void {
+        this.inventoryUI.setExternalGrid(this.stash, `🏰 ${t('lobby.stash')}`);
+        this.syncShopSources();
+        this.rebuildRumors();
+    }
+
+    private rebuildRumors(): void {
+        if (!this.currentTown) {
+            this.currentRumors = [];
+            return;
+        }
+        const marketRumor = getTownFacilities(this.currentTown.id).includes('rumors')
+            ? this.getMarketRumor?.(this.currentTown.id) ?? null
+            : null;
+        const commonRumors = this.currentRumorKeys.map((key) => t(key));
+        this.currentRumors = marketRumor
+            ? [marketRumor, ...commonRumors.slice(0, 2)]
+            : commonRumors.slice(0, 3);
+    }
+
     private getCurrentRestFacility(): RestFacility | null {
         return this.currentTown ? getRestFacility(this.currentTown.id) : null;
     }
@@ -146,14 +167,8 @@ export class TownUI {
         this.deployClickGuardUntilMs = nowMs + TOWN_DEPLOY_CLICK_GUARD_MS;
 
         // Pick 3 random rumors for this visit.
-        const rumorPool = RUMOR_KEYS.map((key) => t(key));
-        const shuffled = [...rumorPool].sort(() => Math.random() - 0.5);
-        const marketRumor = getTownFacilities(town.id).includes('rumors')
-            ? this.getMarketRumor?.(town.id) ?? null
-            : null;
-        this.currentRumors = marketRumor
-            ? [marketRumor, ...shuffled.slice(0, 2)]
-            : shuffled.slice(0, 3);
+        this.currentRumorKeys = [...RUMOR_KEYS].sort(() => Math.random() - 0.5).slice(0, 3);
+        this.rebuildRumors();
 
         this.showTab('storage');
     }
@@ -165,6 +180,8 @@ export class TownUI {
         if (this.inventoryUI.isVisible()) this.inventoryUI.toggle();
         this.shopUI.hide();
         this.currentTown = null;
+        this.currentRumorKeys = [];
+        this.currentRumors = [];
     }
 
     public isVisible(): boolean { return this.visible; }

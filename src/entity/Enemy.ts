@@ -9,6 +9,7 @@ import { getNormalizedMonsterBalance } from '../data/original/originalMonsterBal
 import { TILE_PROPERTIES, type TileType } from '../map/Tile';
 import type { StatusEffect } from '../combat/StatusEffects';
 import { createEnemyAIProfile, type EnemyAIProfile, type EnemyRole } from '../field/EnemyAI';
+import { i18n } from '../i18n/LanguageManager';
 
 export interface EnemyAIMemory {
     turnCount: number;
@@ -34,6 +35,7 @@ export class Enemy extends Entity {
     };
     private tunedRole: EnemyRole | null = null;
     private readonly baseStats: CharacterStats;
+    private localizedNames: { ko: string; en: string } | null = null;
 
     constructor(
         id: string,
@@ -56,6 +58,16 @@ export class Enemy extends Entity {
         this.baseStats = getNormalizedMonsterBalance(monsterId, level).stats;
         this.stats = { ...this.baseStats };
         this.applyRoleTuning(role);
+    }
+
+    public setLocalizedNames(ko: string, en: string): void {
+        this.localizedNames = { ko: ko || en, en: en || ko };
+        this.refreshLocalizedName();
+    }
+
+    public refreshLocalizedName(): void {
+        if (!this.localizedNames) return;
+        this.name = this.localizedNames[i18n.lang];
     }
 
     public setRole(role: EnemyRole): void {

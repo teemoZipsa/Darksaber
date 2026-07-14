@@ -14,6 +14,7 @@ export type MonsterFamily =
 export interface MonsterDefinition {
     id: MonsterId;
     name: string;
+    nameEn: string;
     /** Optional i18n key; when present UI may prefer it over `name`. */
     nameKey?: string;
     sprite: string;
@@ -109,12 +110,76 @@ export const MONSTER_IDS = [
 ] as const;
 export type MonsterId = typeof MONSTER_IDS[number];
 
+const MONSTER_ENGLISH_NAMES: Record<MonsterId, string> = {
+    '206R': 'Infantry B',
+    '302R': 'Skeleton Archer',
+    '303R': 'Burgos Guard',
+    '304R': 'Ratman Warrior',
+    '305R': 'Blue Ratman',
+    '307R': 'Lesser Demon',
+    '308R': 'Blue Demon',
+    '309R': 'Blackwing Gargoyle',
+    '311R': 'Ratman Rogue',
+    '313R': 'Orc Swordsman',
+    '314R': 'Blue Orc Soldier',
+    '315R': 'Purple Minotaur',
+    '317R': 'Minotaur',
+    '346R': 'Plains Wolf',
+    '409R': 'Cave Bat',
+    '434R': 'Skeleton Warrior',
+    '435R': 'Shadow Wolf',
+    '214R': 'Pink Fairy',
+    '215R': 'Flame Imp',
+    '216R': 'Forest Spirit',
+    '217R': 'Young Harpy',
+    '218R': 'Orange Gargoyle',
+    '219R': 'Red Earwig',
+    '224R': 'Red Demon Bird',
+    '225R': 'Firebird',
+    '226R': 'Orange Wyvern',
+    '353R': 'Crimson Sorcerer',
+    '354R': 'Skeleton Guard',
+    '358R': 'Burrow Ratman',
+    '362R': 'Green Lizardman',
+    '366R': 'Green Drake',
+    '367R': 'Verdant Hunting Lizard',
+    '452R': 'Abyss Gargoyle',
+    '453R': 'Green Ogre',
+    '454R': 'Green Troll',
+    '456R': 'Giant Bear',
+    '458R': 'Steel Lancer',
+    '462R': 'Desert Hawk',
+    '463R': 'Horned Beast',
+    '466R': 'Demon Tracker',
+    '467R': 'Witch',
+    '634R': 'Pirate Captain',
+    '635R': 'Naval Swordsman',
+    '636R': 'Golden Knight',
+    '637R': 'Verdant Officer',
+    '638R': 'Guard Captain',
+    '639R': 'Imperial Soldier',
+    '729R': 'Succubus',
+    '730R': 'Veramod',
+    '731R': 'Beelzebuth',
+    '732R': 'Astaroth',
+    '733R': 'Nergal',
+    '748R': 'Ergion',
+    '749R': 'Martani',
+    '750R': 'Blin',
+    '751R': 'Demon Fixer',
+    '752R': 'Jade',
+    '791R': 'Bird',
+    burgos_wolf_boss: 'Kisra',
+    zamora_fenris_boss: 'Fenris',
+    '701R': 'Burgos Palace Monster',
+};
+
 const commonFrame = {
     frameCount: MONSTER_FRAME_COUNT,
     framesPerSecond: MONSTER_FPS,
 };
 
-export const MONSTER_DEFINITIONS: Record<MonsterId, MonsterDefinition> = {
+const MONSTER_DEFINITION_SOURCES: Record<MonsterId, Omit<MonsterDefinition, 'nameEn'>> = {
     '206R': {
         id: '206R', name: '인펀트리B', sprite: '206R.png', role: 'tank',
         level: 3, levelBand: [2, 5], family: 'human', spawnTags: ['grass', 'castle'],
@@ -434,6 +499,13 @@ export const MONSTER_DEFINITIONS: Record<MonsterId, MonsterDefinition> = {
         color: '#ff7f8d', frameSize: 64, renderScale: 1.65, aggroRange: 9, ...commonFrame,
     },
 };
+
+export const MONSTER_DEFINITIONS: Record<MonsterId, MonsterDefinition> = Object.fromEntries(
+    MONSTER_IDS.map((id) => [
+        id,
+        { ...MONSTER_DEFINITION_SOURCES[id], nameEn: MONSTER_ENGLISH_NAMES[id] },
+    ]),
+) as Record<MonsterId, MonsterDefinition>;
 
 export function getMonsterDefinition(id: MonsterId): MonsterDefinition {
     return MONSTER_DEFINITIONS[id];

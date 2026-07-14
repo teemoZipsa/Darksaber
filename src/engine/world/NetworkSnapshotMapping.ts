@@ -1,6 +1,6 @@
 import { Character } from '../../character/Character';
 import { getCharacterExpToNext } from '../../character/CharacterProgression';
-import { getMonsterDefinitionSafe } from '../../data/MonsterCatalog';
+import { getMonsterDefinitionSafe, MONSTER_DEFINITIONS } from '../../data/MonsterCatalog';
 import { Enemy } from '../../entity/Enemy';
 import { LootObject } from '../../entity/LootObject';
 import { Player } from '../../entity/Player';
@@ -9,10 +9,17 @@ import { GridInventory } from '../../inventory/GridInventory';
 import type { ActorSnapshot, EnemySnapshot, GridSnapshot, LootSnapshot } from '../../net/WorldProtocol';
 import { MONSTER_ROW_BY_FACING, MONSTER_SPRITE_PATH } from '../../data/MonsterCatalog';
 import { getItemDef } from '../../data/ItemDB';
+import { STORY_SCENARIOS } from '../../data/StoryScenarioData';
+import { formatMonsterName, formatStoryCompanionName } from '../../i18n/DisplayNames';
 
 export function applyNetworkActorSnapshot(actor: FieldActor, snapshot: ActorSnapshot): void {
     const tierChanged = actor.character.currentTier !== snapshot.currentTier;
+    const displayName = formatStoryCompanionName(
+        snapshot.localActorId ?? actor.character.id,
+        snapshot.name,
+    );
     actor.id = snapshot.id;
+    actor.character.name = displayName;
     actor.character.stats = { ...snapshot.stats };
     actor.character.statuses = snapshot.statuses.map((status) => ({ ...status }));
     actor.character.isDead = snapshot.isDead;
@@ -26,7 +33,7 @@ export function applyNetworkActorSnapshot(actor: FieldActor, snapshot: ActorSnap
     actor.entity.gridY = snapshot.tile.y;
     actor.entity.actionGauge = snapshot.actionGauge;
     actor.entity.facing = snapshot.facing;
-    actor.entity.label = snapshot.name;
+    actor.entity.label = displayName;
     actor.path = [];
     actor.queuedIntent = null;
 }
@@ -71,7 +78,10 @@ export function reconcileNetworkRemoteActors(
         if (!actor) {
             const character = new Character(
                 actorSnapshot.localActorId ?? actorSnapshot.id,
-                actorSnapshot.name,
+                formatStoryCompanionName(
+                    actorSnapshot.localActorId ?? actorSnapshot.id,
+                    actorSnapshot.name,
+                ),
                 actorSnapshot.classLineId
             );
             actor = {
@@ -99,12 +109,14 @@ export function reconcileNetworkEnemies(
     enemySnapshots: readonly EnemySnapshot[]
 ): FieldEnemy[] {
     return enemySnapshots.map((enemySnapshot) => {
+        const localizedNames = getNetworkEnemyLocalizedNames(enemySnapshot);
+        const displayName = formatMonsterName({ name: localizedNames.ko, nameEn: localizedNames.en });
         const existing = previousEnemies.find((entry) => entry.enemy.id === enemySnapshot.id)?.enemy;
         const enemy = existing ?? new Enemy(
             enemySnapshot.id,
             enemySnapshot.tile.x,
             enemySnapshot.tile.y,
-            enemySnapshot.name,
+            displayName,
             enemySnapshot.level,
             enemySnapshot.color,
             enemySnapshot.role
@@ -118,7 +130,7 @@ export function reconcileNetworkEnemies(
         enemy.isAggro = enemySnapshot.isAggro;
         enemy.isBoss = enemySnapshot.isBoss;
         enemy.color = enemySnapshot.color;
-        enemy.name = enemySnapshot.name;
+        enemy.setLocalizedNames(localizedNames.ko, localizedNames.en);
         applyMonsterSprite(enemy, enemySnapshot.monsterId);
         return {
             enemy,
@@ -126,6 +138,36 @@ export function reconcileNetworkEnemies(
             path: [],
         };
     });
+}
+
+export function getNetworkEnemyDisplayName(
+    snapshot: Pick<EnemySnapshot, 'monsterId' | 'name' | 'isBoss'>,
+): string {
+    const names = getNetworkEnemyLocalizedNames(snapshot);
+    return formatMonsterName({ name: names.ko, nameEn: names.en });
+}
+
+export function getNetworkEnemyLocalizedNames(
+    snapshot: Pick<EnemySnapshot, 'monsterId' | 'name' | 'isBoss'>,
+): { ko: string; en: string } {
+    if (snapshot.isBoss) {
+        const scenario = STORY_SCENARIOS.find((candidate) => (
+            candidate.bossName === snapshot.name || candidate.bossNameEn === snapshot.name
+        ));
+        if (scenario) {
+            return {
+                ko: scenario.bossName || scenario.bossNameEn || snapshot.name,
+                en: scenario.bossNameEn || scenario.bossName || snapshot.name,
+            };
+        }
+    }
+    const definition = getMonsterDefinitionSafe(snapshot.monsterId)
+        ?? Object.values(MONSTER_DEFINITIONS).find((candidate) => (
+            candidate.name === snapshot.name || candidate.nameEn === snapshot.name
+        ));
+    return definition
+        ? { ko: definition.name, en: definition.nameEn }
+        : { ko: snapshot.name, en: snapshot.name };
 }
 
 export function createNetworkLootFromSnapshot(snapshot: LootSnapshot): LootObject {

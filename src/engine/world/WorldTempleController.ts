@@ -12,6 +12,7 @@ import type { FusionTempleUI } from '../../ui/FusionTempleUI';
 import type { MasterBranch } from '../../data/ClassTree';
 import type { WorldPhase, WorldRaidSession } from './WorldRaidSession';
 import type { WorldRealmId } from '../../net/WorldProtocol';
+import { t } from '../../i18n/LanguageManager';
 
 export interface WorldTempleContext {
     party: PartyManager;
@@ -64,7 +65,7 @@ export class WorldTempleController {
 
         const hostileActive = this.context.getFieldEnemies().some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro);
         if (hostileActive) {
-            this.context.log('주변의 적을 정리해야 신전에 들어갈 수 있습니다.');
+            this.context.log(t('field.log.templeBlocked'));
             this.dismissedTempleVisitKey = key;
             return;
         }
@@ -81,7 +82,9 @@ export class WorldTempleController {
             candidates: getFusionCandidates(this.context.party),
             canEnterMasterWorld: hasActiveMasterCharacter(this.context.party),
         });
-        this.context.log(worldMap.getRealm() === 'master' ? '현세의 문에 도착했습니다.' : '융합의 신전에 들어섰습니다.');
+        this.context.log(worldMap.getRealm() === 'master'
+            ? t('field.log.templeMasterGate')
+            : t('field.log.templeFusion'));
     }
 
     private performFusion(branch: MasterBranch): void {
@@ -102,7 +105,7 @@ export class WorldTempleController {
 
     private enterMasterWorld(): void {
         if (!hasActiveMasterCharacter(this.context.party)) {
-            this.context.log('마스터 클래스가 있어야 마스터 월드에 들어갈 수 있습니다.');
+            this.context.log(t('field.log.masterClassRequired'));
             return;
         }
 
@@ -128,7 +131,7 @@ export class WorldTempleController {
         this.context.clearWorldLoot();
         this.context.clearFieldTurnState();
         this.dismissedTempleVisitKey = this.getCurrentTempleVisitKey();
-        this.context.log('현세의 융합 신전으로 돌아왔습니다.');
+        this.context.log(t('field.log.returnedToMortalTemple'));
     }
 
     private getCurrentTempleVisitKey(): string | null {

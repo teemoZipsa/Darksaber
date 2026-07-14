@@ -10,6 +10,7 @@ import {
 } from '../../combat/StatusEffects';
 import type { Skill } from '../../data/SkillDB';
 import { getSkill } from '../../data/SkillDB';
+import { formatSkillName } from '../../i18n/DisplayNames';
 import { formatT, t } from '../../i18n/LanguageManager';
 import {
     getEffectiveSkill,
@@ -204,7 +205,7 @@ export class WorldMagicController {
         const slot = this.menu.getSlot(index);
         if (!slot) return;
         if (!slot.enabled) {
-            if (slot.disabledReason) this.sink.log(`${slot.skill.icon} ${slot.skill.nameKr}: ${slot.disabledReason}`);
+            if (slot.disabledReason) this.sink.log(`${slot.skill.icon} ${formatSkillName(slot.skill)}: ${slot.disabledReason}`);
             return;
         }
         this.handleSkillSelect(slot.skill);
@@ -291,7 +292,7 @@ export class WorldMagicController {
         const validTiles = this.computeTargetTiles(actor, skill);
         this.menu.hide();
         this.state = { mode: 'targeting', skill, validTiles, hoverAoeTiles: new Set() };
-        this.sink.log(formatT('field.magic.selectSkillTarget', { icon: skill.icon, skill: skill.nameKr }));
+        this.sink.log(formatT('field.magic.selectSkillTarget', { icon: skill.icon, skill: formatSkillName(skill) }));
     }
 
     private cast(actor: FieldActor, skill: Skill, targetEnemy?: Enemy): void {
@@ -393,7 +394,7 @@ export class WorldMagicController {
                 this.sink.spawnDamage(enemy.gridX, enemy.gridY, 0, false, true);
                 AudioManager.playSfx('sfx.miss', { volume: 0.58, rate: 0.03 });
                 this.sink.log(formatT('field.magic.missChance', {
-                    skill: skill.nameKr,
+                    skill: formatSkillName(skill),
                     target: enemy.name,
                     chance: Math.floor(enemyResult.hitChance ?? 0),
                 }));
@@ -458,7 +459,7 @@ export class WorldMagicController {
                 this.sink.spawnSkillEffect(skill, target.entity.gridX, target.entity.gridY, 'impact');
             }
         }
-        this.sink.log(formatT('field.magic.allyBuff', { icon: skill.icon, skill: skill.nameKr, count: targets.length }));
+        this.sink.log(formatT('field.magic.allyBuff', { icon: skill.icon, skill: formatSkillName(skill), count: targets.length }));
     }
 
     private getAlliedActors(actor: FieldActor, skill: Skill): FieldActor[] {

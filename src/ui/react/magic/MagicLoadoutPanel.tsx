@@ -9,6 +9,7 @@
 
 import { useState, type CSSProperties } from 'react';
 import { SettingsManager } from '../../../engine/SettingsManager';
+import { formatSkillDescription, formatSkillName } from '../../../i18n/DisplayNames';
 import { t, formatT } from '../../../i18n/LanguageManager';
 import { getSkill, type Skill } from '../../../data/SkillDB';
 import {
@@ -125,7 +126,7 @@ export function MagicLoadoutPanel() {
                                         <>
                                             <span style={{ fontSize: 18 }}>{skill.icon}</span>
                                             <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {skill.nameKr}
+                                                {formatSkillName(skill)}
                                             </span>
                                             {level > 1 && <span style={{ color: 'var(--ds-accent)', fontSize: 11 }}>+{level - 1}</span>}
                                         </>
@@ -168,7 +169,7 @@ export function MagicLoadoutPanel() {
                                     }}
                                 >
                                     <span style={{ fontSize: 16 }}>{skill.icon}</span>
-                                    <span style={{ flex: 1 }}>{skill.nameKr}</span>
+                                    <span style={{ flex: 1 }}>{formatSkillName(skill)}</span>
                                     {level > 1 && <span style={{ color: 'var(--ds-accent)', fontSize: 11 }}>+{level - 1}</span>}
                                     {isEquipped && <span style={{ color: 'var(--ds-text-muted)', fontSize: 11 }}>{t('magic.loadout.equipped')}</span>}
                                 </button>
@@ -183,7 +184,7 @@ export function MagicLoadoutPanel() {
                         }} data-magic-detail={detail.id}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span style={{ fontSize: 20 }}>{detail.icon}</span>
-                                <strong>{detail.nameKr}</strong>
+                                <strong>{formatSkillName(detail)}</strong>
                                 <span style={{ marginLeft: 'auto', color: 'var(--ds-accent)' }}>
                                     {formatT('magic.level', { lv: detailLevel })}
                                 </span>
@@ -191,7 +192,7 @@ export function MagicLoadoutPanel() {
                             <div style={{ color: 'var(--ds-text-muted)', fontSize: 12, margin: '6px 0' }}>
                                 {skillTags(detail)} · MP {detail.mpCost}
                             </div>
-                            <div style={{ fontSize: 12, marginBottom: 10 }}>{detail.descKr}</div>
+                            <div style={{ fontSize: 12, marginBottom: 10 }}>{formatSkillDescription(detail)}</div>
                             <button
                                 className="ds-btn"
                                 disabled={detailLevel >= MAX_UPGRADE_LEVEL}

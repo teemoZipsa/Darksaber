@@ -58,7 +58,7 @@ export function TownScreen() {
     const townInv = store.getTownInventory();
     const scaleVar = { '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
     const townPrimaryName = i18n.lang === 'ko' ? town.nameKr : town.name;
-    const townSecondaryName = i18n.lang === 'ko' ? town.name : town.nameKr;
+    const townSecondaryName = i18n.lang === 'ko' ? town.name : null;
     const deploy = () => {
         if (deployPending) return;
         if (store.townDeploy()) AudioManager.playSfx('sfx.deploy');
@@ -76,7 +76,7 @@ export function TownScreen() {
         >
             <div className="ds-town__header" style={scaleVar}>
                 <span className="ds-town__name">🏰 {townPrimaryName}</span>
-                <span className="ds-town__sub">{townSecondaryName}</span>
+                {townSecondaryName && <span className="ds-town__sub">{townSecondaryName}</span>}
             </div>
 
             <div className="ds-town__tabs" style={scaleVar} role="tablist" inert={deployPending}>

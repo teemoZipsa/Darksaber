@@ -2,7 +2,6 @@ import { getClassLine } from '../src/data/ClassTree';
 import { getItemDef } from '../src/data/ItemDB';
 import { createBaseStats, getBaseStatsForClass } from '../src/data/Stats';
 import { STORY_SCENARIOS, type StoryQuestRewardData } from '../src/data/StoryScenarioData';
-import { t } from '../src/i18n/LanguageManager';
 import type { InventorySaveSnapshot } from '../src/shared/CharacterSave';
 
 export function applyStoryQuestRewardsToSaveState(
@@ -103,7 +102,10 @@ function addRosterCompanion(
         ...rawCharacters,
         {
             id: reward.companionId,
-            name: t(reward.nameKey),
+            // Server saves stable identity, never process-global UI language.
+            // Known story companions are localized by the client on load.
+            name: reward.companionId,
+            nameKey: reward.nameKey,
             classKey: reward.classId,
             gender: 'M',
             tier: classLine?.tiers[0]?.tier ?? 1,

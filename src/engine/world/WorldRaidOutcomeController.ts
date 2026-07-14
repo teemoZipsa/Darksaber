@@ -16,6 +16,7 @@ import {
 } from '../../data/StoryQuestData';
 import { BURGOS_CASTLE_DUNGEON_ID } from '../../data/MonsterCatalog';
 import { t, formatT, i18n } from '../../i18n/LanguageManager';
+import { formatItemName } from '../../i18n/DisplayNames';
 import type { TownInfo } from '../../map/BiomeMask';
 import {
     computeRaidFailureLoss,
@@ -43,7 +44,7 @@ function displayTownName(town: TownInfo): string {
 }
 
 function displayItemName(item: ItemDef | undefined, fallback: string): string {
-    return item ? (i18n.lang === 'ko' ? item.nameKr : item.name) : fallback;
+    return item ? formatItemName(item) : fallback;
 }
 
 export interface WorldRaidOutcomeContext {

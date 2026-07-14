@@ -19,7 +19,8 @@ import {
 import { getStoryScenarioMonsterLayout } from '../../data/StoryScenarioMonsterData';
 import { getMonsterDefinition } from '../../data/MonsterCatalog';
 import { getStoryInteriorLayout, isStoryInteriorDungeon, type StoryInteriorLayout } from '../../data/StoryInteriorData';
-import { formatT, t } from '../../i18n/LanguageManager';
+import { formatT, i18n, t } from '../../i18n/LanguageManager';
+import { formatItemName, formatMonsterName, formatStoryBossName } from '../../i18n/DisplayNames';
 import { Enemy } from '../../entity/Enemy';
 import type { Player } from '../../entity/Player';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
@@ -59,6 +60,14 @@ export interface WorldStoryScenarioPendingEnter {
     intentId: string;
     dungeonId: string;
     visitKey: string | null;
+}
+
+function displayDungeonName(dungeon: WorldDungeonInfo): string {
+    return i18n.lang === 'ko' ? dungeon.nameKr : dungeon.name;
+}
+
+function displayScenarioDungeonName(scenario: StoryScenarioDefinition): string {
+    return i18n.lang === 'ko' ? scenario.dungeonNameKr : scenario.dungeonNameEn;
 }
 
 export interface WorldStoryScenarioContext {
@@ -216,7 +225,7 @@ export class WorldStoryScenarioController {
         const requiredItems = this.getFieldEventRequiredItems(event);
         for (const item of requiredItems) {
             if (!this.context.hasScenarioItem(item.id)) {
-                this.context.log(formatT('story.event.useItem.missing', { item: item.nameKr ?? item.name }));
+                this.context.log(formatT('story.event.useItem.missing', { item: formatItemName(item) }));
                 return false;
             }
         }
@@ -242,7 +251,7 @@ export class WorldStoryScenarioController {
         }
         for (const item of requiredItems) {
             if (this.context.consumeScenarioItem(item.id)) {
-                this.context.log(formatT('story.event.useItem.consumed', { item: item.nameKr ?? item.name }));
+                this.context.log(formatT('story.event.useItem.consumed', { item: formatItemName(item) }));
             }
         }
         this.applyFieldEventRewards(event);
@@ -365,7 +374,7 @@ export class WorldStoryScenarioController {
 
         const hostileActive = this.context.getFieldEnemies().some((entry) => entry.enemy.stats.hp > 0 && entry.enemy.isAggro);
         if (hostileActive) {
-            this.context.log(`${dungeon.nameKr}에 들어가려면 주변 전투를 정리해야 합니다.`);
+            this.context.log(formatT('field.log.dungeonBlocked', { dungeon: displayDungeonName(dungeon) }));
             this.dismissedDungeonVisitKey = key;
             return;
         }
@@ -387,7 +396,7 @@ export class WorldStoryScenarioController {
         this.dismissedDungeonVisitKey = visitKey;
         const intentId = networkRaidClient.sendScenarioEnter(actor.id, dungeon.id);
         this.pendingNetworkScenarioEnter = { intentId, dungeonId: dungeon.id, visitKey };
-        this.context.log(`${dungeon.nameKr} 서버 시나리오 진입 요청.`);
+        this.context.log(formatT('field.log.scenarioRequest', { dungeon: displayDungeonName(dungeon) }));
     }
 
     public enterStoryDungeon(dungeon: WorldDungeonInfo): void {
@@ -400,7 +409,7 @@ export class WorldStoryScenarioController {
             return;
         }
 
-        this.context.log(`${dungeon.nameKr} 시나리오는 서버 세션 이관 후 진입할 수 있습니다.`);
+        this.context.log(formatT('field.log.scenarioServerOnly', { dungeon: displayDungeonName(dungeon) }));
     }
 
     public startLocalStoryScenarioDungeon(dungeon: WorldDungeonInfo, storyQuest: StoryQuestDefinition): void {
@@ -456,7 +465,7 @@ export class WorldStoryScenarioController {
         this.context.followCameraToPlayer();
         this.playStoryQuestBgm(dungeon.id);
         this.playStoryScenarioSequence(dungeon.id, 'entry');
-        this.context.log(formatT('story.interior.enterLog', { dungeon: dungeon.nameKr }));
+        this.context.log(formatT('story.interior.enterLog', { dungeon: displayDungeonName(dungeon) }));
         this.context.log(t(storyQuest.enterLogKey));
     }
 
@@ -482,12 +491,13 @@ export class WorldStoryScenarioController {
                 `story_${scenario.dungeonId}_guard_${index}`,
                 tile.x,
                 tile.y,
-                guardDefinition.name,
+                formatMonsterName(guardDefinition),
                 Math.max(scenario.guardLevel, guardDefinition.level),
                 guardDefinition.color,
                 guardRole,
                 monsterId
             );
+            enemy.setLocalizedNames(guardDefinition.name, guardDefinition.nameEn);
             enemy.aggroRange = Math.max(guardDefinition.aggroRange, 8);
             enemy.isAggro = true;
             this.context.applyMonsterSprite(enemy, monsterId);
@@ -504,11 +514,15 @@ export class WorldStoryScenarioController {
                 `story_${scenario.dungeonId}_boss`,
                 tile.x,
                 tile.y,
-                scenario.bossName,
+                formatStoryBossName(scenario),
                 scenario.bossLevel,
                 scenario.bossColor,
                 'boss',
                 monsterId
+            );
+            boss.setLocalizedNames(
+                scenario.bossName || scenario.bossNameEn || '',
+                scenario.bossNameEn || scenario.bossName || '',
             );
             boss.aggroRange = Math.max(bossDefinition?.aggroRange ?? 0, 10);
             boss.isAggro = true;
@@ -600,7 +614,7 @@ export class WorldStoryScenarioController {
             this.context.clearFieldTurnState();
             const scenario = getStoryScenarioByDungeonId(dungeonId);
             if (completedInterior && scenario) {
-                this.context.log(formatT('story.interior.returnLog', { dungeon: scenario.dungeonNameKr }));
+                this.context.log(formatT('story.interior.returnLog', { dungeon: displayScenarioDungeonName(scenario) }));
             }
             this.context.log(t(storyQuest.objectiveCompleteLogKey));
         });
@@ -635,7 +649,7 @@ export class WorldStoryScenarioController {
             this.playStoryScenarioSequence(dungeonId, 'entry');
             const scenario = getStoryScenarioByDungeonId(dungeonId);
             if (scenario && isStoryInteriorDungeon(dungeonId)) {
-                this.context.log(formatT('story.interior.enterLog', { dungeon: scenario.dungeonNameKr }));
+                this.context.log(formatT('story.interior.enterLog', { dungeon: displayScenarioDungeonName(scenario) }));
             }
         }
 
@@ -731,11 +745,11 @@ export class WorldStoryScenarioController {
             const visitKey = this.pendingNetworkScenarioEnter.visitKey;
             this.pendingNetworkScenarioEnter = null;
             this.dismissedDungeonVisitKey = visitKey;
-            this.context.log(`시나리오 진입 실패: ${reason}`);
+            this.context.log(formatT('mp.scenarioRejected', { reason }));
             return true;
         }
         if (this.pendingNetworkFieldEventIntentIds.delete(intentId)) {
-            this.context.log(`시나리오 이벤트 실패: ${reason}`);
+            this.context.log(formatT('mp.actionRejected', { reason }));
             return true;
         }
         if (this.pendingNetworkAmbientSiteIntentIds.delete(intentId)) {
@@ -967,7 +981,7 @@ export class WorldStoryScenarioController {
             }
 
             const item = getItemDef(reward.itemId);
-            const label = item?.nameKr ?? reward.itemId;
+            const label = item ? formatItemName(item) : reward.itemId;
             if (item && this.context.autoPlaceRewardItem(reward.itemId)) {
                 this.context.log(formatT('story.event.reward.item', { item: label }));
             } else {
@@ -1124,7 +1138,7 @@ export class WorldStoryScenarioController {
         }
 
         const item = getItemDef(reward.itemId);
-        const label = item?.nameKr ?? reward.itemId;
+        const label = item ? formatItemName(item) : reward.itemId;
         if (item && this.context.autoPlaceRewardItem(reward.itemId)) {
             this.context.log(formatT('story.event.reward.item', { item: label }));
         } else {

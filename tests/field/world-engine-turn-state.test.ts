@@ -488,6 +488,107 @@ test('network snapshot treats local player actorIds as owned and prefers actor r
     assert.equal(engine.turnStateController.getRemainingActionPoints(), 30);
 });
 
+test('production snapshot controller localizes server enemies and only authored remote companions', () => {
+    const previousLanguage = i18n.lang;
+    const actor = makeActor('hero');
+    const { engine } = makeEngineHarness(actor);
+    engine.networkPlayerId = 'client-1';
+    const snapshot: WorldSnapshot = {
+        seq: 1,
+        serverTime: 1000,
+        players: [
+            { playerId: 'client-1', originHubId: 'central_castle', isGhost: false, actorIds: ['server-hero'] },
+            {
+                playerId: 'client-2',
+                originHubId: 'central_castle',
+                isGhost: false,
+                actorIds: ['remote-companion', 'remote-user'],
+            },
+        ],
+        partyActors: [
+            makeActorSnapshot({
+                id: 'server-hero',
+                localActorId: actor.character.id,
+                ownerPlayerId: 'client-1',
+            }),
+            makeActorSnapshot({
+                id: 'remote-companion',
+                localActorId: 'story_cleric_ep02',
+                ownerPlayerId: 'client-2',
+                name: '클레릭',
+                classLineId: 'cleric',
+            }),
+            makeActorSnapshot({
+                id: 'remote-user',
+                localActorId: 'user-character',
+                ownerPlayerId: 'client-2',
+                name: '홍길동',
+            }),
+        ],
+        enemies: [
+            {
+                id: 'story-boss',
+                monsterId: '466R',
+                name: '가노마스',
+                role: 'boss',
+                level: 5,
+                color: '#fff',
+                tile: { x: 5, y: 5 },
+                home: { x: 5, y: 5 },
+                stats: new Character('enemy-stats', 'Enemy', 'infantry').stats,
+                statuses: [],
+                actionGauge: 0,
+                facing: 'down',
+                isAggro: true,
+                isBoss: true,
+            },
+            {
+                id: 'legacy-enemy',
+                name: '스켈레톤 궁수',
+                role: 'archer',
+                level: 2,
+                color: '#fff',
+                tile: { x: 6, y: 5 },
+                home: { x: 6, y: 5 },
+                stats: new Character('legacy-enemy-stats', 'Enemy', 'infantry').stats,
+                statuses: [],
+                actionGauge: 0,
+                facing: 'down',
+                isAggro: true,
+                isBoss: false,
+            },
+        ],
+        loot: [],
+        readyActors: [],
+        remainingApByActor: {},
+        raidTimer: {
+            active: true,
+            elapsedSeconds: 0,
+            limitSeconds: 900,
+            departureTownId: 'central_castle',
+            modifier: null,
+        },
+        scenario: {
+            enteredDungeonIds: [],
+            activeDungeonId: null,
+            completedDungeonIds: [],
+        },
+    };
+
+    try {
+        i18n.lang = 'en';
+        engine.scenarioNetworkControllers.networkSyncController.applySnapshot(snapshot);
+
+        assert.equal(engine.fieldEnemies[0]?.enemy.name, 'Ganomas');
+        assert.equal(engine.fieldEnemies[1]?.enemy.name, 'Skeleton Archer');
+        assert.equal(engine.remotePartyActors.get('remote-companion')?.character.name, 'Cleric');
+        assert.equal(engine.remotePartyActors.get('remote-companion')?.entity.label, 'Cleric');
+        assert.equal(engine.remotePartyActors.get('remote-user')?.character.name, '홍길동');
+    } finally {
+        i18n.lang = previousLanguage;
+    }
+});
+
 test('network down events record injuries only for owned party characters', () => {
     const actor = makeActor('hero');
     const remote = makeActor('remote-hero');

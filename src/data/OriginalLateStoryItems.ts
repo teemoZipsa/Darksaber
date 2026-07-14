@@ -42,7 +42,7 @@ const content = ORIGINAL_LATE_STORY_ITEMS_JSON as OriginalLateStoryItemContent;
 
 export const ORIGINAL_LATE_STORY_ITEMS: readonly OriginalLateStoryItemRecord[] = content.items;
 
-function buildOriginalLateStoryDescription(item: OriginalLateStoryItemRecord): string {
+function buildOriginalLateStoryKoreanDescription(item: OriginalLateStoryItemRecord): string {
     const sourceSummary = item.sourceEvents
         .map((source) => `${source.eventMember} EVENT ${source.eventNumber}`)
         .join(', ');
@@ -59,6 +59,56 @@ function buildOriginalLateStoryDescription(item: OriginalLateStoryItemRecord): s
     return details.join(' / ');
 }
 
+const ORIGINAL_LATE_STORY_ENGLISH_NAMES: Record<string, string> = {
+    orig_late_0976: 'Moonlight',
+    orig_late_0980: 'Cupid',
+    orig_late_0984: 'Silver Arrow',
+    orig_late_0986: 'Forsaken',
+    orig_late_0992: 'Pyriphlegethon',
+    orig_late_0997: 'Izener',
+    orig_late_1002: 'Garius',
+    orig_late_1005: 'Larsian',
+    orig_late_1007: 'Celestial Emperor',
+    orig_late_1010: 'Guardness Shoes',
+    orig_late_1027: 'Seryunius',
+    orig_late_1030: 'Marsyas',
+    orig_late_1052: 'Dycus',
+    orig_late_1104: 'Eldikaiser',
+    orig_late_1108: 'Material Bow',
+    orig_late_1111: 'Hellfire Lance',
+    orig_late_1113: 'Crimson Crash',
+    orig_late_1116: 'Elina',
+    orig_late_1119: 'Cecillion',
+    orig_late_1122: 'Reginen',
+    orig_late_1125: 'Kelmillion',
+    orig_late_1128: 'Krakes',
+    orig_late_1131: 'Arvagen',
+    orig_late_1134: 'Dicymus',
+    orig_late_1137: 'Arinoa Robe',
+    orig_late_1140: 'Stinian',
+    orig_late_1143: 'Heledian',
+    orig_late_1168: 'Battle Master Mark',
+    orig_late_1169: 'Tactics Master Mark',
+    orig_late_1170: 'Magic Master Mark',
+};
+
+function buildOriginalLateStoryEnglishDescription(item: OriginalLateStoryItemRecord): string {
+    const sourceSummary = item.sourceEvents
+        .map((source) => `${source.eventMember} EVENT ${source.eventNumber}`)
+        .join(', ');
+    const details = [
+        `Original Darksaber ${item.rewardKind}.`,
+        item.requiredLevel > 0 ? `Required level ${item.requiredLevel}` : null,
+        item.attackRange ? `Attack range ${item.attackRange}` : null,
+        item.magicRange ? `Magic range ${item.magicRange}` : null,
+        item.originalMagicId > 0 ? `Original spell ${item.originalMagicId}` : null,
+        item.usableClasses ? 'Class-restricted' : null,
+        sourceSummary ? `Original source ${sourceSummary}` : null,
+        `Original GETITEM ${item.originalItemId}`,
+    ].filter(Boolean);
+    return details.join(' / ');
+}
+
 function itemCategoryFor(slot: RawItemDef['slot']): NonNullable<RawItemDef['itemCategory']> {
     if (slot === 'weapon') return 'normal_weapon';
     if (slot === 'accessory' || slot === 'accessory2') return 'accessory';
@@ -70,10 +120,12 @@ function itemCategoryFor(slot: RawItemDef['slot']): NonNullable<RawItemDef['item
 }
 
 function toRawItemDef(item: OriginalLateStoryItemRecord): RawItemDef {
-    const description = buildOriginalLateStoryDescription(item);
+    const description = buildOriginalLateStoryEnglishDescription(item);
+    const descriptionKr = buildOriginalLateStoryKoreanDescription(item);
     return {
         id: item.currentItemId,
-        name: item.originalNameKr,
+        name: ORIGINAL_LATE_STORY_ENGLISH_NAMES[item.currentItemId]
+            ?? `Original Relic ${item.originalItemId}`,
         nameKr: item.originalNameKr,
         slot: item.slot,
         gridW: item.gridW,
@@ -86,7 +138,7 @@ function toRawItemDef(item: OriginalLateStoryItemRecord): RawItemDef {
         ...(item.attackRange ? { attackRange: item.attackRange } : {}),
         ...(item.magicRange ? { magicRange: item.magicRange } : {}),
         description,
-        descriptionKr: description,
+        descriptionKr,
         rarity: 'unique',
         requiredLevel: item.requiredLevel,
         itemCategory: itemCategoryFor(item.slot),

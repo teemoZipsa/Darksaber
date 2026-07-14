@@ -9,7 +9,7 @@ import { getStoryHmapTileAt } from './StoryHmaps';
 import { HMAP_BLEND_BAND, type HmapSample } from './HmapBlend';
 import { STORY_SCENARIOS } from '../data/StoryScenarioData';
 import { isStoryInteriorDungeon } from '../data/StoryInteriorData';
-import { t } from '../i18n/LanguageManager';
+import { i18n, t } from '../i18n/LanguageManager';
 
 export interface TileBounds {
     width: number;
@@ -100,6 +100,7 @@ export interface WorldInspectMarker {
 
 export interface WorldDungeonInfo {
     id: string;
+    name: string;
     nameKr: string;
     chunkX: number;
     chunkY: number;
@@ -323,11 +324,12 @@ const SCENARIO_WATER_BASINS: ScenarioWaterBasin[] = [
 ];
 
 const DUNGEON_LANDMARKS: WorldDungeonInfo[] = [
-    { id: 'beginner_mine', nameKr: '초심자의 폐광', chunkX: 38, chunkY: 35, sprite: 'beginnerMine', tileSpan: 3, tileRadius: 4 },
-    { id: 'beginner_ruins', nameKr: '초보자 유적', chunkX: 62, chunkY: 28, sprite: 'beginnerRuins', tileSpan: 3, tileRadius: 4 },
-    { id: 'dark_cave', nameKr: '암흑 동굴', chunkX: 62, chunkY: 48, sprite: 'caveEntrance', tileSpan: 3, tileRadius: 4 },
+    { id: 'beginner_mine', name: 'Beginner Mine', nameKr: '초심자의 폐광', chunkX: 38, chunkY: 35, sprite: 'beginnerMine', tileSpan: 3, tileRadius: 4 },
+    { id: 'beginner_ruins', name: 'Beginner Ruins', nameKr: '초보자 유적', chunkX: 62, chunkY: 28, sprite: 'beginnerRuins', tileSpan: 3, tileRadius: 4 },
+    { id: 'dark_cave', name: 'Dark Cave', nameKr: '암흑 동굴', chunkX: 62, chunkY: 48, sprite: 'caveEntrance', tileSpan: 3, tileRadius: 4 },
     ...STORY_SCENARIOS.map((scenario) => ({
         id: scenario.dungeonId,
+        name: scenario.dungeonNameEn,
         nameKr: scenario.dungeonNameKr,
         chunkX: scenario.chunkX,
         chunkY: scenario.chunkY,
@@ -472,7 +474,9 @@ export class WorldMap {
     }
 
     public getDisplayName(): string {
-        return this.getRealm() === 'master' ? '마스터 월드' : '현세 월드';
+        return this.getRealm() === 'master'
+            ? t('world.realm.master')
+            : t('world.realm.mortal');
     }
 
     public setRealm(realm: WorldRealm): void {
@@ -1365,20 +1369,24 @@ export class WorldMap {
         return [
             ...this.getTowns().map((town) => ({
                 ...chunkCenter(town.chunkX, town.chunkY),
-                label: town.nameKr,
+                label: this.getLocalizedLandmarkName(town),
                 kind: 'town' as const,
             })),
             ...this.getTemples().map((temple) => ({
                 ...chunkCenter(temple.chunkX, temple.chunkY),
-                label: temple.nameKr,
+                label: this.getLocalizedLandmarkName(temple),
                 kind: 'temple' as const,
             })),
             ...this.getDungeons().map((dungeon) => ({
                 ...chunkCenter(dungeon.chunkX, dungeon.chunkY),
-                label: dungeon.nameKr,
+                label: this.getLocalizedLandmarkName(dungeon),
                 kind: 'dungeon' as const,
             })),
         ];
+    }
+
+    private getLocalizedLandmarkName(entry: { name: string; nameKr: string }): string {
+        return i18n.lang === 'ko' ? entry.nameKr : entry.name;
     }
 
     public getTempleAtTile(tx: number, ty: number): TempleInfo | null {
@@ -1766,7 +1774,7 @@ export class WorldMap {
             const fallbackColor = isCastle ? '#a88a48' : isPort ? '#5b8aa8' : '#8a6a3a';
             this.renderLandmarkSprite(
                 ctx, cameraX, cameraY, vw, vh,
-                centerTileX, centerTileY, tileSpan, sprite, town.nameKr, fallbackColor
+                centerTileX, centerTileY, tileSpan, sprite, this.getLocalizedLandmarkName(town), fallbackColor
             );
         }
 
@@ -1778,7 +1786,7 @@ export class WorldMap {
                 center.y,
                 dungeon.tileSpan,
                 dungeon.sprite,
-                dungeon.nameKr,
+                this.getLocalizedLandmarkName(dungeon),
                 '#5c4a68'
             );
         }
@@ -2172,8 +2180,9 @@ export class WorldMap {
             ctx.lineWidth = 3;
             ctx.strokeStyle = 'rgba(0, 0, 0, 0.78)';
             ctx.fillStyle = this.getRealm() === 'master' ? '#bdf6ff' : '#f0c8ff';
-            ctx.strokeText(temple.nameKr, labelX, labelY);
-            ctx.fillText(temple.nameKr, labelX, labelY);
+            const label = this.getLocalizedLandmarkName(temple);
+            ctx.strokeText(label, labelX, labelY);
+            ctx.fillText(label, labelX, labelY);
             ctx.restore();
         }
     }

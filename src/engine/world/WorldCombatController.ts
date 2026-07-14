@@ -17,6 +17,7 @@ import { damageDefensiveEquipment, damageEquippedWeapon } from '../../inventory/
 import type { PlacedItem } from '../../inventory/GridInventory';
 import { AudioManager } from '../AudioManager';
 import { formatT, t } from '../../i18n/LanguageManager';
+import { formatItemName } from '../../i18n/DisplayNames';
 
 let nextFeedbackGroupId = 1;
 
@@ -337,7 +338,7 @@ export class WorldCombatController {
 
     private logBrokenEquipment(characterName: string, placed: PlacedItem | null): void {
         if (placed?.durability === 0) {
-            this.sink.log(formatT('field.combat.equipmentBroken', { name: characterName, item: placed.item.nameKr }));
+            this.sink.log(formatT('field.combat.equipmentBroken', { name: characterName, item: formatItemName(placed.item) }));
         }
     }
 }

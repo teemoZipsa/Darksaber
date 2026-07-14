@@ -663,7 +663,7 @@ test('late original story reward item ledger covers every GETITEM cache event', 
         assert.equal(itemDef.rarity, 'unique');
         assert.equal(itemDef.itemCategory, expectedItemCategoryBySlot.get(item.slot) ?? 'armor');
         assert.match(itemDef.descriptionKr ?? '', new RegExp(`원작 GETITEM ${item.originalItemId}`));
-        assert.match(itemDef.description, new RegExp(`원작 GETITEM ${item.originalItemId}`));
+        assert.match(itemDef.description, new RegExp(`Original GETITEM ${item.originalItemId}`));
         if (item.rewardKind === 'mark') assert.equal(itemDef.sellable, false);
         for (const source of item.sourceEvents) {
             const fact = getOriginalLateStoryFact(source.episode);

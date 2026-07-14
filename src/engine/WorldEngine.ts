@@ -12,6 +12,7 @@ import type { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
 import { formatT } from '../i18n/LanguageManager';
+import { formatStoryCompanionName } from '../i18n/DisplayNames';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
@@ -860,6 +861,17 @@ export class WorldEngine {
     }
 
     public isNetworkRaidActive(): boolean { return this.getNetworkState().isRaid; }
+    public refreshLocalizedNames(): void {
+        for (const actor of this.partyActors) {
+            const localizedName = formatStoryCompanionName(actor.character.id, actor.character.name);
+            actor.character.name = localizedName;
+            actor.entity.label = localizedName;
+        }
+        for (const entry of this.fieldEnemies) entry.enemy.refreshLocalizedName();
+        this.getControllerState().scenarioNetworkControllers?.tutorialController.refreshLocalizedNames();
+        this.getCoreState().townSession?.ui.refreshLocalizedText();
+    }
+
     public get networkRaidClient(): NetworkRaidClient | null { return this.getNetworkState().raidClient; }
     public set networkRaidClient(client: NetworkRaidClient | null) { this.getNetworkState().raidClient = client; }
     public get isNetworkRaid(): boolean { return this.getNetworkState().isRaid; }

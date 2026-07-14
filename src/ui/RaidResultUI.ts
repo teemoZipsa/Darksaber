@@ -1,6 +1,7 @@
 import { InputManager } from '../engine/InputManager';
 import { RaidOutcome, type RaidOutcomeMissionLineKind } from '../raid/RaidOutcome';
-import { formatT, i18n, t } from '../i18n/LanguageManager';
+import { formatT, t } from '../i18n/LanguageManager';
+import { formatItemName } from '../i18n/DisplayNames';
 import { formatTownName } from '../i18n/TownMessages';
 import { UI, Parchment, drawParchmentPanel, drawParchmentButton, renderGameTitle } from './UITheme';
 
@@ -15,10 +16,6 @@ function resultTitle(result: RaidOutcome['result']): string {
     if (result === 'SURVIVED') return t('raid.result.survived');
     if (result === 'MIA') return t('raid.result.mia');
     return t('raid.result.failed');
-}
-
-function outcomeItemName(item: { name: string; nameKr: string }): string {
-    return i18n.lang === 'en' ? item.name : item.nameKr;
 }
 
 function missionLineColor(kind: RaidOutcomeMissionLineKind): string {
@@ -197,7 +194,7 @@ export class RaidResultUI {
         if (outcome.secured.length > 0) {
             lines.push({ text: t('raid.result.securedLoot'), color: '#2d6a3d' });
             for (const item of outcome.secured) {
-                lines.push({ text: `${outcomeItemName(item)} x${item.quantity}`, color: Parchment.textDark });
+                lines.push({ text: `${formatItemName(item)} x${item.quantity}`, color: Parchment.textDark });
             }
         }
         if ((outcome.goldReward ?? 0) > 0) lines.push({ text: formatT('raid.result.goldReward', { gold: outcome.goldReward ?? 0 }), color: '#7a5410' });
@@ -206,13 +203,13 @@ export class RaidResultUI {
         if (outcome.lost.length > 0) {
             lines.push({ text: t('raid.result.lostBackpack'), color: '#8a1818' });
             for (const item of outcome.lost) {
-                lines.push({ text: `${outcomeItemName(item)} x${item.quantity}`, color: Parchment.textDark });
+                lines.push({ text: `${formatItemName(item)} x${item.quantity}`, color: Parchment.textDark });
             }
         }
         if (outcome.equipmentLost.length > 0) {
             lines.push({ text: t('raid.result.lostEquipment'), color: '#8a1818' });
             for (const loss of outcome.equipmentLost) {
-                lines.push({ text: `${loss.characterName}: ${outcomeItemName(loss.item)}`, color: Parchment.textDark });
+                lines.push({ text: `${loss.characterName}: ${formatItemName(loss.item)}`, color: Parchment.textDark });
             }
         }
         for (const note of outcome.notes ?? []) lines.push({ text: note, color: Parchment.textMid });

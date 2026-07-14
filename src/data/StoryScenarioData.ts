@@ -20,6 +20,7 @@ export interface StoryScenarioDefinition {
     chunkY: number;
     sprite: LandmarkSpriteId;
     bossName: string | null;
+    bossNameEn: string | null;
     bossLevel: number;
     bossColor: string;
     guardLevel: number;
@@ -30,9 +31,44 @@ export interface StoryScenarioDefinition {
 
 const noReward: StoryQuestRewardData = { type: 'none' };
 
-type LateOriginalScenarioConfig = Pick<StoryScenarioDefinition, 'episode'>;
+type StoryScenarioDefinitionSource = Omit<StoryScenarioDefinition, 'bossNameEn'>;
+type LateOriginalScenarioConfig = Pick<StoryScenarioDefinitionSource, 'episode'>;
 
-function buildLateOriginalScenario(config: LateOriginalScenarioConfig): StoryScenarioDefinition {
+const STORY_BOSS_ENGLISH_NAMES: Record<number, string | null> = {
+    1: 'Kisra',
+    2: 'Fenris',
+    3: 'Ganomas',
+    4: 'Eurytion',
+    5: 'Minotaur',
+    6: 'Pachi',
+    7: 'Amphisbaena',
+    8: 'Shut',
+    9: 'Dangu',
+    10: 'Naiad',
+    11: 'Charon',
+    12: 'Mantagoras',
+    13: 'Myant',
+    14: 'Shut',
+    15: 'Magi',
+    16: 'Barbatu',
+    17: null,
+    18: 'Amphit',
+    19: 'Uraeus',
+    20: 'Mephistopheles',
+    21: 'Nergal',
+    22: 'Beramode',
+    23: 'Beelzebuth',
+    24: 'Astaroth',
+    25: 'Nergal',
+    26: 'Battle Master Mark Guardian',
+    27: 'Tactics Master Mark Guardian',
+    28: 'Ergion',
+    29: 'Martani',
+    30: 'Blin',
+    31: 'Demon Fixer',
+};
+
+function buildLateOriginalScenario(config: LateOriginalScenarioConfig): StoryScenarioDefinitionSource {
     const fact = getOriginalLateStoryFact(config.episode);
     return {
         ...config,
@@ -53,7 +89,7 @@ function buildLateOriginalScenario(config: LateOriginalScenarioConfig): StorySce
     };
 }
 
-export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
+const STORY_SCENARIO_SOURCES: StoryScenarioDefinitionSource[] = [
     {
         episode: 1,
         questId: 'main:episode_01_burgos',
@@ -462,6 +498,11 @@ export const STORY_SCENARIOS: StoryScenarioDefinition[] = [
         episode: 31,
     }),
 ];
+
+export const STORY_SCENARIOS: StoryScenarioDefinition[] = STORY_SCENARIO_SOURCES.map((scenario) => ({
+    ...scenario,
+    bossNameEn: STORY_BOSS_ENGLISH_NAMES[scenario.episode] ?? null,
+}));
 
 export function getStoryScenarioByDungeonId(dungeonId: string): StoryScenarioDefinition | null {
     return STORY_SCENARIOS.find((scenario) => scenario.dungeonId === dungeonId) ?? null;

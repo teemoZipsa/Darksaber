@@ -1,4 +1,5 @@
-import { formatT, i18n, t } from '../../i18n/LanguageManager';
+import { formatItemName } from '../../i18n/DisplayNames';
+import { formatT, t } from '../../i18n/LanguageManager';
 import type { PartyManager } from '../../character/PartyManager';
 import type { PlayerData } from '../../data/PlayerData';
 import { HybridMarketService } from '../../data/HybridMarketService';
@@ -261,7 +262,7 @@ export class WorldTownSession {
         this.playerData.addGold(quote.totalPrice);
         this.marketService.recordSell(townId, item.id, quantity);
         this.playerData.save();
-        this.log(formatT('merchantContract.completedLog', { item: i18n.lang === 'ko' ? item.nameKr : item.name, gold: quote.totalPrice }));
+        this.log(formatT('merchantContract.completedLog', { item: formatItemName(item), gold: quote.totalPrice }));
         return true;
     }
 
@@ -343,7 +344,7 @@ export class WorldTownSession {
             }
             this.marketService.recordBuy(this.ui.getCurrentTown()?.id, item.id);
             this.playerData.save();
-            this.log(formatT('town.log.itemBought', { item: item.nameKr }));
+            this.log(formatT('town.log.itemBought', { item: formatItemName(item) }));
             return true;
         };
         this.ui.getShopUI().onSell = (placed, sourceGrid, price) => {
@@ -353,7 +354,7 @@ export class WorldTownSession {
             this.playerData.addGold(price);
             this.marketService.recordSell(this.ui.getCurrentTown()?.id, placed.item.id, quantity);
             this.playerData.save();
-            this.log(formatT('town.log.itemSold', { item: placed.item.nameKr, price }));
+            this.log(formatT('town.log.itemSold', { item: formatItemName(placed.item), price }));
             return true;
         };
         this.ui.getPendingRestMenuId = () => this.playerData.pendingRestMenuId;

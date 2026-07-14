@@ -5,9 +5,15 @@ import { Character } from '../../src/character/Character';
 import { createStatus, hasStatus } from '../../src/combat/StatusEffects';
 import { PlayerData } from '../../src/data/PlayerData';
 import { GameManager, type HubFlushResult } from '../../src/engine/GameManager';
+import { WorldEngine } from '../../src/engine/WorldEngine';
 import type { HubSaveQueue } from '../../src/engine/HubSaveQueue';
+import { WorldTutorialController } from '../../src/engine/world/WorldTutorialController';
+import { Enemy } from '../../src/entity/Enemy';
+import { Player } from '../../src/entity/Player';
 import { GridInventory } from '../../src/inventory/GridInventory';
 import { AuthApiError, type AuthCharacter, type AuthClient, type CharacterSave, type CharacterSavePatch } from '../../src/net/AuthClient';
+import { i18n, t } from '../../src/i18n/LanguageManager';
+import { TownUI } from '../../src/ui/TownUI';
 
 interface HubSaveHarness {
     hubFlushEnabled: boolean;
@@ -19,7 +25,7 @@ interface HubSaveHarness {
     hubSaveError: string | null;
     hubPageExitFlushArmed: boolean;
     networkSaveRevision: number;
-    worldEngine?: { isNetworkRaidActive(): boolean };
+    worldEngine?: WorldEngine;
     playerData: PlayerData;
     inventory: GridInventory;
     stash: GridInventory;
@@ -28,6 +34,8 @@ interface HubSaveHarness {
     flushHubSaveForPageExit(): void;
     applyServerSave(save: CharacterSave, selectedCharacterId?: string): void;
     loadRosterFromSave(selectedCharacter: AuthCharacter, save: CharacterSave): void;
+    syncStoryCompanionsToRoster(): void;
+    subscribeToLanguageChanges(): void;
 }
 
 class ImageStub {
@@ -230,4 +238,132 @@ test('authenticated roster construction restores persisted injury state', () => 
     const restored = party.getRoster()[0];
     assert.ok(restored);
     assert.equal(hasStatus(restored.statuses, 'injury'), true);
+});
+
+test('authenticated story companions ignore persisted Korean names and follow the active language', () => {
+    const previousLanguage = i18n.lang;
+    const manager = Object.create(GameManager.prototype) as HubSaveHarness;
+    const party = new PartyManager();
+    const playerData = new PlayerData();
+    const primary = new Character('hero', 'Hero', 'infantry');
+    const selectedCharacter: AuthCharacter = {
+        id: primary.id,
+        slotNo: 1,
+        name: primary.name,
+        classKey: 'infantry',
+        tier: primary.currentTier,
+        level: primary.level,
+        exp: primary.exp,
+        baseStats: { ...primary.stats },
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+    const companionId = 'story_cleric_ep02';
+    const companionNameKey = 'story.companion.ep02Cleric.name';
+    const save = playerData.toCharacterSave('2026-01-01T00:00:00.000Z', 1);
+    save.characterId = primary.id;
+    save.rosterSnapshot = {
+        characters: [
+            {
+                id: primary.id,
+                name: primary.name,
+                classKey: primary.classLineId,
+                tier: primary.currentTier,
+                level: primary.level,
+                exp: primary.exp,
+                baseStats: primary.stats,
+            },
+            {
+                id: companionId,
+                name: '서버에 저장된 한국어 이름',
+                nameKey: companionNameKey,
+                classKey: 'cleric',
+                tier: 1,
+                level: 1,
+                exp: 0,
+                baseStats: {},
+            },
+        ],
+    };
+    save.partySnapshot = { activeCharacterIds: [primary.id, companionId] };
+    manager.party = party;
+    manager.playerData = playerData;
+
+    try {
+        i18n.lang = 'en';
+        manager.loadRosterFromSave(selectedCharacter, save);
+        const companion = party.getRoster().find((character) => character.id === companionId);
+        assert.ok(companion);
+        assert.equal(companion.name, t(companionNameKey));
+        assert.doesNotMatch(companion.name, /[\uac00-\ud7a3]/);
+
+        playerData.addStoryCompanion(companionId);
+        i18n.lang = 'ko';
+        manager.syncStoryCompanionsToRoster();
+        assert.equal(companion.name, t(companionNameKey));
+    } finally {
+        i18n.lang = previousLanguage;
+    }
+});
+
+test('GameManager language subscription refreshes live enemies and system companions', () => {
+    const previousLanguage = i18n.lang;
+    const listenerCount = i18n.listeners.length;
+    i18n.lang = 'ko';
+    const manager = Object.create(GameManager.prototype) as HubSaveHarness;
+    const worldEngine = Object.create(WorldEngine.prototype) as WorldEngine;
+    const companion = new Character('story_cleric_ep02', '클레릭', 'cleric');
+    const playerNamedCharacter = new Character('user-character', '홍길동', 'infantry');
+    const companionEntity = new Player(0, 0);
+    const playerEntity = new Player(1, 0);
+    companionEntity.label = companion.name;
+    playerEntity.label = playerNamedCharacter.name;
+    worldEngine.partyActors = [
+        { id: 'remote-companion', character: companion, entity: companionEntity, path: [], queuedIntent: null },
+        { id: 'remote-user', character: playerNamedCharacter, entity: playerEntity, path: [], queuedIntent: null },
+    ];
+    const enemy = new Enemy('skeleton', 2, 0, '스켈레톤 궁수', 1);
+    enemy.setLocalizedNames('스켈레톤 궁수', 'Skeleton Archer');
+    const tutorialEnemy = new Enemy('intro_tutorial_enemy', 3, 0, '연습 몬스터', 1);
+    const instructor = new Player(4, 0);
+    instructor.label = '킹 교관';
+    const tutorialController = new WorldTutorialController({
+        getEnemyById: (enemyId: string) => enemyId === tutorialEnemy.id ? tutorialEnemy : null,
+    } as never);
+    Object.assign(tutorialController, {
+        enemyId: tutorialEnemy.id,
+        instructor,
+    });
+    (worldEngine as unknown as { scenarioNetworkControllers: unknown }).scenarioNetworkControllers = {
+        tutorialController,
+    };
+    const townUI = new TownUI(new GridInventory(5, 5), new GridInventory(5, 5));
+    townUI.getMarketRumor = () => i18n.lang === 'ko' ? '시장 소문' : 'Market rumor';
+    townUI.show({ id: 'central_castle', name: 'Kaosia', nameKr: '카오시아', chunkX: 0, chunkY: 0, radius: 1 });
+    (worldEngine as unknown as { townSession: unknown }).townSession = { ui: townUI };
+    worldEngine.fieldEnemies = [
+        { enemy, home: { x: 2, y: 0 }, path: [] },
+        { enemy: tutorialEnemy, home: { x: 3, y: 0 }, path: [] },
+    ];
+    manager.party = new PartyManager();
+    manager.playerData = new PlayerData();
+    manager.worldEngine = worldEngine;
+
+    try {
+        manager.subscribeToLanguageChanges();
+        i18n.setLanguage('en');
+
+        assert.equal(enemy.name, 'Skeleton Archer');
+        assert.equal(tutorialEnemy.name, 'Practice Monster');
+        assert.equal(instructor.label, 'King Instructor');
+        assert.equal(companion.name, 'Cleric');
+        assert.equal(companionEntity.label, 'Cleric');
+        assert.equal(playerNamedCharacter.name, '홍길동');
+        assert.equal(playerEntity.label, '홍길동');
+        assert.equal(townUI.getInventoryUI().getExternalTitle(), '🏰 Stash');
+        assert.equal(townUI.getRumors()[0], 'Market rumor');
+    } finally {
+        i18n.listeners.splice(listenerCount);
+        i18n.lang = previousLanguage;
+    }
 });
