@@ -849,6 +849,15 @@
     overflow: auto;
     scrollbar-gutter: stable both-edges;
 }
+#ui-overlay .ds-town.is-deploying :is(
+    .ds-town__tabs,
+    .ds-town__tabs *,
+    .ds-town__content,
+    .ds-town__content *,
+    .ds-town__insurance
+) {
+    pointer-events: none;
+}
 #ui-overlay .ds-town__footer {
     transform: scale(var(--ds-scale));
     display: flex;

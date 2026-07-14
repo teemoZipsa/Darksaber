@@ -77,6 +77,29 @@ test('AuthClient retries one stale refresh rotation with the latest cookie', asy
     }
 });
 
+test('AuthClient opts save PATCH requests into keepalive only when requested', async () => {
+    const requestOptions: RequestInit[] = [];
+    globalThis.fetch = (async (_input, options) => {
+        requestOptions.push(options ?? {});
+        return Response.json({ save: {} });
+    }) as typeof fetch;
+
+    try {
+        const client = new AuthClient('http://auth.test');
+        client.setAccessToken('access-token');
+
+        await client.updateCharacterSave('hero-default', {}, 1);
+        await client.updateCharacterSave('hero-keepalive', {}, 2, { keepalive: true });
+
+        assert.equal(requestOptions[0]?.method, 'PATCH');
+        assert.equal(requestOptions[0]?.keepalive, undefined);
+        assert.equal(requestOptions[1]?.method, 'PATCH');
+        assert.equal(requestOptions[1]?.keepalive, true);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
 test('periodic refresh failures do not replace an active game with the auth screen', () => {
     assert.equal(shouldReturnToAuthAfterRefreshFailure(
         'playing',

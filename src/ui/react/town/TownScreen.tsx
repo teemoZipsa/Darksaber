@@ -39,6 +39,7 @@ export function TownScreen() {
     const restFacility = store.getRestFacility();
     const deployPending = store.isTownDeployPending();
     const deployError = store.getTownDeployError();
+    const hubSaveError = store.getHubSaveError();
     const insurancePrice = store.getRaidInsurancePrice();
     const insured = store.hasRaidInsurance();
     if (!town) return null;
@@ -69,13 +70,16 @@ export function TownScreen() {
     };
 
     return (
-        <div className={`ds-town ds-town--${townBackdropKey(tab)}`}>
+        <div
+            className={`ds-town ds-town--${townBackdropKey(tab)}${deployPending ? ' is-deploying' : ''}`}
+            aria-busy={deployPending}
+        >
             <div className="ds-town__header" style={scaleVar}>
                 <span className="ds-town__name">🏰 {townPrimaryName}</span>
                 <span className="ds-town__sub">{townSecondaryName}</span>
             </div>
 
-            <div className="ds-town__tabs" style={scaleVar} role="tablist">
+            <div className="ds-town__tabs" style={scaleVar} role="tablist" inert={deployPending}>
                 {tabs.map((tb) => (
                     <button
                         key={tb.id}
@@ -93,7 +97,7 @@ export function TownScreen() {
                 ))}
             </div>
 
-            <div className="ds-town__content">
+            <div className="ds-town__content" inert={deployPending}>
                 {tab === 'storage' && townInv && (
                     <div className="ds-town__storage">
                         <FacilityUpgradePanel />
@@ -109,6 +113,11 @@ export function TownScreen() {
             </div>
 
             <div className="ds-town__footer" style={scaleVar}>
+                {hubSaveError && (
+                    <div className="ds-town__deploy-error" data-hub-save-error role="alert">
+                        {hubSaveError}
+                    </div>
+                )}
                 {deployError && <div className="ds-town__deploy-error">{deployError}</div>}
                 <button
                     type="button"

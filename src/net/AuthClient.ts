@@ -160,11 +160,17 @@ export class AuthClient {
     public async updateCharacterSave(
         characterId: string,
         patch: CharacterSavePatch,
-        expectedRevision: number
+        expectedRevision: number,
+        options: { keepalive?: boolean } = {},
     ): Promise<CharacterSave> {
         const response = await this.request<{ save: CharacterSave }>(
             `/characters/${encodeURIComponent(characterId)}/save`,
-            { method: 'PATCH', auth: true, body: { expectedRevision, save: patch } }
+            {
+                method: 'PATCH',
+                auth: true,
+                body: { expectedRevision, save: patch },
+                keepalive: options.keepalive,
+            }
         );
         return response.save;
     }
@@ -193,7 +199,10 @@ export class AuthClient {
         }
     }
 
-    private async request<T = unknown>(path: string, options: { method: string; body?: unknown; auth?: boolean }): Promise<T> {
+    private async request<T = unknown>(
+        path: string,
+        options: { method: string; body?: unknown; auth?: boolean; keepalive?: boolean },
+    ): Promise<T> {
         const headers: Record<string, string> = {};
         let body: string | undefined;
         if (options.body !== undefined) {
@@ -210,6 +219,7 @@ export class AuthClient {
             headers,
             body,
             credentials: 'include',
+            ...(options.keepalive === undefined ? {} : { keepalive: options.keepalive }),
         });
         const parsed = await parseResponse(response);
         if (!response.ok) {

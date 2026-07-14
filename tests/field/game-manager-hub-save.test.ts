@@ -5,6 +5,7 @@ import { Character } from '../../src/character/Character';
 import { createStatus, hasStatus } from '../../src/combat/StatusEffects';
 import { PlayerData } from '../../src/data/PlayerData';
 import { GameManager, type HubFlushResult } from '../../src/engine/GameManager';
+import type { HubSaveQueue } from '../../src/engine/HubSaveQueue';
 import { GridInventory } from '../../src/inventory/GridInventory';
 import { AuthApiError, type AuthCharacter, type AuthClient, type CharacterSave, type CharacterSavePatch } from '../../src/net/AuthClient';
 
@@ -13,6 +14,10 @@ interface HubSaveHarness {
     networkAuthContext: { accessToken: string; characterId: string };
     authClient: AuthClient;
     hubSaveInflight: Promise<HubFlushResult> | null;
+    hubSaveQueue: HubSaveQueue | null;
+    hubSaveDebounceTimer: ReturnType<typeof setTimeout> | null;
+    hubSaveError: string | null;
+    hubPageExitFlushArmed: boolean;
     networkSaveRevision: number;
     worldEngine?: { isNetworkRaidActive(): boolean };
     playerData: PlayerData;
@@ -20,6 +25,7 @@ interface HubSaveHarness {
     stash: GridInventory;
     party: PartyManager;
     flushHubSaveToServer(): Promise<HubFlushResult>;
+    flushHubSaveForPageExit(): void;
     applyServerSave(save: CharacterSave, selectedCharacterId?: string): void;
     loadRosterFromSave(selectedCharacter: AuthCharacter, save: CharacterSave): void;
 }
@@ -109,6 +115,48 @@ test('server save sync restores nested equipment for every roster character', ()
     assert.deepEqual(primary.equipment.get('weapon')?.sockets?.map((socket) => socket.id), ['rune_el']);
     assert.equal(companion.equipment.get('body')?.item.id, 'magic_t1_body');
     assert.equal(manager.networkSaveRevision, 7);
+});
+
+test('page exit sends one deduplicated keepalive snapshot', async () => {
+    const manager = Object.create(GameManager.prototype) as HubSaveHarness;
+    const playerData = new PlayerData();
+    const save = playerData.toCharacterSave('2026-01-01T00:00:00.000Z', 2);
+    const keepaliveValues: Array<boolean | undefined> = [];
+    const authClient = {
+        async updateCharacterSave(
+            _characterId: string,
+            _patch: CharacterSavePatch,
+            _expectedRevision: number,
+            options?: { keepalive?: boolean },
+        ): Promise<CharacterSave> {
+            keepaliveValues.push(options?.keepalive);
+            return save;
+        },
+    } as unknown as AuthClient;
+
+    manager.hubFlushEnabled = true;
+    manager.networkAuthContext = { accessToken: 'token', characterId: 'hero' };
+    manager.authClient = authClient;
+    manager.hubSaveQueue = null;
+    manager.hubSaveDebounceTimer = null;
+    manager.hubSaveError = null;
+    manager.hubPageExitFlushArmed = false;
+    manager.networkSaveRevision = 1;
+    manager.playerData = playerData;
+    manager.inventory = new GridInventory(10, 6);
+    manager.stash = new GridInventory(15, 10);
+    manager.party = {
+        getActive: () => null,
+        getCharacters: () => [],
+        getRoster: () => [],
+    } as unknown as PartyManager;
+
+    manager.flushHubSaveForPageExit();
+    manager.flushHubSaveForPageExit();
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(keepaliveValues, [true]);
+    assert.equal(manager.networkSaveRevision, 2);
 });
 
 test('server save sync reconciles only injury while preserving other live statuses', () => {

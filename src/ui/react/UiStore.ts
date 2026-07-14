@@ -120,6 +120,7 @@ export class UiStore {
             this.getTownTab(),
             this.isTownDeployPending() ? 'deploying' : '',
             this.getTownDeployError() ?? '',
+            this.getHubSaveError() ?? '',
             this.getPendingRestMenuId() ?? '',
             this.getInjuredCount(),
             this.hasRaidInsurance() ? 'insured' : `insurance:${this.getRaidInsurancePrice()}`,
@@ -315,6 +316,7 @@ export class UiStore {
         const blocked = this.raidPreparationEditGuard();
         if (blocked) return blocked;
         if (!this.gm.party.swapRoster(a, b)) return { ok: false };
+        this.gm.persistHubSaveToServer();
         this.tick();
         return { ok: true };
     };
@@ -329,6 +331,7 @@ export class UiStore {
 
     private afterPartyChange = (): void => {
         this.gm.onActiveCharacterChanged();
+        this.gm.persistHubSaveToServer();
         this.tick();
     };
 
@@ -344,6 +347,7 @@ export class UiStore {
     getRestFacility = () => this.townUi()?.getRestFacilityPublic() ?? null;
     isTownDeployPending = (): boolean => this.townUi()?.isDeployPending() ?? false;
     getTownDeployError = (): string | null => this.townUi()?.getDeployError() ?? null;
+    getHubSaveError = (): string | null => this.gm.getHubSaveError();
     getPendingRestMenuId = (): string | null => this.townUi()?.getPendingRestMenuId?.() ?? null;
     getInjuredCount = (): number => this.townUi()?.getInjuredCount?.() ?? 0;
     getInjuryTreatmentPrice = (): number => this.town()?.getInjuryTreatmentPrice() ?? 0;

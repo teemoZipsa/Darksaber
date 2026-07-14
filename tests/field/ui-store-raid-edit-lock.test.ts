@@ -34,3 +34,25 @@ test('UiStore rejects party and magic mutations before touching raid preparation
         assert.deepEqual(result, { ok: false, reasonKey: 'raid.editingLocked' });
     }
 });
+
+test('UiStore marks successful party and roster changes for hub persistence', () => {
+    const events: string[] = [];
+    const manager = {
+        isRaidPreparationEditingLocked: () => false,
+        party: {
+            deployCharacter: () => { events.push('deploy'); return true; },
+            swapRoster: () => { events.push('swap-roster'); return true; },
+        },
+        onActiveCharacterChanged: () => events.push('active-change'),
+        persistHubSaveToServer: () => { events.push('persist'); },
+    } as unknown as GameManager;
+    const store = new UiStore(manager);
+    store.tick = () => { events.push('tick'); };
+
+    assert.deepEqual(store.partyDeploy({} as Character), { ok: true });
+    assert.deepEqual(store.partySwapRoster(0, 1), { ok: true });
+    assert.deepEqual(events, [
+        'deploy', 'active-change', 'persist', 'tick',
+        'swap-roster', 'persist', 'tick',
+    ]);
+});

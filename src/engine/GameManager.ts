@@ -37,12 +37,9 @@ import { buildHubSavePatch as serializeHubSavePatch } from '../shared/HubSaveSer
 import { normalizeLoadout, normalizeUpgradeLevels } from '../magic/MagicLoadout';
 import { getExpToNext as originalExpToNext } from '../data/original/originalProgression';
 import { applyStatusToCarrier, createStatus, removeStatusesFromCarrier } from '../combat/StatusEffects';
+import { HubSaveQueue, type HubSaveQueueResult } from './HubSaveQueue';
 
-export interface HubFlushResult {
-    ok: boolean;
-    code?: string;
-    message?: string;
-}
+export type HubFlushResult = HubSaveQueueResult;
 
 const HUB_SAVE_DEBOUNCE_MS = 2000;
 
@@ -101,7 +98,9 @@ export class GameManager {
     private networkSaveRevision = 0;
     private hubFlushEnabled = true;
     private hubSaveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-    private hubSaveInflight: Promise<HubFlushResult> | null = null;
+    private hubSaveQueue: HubSaveQueue | null = null;
+    private hubSaveError: string | null = null;
+    private hubPageExitFlushArmed = false;
 
     // React DOM UI overlay bridge (attached after construction in main.ts)
     private uiStore?: UiStore;
@@ -152,6 +151,13 @@ export class GameManager {
             this.camera.setViewSize(this.viewportWidth, this.viewportHeight);
         };
         window.addEventListener('resize', resize);
+        window.addEventListener('pagehide', () => this.flushHubSaveForPageExit());
+        window.addEventListener('beforeunload', () => this.flushHubSaveForPageExit());
+        window.addEventListener('online', () => this.hubSaveQueue?.retryNow());
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) this.flushHubSaveForPageExit();
+            else this.hubPageExitFlushArmed = false;
+        });
         resize();
     }
 
@@ -302,6 +308,11 @@ export class GameManager {
 
     public setHubFlushEnabled(enabled: boolean): void {
         this.hubFlushEnabled = enabled;
+        this.getHubSaveQueue().setPaused(!enabled);
+    }
+
+    public getHubSaveError(): string | null {
+        return this.hubSaveError;
     }
 
     public isNetworkRaidActive(): boolean {
@@ -331,18 +342,16 @@ export class GameManager {
     public persistHubSaveToServer(options: { force?: boolean } = {}): void {
         if (!this.hubFlushEnabled || !this.networkAuthContext || !this.authClient) return;
         if (this.isNetworkRaidActive()) return;
+        this.getHubSaveQueue().markDirty();
         if (options.force) {
-            if (this.hubSaveDebounceTimer !== null) {
-                clearTimeout(this.hubSaveDebounceTimer);
-                this.hubSaveDebounceTimer = null;
-            }
-            void this.flushHubSaveToServer();
+            this.clearHubSaveDebounce();
+            void this.drainHubSaveQueue();
             return;
         }
         if (this.hubSaveDebounceTimer !== null) clearTimeout(this.hubSaveDebounceTimer);
         this.hubSaveDebounceTimer = setTimeout(() => {
             this.hubSaveDebounceTimer = null;
-            void this.flushHubSaveToServer();
+            void this.drainHubSaveQueue();
         }, HUB_SAVE_DEBOUNCE_MS);
     }
 
@@ -353,20 +362,23 @@ export class GameManager {
         if (this.isNetworkRaidActive()) {
             return { ok: false, code: 'hub_flush_blocked_during_raid', message: 'Hub save is blocked during an active raid.' };
         }
-        if (this.hubSaveInflight) return this.hubSaveInflight;
-        this.hubSaveInflight = this.pushHubSaveToServer(true).finally(() => {
-            this.hubSaveInflight = null;
-        });
-        return this.hubSaveInflight;
+        this.clearHubSaveDebounce();
+        // The deploy barrier also captures model paths that have not explicitly
+        // scheduled a background save yet.
+        this.getHubSaveQueue().markDirty();
+        return this.drainHubSaveQueue();
     }
 
     public async syncHubSaveFromServer(): Promise<HubFlushResult> {
         const client = this.authClient;
         const ctx = this.networkAuthContext;
         if (!client || !ctx) return { ok: true };
+        const queueEpoch = this.getHubSaveQueue().getEpoch();
         try {
             const save = await client.getCharacterSave(ctx.characterId);
+            if (!this.isCurrentHubSaveSession(client, ctx.characterId, queueEpoch)) return { ok: true };
             this.applyServerSave(save, ctx.characterId);
+            this.resetHubSaveQueue();
             return { ok: true };
         } catch (error) {
             if (error instanceof AuthApiError) {
@@ -376,7 +388,11 @@ export class GameManager {
         }
     }
 
-    private async pushHubSaveToServer(retryOnConflict: boolean): Promise<HubFlushResult> {
+    private async pushHubSaveToServer(
+        retryOnConflict: boolean,
+        queueEpoch: number,
+        keepalive: boolean,
+    ): Promise<HubFlushResult> {
         const client = this.authClient;
         const ctx = this.networkAuthContext;
         if (!client || !ctx) return { ok: true };
@@ -389,32 +405,115 @@ export class GameManager {
             primaryCharacterId: ctx.characterId,
         });
         try {
-            const save = await client.updateCharacterSave(ctx.characterId, patch, this.networkSaveRevision);
+            const save = await client.updateCharacterSave(
+                ctx.characterId,
+                patch,
+                this.networkSaveRevision,
+                { keepalive },
+            );
+            if (!this.isCurrentHubSaveSession(client, ctx.characterId, queueEpoch)) return { ok: true };
             this.networkSaveRevision = save.revision;
             return { ok: true };
         } catch (error) {
             if (retryOnConflict && error instanceof AuthApiError && error.code === 'revision_conflict') {
                 try {
+                    if (!this.isCurrentHubSaveSession(client, ctx.characterId, queueEpoch)) return { ok: true };
                     const current = await client.getCharacterSave(ctx.characterId);
+                    if (!this.isCurrentHubSaveSession(client, ctx.characterId, queueEpoch)) return { ok: true };
                     // The local patch is still the source of truth for this retry.
                     // Only advance the optimistic-lock revision; applying `current`
                     // here would roll the live client back to the stale server state.
                     this.networkSaveRevision = current.revision;
-                    const save = await client.updateCharacterSave(ctx.characterId, patch, this.networkSaveRevision);
+                    const save = await client.updateCharacterSave(
+                        ctx.characterId,
+                        patch,
+                        this.networkSaveRevision,
+                        { keepalive },
+                    );
+                    if (!this.isCurrentHubSaveSession(client, ctx.characterId, queueEpoch)) return { ok: true };
                     this.networkSaveRevision = save.revision;
                     return { ok: true };
                 } catch (retryError) {
-                    if (retryError instanceof AuthApiError) {
-                        return { ok: false, code: retryError.code, message: retryError.message };
-                    }
-                    return { ok: false, code: 'hub_flush_failed', message: 'Hub save retry failed.' };
+                    return this.toHubFlushFailure(retryError, 'Hub save retry failed.');
                 }
             }
-            if (error instanceof AuthApiError) {
-                return { ok: false, code: error.code, message: error.message };
-            }
-            return { ok: false, code: 'hub_flush_failed', message: 'Hub save failed.' };
+            return this.toHubFlushFailure(error, 'Hub save failed.');
         }
+    }
+
+    private getHubSaveQueue(): HubSaveQueue {
+        if (!this.hubSaveQueue) {
+            this.hubSaveQueue = new HubSaveQueue({
+                send: (attempt) => this.pushHubSaveToServer(
+                    true,
+                    attempt.epoch,
+                    attempt.keepalive,
+                ),
+                onResult: (result) => {
+                    this.hubSaveError = result?.ok === false ? t('mp.hubSaveBackgroundFailed') : null;
+                    this.uiStore?.tick();
+                },
+            });
+            this.hubSaveQueue.setPaused(!this.hubFlushEnabled);
+        }
+        return this.hubSaveQueue;
+    }
+
+    private async drainHubSaveQueue(options: { keepalive?: boolean } = {}): Promise<HubFlushResult> {
+        return this.getHubSaveQueue().flush(options);
+    }
+
+    private resetHubSaveQueue(): void {
+        this.clearHubSaveDebounce();
+        this.hubSaveQueue?.reset();
+        this.hubSaveError = null;
+        this.hubPageExitFlushArmed = false;
+        this.uiStore?.tick();
+    }
+
+    private clearHubSaveDebounce(): void {
+        if (this.hubSaveDebounceTimer === null) return;
+        clearTimeout(this.hubSaveDebounceTimer);
+        this.hubSaveDebounceTimer = null;
+    }
+
+    private flushHubSaveForPageExit(): void {
+        if (this.hubPageExitFlushArmed) return;
+        if (!this.hubFlushEnabled || !this.networkAuthContext || !this.authClient) return;
+        if (this.isNetworkRaidActive()) return;
+        this.hubPageExitFlushArmed = true;
+        this.clearHubSaveDebounce();
+        // Queue one final current snapshot. The armed flag deduplicates the
+        // visibilitychange/pagehide/beforeunload burst emitted by browsers.
+        this.getHubSaveQueue().markDirty();
+        void this.drainHubSaveQueue({ keepalive: true });
+    }
+
+    private isCurrentHubSaveSession(
+        client: AuthClient,
+        characterId: string,
+        queueEpoch?: number,
+    ): boolean {
+        return this.authClient === client
+            && this.networkAuthContext?.characterId === characterId
+            && (queueEpoch === undefined || this.getHubSaveQueue().getEpoch() === queueEpoch);
+    }
+
+    private toHubFlushFailure(error: unknown, fallbackMessage: string): HubFlushResult {
+        if (error instanceof AuthApiError) {
+            return {
+                ok: false,
+                code: error.code,
+                message: error.message,
+                retryable: error.status === 408 || error.status === 429 || error.status >= 500,
+            };
+        }
+        return {
+            ok: false,
+            code: 'hub_flush_failed',
+            message: fallbackMessage,
+            retryable: true,
+        };
     }
 
     private toggleMagicLoadout(): void {
@@ -481,10 +580,12 @@ export class GameManager {
         gender: string = 'M',
         options: { startIntroTutorial?: boolean } = {}
     ): void {
+        this.resetHubSaveQueue();
         this.networkAuthContext = null;
         this.authClient = null;
         this.networkSaveRevision = 0;
         this.hubFlushEnabled = true;
+        this.hubSaveQueue?.setPaused(false);
         this.playerData = new PlayerData();
         this.playerData.setAuthenticatedSession(false);
         this.playerData.setHubPersistCallback(null);
@@ -513,6 +614,9 @@ export class GameManager {
     }
 
     public enterAuthenticatedCharacter(session: AuthenticatedCharacterSession): void {
+        this.resetHubSaveQueue();
+        this.hubFlushEnabled = true;
+        this.hubSaveQueue?.setPaused(false);
         this.networkAuthContext = {
             accessToken: session.accessToken,
             characterId: session.character.id,
