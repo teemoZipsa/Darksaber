@@ -43,7 +43,6 @@ export class WorldSessionContentSpawner {
             this.context.fieldNests.spawnEnemiesNear(
                 spawnTile,
                 now,
-                false,
                 new Set(),
                 WORLD_SESSION_FIELD_NEST_DEPARTURE_RADIUS_CHUNKS,
                 WORLD_SESSION_FIELD_NEST_DEPARTURE_MAX_ENEMIES,

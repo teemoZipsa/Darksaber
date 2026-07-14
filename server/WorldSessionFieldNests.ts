@@ -12,7 +12,6 @@ import type { TilePoint } from '../src/field/FieldPathing';
 import {
     firstLivingActorTile,
     hasActiveActorWithin,
-    hasNearbyLiveEnemy,
 } from './WorldSessionSpatialQueries';
 import {
     chunkOffsetsByDistance,
@@ -25,13 +24,17 @@ import type {
 } from './WorldSessionTypes';
 
 const FIELD_NEST_RESPAWN_MS = 5 * 60_000;
-const FIELD_NEST_RESPAWN_SAFE_DISTANCE = 18;
 const FIELD_NEST_ROAM_RADIUS_CHUNKS = 2;
 const FIELD_NEST_DEPARTURE_RADIUS_CHUNKS = 4;
 const FIELD_NEST_DEPARTURE_MAX_ENEMIES = 18;
 const FIELD_NEST_REFRESH_MAX_ENEMIES = 28;
 export const FIELD_NEST_NEARBY_ENEMY_DISTANCE = 24;
-const FIELD_NEST_SPAWN_SAFE_DISTANCE = 10;
+/** Keep newly materialized enemies beyond a zoomed-out combat viewport. */
+export const FIELD_NEST_ACTOR_SAFE_DISTANCE = 64;
+// Nest offsets reach four tiles and walkable correction may move another eight
+// tiles on both axes. Check the centre conservatively so every member remains
+// outside the player-safe distance even on obstructed terrain.
+export const FIELD_NEST_CENTER_SAFE_DISTANCE = FIELD_NEST_ACTOR_SAFE_DISTANCE + 20;
 
 export interface WorldSessionFieldNestContext {
     worldMap: WorldMap;
@@ -54,15 +57,13 @@ export class WorldSessionFieldNests {
             if (player.activeDungeonId) continue;
             const anchor = firstLivingActorTile(player, this.context.actors);
             if (!anchor) continue;
-            const forceCenter = !hasNearbyLiveEnemy(this.context.enemies.values(), anchor, FIELD_NEST_NEARBY_ENEMY_DISTANCE);
-            this.spawnEnemiesNear(anchor, now, forceCenter, visited, FIELD_NEST_ROAM_RADIUS_CHUNKS, FIELD_NEST_REFRESH_MAX_ENEMIES);
+            this.spawnEnemiesNear(anchor, now, visited, FIELD_NEST_ROAM_RADIUS_CHUNKS, FIELD_NEST_REFRESH_MAX_ENEMIES);
         }
     }
 
     public spawnEnemiesNear(
         anchor: TilePoint,
         now: number,
-        forceCenter: boolean,
         visited: Set<string> = new Set(),
         radiusChunks = FIELD_NEST_ROAM_RADIUS_CHUNKS,
         maxSpawnedEnemies = Number.POSITIVE_INFINITY,
@@ -81,11 +82,9 @@ export class WorldSessionFieldNests {
             if (visited.has(stateKey)) continue;
             visited.add(stateKey);
             const biome = this.context.worldMap.getBiomeAtChunk(chunkX, chunkY);
-            const force = forceCenter && offset.dx === 0 && offset.dy === 0;
-            spawned += this.spawnNest(chunkX, chunkY, biome, realm, seed, force, now);
+            spawned += this.spawnNest(chunkX, chunkY, biome, realm, seed, now);
         }
 
-        if (forceCenter && spawned === 0) spawned += this.spawnNest(centerChunkX, centerChunkY, 'grass', realm, seed, true, now);
         return spawned;
     }
 
@@ -104,19 +103,18 @@ export class WorldSessionFieldNests {
         biome: ReturnType<WorldMap['getBiomeAtChunk']>,
         realm: ReturnType<WorldMap['getRealm']>,
         seed: string,
-        force: boolean,
         now: number,
     ): number {
-        const nest = pickNestForChunk({ realm, chunkX, chunkY, biome, seed }, force);
+        const nest = pickNestForChunk({ realm, chunkX, chunkY, biome, seed });
         if (!nest) return 0;
-        if (hasActiveActorWithin(this.context.players.values(), this.context.actors, nest.centerTile, FIELD_NEST_SPAWN_SAFE_DISTANCE)) return 0;
+        if (hasActiveActorWithin(this.context.players.values(), this.context.actors, nest.centerTile, FIELD_NEST_CENTER_SAFE_DISTANCE)) return 0;
         const stateKey = nestStateKey(realm, chunkX, chunkY);
         const state = this.getOrCreateNestState(stateKey, nest);
         this.retainLiveNestEnemies(state);
         if (state.monsterIds.length > 0) return 0;
         if (state.cleared) {
             if (now < state.respawnAt) return 0;
-            if (hasActiveActorWithin(this.context.players.values(), this.context.actors, state.centerTile, FIELD_NEST_RESPAWN_SAFE_DISTANCE)) return 0;
+            if (hasActiveActorWithin(this.context.players.values(), this.context.actors, state.centerTile, FIELD_NEST_CENTER_SAFE_DISTANCE)) return 0;
         }
 
         const offsets = nestMemberOffsets(nest.monsters.length);

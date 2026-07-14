@@ -8,6 +8,10 @@ import type { ActorSnapshot, AutoLootGrantMessage, WorldJoinMessage } from '../.
 import { WorldMap } from '../../src/map/WorldMap';
 import { CHUNK_SIZE } from '../../src/map/Chunk';
 import { WorldResumeFailedError, WorldSession } from '../../server/WorldSession';
+import {
+    FIELD_NEST_ACTOR_SAFE_DISTANCE,
+    FIELD_NEST_CENTER_SAFE_DISTANCE,
+} from '../../server/WorldSessionFieldNests';
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
 import { getItemDef } from '../../src/data/ItemDB';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
@@ -22,7 +26,7 @@ import {
 } from '../../src/data/OriginalLateStoryFacts';
 import { getOriginalLateStoryItemsForSourceEvent } from '../../src/data/OriginalLateStoryItems';
 import { MASTER_KEY_ITEM_ID } from '../../src/raid/MarkedCache';
-import { ENEMY_AGGRO_RANGE, ENEMY_SIMULATION_ACTIVE_RANGE } from '../../src/field/FieldConfig';
+import { ENEMY_SIMULATION_ACTIVE_RANGE } from '../../src/field/FieldConfig';
 import type { InventorySaveSnapshot } from '../../src/shared/CharacterSave';
 import {
     clearEnemiesForTest,
@@ -3006,9 +3010,13 @@ test('server generates nest content around roaming players', () => {
         .filter((enemy) => !beforeIds.has(enemy.id));
     assert.ok(spawned.length > 0, 'roaming into a distant chunk should create online nest enemies');
     assert.ok(spawned.some((enemy) =>
-        Math.abs(Math.floor(enemy.tile.x / 32) - 67) <= 1
-        && Math.abs(Math.floor(enemy.tile.y / 32) - 34) <= 1
+        Math.abs(Math.floor(enemy.tile.x / 32) - 67) <= 2
+        && Math.abs(Math.floor(enemy.tile.y / 32) - 34) <= 2
     ));
+    assert.ok(spawned.every((enemy) =>
+        Math.abs(enemy.tile.x - serverActor.tile.x) + Math.abs(enemy.tile.y - serverActor.tile.y)
+            >= FIELD_NEST_ACTOR_SAFE_DISTANCE
+    ), 'new nests should materialize beyond the player viewport');
 
     const firstSpawned = spawned.find((enemy) => enemy.monsterId);
     assert.ok(firstSpawned);
@@ -3024,6 +3032,25 @@ test('server generates nest content around roaming players', () => {
     );
     assert.equal(firstSpawned.stats.maxHp, expected.stats.maxHp);
     assert.equal(firstSpawned.stats.atk, expected.stats.atk);
+});
+
+test('server never forces field nests into protected town or ocean chunks', () => {
+    const session = new WorldSession();
+    session.join(joinMessage('central_castle', 'hero-a'), 0);
+    session.tick(1_000);
+
+    const worldMap = new WorldMap();
+    const activeNests = [...getWorldSessionDebugState(session).nestStates.values()]
+        .filter((state) => state.monsterIds.length > 0);
+    assert.ok(activeNests.length > 0, 'departure seeding should still create distant field nests');
+    for (const state of activeNests) {
+        const biome = worldMap.getBiomeAtChunk(
+            Math.floor(state.centerTile.x / CHUNK_SIZE),
+            Math.floor(state.centerTile.y / CHUNK_SIZE),
+        );
+        assert.notEqual(biome, 'town');
+        assert.notEqual(biome, 'ocean');
+    }
 });
 
 test('cleared field nests respawn after five minutes away from active actors', () => {
@@ -3067,22 +3094,24 @@ test('cleared field nests respawn after five minutes away from active actors', (
 
     serverActor.tile = { ...state.centerTile };
     session.tick(respawnAt + 1);
-    assert.equal(state.monsterIds.length, 0, 'nest should not respawn inside the 18-tile safety radius');
+    assert.equal(state.monsterIds.length, 0, 'nest should not respawn inside the viewport safety radius');
 
     const worldMap = new WorldMap();
     let outsideSafeTile: { x: number; y: number } | null = null;
-    const chunkMinX = stateChunkX * CHUNK_SIZE;
-    const chunkMinY = stateChunkY * CHUNK_SIZE;
+    const safeChunkOffsetX = state.centerTile.x - stateChunkX * CHUNK_SIZE < CHUNK_SIZE / 2 ? 1 : -1;
+    const safeChunkOffsetY = state.centerTile.y - stateChunkY * CHUNK_SIZE < CHUNK_SIZE / 2 ? 1 : -1;
+    const chunkMinX = (stateChunkX + safeChunkOffsetX) * CHUNK_SIZE;
+    const chunkMinY = (stateChunkY + safeChunkOffsetY) * CHUNK_SIZE;
     for (let y = chunkMinY; y < chunkMinY + CHUNK_SIZE && !outsideSafeTile; y++) {
         for (let x = chunkMinX; x < chunkMinX + CHUNK_SIZE; x++) {
             const distance = Math.abs(x - state.centerTile.x) + Math.abs(y - state.centerTile.y);
-            if (distance <= ENEMY_AGGRO_RANGE) continue;
+            if (distance <= FIELD_NEST_CENTER_SAFE_DISTANCE) continue;
             if (!worldMap.isWalkable(x, y)) continue;
             outsideSafeTile = { x, y };
             break;
         }
     }
-    assert.ok(outsideSafeTile, 'test fixture should find a same-chunk tile outside the nest spawn safety radius');
+    assert.ok(outsideSafeTile, 'test fixture should find an adjacent-chunk tile outside the nest spawn safety radius');
     serverActor.tile = outsideSafeTile;
     session.tick(respawnAt + 1_001);
     assert.ok(state.monsterIds.length > 0, 'nest should respawn once the timer passed and actors are outside the spawn safety radius');
