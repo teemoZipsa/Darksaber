@@ -2,7 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { t } from '../../../i18n/LanguageManager';
 import { CHAR_CLASSES, type StartingClassId } from '../../../data/characterClasses';
-import { AuthApiError, AuthClient, type AccountMeResponse, type AuthCharacter, type AuthSessionResponse } from '../../../net/AuthClient';
+import {
+    AuthApiError,
+    AuthClient,
+    type AccountMeResponse,
+    type AuthCharacter,
+    type AuthSessionResponse,
+    type CharacterCreateResponse,
+} from '../../../net/AuthClient';
 import { NetworkRaidClient } from '../../../net/NetworkRaidClient';
 import type { GameManager } from '../../../engine/GameManager';
 import { AsyncActionLock } from './AsyncActionLock';
@@ -82,8 +89,15 @@ export function AuthGate({ client, gameManager }: AuthGateProps) {
 
     const createCharacter = async (name: string, classKey: StartingClassId, gender: 'M' | 'F') => {
         try {
-            const created = await client.createCharacter(name, classKey, gender);
-            await selectCharacter(created.character.id);
+            await createCharacterThenSelect({
+                create: () => client.createCharacter(name, classKey, gender),
+                onCreated: (character) => {
+                    setAccount((current) => accountWithCreatedCharacter(current, character));
+                    setError('');
+                    setScreen('select');
+                },
+                select: selectCharacter,
+            });
         } catch (nextError) {
             showError(nextError);
         }
@@ -383,6 +397,32 @@ function errorText(code: string): string {
     const key = `auth.error.${code}`;
     const translated = t(key);
     return translated === key ? t('auth.error.generic') : translated;
+}
+
+export function accountWithCreatedCharacter(
+    account: AuthSessionResponse | AccountMeResponse | null,
+    character: AuthCharacter,
+): AuthSessionResponse | AccountMeResponse | null {
+    if (!account) return null;
+    return {
+        ...account,
+        characters: [
+            ...account.characters.filter((entry) => entry.id !== character.id),
+            character,
+        ].sort((left, right) => left.slotNo - right.slotNo),
+    };
+}
+
+export async function createCharacterThenSelect({ create, onCreated, select }: {
+    create: () => Promise<CharacterCreateResponse>;
+    onCreated: (character: AuthCharacter) => void;
+    select: (characterId: string) => Promise<void>;
+}): Promise<void> {
+    const created = await create();
+    // Creation is already committed server-side. Reveal that character before
+    // auto-selection so a failed selection retries selection, not creation.
+    onCreated(created.character);
+    await select(created.character.id);
 }
 
 export function shouldReturnToAuthAfterRefreshFailure(screen: Screen, error: unknown): boolean {
