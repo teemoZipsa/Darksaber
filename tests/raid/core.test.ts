@@ -945,6 +945,49 @@ test('WorldMap lays deterministic rivers while road crossings remain walkable', 
     assert.ok(world.isWalkable(bridge.x, bridge.y), 'road crossing should stay walkable');
 });
 
+test('WorldMap distributes irregular lakes and tributaries across the full continent', () => {
+    const world = new WorldMap();
+    const tributaryAnchors = [
+        { label: 'north-west desert tributary', chunkX: 21, chunkY: 19 },
+        { label: 'western forest tributary', chunkX: 21, chunkY: 44 },
+        { label: 'south-west forest tributary', chunkX: 15, chunkY: 77 },
+        { label: 'central watershed', chunkX: 52, chunkY: 28 },
+        { label: 'north-east tributary', chunkX: 69, chunkY: 23 },
+        { label: 'mid-east tributary', chunkX: 69, chunkY: 53 },
+        { label: 'south-east tributary', chunkX: 65, chunkY: 77 },
+    ];
+    const lakeAnchors = [
+        { label: 'north-west lake', chunkX: 12, chunkY: 27 },
+        { label: 'northern lake', chunkX: 28, chunkY: 11 },
+        { label: 'western lake', chunkX: 15, chunkY: 61 },
+        { label: 'western lower lake', chunkX: 8, chunkY: 68 },
+        { label: 'south-west lake', chunkX: 14, chunkY: 88 },
+        { label: 'central lower lake', chunkX: 27, chunkY: 62 },
+        { label: 'central upper lake', chunkX: 53, chunkY: 37 },
+        { label: 'central eastern lake', chunkX: 56, chunkY: 55 },
+        { label: 'eastern lake', chunkX: 73, chunkY: 42 },
+        { label: 'south-eastern lake', chunkX: 62, chunkY: 84 },
+    ];
+
+    for (const anchor of [...tributaryAnchors, ...lakeAnchors]) {
+        const tile = chunkCenter(anchor.chunkX, anchor.chunkY);
+        assert.ok(isWaterTile(world.getTileAt(tile.x, tile.y)), `${anchor.label} should contain water`);
+    }
+
+    for (const town of world.getTowns()) {
+        const spawn = world.getTownSpawnTile(town);
+        assert.ok(world.isWalkable(spawn.x, spawn.y), `${town.id} spawn should remain walkable`);
+    }
+    for (const temple of world.getTemples()) {
+        const entrance = world.getTempleCenterTile(temple);
+        assert.equal(world.getTileAt(entrance.x, entrance.y), TileType.DUNGEON_ENTRANCE, `${temple.id} should stay protected`);
+    }
+    for (const dungeon of world.getDungeons()) {
+        const entrance = world.getDungeonEntranceTile(dungeon);
+        assert.equal(world.getTileAt(entrance.x, entrance.y), TileType.DUNGEON_ENTRANCE, `${dungeon.id} should stay protected`);
+    }
+});
+
 test('WorldMap connects harbor and island scenarios to coastal water', () => {
     const world = new WorldMap();
     const zamoraWaterAnchors = [

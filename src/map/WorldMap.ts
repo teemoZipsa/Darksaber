@@ -136,7 +136,34 @@ interface TileRoute {
     noiseSalt: number;
 }
 
-interface ScenarioWaterBasin {
+interface TileRouteBounds {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+}
+
+const ROUTE_TILE_BOUNDS = new WeakMap<TileRoute, TileRouteBounds>();
+
+function getTileRouteBounds(route: TileRoute): TileRouteBounds {
+    const cached = ROUTE_TILE_BOUNDS.get(route);
+    if (cached) return cached;
+    const padding = route.width + 0.7;
+    const centers = route.points.map((point) => ({
+        x: point.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+        y: point.chunkY * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2),
+    }));
+    const bounds = {
+        minX: Math.min(...centers.map((point) => point.x)) - padding,
+        minY: Math.min(...centers.map((point) => point.y)) - padding,
+        maxX: Math.max(...centers.map((point) => point.x)) + padding,
+        maxY: Math.max(...centers.map((point) => point.y)) + padding,
+    };
+    ROUTE_TILE_BOUNDS.set(route, bounds);
+    return bounds;
+}
+
+interface WaterBasin {
     center: RoutePoint;
     radiusX: number;
     radiusY: number;
@@ -277,6 +304,95 @@ const RIVER_ROUTES: TileRoute[] = [
         width: 2.1,
         noiseSalt: 202,
     },
+    // North-west headwater: descends from the desert rim into the western river.
+    {
+        points: [
+            { chunkX: 8, chunkY: 8 },
+            { chunkX: 13, chunkY: 14 },
+            { chunkX: 21, chunkY: 19 },
+            { chunkX: 27, chunkY: 22 },
+            { chunkX: 32, chunkY: 25 },
+        ],
+        width: 2.0,
+        noiseSalt: 203,
+    },
+    // Western forest tributary: gives the broad western woodland a visible watershed.
+    {
+        points: [
+            { chunkX: 4, chunkY: 39 },
+            { chunkX: 12, chunkY: 42 },
+            { chunkX: 21, chunkY: 44 },
+            { chunkX: 28, chunkY: 46 },
+            { chunkX: 34, chunkY: 48 },
+        ],
+        width: 2.1,
+        noiseSalt: 204,
+    },
+    // South-west runoff: links the southern forest lakes to the main river mouth.
+    {
+        points: [
+            { chunkX: 7, chunkY: 93 },
+            { chunkX: 11, chunkY: 84 },
+            { chunkX: 15, chunkY: 77 },
+            { chunkX: 21, chunkY: 72 },
+        ],
+        width: 2.2,
+        noiseSalt: 205,
+    },
+    // Central watershed: runs from the uplands through the Dalai basin toward the coast.
+    {
+        points: [
+            { chunkX: 52, chunkY: 28 },
+            { chunkX: 49, chunkY: 36 },
+            { chunkX: 46, chunkY: 45 },
+            { chunkX: 48, chunkY: 54 },
+            { chunkX: 51, chunkY: 64 },
+        ],
+        width: 2.1,
+        noiseSalt: 206,
+    },
+    // Northern and mid-eastern tributaries join the long eastern river.
+    {
+        points: [
+            { chunkX: 77, chunkY: 7 },
+            { chunkX: 73, chunkY: 15 },
+            { chunkX: 69, chunkY: 23 },
+            { chunkX: 66, chunkY: 31 },
+        ],
+        width: 1.9,
+        noiseSalt: 207,
+    },
+    {
+        points: [
+            { chunkX: 78, chunkY: 43 },
+            { chunkX: 73, chunkY: 48 },
+            { chunkX: 69, chunkY: 53 },
+            { chunkX: 65, chunkY: 58 },
+        ],
+        width: 2.0,
+        noiseSalt: 208,
+    },
+    // South-eastern outlet and a short western lake tributary complete the network.
+    {
+        points: [
+            { chunkX: 72, chunkY: 90 },
+            { chunkX: 69, chunkY: 82 },
+            { chunkX: 65, chunkY: 77 },
+            { chunkX: 61, chunkY: 75 },
+        ],
+        width: 2.2,
+        noiseSalt: 209,
+    },
+    {
+        points: [
+            { chunkX: 15, chunkY: 61 },
+            { chunkX: 18, chunkY: 65 },
+            { chunkX: 21, chunkY: 68 },
+            { chunkX: 21, chunkY: 72 },
+        ],
+        width: 1.8,
+        noiseSalt: 210,
+    },
 ];
 
 const SCENARIO_WATER_ROUTES: TileRoute[] = [
@@ -312,7 +428,7 @@ const SCENARIO_WATER_ROUTES: TileRoute[] = [
     },
 ];
 
-const SCENARIO_WATER_BASINS: ScenarioWaterBasin[] = [
+const SCENARIO_WATER_BASINS: WaterBasin[] = [
     {
         center: { chunkX: 41, chunkY: 72 },
         radiusX: CHUNK_SIZE * 6.3,
@@ -321,6 +437,20 @@ const SCENARIO_WATER_BASINS: ScenarioWaterBasin[] = [
         outerRadius: 1.02,
         noiseSalt: 321,
     },
+];
+
+/** Filled, irregular inland lakes distributed across the otherwise broad land masses. */
+const INLAND_WATER_BASINS: WaterBasin[] = [
+    { center: { chunkX: 12, chunkY: 27 }, radiusX: CHUNK_SIZE * 1.8, radiusY: CHUNK_SIZE * 1.2, innerRadius: 0, outerRadius: 1, noiseSalt: 331 },
+    { center: { chunkX: 28, chunkY: 11 }, radiusX: CHUNK_SIZE * 2.1, radiusY: CHUNK_SIZE * 1.35, innerRadius: 0, outerRadius: 1, noiseSalt: 332 },
+    { center: { chunkX: 15, chunkY: 61 }, radiusX: CHUNK_SIZE * 2.6, radiusY: CHUNK_SIZE * 1.55, innerRadius: 0, outerRadius: 1, noiseSalt: 333 },
+    { center: { chunkX: 8, chunkY: 68 }, radiusX: CHUNK_SIZE * 1.65, radiusY: CHUNK_SIZE * 1.15, innerRadius: 0, outerRadius: 1, noiseSalt: 334 },
+    { center: { chunkX: 14, chunkY: 88 }, radiusX: CHUNK_SIZE * 2.2, radiusY: CHUNK_SIZE * 1.4, innerRadius: 0, outerRadius: 1, noiseSalt: 335 },
+    { center: { chunkX: 27, chunkY: 62 }, radiusX: CHUNK_SIZE * 2.15, radiusY: CHUNK_SIZE * 1.3, innerRadius: 0, outerRadius: 1, noiseSalt: 336 },
+    { center: { chunkX: 53, chunkY: 37 }, radiusX: CHUNK_SIZE * 2, radiusY: CHUNK_SIZE * 1.35, innerRadius: 0, outerRadius: 1, noiseSalt: 337 },
+    { center: { chunkX: 56, chunkY: 55 }, radiusX: CHUNK_SIZE * 1.8, radiusY: CHUNK_SIZE * 1.2, innerRadius: 0, outerRadius: 1, noiseSalt: 338 },
+    { center: { chunkX: 73, chunkY: 42 }, radiusX: CHUNK_SIZE * 2.25, radiusY: CHUNK_SIZE * 1.4, innerRadius: 0, outerRadius: 1, noiseSalt: 339 },
+    { center: { chunkX: 62, chunkY: 84 }, radiusX: CHUNK_SIZE * 2.6, radiusY: CHUNK_SIZE * 1.55, innerRadius: 0, outerRadius: 1, noiseSalt: 340 },
 ];
 
 const DUNGEON_LANDMARKS: WorldDungeonInfo[] = [
@@ -591,6 +721,8 @@ export class WorldMap {
     }
 
     private isRouteTile(tx: number, ty: number, route: TileRoute, hardCenterWidth: number): boolean {
+        const bounds = getTileRouteBounds(route);
+        if (tx < bounds.minX || tx > bounds.maxX || ty < bounds.minY || ty > bounds.maxY) return false;
         const dist = this.distanceToRoute(tx, ty, route);
         if (dist <= hardCenterWidth) return true;
 
@@ -610,20 +742,28 @@ export class WorldMap {
         return SCENARIO_WATER_ROUTES.some((route) => this.isRouteTile(tx, ty, route, route.width * 0.55));
     }
 
-    private isScenarioWaterBasinTile(tx: number, ty: number): boolean {
-        return SCENARIO_WATER_BASINS.some((basin) => {
+    private isWaterBasinTile(tx: number, ty: number, basins: readonly WaterBasin[]): boolean {
+        return basins.some((basin) => {
             const center = this.routePointToTile(basin.center);
             const dx = (tx - center.x) / basin.radiusX;
             const dy = (ty - center.y) / basin.radiusY;
             const dist = Math.hypot(dx, dy);
+            if (dist > basin.outerRadius + 0.07) return false;
+            if (basin.innerRadius > 0 && dist < basin.innerRadius - 0.07) return false;
             const raggedEdge = (this.fbm(tx, ty, 0.032, basin.noiseSalt) - 0.5) * 0.12;
             const coast = dist + raggedEdge;
-            return coast >= basin.innerRadius && coast <= basin.outerRadius;
+            return coast <= basin.outerRadius && (basin.innerRadius <= 0 || coast >= basin.innerRadius);
         });
     }
 
     private isScenarioWaterTile(tx: number, ty: number): boolean {
-        return this.isScenarioWaterRouteTile(tx, ty) || this.isScenarioWaterBasinTile(tx, ty);
+        return this.isScenarioWaterRouteTile(tx, ty)
+            || this.isWaterBasinTile(tx, ty, SCENARIO_WATER_BASINS);
+    }
+
+    private isInlandWaterTile(tx: number, ty: number): boolean {
+        return this.isRiverTile(tx, ty)
+            || this.isWaterBasinTile(tx, ty, INLAND_WATER_BASINS);
     }
 
     private computeTownTile(tx: number, ty: number, town: TownInfo): TileType {
@@ -746,12 +886,12 @@ export class WorldMap {
             const dy = localY - CHUNK_SIZE / 2;
             if (Math.sqrt(dx * dx + dy * dy) <= 4) return TileType.DUNGEON_ENTRANCE;
             if (this.isRoadTile(tx, ty)) return TileType.ROAD;
-            if (this.isRiverTile(tx, ty)) return TileType.WATER;
+            if (this.isInlandWaterTile(tx, ty)) return TileType.WATER;
             return this.hash(tx, ty, 9) > 0.82 ? TileType.STONE : TileType.POISON_SWAMP;
         }
 
         if (this.isRoadTile(tx, ty)) return TileType.ROAD;
-        if (this.isRiverTile(tx, ty)) return TileType.WATER;
+        if (this.isInlandWaterTile(tx, ty)) return TileType.WATER;
 
         const base = BIOME_TILE[biome];
         return this.varyBiomeTile(base, tx, ty);
@@ -779,13 +919,13 @@ export class WorldMap {
         }
         if (!best) return null;
         const sample = best as HmapSample;
-        // Roads/rivers stay on top of the feathered edge so the travel network
+        // Roads and inland waterways stay on top of the feathered edge so the travel network
         // and its bridges remain connected; only the scenario interior wins, so
         // connecting roads tuck under a dungeon core instead of carving through it.
         if (this.isScenarioWaterTile(tx, ty) && sample.tile !== TileType.DUNGEON_ENTRANCE && sample.tile !== TileType.ROAD) {
             return null;
         }
-        if (sample.weight < HMAP_BLEND_BAND && (this.isRoadTile(tx, ty) || this.isRiverTile(tx, ty) || this.isScenarioWaterTile(tx, ty))) {
+        if (sample.weight < HMAP_BLEND_BAND && (this.isRoadTile(tx, ty) || this.isInlandWaterTile(tx, ty) || this.isScenarioWaterTile(tx, ty))) {
             return null;
         }
         return sample.tile;
@@ -1033,7 +1173,7 @@ export class WorldMap {
             for (let localX = 4; localX < CHUNK_SIZE - 4; localX++) {
                 const tx = baseX + localX;
                 const ty = baseY + localY;
-                if (!this.isRoadTile(tx, ty) || !this.isRiverTile(tx, ty)) continue;
+                if (!this.isRoadTile(tx, ty) || !this.isInlandWaterTile(tx, ty)) continue;
 
                 const sprite = this.pickBridgeSprite(tx, ty);
                 if (!sprite) continue;
@@ -1067,13 +1207,13 @@ export class WorldMap {
             { x: tx - 2, y: ty },
             { x: tx + 2, y: ty },
             { x: tx + 3, y: ty },
-        ], (tile) => this.isRiverTile(tile.x, tile.y));
+        ], (tile) => this.isInlandWaterTile(tile.x, tile.y));
         const riverVertical = this.countRouteHits([
             { x: tx, y: ty - 3 },
             { x: tx, y: ty - 2 },
             { x: tx, y: ty + 2 },
             { x: tx, y: ty + 3 },
-        ], (tile) => this.isRiverTile(tile.x, tile.y));
+        ], (tile) => this.isInlandWaterTile(tile.x, tile.y));
 
         if (roadHorizontal >= roadVertical && riverVertical >= riverHorizontal) return 'woodBridgeHorizontal';
         if (roadVertical > roadHorizontal && riverHorizontal >= riverVertical) return 'woodBridgeVertical';
@@ -1118,7 +1258,7 @@ export class WorldMap {
             return false;
         }
 
-        if (!this.isRoadTile(decoration.anchorTile.x, decoration.anchorTile.y) || !this.isRiverTile(decoration.anchorTile.x, decoration.anchorTile.y)) {
+        if (!this.isRoadTile(decoration.anchorTile.x, decoration.anchorTile.y) || !this.isInlandWaterTile(decoration.anchorTile.x, decoration.anchorTile.y)) {
             return false;
         }
         const anchorTile = this.getTileAt(decoration.anchorTile.x, decoration.anchorTile.y);
@@ -1133,7 +1273,7 @@ export class WorldMap {
         return decoration.passableTiles.every((tile) => {
             const visibleTile = this.getTileAt(tile.x, tile.y);
             return (visibleTile === TileType.ROAD || visibleTile === TileType.WATER) &&
-                (this.isRoadTile(tile.x, tile.y) || this.isRiverTile(tile.x, tile.y));
+                (this.isRoadTile(tile.x, tile.y) || this.isInlandWaterTile(tile.x, tile.y));
         });
     }
 
