@@ -1,9 +1,8 @@
 name: ci
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  # Local-first policy: run remote CI only by explicit request.
+  workflow_dispatch:
 
 permissions:
   contents: read
