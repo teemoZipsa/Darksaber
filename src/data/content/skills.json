@@ -1627,7 +1627,10 @@
     "aoeRadius": 0,
     "icon": "🔥",
     "descKr": "화염 구체를 발사하여 적에게 화속성 피해",
-    "descEn": "Launch a fireball dealing fire damage"
+    "descEn": "Launch a fireball dealing fire damage",
+    "supersedesSkillIds": [
+      "mag_t1"
+    ]
   },
   {
     "id": "og_fire",
@@ -1643,7 +1646,10 @@
     "aoeRadius": 0,
     "icon": "🔥",
     "descKr": "강력한 화염 마법으로 적에게 큰 피해",
-    "descEn": "Powerful fire magic dealing heavy damage"
+    "descEn": "Powerful fire magic dealing heavy damage",
+    "supersedesSkillIds": [
+      "og_fireball"
+    ]
   },
   {
     "id": "og_freeze",
@@ -1659,7 +1665,10 @@
     "aoeRadius": 0,
     "icon": "❄️",
     "descKr": "적을 얼려 빙속성 피해 + 속도 감소",
-    "descEn": "Freeze enemy: ice damage + speed down"
+    "descEn": "Freeze enemy: ice damage + speed down",
+    "supersedesSkillIds": [
+      "nav_t1"
+    ]
   },
   {
     "id": "og_thunder",
@@ -1675,7 +1684,10 @@
     "aoeRadius": 0,
     "icon": "⚡",
     "descKr": "번개를 떨어뜨려 뇌속성 피해",
-    "descEn": "Call lightning bolt dealing thunder damage"
+    "descEn": "Call lightning bolt dealing thunder damage",
+    "supersedesSkillIds": [
+      "mag_t3"
+    ]
   },
   {
     "id": "og_windcutter",
@@ -1691,7 +1703,10 @@
     "aoeRadius": 0,
     "icon": "🌀",
     "descKr": "진공의 칼날로 풍속성 피해",
-    "descEn": "Wind blade dealing wind damage"
+    "descEn": "Wind blade dealing wind damage",
+    "supersedesSkillIds": [
+      "fly_t3"
+    ]
   },
   {
     "id": "og_poison",
@@ -1723,7 +1738,11 @@
     "aoeRadius": 1,
     "icon": "🌨️",
     "descKr": "눈보라를 일으켜 범위 빙속성 피해",
-    "descEn": "Blizzard: AoE ice damage"
+    "descEn": "Blizzard: AoE ice damage",
+    "supersedesSkillIds": [
+      "mag_t2",
+      "nav_t3"
+    ]
   },
   {
     "id": "og_thunderstorm",
@@ -1755,7 +1774,10 @@
     "aoeRadius": 1,
     "icon": "🌪️",
     "descKr": "거대한 회오리바람으로 범위 풍속성 피해",
-    "descEn": "Tornado: AoE wind damage"
+    "descEn": "Tornado: AoE wind damage",
+    "supersedesSkillIds": [
+      "fly_t4"
+    ]
   },
   {
     "id": "og_earthquake",
@@ -1787,7 +1809,10 @@
     "aoeRadius": 2,
     "icon": "☄️",
     "descKr": "메테오! 광범위 최강 화속성 마법",
-    "descEn": "Meteor! Ultimate wide AoE fire magic"
+    "descEn": "Meteor! Ultimate wide AoE fire magic",
+    "supersedesSkillIds": [
+      "mag_t7"
+    ]
   },
   {
     "id": "og_heal",
@@ -1803,7 +1828,10 @@
     "aoeRadius": 0,
     "icon": "💚",
     "descKr": "HP를 마공의 1.5배만큼 회복",
-    "descEn": "Restore HP by 1.5x magic attack"
+    "descEn": "Restore HP by 1.5x magic attack",
+    "supersedesSkillIds": [
+      "cle_t1"
+    ]
   },
   {
     "id": "og_forceheal",
@@ -1819,7 +1847,10 @@
     "aoeRadius": 0,
     "icon": "💛",
     "descKr": "HP를 마공의 3배만큼 대량 회복",
-    "descEn": "Restore HP by 3x magic attack"
+    "descEn": "Restore HP by 3x magic attack",
+    "supersedesSkillIds": [
+      "cle_t4"
+    ]
   },
   {
     "id": "og_cure",
@@ -1835,7 +1866,10 @@
     "aoeRadius": 0,
     "icon": "✨",
     "descKr": "HP 회복 + 상태이상 해제",
-    "descEn": "Restore HP + cleanse debuffs"
+    "descEn": "Restore HP + cleanse debuffs",
+    "supersedesSkillIds": [
+      "cle_t3"
+    ]
   },
   {
     "id": "og_attack",
@@ -1889,7 +1923,10 @@
     "descKr": "속도 40% 증가 (4턴)",
     "descEn": "SPD +40% for 4 turns",
     "buffStat": "spd",
-    "buffDuration": 4
+    "buffDuration": 4,
+    "supersedesSkillIds": [
+      "pri_t3"
+    ]
   },
   {
     "id": "og_resist",
@@ -2003,7 +2040,10 @@
     "aoeRadius": 0,
     "icon": "🧛",
     "descKr": "적의 HP를 빨아들여 자신의 HP로 전환",
-    "descEn": "Drain enemy HP and restore own HP"
+    "descEn": "Drain enemy HP and restore own HP",
+    "supersedesSkillIds": [
+      "cul_t3"
+    ]
   },
   {
     "id": "og_mpdrain",

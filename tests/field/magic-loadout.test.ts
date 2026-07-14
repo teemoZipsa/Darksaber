@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createBaseStats } from '../../src/data/Stats';
+import { ALL_CLASS_LINES } from '../../src/data/ClassTree';
 import { getSkill } from '../../src/data/SkillDB';
 import { resolveSkillEffect, type SkillEffectEnemyInput } from '../../src/combat/SkillEffectResolver';
 import {
@@ -52,6 +53,47 @@ test('skills no longer learnable are dropped and empty slots backfill in order',
     assert.deepEqual(normalized, ['inf_t1', ...getOrderedLearnedSkills(INFANTRY_T1)
         .map((s) => s.id)
         .filter((id) => id !== 'inf_t1')]);
+});
+
+test('original spells supersede redundant class and lower-rank spell variants', () => {
+    const cases = [
+        { owner: { classLineId: 'mage', currentTier: 1 }, winner: 'og_fireball', loser: 'mag_t1' },
+        { owner: { classLineId: 'mage', currentTier: 2 }, winner: 'og_fire', loser: 'og_fireball' },
+        { owner: { classLineId: 'mage', currentTier: 3 }, winner: 'og_blizzard', loser: 'mag_t2' },
+        { owner: { classLineId: 'mage', currentTier: 3 }, winner: 'og_thunder', loser: 'mag_t3' },
+        { owner: { classLineId: 'mage', currentTier: 7 }, winner: 'og_meteor', loser: 'mag_t7' },
+        { owner: { classLineId: 'flying', currentTier: 3 }, winner: 'og_windcutter', loser: 'fly_t3' },
+        { owner: { classLineId: 'flying', currentTier: 5 }, winner: 'og_tornado', loser: 'fly_t4' },
+        { owner: { classLineId: 'naval', currentTier: 2 }, winner: 'og_freeze', loser: 'nav_t1' },
+        { owner: { classLineId: 'naval', currentTier: 3 }, winner: 'og_blizzard', loser: 'nav_t3' },
+        { owner: { classLineId: 'cleric', currentTier: 1 }, winner: 'og_heal', loser: 'cle_t1' },
+        { owner: { classLineId: 'cleric', currentTier: 4 }, winner: 'og_cure', loser: 'cle_t3' },
+        { owner: { classLineId: 'cleric', currentTier: 4 }, winner: 'og_forceheal', loser: 'cle_t4' },
+        { owner: { classLineId: 'priest', currentTier: 4 }, winner: 'og_quick', loser: 'pri_t3' },
+        { owner: { classLineId: 'cultist', currentTier: 6 }, winner: 'og_hpdrain', loser: 'cul_t3' },
+    ];
+
+    for (const { owner, winner, loser } of cases) {
+        const ids = getOrderedLearnedSkills(owner).map((skill) => skill.id);
+        assert.ok(ids.includes(winner), `${owner.classLineId} T${owner.currentTier} keeps ${winner}`);
+        assert.ok(!ids.includes(loser), `${owner.classLineId} T${owner.currentTier} removes ${loser}`);
+    }
+});
+
+test('playable class learned lists never show duplicate spell names', () => {
+    for (const classLine of ALL_CLASS_LINES) {
+        for (const { tier } of classLine.tiers) {
+            const learned = getOrderedLearnedSkills({ classLineId: classLine.id, currentTier: tier });
+            for (const languageKey of ['nameKr', 'nameEn'] as const) {
+                const names = learned.map((skill) => skill[languageKey].trim().toLocaleLowerCase());
+                assert.equal(
+                    new Set(names).size,
+                    names.length,
+                    `${classLine.id} T${tier} has duplicate ${languageKey} names`,
+                );
+            }
+        }
+    }
 });
 
 test('upgrade is blocked when unlearned, maxed, or low on gold', () => {

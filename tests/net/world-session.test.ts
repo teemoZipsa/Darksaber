@@ -27,6 +27,7 @@ import {
 import { getOriginalLateStoryItemsForSourceEvent } from '../../src/data/OriginalLateStoryItems';
 import { MASTER_KEY_ITEM_ID } from '../../src/raid/MarkedCache';
 import { ENEMY_SIMULATION_ACTIVE_RANGE } from '../../src/field/FieldConfig';
+import { getOrderedLearnedSkills } from '../../src/magic/MagicLoadout';
 import type { InventorySaveSnapshot } from '../../src/shared/CharacterSave';
 import {
     clearEnemiesForTest,
@@ -1134,7 +1135,7 @@ test('network kill progression obeys the local mortal/master realm gate', () => 
 
 test('castSkill rejects a learned-but-unequipped skill', () => {
     const session = new WorldSession();
-    // Infantry T5 learns >8 skills, so the default loadout benches inf_t3.
+    // Infantry T5 learns more than eight skills, so at least one is benched.
     const joined = session.join({
         ...joinMessage('central_castle', 'hero-a'),
         partyComposition: [actor('hero-a', {
@@ -1147,7 +1148,9 @@ test('castSkill rejects a learned-but-unequipped skill', () => {
     const serverActor = [...internals.actors.values()].find((entry) => entry.ownerPlayerId === joined.playerId);
     const serverEnemyEntry = [...internals.enemies.values()][0];
     assert.ok(serverActor);
-    assert.ok(!serverActor.magicLoadout.includes('inf_t3'), 'inf_t3 should be benched at T5 default loadout');
+    const benchedSkill = getOrderedLearnedSkills({ classLineId: 'infantry', currentTier: 5 })
+        .find((skill) => !serverActor.magicLoadout.includes(skill.id));
+    assert.ok(benchedSkill, 'T5 default loadout should leave a learned skill unequipped');
     serverActor.actionGauge = 100;
     serverActor.remainingAp = 80;
     serverActor.tile = { x: serverEnemyEntry.enemy.gridX - 1, y: serverEnemyEntry.enemy.gridY };
@@ -1157,7 +1160,7 @@ test('castSkill rejects a learned-but-unequipped skill', () => {
         intentId: 'cast-benched',
         actorId: serverActor.id,
         kind: 'castSkill',
-        payload: { skillId: 'inf_t3', targetId: serverEnemyEntry.enemy.id },
+        payload: { skillId: benchedSkill.id, targetId: serverEnemyEntry.enemy.id },
     }, 1_000);
 
     assert.equal(result.replies[0]?.type, 'ACTION_REJECTED');

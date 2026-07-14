@@ -32,6 +32,8 @@ export interface Skill {
     targetScope?: SkillTargetScope;
     allyRadius?: number;
     skillGroup?: SkillGroup;
+    /** Learned skill ids this skill replaces in the same character's spell list. */
+    supersedesSkillIds?: string[];
 }
 
 const SKILL_CONTENT = SKILLS_JSON as Skill[];
@@ -62,7 +64,9 @@ export function getLearnedSkills(classId: string, characterTier: number, unlocke
         const sharedSkills = ALL_SKILLS.filter(
             s => s.classId === 'shared' && unlockedSkillIds.includes(s.id)
         );
-        return [...classSkills, ...sharedSkills];
+        const learned = [...classSkills, ...sharedSkills];
+        const supersededIds = new Set(learned.flatMap((skill) => skill.supersedesSkillIds ?? []));
+        return learned.filter((skill) => !supersededIds.has(skill.id));
     }
 
     return classSkills;
