@@ -542,6 +542,7 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'weapon', gridW: 1, gridH: 3, color: '#ffd700', icon: '✨',
         maxDurability: 9999,
         stats: { atk: 25, magAtk: 25 },
+        attackRange: 1,
         description: 'A divine blade that absorbs the sins of the fallen. A unique 3-socket weapon.',
         descriptionKr: '타락한 자들의 죄악을 흡수하는 신성한 검입니다. 3소켓 고유 무기입니다.',
         itemCategory: 'divine_weapon',
@@ -555,6 +556,7 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'weapon', gridW: 1, gridH: 3, color: '#8899aa', icon: '🗡️',
         maxDurability: 100,
         stats: { atk: 8 },
+        attackRange: 1,
         description: 'A basic iron short sword.',
         descriptionKr: '기본적인 철제 단검입니다.',
         itemCategory: 'normal_weapon',
@@ -566,6 +568,7 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'weapon', gridW: 1, gridH: 4, color: '#aabbcc', icon: '⚔️',
         maxDurability: 120,
         stats: { atk: 14 },
+        attackRange: 1,
         description: 'A well-forged long sword with good reach.',
         descriptionKr: '리치가 길고 잘 벼려진 장검입니다.'
     },
@@ -574,6 +577,7 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'weapon', gridW: 1, gridH: 4, color: '#9966cc', icon: '🪄',
         maxDurability: 80,
         stats: { magAtk: 12, mp: 10 },
+        attackRange: 1,
         description: 'A staff imbued with magical energy.',
         descriptionKr: '마력이 깃든 지팡이입니다.'
     },
@@ -582,6 +586,7 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'weapon', gridW: 2, gridH: 3, color: '#8b6914', icon: '🏹',
         maxDurability: 90,
         stats: { atk: 10 },
+        attackRange: 5,
         description: 'A compact bow for ranged attacks.',
         descriptionKr: '원거리 공격용 소형 활입니다.'
     },
@@ -590,6 +595,7 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'weapon', gridW: 1, gridH: 5, color: '#778899', icon: '🔱',
         maxDurability: 110,
         stats: { atk: 12 },
+        attackRange: 2,
         description: 'A long iron lance for cavalry and lancers.',
         descriptionKr: '기병과 창병을 위한 긴 철제 창입니다.'
     },
@@ -935,6 +941,7 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'weapon', gridW: 1, gridH: 3, color: '#f0c050', icon: '*',
         maxDurability: 1,
         stats: { atk: 12, magAtk: 4, hitRate: 8 },
+        attackRange: 1,
         description: 'Original GETITEM 098. A class-free sacred blade recovered after clearing Etna Volcano. Its durability does not decrease.',
         descriptionKr: '원작 GETITEM 098. 에트나 화산 클리어 후 획득하는 직업 제한 없는 보검. 내구도가 소모되지 않습니다.',
         rarity: 'unique',
@@ -960,6 +967,7 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'weapon', gridW: 1, gridH: 3, color: '#b7c8ff', icon: '*',
         maxDurability: 100,
         stats: { atk: 8, hitRate: 5 },
+        attackRange: 1,
         description: 'Original Darksaber episode 13 chest reward. Preserves GETITEM 008.',
         descriptionKr: '원작 다크세이버 13화 상자 보상. GETITEM 008을 보존합니다.',
         rarity: 'unique',
@@ -1607,6 +1615,7 @@ const RAW_ITEMS: RawItemDef[] = [
         slot: 'weapon', gridW: 2, gridH: 4, color: '#cc0033', icon: '🗡️',
         maxDurability: 200,
         stats: { atk: 28, magAtk: 8 },
+        attackRange: 1,
         description: 'A cursed blade dripping with dark energy. Dropped by Destroyer Kaiger.',
         descriptionKr: '어둠의 에너지가 흐르는 저주받은 검입니다. 디스트로어 카이거가 드랍합니다.'
     },

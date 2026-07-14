@@ -34,6 +34,8 @@ export interface ServerActor {
     stats: CharacterStats;
     /** Server-authoritative equipment/socket bonuses, kept separate so client snapshots retain base stats. */
     equipmentStatBonus?: Partial<CharacterStats>;
+    /** Server-authoritative equipped weapon range. Optional for older persisted sessions. */
+    attackRange?: number;
     statuses: StatusEffect[];
     actionGauge: number;
     remainingAp: number;
@@ -130,6 +132,7 @@ export interface WorldJoinContext {
     shardId?: string;
     saveSnapshot?: CharacterSave;
     equipmentStatBonuses?: Record<string, Partial<CharacterStats>>;
+    equipmentAttackRanges?: Record<string, number>;
 }
 
 export interface WorldSessionPersistentPlayer {

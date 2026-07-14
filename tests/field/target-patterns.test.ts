@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import type { Character } from '../../src/character/Character';
 import { resolveSkillEffect } from '../../src/combat/SkillEffectResolver';
 import { getClassAttackProfile, getSkillAttackProfile } from '../../src/data/AttackPatternProfiles';
+import { getItemDef } from '../../src/data/ItemDB';
 import { getSkill } from '../../src/data/SkillDB';
 import type { Skill } from '../../src/data/SkillDB';
 import { createBaseStats } from '../../src/data/Stats';
@@ -13,6 +15,11 @@ import {
     isSelectableTile,
 } from '../../src/field/TargetPatterns';
 import { TilePoint, tilesInRange } from '../../src/field/FieldPathing';
+import type { FieldActor } from '../../src/field/FieldTypes';
+import {
+    getWorldActorAttackProfile,
+    getWorldActorAttackRange,
+} from '../../src/engine/world/WorldAttackTargeting';
 
 function keys(tiles: TilePoint[]): string[] {
     return tiles.map((tile) => `${tile.x},${tile.y}`).sort();
@@ -20,6 +27,21 @@ function keys(tiles: TilePoint[]): string[] {
 
 function assertTileSet(actual: TilePoint[], expected: TilePoint[]): void {
     assert.deepEqual(keys(actual), keys(expected));
+}
+
+function actorWithWeapon(classLineId: string, itemId?: string): FieldActor {
+    const item = itemId ? getItemDef(itemId) : undefined;
+    assert.ok(!itemId || item);
+    const equipment = new Map();
+    if (item) equipment.set('weapon', {
+        item,
+        gridX: 0,
+        gridY: 0,
+        durability: item.maxDurability,
+        quantity: 1,
+    });
+    const character = { classLineId, equipment } as unknown as Character;
+    return { character } as FieldActor;
 }
 
 test('class attack profiles differentiate infantry, cavalry, lancer, archer, and mage basics', () => {
@@ -47,6 +69,25 @@ test('class attack profiles differentiate infantry, cavalry, lancer, archer, and
     const mage = getClassAttackProfile('mage');
     assert.equal(mage.damageMultiplier, 0.6);
     assert.equal(getEffectTiles(mage, { casterTile: caster, selectedTile: { x: 2, y: 0 } }).length, 9);
+});
+
+test('world basic attacks use equipped weapon range instead of class magic range', () => {
+    const caster = { x: 0, y: 0 };
+    const mage = actorWithWeapon('mage', 'staff');
+    const mageProfile = getWorldActorAttackProfile(mage);
+
+    assert.equal(getWorldActorAttackRange(mage.character), 1);
+    assert.equal(isSelectableTile(mageProfile, { casterTile: caster }, { x: 1, y: 0 }), true);
+    assert.equal(isSelectableTile(mageProfile, { casterTile: caster }, { x: 2, y: 0 }), false);
+    assert.deepEqual(getEffectTiles(mageProfile, { casterTile: caster, selectedTile: { x: 1, y: 0 } }), [{ x: 1, y: 0 }]);
+
+    const archer = actorWithWeapon('archer', 'short_bow');
+    const archerProfile = getWorldActorAttackProfile(archer);
+    assert.equal(getWorldActorAttackRange(archer.character), 5);
+    assert.equal(isSelectableTile(archerProfile, { casterTile: caster }, { x: 5, y: 0 }), true);
+    assert.equal(isSelectableTile(archerProfile, { casterTile: caster }, { x: 6, y: 0 }), false);
+
+    assert.equal(getWorldActorAttackRange(actorWithWeapon('mage').character), 1);
 });
 
 test('master class attack profiles preserve branch combat roles', () => {

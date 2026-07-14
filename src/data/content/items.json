@@ -13,6 +13,7 @@
       "atk": 25,
       "magAtk": 25
     },
+    "attackRange": 1,
     "description": "A divine blade that absorbs the sins of the fallen. A unique 3-socket weapon.",
     "descriptionKr": "타락한 자들의 죄악을 흡수하는 신성한 검입니다. 3소켓 고유 무기입니다.",
     "itemCategory": "divine_weapon",
@@ -38,6 +39,7 @@
     "stats": {
       "atk": 8
     },
+    "attackRange": 1,
     "description": "A basic iron short sword.",
     "descriptionKr": "기본적인 철제 단검입니다.",
     "itemCategory": "normal_weapon",
@@ -63,6 +65,7 @@
     "stats": {
       "atk": 14
     },
+    "attackRange": 1,
     "description": "A well-forged long sword with good reach.",
     "descriptionKr": "리치가 길고 잘 벼려진 장검입니다.",
     "rarity": "rare",
@@ -88,6 +91,7 @@
       "magAtk": 12,
       "mp": 10
     },
+    "attackRange": 1,
     "description": "A staff imbued with magical energy.",
     "descriptionKr": "마력이 깃든 지팡이입니다.",
     "rarity": "rare",
@@ -112,6 +116,7 @@
     "stats": {
       "atk": 10
     },
+    "attackRange": 5,
     "description": "A compact bow for ranged attacks.",
     "descriptionKr": "원거리 공격용 소형 활입니다.",
     "rarity": "uncommon",
@@ -136,6 +141,7 @@
     "stats": {
       "atk": 12
     },
+    "attackRange": 2,
     "description": "A long iron lance for cavalry and lancers.",
     "descriptionKr": "기병과 창병을 위한 긴 철제 창입니다.",
     "rarity": "rare",
@@ -3082,6 +3088,7 @@
       "magAtk": 4,
       "hitRate": 8
     },
+    "attackRange": 1,
     "description": "Original GETITEM 098. A class-free sacred blade recovered after clearing Etna Volcano. Its durability does not decrease.",
     "descriptionKr": "원작 GETITEM 098. 에트나 화산 클리어 후 획득하는 직업 제한 없는 보검. 내구도가 소모되지 않습니다.",
     "rarity": "unique",
@@ -8713,6 +8720,7 @@
       "atk": 28,
       "magAtk": 8
     },
+    "attackRange": 1,
     "description": "A cursed blade dripping with dark energy. Dropped by Destroyer Kaiger.",
     "descriptionKr": "어둠의 에너지가 흐르는 저주받은 검입니다. 디스트로어 카이거가 드랍합니다.",
     "rarity": "epic",

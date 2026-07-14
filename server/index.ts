@@ -433,6 +433,7 @@ async function handleWorldJoin(ws: WebSocket, message: WorldJoinMessage): Promis
             shardId: sessionKey,
             saveSnapshot: joinSaveState.saveSnapshot,
             equipmentStatBonuses: joinSaveState.equipmentStatBonuses,
+            equipmentAttackRanges: joinSaveState.equipmentAttackRanges,
         });
     } catch (error) {
         if (error instanceof WorldResumeFailedError) {

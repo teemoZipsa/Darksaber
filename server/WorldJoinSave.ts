@@ -3,6 +3,7 @@ import {
     getEffectiveStats,
     type StatusEffect,
 } from '../src/combat/StatusEffects';
+import { getEquippedWeaponAttackRange } from '../src/combat/BasicAttackRange';
 import { getItemDef, type ItemSlot } from '../src/data/ItemDB';
 import { getRestFacility } from '../src/data/RestFacilityData';
 import type { CharacterStats } from '../src/data/Stats';
@@ -37,6 +38,7 @@ export interface WorldJoinSaveState {
     partyComposition: ActorSnapshot[];
     carriedWeight: number;
     equipmentStatBonuses: Record<string, Partial<CharacterStats>>;
+    equipmentAttackRanges: Record<string, number>;
     saveSnapshot: CharacterSave;
     consumedPendingRestMenuId?: string;
 }
@@ -53,6 +55,7 @@ export function createWorldJoinSaveState(character: AuthCharacter, save: Charact
     const restMenu = readPendingRestMenu(save);
     const restStatuses = restMenu ? createRestStatuses(restMenu) : [];
     const equipmentStatBonuses: Record<string, Partial<CharacterStats>> = {};
+    const equipmentAttackRanges: Record<string, number> = {};
     const equippedItems: PlacedItem[] = [];
 
     const partyComposition = entries.map((entry): ActorSnapshot => {
@@ -62,6 +65,7 @@ export function createWorldJoinSaveState(character: AuthCharacter, save: Charact
         const equipment = readEquipment(equipmentRecord);
         const equipmentStatBonus = getEquipmentStatBonus(equipment);
         equipmentStatBonuses[entry.id] = equipmentStatBonus;
+        equipmentAttackRanges[entry.id] = getEquippedWeaponAttackRange(equipment);
         equippedItems.push(...equipment.values());
 
         const statuses = restStatuses.map((status) => ({ ...status }));
@@ -103,6 +107,7 @@ export function createWorldJoinSaveState(character: AuthCharacter, save: Charact
         partyComposition,
         carriedWeight: getPlacedItemsWeight([...backpackItems, ...equippedItems]),
         equipmentStatBonuses,
+        equipmentAttackRanges,
         saveSnapshot,
         ...(restMenu ? { consumedPendingRestMenuId: restMenu.id } : {}),
     };

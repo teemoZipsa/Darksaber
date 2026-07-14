@@ -249,6 +249,15 @@ test('item normalization keeps consumable rarity and generated armor metadata st
     assert.equal(ITEMS.some((item) => item.itemCategory === 'armor' && item.slot === 'head'), true);
 });
 
+test('every weapon declares a positive integer basic attack range', () => {
+    for (const item of ITEMS.filter((candidate) => candidate.slot === 'weapon')) {
+        assert.ok(
+            Number.isInteger(item.attackRange) && (item.attackRange ?? 0) >= 1,
+            `${item.id} must declare a positive attackRange`,
+        );
+    }
+});
+
 test('shop and original item data expose guarded equipment fields', () => {
     const crossbow = ORIGINAL_SHOP_ITEMS.find((item) => item.id === 'web_66_23');
     assert.ok(crossbow);

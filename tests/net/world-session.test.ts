@@ -118,6 +118,36 @@ test('world session exposes equipment-adjusted base stats only for remote actors
     assert.equal(remoteView.stats.atk, ownView.stats.atk + 5);
 });
 
+test('server rejects a mage basic attack beyond the equipped weapon range', () => {
+    const session = new WorldSession();
+    const localActorId = 'mage-range-hero';
+    const joined = session.join({
+        ...joinMessage('central_castle', localActorId),
+        partyComposition: [actor(localActorId, { classLineId: 'mage' })],
+    }, 0, {
+        equipmentAttackRanges: { [localActorId]: 1 },
+    });
+    const serverActor = getActorForPlayer(session, joined.playerId);
+    const serverEnemy = getFirstEnemy(session);
+    serverActor.actionGauge = 100;
+    serverActor.remainingAp = 80;
+    serverActor.tile = { x: serverEnemy.enemy.gridX - 2, y: serverEnemy.enemy.gridY };
+
+    const result = session.handleMessage(joined.playerId, {
+        type: 'PLAYER_INTENT',
+        intentId: 'mage-basic-too-far',
+        actorId: serverActor.id,
+        kind: 'attack',
+        payload: { targetId: serverEnemy.enemy.id },
+    }, 1_000);
+
+    assert.equal(result.replies[0]?.type, 'ACTION_REJECTED');
+    assert.match(
+        result.replies[0]?.type === 'ACTION_REJECTED' ? result.replies[0].reason : '',
+        /out of range/i,
+    );
+});
+
 function withFixedRandom<T>(value: number, callback: () => T): T {
     const previousRandom = Math.random;
     Math.random = () => value;

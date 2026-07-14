@@ -71,8 +71,22 @@ const SKILL_ATTACK_PROFILES: Record<string, AttackPatternProfile> = {
     },
 };
 
-export function getClassAttackProfile(classId: string, fallbackRange: number = 1): AttackPatternProfile {
-    return CLASS_ATTACK_PROFILES[classId] ?? getFallbackClassAttackProfile(fallbackRange);
+export function getClassAttackProfile(classId: string, attackRange?: number): AttackPatternProfile {
+    const authored = CLASS_ATTACK_PROFILES[classId];
+    if (attackRange === undefined) return authored ?? getFallbackClassAttackProfile(1);
+
+    const maxRange = Math.max(1, Math.floor(attackRange));
+    if (maxRange === 1) return adjacentSingle;
+    if (!authored || authored.select.kind === 'adjacent') return getFallbackClassAttackProfile(maxRange);
+
+    return {
+        ...authored,
+        select: {
+            ...authored.select,
+            minRange: Math.min(authored.select.minRange ?? 1, maxRange),
+            maxRange,
+        },
+    };
 }
 
 export function getSkillAttackProfile(skill: Skill): AttackPatternProfile {

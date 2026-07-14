@@ -154,6 +154,8 @@ test('world join save state restores authoritative equipment, sockets, magic, re
     assert.equal(snapshot.statuses[0]?.remainingSeconds, 300);
     assert.equal(state.equipmentStatBonuses[selected.id]?.atk, 4);
     assert.ok((state.equipmentStatBonuses['prepared-companion']?.def ?? 0) > 0);
+    assert.equal(state.equipmentAttackRanges[selected.id], 1);
+    assert.equal(state.equipmentAttackRanges['prepared-companion'], 1);
     assert.equal(state.carriedWeight, expectedWeight);
     assert.equal(save.hubLocation.pendingRestMenuId, 'meat_plate');
     assert.equal(state.saveSnapshot.hubLocation.pendingRestMenuId, null);
@@ -168,6 +170,7 @@ test('world join save state restores authoritative equipment, sockets, magic, re
         },
         context: {
             equipmentStatBonuses: state.equipmentStatBonuses,
+            equipmentAttackRanges: state.equipmentAttackRanges,
             saveSnapshot: state.saveSnapshot,
         },
         playerId: 'p1',
@@ -181,6 +184,7 @@ test('world join save state restores authoritative equipment, sockets, magic, re
     assert.equal(actor.exp, 37);
     assert.equal(actor.hasEmblem, true);
     assert.deepEqual(actor.equipmentStatBonus, state.equipmentStatBonuses[selected.id]);
+    assert.equal(actor.attackRange, 1);
     assert.equal(
         getEffectiveServerActorStats(actor).atk,
         Math.floor((actor.stats.atk + 4) * 1.1),

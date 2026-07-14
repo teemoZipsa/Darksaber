@@ -3,7 +3,7 @@ import {
     removeActionStanceStatusesFromCarrier,
     replaceActionStanceStatuses,
 } from '../src/combat/StatusEffects';
-import { getClassLine } from '../src/data/ClassTree';
+import { normalizeBasicAttackRange } from '../src/combat/BasicAttackRange';
 import { getItemDef } from '../src/data/ItemDB';
 import {
     ATTACK_AP_COST,
@@ -124,7 +124,7 @@ export class WorldSessionPlayerIntentResolver {
         if (!canActorTargetEnemy(actor, target)) return reject(intentId, 'Target is not visible.');
         if (actor.remainingAp < ATTACK_AP_COST) return reject(intentId, 'No action available for attack.');
 
-        const range = getClassLine(actor.classLineId)?.attackRange ?? 1;
+        const range = normalizeBasicAttackRange(actor.attackRange);
         const targetTile = { x: target.enemy.gridX, y: target.enemy.gridY };
         if (manhattan(actor.tile, targetTile) > range) return reject(intentId, 'Target is out of range.');
         if (range > 1 && !this.context.hasFieldLineOfSight(actor.tile, targetTile, actor.ownerPlayerId)) {

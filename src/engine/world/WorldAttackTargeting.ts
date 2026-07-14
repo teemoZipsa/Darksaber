@@ -1,6 +1,6 @@
 import type { Character } from '../../character/Character';
 import type { Enemy } from '../../entity/Enemy';
-import { getClassLine } from '../../data/ClassTree';
+import { getEquippedWeaponAttackRange } from '../../combat/BasicAttackRange';
 import { getClassAttackProfile } from '../../data/AttackPatternProfiles';
 import type { WorldMap } from '../../map/WorldMap';
 import { hasLineOfSight } from '../../field/LineOfSight';
@@ -27,7 +27,7 @@ import {
 } from './WorldEngineFieldHelpers';
 
 export function getWorldActorAttackRange(character: Character): number {
-    return getClassLine(character.classLineId)?.attackRange ?? 1;
+    return getEquippedWeaponAttackRange(character.equipment);
 }
 
 export function getWorldActorAttackProfile(actor: FieldActor): AttackPatternProfile {

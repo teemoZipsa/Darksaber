@@ -1,4 +1,5 @@
 import type { TilePoint } from '../src/field/FieldPathing';
+import { normalizeBasicAttackRange } from '../src/combat/BasicAttackRange';
 import { normalizeLoadout, normalizeUpgradeLevels } from '../src/magic/MagicLoadout';
 import type { WorldJoinMessage, WorldWelcomeMessage } from '../src/net/WorldProtocol';
 import type { RaidModifier } from '../src/raid/RaidModifiers';
@@ -74,6 +75,7 @@ export function buildWorldSessionJoinedPlayer(input: WorldSessionJoinedPlayerInp
             tile,
             stats: syncStatsMovementToClass(snapshot.stats, snapshot.classLineId),
             equipmentStatBonus: { ...(context.equipmentStatBonuses?.[snapshot.id] ?? {}) },
+            attackRange: normalizeBasicAttackRange(context.equipmentAttackRanges?.[snapshot.id]),
             statuses: cloneStatuses(snapshot.statuses),
             actionGauge: 0,
             remainingAp: 0,
