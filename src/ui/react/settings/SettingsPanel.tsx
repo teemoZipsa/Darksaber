@@ -16,16 +16,13 @@ import { useModalDialog } from '../useModalDialog';
 
 const S = SettingsManager;
 
-// Repeated inline styles, hoisted to local constants (CSS file is shared → off-limits).
+// Small one-off layout values that do not need responsive behavior.
 const styles = {
     sectionBody: { display: 'flex', flexDirection: 'column', gap: 6 } as CSSProperties,
-    sliderWrap: { display: 'flex', alignItems: 'center', gap: 8 } as CSSProperties,
-    keyGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 } as CSSProperties,
     keyRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minWidth: 0 } as CSSProperties,
     keyLabel: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as CSSProperties,
     keyButton: { minWidth: 58, padding: '4px 8px' } as CSSProperties,
     keyActions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 2 } as CSSProperties,
-    footer: { textAlign: 'center', color: 'var(--ds-text-dim)', fontSize: 12, padding: '8px 0 14px' } as CSSProperties,
 };
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -37,9 +34,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
     );
 }
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
+function Row({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
     return (
-        <div className="ds-row">
+        <div className={`ds-row${className ? ` ${className}` : ''}`}>
             <span className="ds-row__label">{label}</span>
             {children}
         </div>
@@ -48,7 +45,8 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 function Toggle({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) {
     return (
-        <div
+        <button
+            type="button"
             className={`ds-toggle${on ? ' is-on' : ''}`}
             role="switch"
             aria-checked={on}
@@ -56,14 +54,15 @@ function Toggle({ label, on, onToggle }: { label: string; on: boolean; onToggle:
             title={label}
             onClick={() => { onToggle(); AudioManager.playUi('ui.confirm'); }}
         >
-            <div className="ds-toggle__knob" />
-        </div>
+            <span className="ds-toggle__knob" aria-hidden="true" />
+        </button>
     );
 }
 
 function Cycle({ label, value, onCycle }: { label: string; value: string; onCycle: () => void }) {
     return (
         <button
+            type="button"
             className="ds-btn"
             aria-label={`${label}: ${value}`}
             title={label}
@@ -78,7 +77,7 @@ function Slider({ label, value, onChange, sfx }: { label: string; value: number;
     const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
     const fill = `linear-gradient(to right, var(--ds-accent) ${pct}%, var(--ds-panel-inset) ${pct}%)`;
     return (
-        <div style={styles.sliderWrap}>
+        <div className="ds-settings__slider-control">
             <input
                 type="range"
                 className="ds-range"
@@ -114,6 +113,7 @@ function KeybindingButton({
         <div style={styles.keyRow}>
             <span style={styles.keyLabel}>{label}</span>
             <button
+                type="button"
                 className={`ds-btn${isCapturing ? ' is-active' : ''}`}
                 style={styles.keyButton}
                 aria-label={`${label}: ${value}`}
@@ -133,19 +133,20 @@ function KeybindingSection({ capturing, setCapturing }: { capturing: KeybindingI
     return (
         <Section title={t('settings.keybindings')}>
             <div className="ds-section__title" style={{ marginTop: 0 }}>{t('settings.keybindingsAction')}</div>
-            <div style={styles.keyGrid}>
+            <div className="ds-settings__key-grid">
                 {actionBindings.map((definition) => (
                     <KeybindingButton key={definition.id} definition={definition} capturing={capturing} setCapturing={setCapturing} />
                 ))}
             </div>
             <div className="ds-section__title" style={{ marginTop: 4 }}>{t('settings.keybindingsWorld')}</div>
-            <div style={styles.keyGrid}>
+            <div className="ds-settings__key-grid">
                 {worldBindings.map((definition) => (
                     <KeybindingButton key={definition.id} definition={definition} capturing={capturing} setCapturing={setCapturing} />
                 ))}
             </div>
             <div style={styles.keyActions}>
                 <button
+                    type="button"
                     className="ds-btn"
                     onClick={() => { S.resetKeybindings(); setCapturing(null); AudioManager.playUi('ui.confirm'); }}
                     title={t('settings.keyResetAll')}
@@ -162,7 +163,6 @@ export function SettingsPanel() {
     const store = useStore();
     const dialogRef = useModalDialog<HTMLDivElement>();
     const [capturing, setCapturing] = useState<KeybindingId | null>(null);
-    const panelStyle = { width: 520, maxHeight: 'min(760px, 92vh)', overflowY: 'auto', '--ds-scale': S.getUIScale() } as CSSProperties;
 
     useEffect(() => {
         if (!capturing) return undefined;
@@ -186,19 +186,19 @@ export function SettingsPanel() {
     }, [capturing]);
 
     return (
-        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('pause.settings')} tabIndex={-1} className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('pause.settings')} tabIndex={-1} className="ds-panel ds-settings-panel" onClick={(e) => e.stopPropagation()}>
             <div className="ds-panel__header">
                 <span className="ds-panel__title">{t('pause.settings')}</span>
-                <button className="ds-close-btn" onClick={() => store.closeSettings()} aria-label={t('ui.close')} title={t('ui.close')}>✕</button>
+                <button type="button" className="ds-close-btn" onClick={() => store.closeSettings()} aria-label={t('ui.close')} title={t('ui.close')}>✕</button>
             </div>
 
             <div className="ds-settings">
                 <Section title={t('settings.sound')}>
                     <Row label={t('settings.muteBGM')}><Toggle label={t('settings.muteBGM')} on={S.getMuteBGM()} onToggle={() => S.setMuteBGM(!S.getMuteBGM())} /></Row>
                     <Row label={t('settings.muteSFX')}><Toggle label={t('settings.muteSFX')} on={S.getMuteSFX()} onToggle={() => S.setMuteSFX(!S.getMuteSFX())} /></Row>
-                    <Row label={t('settings.bgmVolume')}><Slider label={t('settings.bgmVolume')} value={S.getBgmVolume()} onChange={(v) => S.setBgmVolume(v)} /></Row>
-                    <Row label={t('settings.sfxVolume')}><Slider label={t('settings.sfxVolume')} value={S.getSfxVolume()} onChange={(v) => S.setSfxVolume(v)} sfx="ui.confirm" /></Row>
-                    <Row label={t('settings.uiVolume')}><Slider label={t('settings.uiVolume')} value={S.getUiVolume()} onChange={(v) => S.setUiVolume(v)} sfx="ui.hover" /></Row>
+                    <Row className="ds-settings__slider-row" label={t('settings.bgmVolume')}><Slider label={t('settings.bgmVolume')} value={S.getBgmVolume()} onChange={(v) => S.setBgmVolume(v)} /></Row>
+                    <Row className="ds-settings__slider-row" label={t('settings.sfxVolume')}><Slider label={t('settings.sfxVolume')} value={S.getSfxVolume()} onChange={(v) => S.setSfxVolume(v)} sfx="ui.confirm" /></Row>
+                    <Row className="ds-settings__slider-row" label={t('settings.uiVolume')}><Slider label={t('settings.uiVolume')} value={S.getUiVolume()} onChange={(v) => S.setUiVolume(v)} sfx="ui.hover" /></Row>
                 </Section>
 
                 <Section title={t('settings.screen')}>
@@ -219,7 +219,7 @@ export function SettingsPanel() {
                 <KeybindingSection capturing={capturing} setCapturing={setCapturing} />
             </div>
 
-            <div style={styles.footer}>
+            <div className="ds-settings__footer">
                 {t('ui.closeHint')}
             </div>
         </div>

@@ -621,6 +621,42 @@
     max-height: 62vh;
     overflow-y: auto;
 }
+#ui-overlay .ds-settings-panel {
+    display: flex;
+    flex-direction: column;
+    width: min(520px, calc(100vw - 12px));
+    max-height: min(760px, calc(100vh - 12px));
+    overflow: hidden;
+}
+#ui-overlay .ds-settings-panel .ds-settings {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+#ui-overlay .ds-settings__slider-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+#ui-overlay .ds-settings__key-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+#ui-overlay .ds-settings__footer {
+    flex: none;
+    padding: 8px 0 14px;
+    color: var(--ds-text-dim);
+    font-size: 12px;
+    text-align: center;
+}
+#ui-overlay .ds-settings-panel :is(button, input):focus-visible {
+    outline: 2px solid var(--ds-accent-bright);
+    outline-offset: 2px;
+}
 #ui-overlay .ds-section__title {
     font-size: 12px;
     letter-spacing: 1.5px;
@@ -647,6 +683,7 @@
 
 /* Toggle switch */
 #ui-overlay .ds-toggle {
+    appearance: none;
     width: 46px; height: 24px;
     border-radius: 999px;
     background: var(--ds-panel-inset);
@@ -688,6 +725,31 @@
     background: var(--ds-accent-bright);
     border: 1px solid var(--ds-border-shadow);
     cursor: pointer;
+}
+
+@media (max-width: 390px) {
+    #ui-overlay .ds-settings-panel .ds-settings {
+        padding-inline: 16px;
+    }
+    #ui-overlay .ds-settings__slider-row {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 4px;
+    }
+    #ui-overlay .ds-settings__slider-row .ds-row__label {
+        white-space: nowrap;
+    }
+    #ui-overlay .ds-settings__slider-control {
+        width: 100%;
+    }
+    #ui-overlay .ds-settings__slider-control .ds-range {
+        flex: 1;
+        min-width: 0;
+        width: auto;
+    }
+    #ui-overlay .ds-settings__key-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 /* ─── Party panel ───────────────────────────────────────────── */

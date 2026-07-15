@@ -528,6 +528,32 @@ test('pause settings expose modal focus and persist the document language', asyn
     await expect(page.getByRole('dialog', { name: 'Paused' })).toBeVisible({ timeout: 10_000 });
 });
 
+test('settings keep one scroll surface and reflow narrow controls', async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 240 });
+    await page.goto('/?devStart=tutorial');
+    await expect(page.locator('#gameCanvas')).toBeVisible();
+    await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
+    await page.evaluate(() => (window as unknown as { __gm?: { openPauseMenu: () => void } }).__gm?.openPauseMenu());
+    await page.getByRole('button', { name: /설정|Settings/ }).click();
+
+    const settingsDialog = page.getByRole('dialog', { name: /설정|Settings/ });
+    await expect(settingsDialog).toBeVisible();
+    await expect.poll(() => settingsDialog.evaluate((dialog) => (
+        [dialog, ...dialog.querySelectorAll<HTMLElement>('*')].filter((element) => {
+            const style = getComputedStyle(element);
+            return element.scrollHeight > element.clientHeight && /auto|scroll/.test(style.overflowY);
+        }).length
+    ))).toBe(1);
+
+    await page.setViewportSize({ width: 320, height: 568 });
+    const sliderRow = settingsDialog.locator('.ds-settings__slider-row').first();
+    await expect.poll(() => sliderRow.evaluate((row) => getComputedStyle(row).flexDirection)).toBe('column');
+    await expect.poll(() => settingsDialog.locator('.ds-settings__key-grid').first().evaluate((grid) => (
+        getComputedStyle(grid).gridTemplateColumns.split(' ').length
+    ))).toBe(1);
+    await expect(settingsDialog.getByRole('switch', { name: /BGM 음소거|Mute BGM/ })).toBeEnabled();
+});
+
 test('dev tutorial can swap magic loadout slots from the world hotkey overlay', async ({ page }) => {
     await page.goto('/?devStart=tutorial');
     await expect(page.locator('#gameCanvas')).toBeVisible();
