@@ -1,5 +1,47 @@
 # Raid Lab — Progress
 
+## Batch 2026-07-17e — Multi-policy coverage (labVersion 7)
+
+### Experiments run
+
+- cautious smoke had 11% DEAD (seed 2 cornered-stall on extract) → disengage once `shouldExtract`
+- random-legal smoke was 100% LEFT in ~1s via early `leave_manual` → remove that option
+- npm scripts for cautious/random smoke + 1k cohorts
+
+### Outcome ratios (smoke 0..99 / labVersion 7)
+
+| Policy | SURVIVED | DEAD | LEFT | invariants |
+|---|---:|---:|---:|---:|
+| balanced | 100 | 0 | 0 | 0 |
+| cautious | 100 | 0 | 0 | 0 |
+| random-legal | 100 | 0 | 0 | 0 |
+
+### Tests added/updated
+
+- cautious seed 2 SURVIVED regression
+- random-legal seed 0 no early `random-leave`
+- determinism suite: **14 pass**
+
+### Code changed
+
+- `policies.ts` — cautious extract disengage; random-legal no early abandon
+- `package.json` — `raid-lab:smoke:{cautious,random}`, `raid-lab:cohort1k:{cautious,random}`
+- `RAID_LAB_VERSION = 7`
+
+### Verification
+
+| Command | Result |
+|---|---|
+| raid-lab determinism tests | 14 pass |
+| `raid-lab:smoke` / `:cautious` / `:random` | each **100% SURVIVED** |
+
+### Next work queue
+
+1. Finish 1k cohorts for balanced / cautious / random-legal under labVersion 7
+2. Optional Phase 3 stress cohorts
+
+---
+
 ## Batch 2026-07-17d — Last DEAD shrink (labVersion 6)
 
 ### Experiments run

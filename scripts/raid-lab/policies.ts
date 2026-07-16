@@ -153,9 +153,19 @@ function cautiousPolicy(obs: LabObservation): LabDecision {
         return { kind: 'rest', detail: 'cautious-rest' };
     }
 
+    // Once extracting, disengage — seed 2 died cornered-fighting on the extract path.
+    if (shouldExtract(obs)) {
+        if (obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
+            return moveToward(obs, obs.extractionGoal, 'extract-path');
+        }
+        if (obs.remainingAp > 0) return { kind: 'endTurn', detail: 'extract-spent' };
+        return { kind: 'wait' };
+    }
+
     const adjacentThreat = nearestAttackable(obs);
-    if (adjacentThreat && (adjacentThreat.isAggro || manhattan(obs.tile, adjacentThreat.tile) <= 1)
-        && obs.remainingAp >= ATTACK_AP_COST) {
+    if (adjacentThreat && manhattan(obs.tile, adjacentThreat.tile) <= 1
+        && obs.remainingAp >= ATTACK_AP_COST
+        && hpRatio > 0.7) {
         return { kind: 'attack', targetId: adjacentThreat.id, detail: 'cornered' };
     }
 
@@ -168,14 +178,12 @@ function cautiousPolicy(obs: LabObservation): LabDecision {
         return moveToward(obs, away, 'flee');
     }
 
-    // Cautious extracts early — only a short loot peek near spawn.
-    if (!shouldExtract(obs)) {
-        const nearbyLoot = nearestLoot(obs, 12);
-        if (nearbyLoot && obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
-            const adjacent = nearestLoot(obs, 1);
-            if (adjacent) return { kind: 'loot', lootId: adjacent.id, detail: 'open-pickup' };
-            return moveToward(obs, nearbyLoot.tile, 'loot-peek');
-        }
+    // Short loot peek near spawn only.
+    const nearbyLoot = nearestLoot(obs, 12);
+    if (nearbyLoot && obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
+        const adjacent = nearestLoot(obs, 1);
+        if (adjacent) return { kind: 'loot', lootId: adjacent.id, detail: 'open-pickup' };
+        return moveToward(obs, nearbyLoot.tile, 'loot-peek');
     }
 
     if (obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
@@ -215,9 +223,8 @@ function randomLegalPolicy(obs: LabObservation): LabDecision {
     if (obs.currentTownId && obs.currentTownId !== obs.departureTownId) {
         options.push({ kind: 'leave_town', detail: `extract:${obs.currentTownId}` });
     }
-    if (!shouldExtract(obs)) {
-        options.push({ kind: 'leave_manual', detail: 'random-leave' });
-    }
+    // Do not offer early leave_manual — it made random-legal 100% LEFT in ~1s smokes.
+    // Max-actions still forces a manual leave via the runner.
 
     if (options.length === 0) return { kind: 'wait' };
     return options[pickIndex(obs.random, options.length)]!;

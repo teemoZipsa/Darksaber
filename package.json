@@ -46,7 +46,11 @@
     "test:field": "node --import tsx --test tests/field/*.test.ts",
     "raid-lab": "node --import tsx scripts/raid-lab/index.ts",
     "raid-lab:smoke": "node --import tsx scripts/raid-lab/index.ts --seeds 100 --policy balanced --max-actions 1500",
-    "raid-lab:cohort1k": "node --import tsx scripts/raid-lab/index.ts --seeds 1000 --policy balanced --max-actions 1500"
+    "raid-lab:smoke:cautious": "node --import tsx scripts/raid-lab/index.ts --seeds 100 --policy cautious --max-actions 1500",
+    "raid-lab:smoke:random": "node --import tsx scripts/raid-lab/index.ts --seeds 100 --policy random-legal --max-actions 1500",
+    "raid-lab:cohort1k": "node --import tsx scripts/raid-lab/index.ts --seeds 1000 --policy balanced --max-actions 1500",
+    "raid-lab:cohort1k:cautious": "node --import tsx scripts/raid-lab/index.ts --seeds 1000 --policy cautious --max-actions 1500",
+    "raid-lab:cohort1k:random": "node --import tsx scripts/raid-lab/index.ts --seeds 1000 --policy random-legal --max-actions 1500"
   },
   "keywords": [
     "srpg",

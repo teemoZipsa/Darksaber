@@ -102,3 +102,20 @@ test('raid lab balanced policy skips cursed reliquary loot on seed 852', () => {
     assert.equal(result.extractionTownId, 'e_stronghold');
     assert.ok(!result.actions.some((a) => (a.detail ?? '').includes('reliquary')));
 });
+
+test('raid lab cautious extract disengages instead of cornered-stalling on seed 2', () => {
+    // 49 cornered attacks on extract path then rested to enemy death at ~(1815,1458).
+    const result = runRaidLabExpedition({ seed: 2, policy: 'cautious', maxActions: 1_500 });
+    assert.equal(result.result, 'SURVIVED');
+    assert.equal(result.extractionTownId, 'e_stronghold');
+});
+
+test('raid lab random-legal does not early-abandon on seed 0', () => {
+    // Previously leave_manual was a legal option before extract → LEFT in a few actions.
+    const result = runRaidLabExpedition({ seed: 0, policy: 'random-legal', maxActions: 200 });
+    assert.ok(!result.actions.some((a) => a.detail === 'random-leave'));
+    assert.ok(result.actions.length >= 50);
+    if (result.result === 'LEFT') {
+        assert.equal(result.stopReason, 'max_actions');
+    }
+});

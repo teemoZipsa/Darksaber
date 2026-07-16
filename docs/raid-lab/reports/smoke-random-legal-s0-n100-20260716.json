@@ -1,7 +1,7 @@
 {
   "summary": {
     "labVersion": 7,
-    "policy": "balanced",
+    "policy": "random-legal",
     "seedStart": 0,
     "seedEnd": 99,
     "count": 100,
@@ -13,507 +13,507 @@
     },
     "invariantViolationCount": 0,
     "invariantCodes": {},
-    "meanElapsedSeconds": 35.815000000000225,
-    "meanKills": 0.63,
+    "meanElapsedSeconds": 87.17499999999933,
+    "meanKills": 0,
     "digests": [
       {
         "seed": 0,
-        "digest": "b80fd08624910592a46c1880c5bc7c58f389f78dd1bd75024bd6304f30dfe072",
+        "digest": "8ceaae40b4537e7946471fbaa336eaa5efe9844fe2ecdfcf4d31bbac728f3169",
         "result": "SURVIVED"
       },
       {
         "seed": 1,
-        "digest": "c89c84052fa806998b20e5fa99c225f90a9adb305682170fdb4e070de1b161f1",
+        "digest": "e4964bb6e342ea63668313dbb20cb3272f49955a964df0c3e76e49d4a6023e0b",
         "result": "SURVIVED"
       },
       {
         "seed": 2,
-        "digest": "8fe01c38da153f2597d53010a73de83c33ebd738e953fb46920f072dd57464f0",
+        "digest": "9609692516ebc7e386f71cbeed5f941368ecf281cb7630f3ae5689c7965adaa6",
         "result": "SURVIVED"
       },
       {
         "seed": 3,
-        "digest": "d60890eb07d503f7869daf6f4d1ab30a295b497dd7ed739a8c644d36cb4682da",
+        "digest": "3759df2c1da6fb524700e239a4460bd09d319b5c188227f522a5341729791f99",
         "result": "SURVIVED"
       },
       {
         "seed": 4,
-        "digest": "e983e328011084e0b32a0dc0be7eb93c5ce19db0c90c1d40586663d3cc1570da",
+        "digest": "6265ae381f4a8e174b2e46c597fdd888b87b8dd87d0020adcc228c2a1c75009e",
         "result": "SURVIVED"
       },
       {
         "seed": 5,
-        "digest": "4a6360f67760b9ea84f09003276e89d7e75600ac10c9a19a1491a347120e1240",
+        "digest": "a8f74a8927eb5f58bf3de9e5dff0302ea56e5be42589e5d0552388024c27ec69",
         "result": "SURVIVED"
       },
       {
         "seed": 6,
-        "digest": "6c74b23e74b00f962a40279f3942d8a77ba21e0ca083b25bf74e21b211ad8809",
+        "digest": "4b4875cf873b6549cdd1c17abf76a37b1ee48539b2205f6566f5a086f566104e",
         "result": "SURVIVED"
       },
       {
         "seed": 7,
-        "digest": "7590d7e9f956583718f651e03a60be22b7f84621eb748f2fee2bd230e7a67bc4",
+        "digest": "94e3ecedc79cb069d54ccaf37216cf5a2f20749409b77212dcc7de25b248b8c9",
         "result": "SURVIVED"
       },
       {
         "seed": 8,
-        "digest": "a5cb9e2d428509e3e28962b07e99c2710ecbb5393114bf1719e69bb18e843d42",
+        "digest": "f6cc6553748e18c74f8f15e969695ff798a6804aea1d2759864890d52a79adec",
         "result": "SURVIVED"
       },
       {
         "seed": 9,
-        "digest": "d20adb22acdba5eeb8bc68b6f85c601e557c0a26b354bedf2c91f999b17b8ac8",
+        "digest": "be92b4f7641a9da8acb82182ea5b834296bed034849157c10465edefa45dbc32",
         "result": "SURVIVED"
       },
       {
         "seed": 10,
-        "digest": "49a85a4d5b35ed605aa5d0807bc038358e5db106c5918672c05e000fa3653ee6",
+        "digest": "9455c74c364cffc11599de3716b229bc88226bbfc05fa0f66dde8a08e2e35674",
         "result": "SURVIVED"
       },
       {
         "seed": 11,
-        "digest": "8dec46cc24001cf82a6fdba12b1184f0e04888f5af77ebd3ce1bb402b9957aa6",
+        "digest": "7f0739fcfc07ad57cf38b8b27b1f6bf1e47e54740578356c5fc51eba0cc9ab5c",
         "result": "SURVIVED"
       },
       {
         "seed": 12,
-        "digest": "23927ce19cea1b35d4fc4a8f5596491151672f1977a6009eae2e701dddb85fa2",
+        "digest": "1754597b87cd2710e9cb5735c3ba3b29354a5e7741a682f95ee9e488f360bc53",
         "result": "SURVIVED"
       },
       {
         "seed": 13,
-        "digest": "4efe45f1c8a65aee6d4c9ee969c63cd33050a7816d216dba7c02bdc2d3d552da",
+        "digest": "41ed27d8054dd37776ab34b326ec9957b8319e9aacc65ed714d6ce4418da03a6",
         "result": "SURVIVED"
       },
       {
         "seed": 14,
-        "digest": "09a4d2bab39621506b8f92fae4b4d6562759210e7a6e3390287555fc9e0bdd83",
+        "digest": "64f70ac929a7273323055d40971207bdf7219229c1e2db0aa634c4c5bfe156d7",
         "result": "SURVIVED"
       },
       {
         "seed": 15,
-        "digest": "4ce90d4f2c505518a21420d8e4c0a8759044e532833dbae5064a7580d88fd42d",
+        "digest": "f5168c10b885868bf2f7b2e7a4b35062ae2bea9ff1aa505ac76369155f34ac82",
         "result": "SURVIVED"
       },
       {
         "seed": 16,
-        "digest": "f082e1bb2a1ed20fca254f0853693f75e3f9bb2c246d05d1e37ad14532faec18",
+        "digest": "e907077cef332f04b8a6c3b63725cbb01226349bf3855312cd69f52a497028d8",
         "result": "SURVIVED"
       },
       {
         "seed": 17,
-        "digest": "39a619050de9f9cb5b6443d87c8c121fa9abfdfc2fab96808eeaadcab90c6591",
+        "digest": "9be0c25505e96e2df7dbed074a49a4e5a3037abe17f5b2759d5c2190effabdd1",
         "result": "SURVIVED"
       },
       {
         "seed": 18,
-        "digest": "506eaf279d48cf20589398a9af4aaaf2d16e42e3b0dc44f581355a918c94bf37",
+        "digest": "99b056a320bc90d7be124be5f4519ef467ef4001693e354ffcf303ab1cec4725",
         "result": "SURVIVED"
       },
       {
         "seed": 19,
-        "digest": "b684726416be11d0ba7f8089eadbd6e57f8078b2208d1ed6c757e01686bc342a",
+        "digest": "083e865922550e6af90e4da3107643990cd2fd9a2dcc16851d78f3bb5d836bbf",
         "result": "SURVIVED"
       },
       {
         "seed": 20,
-        "digest": "cc0492f9d50b50391625216dc6571b48fb83b62f87e150c27b7b4338381a59f4",
+        "digest": "1d285c972cf6661756f83d9e277057bff348c5c3ae93f1d65bcde7b8f55b988f",
         "result": "SURVIVED"
       },
       {
         "seed": 21,
-        "digest": "c553962825e93d0db1c5f63b581ecf15113926d114459b0768f4337635d20d7e",
+        "digest": "c29a4d41e39e12bc64fdd56b4720010d2feb2ac9e4daac3e917915b924a5ec0b",
         "result": "SURVIVED"
       },
       {
         "seed": 22,
-        "digest": "6860ff840f12e12911ba85292dabe121b30cae846b939dfa82768363b0a14866",
+        "digest": "d4559e1f9d9ffbb72dcef44609c33a652763c78c388918dcaa2fc009ddf2da40",
         "result": "SURVIVED"
       },
       {
         "seed": 23,
-        "digest": "47f4d53cfdbdba16f186177ce802ab5cf66c71fc9eb8e004241ae5d9a57594a6",
+        "digest": "c130de0ece9f1ebb07fa095172f2dca0539b443afea9921fc52802462da4aa6e",
         "result": "SURVIVED"
       },
       {
         "seed": 24,
-        "digest": "c051a4f483779f8ec4257220fea5af1e9028fc874439c7f728e03382561e3b83",
+        "digest": "a39088b0016138311f45816aa78053de887127d5303d0cfcba40d43ac21129c8",
         "result": "SURVIVED"
       },
       {
         "seed": 25,
-        "digest": "5f15f6541620b5b1b3b6808bdbeee1f69d1c85839d471f464ed8c1c19bbc64bd",
+        "digest": "fb66731939051fc06e94aa2a60ecce87fa5f3207176b1ba548d544ca774ca6b6",
         "result": "SURVIVED"
       },
       {
         "seed": 26,
-        "digest": "38e80690079a2f008dc36faedfdf88ce1202c2de29cceaffe28462f1ecba2452",
+        "digest": "ba0562c4682472c17cd3cabd95d8f98f7444b027afc3cb78e3b7dafd1063c8e9",
         "result": "SURVIVED"
       },
       {
         "seed": 27,
-        "digest": "de9d2e15eb31ae2f3e89eb1cce9ac5664a4e506a840b04aa025553d8f06c4788",
+        "digest": "8b36bc1331d664d7678a8dbb6a6a52fc7c62872f0605b3d496837050158f5991",
         "result": "SURVIVED"
       },
       {
         "seed": 28,
-        "digest": "00bed4892050fc7b99340f3b1fcd668cb915efdd33c3b1265f34c96efc920690",
+        "digest": "60d65ef2c1750b5e7f082a2c9e3e7133f9128e7d9178b622fd6d35a8df13e2fd",
         "result": "SURVIVED"
       },
       {
         "seed": 29,
-        "digest": "cdcfccd6983ffe000e05cbb0698d5b62e20a1eb63ff7226b0f0d4f23e5e6b9cc",
+        "digest": "ff79b73dda21b1467883b3969a8c4a2564a3ea78ca15a7dde1559fc0a05a24f1",
         "result": "SURVIVED"
       },
       {
         "seed": 30,
-        "digest": "ed17b5fadd3a6af63bb8d0088daef500b63dcea92aae6cf6d0d0e4de405ea3ce",
+        "digest": "61e9869aa8c7571355dcca498a99511ad4ff99f93d7da43530fef961cc59ec35",
         "result": "SURVIVED"
       },
       {
         "seed": 31,
-        "digest": "c8f469ce329d1b0de6a6a008413989e3c01580f784e8365f46a51456b16055ca",
+        "digest": "178ffcc3a4ec5390207fde27d8f297e440d3896dde1d755d0260c5d382425aac",
         "result": "SURVIVED"
       },
       {
         "seed": 32,
-        "digest": "0820fdcc075a17d6d8e93fc3e0ba46d2a0aba6b423fb5341c4bf2dd9ada84196",
+        "digest": "5df56f825e11455d930c57088e1e7d95369b0064e9068f6d9e06be7e325ab33b",
         "result": "SURVIVED"
       },
       {
         "seed": 33,
-        "digest": "9b90f0b6b86450951b2731a410024ab1ad1b9de68464ed6c2294635950a4d99c",
+        "digest": "f67e14f7b6a18b8778cc7358bccc016e8c3a25f7cc582773d2408e2e283475df",
         "result": "SURVIVED"
       },
       {
         "seed": 34,
-        "digest": "6a1ba42739481ffa16bb2a5ddf0c81bc56a9e72090386d36b8313e957dd3a290",
+        "digest": "15ee71d8858f387e0d2a6ec354cd52938e032b6544b5c8a3207f6c03593ea6f1",
         "result": "SURVIVED"
       },
       {
         "seed": 35,
-        "digest": "8f865155faa74e8cc20bd2262b7606cc6a019e58b1e0b0a763526e88beaff2a8",
+        "digest": "1f06e155c6d57eb33084ff09a8c3f08064e9c929ffd48a1bfe362601c68cdde0",
         "result": "SURVIVED"
       },
       {
         "seed": 36,
-        "digest": "e3132822118f7629e9df90ca8816f8a7d326d3367ddab33d271eb41aada3558e",
+        "digest": "cdb75148fed21ebff52ebd44b0be09e7e6f9d750d88e6d6c07f7f07649367096",
         "result": "SURVIVED"
       },
       {
         "seed": 37,
-        "digest": "1c7be9a2e68f7ecf0e3f5453f8ac7c26fbfdf2deb435780e7d287700f144660b",
+        "digest": "ef30fb44666d616929b46d2210b796c05810a3edd4082b9b11ba7390da3bcf0d",
         "result": "SURVIVED"
       },
       {
         "seed": 38,
-        "digest": "9cb18f63618465a4dbb794d0a6aac08276bb2720a4ddf7ac2813b0d3e64d81b5",
+        "digest": "13f7cda581301357d9b071e6e5082c56f1a2dee45fa442203d39141d8fa15a71",
         "result": "SURVIVED"
       },
       {
         "seed": 39,
-        "digest": "a7d94860fdc60d6cb044bc58c369a9fe8803fa3270f50a46949410099423dabd",
+        "digest": "a323e3e6412162745432df359c1c8f2325b09ce847f113489ba7b3edcf21a283",
         "result": "SURVIVED"
       },
       {
         "seed": 40,
-        "digest": "1f4f30345c89ad715adcbe882c47ec454089e08a4e563133b12ab05316b0e5b1",
+        "digest": "c16cd65f8481ddb7bbf7c190664d39a1f909ff5a78f987152c30628e64937a57",
         "result": "SURVIVED"
       },
       {
         "seed": 41,
-        "digest": "a15aea5092557adf7c0e41e1d388655d0202ec38c63ad0447ac280b4f0568bdd",
+        "digest": "2eb6dfd6efa052625a4f421be7eeda50b83bcad84fc11dfe41b415d2d9977dee",
         "result": "SURVIVED"
       },
       {
         "seed": 42,
-        "digest": "a7dabc1da9c79ad7f44ea21f1c5f042200b611f5f165f7a0060fde3c6102e533",
+        "digest": "5905815dc4dfba610ed8f35b421e01797a43d1ee2916afd92cd3dd25a9c28bea",
         "result": "SURVIVED"
       },
       {
         "seed": 43,
-        "digest": "7001e53987e7a9d5c5780e28900f76f5dbf35907aa3d6605bfd55435c453f8f4",
+        "digest": "d4301fee31bffe2f678b3f4912c88889cfdbfc86aee5a9cd9cdefb3eaf245f64",
         "result": "SURVIVED"
       },
       {
         "seed": 44,
-        "digest": "ef54ff0f625c8eb200f6f212ef5b91762dbf040aac99743016fa939e4256f844",
+        "digest": "6475fa5505eee14c8f63364d2911d7831a4e04afc1fc2d0710247531e0ae6716",
         "result": "SURVIVED"
       },
       {
         "seed": 45,
-        "digest": "ccceb9aa04a991d67b0a8f067c516aa31ba9152060b3c622c097ef95801538d0",
+        "digest": "97e77a7ed9993b1b77ea950985a2dc912d87cfa03bf45b1b8d3e709aa36dcb76",
         "result": "SURVIVED"
       },
       {
         "seed": 46,
-        "digest": "3d3788ac4ef257064c863e6c608067276cbc090b7ec53f3b86e01e77d42cbe20",
+        "digest": "9c0dd17e580d8956bbbef0aae7566dfd499acd941280ca637e0cca70146418aa",
         "result": "SURVIVED"
       },
       {
         "seed": 47,
-        "digest": "c6f74105f84f7d59d083da55d036507e8b297800e12c73dd4c9879851b886c1d",
+        "digest": "0c8972afc6c2ca78ddf017efb15847af024e7733a6fa084d24b6abb02e296209",
         "result": "SURVIVED"
       },
       {
         "seed": 48,
-        "digest": "c19c3efbcb21073ee9139f1745bd6d85b1c74cd946ecdc506821c4f173a82a3e",
+        "digest": "97ba077921461678003e56c6542a4589b12dbf937b58b383a54b40fcf2003688",
         "result": "SURVIVED"
       },
       {
         "seed": 49,
-        "digest": "d423f9427434c2b40cfdc5ac08f4c3ae5a5296f0b81c393647c14b61fdab1f3c",
+        "digest": "4a8fad3e163f8c1e3194e59bbfc19f2c92bdf2c304e2c8c9c05969c3461fce33",
         "result": "SURVIVED"
       },
       {
         "seed": 50,
-        "digest": "5612a54f3eecbf2ac9e1350b23b94e115078288e6bfd2b57132913eff5bbe679",
+        "digest": "d58223d0151fa7b2e5161380c75580c8298229ace7d8ff09aaec0471f11a8f1a",
         "result": "SURVIVED"
       },
       {
         "seed": 51,
-        "digest": "815800a842427d97efccd1daeae71e261395ebab8d2e695c9fd29a478234f5bd",
+        "digest": "2c3d5e3b9f01ec350ebd91d37a6efc999f0dac2cee5c9cb705c364238b8d1bf4",
         "result": "SURVIVED"
       },
       {
         "seed": 52,
-        "digest": "c2510f6a9e7bc76cd329b88c126924bfb3b31c7d8a8795fde71bfabc8938e90a",
+        "digest": "17b6ee7f0b328433f5186e792bdfa9b8bd58b60fdcea1abb96ca6464cd3e3824",
         "result": "SURVIVED"
       },
       {
         "seed": 53,
-        "digest": "90d29d8ad222846393be1de637f40f505ab4bb5b7193791f2eea32eaa3f36739",
+        "digest": "3d0a583da4c2eb621f29c25afd9811962cb0f6750d10e79900a24909f0922636",
         "result": "SURVIVED"
       },
       {
         "seed": 54,
-        "digest": "73ca060ee6e832247e5ecb5981877029ec1757a432dccee685b936c04d895583",
+        "digest": "a968df923d94698bb85027ba154b1700d04a5c57653f4275cf3b7a7f35973514",
         "result": "SURVIVED"
       },
       {
         "seed": 55,
-        "digest": "3bf3442fd404398c69fb2a3a6e7f2c8c0ab87cefa48499085da526154165268f",
+        "digest": "05a58a2304fab21608fa98376e0d71773b56319c45caf9110066f2d7c9ec1723",
         "result": "SURVIVED"
       },
       {
         "seed": 56,
-        "digest": "7bf5580511b003430e2d64707ff263329ced08dcaf079a7590eebfdffd89ffe2",
+        "digest": "11d39c531d8aebe0e5d7ff561ce338fa7e60092c20be3daf6af05ca4d284e908",
         "result": "SURVIVED"
       },
       {
         "seed": 57,
-        "digest": "0ae60785f47d9c67ce6cfa8346f271b507604807ca236c321f001e96424cbe3f",
+        "digest": "a2e5bf53c18d178b77f999cf26d888b0cef03711bd6a2d6d87d33511cb855e67",
         "result": "SURVIVED"
       },
       {
         "seed": 58,
-        "digest": "519ac73f13d433721cbf044591f11894f86c813c56a19409f5888372d571ac28",
+        "digest": "524a5c3c25411905457458d2c5f49e87f9598ba842a40f3a8a15d304dd871ee7",
         "result": "SURVIVED"
       },
       {
         "seed": 59,
-        "digest": "64f447c0ce30e279e343769c862e5e3b6a7024ff5e88f51152f58ed1cdf766a9",
+        "digest": "aea1fbc640997bbe4f030af0be72d313cd6b1b9fd657887c2c190a723c02c5b1",
         "result": "SURVIVED"
       },
       {
         "seed": 60,
-        "digest": "0b6ca6574c10fa55460abded64a4bf01ded500142bdbb7ed15b8ff5c2f116467",
+        "digest": "c4c1da4f659c0525121298ce0dd0732e301b0b900bf3dfc16e895ca855d53b24",
         "result": "SURVIVED"
       },
       {
         "seed": 61,
-        "digest": "389b7dd951b140ced3898ee127c49b02db5acb05aad7c06100f0570d4af15ae5",
+        "digest": "09de6a3de98a3bb68f380456474c6d7a3d248727b73332cea129fd4d23251542",
         "result": "SURVIVED"
       },
       {
         "seed": 62,
-        "digest": "b917508a18e7120bde7b77dfed9a3bba884c473b43d563e8f34e622960c8ef06",
+        "digest": "9ffe31578be499ee51f8dede1fd0ee91300e735f762e5d1991a2f649e5f47b9a",
         "result": "SURVIVED"
       },
       {
         "seed": 63,
-        "digest": "95ab8c9d1347fedd6e36294c03c004dc8d9ed8f8428d7dcab44845e5d4ce8f43",
+        "digest": "7c388f51c0db68fd27f9dc5d600e41fe526d207b3eddd709ee4aba091397cbc3",
         "result": "SURVIVED"
       },
       {
         "seed": 64,
-        "digest": "f84998c8f80ada0b4dfc0126c0a90d98b1f992a97beeaa4c411181c7ab711f21",
+        "digest": "98c543e7390b309c9291bfa3ded0c50fde058348e984b10299cc254a2c7f2c1c",
         "result": "SURVIVED"
       },
       {
         "seed": 65,
-        "digest": "02db673ad6d1aa0b1830def2ce886fd994f13d58765b594c3bcb72b076d6c05c",
+        "digest": "34435d572d91afc2fa06d4e67affff09f986b0ac1db597840de2cb433d968996",
         "result": "SURVIVED"
       },
       {
         "seed": 66,
-        "digest": "698ce8008f36274af39de2324080abc13f83431f26c94c03d2a4e286a3175cc1",
+        "digest": "389b311aa1350cb6a0bec1a2ba3a54e8d417a662baf3e91ede9a04fd192efd82",
         "result": "SURVIVED"
       },
       {
         "seed": 67,
-        "digest": "0556cd44e5da378be9cfc942915e3dba91723913d7161cdb2045a78290f7a6a9",
+        "digest": "c159a5fa0bdea4a611c0fe5c4e33e2b5cfca95beaa7c8b8ba7952df9c92e7e0f",
         "result": "SURVIVED"
       },
       {
         "seed": 68,
-        "digest": "e81a32e77d24b65cab66fb28d8b751139128849656b84ac18501c5d9a62069fb",
+        "digest": "7e415e3ad6487fca951a03dc383710b225cf6acf016cb98661944d4274299ea4",
         "result": "SURVIVED"
       },
       {
         "seed": 69,
-        "digest": "a6845868b5fefd7987d93a37ca051aae4398bedf71f8afe271de33afbc82ad03",
+        "digest": "3a001550eb08c67bc4249eafb58d4658a21180fc0512bfca4dc0a414259fef31",
         "result": "SURVIVED"
       },
       {
         "seed": 70,
-        "digest": "a7d808f150954cda0e82bf2aadb57dff7361cf38b2e594682b7d07b3ce9f994b",
+        "digest": "b23a2788aa2acdcfd4aeb43923d480745c226f65fa6a969b42e4bc5ca9becfa3",
         "result": "SURVIVED"
       },
       {
         "seed": 71,
-        "digest": "70aa047bd00de194b9a24a05465b639e586acd94498bf9f25909398f0788a88d",
+        "digest": "1cdfa57b5a75d538fcbb5fc84cbbbdcadec8c3d386126c63fc479a98ddab1ba2",
         "result": "SURVIVED"
       },
       {
         "seed": 72,
-        "digest": "789430aab1e084a67be0895b7e53a3555bc6f242742912d56b839cdac73474ed",
+        "digest": "fdddbef7467d7bcdacb860d14ff651c818eca5ed6408712e131f408aa366e747",
         "result": "SURVIVED"
       },
       {
         "seed": 73,
-        "digest": "9e162032ad93e4c028c906c47406c61b2afd78771f64003327b3264c56930bd7",
+        "digest": "d5c4282de969d02d2f6f9fbec453edafcc189534667e760e8ec7942777bce0b5",
         "result": "SURVIVED"
       },
       {
         "seed": 74,
-        "digest": "58b9c500b543b8d085f4c10a2d7a20debeda5ec535bafeb1d3cbd0076daf6bda",
+        "digest": "efae1885ff51b7a312027ec44bdddff21a2f82d5117fc2f23a2b602a23b2318a",
         "result": "SURVIVED"
       },
       {
         "seed": 75,
-        "digest": "5e08ba362aae337b992ec57257f7a03fb4e65bf7d6b709d8124b45aec4ef4c02",
+        "digest": "1506003a90412bedf8236af50cdf54a2d2424b51dc466442fd729d57d3dd220d",
         "result": "SURVIVED"
       },
       {
         "seed": 76,
-        "digest": "1947e0d0d75697a5f00922eb3cc5c26908e537e5cfa116880901abbc4cab8d3c",
+        "digest": "edcee695ebd492a4d54554a6e351cca33199e2f6e9d09098f7c49902a2a8cd94",
         "result": "SURVIVED"
       },
       {
         "seed": 77,
-        "digest": "a3caf533f9b0e4d74898bcabe8a1741f12b4707ab147959b18d9531f45933782",
+        "digest": "d6d5de6f113a5fec12f260604469d93f219908a31016befb345a8c842b9a5043",
         "result": "SURVIVED"
       },
       {
         "seed": 78,
-        "digest": "6e4a4c1a27a3072c36f02df33d135214a1aa083fdd2b48bc87b9625ac6e5d27e",
+        "digest": "443a275683c684ce8b6ede57f7d2dcd7e44afdc391383a32aff02fe15da69d26",
         "result": "SURVIVED"
       },
       {
         "seed": 79,
-        "digest": "18daa15421453a9fa0234693fb2dca1eafb63d946f992b8c971c973b15ba985a",
+        "digest": "56828592238ca0f29d1710023596b44f64247c93a871fa721b37a336de31227e",
         "result": "SURVIVED"
       },
       {
         "seed": 80,
-        "digest": "aeeed5b16e27ec8f8998555d3484334e2457fb67257bdcde0ad071aa0aa12d13",
+        "digest": "c83233676888feea8059cab520670ad1be0fef4831f8f9568446067dc40a8707",
         "result": "SURVIVED"
       },
       {
         "seed": 81,
-        "digest": "26d6c1c3c79c9734d719f184e3219b02ef37b4e49b6423b52c9332c9455f741f",
+        "digest": "c8473c5f736a1dfa95ff2d5f7f671be109d59c2fa675371f02b85864001d4695",
         "result": "SURVIVED"
       },
       {
         "seed": 82,
-        "digest": "6f94c17357bb9b05ef83001d5b1aea09deee5ddadaeeca15f858402c4927c2d1",
+        "digest": "446750ad27a75ceb58163b7ee950904cf64909f862f7c1caa7bceae2c367b3bc",
         "result": "SURVIVED"
       },
       {
         "seed": 83,
-        "digest": "6e7d64bf2e624c9621a3b5d384fc1d16efddbfeb3436d6d3d4194ece05c8ddf4",
+        "digest": "0a3aed2f954d6b2fdac7e8714a807650c1aee008d0fb672157e0afc175cc1d76",
         "result": "SURVIVED"
       },
       {
         "seed": 84,
-        "digest": "f7f0c20a324aba01741620518d6c8aacad066e2e752fba63a896201148f6423a",
+        "digest": "1d956b9b961164c460981024d56a8beaee9708fbe88ffb3727426b916127eaee",
         "result": "SURVIVED"
       },
       {
         "seed": 85,
-        "digest": "0143e416b0291b99a9c8d94148801cd7492f2ad854f63f6cc66afc160d3d8cb1",
+        "digest": "d3e06791aee7fbe521f129aeef99eacef977aa8c8e2d389f18da9bbdd35e4ee7",
         "result": "SURVIVED"
       },
       {
         "seed": 86,
-        "digest": "43b900312ca23f6751e50bb1c84af1e2139f513442b3de048821f6685b180b8e",
+        "digest": "9b6ac1ae7d99fc242232c972ab2fc30210a8dd758747fc4aa621eed6a1882848",
         "result": "SURVIVED"
       },
       {
         "seed": 87,
-        "digest": "d7a64cd21bff46f34a7c13b392c0625631a92f792d934e3b694132f9b33395ed",
+        "digest": "615ba0a6be862608516e5e45959783fb135218c812fd69d68b67103c0d563174",
         "result": "SURVIVED"
       },
       {
         "seed": 88,
-        "digest": "06a5392aeec64682a78f904bcdc330cf822632bf51cf1294a998e468eed3637a",
+        "digest": "26afa4405246a11b44b17106036aa255a7ff6a9dccfd513d114128ef96a013d3",
         "result": "SURVIVED"
       },
       {
         "seed": 89,
-        "digest": "4441fe5f0f051173a3faa91df2e319d4502f5618a77ccc201b7456ba026b7a1c",
+        "digest": "274193a27b495f0b461b66700cdf682c78e2dff5a14e06c6e3322c7c704a13d6",
         "result": "SURVIVED"
       },
       {
         "seed": 90,
-        "digest": "d3c78986f96c0043839dd41e8e45f7fc99e27d6b9d296a820c91b50972f622fd",
+        "digest": "76b38455e944729db6692cf9fa2b5e185707b9475e26e67e3b702e476bb91588",
         "result": "SURVIVED"
       },
       {
         "seed": 91,
-        "digest": "420bd7ba47ab73bc42f3bc1135c1b1715ecb630548742c030013cc75f5daf6b8",
+        "digest": "8e0ec8e2e8ffca794ea909c64e808ed1d52ff9de07d67671e974e69d76b91c38",
         "result": "SURVIVED"
       },
       {
         "seed": 92,
-        "digest": "2fbf6db63d55e2451f89bd95f1edadde9464f158d15bb026c7872cd696ec1768",
+        "digest": "40e647644339297840491bb8731561460105f6c9fcf352f53d9fdde90760d2b7",
         "result": "SURVIVED"
       },
       {
         "seed": 93,
-        "digest": "b476d0d658514ee652fb9a9dc45eaffb470fe8e2d51f566d9c9f8e95b8431266",
+        "digest": "2ad51a746ff88a89a21d29803e33d22b58d76dc07423e729610b65682a5f9448",
         "result": "SURVIVED"
       },
       {
         "seed": 94,
-        "digest": "a0b0c99761fc7f395d1c9550a153ee409775d526b5255f13a16264bc6c26a262",
+        "digest": "43bcb009c118b261e0c85d84b1a2c708850289aa24c3856f5722ff47dacd9def",
         "result": "SURVIVED"
       },
       {
         "seed": 95,
-        "digest": "bc5ff7abafe1d3a0608ddbe3030e35ff0c7384772aa0664469b21ecce5bc59b4",
+        "digest": "86f183be64d81812cada9b3bccdf0b25c6f1d3bab737bcc48c606a0a16ef76ff",
         "result": "SURVIVED"
       },
       {
         "seed": 96,
-        "digest": "76449e4155a29ed15b89d3c2de000f7c179afc413da217cc8efba6845322bd6f",
+        "digest": "8aec6ec27562170b30194c307b567616cef579aa257a9444bec884373eb3fd28",
         "result": "SURVIVED"
       },
       {
         "seed": 97,
-        "digest": "bc14dfa9fb735b60baaa8334bc12fa142e4633af44238ccbcbf1375df2f12f2d",
+        "digest": "dcb4ccff64aa709b9dba9492838e63760b1c1b52eb3dd2125e912a485a6dee66",
         "result": "SURVIVED"
       },
       {
         "seed": 98,
-        "digest": "38b331290cbcf07e6ca0f283829b9514d762ffbb7c99bf3706ffb79371bc9d97",
+        "digest": "6c49ca7813ec58973ad0ebb246d8f32f347f70d760bc2076d557aa8be1b851f3",
         "result": "SURVIVED"
       },
       {
         "seed": 99,
-        "digest": "abf7bd520bc64bb6d3c0f010829575a451d25ebcb9ee7db182e40a3f06009ff1",
+        "digest": "260496ffe4947c424f8cc1908be9dda78170a9f9a4247acf8f66dad7f081400c",
         "result": "SURVIVED"
       }
     ],
@@ -567,17 +567,18 @@
   "results": [
     {
       "seed": 0,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 30.700000000000166,
+      "elapsedSeconds": 79.69999999999975,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 6.199999999999994,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -589,8 +590,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 302,
-      "digest": "b80fd08624910592a46c1880c5bc7c58f389f78dd1bd75024bd6304f30dfe072",
+      "actionCount": 792,
+      "digest": "8ceaae40b4537e7946471fbaa336eaa5efe9844fe2ecdfcf4d31bbac728f3169",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -605,52 +606,15 @@
     },
     {
       "seed": 1,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 84.29999999999949,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "c89c84052fa806998b20e5fa99c225f90a9adb305682170fdb4e070de1b161f1",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 2,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 40.1000000000003,
-      "kills": 0,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 75.39999999999999,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
         "lootItemsAcquired": 0,
         "lootItemsSecured": 0,
@@ -665,8 +629,47 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 396,
-      "digest": "8fe01c38da153f2597d53010a73de83c33ebd738e953fb46920f072dd57464f0",
+      "actionCount": 838,
+      "digest": "e4964bb6e342ea63668313dbb20cb3272f49955a964df0c3e76e49d4a6023e0b",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2027,
+        "tileY": 1578,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 2,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 97.79999999999872,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "firstEngagementSeconds": 62.80000000000062,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 17.399999999999096,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 973,
+      "digest": "9609692516ebc7e386f71cbeed5f941368ecf281cb7630f3ae5689c7965adaa6",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -681,200 +684,9 @@
     },
     {
       "seed": 3,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
-      "kills": 0,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "d60890eb07d503f7869daf6f4d1ab30a295b497dd7ed739a8c644d36cb4682da",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 4,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
-      "kills": 0,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "e983e328011084e0b32a0dc0be7eb93c5ce19db0c90c1d40586663d3cc1570da",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 5,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 39.000000000000284,
-      "kills": 0,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 1,
-        "lootItemsSecured": 1,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 385,
-      "digest": "4a6360f67760b9ea84f09003276e89d7e75600ac10c9a19a1491a347120e1240",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 6,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 37.000000000000256,
-      "kills": 3,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 3.2000000000000015,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 3,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 368,
-      "digest": "6c74b23e74b00f962a40279f3942d8a77ba21e0ca083b25bf74e21b211ad8809",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 150,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 7,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
-      "kills": 0,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "7590d7e9f956583718f651e03a60be22b7f84621eb748f2fee2bd230e7a67bc4",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 8,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 38.60000000000028,
+      "elapsedSeconds": 113.49999999999783,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
@@ -894,8 +706,199 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 381,
-      "digest": "a5cb9e2d428509e3e28962b07e99c2710ecbb5393114bf1719e69bb18e843d42",
+      "actionCount": 1130,
+      "digest": "3759df2c1da6fb524700e239a4460bd09d319b5c188227f522a5341729791f99",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2025,
+        "tileY": 1577,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 4,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 98.79999999999866,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "engagementCount": 0,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 983,
+      "digest": "6265ae381f4a8e174b2e46c597fdd888b87b8dd87d0020adcc228c2a1c75009e",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2023,
+        "tileY": 1575,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 5,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 75.00000000000001,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "engagementCount": 0,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 745,
+      "digest": "a8f74a8927eb5f58bf3de9e5dff0302ea56e5be42589e5d0552388024c27ec69",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2025,
+        "tileY": 1577,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 6,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 101.39999999999851,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "engagementCount": 0,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 1009,
+      "digest": "4b4875cf873b6549cdd1c17abf76a37b1ee48539b2205f6566f5a086f566104e",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2024,
+        "tileY": 1575,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 7,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 101.19999999999852,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "engagementCount": 0,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 1007,
+      "digest": "94e3ecedc79cb069d54ccaf37216cf5a2f20749409b77212dcc7de25b248b8c9",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2024,
+        "tileY": 1576,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 8,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 80.5999999999997,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "firstEngagementSeconds": 7.899999999999988,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 59.40000000000046,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 801,
+      "digest": "f6cc6553748e18c74f8f15e969695ff798a6804aea1d2759864890d52a79adec",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -910,9 +913,9 @@
     },
     {
       "seed": 9,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 50.00000000000044,
+      "elapsedSeconds": 94.19999999999892,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
@@ -932,8 +935,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 495,
-      "digest": "d20adb22acdba5eeb8bc68b6f85c601e557c0a26b354bedf2c91f999b17b8ac8",
+      "actionCount": 937,
+      "digest": "be92b4f7641a9da8acb82182ea5b834296bed034849157c10465edefa45dbc32",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -948,17 +951,18 @@
     },
     {
       "seed": 10,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 104.19999999999835,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 85.59999999999941,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -970,8 +974,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "49a85a4d5b35ed605aa5d0807bc038358e5db106c5918672c05e000fa3653ee6",
+      "actionCount": 1037,
+      "digest": "9455c74c364cffc11599de3716b229bc88226bbfc05fa0f66dde8a08e2e35674",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -986,48 +990,9 @@
     },
     {
       "seed": 11,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 33.1000000000002,
-      "kills": 3,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 5.599999999999996,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 3,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 329,
-      "digest": "8dec46cc24001cf82a6fdba12b1184f0e04888f5af77ebd3ce1bb402b9957aa6",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 91,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 210,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 12,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 38.50000000000028,
+      "elapsedSeconds": 86.29999999999937,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
@@ -1047,8 +1012,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 380,
-      "digest": "23927ce19cea1b35d4fc4a8f5596491151672f1977a6009eae2e701dddb85fa2",
+      "actionCount": 858,
+      "digest": "7f0739fcfc07ad57cf38b8b27b1f6bf1e47e54740578356c5fc51eba0cc9ab5c",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1062,15 +1027,16 @@
       }
     },
     {
-      "seed": 13,
-      "policy": "balanced",
+      "seed": 12,
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 38.50000000000028,
+      "elapsedSeconds": 74.80000000000003,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 7.19999999999999,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
         "lootItemsAcquired": 0,
         "lootItemsSecured": 0,
@@ -1085,8 +1051,47 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 380,
-      "digest": "4efe45f1c8a65aee6d4c9ee969c63cd33050a7816d216dba7c02bdc2d3d552da",
+      "actionCount": 743,
+      "digest": "1754597b87cd2710e9cb5735c3ba3b29354a5e7741a682f95ee9e488f360bc53",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2023,
+        "tileY": 1575,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 13,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 78.89999999999979,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "firstEngagementSeconds": 36.10000000000024,
+        "engagementCount": 1,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 784,
+      "digest": "41ed27d8054dd37776ab34b326ec9957b8319e9aacc65ed714d6ce4418da03a6",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1101,17 +1106,17 @@
     },
     {
       "seed": 14,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 38.90000000000028,
+      "elapsedSeconds": 79.99999999999973,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -1123,8 +1128,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 384,
-      "digest": "09a4d2bab39621506b8f92fae4b4d6562759210e7a6e3390287555fc9e0bdd83",
+      "actionCount": 795,
+      "digest": "64f70ac929a7273323055d40971207bdf7219229c1e2db0aa634c4c5bfe156d7",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1139,17 +1144,18 @@
     },
     {
       "seed": 15,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 87.99999999999928,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 72.60000000000015,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -1161,8 +1167,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "4ce90d4f2c505518a21420d8e4c0a8759044e532833dbae5064a7580d88fd42d",
+      "actionCount": 875,
+      "digest": "f5168c10b885868bf2f7b2e7a4b35062ae2bea9ff1aa505ac76369155f34ac82",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1177,17 +1183,18 @@
     },
     {
       "seed": 16,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 89.09999999999921,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 14.299999999999965,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -1199,8 +1206,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "f082e1bb2a1ed20fca254f0853693f75e3f9bb2c246d05d1e37ad14532faec18",
+      "actionCount": 886,
+      "digest": "e907077cef332f04b8a6c3b63725cbb01226349bf3855312cd69f52a497028d8",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1209,23 +1216,23 @@
         "level": 1,
         "exp": 0,
         "tileX": 2023,
-        "tileY": 1574,
+        "tileY": 1575,
         "mov": 6
       }
     },
     {
       "seed": 17,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 95.69999999999884,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -1237,8 +1244,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "39a619050de9f9cb5b6443d87c8c121fa9abfdfc2fab96808eeaadcab90c6591",
+      "actionCount": 952,
+      "digest": "9be0c25505e96e2df7dbed074a49a4e5a3037abe17f5b2759d5c2190effabdd1",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1253,56 +1260,17 @@
     },
     {
       "seed": 18,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 38.00000000000027,
-      "kills": 1,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 4.6,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 1,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 376,
-      "digest": "506eaf279d48cf20589398a9af4aaaf2d16e42e3b0dc44f581355a918c94bf37",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 50,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 19,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 77.89999999999985,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -1314,8 +1282,46 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "b684726416be11d0ba7f8089eadbd6e57f8078b2208d1ed6c757e01686bc342a",
+      "actionCount": 774,
+      "digest": "99b056a320bc90d7be124be5f4519ef467ef4001693e354ffcf303ab1cec4725",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2024,
+        "tileY": 1576,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 19,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 101.09999999999853,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "engagementCount": 0,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 1006,
+      "digest": "083e865922550e6af90e4da3107643990cd2fd9a2dcc16851d78f3bb5d836bbf",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1330,52 +1336,15 @@
     },
     {
       "seed": 20,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 30.800000000000168,
+      "elapsedSeconds": 84.49999999999947,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 303,
-      "digest": "cc0492f9d50b50391625216dc6571b48fb83b62f87e150c27b7b4338381a59f4",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 21,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 38.60000000000028,
-      "kills": 0,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 44.80000000000037,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
         "lootItemsAcquired": 0,
         "lootItemsSecured": 0,
@@ -1390,8 +1359,47 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 381,
-      "digest": "c553962825e93d0db1c5f63b581ecf15113926d114459b0768f4337635d20d7e",
+      "actionCount": 840,
+      "digest": "1d285c972cf6661756f83d9e277057bff348c5c3ae93f1d65bcde7b8f55b988f",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2024,
+        "tileY": 1576,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 21,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 85.6999999999994,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "firstEngagementSeconds": 26.1000000000001,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 18.600000000000264,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 852,
+      "digest": "c29a4d41e39e12bc64fdd56b4720010d2feb2ac9e4daac3e917915b924a5ec0b",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1406,14 +1414,15 @@
     },
     {
       "seed": 22,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 40.0000000000003,
+      "elapsedSeconds": 82.49999999999959,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 5.4999999999999964,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
         "lootItemsAcquired": 0,
         "lootItemsSecured": 0,
@@ -1428,8 +1437,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 395,
-      "digest": "6860ff840f12e12911ba85292dabe121b30cae846b939dfa82768363b0a14866",
+      "actionCount": 820,
+      "digest": "d4559e1f9d9ffbb72dcef44609c33a652763c78c388918dcaa2fc009ddf2da40",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1437,24 +1446,25 @@
         "mp": 30,
         "level": 1,
         "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
+        "tileX": 2024,
+        "tileY": 1576,
         "mov": 6
       }
     },
     {
       "seed": 23,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.700000000000138,
+      "elapsedSeconds": 73.00000000000013,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 5,
-        "lootItemsSecured": 5,
+        "firstEngagementSeconds": 21.600000000000037,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 40.20000000000057,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -1466,8 +1476,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 282,
-      "digest": "47f4d53cfdbdba16f186177ce802ab5cf66c71fc9eb8e004241ae5d9a57594a6",
+      "actionCount": 725,
+      "digest": "c130de0ece9f1ebb07fa095172f2dca0539b443afea9921fc52802462da4aa6e",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1482,95 +1492,18 @@
     },
     {
       "seed": 24,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 47.90000000000041,
-      "kills": 1,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 3.0000000000000013,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 1,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 475,
-      "digest": "c051a4f483779f8ec4257220fea5af1e9028fc874439c7f728e03382561e3b83",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 50,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 25,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 36.60000000000025,
-      "kills": 3,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 3.600000000000002,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 3,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 364,
-      "digest": "5f15f6541620b5b1b3b6808bdbeee1f69d1c85839d471f464ed8c1c19bbc64bd",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 150,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 26,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 105.69999999999827,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "firstEngagementSeconds": 10.899999999999977,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 77.49999999999928,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -1582,8 +1515,85 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "38e80690079a2f008dc36faedfdf88ce1202c2de29cceaffe28462f1ecba2452",
+      "actionCount": 1052,
+      "digest": "a39088b0016138311f45816aa78053de887127d5303d0cfcba40d43ac21129c8",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2023,
+        "tileY": 1574,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 25,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 99.09999999999864,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "engagementCount": 0,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 986,
+      "digest": "fb66731939051fc06e94aa2a60ecce87fa5f3207176b1ba548d544ca774ca6b6",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2023,
+        "tileY": 1574,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 26,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 77.59999999999987,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "firstEngagementSeconds": 6.199999999999994,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 54.9000000000006,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 771,
+      "digest": "ba0562c4682472c17cd3cabd95d8f98f7444b027afc3cb78e3b7dafd1063c8e9",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1598,17 +1608,17 @@
     },
     {
       "seed": 27,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 54.2000000000005,
+      "elapsedSeconds": 87.5999999999993,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 2,
-        "lootItemsSecured": 2,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -1620,8 +1630,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 537,
-      "digest": "de9d2e15eb31ae2f3e89eb1cce9ac5664a4e506a840b04aa025553d8f06c4788",
+      "actionCount": 871,
+      "digest": "8b36bc1331d664d7678a8dbb6a6a52fc7c62872f0605b3d496837050158f5991",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1636,21 +1646,21 @@
     },
     {
       "seed": 28,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 30.600000000000165,
-      "kills": 3,
+      "elapsedSeconds": 83.49999999999953,
+      "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "firstEngagementSeconds": 3.900000000000002,
+        "firstEngagementSeconds": 10.799999999999978,
         "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
-          "low": 3,
+          "low": 0,
           "mid": 0,
           "high": 0,
           "scenario": 0
@@ -1659,15 +1669,15 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 304,
-      "digest": "00bed4892050fc7b99340f3b1fcd668cb915efdd33c3b1265f34c96efc920690",
+      "actionCount": 830,
+      "digest": "60d65ef2c1750b5e7f082a2c9e3e7133f9128e7d9178b622fd6d35a8df13e2fd",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
         "maxHp": 100,
         "mp": 30,
         "level": 1,
-        "exp": 210,
+        "exp": 0,
         "tileX": 2023,
         "tileY": 1574,
         "mov": 6
@@ -1675,17 +1685,17 @@
     },
     {
       "seed": 29,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 94.79999999999889,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -1697,8 +1707,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "cdcfccd6983ffe000e05cbb0698d5b62e20a1eb63ff7226b0f0d4f23e5e6b9cc",
+      "actionCount": 943,
+      "digest": "ff79b73dda21b1467883b3969a8c4a2564a3ea78ca15a7dde1559fc0a05a24f1",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1706,28 +1716,28 @@
         "mp": 30,
         "level": 1,
         "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
+        "tileX": 2024,
+        "tileY": 1576,
         "mov": 6
       }
     },
     {
       "seed": 30,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 43.00000000000034,
-      "kills": 1,
+      "elapsedSeconds": 80.99999999999967,
+      "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "firstEngagementSeconds": 5.699999999999996,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "firstEngagementSeconds": 9.199999999999983,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 44.40000000000051,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
-          "low": 1,
+          "low": 0,
           "mid": 0,
           "high": 0,
           "scenario": 0
@@ -1736,15 +1746,15 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 426,
-      "digest": "ed17b5fadd3a6af63bb8d0088daef500b63dcea92aae6cf6d0d0e4de405ea3ce",
+      "actionCount": 805,
+      "digest": "61e9869aa8c7571355dcca498a99511ad4ff99f93d7da43530fef961cc59ec35",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
         "maxHp": 100,
         "mp": 30,
         "level": 1,
-        "exp": 70,
+        "exp": 0,
         "tileX": 2023,
         "tileY": 1574,
         "mov": 6
@@ -1752,9 +1762,9 @@
     },
     {
       "seed": 31,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 38.70000000000028,
+      "elapsedSeconds": 79.79999999999974,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
@@ -1774,8 +1784,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 382,
-      "digest": "c8f469ce329d1b0de6a6a008413989e3c01580f784e8365f46a51456b16055ca",
+      "actionCount": 793,
+      "digest": "178ffcc3a4ec5390207fde27d8f297e440d3896dde1d755d0260c5d382425aac",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1783,16 +1793,16 @@
         "mp": 30,
         "level": 1,
         "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
+        "tileX": 2025,
+        "tileY": 1577,
         "mov": 6
       }
     },
     {
       "seed": 32,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 38.60000000000028,
+      "elapsedSeconds": 81.29999999999966,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
@@ -1812,8 +1822,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 381,
-      "digest": "0820fdcc075a17d6d8e93fc3e0ba46d2a0aba6b423fb5341c4bf2dd9ada84196",
+      "actionCount": 808,
+      "digest": "5df56f825e11455d930c57088e1e7d95369b0064e9068f6d9e06be7e325ab33b",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1828,47 +1838,9 @@
     },
     {
       "seed": 33,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
-      "kills": 0,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "9b90f0b6b86450951b2731a410024ab1ad1b9de68464ed6c2294635950a4d99c",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 34,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 39.000000000000284,
+      "elapsedSeconds": 107.89999999999814,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
@@ -1888,8 +1860,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 385,
-      "digest": "6a1ba42739481ffa16bb2a5ddf0c81bc56a9e72090386d36b8313e957dd3a290",
+      "actionCount": 1074,
+      "digest": "f67e14f7b6a18b8778cc7358bccc016e8c3a25f7cc582773d2408e2e283475df",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1898,62 +1870,24 @@
         "level": 1,
         "exp": 0,
         "tileX": 2023,
-        "tileY": 1574,
+        "tileY": 1575,
         "mov": 6
       }
     },
     {
-      "seed": 35,
-      "policy": "balanced",
+      "seed": 34,
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 54.500000000000504,
-      "kills": 2,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 3.800000000000002,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 2,
-        "lootItemsSecured": 2,
-        "killsByDangerBand": {
-          "starter": 2,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 542,
-      "digest": "8f865155faa74e8cc20bd2262b7606cc6a019e58b1e0b0a763526e88beaff2a8",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 86,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 100,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 36,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 82.1999999999996,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "firstEngagementSeconds": 10.09999999999998,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 61.10000000000025,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -1965,8 +1899,85 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "e3132822118f7629e9df90ca8816f8a7d326d3367ddab33d271eb41aada3558e",
+      "actionCount": 817,
+      "digest": "15ee71d8858f387e0d2a6ec354cd52938e032b6544b5c8a3207f6c03593ea6f1",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2025,
+        "tileY": 1577,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 35,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 80.99999999999967,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "engagementCount": 0,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 805,
+      "digest": "1f06e155c6d57eb33084ff09a8c3f08064e9c929ffd48a1bfe362601c68cdde0",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2026,
+        "tileY": 1578,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 36,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 80.39999999999971,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "firstEngagementSeconds": 5.1999999999999975,
+        "engagementCount": 1,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 799,
+      "digest": "cdb75148fed21ebff52ebd44b0be09e7e6f9d750d88e6d6c07f7f07649367096",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -1981,20 +1992,20 @@
     },
     {
       "seed": 37,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 55.300000000000516,
-      "kills": 1,
+      "elapsedSeconds": 91.0999999999991,
+      "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "firstEngagementSeconds": 8.999999999999984,
+        "firstEngagementSeconds": 70.70000000000026,
         "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 1,
-        "lootItemsSecured": 1,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
-          "starter": 1,
+          "starter": 0,
           "low": 0,
           "mid": 0,
           "high": 0,
@@ -2004,15 +2015,15 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 549,
-      "digest": "1c7be9a2e68f7ecf0e3f5453f8ac7c26fbfdf2deb435780e7d287700f144660b",
+      "actionCount": 906,
+      "digest": "ef30fb44666d616929b46d2210b796c05810a3edd4082b9b11ba7390da3bcf0d",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
         "maxHp": 100,
         "mp": 30,
         "level": 1,
-        "exp": 50,
+        "exp": 0,
         "tileX": 2023,
         "tileY": 1574,
         "mov": 6
@@ -2020,21 +2031,21 @@
     },
     {
       "seed": 38,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 31.800000000000182,
-      "kills": 3,
+      "elapsedSeconds": 77.19999999999989,
+      "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "firstEngagementSeconds": 5.099999999999998,
+        "firstEngagementSeconds": 45.10000000000037,
         "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
-          "low": 3,
+          "low": 0,
           "mid": 0,
           "high": 0,
           "scenario": 0
@@ -2043,15 +2054,15 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 316,
-      "digest": "9cb18f63618465a4dbb794d0a6aac08276bb2720a4ddf7ac2813b0d3e64d81b5",
+      "actionCount": 767,
+      "digest": "13f7cda581301357d9b071e6e5082c56f1a2dee45fa442203d39141d8fa15a71",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
         "maxHp": 100,
         "mp": 30,
         "level": 1,
-        "exp": 210,
+        "exp": 0,
         "tileX": 2023,
         "tileY": 1574,
         "mov": 6
@@ -2059,48 +2070,9 @@
     },
     {
       "seed": 39,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 30.100000000000158,
-      "kills": 3,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 3.900000000000002,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 3,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 299,
-      "digest": "a7d94860fdc60d6cb044bc58c369a9fe8803fa3270f50a46949410099423dabd",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 210,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 40,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 37.30000000000026,
+      "elapsedSeconds": 81.79999999999963,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
@@ -2120,8 +2092,46 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 368,
-      "digest": "1f4f30345c89ad715adcbe882c47ec454089e08a4e563133b12ab05316b0e5b1",
+      "actionCount": 813,
+      "digest": "a323e3e6412162745432df359c1c8f2325b09ce847f113489ba7b3edcf21a283",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2023,
+        "tileY": 1574,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 40,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 80.29999999999971,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "engagementCount": 0,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 798,
+      "digest": "c16cd65f8481ddb7bbf7c190664d39a1f909ff5a78f987152c30628e64937a57",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2136,17 +2146,17 @@
     },
     {
       "seed": 41,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 85.09999999999944,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -2158,8 +2168,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "a15aea5092557adf7c0e41e1d388655d0202ec38c63ad0447ac280b4f0568bdd",
+      "actionCount": 846,
+      "digest": "2eb6dfd6efa052625a4f421be7eeda50b83bcad84fc11dfe41b415d2d9977dee",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2174,56 +2184,17 @@
     },
     {
       "seed": 42,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 30.20000000000016,
-      "kills": 3,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 3.5000000000000018,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 3,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 300,
-      "digest": "a7dabc1da9c79ad7f44ea21f1c5f042200b611f5f165f7a0060fde3c6102e533",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 91,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 210,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 43,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 79.49999999999976,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -2235,8 +2206,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "7001e53987e7a9d5c5780e28900f76f5dbf35907aa3d6605bfd55435c453f8f4",
+      "actionCount": 790,
+      "digest": "5905815dc4dfba610ed8f35b421e01797a43d1ee2916afd92cd3dd25a9c28bea",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2250,18 +2221,18 @@
       }
     },
     {
-      "seed": 44,
-      "policy": "balanced",
+      "seed": 43,
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 86.79999999999934,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -2273,8 +2244,47 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "ef54ff0f625c8eb200f6f212ef5b91762dbf040aac99743016fa939e4256f844",
+      "actionCount": 863,
+      "digest": "d4301fee31bffe2f678b3f4912c88889cfdbfc86aee5a9cd9cdefb3eaf245f64",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2024,
+        "tileY": 1576,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 44,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 101.49999999999851,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "firstEngagementSeconds": 8.199999999999987,
+        "engagementCount": 1,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 1010,
+      "digest": "6475fa5505eee14c8f63364d2911d7831a4e04afc1fc2d0710247531e0ae6716",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2289,17 +2299,18 @@
     },
     {
       "seed": 45,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 84.89999999999945,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "firstEngagementSeconds": 5.799999999999995,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 52.30000000000056,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -2311,8 +2322,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "ccceb9aa04a991d67b0a8f067c516aa31ba9152060b3c622c097ef95801538d0",
+      "actionCount": 844,
+      "digest": "97e77a7ed9993b1b77ea950985a2dc912d87cfa03bf45b1b8d3e709aa36dcb76",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2327,17 +2338,18 @@
     },
     {
       "seed": 46,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 112.0999999999979,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "firstEngagementSeconds": 15.499999999999961,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 86.69999999999851,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -2349,8 +2361,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "3d3788ac4ef257064c863e6c608067276cbc090b7ec53f3b86e01e77d42cbe20",
+      "actionCount": 1116,
+      "digest": "9c0dd17e580d8956bbbef0aae7566dfd499acd941280ca637e0cca70146418aa",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2359,23 +2371,23 @@
         "level": 1,
         "exp": 0,
         "tileX": 2023,
-        "tileY": 1574,
+        "tileY": 1575,
         "mov": 6
       }
     },
     {
       "seed": 47,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 93.19999999999898,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -2387,8 +2399,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "c6f74105f84f7d59d083da55d036507e8b297800e12c73dd4c9879851b886c1d",
+      "actionCount": 927,
+      "digest": "0c8972afc6c2ca78ddf017efb15847af024e7733a6fa084d24b6abb02e296209",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2403,17 +2415,18 @@
     },
     {
       "seed": 48,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 79.29999999999977,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 10.19999999999998,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -2425,8 +2438,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "c19c3efbcb21073ee9139f1745bd6d85b1c74cd946ecdc506821c4f173a82a3e",
+      "actionCount": 788,
+      "digest": "97ba077921461678003e56c6542a4589b12dbf937b58b383a54b40fcf2003688",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2441,17 +2454,18 @@
     },
     {
       "seed": 49,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 93.79999999999895,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 82.79999999999957,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -2463,8 +2477,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "d423f9427434c2b40cfdc5ac08f4c3ae5a5296f0b81c393647c14b61fdab1f3c",
+      "actionCount": 933,
+      "digest": "4a8fad3e163f8c1e3194e59bbfc19f2c92bdf2c304e2c8c9c05969c3461fce33",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2479,17 +2493,18 @@
     },
     {
       "seed": 50,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 88.79999999999923,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 65.30000000000057,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -2501,8 +2516,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "5612a54f3eecbf2ac9e1350b23b94e115078288e6bfd2b57132913eff5bbe679",
+      "actionCount": 883,
+      "digest": "d58223d0151fa7b2e5161380c75580c8298229ace7d8ff09aaec0471f11a8f1a",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2510,16 +2525,16 @@
         "mp": 30,
         "level": 1,
         "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
+        "tileX": 2026,
+        "tileY": 1578,
         "mov": 6
       }
     },
     {
       "seed": 51,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 38.400000000000276,
+      "elapsedSeconds": 104.29999999999835,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
@@ -2539,8 +2554,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 379,
-      "digest": "815800a842427d97efccd1daeae71e261395ebab8d2e695c9fd29a478234f5bd",
+      "actionCount": 1038,
+      "digest": "2c3d5e3b9f01ec350ebd91d37a6efc999f0dac2cee5c9cb705c364238b8d1bf4",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2555,17 +2570,18 @@
     },
     {
       "seed": 52,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 38.70000000000028,
+      "elapsedSeconds": 69.10000000000035,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 7.799999999999988,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 1,
-        "lootItemsSecured": 1,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -2577,8 +2593,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 382,
-      "digest": "c2510f6a9e7bc76cd329b88c126924bfb3b31c7d8a8795fde71bfabc8938e90a",
+      "actionCount": 686,
+      "digest": "17b6ee7f0b328433f5186e792bdfa9b8bd58b60fdcea1abb96ca6464cd3e3824",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2586,27 +2602,27 @@
         "mp": 30,
         "level": 1,
         "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
+        "tileX": 2025,
+        "tileY": 1577,
         "mov": 6
       }
     },
     {
       "seed": 53,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 50.10000000000044,
-      "kills": 3,
+      "elapsedSeconds": 81.79999999999963,
+      "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "firstEngagementSeconds": 3.4000000000000017,
+        "firstEngagementSeconds": 8.499999999999986,
         "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
-          "starter": 3,
+          "starter": 0,
           "low": 0,
           "mid": 0,
           "high": 0,
@@ -2616,15 +2632,15 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 499,
-      "digest": "90d29d8ad222846393be1de637f40f505ab4bb5b7193791f2eea32eaa3f36739",
+      "actionCount": 813,
+      "digest": "3d0a583da4c2eb621f29c25afd9811962cb0f6750d10e79900a24909f0922636",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
         "maxHp": 100,
         "mp": 30,
         "level": 1,
-        "exp": 150,
+        "exp": 0,
         "tileX": 2023,
         "tileY": 1574,
         "mov": 6
@@ -2632,17 +2648,18 @@
     },
     {
       "seed": 54,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 79.49999999999976,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 7.599999999999989,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -2654,8 +2671,47 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "73ca060ee6e832247e5ecb5981877029ec1757a432dccee685b936c04d895583",
+      "actionCount": 790,
+      "digest": "a968df923d94698bb85027ba154b1700d04a5c57653f4275cf3b7a7f35973514",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2028,
+        "tileY": 1579,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 55,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 79.49999999999976,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "firstEngagementSeconds": 4.999999999999998,
+        "engagementCount": 1,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 790,
+      "digest": "05a58a2304fab21608fa98376e0d71773b56319c45caf9110066f2d7c9ec1723",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2669,61 +2725,22 @@
       }
     },
     {
-      "seed": 55,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 31.400000000000176,
-      "kills": 2,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 3.900000000000002,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 2,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 311,
-      "digest": "3bf3442fd404398c69fb2a3a6e7f2c8c0ab87cefa48499085da526154165268f",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 140,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
       "seed": 56,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 30.20000000000016,
-      "kills": 1,
+      "elapsedSeconds": 86.89999999999934,
+      "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "firstEngagementSeconds": 5.099999999999998,
+        "firstEngagementSeconds": 6.699999999999992,
         "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
-          "low": 1,
+          "low": 0,
           "mid": 0,
           "high": 0,
           "scenario": 0
@@ -2732,15 +2749,15 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 298,
-      "digest": "7bf5580511b003430e2d64707ff263329ced08dcaf079a7590eebfdffd89ffe2",
+      "actionCount": 864,
+      "digest": "11d39c531d8aebe0e5d7ff561ce338fa7e60092c20be3daf6af05ca4d284e908",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
         "maxHp": 100,
         "mp": 30,
         "level": 1,
-        "exp": 70,
+        "exp": 0,
         "tileX": 2023,
         "tileY": 1574,
         "mov": 6
@@ -2748,95 +2765,18 @@
     },
     {
       "seed": 57,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 50.60000000000045,
-      "kills": 1,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 5.099999999999998,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 1,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 502,
-      "digest": "0ae60785f47d9c67ce6cfa8346f271b507604807ca236c321f001e96424cbe3f",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 50,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 58,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 35.600000000000236,
-      "kills": 2,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 5.1999999999999975,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 2,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 353,
-      "digest": "519ac73f13d433721cbf044591f11894f86c813c56a19409f5888372d571ac28",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 100,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 59,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 79.69999999999975,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 28.000000000000128,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -2848,8 +2788,86 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "64f447c0ce30e279e343769c862e5e3b6a7024ff5e88f51152f58ed1cdf766a9",
+      "actionCount": 792,
+      "digest": "a2e5bf53c18d178b77f999cf26d888b0cef03711bd6a2d6d87d33511cb855e67",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2024,
+        "tileY": 1576,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 58,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 79.99999999999973,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "firstEngagementSeconds": 41.70000000000032,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 19.400000000000276,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 795,
+      "digest": "524a5c3c25411905457458d2c5f49e87f9598ba842a40f3a8a15d304dd871ee7",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2024,
+        "tileY": 1576,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 59,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 79.99999999999973,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "firstEngagementSeconds": 64.20000000000063,
+        "engagementCount": 1,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 795,
+      "digest": "aea1fbc640997bbe4f030af0be72d313cd6b1b9fd657887c2c190a723c02c5b1",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2864,17 +2882,17 @@
     },
     {
       "seed": 60,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 85.09999999999944,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -2886,8 +2904,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "0b6ca6574c10fa55460abded64a4bf01ded500142bdbb7ed15b8ff5c2f116467",
+      "actionCount": 846,
+      "digest": "c4c1da4f659c0525121298ce0dd0732e301b0b900bf3dfc16e895ca855d53b24",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2902,17 +2920,18 @@
     },
     {
       "seed": 61,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 84.19999999999949,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "firstEngagementSeconds": 7.499999999999989,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 26.600000000000225,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -2924,8 +2943,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "389b7dd951b140ced3898ee127c49b02db5acb05aad7c06100f0570d4af15ae5",
+      "actionCount": 837,
+      "digest": "09de6a3de98a3bb68f380456474c6d7a3d248727b73332cea129fd4d23251542",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -2940,56 +2959,18 @@
     },
     {
       "seed": 62,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 31.60000000000018,
-      "kills": 3,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 3.800000000000002,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 3,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 314,
-      "digest": "b917508a18e7120bde7b77dfed9a3bba884c473b43d563e8f34e622960c8ef06",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 81,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 210,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 63,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 38.50000000000028,
+      "elapsedSeconds": 78.7999999999998,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 50.20000000000044,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 1,
-        "lootItemsSecured": 1,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -3001,8 +2982,46 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 380,
-      "digest": "95ab8c9d1347fedd6e36294c03c004dc8d9ed8f8428d7dcab44845e5d4ce8f43",
+      "actionCount": 783,
+      "digest": "9ffe31578be499ee51f8dede1fd0ee91300e735f762e5d1991a2f649e5f47b9a",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2023,
+        "tileY": 1574,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 63,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 83.69999999999952,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "engagementCount": 0,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 832,
+      "digest": "7c388f51c0db68fd27f9dc5d600e41fe526d207b3eddd709ee4aba091397cbc3",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3017,20 +3036,20 @@
     },
     {
       "seed": 64,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 35.10000000000023,
-      "kills": 1,
+      "elapsedSeconds": 80.5999999999997,
+      "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "firstEngagementSeconds": 3.0000000000000013,
+        "firstEngagementSeconds": 65.10000000000058,
         "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
-          "starter": 1,
+          "starter": 0,
           "low": 0,
           "mid": 0,
           "high": 0,
@@ -3040,15 +3059,15 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 347,
-      "digest": "f84998c8f80ada0b4dfc0126c0a90d98b1f992a97beeaa4c411181c7ab711f21",
+      "actionCount": 801,
+      "digest": "98c543e7390b309c9291bfa3ded0c50fde058348e984b10299cc254a2c7f2c1c",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
         "maxHp": 100,
         "mp": 30,
         "level": 1,
-        "exp": 50,
+        "exp": 0,
         "tileX": 2023,
         "tileY": 1574,
         "mov": 6
@@ -3056,56 +3075,17 @@
     },
     {
       "seed": 65,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 31.500000000000178,
-      "kills": 3,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 3.700000000000002,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 3,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 313,
-      "digest": "02db673ad6d1aa0b1830def2ce886fd994f13d58765b594c3bcb72b076d6c05c",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 210,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 66,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 77.59999999999987,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -3117,8 +3097,47 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "698ce8008f36274af39de2324080abc13f83431f26c94c03d2a4e286a3175cc1",
+      "actionCount": 771,
+      "digest": "34435d572d91afc2fa06d4e67affff09f986b0ac1db597840de2cb433d968996",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2025,
+        "tileY": 1577,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 66,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 102.59999999999845,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "firstEngagementSeconds": 5.299999999999997,
+        "engagementCount": 1,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 1021,
+      "digest": "389b311aa1350cb6a0bec1a2ba3a54e8d417a662baf3e91ede9a04fd192efd82",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3133,56 +3152,18 @@
     },
     {
       "seed": 67,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 30.700000000000166,
-      "kills": 3,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 4.999999999999998,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 3,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 305,
-      "digest": "0556cd44e5da378be9cfc942915e3dba91723913d7161cdb2045a78290f7a6a9",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 210,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 68,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 39.9000000000003,
+      "elapsedSeconds": 75.59999999999998,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "firstEngagementSeconds": 46.700000000000394,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 17.60000000000023,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -3194,8 +3175,47 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 394,
-      "digest": "e81a32e77d24b65cab66fb28d8b751139128849656b84ac18501c5d9a62069fb",
+      "actionCount": 751,
+      "digest": "c159a5fa0bdea4a611c0fe5c4e33e2b5cfca95beaa7c8b8ba7952df9c92e7e0f",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2032,
+        "tileY": 1582,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 68,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 114.79999999999775,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "firstEngagementSeconds": 6.799999999999992,
+        "engagementCount": 1,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 1143,
+      "digest": "7e415e3ad6487fca951a03dc383710b225cf6acf016cb98661944d4274299ea4",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3210,17 +3230,18 @@
     },
     {
       "seed": 69,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 39.100000000000286,
+      "elapsedSeconds": 77.79999999999986,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 64.8000000000006,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -3232,8 +3253,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 386,
-      "digest": "a6845868b5fefd7987d93a37ca051aae4398bedf71f8afe271de33afbc82ad03",
+      "actionCount": 773,
+      "digest": "3a001550eb08c67bc4249eafb58d4658a21180fc0512bfca4dc0a414259fef31",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3248,20 +3269,20 @@
     },
     {
       "seed": 70,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 36.70000000000025,
-      "kills": 1,
+      "elapsedSeconds": 82.09999999999961,
+      "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "firstEngagementSeconds": 3.4000000000000017,
+        "firstEngagementSeconds": 7.599999999999989,
         "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
-          "starter": 1,
+          "starter": 0,
           "low": 0,
           "mid": 0,
           "high": 0,
@@ -3271,15 +3292,15 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 363,
-      "digest": "a7d808f150954cda0e82bf2aadb57dff7361cf38b2e594682b7d07b3ce9f994b",
+      "actionCount": 816,
+      "digest": "b23a2788aa2acdcfd4aeb43923d480745c226f65fa6a969b42e4bc5ca9becfa3",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
         "maxHp": 100,
         "mp": 30,
         "level": 1,
-        "exp": 50,
+        "exp": 0,
         "tileX": 2023,
         "tileY": 1574,
         "mov": 6
@@ -3287,17 +3308,17 @@
     },
     {
       "seed": 71,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 123.19999999999727,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -3309,8 +3330,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "70aa047bd00de194b9a24a05465b639e586acd94498bf9f25909398f0788a88d",
+      "actionCount": 1227,
+      "digest": "1cdfa57b5a75d538fcbb5fc84cbbbdcadec8c3d386126c63fc479a98ddab1ba2",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3318,28 +3339,28 @@
         "mp": 30,
         "level": 1,
         "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
+        "tileX": 2024,
+        "tileY": 1576,
         "mov": 6
       }
     },
     {
       "seed": 72,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 32.700000000000195,
-      "kills": 3,
+      "elapsedSeconds": 78.7999999999998,
+      "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "firstEngagementSeconds": 4.200000000000001,
+        "firstEngagementSeconds": 6.399999999999993,
         "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
-          "low": 3,
+          "low": 0,
           "mid": 0,
           "high": 0,
           "scenario": 0
@@ -3348,15 +3369,15 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 325,
-      "digest": "789430aab1e084a67be0895b7e53a3555bc6f242742912d56b839cdac73474ed",
+      "actionCount": 783,
+      "digest": "fdddbef7467d7bcdacb860d14ff651c818eca5ed6408712e131f408aa366e747",
       "stopReason": "raid_result",
       "actorFinal": {
-        "hp": 87,
+        "hp": 100,
         "maxHp": 100,
         "mp": 30,
         "level": 1,
-        "exp": 220,
+        "exp": 0,
         "tileX": 2023,
         "tileY": 1574,
         "mov": 6
@@ -3364,20 +3385,19 @@
     },
     {
       "seed": 73,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 34.900000000000226,
-      "kills": 1,
+      "elapsedSeconds": 109.49999999999805,
+      "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "firstEngagementSeconds": 3.3000000000000016,
-        "engagementCount": 1,
+        "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
-          "starter": 1,
+          "starter": 0,
           "low": 0,
           "mid": 0,
           "high": 0,
@@ -3387,15 +3407,15 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 345,
-      "digest": "9e162032ad93e4c028c906c47406c61b2afd78771f64003327b3264c56930bd7",
+      "actionCount": 1090,
+      "digest": "d5c4282de969d02d2f6f9fbec453edafcc189534667e760e8ec7942777bce0b5",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
         "maxHp": 100,
         "mp": 30,
         "level": 1,
-        "exp": 50,
+        "exp": 0,
         "tileX": 2023,
         "tileY": 1574,
         "mov": 6
@@ -3403,17 +3423,18 @@
     },
     {
       "seed": 74,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 75.69999999999997,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 61.600000000000605,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -3425,8 +3446,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "58b9c500b543b8d085f4c10a2d7a20debeda5ec535bafeb1d3cbd0076daf6bda",
+      "actionCount": 752,
+      "digest": "efae1885ff51b7a312027ec44bdddff21a2f82d5117fc2f23a2b602a23b2318a",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3434,28 +3455,27 @@
         "mp": 30,
         "level": 1,
         "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
+        "tileX": 2024,
+        "tileY": 1576,
         "mov": 6
       }
     },
     {
       "seed": 75,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 31.100000000000172,
-      "kills": 2,
+      "elapsedSeconds": 72.00000000000018,
+      "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "firstEngagementSeconds": 5.399999999999997,
-        "engagementCount": 1,
+        "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
-          "low": 2,
+          "low": 0,
           "mid": 0,
           "high": 0,
           "scenario": 0
@@ -3464,33 +3484,34 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 308,
-      "digest": "5e08ba362aae337b992ec57257f7a03fb4e65bf7d6b709d8124b45aec4ef4c02",
+      "actionCount": 715,
+      "digest": "1506003a90412bedf8236af50cdf54a2d2424b51dc466442fd729d57d3dd220d",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
         "maxHp": 100,
         "mp": 30,
         "level": 1,
-        "exp": 140,
-        "tileX": 2023,
-        "tileY": 1574,
+        "exp": 0,
+        "tileX": 2024,
+        "tileY": 1576,
         "mov": 6
       }
     },
     {
       "seed": 76,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 73.90000000000008,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 8.399999999999986,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -3502,8 +3523,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "1947e0d0d75697a5f00922eb3cc5c26908e537e5cfa116880901abbc4cab8d3c",
+      "actionCount": 734,
+      "digest": "edcee695ebd492a4d54554a6e351cca33199e2f6e9d09098f7c49902a2a8cd94",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3511,24 +3532,24 @@
         "mp": 30,
         "level": 1,
         "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
+        "tileX": 2024,
+        "tileY": 1576,
         "mov": 6
       }
     },
     {
       "seed": 77,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 110.89999999999797,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -3540,8 +3561,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "a3caf533f9b0e4d74898bcabe8a1741f12b4707ab147959b18d9531f45933782",
+      "actionCount": 1104,
+      "digest": "d6d5de6f113a5fec12f260604469d93f219908a31016befb345a8c842b9a5043",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3549,24 +3570,24 @@
         "mp": 30,
         "level": 1,
         "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
+        "tileX": 2025,
+        "tileY": 1576,
         "mov": 6
       }
     },
     {
       "seed": 78,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 47.70000000000041,
+      "elapsedSeconds": 87.89999999999928,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -3578,8 +3599,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 472,
-      "digest": "6e4a4c1a27a3072c36f02df33d135214a1aa083fdd2b48bc87b9625ac6e5d27e",
+      "actionCount": 874,
+      "digest": "443a275683c684ce8b6ede57f7d2dcd7e44afdc391383a32aff02fe15da69d26",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3594,9 +3615,9 @@
     },
     {
       "seed": 79,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 54.90000000000051,
+      "elapsedSeconds": 96.69999999999878,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
@@ -3616,8 +3637,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 544,
-      "digest": "18daa15421453a9fa0234693fb2dca1eafb63d946f992b8c971c973b15ba985a",
+      "actionCount": 962,
+      "digest": "56828592238ca0f29d1710023596b44f64247c93a871fa721b37a336de31227e",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3632,20 +3653,20 @@
     },
     {
       "seed": 80,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 47.1000000000004,
-      "kills": 1,
+      "elapsedSeconds": 74.40000000000005,
+      "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "firstEngagementSeconds": 3.4000000000000017,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "firstEngagementSeconds": 38.80000000000028,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 26.60000000000028,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
-          "starter": 1,
+          "starter": 0,
           "low": 0,
           "mid": 0,
           "high": 0,
@@ -3655,15 +3676,15 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 467,
-      "digest": "aeeed5b16e27ec8f8998555d3484334e2457fb67257bdcde0ad071aa0aa12d13",
+      "actionCount": 739,
+      "digest": "c83233676888feea8059cab520670ad1be0fef4831f8f9568446067dc40a8707",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
         "maxHp": 100,
         "mp": 30,
         "level": 1,
-        "exp": 50,
+        "exp": 0,
         "tileX": 2023,
         "tileY": 1574,
         "mov": 6
@@ -3671,14 +3692,15 @@
     },
     {
       "seed": 81,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 38.70000000000028,
+      "elapsedSeconds": 83.49999999999953,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 68.70000000000037,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
         "lootItemsAcquired": 0,
         "lootItemsSecured": 0,
@@ -3693,8 +3715,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 382,
-      "digest": "26d6c1c3c79c9734d719f184e3219b02ef37b4e49b6423b52c9332c9455f741f",
+      "actionCount": 830,
+      "digest": "c8473c5f736a1dfa95ff2d5f7f671be109d59c2fa675371f02b85864001d4695",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3709,17 +3731,17 @@
     },
     {
       "seed": 82,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 81.39999999999965,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
         "engagementCount": 0,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -3731,8 +3753,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "6f94c17357bb9b05ef83001d5b1aea09deee5ddadaeeca15f858402c4927c2d1",
+      "actionCount": 809,
+      "digest": "446750ad27a75ceb58163b7ee950904cf64909f862f7c1caa7bceae2c367b3bc",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3747,17 +3769,18 @@
     },
     {
       "seed": 83,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 79.89999999999974,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 65.10000000000058,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -3769,8 +3792,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "6e7d64bf2e624c9621a3b5d384fc1d16efddbfeb3436d6d3d4194ece05c8ddf4",
+      "actionCount": 794,
+      "digest": "0a3aed2f954d6b2fdac7e8714a807650c1aee008d0fb672157e0afc175cc1d76",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3785,9 +3808,9 @@
     },
     {
       "seed": 84,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 54.600000000000506,
+      "elapsedSeconds": 79.79999999999974,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
@@ -3807,8 +3830,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 541,
-      "digest": "f7f0c20a324aba01741620518d6c8aacad066e2e752fba63a896201148f6423a",
+      "actionCount": 793,
+      "digest": "1d956b9b961164c460981024d56a8beaee9708fbe88ffb3727426b916127eaee",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3823,17 +3846,18 @@
     },
     {
       "seed": 85,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 36.10000000000024,
+      "elapsedSeconds": 80.99999999999967,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 7.499999999999989,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -3845,8 +3869,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 356,
-      "digest": "0143e416b0291b99a9c8d94148801cd7492f2ad854f63f6cc66afc160d3d8cb1",
+      "actionCount": 805,
+      "digest": "d3e06791aee7fbe521f129aeef99eacef977aa8c8e2d389f18da9bbdd35e4ee7",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3861,47 +3885,9 @@
     },
     {
       "seed": 86,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
-      "kills": 0,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 0,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "43b900312ca23f6751e50bb1c84af1e2139f513442b3de048821f6685b180b8e",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 100,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 87,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 36.900000000000254,
+      "elapsedSeconds": 101.79999999999849,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
@@ -3921,8 +3907,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 364,
-      "digest": "d7a64cd21bff46f34a7c13b392c0625631a92f792d934e3b694132f9b33395ed",
+      "actionCount": 1013,
+      "digest": "9b6ac1ae7d99fc242232c972ab2fc30210a8dd758747fc4aa621eed6a1882848",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -3930,27 +3916,27 @@
         "mp": 30,
         "level": 1,
         "exp": 0,
-        "tileX": 2025,
-        "tileY": 1577,
+        "tileX": 2023,
+        "tileY": 1575,
         "mov": 6
       }
     },
     {
-      "seed": 88,
-      "policy": "balanced",
+      "seed": 87,
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 49.10000000000043,
-      "kills": 3,
+      "elapsedSeconds": 86.59999999999935,
+      "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "firstEngagementSeconds": 2.500000000000001,
+        "firstEngagementSeconds": 65.90000000000053,
         "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
-          "starter": 3,
+          "starter": 0,
           "low": 0,
           "mid": 0,
           "high": 0,
@@ -3960,15 +3946,53 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 489,
-      "digest": "06a5392aeec64682a78f904bcdc330cf822632bf51cf1294a998e468eed3637a",
+      "actionCount": 861,
+      "digest": "615ba0a6be862608516e5e45959783fb135218c812fd69d68b67103c0d563174",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
         "maxHp": 100,
         "mp": 30,
         "level": 1,
-        "exp": 150,
+        "exp": 0,
+        "tileX": 2023,
+        "tileY": 1574,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 88,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 70.70000000000026,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "engagementCount": 0,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 702,
+      "digest": "26afa4405246a11b44b17106036aa255a7ff6a9dccfd513d114128ef96a013d3",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
         "tileX": 2023,
         "tileY": 1574,
         "mov": 6
@@ -3976,53 +4000,15 @@
     },
     {
       "seed": 89,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 32.9000000000002,
-      "kills": 3,
-      "departureTownId": "central_castle",
-      "extractionTownId": "e_stronghold",
-      "telemetry": {
-        "firstEngagementSeconds": 4.999999999999998,
-        "engagementCount": 1,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
-        "killsByDangerBand": {
-          "starter": 0,
-          "low": 3,
-          "mid": 0,
-          "high": 0,
-          "scenario": 0
-        },
-        "deathCause": "none"
-      },
-      "invariantViolationCount": 0,
-      "invariantCodes": [],
-      "actionCount": 327,
-      "digest": "4441fe5f0f051173a3faa91df2e319d4502f5618a77ccc201b7456ba026b7a1c",
-      "stopReason": "raid_result",
-      "actorFinal": {
-        "hp": 77,
-        "maxHp": 100,
-        "mp": 30,
-        "level": 1,
-        "exp": 210,
-        "tileX": 2023,
-        "tileY": 1574,
-        "mov": 6
-      }
-    },
-    {
-      "seed": 90,
-      "policy": "balanced",
-      "result": "SURVIVED",
-      "elapsedSeconds": 54.70000000000051,
+      "elapsedSeconds": 79.19999999999978,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 5.999999999999995,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
         "lootItemsAcquired": 0,
         "lootItemsSecured": 0,
@@ -4037,8 +4023,47 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 542,
-      "digest": "d3c78986f96c0043839dd41e8e45f7fc99e27d6b9d296a820c91b50972f622fd",
+      "actionCount": 787,
+      "digest": "274193a27b495f0b461b66700cdf682c78e2dff5a14e06c6e3322c7c704a13d6",
+      "stopReason": "raid_result",
+      "actorFinal": {
+        "hp": 100,
+        "maxHp": 100,
+        "mp": 30,
+        "level": 1,
+        "exp": 0,
+        "tileX": 2023,
+        "tileY": 1574,
+        "mov": 6
+      }
+    },
+    {
+      "seed": 90,
+      "policy": "random-legal",
+      "result": "SURVIVED",
+      "elapsedSeconds": 92.39999999999903,
+      "kills": 0,
+      "departureTownId": "central_castle",
+      "extractionTownId": "e_stronghold",
+      "telemetry": {
+        "firstEngagementSeconds": 82.89999999999957,
+        "engagementCount": 1,
+        "engagementGapSecondsTotal": 0,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
+        "killsByDangerBand": {
+          "starter": 0,
+          "low": 0,
+          "mid": 0,
+          "high": 0,
+          "scenario": 0
+        },
+        "deathCause": "none"
+      },
+      "invariantViolationCount": 0,
+      "invariantCodes": [],
+      "actionCount": 919,
+      "digest": "76b38455e944729db6692cf9fa2b5e185707b9475e26e67e3b702e476bb91588",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -4053,20 +4078,20 @@
     },
     {
       "seed": 91,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 49.10000000000043,
-      "kills": 3,
+      "elapsedSeconds": 77.39999999999988,
+      "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "firstEngagementSeconds": 3.1000000000000014,
+        "firstEngagementSeconds": 5.4999999999999964,
         "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
-          "starter": 3,
+          "starter": 0,
           "low": 0,
           "mid": 0,
           "high": 0,
@@ -4076,33 +4101,34 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 489,
-      "digest": "420bd7ba47ab73bc42f3bc1135c1b1715ecb630548742c030013cc75f5daf6b8",
+      "actionCount": 769,
+      "digest": "8e0ec8e2e8ffca794ea909c64e808ed1d52ff9de07d67671e974e69d76b91c38",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
         "maxHp": 100,
         "mp": 30,
         "level": 1,
-        "exp": 150,
+        "exp": 0,
         "tileX": 2023,
-        "tileY": 1574,
+        "tileY": 1575,
         "mov": 6
       }
     },
     {
       "seed": 92,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.80000000000014,
+      "elapsedSeconds": 74.70000000000003,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 7.499999999999989,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 3,
-        "lootItemsSecured": 3,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -4114,8 +4140,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 283,
-      "digest": "2fbf6db63d55e2451f89bd95f1edadde9464f158d15bb026c7872cd696ec1768",
+      "actionCount": 742,
+      "digest": "40e647644339297840491bb8731561460105f6c9fcf352f53d9fdde90760d2b7",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -4124,23 +4150,24 @@
         "level": 1,
         "exp": 0,
         "tileX": 2023,
-        "tileY": 1574,
+        "tileY": 1575,
         "mov": 6
       }
     },
     {
       "seed": 93,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 47.90000000000041,
+      "elapsedSeconds": 106.8999999999982,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 7.29999999999999,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -4152,8 +4179,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 474,
-      "digest": "b476d0d658514ee652fb9a9dc45eaffb470fe8e2d51f566d9c9f8e95b8431266",
+      "actionCount": 1064,
+      "digest": "2ad51a746ff88a89a21d29803e33d22b58d76dc07423e729610b65682a5f9448",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -4161,24 +4188,25 @@
         "mp": 30,
         "level": 1,
         "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
+        "tileX": 2024,
+        "tileY": 1575,
         "mov": 6
       }
     },
     {
       "seed": 94,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 91.59999999999907,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 75.99999999999996,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -4190,8 +4218,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "a0b0c99761fc7f395d1c9550a153ee409775d526b5255f13a16264bc6c26a262",
+      "actionCount": 911,
+      "digest": "43bcb009c118b261e0c85d84b1a2c708850289aa24c3856f5722ff47dacd9def",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -4206,9 +4234,9 @@
     },
     {
       "seed": 95,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 55.00000000000051,
+      "elapsedSeconds": 74.40000000000005,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
@@ -4228,8 +4256,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 545,
-      "digest": "bc5ff7abafe1d3a0608ddbe3030e35ff0c7384772aa0664469b21ecce5bc59b4",
+      "actionCount": 739,
+      "digest": "86f183be64d81812cada9b3bccdf0b25c6f1d3bab737bcc48c606a0a16ef76ff",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -4244,17 +4272,18 @@
     },
     {
       "seed": 96,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 81.49999999999964,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 39.800000000000296,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -4266,8 +4295,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "76449e4155a29ed15b89d3c2de000f7c179afc413da217cc8efba6845322bd6f",
+      "actionCount": 810,
+      "digest": "8aec6ec27562170b30194c307b567616cef579aa257a9444bec884373eb3fd28",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -4282,9 +4311,9 @@
     },
     {
       "seed": 97,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 54.500000000000504,
+      "elapsedSeconds": 85.7999999999994,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
@@ -4304,8 +4333,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 540,
-      "digest": "bc14dfa9fb735b60baaa8334bc12fa142e4633af44238ccbcbf1375df2f12f2d",
+      "actionCount": 853,
+      "digest": "dcb4ccff64aa709b9dba9492838e63760b1c1b52eb3dd2125e912a485a6dee66",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -4320,17 +4349,18 @@
     },
     {
       "seed": 98,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 28.90000000000014,
+      "elapsedSeconds": 111.49999999999794,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
-        "engagementGapSecondsTotal": 0,
-        "lootItemsAcquired": 4,
-        "lootItemsSecured": 4,
+        "firstEngagementSeconds": 6.999999999999991,
+        "engagementCount": 2,
+        "engagementGapSecondsTotal": 91.19999999999871,
+        "lootItemsAcquired": 0,
+        "lootItemsSecured": 0,
         "killsByDangerBand": {
           "starter": 0,
           "low": 0,
@@ -4342,8 +4372,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 284,
-      "digest": "38b331290cbcf07e6ca0f283829b9514d762ffbb7c99bf3706ffb79371bc9d97",
+      "actionCount": 1110,
+      "digest": "6c49ca7813ec58973ad0ebb246d8f32f347f70d760bc2076d557aa8be1b851f3",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -4358,14 +4388,15 @@
     },
     {
       "seed": 99,
-      "policy": "balanced",
+      "policy": "random-legal",
       "result": "SURVIVED",
-      "elapsedSeconds": 39.100000000000286,
+      "elapsedSeconds": 85.19999999999943,
       "kills": 0,
       "departureTownId": "central_castle",
       "extractionTownId": "e_stronghold",
       "telemetry": {
-        "engagementCount": 0,
+        "firstEngagementSeconds": 37.600000000000264,
+        "engagementCount": 1,
         "engagementGapSecondsTotal": 0,
         "lootItemsAcquired": 0,
         "lootItemsSecured": 0,
@@ -4380,8 +4411,8 @@
       },
       "invariantViolationCount": 0,
       "invariantCodes": [],
-      "actionCount": 386,
-      "digest": "abf7bd520bc64bb6d3c0f010829575a451d25ebcb9ee7db182e40a3f06009ff1",
+      "actionCount": 847,
+      "digest": "260496ffe4947c424f8cc1908be9dda78170a9f9a4247acf8f66dad7f081400c",
       "stopReason": "raid_result",
       "actorFinal": {
         "hp": 100,
@@ -4389,8 +4420,8 @@
         "mp": 30,
         "level": 1,
         "exp": 0,
-        "tileX": 2023,
-        "tileY": 1574,
+        "tileX": 2024,
+        "tileY": 1576,
         "mov": 6
       }
     }
