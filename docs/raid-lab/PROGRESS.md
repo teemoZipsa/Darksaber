@@ -1,5 +1,37 @@
 # Raid Lab — Progress
 
+## Batch 2026-07-17h — Phase 3 dense-nests stress (labVersion 8)
+
+### Experiments run
+
+- `WorldSession.fieldNestTuning` DI (respawn / roam / spawn caps)
+- `stress=dense-nests` → 20s respawn, roam 3, refresh 48, departure 5/36
+
+### Outcome ratios (smoke 0..99 / balanced / stress=dense-nests)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 100 | **100.0%** |
+| DEAD | 0 | 0.0% |
+| LEFT | 0 | 0.0% |
+
+### Tests added/updated
+
+- dense-nests stress determinism + digest divergence
+- determinism suite: **18 pass**
+
+### Code changed
+
+- `WorldSessionFieldNests` / `ContentSpawner` / `WorldSessionOptions`
+- `runner` / `index` / `types` / `PLAN` / `package.json`
+
+### Next work queue
+
+1. Finish low-hp 1k cohort docs
+2. Optional dense-nests 1k
+
+---
+
 ## Batch 2026-07-17g — Phase 3 low-hp stress (labVersion 8)
 
 ### Experiments run
@@ -25,11 +57,6 @@
 - `types` / `runner` / `index` / `report` / `digest` — stress mode plumbing
 - `PLAN.md` — Phase 3 section
 - `package.json` — `raid-lab:smoke:stress:low-hp`
-
-### Next work queue
-
-1. Optional low-hp 1k cohort
-2. denser-nests stress preset
 
 ---
 

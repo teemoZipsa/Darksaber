@@ -35,7 +35,7 @@ function parseArgs(argv: string[]): {
             if (next === 'balanced' || next === 'cautious' || next === 'random-legal') policy = next;
             i += 1;
         } else if (arg === '--stress' && next) {
-            if (next === 'none' || next === 'low-hp') stress = next;
+            if (next === 'none' || next === 'low-hp' || next === 'dense-nests') stress = next;
             i += 1;
         } else if (arg === '--max-actions' && next) {
             maxActions = Math.max(1, Number.parseInt(next, 10) || 400);

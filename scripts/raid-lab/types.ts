@@ -4,7 +4,7 @@ export const RAID_LAB_VERSION = 8;
 
 export type RaidLabPolicyId = 'balanced' | 'cautious' | 'random-legal';
 /** Optional Phase 3 stress presets (default / omitted = none). */
-export type RaidLabStressMode = 'none' | 'low-hp';
+export type RaidLabStressMode = 'none' | 'low-hp' | 'dense-nests';
 export type RaidLabResult = RaidResultMessage['result'];
 
 export interface RaidLabActionRecord {

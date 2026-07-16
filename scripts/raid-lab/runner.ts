@@ -27,6 +27,14 @@ import {
 const DEFAULT_MAX_ACTIONS = 1_500;
 const DEFAULT_MAX_SIM_MS = 30 * 60 * 1000;
 const HEAL_ITEM_CANDIDATES = ['herb_common', 'herb_cheap', 'herb_rare'] as const;
+/** Phase 3 denser nests: faster respawn, wider roam, higher spawn caps. */
+const DENSE_NEST_TUNING = {
+    respawnMs: 20_000,
+    roamRadiusChunks: 3,
+    refreshMaxEnemies: 48,
+    departureRadiusChunks: 5,
+    departureMaxEnemies: 36,
+} as const;
 
 let sharedWorldMap: WorldMap | null = null;
 
@@ -44,11 +52,13 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
     const policyRng = createMulberry32((options.seed * 0x85ebca6b) >>> 0);
     const combatRng = createMulberry32((options.seed * 0xc2b2ae35) >>> 0);
 
+    const stressMode = options.stress ?? 'none';
     const sessionEpoch = sessionEpochFromSeed(options.seed);
     const session = new WorldSession({
         sessionEpoch,
         random: combatRng,
         createToken: createLabTokenFactory(options.seed),
+        ...(stressMode === 'dense-nests' ? { fieldNestTuning: DENSE_NEST_TUNING } : {}),
     });
 
     const world = getSharedWorldMap();
@@ -97,7 +107,6 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
     };
 
     applyMessages(flattenTick(session.tick(now)));
-    const stressMode = options.stress ?? 'none';
     if (stressMode === 'low-hp') {
         applyLowHpStress(session, joined.playerId);
     }

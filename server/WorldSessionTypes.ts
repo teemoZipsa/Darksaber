@@ -118,6 +118,15 @@ export interface WorldSessionDebugCounts {
     lootLocks: number;
 }
 
+/** Optional field-nest density overrides (raid-lab stress / tests). Production omits. */
+export interface WorldSessionFieldNestTuning {
+    respawnMs?: number;
+    roamRadiusChunks?: number;
+    refreshMaxEnemies?: number;
+    departureRadiusChunks?: number;
+    departureMaxEnemies?: number;
+}
+
 export interface WorldSessionOptions {
     realm?: WorldRealm;
     ghostGraceMs?: number;
@@ -127,6 +136,8 @@ export interface WorldSessionOptions {
     random?: () => number;
     /** Optional resume-token factory. Defaults to createToken(). */
     createToken?: (prefix: string) => string;
+    /** Optional nest spawn/respawn tuning. Defaults match live field balance. */
+    fieldNestTuning?: WorldSessionFieldNestTuning;
 }
 
 export interface WorldJoinContext {

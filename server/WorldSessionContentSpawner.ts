@@ -17,8 +17,6 @@ import type { WorldSessionLootState } from './WorldSessionLootState';
 import {
     FIELD_NEST_NEARBY_ENEMY_DISTANCE,
     WorldSessionFieldNests,
-    WORLD_SESSION_FIELD_NEST_DEPARTURE_MAX_ENEMIES,
-    WORLD_SESSION_FIELD_NEST_DEPARTURE_RADIUS_CHUNKS,
 } from './WorldSessionFieldNests';
 import type { ServerEnemy, ServerPlayer } from './WorldSessionTypes';
 
@@ -40,12 +38,13 @@ export class WorldSessionContentSpawner {
 
     public ensureContentNear(spawnTile: TilePoint, departureTownId: string | null | undefined, now: number): void {
         if (!hasNearbyLiveEnemy(this.context.enemies.values(), spawnTile, FIELD_NEST_NEARBY_ENEMY_DISTANCE)) {
+            const departure = this.context.fieldNests.getDepartureSpawnParams();
             this.context.fieldNests.spawnEnemiesNear(
                 spawnTile,
                 now,
                 new Set(),
-                WORLD_SESSION_FIELD_NEST_DEPARTURE_RADIUS_CHUNKS,
-                WORLD_SESSION_FIELD_NEST_DEPARTURE_MAX_ENEMIES,
+                departure.radiusChunks,
+                departure.maxEnemies,
             );
         }
 

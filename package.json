@@ -51,7 +51,9 @@
     "raid-lab:cohort1k": "node --import tsx scripts/raid-lab/index.ts --seeds 1000 --policy balanced --max-actions 1500",
     "raid-lab:cohort1k:cautious": "node --import tsx scripts/raid-lab/index.ts --seeds 1000 --policy cautious --max-actions 1500",
     "raid-lab:cohort1k:random": "node --import tsx scripts/raid-lab/index.ts --seeds 1000 --policy random-legal --max-actions 1500",
-    "raid-lab:smoke:stress:low-hp": "node --import tsx scripts/raid-lab/index.ts --seeds 100 --policy balanced --stress low-hp --max-actions 1500"
+    "raid-lab:smoke:stress:low-hp": "node --import tsx scripts/raid-lab/index.ts --seeds 100 --policy balanced --stress low-hp --max-actions 1500",
+    "raid-lab:cohort1k:stress:low-hp": "node --import tsx scripts/raid-lab/index.ts --seeds 1000 --policy balanced --stress low-hp --max-actions 1500",
+    "raid-lab:smoke:stress:dense-nests": "node --import tsx scripts/raid-lab/index.ts --seeds 100 --policy balanced --stress dense-nests --max-actions 1500"
   },
   "keywords": [
     "srpg",

@@ -36,6 +36,14 @@ export const FIELD_NEST_ACTOR_SAFE_DISTANCE = 64;
 // outside the player-safe distance even on obstructed terrain.
 export const FIELD_NEST_CENTER_SAFE_DISTANCE = FIELD_NEST_ACTOR_SAFE_DISTANCE + 20;
 
+export interface WorldSessionFieldNestTuningResolved {
+    respawnMs: number;
+    roamRadiusChunks: number;
+    refreshMaxEnemies: number;
+    departureRadiusChunks: number;
+    departureMaxEnemies: number;
+}
+
 export interface WorldSessionFieldNestContext {
     worldMap: WorldMap;
     players: ReadonlyMap<string, ServerPlayer>;
@@ -45,10 +53,28 @@ export interface WorldSessionFieldNestContext {
     sessionEpoch: number;
     nextEnemyId: () => number;
     findNearbyWalkableTile: (tile: TilePoint, actorId: string, ownerPlayerId?: string) => TilePoint;
+    nestTuning?: Partial<WorldSessionFieldNestTuningResolved>;
 }
 
 export class WorldSessionFieldNests {
-    public constructor(private readonly context: WorldSessionFieldNestContext) {}
+    private readonly tuning: WorldSessionFieldNestTuningResolved;
+
+    public constructor(private readonly context: WorldSessionFieldNestContext) {
+        this.tuning = {
+            respawnMs: context.nestTuning?.respawnMs ?? FIELD_NEST_RESPAWN_MS,
+            roamRadiusChunks: context.nestTuning?.roamRadiusChunks ?? FIELD_NEST_ROAM_RADIUS_CHUNKS,
+            refreshMaxEnemies: context.nestTuning?.refreshMaxEnemies ?? FIELD_NEST_REFRESH_MAX_ENEMIES,
+            departureRadiusChunks: context.nestTuning?.departureRadiusChunks ?? FIELD_NEST_DEPARTURE_RADIUS_CHUNKS,
+            departureMaxEnemies: context.nestTuning?.departureMaxEnemies ?? FIELD_NEST_DEPARTURE_MAX_ENEMIES,
+        };
+    }
+
+    public getDepartureSpawnParams(): { radiusChunks: number; maxEnemies: number } {
+        return {
+            radiusChunks: this.tuning.departureRadiusChunks,
+            maxEnemies: this.tuning.departureMaxEnemies,
+        };
+    }
 
     public refreshFieldNests(now: number): void {
         const visited = new Set<string>();
@@ -57,7 +83,13 @@ export class WorldSessionFieldNests {
             if (player.activeDungeonId) continue;
             const anchor = firstLivingActorTile(player, this.context.actors);
             if (!anchor) continue;
-            this.spawnEnemiesNear(anchor, now, visited, FIELD_NEST_ROAM_RADIUS_CHUNKS, FIELD_NEST_REFRESH_MAX_ENEMIES);
+            this.spawnEnemiesNear(
+                anchor,
+                now,
+                visited,
+                this.tuning.roamRadiusChunks,
+                this.tuning.refreshMaxEnemies,
+            );
         }
     }
 
@@ -65,7 +97,7 @@ export class WorldSessionFieldNests {
         anchor: TilePoint,
         now: number,
         visited: Set<string> = new Set(),
-        radiusChunks = FIELD_NEST_ROAM_RADIUS_CHUNKS,
+        radiusChunks = this.tuning.roamRadiusChunks,
         maxSpawnedEnemies = Number.POSITIVE_INFINITY,
     ): number {
         const realm = this.context.worldMap.getRealm();
@@ -94,7 +126,7 @@ export class WorldSessionFieldNests {
         state.monsterIds = state.monsterIds.filter((id) => id !== enemyId);
         if (state.monsterIds.length > 0) return;
         state.cleared = true;
-        state.respawnAt = now + FIELD_NEST_RESPAWN_MS;
+        state.respawnAt = now + this.tuning.respawnMs;
     }
 
     private spawnNest(

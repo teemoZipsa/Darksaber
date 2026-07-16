@@ -209,6 +209,7 @@ export class WorldSession {
             sessionEpoch: this.sessionEpoch,
             nextEnemyId: () => this.nextEnemyId++,
             findNearbyWalkableTile: (tile, actorId, ownerPlayerId) => this.findNearbyWalkableTile(tile, actorId, ownerPlayerId),
+            nestTuning: options.fieldNestTuning,
         });
         this.scenarioRewards = new WorldSessionScenarioRewards({
             saveState: this.saveState,

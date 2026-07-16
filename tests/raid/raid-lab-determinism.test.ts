@@ -143,3 +143,13 @@ test('raid lab low-hp stress stays deterministic and diverges from unstressed', 
     assert.notEqual(first.digest, plain.digest);
     assert.ok(['SURVIVED', 'DEAD', 'MIA', 'LEFT'].includes(first.result));
 });
+
+test('raid lab dense-nests stress stays deterministic and diverges from unstressed', () => {
+    const plain = runRaidLabExpedition({ seed: 5, policy: 'balanced', maxActions: 100 });
+    const first = runRaidLabExpedition({ seed: 5, policy: 'balanced', stress: 'dense-nests', maxActions: 100 });
+    const second = runRaidLabExpedition({ seed: 5, policy: 'balanced', stress: 'dense-nests', maxActions: 100 });
+    assert.equal(first.stress, 'dense-nests');
+    assert.equal(first.digest, second.digest);
+    assert.notEqual(first.digest, plain.digest);
+    assert.ok(['SURVIVED', 'DEAD', 'MIA', 'LEFT'].includes(first.result));
+});
