@@ -39,15 +39,15 @@
 
 | Policy | SURVIVED | DEAD | LEFT | invariants |
 |---|---:|---:|---:|---:|
+| balanced | **1000** | 0 | 0 | 0 |
 | cautious | **1000** | 0 | 0 | 0 |
 | random-legal | **1000** | 0 | 0 | 0 |
 
-- Reports: `smoke-{cautious,random-legal}-s0-n1000-20260716.*` (labVersion 8)
+- Reports: `smoke-{balanced,cautious,random-legal}-s0-n1000-20260716.*` (labVersion 8)
 
 ### Next work queue
 
-1. Optional balanced 1k reconfirm at labVersion 8
-2. Optional Phase 3 stress cohorts
+1. Phase 3 stress cohorts (forced low HP / denser nests)
 
 ---
 
