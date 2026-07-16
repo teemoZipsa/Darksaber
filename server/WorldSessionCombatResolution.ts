@@ -38,6 +38,7 @@ export interface WorldSessionEnemyKillContext {
 export interface WorldSessionActorAttackContext {
     enemyKillContext: WorldSessionEnemyKillContext;
     getServerTileAt(tile: TilePoint, ownerPlayerId?: string | null): ReturnType<WorldMap['getTileAt']>;
+    random?: () => number;
 }
 
 export interface WorldSessionActorAttackResolution {
@@ -57,7 +58,10 @@ export function resolveWorldSessionActorAttack(
         getEffectiveServerActorStats(actor),
         getEffectiveStatsForEnemy(enemy),
         context.getServerTileAt({ x: enemy.gridX, y: enemy.gridY }, actor.ownerPlayerId),
-        { isRanged: manhattan(actor.tile, { x: enemy.gridX, y: enemy.gridY }) > 1 }
+        {
+            isRanged: manhattan(actor.tile, { x: enemy.gridX, y: enemy.gridY }) > 1,
+            ...(context.random ? { random: context.random } : {}),
+        }
     );
     const event: CombatEventMessage = {
         type: 'COMBAT_EVENT',

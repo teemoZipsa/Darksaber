@@ -47,6 +47,7 @@ export interface WorldSessionSkillResolverContext {
     getServerTileAt: (tile: TilePoint, ownerPlayerId?: string | null) => ReturnType<WorldMap['getTileAt']>;
     getServerBoundsForOwner: (ownerPlayerId?: string | null) => ReturnType<WorldMap['getBoundsTiles']>;
     hasFieldLineOfSight: (from: TilePoint, to: TilePoint, ownerPlayerId?: string) => boolean;
+    random?: () => number;
     spendActorGauge: (actor: ServerActor, cost: number) => void;
     finishActorIfSpent: (actor: ServerActor) => void;
     completeEnemyKill: (actor: ServerActor, target: ServerEnemy, now: number) => CompleteEnemyKillResult;
@@ -118,6 +119,7 @@ export class WorldSessionSkillResolver {
                 targetEnemy: target?.enemy,
                 getTileAt: (tile) => this.context.getServerTileAt(tile, actor.ownerPlayerId),
             }),
+            ...(this.context.random ? { random: this.context.random } : {}),
         });
 
         if (effect.enemyResults.length > 0) this.context.recordCombatActivity?.(player);

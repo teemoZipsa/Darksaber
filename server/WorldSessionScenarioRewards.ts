@@ -28,6 +28,7 @@ import { getEffectiveServerActorStats } from './WorldSessionHelpers';
 
 export interface WorldSessionScenarioRewardsContext {
     saveState: WorldSessionSaveState;
+    random?: () => number;
 }
 
 export class WorldSessionScenarioRewards {
@@ -78,7 +79,8 @@ export class WorldSessionScenarioRewards {
     }
 
     public rollFieldEventRandom(event: StoryScenarioFieldEvent): boolean {
-        return doesStoryScenarioFieldEventRandomPass(event, () => Math.random());
+        const random = this.context.random ?? Math.random;
+        return doesStoryScenarioFieldEventRandomPass(event, random);
     }
 
     public canConsumeFieldEventUseItems(player: ServerPlayer, event: StoryScenarioFieldEvent): boolean {

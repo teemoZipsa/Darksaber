@@ -162,6 +162,8 @@ export class WorldSession {
     private lastNestRefreshAt = 0;
     private readonly ghostGraceMs: number;
     private readonly logger: (message: string) => void;
+    private readonly random: () => number;
+    private readonly createTokenFn: (prefix: string) => string;
 
     constructor(options: WorldSessionOptions = {}) {
         this.sessionEpoch = options.sessionEpoch ?? Date.now();
@@ -169,6 +171,8 @@ export class WorldSession {
         this.shardId = `${this.worldMap.getRealm()}`;
         this.ghostGraceMs = options.ghostGraceMs ?? DISCONNECT_GRACE_MS;
         this.logger = options.logger ?? (() => undefined);
+        this.random = options.random ?? Math.random;
+        this.createTokenFn = options.createToken ?? createToken;
         this.enemyState = new WorldSessionEnemyState<ServerEnemy, ServerActor>({
             getTargetableActors: (entry) => getTargetableActors(this.players, this.actors.values(), entry),
             hasActiveActorWithin: (tile, distance, ownerPlayerId) =>
@@ -182,6 +186,7 @@ export class WorldSession {
             getServerTileAt: (tile, ownerPlayerId) => this.getServerTileAt(tile, ownerPlayerId),
             isFieldPassable: (query) => this.isFieldPassable(query),
             hasFieldLineOfSight: (from, to, ownerPlayerId) => this.hasFieldLineOfSight(from, to, ownerPlayerId),
+            random: this.random,
             onActorDown: (actor, cause) => {
                 const player = this.players.get(actor.ownerPlayerId);
                 if (player) {
@@ -207,6 +212,7 @@ export class WorldSession {
         });
         this.scenarioRewards = new WorldSessionScenarioRewards({
             saveState: this.saveState,
+            random: this.random,
         });
         this.scenarioRuntime = new WorldSessionScenarioRuntime({
             players: this.players,
@@ -275,6 +281,7 @@ export class WorldSession {
             getServerTileAt: (tile, ownerPlayerId) => this.getServerTileAt(tile, ownerPlayerId),
             getServerBoundsForOwner: (ownerPlayerId) => this.getServerBoundsForOwner(ownerPlayerId),
             hasFieldLineOfSight: (from, to, ownerPlayerId) => this.hasFieldLineOfSight(from, to, ownerPlayerId),
+            random: this.random,
             spendActorGauge: (actor, cost) => this.spendActorGauge(actor, cost),
             finishActorIfSpent: (actor) => this.finishActorIfSpent(actor),
             completeEnemyKill: (actor, target, now) => this.completeEnemyKill(actor, target, now),
@@ -392,7 +399,7 @@ export class WorldSession {
         }
 
         const playerId = `player_${this.nextPlayerId++}`;
-        const resumeToken = createToken('resume');
+        const resumeToken = this.createTokenFn('resume');
         const originHubId = this.getTownById(message.originHubId)?.id ?? 'central_castle';
         const spawnTile = this.getOriginExitTile(originHubId);
         const raidModifier = rollRaidModifier(`${this.sessionEpoch}:${this.shardId}:${originHubId}:${playerId}`);
@@ -637,6 +644,7 @@ export class WorldSession {
         return resolveWorldSessionActorAttack({
             enemyKillContext: this.getEnemyKillContext(),
             getServerTileAt: (tile, ownerPlayerId) => this.getServerTileAt(tile, ownerPlayerId),
+            random: this.random,
         }, actor, target, now);
     }
 

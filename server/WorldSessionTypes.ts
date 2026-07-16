@@ -123,6 +123,10 @@ export interface WorldSessionOptions {
     ghostGraceMs?: number;
     sessionEpoch?: number;
     logger?: (message: string) => void;
+    /** Optional RNG for combat/skill/scenario rolls. Defaults to Math.random. */
+    random?: () => number;
+    /** Optional resume-token factory. Defaults to createToken(). */
+    createToken?: (prefix: string) => string;
 }
 
 export interface WorldJoinContext {

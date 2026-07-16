@@ -44,6 +44,7 @@ export interface WorldSessionEnemyTurnContext {
     hasFieldLineOfSight: (from: TilePoint, to: TilePoint, ownerPlayerId?: string) => boolean;
     onActorDown?: (actor: ServerActor, cause: 'enemy') => void;
     onCombatActivity?: (actor: ServerActor) => void;
+    random?: () => number;
 }
 
 export class WorldSessionEnemyTurnResolver {
@@ -133,7 +134,10 @@ export class WorldSessionEnemyTurnResolver {
             getEffectiveStatsForEnemy(enemy),
             getEffectiveServerActorStats(actor),
             this.context.getServerTileAt(actor.tile, actor.ownerPlayerId),
-            { isRanged: range > 1 }
+            {
+                isRanged: range > 1,
+                ...(this.context.random ? { random: this.context.random } : {}),
+            }
         );
         enemy.facing = directionFromTo({ x: enemy.gridX, y: enemy.gridY }, actor.tile);
         let dealtDamage = result.damage;

@@ -1,0 +1,38 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { runRaidLabExpedition } from '../../scripts/raid-lab/runner';
+import type { RaidLabPolicyId } from '../../scripts/raid-lab/types';
+
+const POLICIES: RaidLabPolicyId[] = ['balanced', 'cautious', 'random-legal'];
+
+test('raid lab same seed produces identical digests for each policy', () => {
+    for (const policy of POLICIES) {
+        const first = runRaidLabExpedition({ seed: 42, policy, maxActions: 80 });
+        const second = runRaidLabExpedition({ seed: 42, policy, maxActions: 80 });
+        assert.equal(first.digest, second.digest, `${policy} digest mismatch`);
+        assert.equal(first.result, second.result, `${policy} result mismatch`);
+        assert.equal(first.kills, second.kills, `${policy} kills mismatch`);
+        assert.deepEqual(first.actions, second.actions, `${policy} actions mismatch`);
+        assert.deepEqual(first.invariantViolations, second.invariantViolations, `${policy} invariants mismatch`);
+    }
+});
+
+test('raid lab different seeds diverge or remain independently stable', () => {
+    const a = runRaidLabExpedition({ seed: 7, policy: 'balanced', maxActions: 60 });
+    const b = runRaidLabExpedition({ seed: 8, policy: 'balanced', maxActions: 60 });
+    const aAgain = runRaidLabExpedition({ seed: 7, policy: 'balanced', maxActions: 60 });
+    assert.equal(a.digest, aAgain.digest);
+    // Different seeds usually diverge; if they collide, both must still be self-stable.
+    if (a.digest === b.digest) {
+        const bAgain = runRaidLabExpedition({ seed: 8, policy: 'balanced', maxActions: 60 });
+        assert.equal(b.digest, bAgain.digest);
+    }
+});
+
+test('raid lab starter expedition finishes with a legal raid result', () => {
+    const result = runRaidLabExpedition({ seed: 1, policy: 'balanced', maxActions: 120 });
+    assert.ok(['SURVIVED', 'DEAD', 'MIA', 'LEFT'].includes(result.result));
+    assert.ok(result.actions.length > 0);
+    assert.equal(result.departureTownId, 'central_castle');
+    assert.ok(result.digest.length >= 16);
+});
