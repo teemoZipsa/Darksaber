@@ -14,14 +14,28 @@
 - Determinism + extract regressions in `tests/raid/raid-lab-determinism.test.ts`
 - Smoke / 1k cohort pending re-run under labVersion 3
 
-### Outcome ratios
+### Outcome ratios (smoke 0..99 / balanced / labVersion 3)
 
-- Seed spot-checks: cautious 3 SURVIVED; balanced 6 SURVIVED (~0.5–1s each)
-- Full smoke `0..99` and cohort1k: **queued next**
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 89 | 89.0% |
+| DEAD | 0 | 0.0% |
+| MIA | 0 | 0.0% |
+| LEFT | 11 | 11.0% |
+
+- mean elapsedSeconds: **49.95**
+- mean kills: **0.89**
+- vs labVersion 2 smoke: SURVIVED 84% → **89%**, LEFT 16% → **11%**
+- Report: `docs/raid-lab/reports/smoke-balanced-s0-n100-20260716.md` (overwritten with v3)
 
 ### Invariant violations
 
-- none observed on regression seeds
+- total: **0**
+
+### Minimal reproductions / clusters
+
+- `max_actions` / LEFT (11/100): seeds 9, 14, 18, 35, 63, 69, 77, 82 (+ samples in report)
+- Seed 6 water trap: **fixed** (now in SURVIVED / raid_result)
 
 ### Tests added/updated
 
@@ -40,12 +54,13 @@
 |---|---|
 | `npm run typecheck` | pass |
 | `node --import tsx --test tests/raid/raid-lab-determinism.test.ts` | 5 pass |
+| `npm run raid-lab:smoke` | SURVIVED 89 / LEFT 11 / invariants 0 (~42s) |
 
 ### Next work queue
 
-1. Re-run `npm run raid-lab:smoke` under labVersion 3; compare LEFT rate vs 16%
-2. Finish `npm run raid-lab:cohort1k`; update ratios/clusters
-3. Shrink any remaining LEFT/DEAD clusters into regression seeds
+1. Finish `npm run raid-lab:cohort1k`; update ratios/clusters
+2. Shrink remaining LEFT seeds (9, 14, …) into regression cases
+3. Add DEAD/MIA stress cohort once LEFT cluster is reduced further
 
 ---
 
