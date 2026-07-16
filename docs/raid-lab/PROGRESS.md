@@ -27,8 +27,7 @@
 
 ### Next work queue
 
-1. Finish low-hp 1k cohort docs
-2. Optional dense-nests 1k
+1. Optional dense-nests 1k cohort
 
 ---
 
@@ -46,6 +45,16 @@
 | SURVIVED | 100 | **100.0%** |
 | DEAD | 0 | 0.0% |
 | LEFT | 0 | 0.0% |
+
+### Outcome ratios (cohort 0..999 / balanced / stress=low-hp)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | **1000** | **100.0%** |
+| DEAD | 0 | 0.0% |
+| LEFT | 0 | 0.0% |
+
+- Report: `smoke-balanced-stress-low-hp-s0-n1000-20260716.*`
 
 ### Tests added/updated
 
