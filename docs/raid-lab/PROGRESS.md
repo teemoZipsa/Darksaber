@@ -1,73 +1,77 @@
 # Raid Lab — Progress
 
-## Batch 2026-07-16 — Phase 0 + Phase 1 minimal deterministic raid
+## Batch 2026-07-16b — Phase 2 extract path + clustering + 100-seed cohort
 
 ### Experiments run
 
-- Phase 0 tooling baseline (`npm run typecheck`, `npm test`)
-- Phase 1 same-seed determinism suite (`tests/raid/raid-lab-determinism.test.ts`)
-- Phase 1 100-seed smoke (`npm run raid-lab:smoke`, policy `balanced`)
+- Extract-path fix (staged waypoints + shared WorldMap + no per-tick snapshots)
+- Failure/outcome clustering in cohort reports
+- Re-run balanced smoke seeds `0..99` (labVersion 2)
+- Cautious SURVIVED regression test (seed 3 → `e_stronghold`)
 
 ### Seed range
 
-- Determinism: seed `42` (all policies), seeds `7`/`8` divergence check, seed `1` legality
-- Smoke: seeds `0..99` (policy `balanced`, maxActions default 600)
+- Determinism / SURVIVED regression: seeds covered by `tests/raid/raid-lab-determinism.test.ts`
+- Smoke: seeds `0..99`, policy `balanced`, maxActions `1500`
 
-### Outcome ratios (smoke 0..99 / balanced)
+### Outcome ratios (smoke 0..99 / balanced / labVersion 2)
 
 | Result | Count | Share |
 |---|---:|---:|
-| SURVIVED | 0 | 0.0% |
+| SURVIVED | 84 | 84.0% |
 | DEAD | 0 | 0.0% |
 | MIA | 0 | 0.0% |
-| LEFT | 100 | 100.0% |
+| LEFT | 16 | 16.0% |
 
-- mean elapsedSeconds: **111.50**
-- mean kills: **21.94**
+- mean elapsedSeconds: **52.12**
+- mean kills: **1.14**
 - Report: `docs/raid-lab/reports/smoke-balanced-s0-n100-20260716.md`
-
-Notes: LEFT-heavy is expected for Phase 1 — starter parties hit the action budget while hunting
-departure-area nests (~100+ tiles out) before reaching a non-departure town for SURVIVED.
 
 ### Invariant violations
 
 - total: **0**
 
-### Minimal reproductions
+### Minimal reproductions / clusters
 
-None yet (no invariant failures in the first 100-seed cohort).
+- Highest non-survive cluster: `stopReason=max_actions` / `LEFT` (16/100)
+  - sample seeds: 6, 25, 29, 34, 37, 58, 62, 64
+- No DEAD/MIA/invariant clusters in this cohort
 
-### Tests added
+### Tests added/updated
 
 - `tests/raid/raid-lab-determinism.test.ts`
-  - same seed → identical digests for `balanced` / `cautious` / `random-legal`
-  - seed self-stability
-  - legal raid result for starter expedition
+  - cautious extract seed 3 must `SURVIVED` at `e_stronghold`
 
 ### Code changed
 
-- Optional `WorldSessionOptions.random` / `createToken` DI (defaults unchanged for production)
-- Threaded RNG through combat, enemy turns, skills, scenario field-event rolls
-- `scripts/raid-lab/*` WorldSession headless runner, policies, invariants, digest, CLI
-- `docs/raid-lab/*` plan, baseline, schema, progress, smoke reports
-- npm scripts: `raid-lab`, `raid-lab:smoke`
-- `tsconfig.test.json` includes `scripts/raid-lab`
+- Staged waypoint routing (`scripts/raid-lab/pathing.ts`) to escape greedy dead-ends
+- Extract phase in policies (hunt then extract; bypass nearby threats)
+- Shared WorldMap + debug loot reads (faster cohort runs)
+- Cohort clustering in `report.ts` / progress prints in CLI
+- `RAID_LAB_VERSION = 2`
+- npm script `raid-lab:cohort1k`
 
 ### Verification commands
 
 | Command | Result |
 |---|---|
 | `npm run typecheck` | pass |
-| `npm run lint` | pass (after stopReason fix) |
-| `node --import tsx --test tests/raid/raid-lab-determinism.test.ts` | 3 pass |
-| `npm run raid-lab:smoke` | 100 seeds, 0 invariant violations |
+| `npm run lint` | pass |
+| `node --import tsx --test tests/raid/raid-lab-determinism.test.ts` | 4 pass |
+| `npm run raid-lab:smoke` | SURVIVED 84 / LEFT 16 / invariants 0 (~1247s) |
 
 ### Next work queue
 
-1. Phase 2: expand to 1,000 seeds; keep the same cohort comparison discipline
-2. Probe why SURVIVED remains 0 under action budgets — longer extract path / path quality
-3. Add rest/heal stress cohort (force low HP) and DEAD/MIA clusters
-4. Shrink any future invariant violation into `tests/raid/raid-lab-regression-*.test.ts` before fixes
+1. Finish 1,000-seed cohort (`npm run raid-lab:cohort1k`) and compare against this 100-seed baseline
+2. Shrink `max_actions` LEFT seeds (6, 25, …) — path traps vs combat delays
+3. Add DEAD/MIA stress cohort (forced low HP / denser nests) once LEFT cluster is reduced
+4. Keep regression seeds for any new invariant violations before fixes
+
+---
+
+## Batch 2026-07-16 — Phase 0 + Phase 1 minimal deterministic raid
+
+See git commit `402589a` / earlier section in git history. Baseline LEFT-heavy 100-seed cohort was labVersion 1 before extract routing.
 
 ---
 

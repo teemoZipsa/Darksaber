@@ -12,6 +12,7 @@ import type {
 import { FIELD_MAX_ACTION_GAUGE } from '../../src/field/FieldActionEconomy';
 import { digestExperimentResult } from './digest';
 import { checkRaidLabInvariants } from './invariants';
+import { planLocalStep, type PathCache } from './pathing';
 import { getRaidLabPolicy, type LabObservation } from './policies';
 import { createLabTokenFactory, createMulberry32, sessionEpochFromSeed } from './rng';
 import {
@@ -23,9 +24,16 @@ import {
     type RaidLabRunOptions,
 } from './types';
 
-const DEFAULT_MAX_ACTIONS = 600;
+const DEFAULT_MAX_ACTIONS = 1_500;
 const DEFAULT_MAX_SIM_MS = 30 * 60 * 1000;
 const HEAL_ITEM_CANDIDATES = ['herb_common', 'herb_cheap', 'herb_rare', 'mp_potion'] as const;
+
+let sharedWorldMap: WorldMap | null = null;
+
+function getSharedWorldMap(): WorldMap {
+    sharedWorldMap ??= new WorldMap();
+    return sharedWorldMap;
+}
 
 export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperimentResult {
     const maxActions = options.maxActions ?? DEFAULT_MAX_ACTIONS;
@@ -43,7 +51,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
         createToken: createLabTokenFactory(options.seed),
     });
 
-    const world = new WorldMap();
+    const world = getSharedWorldMap();
     const departureTownId = 'central_castle';
     const extraction = pickExtractionTown(world, departureTownId);
     const character = createStarterCharacter(options.seed);
@@ -65,6 +73,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
     let intentOrdinal = 0;
     let cappedStop: 'max_actions' | 'max_sim_ms' | 'invariant_abort' | null = null;
     const ignoredLootIds = new Set<string>();
+    const pathCache: PathCache = { goalKey: '', waypointKey: '', path: [], index: 0 };
 
     const recordAction = (kind: string, detail?: string) => {
         actions.push({
@@ -102,7 +111,16 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
             break;
         }
 
-        const observation = buildObservation(session, world, joined.playerId, extraction, policyRng, ignoredLootIds);
+        const observation = buildObservation(
+            session,
+            world,
+            joined.playerId,
+            extraction,
+            policyRng,
+            ignoredLootIds,
+            actions.length,
+            pathCache
+        );
         if (!observation) {
             break;
         }
@@ -120,6 +138,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
             exp: getActorExp(session, joined.playerId),
             tileX: observation.tile.x,
             tileY: observation.tile.y,
+            mov: observation.mov,
         };
 
         const decision = policy(observation);
@@ -408,7 +427,9 @@ function buildObservation(
     playerId: string,
     extraction: { townId: string; tile: { x: number; y: number } },
     policyRng: () => number,
-    ignoredLootIds: ReadonlySet<string>
+    ignoredLootIds: ReadonlySet<string>,
+    actionCount: number,
+    pathCache: PathCache
 ): LabObservation | null {
     const debug = session.getDebugState();
     const player = debug.players.get(playerId);
@@ -416,9 +437,11 @@ function buildObservation(
     const actor = [...debug.actors.values()].find((entry) => entry.ownerPlayerId === playerId);
     if (!actor) return null;
 
-    const snapshot = session.createSnapshot(playerId, 0);
     const currentTownId = world.getTownAtTile(actor.tile.x, actor.tile.y)?.id ?? null;
     const healItemId = HEAL_ITEM_CANDIDATES.find((itemId) => (player.carriedItems.get(itemId) ?? 0) > 0) ?? null;
+    const lootItemsAcquired = (player.saveSnapshot?.inventory.items ?? [])
+        .filter((item) => item.acquiredInRaid === true)
+        .reduce((sum, item) => sum + Math.max(1, Math.floor(item.quantity ?? 1)), 0);
 
     return {
         actorReady: actor.actionGauge >= FIELD_MAX_ACTION_GAUGE && actor.remainingAp > 0 && !actor.isDead,
@@ -441,12 +464,25 @@ function buildObservation(
             hp: entry.enemy.stats.hp,
             isAggro: entry.enemy.isAggro,
         })),
-        loot: snapshot.loot.map((entry) => ({
-            id: entry.id,
-            tile: { ...entry.tile },
-        })),
+        loot: [...debug.loot.values()]
+            .filter((entry) => !entry.opened)
+            .map((entry) => ({
+                id: entry.id,
+                tile: { x: entry.x, y: entry.y },
+            })),
         ignoredLootIds,
         healItemId,
+        kills: player.kills,
+        lootItemsAcquired,
+        actionCount,
+        planStep: (goal) => planLocalStep(
+            world,
+            actor.tile,
+            goal,
+            Math.max(1, actor.stats.mov || 1),
+            actor.id,
+            pathCache
+        ),
         random: policyRng,
     };
 }
@@ -492,18 +528,8 @@ function attemptMove(
     intentId: string,
     now: number
 ): { replies: WorldServerMessage[]; broadcasts: WorldServerMessage[]; rejected: boolean; tile: { x: number; y: number } } {
-    const candidates: Array<{ x: number; y: number }> = [desired];
-    const dx = Math.sign(desired.x - from.x);
-    const dy = Math.sign(desired.y - from.y);
-    if (dx !== 0) candidates.push({ x: from.x + dx, y: from.y });
-    if (dy !== 0) candidates.push({ x: from.x, y: from.y + dy });
-    candidates.push(
-        { x: from.x + 1, y: from.y },
-        { x: from.x - 1, y: from.y },
-        { x: from.x, y: from.y + 1 },
-        { x: from.x, y: from.y - 1 },
-    );
-
+    // Try farthest legal prefix first so rejected long WorldMap plans still get full MOV steps.
+    const candidates = buildMoveCandidates(from, desired, 8);
     const seen = new Set<string>();
     for (const tile of candidates) {
         const key = `${tile.x},${tile.y}`;
@@ -522,6 +548,38 @@ function attemptMove(
         }
     }
     return { replies: [], broadcasts: [], rejected: true, tile: desired };
+}
+
+function buildMoveCandidates(
+    from: { x: number; y: number },
+    desired: { x: number; y: number },
+    maxSteps: number
+): Array<{ x: number; y: number }> {
+    const line: Array<{ x: number; y: number }> = [];
+    let x = from.x;
+    let y = from.y;
+    for (let step = 0; step < maxSteps; step++) {
+        if (x === desired.x && y === desired.y) break;
+        if (Math.abs(desired.x - x) >= Math.abs(desired.y - y) && x !== desired.x) {
+            x += Math.sign(desired.x - x);
+        } else if (y !== desired.y) {
+            y += Math.sign(desired.y - y);
+        } else if (x !== desired.x) {
+            x += Math.sign(desired.x - x);
+        } else {
+            break;
+        }
+        line.push({ x, y });
+    }
+
+    return [
+        desired,
+        ...[...line].reverse(),
+        { x: from.x + 1, y: from.y },
+        { x: from.x - 1, y: from.y },
+        { x: from.x, y: from.y + 1 },
+        { x: from.x, y: from.y - 1 },
+    ];
 }
 
 function advanceUntilReadyOrDone(

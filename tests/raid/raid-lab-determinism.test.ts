@@ -36,3 +36,11 @@ test('raid lab starter expedition finishes with a legal raid result', () => {
     assert.equal(result.departureTownId, 'central_castle');
     assert.ok(result.digest.length >= 16);
 });
+
+test('raid lab cautious extract can survive at a non-departure town', () => {
+    const result = runRaidLabExpedition({ seed: 3, policy: 'cautious', maxActions: 1_500 });
+    assert.equal(result.result, 'SURVIVED');
+    assert.equal(result.extractionTownId, 'e_stronghold');
+    assert.notEqual(result.extractionTownId, result.departureTownId);
+    assert.ok(result.actions.some((action) => action.kind === 'leave_town'));
+});

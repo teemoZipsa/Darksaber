@@ -1,6 +1,6 @@
 import type { RaidBalanceTelemetry, RaidResultMessage } from '../../src/net/WorldProtocol';
 
-export const RAID_LAB_VERSION = 1;
+export const RAID_LAB_VERSION = 2;
 
 export type RaidLabPolicyId = 'balanced' | 'cautious' | 'random-legal';
 export type RaidLabResult = RaidResultMessage['result'];
@@ -27,6 +27,7 @@ export interface RaidLabActorFinal {
     exp: number;
     tileX: number;
     tileY: number;
+    mov?: number;
 }
 
 export interface RaidLabExperimentResult {
@@ -68,4 +69,13 @@ export interface RaidLabCohortSummary {
     meanElapsedSeconds: number;
     meanKills: number;
     digests: Array<{ seed: number; digest: string; result: RaidLabResult }>;
+    clusters: RaidLabFailureClusters;
+}
+
+export interface RaidLabFailureClusters {
+    byResult: Record<string, number>;
+    byStopReason: Record<string, number>;
+    byDeathCause: Record<string, number>;
+    byInvariantCode: Record<string, number>;
+    sampleSeeds: Record<string, number[]>;
 }

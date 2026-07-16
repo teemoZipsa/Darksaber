@@ -1,7 +1,13 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { RaidLabCohortSummary, RaidLabExperimentResult, RaidLabPolicyId, RaidLabResult } from './types';
+import type {
+    RaidLabCohortSummary,
+    RaidLabExperimentResult,
+    RaidLabFailureClusters,
+    RaidLabPolicyId,
+    RaidLabResult,
+} from './types';
 import { RAID_LAB_VERSION } from './types';
 
 const EMPTY_RESULTS: Record<RaidLabResult, number> = {
@@ -10,6 +16,45 @@ const EMPTY_RESULTS: Record<RaidLabResult, number> = {
     MIA: 0,
     LEFT: 0,
 };
+
+const SAMPLE_LIMIT = 8;
+
+export function clusterResults(results: RaidLabExperimentResult[]): RaidLabFailureClusters {
+    const byResult: Record<string, number> = {};
+    const byStopReason: Record<string, number> = {};
+    const byDeathCause: Record<string, number> = {};
+    const byInvariantCode: Record<string, number> = {};
+    const sampleSeeds: Record<string, number[]> = {};
+
+    const pushSample = (key: string, seed: number) => {
+        const list = sampleSeeds[key] ?? (sampleSeeds[key] = []);
+        if (list.length < SAMPLE_LIMIT) list.push(seed);
+    };
+
+    for (const result of results) {
+        byResult[result.result] = (byResult[result.result] ?? 0) + 1;
+        pushSample(`result:${result.result}`, result.seed);
+
+        byStopReason[result.stopReason] = (byStopReason[result.stopReason] ?? 0) + 1;
+        pushSample(`stop:${result.stopReason}`, result.seed);
+
+        const deathCause = result.telemetry.deathCause ?? 'unknown';
+        byDeathCause[deathCause] = (byDeathCause[deathCause] ?? 0) + 1;
+        pushSample(`death:${deathCause}`, result.seed);
+
+        const codes = new Set(result.invariantViolations.map((entry) => entry.code));
+        if (codes.size === 0) {
+            byInvariantCode.none = (byInvariantCode.none ?? 0) + 1;
+        } else {
+            for (const code of codes) {
+                byInvariantCode[code] = (byInvariantCode[code] ?? 0) + 1;
+                pushSample(`invariant:${code}`, result.seed);
+            }
+        }
+    }
+
+    return { byResult, byStopReason, byDeathCause, byInvariantCode, sampleSeeds };
+}
 
 export function summarizeCohort(
     results: RaidLabExperimentResult[],
@@ -49,6 +94,7 @@ export function summarizeCohort(
             digest: result.digest,
             result: result.result,
         })),
+        clusters: clusterResults(results),
     };
 }
 
@@ -58,9 +104,19 @@ export function formatCohortMarkdown(summary: RaidLabCohortSummary): string {
         .sort((a, b) => b[1] - a[1])
         .map(([code, count]) => `- \`${code}\`: ${count}`)
         .join('\n');
+    const clusterSection = (title: string, bag: Record<string, number>, prefix: string) => {
+        const lines = Object.entries(bag)
+            .sort((a, b) => b[1] - a[1])
+            .map(([key, count]) => {
+                const samples = summary.clusters.sampleSeeds[`${prefix}${key}`] ?? [];
+                const sampleText = samples.length > 0 ? ` — seeds ${samples.join(', ')}` : '';
+                return `- \`${key}\`: ${count}${sampleText}`;
+            });
+        return [`## ${title}`, '', ...(lines.length > 0 ? lines : ['- none']), ''].join('\n');
+    };
 
     return [
-        `# Raid Lab Smoke Report`,
+        `# Raid Lab Cohort Report`,
         '',
         `- labVersion: ${summary.labVersion}`,
         `- policy: ${summary.policy}`,
@@ -80,6 +136,9 @@ export function formatCohortMarkdown(summary: RaidLabCohortSummary): string {
         `- total: ${summary.invariantViolationCount}`,
         invariantLines || '- none',
         '',
+        clusterSection('Clusters — stopReason', summary.clusters.byStopReason, 'stop:'),
+        clusterSection('Clusters — deathCause', summary.clusters.byDeathCause, 'death:'),
+        clusterSection('Clusters — invariant codes', summary.clusters.byInvariantCode, 'invariant:'),
     ].join('\n');
 }
 

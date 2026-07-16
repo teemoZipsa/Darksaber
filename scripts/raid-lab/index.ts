@@ -1,6 +1,6 @@
-import { runRaidLabCohort, runRaidLabExpedition } from './runner';
+import { runRaidLabExpedition } from './runner';
 import { formatCohortMarkdown, summarizeCohort, writeCohortReport } from './report';
-import type { RaidLabPolicyId } from './types';
+import type { RaidLabExperimentResult, RaidLabPolicyId } from './types';
 
 function parseArgs(argv: string[]): {
     seeds: number;
@@ -13,7 +13,7 @@ function parseArgs(argv: string[]): {
     let seeds = 100;
     let seedStart = 0;
     let policy: RaidLabPolicyId = 'balanced';
-    let maxActions = 400;
+    let maxActions = 1_500;
     let writeReport = true;
     let singleSeed: number | null = null;
 
@@ -55,9 +55,20 @@ function main(): void {
         return;
     }
 
-    const results = runRaidLabCohort(args.seedStart, args.seeds, args.policy, {
-        maxActions: args.maxActions,
-    });
+    const startedAt = Date.now();
+    const results: RaidLabExperimentResult[] = [];
+    for (let i = 0; i < args.seeds; i++) {
+        const seed = args.seedStart + i;
+        results.push(runRaidLabExpedition({
+            seed,
+            policy: args.policy,
+            maxActions: args.maxActions,
+        }));
+        if ((i + 1) % 25 === 0 || i + 1 === args.seeds) {
+            const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+            process.stdout.write(`progress ${i + 1}/${args.seeds} seeds in ${elapsed}s\n`);
+        }
+    }
     const summary = summarizeCohort(results, args.policy, args.seedStart);
     process.stdout.write(`${formatCohortMarkdown(summary)}\n`);
 

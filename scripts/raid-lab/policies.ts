@@ -55,10 +55,19 @@ export interface LabObservation {
     loot: LabLootView[];
     ignoredLootIds: ReadonlySet<string>;
     healItemId: string | null;
+    kills: number;
+    lootItemsAcquired: number;
+    actionCount: number;
+    /** Policy-facing local step planner (terrain-aware). */
+    planStep: (goal: TilePoint) => TilePoint;
     random: () => number;
 }
 
 export type RaidLabPolicy = (observation: LabObservation) => LabDecision;
+
+const EXTRACT_AFTER_KILLS = 3;
+const EXTRACT_AFTER_LOOT = 3;
+const EXTRACT_AFTER_ACTIONS = 100;
 
 export function getRaidLabPolicy(id: RaidLabPolicyId): RaidLabPolicy {
     switch (id) {
@@ -75,6 +84,12 @@ export function getRaidLabPolicy(id: RaidLabPolicyId): RaidLabPolicy {
     }
 }
 
+function shouldExtract(obs: LabObservation): boolean {
+    return obs.kills >= EXTRACT_AFTER_KILLS
+        || obs.lootItemsAcquired >= EXTRACT_AFTER_LOOT
+        || obs.actionCount >= EXTRACT_AFTER_ACTIONS;
+}
+
 function balancedPolicy(obs: LabObservation): LabDecision {
     if (obs.currentTownId && obs.currentTownId !== obs.departureTownId) {
         return { kind: 'leave_town', detail: `extract:${obs.currentTownId}` };
@@ -87,6 +102,10 @@ function balancedPolicy(obs: LabObservation): LabDecision {
     }
     if (hpRatio <= 0.25 && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
         return { kind: 'rest', detail: 'low-hp-rest' };
+    }
+
+    if (shouldExtract(obs)) {
+        return extractPhase(obs, hpRatio, 'balanced-extract');
     }
 
     const inRange = nearestAttackable(obs);
@@ -108,7 +127,6 @@ function balancedPolicy(obs: LabObservation): LabDecision {
         return moveToward(obs, nearbyLootFar.tile, 'loot-hunt');
     }
 
-    // Departure nests often sit ~100+ tiles out; chase the nearest live enemy.
     const chase = nearestEnemy(obs, Number.POSITIVE_INFINITY);
     if (chase && hpRatio > 0.4 && obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
         return moveToward(obs, chase.tile, 'chase');
@@ -150,6 +168,16 @@ function cautiousPolicy(obs: LabObservation): LabDecision {
         return moveToward(obs, away, 'flee');
     }
 
+    // Cautious extracts early — only a short loot peek near spawn.
+    if (!shouldExtract(obs)) {
+        const nearbyLoot = nearestLoot(obs, 12);
+        if (nearbyLoot && obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
+            const adjacent = nearestLoot(obs, 1);
+            if (adjacent) return { kind: 'loot', lootId: adjacent.id, detail: 'open-pickup' };
+            return moveToward(obs, nearbyLoot.tile, 'loot-peek');
+        }
+    }
+
     if (obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
         return moveToward(obs, obs.extractionGoal, 'extract-path');
     }
@@ -166,10 +194,12 @@ function randomLegalPolicy(obs: LabObservation): LabDecision {
     const options: LabDecision[] = [];
     if (obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
         options.push(moveToward(obs, obs.extractionGoal, 'random-extract'));
-        const enemy = nearestEnemy(obs, Number.POSITIVE_INFINITY);
-        if (enemy) options.push(moveToward(obs, enemy.tile, 'random-chase'));
-        const loot = nearestLoot(obs, 24);
-        if (loot) options.push(moveToward(obs, loot.tile, 'random-loot'));
+        if (!shouldExtract(obs)) {
+            const enemy = nearestEnemy(obs, Number.POSITIVE_INFINITY);
+            if (enemy) options.push(moveToward(obs, enemy.tile, 'random-chase'));
+            const loot = nearestLoot(obs, 24);
+            if (loot) options.push(moveToward(obs, loot.tile, 'random-loot'));
+        }
     }
     const attackable = nearestAttackable(obs);
     if (attackable && obs.remainingAp >= ATTACK_AP_COST) {
@@ -185,10 +215,35 @@ function randomLegalPolicy(obs: LabObservation): LabDecision {
     if (obs.currentTownId && obs.currentTownId !== obs.departureTownId) {
         options.push({ kind: 'leave_town', detail: `extract:${obs.currentTownId}` });
     }
-    options.push({ kind: 'leave_manual', detail: 'random-leave' });
+    if (!shouldExtract(obs)) {
+        options.push({ kind: 'leave_manual', detail: 'random-leave' });
+    }
 
     if (options.length === 0) return { kind: 'wait' };
     return options[pickIndex(obs.random, options.length)]!;
+}
+
+function extractPhase(obs: LabObservation, hpRatio: number, detailPrefix: string): LabDecision {
+    const threat = nearestEnemy(obs, 4);
+    if (threat && obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
+        // Sidestep threats while still progressing toward extraction.
+        const away = {
+            x: obs.tile.x + Math.sign(obs.tile.x - threat.tile.x) + Math.sign(obs.extractionGoal.x - obs.tile.x),
+            y: obs.tile.y + Math.sign(obs.tile.y - threat.tile.y) + Math.sign(obs.extractionGoal.y - obs.tile.y),
+        };
+        return moveToward(obs, away, `${detailPrefix}-bypass`);
+    }
+    const adjacentThreat = nearestAttackable(obs);
+    if (adjacentThreat && manhattan(obs.tile, adjacentThreat.tile) <= 1
+        && obs.remainingAp >= ATTACK_AP_COST
+        && hpRatio > 0.45) {
+        return { kind: 'attack', targetId: adjacentThreat.id, detail: `${detailPrefix}-clear` };
+    }
+    if (obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
+        return moveToward(obs, obs.extractionGoal, detailPrefix);
+    }
+    if (obs.remainingAp > 0) return { kind: 'endTurn', detail: `${detailPrefix}-spent` };
+    return { kind: 'wait' };
 }
 
 function nearestAttackable(obs: LabObservation): LabEnemyView | null {
@@ -234,23 +289,5 @@ function nearestLoot(obs: LabObservation, maxDist: number): LabLootView | null {
 }
 
 function moveToward(obs: LabObservation, goal: TilePoint, detail: string): LabDecision {
-    const step = greedyStep(obs.tile, goal, Math.max(1, obs.mov));
-    return { kind: 'move', tile: step, detail };
-}
-
-function greedyStep(from: TilePoint, goal: TilePoint, budget: number): TilePoint {
-    let x = from.x;
-    let y = from.y;
-    let remaining = budget;
-    while (remaining > 0 && (x !== goal.x || y !== goal.y)) {
-        if (Math.abs(goal.x - x) >= Math.abs(goal.y - y) && x !== goal.x) {
-            x += Math.sign(goal.x - x);
-        } else if (y !== goal.y) {
-            y += Math.sign(goal.y - y);
-        } else if (x !== goal.x) {
-            x += Math.sign(goal.x - x);
-        }
-        remaining -= 1;
-    }
-    return { x, y };
+    return { kind: 'move', tile: obs.planStep(goal), detail };
 }
