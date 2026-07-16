@@ -42,11 +42,25 @@
 | raid-lab determinism tests | 7 pass |
 | `npm run raid-lab:smoke` | SURVIVED 90 / LEFT 9 / DEAD 1 / invariants 0 (~61s) |
 
+### Outcome ratios (cohort 0..999 / balanced / labVersion 4)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 892 | 89.2% |
+| DEAD | 22 | 2.2% |
+| MIA | 0 | 0.0% |
+| LEFT | 86 | 8.6% |
+
+- vs labVersion 3 1k: SURVIVED 90.8% → **89.2%**, LEFT 8.8% → **8.6%**, DEAD 0.4% → **2.2%**
+- Near-town no-bypass fixed LEFT stalls but increased combat deaths
+- DEAD/enemy samples: 59, 137, 144, …; DEAD/curse: **611**, **852** (stable vs v3)
+- Report: `docs/raid-lab/reports/smoke-balanced-s0-n1000-20260716.md` (v4)
+
 ### Next work queue
 
-1. Re-run `raid-lab:cohort1k` under labVersion 4
-2. Shrink new LEFT set (10, 15, …) + DEAD seed 59
-3. Reproduce DEAD 301/622/611/852 from v3 1k if still present
+1. Reduce DEAD/enemy (near-town extract push) without reintroducing bypass stall — seed 59
+2. Shrink new LEFT set (10, 15, 24, 45, …)
+3. Keep curse DEAD 611/852 as known hazard seeds
 
 ---
 
