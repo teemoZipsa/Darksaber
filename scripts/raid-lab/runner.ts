@@ -26,7 +26,7 @@ import {
 
 const DEFAULT_MAX_ACTIONS = 1_500;
 const DEFAULT_MAX_SIM_MS = 30 * 60 * 1000;
-const HEAL_ITEM_CANDIDATES = ['herb_common', 'herb_cheap', 'herb_rare', 'mp_potion'] as const;
+const HEAL_ITEM_CANDIDATES = ['herb_common', 'herb_cheap', 'herb_rare'] as const;
 
 let sharedWorldMap: WorldMap | null = null;
 
@@ -486,14 +486,22 @@ function buildObservation(
         kills: player.kills,
         lootItemsAcquired,
         actionCount,
-        planStep: (goal) => planLocalStep(
-            world,
-            actor.tile,
-            goal,
-            Math.max(1, actor.stats.mov || 1),
-            actor.id,
-            pathCache
-        ),
+        planStep: (goal) => {
+            // Chase/loot can burn A* credits; always keep a reserve for extraction routing
+            // (seed 53: credits=0 left the actor oscillating on a western water shore).
+            if (goal.x === extraction.tile.x && goal.y === extraction.tile.y
+                && (pathCache.astarCredits ?? 0) < 12) {
+                pathCache.astarCredits = 12;
+            }
+            return planLocalStep(
+                world,
+                actor.tile,
+                goal,
+                Math.max(1, actor.stats.mov || 1),
+                actor.id,
+                pathCache
+            );
+        },
         random: policyRng,
     };
 }

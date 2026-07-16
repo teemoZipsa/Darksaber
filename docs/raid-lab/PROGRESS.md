@@ -1,5 +1,55 @@
 # Raid Lab — Progress
 
+## Batch 2026-07-17c — Extract survival + bypass removal (labVersion 5)
+
+### Experiments run
+
+- DEAD seed 59: clear-attack stall + `mp_potion` treated as heal
+- LEFT seeds 10/15/…: bypass oscillation mid-route; seed 53 west water shore with A* credits=0
+- Fix: real heal-only items; extract-phase heal/rest; clear only on extract axis; remove bypass;
+  top up A* credits when planning toward extraction goal
+
+### Outcome ratios (smoke 0..99 / balanced / labVersion 5)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 100 | **100.0%** |
+| DEAD | 0 | 0.0% |
+| MIA | 0 | 0.0% |
+| LEFT | 0 | 0.0% |
+
+- vs labVersion 4 smoke: SURVIVED 90% → **100%**, LEFT 9% → **0%**, DEAD 1% → **0%**
+- mean elapsedSeconds: **43.64**; mean kills: **1.08**; runtime ~37s
+- Report: `docs/raid-lab/reports/smoke-balanced-s0-n100-20260716.md` (v5)
+
+### Tests added/updated
+
+- seed 59 enemy-pack SURVIVED
+- seed 10 mid-route bypass SURVIVED
+- seed 53 west-shore SURVIVED
+- determinism suite: **10 pass**
+
+### Code changed
+
+- `policies.ts` — extract heal/rest, selective clear, no bypass
+- `runner.ts` — drop `mp_potion` from heal candidates; extract A* credit reserve
+- `RAID_LAB_VERSION = 5`
+
+### Verification
+
+| Command | Result |
+|---|---|
+| `npm run typecheck` | pass |
+| raid-lab determinism tests | 10 pass |
+| `npm run raid-lab:smoke` | **SURVIVED 100 / invariants 0** (~37s) |
+
+### Next work queue
+
+1. Finish `raid-lab:cohort1k` under labVersion 5
+2. Revisit curse DEAD 611/852 if still present at 1k scale
+
+---
+
 ## Batch 2026-07-17b — Extract stall fixes (labVersion 4)
 
 ### Experiments run

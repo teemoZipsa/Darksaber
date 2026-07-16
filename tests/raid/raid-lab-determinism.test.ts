@@ -66,3 +66,24 @@ test('raid lab balanced extract does not bypass-stall near town on seed 77', () 
     assert.equal(result.result, 'SURVIVED');
     assert.equal(result.extractionTownId, 'e_stronghold');
 });
+
+test('raid lab balanced extract survives enemy pack on regression seed 59', () => {
+    // Previously stuck clear-attacking at ~(1873,1459) then wasted AP on mp_potion.
+    const result = runRaidLabExpedition({ seed: 59, policy: 'balanced', maxActions: 1_500 });
+    assert.equal(result.result, 'SURVIVED');
+    assert.equal(result.extractionTownId, 'e_stronghold');
+});
+
+test('raid lab balanced extract does not bypass-stall mid-route on seed 10', () => {
+    // max_actions LEFT at ~(1945,1492) alternating extract/bypass outside the old 96 cutoff.
+    const result = runRaidLabExpedition({ seed: 10, policy: 'balanced', maxActions: 1_500 });
+    assert.equal(result.result, 'SURVIVED');
+    assert.equal(result.extractionTownId, 'e_stronghold');
+});
+
+test('raid lab balanced extract does not west-stall on bypass seed 53', () => {
+    // 1400+ bypass moves drifting west to ~(1100,1481) until max_actions.
+    const result = runRaidLabExpedition({ seed: 53, policy: 'balanced', maxActions: 1_500 });
+    assert.equal(result.result, 'SURVIVED');
+    assert.equal(result.extractionTownId, 'e_stronghold');
+});

@@ -224,34 +224,39 @@ function randomLegalPolicy(obs: LabObservation): LabDecision {
 }
 
 function extractPhase(obs: LabObservation, hpRatio: number, detailPrefix: string): LabDecision {
-    const distToExtract = manhattan(obs.tile, obs.extractionGoal);
+    // Survive first — extractPhase used to skip heal/rest once entered.
+    if (hpRatio <= 0.5 && obs.healItemId && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
+        return { kind: 'useItem', itemId: obs.healItemId, detail: `${detailPrefix}-heal` };
+    }
+    if (hpRatio <= 0.35 && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
+        return { kind: 'rest', detail: `${detailPrefix}-rest` };
+    }
+
     const adjacentThreat = nearestAttackable(obs);
+    // Only clear when healthy and the foe sits on the extract axis; otherwise disengage.
     if (adjacentThreat && manhattan(obs.tile, adjacentThreat.tile) <= 1
         && obs.remainingAp >= ATTACK_AP_COST
-        && hpRatio > 0.45) {
+        && hpRatio > 0.65
+        && isOnExtractAxis(obs.tile, adjacentThreat.tile, obs.extractionGoal)) {
         return { kind: 'attack', targetId: adjacentThreat.id, detail: `${detailPrefix}-clear` };
     }
 
-    const threat = nearestEnemy(obs, 4);
-    // Far from town: sidestep with a nudge that still biases toward extract.
-    // Near town: never bypass — combined away+extract vectors cancel and stall.
-    if (threat && distToExtract > 96 && obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
-        const ex = Math.sign(obs.extractionGoal.x - obs.tile.x);
-        const ey = Math.sign(obs.extractionGoal.y - obs.tile.y);
-        const tx = Math.sign(obs.tile.x - threat.tile.x);
-        const ty = Math.sign(obs.tile.y - threat.tile.y);
-        const bypassGoal = {
-            x: obs.tile.x + ex * 6 + (ex === 0 ? tx * 2 : tx),
-            y: obs.tile.y + ey * 6 + (ey === 0 ? ty * 2 : ty),
-        };
-        return moveToward(obs, bypassGoal, `${detailPrefix}-bypass`);
-    }
-
+    // No sidestep bypass — prior bypass variants stalled (seeds 10/53/77/194) or
+    // cancelled extract progress. Push the extract goal; clear only when blocking.
     if (obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
         return moveToward(obs, obs.extractionGoal, detailPrefix);
     }
     if (obs.remainingAp > 0) return { kind: 'endTurn', detail: `${detailPrefix}-spent` };
     return { kind: 'wait' };
+}
+
+/** True when the foe lies toward the extract goal on at least one shared axis. */
+function isOnExtractAxis(from: TilePoint, foe: TilePoint, goal: TilePoint): boolean {
+    const ex = Math.sign(goal.x - from.x);
+    const ey = Math.sign(goal.y - from.y);
+    const fx = Math.sign(foe.x - from.x);
+    const fy = Math.sign(foe.y - from.y);
+    return (ex !== 0 && fx === ex) || (ey !== 0 && fy === ey);
 }
 
 function nearestAttackable(obs: LabObservation): LabEnemyView | null {
