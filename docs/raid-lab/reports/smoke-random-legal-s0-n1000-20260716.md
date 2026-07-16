@@ -1,15 +1,15 @@
 # Raid Lab Cohort Report
 
 - labVersion: 7
-- policy: balanced
+- policy: random-legal
 - seeds: 0..999 (n=1000)
-- mean elapsedSeconds: 35.77
-- mean kills: 0.70
+- mean elapsedSeconds: 87.29
+- mean kills: 0.01
 
 ## Outcomes
 
-- SURVIVED: 1000 (100.0%)
-- DEAD: 0 (0.0%)
+- SURVIVED: 999 (99.9%)
+- DEAD: 1 (0.1%)
 - MIA: 0 (0.0%)
 - LEFT: 0 (0.0%)
 
@@ -24,7 +24,8 @@
 
 ## Clusters — deathCause
 
-- `none`: 1000 — seeds 0, 1, 2, 3, 4, 5, 6, 7
+- `none`: 999 — seeds 0, 1, 2, 3, 4, 5, 6, 7
+- `enemy`: 1 — seeds 973
 
 ## Clusters — invariant codes
 
