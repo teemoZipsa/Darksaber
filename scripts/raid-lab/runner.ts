@@ -58,7 +58,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
         sessionEpoch,
         random: combatRng,
         createToken: createLabTokenFactory(options.seed),
-        ...(stressMode === 'dense-nests' ? { fieldNestTuning: DENSE_NEST_TUNING } : {}),
+        ...(usesDenseNestStress(stressMode) ? { fieldNestTuning: DENSE_NEST_TUNING } : {}),
     });
 
     const world = getSharedWorldMap();
@@ -107,7 +107,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
     };
 
     applyMessages(flattenTick(session.tick(now)));
-    if (stressMode === 'low-hp') {
+    if (usesLowHpStress(stressMode)) {
         applyLowHpStress(session, joined.playerId);
     }
     collectInvariants();
@@ -535,6 +535,14 @@ function applyLowHpStress(session: WorldSession, playerId: string): void {
     if (!actor) return;
     const maxHp = Math.max(1, actor.stats.maxHp);
     actor.stats.hp = Math.max(1, Math.floor(maxHp * 0.3));
+}
+
+function usesLowHpStress(stress: RaidLabRunOptions['stress']): boolean {
+    return stress === 'low-hp' || stress === 'low-hp+dense-nests';
+}
+
+function usesDenseNestStress(stress: RaidLabRunOptions['stress']): boolean {
+    return stress === 'dense-nests' || stress === 'low-hp+dense-nests';
 }
 
 function getActorLevel(session: WorldSession, playerId: string): number {

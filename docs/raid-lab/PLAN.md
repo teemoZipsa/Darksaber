@@ -78,11 +78,12 @@ rules, still deterministic.
 
 1. `stress=low-hp` — join at ≈30% HP (heal/rest path pressure)
 2. `stress=dense-nests` — shorter nest respawn, wider roam, higher spawn caps
-3. Cluster new DEAD/LEFT → regression seeds → minimal policy/pathing fixes
-4. Do not tune combat formulas from a single stressed seed
+3. `stress=low-hp+dense-nests` — both presets combined
+4. Cluster new DEAD/LEFT → regression seeds → minimal policy/pathing fixes
+5. Do not tune combat formulas from a single stressed seed
 
-CLI: `--stress none|low-hp|dense-nests` (default `none`).
-npm: `raid-lab:smoke:stress:low-hp`, `raid-lab:smoke:stress:dense-nests`.
+CLI: `--stress none|low-hp|dense-nests|low-hp+dense-nests` (default `none`).
+npm: `raid-lab:smoke:stress:low-hp`, `:dense-nests`, `:combo`.
 
 ## Success signals
 

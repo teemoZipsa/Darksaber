@@ -35,7 +35,14 @@ function parseArgs(argv: string[]): {
             if (next === 'balanced' || next === 'cautious' || next === 'random-legal') policy = next;
             i += 1;
         } else if (arg === '--stress' && next) {
-            if (next === 'none' || next === 'low-hp' || next === 'dense-nests') stress = next;
+            if (
+                next === 'none'
+                || next === 'low-hp'
+                || next === 'dense-nests'
+                || next === 'low-hp+dense-nests'
+            ) {
+                stress = next;
+            }
             i += 1;
         } else if (arg === '--max-actions' && next) {
             maxActions = Math.max(1, Number.parseInt(next, 10) || 400);
@@ -82,7 +89,9 @@ function main(): void {
 
     if (args.writeReport) {
         const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const stressTag = args.stress === 'none' ? '' : `-stress-${args.stress}`;
+        const stressTag = args.stress === 'none'
+            ? ''
+            : `-stress-${args.stress.replace(/\+/g, '-and-')}`;
         const label = `smoke-${args.policy}${stressTag}-s${args.seedStart}-n${args.seeds}-${stamp}`;
         const paths = writeCohortReport(summary, results, label);
         process.stdout.write(`Wrote ${paths.mdPath}\n`);

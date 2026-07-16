@@ -1,5 +1,32 @@
 # Raid Lab — Progress
 
+## Batch 2026-07-17i — Phase 3 combo stress (labVersion 8)
+
+### Experiments run
+
+- `stress=low-hp+dense-nests` combines both presets
+- npm: `raid-lab:smoke:stress:combo`
+
+### Outcome ratios (smoke 0..99 / balanced / stress=low-hp+dense-nests)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 100 | **100.0%** |
+| DEAD | 0 | 0.0% |
+| LEFT | 0 | 0.0% |
+
+### Tests added/updated
+
+- combo stress determinism
+- determinism suite: **19 pass**
+
+### Next work queue
+
+1. Optional combo 1k cohort
+2. Phase 3 stress suite otherwise complete at smoke
+
+---
+
 ## Batch 2026-07-17h — Phase 3 dense-nests stress (labVersion 8)
 
 ### Experiments run
@@ -37,8 +64,7 @@
 
 ### Next work queue
 
-1. Optional combined stress (`low-hp` + `dense-nests`) if still needed
-2. Otherwise Phase 3 stress presets are green at 1k
+1. _(combo shipped in 2026-07-17i)_
 
 ---
 
