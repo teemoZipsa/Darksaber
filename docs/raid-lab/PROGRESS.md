@@ -39,10 +39,23 @@
 | raid-lab determinism tests | 12 pass |
 | `npm run raid-lab:smoke` | **SURVIVED 100 / invariants 0** (~32s) |
 
+### Outcome ratios (cohort 0..999 / balanced / labVersion 6)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 1000 | **100.0%** |
+| DEAD | 0 | 0.0% |
+| MIA | 0 | 0.0% |
+| LEFT | 0 | 0.0% |
+
+- vs labVersion 5 1k: SURVIVED 99.6% → **100%**, DEAD 0.4% → **0%**
+- invariants: **0**; runtime ~335s
+- Report: `docs/raid-lab/reports/smoke-balanced-s0-n1000-20260716.md` (v6)
+
 ### Next work queue
 
-1. Finish `raid-lab:cohort1k` under labVersion 6
-2. Optional: cautious/random-legal cohorts
+1. Optional: cautious / random-legal policy cohorts
+2. Optional: stress cohorts (forced low HP / denser nests) for balance lab Phase 3
 
 ---
 
