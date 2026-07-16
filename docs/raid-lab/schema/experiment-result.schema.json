@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://darksaber.local/raid-lab/experiment-result.schema.json",
+  "title": "RaidLabExperimentResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "labVersion",
+    "seed",
+    "policy",
+    "result",
+    "elapsedSeconds",
+    "kills",
+    "departureTownId",
+    "extractionTownId",
+    "telemetry",
+    "actions",
+    "invariantViolations",
+    "digest",
+    "finishedAtSimMs"
+  ],
+  "properties": {
+    "labVersion": { "type": "integer", "minimum": 1 },
+    "seed": { "type": "integer" },
+    "policy": {
+      "type": "string",
+      "enum": ["balanced", "cautious", "random-legal"]
+    },
+    "result": {
+      "type": "string",
+      "enum": ["SURVIVED", "DEAD", "MIA", "LEFT"]
+    },
+    "elapsedSeconds": { "type": "number", "minimum": 0 },
+    "kills": { "type": "integer", "minimum": 0 },
+    "departureTownId": { "type": "string", "minLength": 1 },
+    "extractionTownId": { "type": "string", "minLength": 1 },
+    "completedDungeonIds": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engagementCount",
+        "engagementGapSecondsTotal",
+        "lootItemsAcquired",
+        "lootItemsSecured",
+        "killsByDangerBand",
+        "deathCause"
+      ],
+      "properties": {
+        "firstEngagementSeconds": { "type": "number" },
+        "engagementCount": { "type": "integer", "minimum": 0 },
+        "engagementGapSecondsTotal": { "type": "number", "minimum": 0 },
+        "lootItemsAcquired": { "type": "integer", "minimum": 0 },
+        "lootItemsSecured": { "type": "integer", "minimum": 0 },
+        "killsByDangerBand": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["starter", "low", "mid", "high", "scenario"],
+          "properties": {
+            "starter": { "type": "integer", "minimum": 0 },
+            "low": { "type": "integer", "minimum": 0 },
+            "mid": { "type": "integer", "minimum": 0 },
+            "high": { "type": "integer", "minimum": 0 },
+            "scenario": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "deathCause": {
+          "type": "string",
+          "enum": ["none", "enemy", "curse", "timeout", "manual", "unknown"]
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "kind", "simMs"],
+        "properties": {
+          "index": { "type": "integer", "minimum": 0 },
+          "kind": { "type": "string" },
+          "simMs": { "type": "integer", "minimum": 0 },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+    "invariantViolations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message", "simMs", "actionIndex"],
+        "properties": {
+          "code": { "type": "string" },
+          "message": { "type": "string" },
+          "simMs": { "type": "integer", "minimum": 0 },
+          "actionIndex": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "digest": {
+      "type": "string",
+      "minLength": 16,
+      "description": "Stable hash of outcome-relevant fields for same-seed equality"
+    },
+    "finishedAtSimMs": { "type": "integer", "minimum": 0 },
+    "actorFinal": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hp": { "type": "integer" },
+        "maxHp": { "type": "integer" },
+        "mp": { "type": "integer" },
+        "level": { "type": "integer" },
+        "exp": { "type": "integer" },
+        "tileX": { "type": "integer" },
+        "tileY": { "type": "integer" }
+      }
+    },
+    "stopReason": {
+      "type": "string",
+      "enum": ["raid_result", "max_actions", "max_sim_ms", "invariant_abort"]
+    }
+  }
+}
