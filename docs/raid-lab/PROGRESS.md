@@ -56,10 +56,31 @@
 | `node --import tsx --test tests/raid/raid-lab-determinism.test.ts` | 5 pass |
 | `npm run raid-lab:smoke` | SURVIVED 89 / LEFT 11 / invariants 0 (~42s) |
 
+### Outcome ratios (cohort 0..999 / balanced / labVersion 3)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 908 | 90.8% |
+| DEAD | 4 | 0.4% |
+| MIA | 0 | 0.0% |
+| LEFT | 88 | 8.8% |
+
+- mean elapsedSeconds: **49.19**
+- mean kills: **1.00**
+- runtime: **~443s**
+- Report: `docs/raid-lab/reports/smoke-balanced-s0-n1000-20260716.md`
+
+### 1k clusters
+
+- `max_actions` / LEFT (88): samples 9, 14, 18, 35, 63, 69, 77, 82
+- DEAD / enemy: seeds **301**, **622**
+- DEAD / curse: seeds **611**, **852**
+- invariants: **0**
+
 ### Next work queue
 
-1. Finish `npm run raid-lab:cohort1k`; update ratios/clusters
-2. Shrink remaining LEFT seeds (9, 14, …) into regression cases
+1. Shrink remaining LEFT seeds (9, 14, …) into regression cases
+2. Reproduce DEAD seeds 301/622 (enemy) and 611/852 (curse)
 3. Add DEAD/MIA stress cohort once LEFT cluster is reduced further
 
 ---
