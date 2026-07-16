@@ -59,7 +59,8 @@ export function clusterResults(results: RaidLabExperimentResult[]): RaidLabFailu
 export function summarizeCohort(
     results: RaidLabExperimentResult[],
     policy: RaidLabPolicyId,
-    seedStart: number
+    seedStart: number,
+    stress: RaidLabExperimentResult['stress'] = 'none'
 ): RaidLabCohortSummary {
     const tallies = { ...EMPTY_RESULTS };
     const invariantCodes: Record<string, number> = {};
@@ -81,6 +82,7 @@ export function summarizeCohort(
     return {
         labVersion: RAID_LAB_VERSION,
         policy,
+        stress,
         seedStart,
         seedEnd: seedStart + results.length - 1,
         count: results.length,
@@ -120,6 +122,7 @@ export function formatCohortMarkdown(summary: RaidLabCohortSummary): string {
         '',
         `- labVersion: ${summary.labVersion}`,
         `- policy: ${summary.policy}`,
+        `- stress: ${summary.stress}`,
         `- seeds: ${summary.seedStart}..${summary.seedEnd} (n=${summary.count})`,
         `- mean elapsedSeconds: ${summary.meanElapsedSeconds.toFixed(2)}`,
         `- mean kills: ${summary.meanKills.toFixed(2)}`,

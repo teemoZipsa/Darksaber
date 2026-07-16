@@ -1,5 +1,38 @@
 # Raid Lab — Progress
 
+## Batch 2026-07-17g — Phase 3 low-hp stress (labVersion 8)
+
+### Experiments run
+
+- Added `--stress low-hp` (join at ≈30% HP) + `raid-lab:smoke:stress:low-hp`
+- Determinism: stressed digests stable; diverge from unstressed
+
+### Outcome ratios (smoke 0..99 / balanced / stress=low-hp)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 100 | **100.0%** |
+| DEAD | 0 | 0.0% |
+| LEFT | 0 | 0.0% |
+
+### Tests added/updated
+
+- low-hp stress determinism + digest divergence
+- determinism suite: **17 pass**
+
+### Code changed
+
+- `types` / `runner` / `index` / `report` / `digest` — stress mode plumbing
+- `PLAN.md` — Phase 3 section
+- `package.json` — `raid-lab:smoke:stress:low-hp`
+
+### Next work queue
+
+1. Optional low-hp 1k cohort
+2. denser-nests stress preset
+
+---
+
 ## Batch 2026-07-17f — Clear remaining LEFT/DEAD (labVersion 8)
 
 ### Experiments run
@@ -44,10 +77,6 @@
 | random-legal | **1000** | 0 | 0 | 0 |
 
 - Reports: `smoke-{balanced,cautious,random-legal}-s0-n1000-20260716.*` (labVersion 8)
-
-### Next work queue
-
-1. Phase 3 stress cohorts (forced low HP / denser nests)
 
 ---
 

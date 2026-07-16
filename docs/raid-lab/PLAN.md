@@ -70,8 +70,21 @@ time with `session.tick(now)`, and asserts invariants after each step.
 | `cautious` | Prefer rest/heal and extraction path; fight only when cornered or very close |
 | `random-legal` | Uniform choice among currently legal intents (seeded) |
 
+### Phase 3 — Stress Cohorts (balance lab)
+
+Once baseline policies clear 1k with 0 LEFT/DEAD, add hardship presets that
+probe survival under worse starting conditions — still on real `WorldSession`
+rules, still deterministic.
+
+1. `stress=low-hp` — join at ≈30% HP (heal/rest path pressure)
+2. Later: denser nests / shorter nest respawn (engagement pressure)
+3. Cluster new DEAD/LEFT → regression seeds → minimal policy/pathing fixes
+4. Do not tune combat formulas from a single stressed seed
+
+CLI: `--stress none|low-hp` (default `none`). npm: `raid-lab:smoke:stress:low-hp`.
+
 ## Success signals
 
-- Bit-identical digests for the same `(seed, policy, labVersion)`
+- Bit-identical digests for the same `(seed, policy, labVersion[, stress])`
 - Invariant violations become regression tests then disappear
 - Outcome mix (SURVIVED / DEAD / MIA / LEFT) is stable across cohort re-runs

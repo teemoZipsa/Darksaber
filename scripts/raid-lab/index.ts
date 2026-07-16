@@ -1,11 +1,12 @@
 import { runRaidLabExpedition } from './runner';
 import { formatCohortMarkdown, summarizeCohort, writeCohortReport } from './report';
-import type { RaidLabExperimentResult, RaidLabPolicyId } from './types';
+import type { RaidLabExperimentResult, RaidLabPolicyId, RaidLabStressMode } from './types';
 
 function parseArgs(argv: string[]): {
     seeds: number;
     seedStart: number;
     policy: RaidLabPolicyId;
+    stress: RaidLabStressMode;
     maxActions: number;
     writeReport: boolean;
     singleSeed: number | null;
@@ -13,6 +14,7 @@ function parseArgs(argv: string[]): {
     let seeds = 100;
     let seedStart = 0;
     let policy: RaidLabPolicyId = 'balanced';
+    let stress: RaidLabStressMode = 'none';
     let maxActions = 1_500;
     let writeReport = true;
     let singleSeed: number | null = null;
@@ -32,6 +34,9 @@ function parseArgs(argv: string[]): {
         } else if (arg === '--policy' && next) {
             if (next === 'balanced' || next === 'cautious' || next === 'random-legal') policy = next;
             i += 1;
+        } else if (arg === '--stress' && next) {
+            if (next === 'none' || next === 'low-hp') stress = next;
+            i += 1;
         } else if (arg === '--max-actions' && next) {
             maxActions = Math.max(1, Number.parseInt(next, 10) || 400);
             i += 1;
@@ -40,7 +45,7 @@ function parseArgs(argv: string[]): {
         }
     }
 
-    return { seeds, seedStart, policy, maxActions, writeReport, singleSeed };
+    return { seeds, seedStart, policy, stress, maxActions, writeReport, singleSeed };
 }
 
 function main(): void {
@@ -50,6 +55,7 @@ function main(): void {
             seed: args.singleSeed,
             policy: args.policy,
             maxActions: args.maxActions,
+            stress: args.stress,
         });
         process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
         return;
@@ -63,6 +69,7 @@ function main(): void {
             seed,
             policy: args.policy,
             maxActions: args.maxActions,
+            stress: args.stress,
         }));
         if ((i + 1) % 10 === 0 || i + 1 === args.seeds) {
             const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
@@ -70,12 +77,13 @@ function main(): void {
             process.stderr.write(`progress ${i + 1}/${args.seeds} seeds in ${elapsed}s\n`);
         }
     }
-    const summary = summarizeCohort(results, args.policy, args.seedStart);
+    const summary = summarizeCohort(results, args.policy, args.seedStart, args.stress);
     process.stdout.write(`${formatCohortMarkdown(summary)}\n`);
 
     if (args.writeReport) {
         const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const label = `smoke-${args.policy}-s${args.seedStart}-n${args.seeds}-${stamp}`;
+        const stressTag = args.stress === 'none' ? '' : `-stress-${args.stress}`;
+        const label = `smoke-${args.policy}${stressTag}-s${args.seedStart}-n${args.seeds}-${stamp}`;
         const paths = writeCohortReport(summary, results, label);
         process.stdout.write(`Wrote ${paths.mdPath}\n`);
         process.stdout.write(`Wrote ${paths.jsonPath}\n`);

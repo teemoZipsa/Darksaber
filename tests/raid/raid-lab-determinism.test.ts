@@ -132,3 +132,14 @@ test('raid lab random-legal survives low-HP rest trap on seed 973', () => {
     const result = runRaidLabExpedition({ seed: 973, policy: 'random-legal', maxActions: 1_500 });
     assert.equal(result.result, 'SURVIVED');
 });
+
+test('raid lab low-hp stress stays deterministic and diverges from unstressed', () => {
+    const plain = runRaidLabExpedition({ seed: 1, policy: 'balanced', maxActions: 120 });
+    const first = runRaidLabExpedition({ seed: 1, policy: 'balanced', stress: 'low-hp', maxActions: 120 });
+    const second = runRaidLabExpedition({ seed: 1, policy: 'balanced', stress: 'low-hp', maxActions: 120 });
+    assert.equal(plain.stress, 'none');
+    assert.equal(first.stress, 'low-hp');
+    assert.equal(first.digest, second.digest);
+    assert.notEqual(first.digest, plain.digest);
+    assert.ok(['SURVIVED', 'DEAD', 'MIA', 'LEFT'].includes(first.result));
+});

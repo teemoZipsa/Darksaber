@@ -7,6 +7,8 @@ export function digestExperimentResult(result: Omit<RaidLabExperimentResult, 'di
         labVersion: result.labVersion,
         seed: result.seed,
         policy: result.policy,
+        // Omit default so unstressed digests stay comparable to labVersion 8.
+        ...(result.stress !== 'none' ? { stress: result.stress } : {}),
         result: result.result,
         elapsedSeconds: round3(result.elapsedSeconds),
         kills: result.kills,

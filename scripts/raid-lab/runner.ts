@@ -97,6 +97,10 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
     };
 
     applyMessages(flattenTick(session.tick(now)));
+    const stressMode = options.stress ?? 'none';
+    if (stressMode === 'low-hp') {
+        applyLowHpStress(session, joined.playerId);
+    }
     collectInvariants();
 
     while (!raidResult) {
@@ -298,6 +302,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
         labVersion: RAID_LAB_VERSION,
         seed: options.seed,
         policy: policyId,
+        stress: stressMode,
         result: finalResult.result,
         elapsedSeconds: finalResult.elapsedSeconds,
         kills: finalResult.kills,
@@ -513,6 +518,14 @@ function buildObservation(
 
 function getOwnedActor(session: WorldSession, playerId: string) {
     return [...session.getDebugState().actors.values()].find((entry) => entry.ownerPlayerId === playerId);
+}
+
+/** Phase 3 stress: start the expedition already wounded (≈30% HP). */
+function applyLowHpStress(session: WorldSession, playerId: string): void {
+    const actor = getOwnedActor(session, playerId);
+    if (!actor) return;
+    const maxHp = Math.max(1, actor.stats.maxHp);
+    actor.stats.hp = Math.max(1, Math.floor(maxHp * 0.3));
 }
 
 function getActorLevel(session: WorldSession, playerId: string): number {

@@ -3,6 +3,8 @@ import type { RaidBalanceTelemetry, RaidResultMessage } from '../../src/net/Worl
 export const RAID_LAB_VERSION = 8;
 
 export type RaidLabPolicyId = 'balanced' | 'cautious' | 'random-legal';
+/** Optional Phase 3 stress presets (default / omitted = none). */
+export type RaidLabStressMode = 'none' | 'low-hp';
 export type RaidLabResult = RaidResultMessage['result'];
 
 export interface RaidLabActionRecord {
@@ -34,6 +36,7 @@ export interface RaidLabExperimentResult {
     labVersion: number;
     seed: number;
     policy: RaidLabPolicyId;
+    stress: RaidLabStressMode;
     result: RaidLabResult;
     elapsedSeconds: number;
     kills: number;
@@ -55,11 +58,14 @@ export interface RaidLabRunOptions {
     maxActions?: number;
     maxSimMs?: number;
     abortOnInvariant?: boolean;
+    /** Phase 3: forced hardship presets. */
+    stress?: RaidLabStressMode;
 }
 
 export interface RaidLabCohortSummary {
     labVersion: number;
     policy: RaidLabPolicyId;
+    stress: RaidLabStressMode;
     seedStart: number;
     seedEnd: number;
     count: number;
