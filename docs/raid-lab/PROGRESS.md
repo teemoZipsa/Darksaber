@@ -15,6 +15,16 @@
 | DEAD | 0 | 0.0% |
 | LEFT | 0 | 0.0% |
 
+### Outcome ratios (cohort 0..999 / balanced / stress=dense-nests)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | **1000** | **100.0%** |
+| DEAD | 0 | 0.0% |
+| LEFT | 0 | 0.0% |
+
+- Report: `smoke-balanced-stress-dense-nests-s0-n1000-20260716.*`
+
 ### Tests added/updated
 
 - dense-nests stress determinism + digest divergence
@@ -27,7 +37,8 @@
 
 ### Next work queue
 
-1. Optional dense-nests 1k cohort
+1. Optional combined stress (`low-hp` + `dense-nests`) if still needed
+2. Otherwise Phase 3 stress presets are green at 1k
 
 ---
 
