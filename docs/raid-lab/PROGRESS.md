@@ -35,9 +35,18 @@
 | raid-lab determinism tests | 16 pass |
 | `raid-lab:smoke` / `:cautious` / `:random` | each **100% SURVIVED** |
 
+### Outcome ratios (cohort 0..999 / labVersion 8)
+
+| Policy | SURVIVED | DEAD | LEFT | invariants |
+|---|---:|---:|---:|---:|
+| cautious | **1000** | 0 | 0 | 0 |
+| random-legal | **1000** | 0 | 0 | 0 |
+
+- Reports: `smoke-{cautious,random-legal}-s0-n1000-20260716.*` (labVersion 8)
+
 ### Next work queue
 
-1. Re-run cautious + random-legal 1k cohorts (expect 100%)
+1. Optional balanced 1k reconfirm at labVersion 8
 2. Optional Phase 3 stress cohorts
 
 ---
