@@ -1,5 +1,52 @@
 # Raid Lab — Progress
 
+## Batch 2026-07-17 — Water-chokepoint routing (labVersion 3)
+
+### Experiments run
+
+- Root-caused LEFT cluster seed 6: stuck at ~(1662,1584) where east is water
+- Coast-slide alone preferred a short southern gap into a longer trap / combat death
+- Lab corridor now uses sticky paths + unit-cost binary-heap A* when greedy steps block
+- Regression: balanced seed 6 must `SURVIVED` at `e_stronghold`
+
+### Seed range
+
+- Determinism + extract regressions in `tests/raid/raid-lab-determinism.test.ts`
+- Smoke / 1k cohort pending re-run under labVersion 3
+
+### Outcome ratios
+
+- Seed spot-checks: cautious 3 SURVIVED; balanced 6 SURVIVED (~0.5–1s each)
+- Full smoke `0..99` and cohort1k: **queued next**
+
+### Invariant violations
+
+- none observed on regression seeds
+
+### Tests added/updated
+
+- `tests/raid/raid-lab-determinism.test.ts` — water chokepoint seed 6
+
+### Code changed
+
+- `scripts/raid-lab/pathing.ts` — greedy improving steps, sticky corridor, unit-cost heap A*
+- `RAID_LAB_VERSION = 3`
+
+### Verification commands
+
+| Command | Result |
+|---|---|
+| `npm run typecheck` | pass |
+| `node --import tsx --test tests/raid/raid-lab-determinism.test.ts` | 5 pass |
+
+### Next work queue
+
+1. Re-run `npm run raid-lab:smoke` under labVersion 3; compare LEFT rate vs 16%
+2. Finish `npm run raid-lab:cohort1k`; update ratios/clusters
+3. Shrink any remaining LEFT/DEAD clusters into regression seeds
+
+---
+
 ## Batch 2026-07-16b — Phase 2 extract path + clustering + 100-seed cohort
 
 ### Experiments run

@@ -44,3 +44,11 @@ test('raid lab cautious extract can survive at a non-departure town', () => {
     assert.notEqual(result.extractionTownId, result.departureTownId);
     assert.ok(result.actions.some((action) => action.kind === 'leave_town'));
 });
+
+test('raid lab balanced extract detours water chokepoint on regression seed 6', () => {
+    // Previously stuck at (1662,1584) where east is water; must route around and SURVIVE.
+    const result = runRaidLabExpedition({ seed: 6, policy: 'balanced', maxActions: 1_500 });
+    assert.equal(result.result, 'SURVIVED');
+    assert.equal(result.extractionTownId, 'e_stronghold');
+    assert.ok((result.actorFinal?.tileX ?? 0) > 1900);
+});
