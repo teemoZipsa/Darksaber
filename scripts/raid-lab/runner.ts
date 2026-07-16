@@ -173,6 +173,9 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
         let handled = false;
 
         if (decision.kind === 'move' && decision.tile) {
+            // Prefer tiles on the lab corridor — straight-line candidates clip through walls
+            // and stall (cautious seeds 125/261 stuck at ~(1426,1444) east of a WALL).
+            const pathHint = pathCache.path.slice(pathCache.index, pathCache.index + 10);
             const moveAttempt = attemptMove(
                 session,
                 joined.playerId,
@@ -180,7 +183,9 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
                 actor.tile,
                 decision.tile,
                 intentId,
-                now
+                now,
+                pathHint,
+                world
             );
             applyMessages([...moveAttempt.replies, ...moveAttempt.broadcasts]);
             recordAction(
@@ -545,10 +550,12 @@ function attemptMove(
     from: { x: number; y: number },
     desired: { x: number; y: number },
     intentId: string,
-    now: number
+    now: number,
+    pathHint: Array<{ x: number; y: number }> = [],
+    world?: WorldMap
 ): { replies: WorldServerMessage[]; broadcasts: WorldServerMessage[]; rejected: boolean; tile: { x: number; y: number } } {
-    // Try farthest legal prefix first so rejected long WorldMap plans still get full MOV steps.
-    const candidates = buildMoveCandidates(from, desired, 8);
+    // Farthest corridor/walkable prefix first so wall chokepoints use the lab detour.
+    const candidates = buildMoveCandidates(from, desired, 8, pathHint, world);
     const seen = new Set<string>();
     for (const tile of candidates) {
         const key = `${tile.x},${tile.y}`;
@@ -572,33 +579,72 @@ function attemptMove(
 function buildMoveCandidates(
     from: { x: number; y: number },
     desired: { x: number; y: number },
-    maxSteps: number
+    maxSteps: number,
+    pathHint: Array<{ x: number; y: number }> = [],
+    world?: WorldMap
 ): Array<{ x: number; y: number }> {
-    const line: Array<{ x: number; y: number }> = [];
-    let x = from.x;
-    let y = from.y;
+    const walkableLine: Array<{ x: number; y: number }> = [];
+    let cur = { ...from };
     for (let step = 0; step < maxSteps; step++) {
-        if (x === desired.x && y === desired.y) break;
-        if (Math.abs(desired.x - x) >= Math.abs(desired.y - y) && x !== desired.x) {
-            x += Math.sign(desired.x - x);
-        } else if (y !== desired.y) {
-            y += Math.sign(desired.y - y);
-        } else if (x !== desired.x) {
-            x += Math.sign(desired.x - x);
-        } else {
-            break;
-        }
-        line.push({ x, y });
+        if (cur.x === desired.x && cur.y === desired.y) break;
+        const next = world
+            ? stepTowardWalkableTile(world, cur, desired)
+            : stepTowardBlind(cur, desired);
+        if (!next || (next.x === cur.x && next.y === cur.y)) break;
+        walkableLine.push(next);
+        cur = next;
     }
 
+    const hintForward = pathHint.filter((tile) => tile.x !== from.x || tile.y !== from.y);
+
     return [
+        ...[...hintForward].reverse(),
         desired,
-        ...[...line].reverse(),
+        ...[...walkableLine].reverse(),
         { x: from.x + 1, y: from.y },
         { x: from.x - 1, y: from.y },
         { x: from.x, y: from.y + 1 },
         { x: from.x, y: from.y - 1 },
     ];
+}
+
+function stepTowardBlind(
+    from: { x: number; y: number },
+    goal: { x: number; y: number }
+): { x: number; y: number } | null {
+    if (from.x === goal.x && from.y === goal.y) return null;
+    let x = from.x;
+    let y = from.y;
+    if (Math.abs(goal.x - x) >= Math.abs(goal.y - y) && x !== goal.x) {
+        x += Math.sign(goal.x - x);
+    } else if (y !== goal.y) {
+        y += Math.sign(goal.y - y);
+    } else if (x !== goal.x) {
+        x += Math.sign(goal.x - x);
+    }
+    return { x, y };
+}
+
+function stepTowardWalkableTile(
+    world: WorldMap,
+    from: { x: number; y: number },
+    goal: { x: number; y: number }
+): { x: number; y: number } | null {
+    const dx = Math.sign(goal.x - from.x);
+    const dy = Math.sign(goal.y - from.y);
+    if (dx === 0 && dy === 0) return null;
+    const ordered: Array<{ x: number; y: number }> = [];
+    if (Math.abs(goal.x - from.x) >= Math.abs(goal.y - from.y)) {
+        if (dx !== 0) ordered.push({ x: from.x + dx, y: from.y });
+        if (dy !== 0) ordered.push({ x: from.x, y: from.y + dy });
+    } else {
+        if (dy !== 0) ordered.push({ x: from.x, y: from.y + dy });
+        if (dx !== 0) ordered.push({ x: from.x + dx, y: from.y });
+    }
+    for (const tile of ordered) {
+        if (world.isWalkable(tile.x, tile.y)) return tile;
+    }
+    return null;
 }
 
 function advanceUntilReadyOrDone(

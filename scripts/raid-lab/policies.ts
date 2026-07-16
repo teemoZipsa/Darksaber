@@ -199,6 +199,23 @@ function randomLegalPolicy(obs: LabObservation): LabDecision {
     }
     if (!obs.actorReady) return { kind: 'wait' };
 
+    const hpRatio = obs.hp / Math.max(1, obs.maxHp);
+    // Seed 973: random-rest beside aggro while low HP → enemy death. Survive bias first.
+    if (hpRatio <= 0.4) {
+        if (obs.healItemId && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
+            return { kind: 'useItem', itemId: obs.healItemId, detail: 'random-heal-lowhp' };
+        }
+        if (obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
+            return moveToward(obs, obs.extractionGoal, 'random-extract-lowhp');
+        }
+        const threatened = nearestEnemy(obs, 4) !== null;
+        if (!threatened && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
+            return { kind: 'rest', detail: 'random-rest-lowhp' };
+        }
+        if (obs.remainingAp > 0) return { kind: 'endTurn', detail: 'random-end-lowhp' };
+        return { kind: 'wait' };
+    }
+
     const options: LabDecision[] = [];
     if (obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
         options.push(moveToward(obs, obs.extractionGoal, 'random-extract'));
@@ -216,7 +233,8 @@ function randomLegalPolicy(obs: LabObservation): LabDecision {
     if (obs.healItemId && obs.remainingAp >= REST_ACTION_GAUGE_COST && obs.hp < obs.maxHp) {
         options.push({ kind: 'useItem', itemId: obs.healItemId, detail: 'random-heal' });
     }
-    if (obs.remainingAp >= REST_ACTION_GAUGE_COST) {
+    // Prefer not resting when an enemy is adjacent — rest burns gauge while they swing.
+    if (obs.remainingAp >= REST_ACTION_GAUGE_COST && nearestEnemy(obs, 1) === null) {
         options.push({ kind: 'rest', detail: 'random-rest' });
     }
     if (obs.remainingAp > 0) options.push({ kind: 'endTurn', detail: 'random-end' });

@@ -119,3 +119,16 @@ test('raid lab random-legal does not early-abandon on seed 0', () => {
         assert.equal(result.stopReason, 'max_actions');
     }
 });
+
+test('raid lab cautious clears wall-chokepoint stuck pocket on seed 125', () => {
+    // Blind Bresenham move candidates clipped through WALL @ ~(1428,1444) → max_actions LEFT.
+    const result = runRaidLabExpedition({ seed: 125, policy: 'cautious', maxActions: 1_500 });
+    assert.equal(result.result, 'SURVIVED');
+    assert.notEqual(result.stopReason, 'max_actions');
+});
+
+test('raid lab random-legal survives low-HP rest trap on seed 973', () => {
+    // random-rest beside aggro at ~HP 34 → enemy death at ~(1809,1458).
+    const result = runRaidLabExpedition({ seed: 973, policy: 'random-legal', maxActions: 1_500 });
+    assert.equal(result.result, 'SURVIVED');
+});

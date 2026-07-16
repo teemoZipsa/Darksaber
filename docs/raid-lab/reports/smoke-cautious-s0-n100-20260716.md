@@ -1,10 +1,10 @@
 # Raid Lab Cohort Report
 
-- labVersion: 7
+- labVersion: 8
 - policy: cautious
 - seeds: 0..99 (n=100)
-- mean elapsedSeconds: 27.90
-- mean kills: 0.01
+- mean elapsedSeconds: 29.80
+- mean kills: 0.00
 
 ## Outcomes
 

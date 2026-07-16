@@ -1,5 +1,47 @@
 # Raid Lab — Progress
 
+## Batch 2026-07-17f — Clear remaining LEFT/DEAD (labVersion 8)
+
+### Experiments run
+
+- cautious LEFT (seed 125 etc.): `attemptMove` used blind Bresenham that clipped through WALL @ ~(1428,1444) → corridor path hint + walkable stepping
+- random-legal DEAD (seed 973): `random-rest` beside aggro at low HP → survive bias at hp≤40% + no adjacent rest
+
+### Outcome ratios (smoke 0..99 / labVersion 8)
+
+| Policy | SURVIVED | DEAD | LEFT | invariants |
+|---|---:|---:|---:|---:|
+| balanced | 100 | 0 | 0 | 0 |
+| cautious | 100 | 0 | 0 | 0 |
+| random-legal | 100 | 0 | 0 | 0 |
+
+### Tests added/updated
+
+- cautious seed 125 wall-chokepoint SURVIVED
+- random-legal seed 973 low-HP rest trap SURVIVED
+- determinism suite: **16 pass**
+
+### Code changed
+
+- `runner.ts` — path-hint + walkable move candidates
+- `policies.ts` — random-legal low-HP / adjacent-rest guards
+- `RAID_LAB_VERSION = 8`
+
+### Verification
+
+| Command | Result |
+|---|---|
+| typecheck | pass |
+| raid-lab determinism tests | 16 pass |
+| `raid-lab:smoke` / `:cautious` / `:random` | each **100% SURVIVED** |
+
+### Next work queue
+
+1. Re-run cautious + random-legal 1k cohorts (expect 100%)
+2. Optional Phase 3 stress cohorts
+
+---
+
 ## Batch 2026-07-17e — Multi-policy coverage (labVersion 7)
 
 ### Experiments run
