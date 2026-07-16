@@ -11,12 +11,15 @@ export interface PathCache {
     waypointKey: string;
     path: TilePoint[];
     index: number;
+    /** Remaining full A* searches allowed this expedition (coast fallback after). */
+    astarCredits?: number;
 }
 
 const WAYPOINT_SPAN = 40;
-const DETOUR_SPAN = 120;
-const ASTAR_MAX_NODES = 80_000;
+const DETOUR_SPAN = 200;
+const ASTAR_MAX_NODES = 40_000;
 const ASTAR_MAX_DISTANCE = 800;
+const ROUTE_REJOIN_DIST = 12;
 
 /**
  * Pick the best tile within one MOV budget toward `goal`.
@@ -60,28 +63,33 @@ function followWaypointRoute(
     cache: PathCache
 ): TilePoint | null {
     const goalKey = `${goal.x},${goal.y}`;
+    const routeSlack = Math.max(ROUTE_REJOIN_DIST, budget * 2);
     // Stay on a committed corridor until exhausted or lost — rebuilding every
-    // tile undoes temporary Manhattan worsenings on lake/river detours.
+    // tile undoes temporary Manhattan worsenings and re-triggers expensive A*.
+    let nearDist = cache.goalKey === goalKey && cache.path.length > 0
+        ? nearestPathDistance(cache.path, from, cache.index)
+        : Infinity;
     const onRoute = cache.goalKey === goalKey
         && cache.path.length > 0
         && cache.index < cache.path.length
-        && nearestPathDistance(cache.path, from, cache.index) <= Math.max(2, budget);
+        && nearDist <= routeSlack;
 
     if (!onRoute) {
-        const corridor = buildCorridor(world, from, goal);
+        const corridor = buildCorridor(world, from, goal, cache);
         const waypoint = corridor[corridor.length - 1] ?? from;
         cache.goalKey = goalKey;
         cache.waypointKey = `${waypoint.x},${waypoint.y}`;
         cache.path = corridor;
         cache.index = 0;
+        nearDist = corridor.length > 0 ? nearestPathDistance(corridor, from, 0) : Infinity;
     }
 
     if (cache.path.length === 0) return null;
 
     let bestIndex = cache.index;
     let bestDist = Infinity;
-    const start = Math.max(0, cache.index - 4);
-    const end = Math.min(cache.path.length, cache.index + 24);
+    const start = Math.max(0, cache.index - 8);
+    const end = Math.min(cache.path.length, cache.index + 48);
     for (let i = start; i < end; i++) {
         const tile = cache.path[i]!;
         const dist = manhattan(from, tile);
@@ -120,7 +128,12 @@ const CARDINALS: TilePoint[] = [
  * Build a short walkable corridor toward the goal.
  * Open ground uses greedy steps; blockers use binary-heap A*.
  */
-function buildCorridor(world: WorldMap, from: TilePoint, goal: TilePoint): TilePoint[] {
+function buildCorridor(
+    world: WorldMap,
+    from: TilePoint,
+    goal: TilePoint,
+    cache: PathCache
+): TilePoint[] {
     const straight = collectToward(world, from, goal, WAYPOINT_SPAN);
     const tip = straight[straight.length - 1] ?? from;
     const canContinue = stepTowardWalkable(world, tip, goal) !== null;
@@ -129,8 +142,17 @@ function buildCorridor(world: WorldMap, from: TilePoint, goal: TilePoint): TileP
         return straight;
     }
 
-    const detour = astarCorridor(world, from, goal, DETOUR_SPAN);
-    if (detour.length > 0) return detour;
+    if (cache.astarCredits === undefined) cache.astarCredits = 20;
+    if (cache.astarCredits > 0) {
+        cache.astarCredits -= 1;
+        // Stop at first Manhattan improvement — enough to clear a lake gap,
+        // without searching all the way to the extraction town.
+        const detour = astarCorridor(world, from, goal, DETOUR_SPAN, true);
+        if (detour.length > 0) return detour;
+    }
+
+    const coastal = coastDetour(world, from, goal);
+    if (coastal.length > 0) return coastal;
 
     return straight;
 }
@@ -189,25 +211,30 @@ interface AStarNode {
     f: number;
 }
 
-/** Binary-heap A* corridor toward goal; returns up to `span` steps. */
+/**
+ * Binary-heap A* corridor toward goal; returns up to `span` steps.
+ * When `stopOnProgress`, returns as soon as Manhattan to goal improves.
+ */
 function astarCorridor(
     world: WorldMap,
     from: TilePoint,
     goal: TilePoint,
-    span: number
+    span: number,
+    stopOnProgress = false
 ): TilePoint[] {
     if (from.x === goal.x && from.y === goal.y) return [];
 
     const startKey = tileKey(from);
     const goalKey = tileKey(goal);
+    const startScore = manhattan(from, goal);
     const open = new MinHeap();
-    open.push({ x: from.x, y: from.y, g: 0, f: manhattan(from, goal) });
+    open.push({ x: from.x, y: from.y, g: 0, f: startScore });
     const cameFrom = new Map<string, string>();
     const gScore = new Map<string, number>([[startKey, 0]]);
     const closed = new Set<string>();
     let visited = 0;
     let bestKey = startKey;
-    let bestF = manhattan(from, goal);
+    let bestScore = startScore;
 
     while (open.size > 0 && visited < ASTAR_MAX_NODES) {
         const current = open.pop()!;
@@ -216,9 +243,13 @@ function astarCorridor(
         closed.add(currentKey);
         visited += 1;
 
-        if (current.f < bestF || (current.f === bestF && current.g > (gScore.get(bestKey) ?? 0))) {
-            bestF = current.f;
+        const score = manhattan(current, goal);
+        if (score < bestScore) {
+            bestScore = score;
             bestKey = currentKey;
+            if (stopOnProgress && score < startScore) {
+                return reconstructPath(cameFrom, startKey, currentKey).slice(0, span);
+            }
         }
 
         if (currentKey === goalKey) {
@@ -248,8 +279,52 @@ function astarCorridor(
         }
     }
 
-    if (bestKey === startKey) return [];
+    if (bestKey === startKey || bestScore >= startScore) return [];
     return reconstructPath(cameFrom, startKey, bestKey).slice(0, span);
+}
+
+/** Cheap north-preferring shore slide when A* credits are exhausted. */
+function coastDetour(world: WorldMap, from: TilePoint, goal: TilePoint): TilePoint[] {
+    const dominantIsX = Math.abs(goal.x - from.x) >= Math.abs(goal.y - from.y);
+    const advance: TilePoint = dominantIsX
+        ? { x: Math.sign(goal.x - from.x), y: 0 }
+        : { x: 0, y: Math.sign(goal.y - from.y) };
+    if (advance.x === 0 && advance.y === 0) return [];
+
+    const perps: TilePoint[] = dominantIsX
+        ? [{ x: 0, y: -1 }, { x: 0, y: 1 }]
+        : [{ x: -1, y: 0 }, { x: 1, y: 0 }];
+
+    let best: TilePoint[] | null = null;
+    let bestScore = Infinity;
+
+    for (const dir of perps) {
+        const path: TilePoint[] = [];
+        for (let dist = 1; dist <= 160; dist++) {
+            const along = { x: from.x + dir.x * dist, y: from.y + dir.y * dist };
+            if (!world.isWalkable(along.x, along.y)) break;
+            path.push(along);
+            const toward = { x: along.x + advance.x, y: along.y + advance.y };
+            if (!world.isWalkable(toward.x, toward.y)) continue;
+
+            let cur = along;
+            for (let step = 0; step < 80; step++) {
+                const next = { x: cur.x + advance.x, y: cur.y + advance.y };
+                if (!world.isWalkable(next.x, next.y)) break;
+                path.push(next);
+                cur = next;
+                if (manhattan(cur, goal) < manhattan(from, goal)) break;
+            }
+            const tip = path[path.length - 1]!;
+            const score = path.length + manhattan(tip, goal);
+            if (score < bestScore) {
+                bestScore = score;
+                best = path.slice();
+            }
+            break;
+        }
+    }
+    return best ?? [];
 }
 
 class MinHeap {

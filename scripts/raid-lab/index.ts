@@ -64,9 +64,10 @@ function main(): void {
             policy: args.policy,
             maxActions: args.maxActions,
         }));
-        if ((i + 1) % 25 === 0 || i + 1 === args.seeds) {
+        if ((i + 1) % 10 === 0 || i + 1 === args.seeds) {
             const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-            process.stdout.write(`progress ${i + 1}/${args.seeds} seeds in ${elapsed}s\n`);
+            // stderr stays line-buffered when stdout is captured by the harness.
+            process.stderr.write(`progress ${i + 1}/${args.seeds} seeds in ${elapsed}s\n`);
         }
     }
     const summary = summarizeCohort(results, args.policy, args.seedStart);

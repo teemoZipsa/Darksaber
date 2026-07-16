@@ -30,6 +30,8 @@
 ### Code changed
 
 - `scripts/raid-lab/pathing.ts` — greedy improving steps, sticky corridor, unit-cost heap A*
+  - A* stops at first Manhattan improvement; credits + coast fallback avoid cohort hangs
+  - Soft rejoin + stderr progress every 10 seeds
 - `RAID_LAB_VERSION = 3`
 
 ### Verification commands
