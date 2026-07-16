@@ -43,10 +43,23 @@
 | raid-lab determinism tests | 10 pass |
 | `npm run raid-lab:smoke` | **SURVIVED 100 / invariants 0** (~37s) |
 
+### Outcome ratios (cohort 0..999 / balanced / labVersion 5)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 996 | **99.6%** |
+| DEAD | 4 | 0.4% |
+| MIA | 0 | 0.0% |
+| LEFT | 0 | **0.0%** |
+
+- vs labVersion 4 1k: SURVIVED 89.2% → **99.6%**, LEFT 8.6% → **0%**, DEAD 2.2% → **0.4%**
+- DEAD/enemy: **168**, **321**; DEAD/curse: **611**, **852**
+- runtime ~365s; Report: `docs/raid-lab/reports/smoke-balanced-s0-n1000-20260716.md` (v5)
+
 ### Next work queue
 
-1. Finish `raid-lab:cohort1k` under labVersion 5
-2. Revisit curse DEAD 611/852 if still present at 1k scale
+1. Shrink remaining DEAD (enemy 168/321, curse 611/852) into regressions if actionable
+2. Optional: cautious/random-legal cohorts for policy coverage
 
 ---
 
