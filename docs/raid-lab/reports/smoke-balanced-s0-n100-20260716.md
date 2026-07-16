@@ -1,17 +1,17 @@
 # Raid Lab Cohort Report
 
-- labVersion: 3
+- labVersion: 4
 - policy: balanced
 - seeds: 0..99 (n=100)
-- mean elapsedSeconds: 49.95
-- mean kills: 0.89
+- mean elapsedSeconds: 91.16
+- mean kills: 1.89
 
 ## Outcomes
 
-- SURVIVED: 89 (89.0%)
-- DEAD: 0 (0.0%)
+- SURVIVED: 90 (90.0%)
+- DEAD: 1 (1.0%)
 - MIA: 0 (0.0%)
-- LEFT: 11 (11.0%)
+- LEFT: 9 (9.0%)
 
 ## Invariant violations
 
@@ -20,13 +20,14 @@
 
 ## Clusters — stopReason
 
-- `raid_result`: 89 — seeds 0, 1, 2, 3, 4, 5, 6, 7
-- `max_actions`: 11 — seeds 9, 14, 18, 35, 63, 69, 77, 82
+- `raid_result`: 91 — seeds 0, 1, 2, 3, 4, 5, 6, 7
+- `max_actions`: 9 — seeds 10, 15, 24, 45, 46, 53, 71, 89
 
 ## Clusters — deathCause
 
-- `none`: 89 — seeds 0, 1, 2, 3, 4, 5, 6, 7
-- `manual`: 11 — seeds 9, 14, 18, 35, 63, 69, 77, 82
+- `none`: 90 — seeds 0, 1, 2, 3, 4, 5, 6, 7
+- `manual`: 9 — seeds 10, 15, 24, 45, 46, 53, 71, 89
+- `enemy`: 1 — seeds 59
 
 ## Clusters — invariant codes
 

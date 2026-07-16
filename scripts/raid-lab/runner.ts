@@ -141,6 +141,17 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
             mov: observation.mov,
         };
 
+        if (process.env.RAID_LAB_TRACE === '1' && actions.length % 50 === 0) {
+            process.stderr.write(
+                `trace seed=${options.seed} i=${actions.length} `
+                + `pos=${observation.tile.x},${observation.tile.y} `
+                + `hp=${observation.hp} kills=${observation.kills} `
+                + `enemies=${observation.enemies.length} `
+                + `town=${observation.currentTownId ?? '-'} `
+                + `credits=${pathCache.astarCredits ?? '-'}\n`
+            );
+        }
+
         const decision = policy(observation);
         if (decision.kind === 'wait') {
             now += WORLD_TICK_MS;

@@ -52,3 +52,17 @@ test('raid lab balanced extract detours water chokepoint on regression seed 6', 
     assert.equal(result.extractionTownId, 'e_stronghold');
     assert.ok((result.actorFinal?.tileX ?? 0) > 1900);
 });
+
+test('raid lab balanced extract does not stall in wall pocket on seed 9', () => {
+    // Burned A* credits on chase, then coast-failed at ~(1474,1486) until max_actions.
+    const result = runRaidLabExpedition({ seed: 9, policy: 'balanced', maxActions: 1_500 });
+    assert.equal(result.result, 'SURVIVED');
+    assert.equal(result.extractionTownId, 'e_stronghold');
+});
+
+test('raid lab balanced extract does not bypass-stall near town on seed 77', () => {
+    // Oscillated extract/bypass at ~(1970,1526) with enemies between actor and town.
+    const result = runRaidLabExpedition({ seed: 77, policy: 'balanced', maxActions: 1_500 });
+    assert.equal(result.result, 'SURVIVED');
+    assert.equal(result.extractionTownId, 'e_stronghold');
+});

@@ -224,21 +224,29 @@ function randomLegalPolicy(obs: LabObservation): LabDecision {
 }
 
 function extractPhase(obs: LabObservation, hpRatio: number, detailPrefix: string): LabDecision {
-    const threat = nearestEnemy(obs, 4);
-    if (threat && obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
-        // Sidestep threats while still progressing toward extraction.
-        const away = {
-            x: obs.tile.x + Math.sign(obs.tile.x - threat.tile.x) + Math.sign(obs.extractionGoal.x - obs.tile.x),
-            y: obs.tile.y + Math.sign(obs.tile.y - threat.tile.y) + Math.sign(obs.extractionGoal.y - obs.tile.y),
-        };
-        return moveToward(obs, away, `${detailPrefix}-bypass`);
-    }
+    const distToExtract = manhattan(obs.tile, obs.extractionGoal);
     const adjacentThreat = nearestAttackable(obs);
     if (adjacentThreat && manhattan(obs.tile, adjacentThreat.tile) <= 1
         && obs.remainingAp >= ATTACK_AP_COST
         && hpRatio > 0.45) {
         return { kind: 'attack', targetId: adjacentThreat.id, detail: `${detailPrefix}-clear` };
     }
+
+    const threat = nearestEnemy(obs, 4);
+    // Far from town: sidestep with a nudge that still biases toward extract.
+    // Near town: never bypass — combined away+extract vectors cancel and stall.
+    if (threat && distToExtract > 96 && obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
+        const ex = Math.sign(obs.extractionGoal.x - obs.tile.x);
+        const ey = Math.sign(obs.extractionGoal.y - obs.tile.y);
+        const tx = Math.sign(obs.tile.x - threat.tile.x);
+        const ty = Math.sign(obs.tile.y - threat.tile.y);
+        const bypassGoal = {
+            x: obs.tile.x + ex * 6 + (ex === 0 ? tx * 2 : tx),
+            y: obs.tile.y + ey * 6 + (ey === 0 ? ty * 2 : ty),
+        };
+        return moveToward(obs, bypassGoal, `${detailPrefix}-bypass`);
+    }
+
     if (obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
         return moveToward(obs, obs.extractionGoal, detailPrefix);
     }

@@ -1,5 +1,55 @@
 # Raid Lab — Progress
 
+## Batch 2026-07-17b — Extract stall fixes (labVersion 4)
+
+### Experiments run
+
+- LEFT seed 9: A* credits burned by short-range chase → coast-failed wall pocket ~(1474,1486)
+- LEFT seed 77: extract-bypass vector cancelled near town ~(1970,1526) with 600+ bypass moves
+- Fix: A* only for goals ≥32 tiles; refund failed searches; no bypass when distToExtract ≤96
+
+### Outcome ratios (smoke 0..99 / balanced / labVersion 4)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 90 | 90.0% |
+| DEAD | 1 | 1.0% |
+| MIA | 0 | 0.0% |
+| LEFT | 9 | 9.0% |
+
+- vs labVersion 3 smoke: SURVIVED 89% → **90%**, LEFT 11% → **9%** (new DEAD seed 59)
+- Former LEFT samples 9/14/18/35/63/69/77/82: all **SURVIVED**
+- Remaining LEFT: 10, 15, 24, 45, 46, 53, 71, 89
+- Report: `docs/raid-lab/reports/smoke-balanced-s0-n100-20260716.md` (v4)
+
+### Tests added/updated
+
+- seed 9 wall-pocket SURVIVED regression
+- seed 77 near-town bypass SURVIVED regression
+
+### Code changed
+
+- `scripts/raid-lab/pathing.ts` — short-range A* skip + credit refund
+- `scripts/raid-lab/policies.ts` — extract bypass only when far from town
+- `RAID_LAB_VERSION = 4`
+- optional `RAID_LAB_TRACE=1` position samples in runner
+
+### Verification
+
+| Command | Result |
+|---|---|
+| `npm run typecheck` | pass |
+| raid-lab determinism tests | 7 pass |
+| `npm run raid-lab:smoke` | SURVIVED 90 / LEFT 9 / DEAD 1 / invariants 0 (~61s) |
+
+### Next work queue
+
+1. Re-run `raid-lab:cohort1k` under labVersion 4
+2. Shrink new LEFT set (10, 15, …) + DEAD seed 59
+3. Reproduce DEAD 301/622/611/852 from v3 1k if still present
+
+---
+
 ## Batch 2026-07-17 — Water-chokepoint routing (labVersion 3)
 
 ### Experiments run

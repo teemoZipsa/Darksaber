@@ -20,6 +20,9 @@ const DETOUR_SPAN = 200;
 const ASTAR_MAX_NODES = 40_000;
 const ASTAR_MAX_DISTANCE = 800;
 const ROUTE_REJOIN_DIST = 12;
+/** Short-range chase/loot must not burn lake-detour A* credits. */
+const ASTAR_MIN_GOAL_DIST = 32;
+const ASTAR_CREDITS_DEFAULT = 48;
 
 /**
  * Pick the best tile within one MOV budget toward `goal`.
@@ -142,13 +145,25 @@ function buildCorridor(
         return straight;
     }
 
-    if (cache.astarCredits === undefined) cache.astarCredits = 20;
+    const goalDist = manhattan(from, goal);
+    // Local chase/loot: cheap step only — do not spend expedition A* budget.
+    if (goalDist < ASTAR_MIN_GOAL_DIST) {
+        const step = stepTowardWalkable(world, from, goal) ?? null;
+        if (step) return [step];
+        return straight.length > 0 ? straight : [cardinalFallback(world, from, goal)].filter(
+            (tile) => tile.x !== from.x || tile.y !== from.y
+        );
+    }
+
+    if (cache.astarCredits === undefined) cache.astarCredits = ASTAR_CREDITS_DEFAULT;
     if (cache.astarCredits > 0) {
-        cache.astarCredits -= 1;
-        // Stop at first Manhattan improvement — enough to clear a lake gap,
-        // without searching all the way to the extraction town.
+        // Stop at first Manhattan improvement — enough to clear a lake gap.
         const detour = astarCorridor(world, from, goal, DETOUR_SPAN, true);
-        if (detour.length > 0) return detour;
+        if (detour.length > 0) {
+            cache.astarCredits -= 1;
+            return detour;
+        }
+        // Failed search does not consume a credit.
     }
 
     const coastal = coastDetour(world, from, goal);
