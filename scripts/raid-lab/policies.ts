@@ -232,31 +232,13 @@ function extractPhase(obs: LabObservation, hpRatio: number, detailPrefix: string
         return { kind: 'rest', detail: `${detailPrefix}-rest` };
     }
 
-    const adjacentThreat = nearestAttackable(obs);
-    // Only clear when healthy and the foe sits on the extract axis; otherwise disengage.
-    if (adjacentThreat && manhattan(obs.tile, adjacentThreat.tile) <= 1
-        && obs.remainingAp >= ATTACK_AP_COST
-        && hpRatio > 0.65
-        && isOnExtractAxis(obs.tile, adjacentThreat.tile, obs.extractionGoal)) {
-        return { kind: 'attack', targetId: adjacentThreat.id, detail: `${detailPrefix}-clear` };
-    }
-
-    // No sidestep bypass — prior bypass variants stalled (seeds 10/53/77/194) or
-    // cancelled extract progress. Push the extract goal; clear only when blocking.
+    // No extract-clear: seeds 168/321 spent 80–180 attacks with 0 kills then died.
+    // Disengage toward town; heal/rest already handled above.
     if (obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
         return moveToward(obs, obs.extractionGoal, detailPrefix);
     }
     if (obs.remainingAp > 0) return { kind: 'endTurn', detail: `${detailPrefix}-spent` };
     return { kind: 'wait' };
-}
-
-/** True when the foe lies toward the extract goal on at least one shared axis. */
-function isOnExtractAxis(from: TilePoint, foe: TilePoint, goal: TilePoint): boolean {
-    const ex = Math.sign(goal.x - from.x);
-    const ey = Math.sign(goal.y - from.y);
-    const fx = Math.sign(foe.x - from.x);
-    const fy = Math.sign(foe.y - from.y);
-    return (ex !== 0 && fx === ex) || (ey !== 0 && fy === ey);
 }
 
 function nearestAttackable(obs: LabObservation): LabEnemyView | null {
@@ -293,12 +275,19 @@ function nearestLoot(obs: LabObservation, maxDist: number): LabLootView | null {
     let bestDist = Infinity;
     for (const loot of obs.loot) {
         if (obs.ignoredLootIds.has(loot.id)) continue;
+        // Curse deaths (seeds 611/852) came from sealed reliquary pickups.
+        if (isHazardLootId(loot.id)) continue;
         const dist = manhattan(obs.tile, loot.tile);
         if (dist > maxDist || dist >= bestDist) continue;
         best = loot;
         bestDist = dist;
     }
     return best;
+}
+
+function isHazardLootId(lootId: string): boolean {
+    const id = lootId.toLowerCase();
+    return id.includes('reliquary') || id.includes('cursed') || id.includes('hex');
 }
 
 function moveToward(obs: LabObservation, goal: TilePoint, detail: string): LabDecision {

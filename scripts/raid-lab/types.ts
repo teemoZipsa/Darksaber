@@ -1,6 +1,6 @@
 import type { RaidBalanceTelemetry, RaidResultMessage } from '../../src/net/WorldProtocol';
 
-export const RAID_LAB_VERSION = 5;
+export const RAID_LAB_VERSION = 6;
 
 export type RaidLabPolicyId = 'balanced' | 'cautious' | 'random-legal';
 export type RaidLabResult = RaidResultMessage['result'];

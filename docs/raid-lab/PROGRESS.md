@@ -1,5 +1,51 @@
 # Raid Lab — Progress
 
+## Batch 2026-07-17d — Last DEAD shrink (labVersion 6)
+
+### Experiments run
+
+- DEAD/enemy 168/321: extract-clear stall (80–180 attacks, 0 kills) → remove extract-clear
+- DEAD/curse 611/852: sealed reliquary pickup → skip hazard loot ids (`reliquary`/`cursed`/`hex`)
+
+### Tests added/updated
+
+- seed 168 clear-stall SURVIVED
+- seed 852 cursed-reliquary skip SURVIVED
+- determinism suite: **12 pass**
+
+### Code changed
+
+- `policies.ts` — no extract-clear; hazard loot filter
+- `RAID_LAB_VERSION = 6`
+
+### Outcome ratios (smoke 0..99 / balanced / labVersion 6)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 100 | **100.0%** |
+| DEAD | 0 | 0.0% |
+| MIA | 0 | 0.0% |
+| LEFT | 0 | 0.0% |
+
+- mean elapsedSeconds: **35.82**; mean kills: **0.63**; ~32s
+- Former DEAD 168/321/611/852: all **SURVIVED**
+- Report: `docs/raid-lab/reports/smoke-balanced-s0-n100-20260716.md` (v6)
+
+### Verification
+
+| Command | Result |
+|---|---|
+| `npm run typecheck` | pass |
+| raid-lab determinism tests | 12 pass |
+| `npm run raid-lab:smoke` | **SURVIVED 100 / invariants 0** (~32s) |
+
+### Next work queue
+
+1. Finish `raid-lab:cohort1k` under labVersion 6
+2. Optional: cautious/random-legal cohorts
+
+---
+
 ## Batch 2026-07-17c — Extract survival + bypass removal (labVersion 5)
 
 ### Experiments run

@@ -87,3 +87,18 @@ test('raid lab balanced extract does not west-stall on bypass seed 53', () => {
     assert.equal(result.result, 'SURVIVED');
     assert.equal(result.extractionTownId, 'e_stronghold');
 });
+
+test('raid lab balanced extract disengages instead of clear-stalling on seed 168', () => {
+    // 181 clear attacks / 0 kills at ~(1813,1457) then enemy death while resting.
+    const result = runRaidLabExpedition({ seed: 168, policy: 'balanced', maxActions: 1_500 });
+    assert.equal(result.result, 'SURVIVED');
+    assert.equal(result.extractionTownId, 'e_stronghold');
+});
+
+test('raid lab balanced policy skips cursed reliquary loot on seed 852', () => {
+    // Picked sealed_reliquary then curse-ticked to death before extract.
+    const result = runRaidLabExpedition({ seed: 852, policy: 'balanced', maxActions: 1_500 });
+    assert.equal(result.result, 'SURVIVED');
+    assert.equal(result.extractionTownId, 'e_stronghold');
+    assert.ok(!result.actions.some((a) => (a.detail ?? '').includes('reliquary')));
+});
