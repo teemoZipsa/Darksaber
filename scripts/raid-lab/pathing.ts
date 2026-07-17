@@ -69,7 +69,7 @@ function followWaypointRoute(
     const routeSlack = Math.max(ROUTE_REJOIN_DIST, budget * 2);
     // Stay on a committed corridor until exhausted or lost — rebuilding every
     // tile undoes temporary Manhattan worsenings and re-triggers expensive A*.
-    let nearDist = cache.goalKey === goalKey && cache.path.length > 0
+    const nearDist = cache.goalKey === goalKey && cache.path.length > 0
         ? nearestPathDistance(cache.path, from, cache.index)
         : Infinity;
     const onRoute = cache.goalKey === goalKey
@@ -84,7 +84,6 @@ function followWaypointRoute(
         cache.waypointKey = `${waypoint.x},${waypoint.y}`;
         cache.path = corridor;
         cache.index = 0;
-        nearDist = corridor.length > 0 ? nearestPathDistance(corridor, from, 0) : Infinity;
     }
 
     if (cache.path.length === 0) return null;

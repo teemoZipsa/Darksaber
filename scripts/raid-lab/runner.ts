@@ -1,5 +1,6 @@
-import { createBaseStats } from '../../src/data/Stats';
+import { createBaseStats, getBaseStatsForClass } from '../../src/data/Stats';
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
+import { getClassLine } from '../../src/data/ClassTree';
 import { WorldSession, WORLD_TICK_MS } from '../../server/WorldSession';
 import { WorldMap } from '../../src/map/WorldMap';
 import type {
@@ -53,6 +54,8 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
     const combatRng = createMulberry32((options.seed * 0xc2b2ae35) >>> 0);
 
     const stressMode = options.stress ?? 'none';
+    const classKey = options.classKey ?? 'infantry';
+    const routeMode = options.routeMode ?? 'nearest';
     const sessionEpoch = sessionEpochFromSeed(options.seed);
     const session = new WorldSession({
         sessionEpoch,
@@ -63,12 +66,13 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
 
     const world = getSharedWorldMap();
     const departureTownId = 'central_castle';
-    const extraction = pickExtractionTown(world, departureTownId);
-    const character = createStarterCharacter(options.seed);
+    const extraction = pickExtractionTown(world, departureTownId, routeMode, options.seed);
+    const character = createStarterCharacter(options.seed, classKey);
     const save = createDefaultCharacterSave(character, 'M', '2026-01-01T00:00:00.000Z');
-    ensureStarterHealItem(save);
+    const starterHealQuantity = usesLowHpStress(stressMode) ? 0 : 3;
+    configureStarterHealItems(save, starterHealQuantity);
 
-    const joinMessage = createJoinMessage(character, departureTownId);
+    const joinMessage = createJoinMessage(character, departureTownId, starterHealQuantity);
     let now = 0;
     const joined = session.join(joinMessage, now, {
         accountId: character.accountId,
@@ -79,6 +83,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
     const actions: RaidLabActionRecord[] = [];
     const invariantViolations: RaidLabInvariantViolation[] = [];
     let raidResult: RaidResultMessage | null = null;
+    let raidResultCount = 0;
     let actorFinal: RaidLabExperimentResult['actorFinal'];
     let intentOrdinal = 0;
     let cappedStop: 'max_actions' | 'max_sim_ms' | 'invariant_abort' | null = null;
@@ -97,6 +102,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
     const applyMessages = (messages: WorldServerMessage[]) => {
         for (const message of messages) {
             if (message.type === 'RAID_RESULT') {
+                raidResultCount += 1;
                 raidResult = message;
             }
             if (message.type === 'AUTO_LOOT_GRANT') {
@@ -132,7 +138,8 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
             policyRng,
             ignoredLootIds,
             actions.length,
-            pathCache
+            pathCache,
+            now,
         );
         if (!observation) {
             break;
@@ -215,7 +222,18 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
                 payload: { targetId: decision.targetId },
             }, now);
             applyMessages([...result.replies, ...result.broadcasts]);
-            recordAction('attack', decision.detail ?? decision.targetId);
+            recordAction(hasActionRejected(result.replies) ? 'attack_rejected' : 'attack', decision.detail ?? decision.targetId);
+            handled = true;
+        } else if (decision.kind === 'defend') {
+            const result = session.handleMessage(joined.playerId, {
+                type: 'PLAYER_INTENT',
+                intentId,
+                actorId: actor.id,
+                kind: 'defend',
+                payload: {},
+            }, now);
+            applyMessages([...result.replies, ...result.broadcasts]);
+            recordAction(hasActionRejected(result.replies) ? 'defend_rejected' : 'defend', decision.detail);
             handled = true;
         } else if (decision.kind === 'rest') {
             const result = session.handleMessage(joined.playerId, {
@@ -226,7 +244,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
                 payload: {},
             }, now);
             applyMessages([...result.replies, ...result.broadcasts]);
-            recordAction('rest', decision.detail);
+            recordAction(hasActionRejected(result.replies) ? 'rest_rejected' : 'rest', decision.detail);
             handled = true;
         } else if (decision.kind === 'useItem' && decision.itemId) {
             const result = session.handleMessage(joined.playerId, {
@@ -237,7 +255,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
                 payload: { itemId: decision.itemId },
             }, now);
             applyMessages([...result.replies, ...result.broadcasts]);
-            recordAction('useItem', decision.itemId);
+            recordAction(hasActionRejected(result.replies) ? 'useItem_rejected' : 'useItem', decision.itemId);
             handled = true;
         } else if (decision.kind === 'loot' && decision.lootId) {
             const interact = session.handleMessage(joined.playerId, {
@@ -277,7 +295,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
                 payload: { reason: decision.detail ?? 'lab' },
             }, now);
             applyMessages([...result.replies, ...result.broadcasts]);
-            recordAction('endTurn', decision.detail);
+            recordAction(hasActionRejected(result.replies) ? 'endTurn_rejected' : 'endTurn', decision.detail);
             handled = true;
         }
 
@@ -312,10 +330,13 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
         seed: options.seed,
         policy: policyId,
         stress: stressMode,
+        classKey,
+        routeMode,
         result: finalResult.result,
         elapsedSeconds: finalResult.elapsedSeconds,
         kills: finalResult.kills,
         departureTownId: finalResult.departureTownId,
+        targetTownId: extraction.townId,
         extractionTownId: finalResult.extractionTownId,
         completedDungeonIds: finalResult.completedDungeonIds ?? [],
         telemetry: finalResult.telemetry ?? {
@@ -332,6 +353,15 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
         actorFinal,
         stopReason,
     };
+
+    if (raidResultCount !== 1) {
+        invariantViolations.push({
+            code: 'raid_result_count',
+            message: `Expected exactly one RAID_RESULT, received ${raidResultCount}`,
+            simMs: now,
+            actionIndex: actions.length,
+        });
+    }
 
     return {
         ...base,
@@ -375,47 +405,52 @@ export function runRaidLabCohort(
     return results;
 }
 
-function createStarterCharacter(seed: number): AuthCharacter {
+function createStarterCharacter(seed: number, classKey: AuthCharacter['classKey']): AuthCharacter {
+    const classLine = getClassLine(classKey);
+    const baseStats = createBaseStats(getBaseStatsForClass(classKey, classLine?.baseMovRange ?? 3));
     return {
         id: `lab_char_${seed}`,
         accountId: `lab_account_${seed}`,
         slotNo: 0,
         name: `LabHero${seed}`,
-        classKey: 'infantry',
+        classKey,
         tier: 1,
         level: 1,
         exp: 0,
-        baseStats: createBaseStats({ spd: 100, mov: 5, actionLimit: 80, hitRate: 200 }),
+        baseStats,
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
         deletedAt: null,
     };
 }
 
-function ensureStarterHealItem(save: ReturnType<typeof createDefaultCharacterSave>): void {
-    const hasHeal = save.inventory.items.some((item) => (
-        HEAL_ITEM_CANDIDATES.includes(item.itemId as typeof HEAL_ITEM_CANDIDATES[number])
+function configureStarterHealItems(
+    save: ReturnType<typeof createDefaultCharacterSave>,
+    quantity: number,
+): void {
+    save.inventory.items = save.inventory.items.filter((item) => (
+        !HEAL_ITEM_CANDIDATES.includes(item.itemId as typeof HEAL_ITEM_CANDIDATES[number])
     ));
-    if (hasHeal) return;
+    if (quantity <= 0) return;
     save.inventory.items.push({
         itemId: 'herb_common',
         gridX: 0,
         gridY: 0,
-        quantity: 3,
+        quantity,
         durability: 1,
     });
 }
 
-function createJoinMessage(character: AuthCharacter, originHubId: string): WorldJoinMessage {
+function createJoinMessage(character: AuthCharacter, originHubId: string, healQuantity: number): WorldJoinMessage {
     const partyActor: ActorSnapshot = {
         id: character.id,
         localActorId: character.id,
         name: character.name,
-        classLineId: 'infantry',
+        classLineId: character.classKey,
         currentTier: 1,
         level: 1,
         tile: { x: 0, y: 0 },
-        stats: createBaseStats({ spd: 100, mov: 5, actionLimit: 80, hitRate: 200 }),
+        stats: { ...character.baseStats },
         statuses: [],
         actionGauge: 0,
         remainingAp: 0,
@@ -427,17 +462,26 @@ function createJoinMessage(character: AuthCharacter, originHubId: string): World
         originHubId,
         partyComposition: [partyActor],
         clientVersion: 'raid-lab',
-        carriedItems: [{ itemId: 'herb_common', quantity: 3 }],
+        carriedItems: healQuantity > 0 ? [{ itemId: 'herb_common', quantity: healQuantity }] : [],
     };
 }
 
 function pickExtractionTown(
     world: WorldMap,
-    departureTownId: string
+    departureTownId: string,
+    routeMode: RaidLabRunOptions['routeMode'],
+    seed: number,
 ): { townId: string; tile: { x: number; y: number } } {
     const departure = world.getTowns().find((town) => town.id === departureTownId);
     const others = world.getTowns().filter((town) => town.id !== departureTownId);
     const origin = departure ? world.getTownExitTile(departure) : { x: 0, y: 0 };
+    if (routeMode === 'sweep') {
+        const ordered = [...others].sort((a, b) => a.id.localeCompare(b.id));
+        const index = ((seed % ordered.length) + ordered.length) % ordered.length;
+        const selected = ordered[index]!;
+        return { townId: selected.id, tile: world.getTownSpawnTile(selected) };
+    }
+
     let best = others[0]!;
     let bestDist = Infinity;
     for (const town of others) {
@@ -459,12 +503,16 @@ function buildObservation(
     policyRng: () => number,
     ignoredLootIds: ReadonlySet<string>,
     actionCount: number,
-    pathCache: PathCache
+    pathCache: PathCache,
+    now: number,
 ): LabObservation | null {
     const debug = session.getDebugState();
     const player = debug.players.get(playerId);
     if (!player) return null;
-    const actor = [...debug.actors.values()].find((entry) => entry.ownerPlayerId === playerId);
+    const serverActor = [...debug.actors.values()].find((entry) => entry.ownerPlayerId === playerId);
+    if (!serverActor) return null;
+    const snapshot = session.createSnapshot(playerId, now);
+    const actor = snapshot.partyActors.find((entry) => entry.id === serverActor.id);
     if (!actor) return null;
 
     const currentTownId = world.getTownAtTile(actor.tile.x, actor.tile.y)?.id ?? null;
@@ -482,23 +530,24 @@ function buildObservation(
         mp: actor.stats.mp,
         maxMp: actor.stats.maxMp,
         tile: { ...actor.tile },
-        attackRange: actor.attackRange ?? 1,
+        attackRange: serverActor.attackRange ?? 1,
         mov: Math.max(1, actor.stats.mov || 1),
         currentTownId,
         departureTownId: player.departureTownId,
         extractionGoal: extraction.tile,
         extractionTownId: extraction.townId,
-        enemies: [...debug.enemies.values()].map((entry) => ({
-            id: entry.enemy.id,
-            tile: { x: entry.enemy.gridX, y: entry.enemy.gridY },
-            hp: entry.enemy.stats.hp,
-            isAggro: entry.enemy.isAggro,
+        // Policies consume the same visibility-filtered view a real client receives.
+        enemies: snapshot.enemies.map((entry) => ({
+            id: entry.id,
+            tile: { ...entry.tile },
+            hp: entry.stats.hp,
+            isAggro: entry.isAggro,
         })),
-        loot: [...debug.loot.values()]
+        loot: snapshot.loot
             .filter((entry) => !entry.opened)
             .map((entry) => ({
                 id: entry.id,
-                tile: { x: entry.x, y: entry.y },
+                tile: { ...entry.tile },
             })),
         ignoredLootIds,
         healItemId,
@@ -517,7 +566,7 @@ function buildObservation(
                 actor.tile,
                 goal,
                 Math.max(1, actor.stats.mov || 1),
-                actor.id,
+                serverActor.id,
                 pathCache
             );
         },
@@ -558,6 +607,10 @@ function flattenTick(tick: {
     perPlayerMessages: Array<{ message: WorldServerMessage }>;
 }): WorldServerMessage[] {
     return [...tick.events, ...tick.perPlayerMessages.map((entry) => entry.message)];
+}
+
+function hasActionRejected(messages: readonly WorldServerMessage[]): boolean {
+    return messages.some((message) => message.type === 'ACTION_REJECTED');
 }
 
 function resolveAutoLoot(

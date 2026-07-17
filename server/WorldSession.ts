@@ -171,7 +171,9 @@ export class WorldSession {
         this.shardId = `${this.worldMap.getRealm()}`;
         this.ghostGraceMs = options.ghostGraceMs ?? DISCONNECT_GRACE_MS;
         this.logger = options.logger ?? (() => undefined);
-        this.random = options.random ?? Math.random;
+        // Keep the production default lazy. Tests and embedders may temporarily
+        // replace Math.random around one authoritative action.
+        this.random = options.random ?? (() => Math.random());
         this.createTokenFn = options.createToken ?? createToken;
         this.enemyState = new WorldSessionEnemyState<ServerEnemy, ServerActor>({
             getTargetableActors: (entry) => getTargetableActors(this.players, this.actors.values(), entry),

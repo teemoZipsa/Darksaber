@@ -1,10 +1,12 @@
 import type { RaidBalanceTelemetry, RaidResultMessage } from '../../src/net/WorldProtocol';
+import type { StartingClassId } from '../../src/data/characterClasses';
 
-export const RAID_LAB_VERSION = 8;
+export const RAID_LAB_VERSION = 9;
 
 export type RaidLabPolicyId = 'balanced' | 'cautious' | 'random-legal';
 /** Optional Phase 3 stress presets (default / omitted = none). */
 export type RaidLabStressMode = 'none' | 'low-hp' | 'dense-nests' | 'low-hp+dense-nests';
+export type RaidLabRouteMode = 'nearest' | 'sweep';
 export type RaidLabResult = RaidResultMessage['result'];
 
 export interface RaidLabActionRecord {
@@ -37,10 +39,13 @@ export interface RaidLabExperimentResult {
     seed: number;
     policy: RaidLabPolicyId;
     stress: RaidLabStressMode;
+    classKey: StartingClassId;
+    routeMode: RaidLabRouteMode;
     result: RaidLabResult;
     elapsedSeconds: number;
     kills: number;
     departureTownId: string;
+    targetTownId: string;
     extractionTownId: string;
     completedDungeonIds: string[];
     telemetry: RaidBalanceTelemetry;
@@ -60,6 +65,10 @@ export interface RaidLabRunOptions {
     abortOnInvariant?: boolean;
     /** Phase 3: forced hardship presets. */
     stress?: RaidLabStressMode;
+    /** Starting class used by this expedition. */
+    classKey?: StartingClassId;
+    /** nearest preserves path regressions; sweep rotates through every destination town. */
+    routeMode?: RaidLabRouteMode;
 }
 
 export interface RaidLabCohortSummary {
@@ -74,6 +83,11 @@ export interface RaidLabCohortSummary {
     invariantCodes: Record<string, number>;
     meanElapsedSeconds: number;
     meanKills: number;
+    meanEngagements: number;
+    meanLootItemsAcquired: number;
+    classCounts: Record<string, number>;
+    targetTownCounts: Record<string, number>;
+    extractionTownCounts: Record<string, number>;
     digests: Array<{ seed: number; digest: string; result: RaidLabResult }>;
     clusters: RaidLabFailureClusters;
 }

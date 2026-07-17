@@ -1,5 +1,6 @@
 import type { WorldSession } from '../../server/WorldSession';
 import type { ServerActor, ServerPlayer } from '../../server/WorldSessionTypes';
+import type { InventorySaveSnapshot } from '../../src/shared/CharacterSave';
 import type { RaidLabInvariantViolation } from './types';
 
 export interface InvariantCheckContext {
@@ -35,11 +36,17 @@ export function checkRaidLabInvariants(context: InvariantCheckContext): RaidLabI
     }
 
     checkPlayer(player, push);
+    if (new Set(player.actorIds).size !== player.actorIds.length) {
+        push('duplicate_actor_id', `Player ${player.id} has duplicate actorIds`);
+    }
     for (const actorId of player.actorIds) {
         const actor = debug.actors.get(actorId);
         if (!actor) {
             push('missing_actor', `Missing actor ${actorId} for player ${player.id}`);
             continue;
+        }
+        if (actor.ownerPlayerId !== player.id) {
+            push('actor_owner_mismatch', `Actor ${actor.id} owner=${actor.ownerPlayerId} expected=${player.id}`);
         }
         checkActor(actor, push);
     }
@@ -50,6 +57,9 @@ export function checkRaidLabInvariants(context: InvariantCheckContext): RaidLabI
         }
         if (enemy.enemy.stats.hp < 0) {
             push('enemy_hp_negative', `Enemy ${enemy.enemy.id} HP ${enemy.enemy.stats.hp} < 0`);
+        }
+        if (!Number.isFinite(enemy.enemy.gridX) || !Number.isFinite(enemy.enemy.gridY)) {
+            push('enemy_tile_nonfinite', `Enemy ${enemy.enemy.id} has non-finite tile`);
         }
     }
 
@@ -64,9 +74,27 @@ function checkPlayer(player: ServerPlayer, push: (code: string, message: string)
         push('elapsed_past_raid_limit', `elapsedSeconds=${player.elapsedSeconds}`);
     }
     if (player.kills < 0) push('kills_negative', `kills=${player.kills}`);
+    if (!Number.isFinite(player.carriedWeight)) push('carried_weight_nonfinite', `carriedWeight=${player.carriedWeight}`);
     if (player.carriedWeight < -1e-6) push('carried_weight_negative', `carriedWeight=${player.carriedWeight}`);
     if (!player.departureTownId) push('missing_departure_town', 'departureTownId empty');
     if (player.actorIds.length === 0) push('no_actors', 'Player has zero actorIds');
+    for (const [itemId, quantity] of player.carriedItems) {
+        if (!itemId) push('carried_item_empty_id', 'carried item id is empty');
+        if (!Number.isFinite(quantity) || !Number.isInteger(quantity) || quantity <= 0) {
+            push('carried_item_quantity_invalid', `${itemId} quantity=${quantity}`);
+        }
+    }
+    const save = player.saveSnapshot;
+    if (save) {
+        if (player.characterId && save.characterId !== player.characterId) {
+            push('save_character_mismatch', `save=${save.characterId} player=${player.characterId}`);
+        }
+        if (!Number.isInteger(save.revision) || save.revision < 0) {
+            push('save_revision_invalid', `revision=${save.revision}`);
+        }
+        checkInventory(save.inventory, 'inventory', push);
+        checkInventory(save.stashSnapshot, 'stash', push);
+    }
 }
 
 function checkActor(actor: ServerActor, push: (code: string, message: string) => void): void {
@@ -92,5 +120,38 @@ function checkActor(actor: ServerActor, push: (code: string, message: string) =>
     }
     if (!actor.isDead && actor.stats.hp <= 0) {
         push('actor_alive_with_zero_hp', `Actor ${actor.id} hp<=0 but not isDead`);
+    }
+    if (!Number.isFinite(actor.tile.x) || !Number.isFinite(actor.tile.y)) {
+        push('actor_tile_nonfinite', `Actor ${actor.id} has non-finite tile`);
+    }
+}
+
+function checkInventory(
+    inventory: InventorySaveSnapshot,
+    label: string,
+    push: (code: string, message: string) => void,
+): void {
+    if (!Number.isInteger(inventory.width) || inventory.width <= 0
+        || !Number.isInteger(inventory.height) || inventory.height <= 0) {
+        push('inventory_dimensions_invalid', `${label}=${inventory.width}x${inventory.height}`);
+    }
+    const uids = new Set<string>();
+    for (const item of inventory.items) {
+        if (!item.itemId) push('inventory_item_empty_id', `${label} contains empty itemId`);
+        if (!Number.isFinite(item.quantity) || !Number.isInteger(item.quantity) || item.quantity <= 0) {
+            push('inventory_item_quantity_invalid', `${label}:${item.itemId} quantity=${item.quantity}`);
+        }
+        if (!Number.isFinite(item.durability) || item.durability < 0) {
+            push('inventory_item_durability_invalid', `${label}:${item.itemId} durability=${item.durability}`);
+        }
+        if (!Number.isInteger(item.gridX) || !Number.isInteger(item.gridY)
+            || item.gridX < 0 || item.gridY < 0
+            || item.gridX >= inventory.width || item.gridY >= inventory.height) {
+            push('inventory_item_origin_oob', `${label}:${item.itemId} origin=${item.gridX},${item.gridY}`);
+        }
+        if (item.uid) {
+            if (uids.has(item.uid)) push('inventory_duplicate_uid', `${label} duplicate uid=${item.uid}`);
+            uids.add(item.uid);
+        }
     }
 }

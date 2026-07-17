@@ -95,12 +95,12 @@ test('raid lab balanced extract disengages instead of clear-stalling on seed 168
     assert.equal(result.extractionTownId, 'e_stronghold');
 });
 
-test('raid lab balanced policy skips cursed reliquary loot on seed 852', () => {
-    // Picked sealed_reliquary then curse-ticked to death before extract.
+test('raid lab balanced policy preserves cursed reliquary failure on seed 852', () => {
+    // The lab must expose this game hazard instead of teaching the policy its internal id.
     const result = runRaidLabExpedition({ seed: 852, policy: 'balanced', maxActions: 1_500 });
-    assert.equal(result.result, 'SURVIVED');
-    assert.equal(result.extractionTownId, 'e_stronghold');
-    assert.ok(!result.actions.some((a) => (a.detail ?? '').includes('reliquary')));
+    assert.equal(result.result, 'DEAD');
+    assert.equal(result.telemetry.deathCause, 'curse');
+    assert.ok(result.actions.some((a) => (a.detail ?? '').includes('reliquary')));
 });
 
 test('raid lab cautious extract disengages instead of cornered-stalling on seed 2', () => {
@@ -110,14 +110,11 @@ test('raid lab cautious extract disengages instead of cornered-stalling on seed 
     assert.equal(result.extractionTownId, 'e_stronghold');
 });
 
-test('raid lab random-legal does not early-abandon on seed 0', () => {
-    // Previously leave_manual was a legal option before extract → LEFT in a few actions.
+test('raid lab random-legal includes legal manual leave on seed 0', () => {
     const result = runRaidLabExpedition({ seed: 0, policy: 'random-legal', maxActions: 200 });
-    assert.ok(!result.actions.some((a) => a.detail === 'random-leave'));
-    assert.ok(result.actions.length >= 50);
-    if (result.result === 'LEFT') {
-        assert.equal(result.stopReason, 'max_actions');
-    }
+    assert.equal(result.result, 'LEFT');
+    assert.equal(result.stopReason, 'raid_result');
+    assert.ok(result.actions.some((a) => a.kind === 'leave_manual' && a.detail === 'random-leave'));
 });
 
 test('raid lab cautious clears wall-chokepoint stuck pocket on seed 125', () => {
@@ -127,10 +124,11 @@ test('raid lab cautious clears wall-chokepoint stuck pocket on seed 125', () => 
     assert.notEqual(result.stopReason, 'max_actions');
 });
 
-test('raid lab random-legal survives low-HP rest trap on seed 973', () => {
-    // random-rest beside aggro at ~HP 34 → enemy death at ~(1809,1458).
+test('raid lab random-legal emits executable intents without survival bias on seed 973', () => {
     const result = runRaidLabExpedition({ seed: 973, policy: 'random-legal', maxActions: 1_500 });
-    assert.equal(result.result, 'SURVIVED');
+    assert.ok(['SURVIVED', 'DEAD', 'MIA', 'LEFT'].includes(result.result));
+    assert.ok(!result.actions.some((action) => action.kind.endsWith('_rejected')));
+    assert.deepEqual(result.invariantViolations, []);
 });
 
 test('raid lab low-hp stress stays deterministic and diverges from unstressed', () => {
@@ -141,6 +139,7 @@ test('raid lab low-hp stress stays deterministic and diverges from unstressed', 
     assert.equal(first.stress, 'low-hp');
     assert.equal(first.digest, second.digest);
     assert.notEqual(first.digest, plain.digest);
+    assert.notEqual(first.actions[0]?.kind, 'useItem');
     assert.ok(['SURVIVED', 'DEAD', 'MIA', 'LEFT'].includes(first.result));
 });
 
@@ -170,4 +169,25 @@ test('raid lab combo stress stays deterministic', () => {
     assert.equal(first.stress, 'low-hp+dense-nests');
     assert.equal(first.digest, second.digest);
     assert.ok(['SURVIVED', 'DEAD', 'MIA', 'LEFT'].includes(first.result));
+});
+
+test('raid lab records class and route matrix inputs in the digest', () => {
+    const matrix = runRaidLabExpedition({
+        seed: 4,
+        policy: 'balanced',
+        classKey: 'mage',
+        routeMode: 'sweep',
+        maxActions: 40,
+    });
+    const baseline = runRaidLabExpedition({
+        seed: 4,
+        policy: 'balanced',
+        classKey: 'infantry',
+        routeMode: 'nearest',
+        maxActions: 40,
+    });
+    assert.equal(matrix.classKey, 'mage');
+    assert.equal(matrix.routeMode, 'sweep');
+    assert.notEqual(matrix.targetTownId, matrix.departureTownId);
+    assert.notEqual(matrix.digest, baseline.digest);
 });

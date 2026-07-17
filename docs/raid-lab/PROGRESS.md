@@ -1,5 +1,49 @@
 # Raid Lab — Progress
 
+## Batch 2026-07-17j — Reliability audit corrections (labVersion 9)
+
+### Corrections
+
+- Restored lazy production RNG defaults so action-scoped deterministic tests work.
+- `random-legal` is now an unbiased executable-intent fuzzer: manual leave,
+  defend, visible enemies, visible loot, hazards, and terminal outcomes remain data.
+- Policies read visibility-filtered `WorldSnapshot` enemy/loot state instead of
+  omniscient debug collections.
+- Removed the sealed-reliquary id blacklist and the low-HP survival override.
+- `stress=low-hp` no longer receives three guaranteed starter herbs.
+- Default CLI cohorts sweep all four starting classes and destination routes;
+  reports distinguish target towns from final result towns.
+- Added carried-item, inventory, save identity/revision, actor ownership/tile,
+  enemy tile, duplicate actor id, and exactly-once `RAID_RESULT` invariants.
+- Fixed the pathing lint failure from an unused `nearDist` assignment.
+
+### Audit cohort (holdout seeds 20000..20011, maxActions=400)
+
+| Condition | SURVIVED | DEAD | LEFT | invariants |
+|---|---:|---:|---:|---:|
+| balanced / class+route sweep | 2 | 3 | 7 | 0 |
+| balanced / low-hp+dense-nests | 1 | 10 | 1 | 0 |
+| random-legal terminal fuzzer | 0 | 0 | 12 | 0 |
+
+- Class coverage: infantry/cavalry/cleric/mage = 3 each.
+- Route targets covered seven non-departure towns.
+- These distributions intentionally replace the invalid “100% survival” target;
+  expected deaths and manual leaves are no longer optimized away.
+
+### Verification
+
+| Command | Result |
+|---|---|
+| `npm run typecheck` | pass |
+| `npm run lint` | pass |
+| `npm test` | 774 pass / 1 skipped / 0 failed (775 total) |
+| raid-lab determinism suite | 20 pass |
+| `npm run test:e2e` | 26 pass |
+| client + server production builds | pass |
+| asset verification | pass |
+
+---
+
 ## Batch 2026-07-17i — Phase 3 combo stress (labVersion 8)
 
 ### Experiments run

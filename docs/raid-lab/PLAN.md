@@ -40,7 +40,7 @@ time with `session.tick(now)`, and asserts invariants after each step.
 
 1. Optional DI for `random` / `createToken` on `WorldSession` (production defaults unchanged)
 2. Starter solo deploy from `central_castle`
-3. Policies: `balanced`, `cautious`, `random-legal`
+3. Policies: `balanced`, `cautious`, `random-legal` (unbiased intent fuzzer)
 4. Intents: move, attack, rest/heal, loot, manual leave, extraction leave
 5. Post-action invariant checks
 6. Same-seed replay equality test
@@ -50,7 +50,7 @@ time with `session.tick(now)`, and asserts invariants after each step.
 
 1. Expand to 1,000 seeds
 2. Cluster failures by cause
-3. Shrink → regression test → minimal fix → re-run prior cohort
+3. Shrink technical failures → regression test → minimal fix → re-run prior cohort
 4. Continue to next cluster
 
 ## Experiment protocol
@@ -68,18 +68,32 @@ time with `session.tick(now)`, and asserts invariants after each step.
 |---|---|
 | `balanced` | Engage nearby enemies when healthy; heal when low; extract toward nearest other town |
 | `cautious` | Prefer rest/heal and extraction path; fight only when cornered or very close |
-| `random-legal` | Uniform choice among currently legal intents (seeded) |
+| `random-legal` | Uniform choice among enumerated executable intents (seeded); includes manual leave and hazards, with no survival bias |
+
+Policies read the visibility-filtered `WorldSnapshot` used by real clients. The
+runner may inspect its own player's carried inventory and server attack range,
+but policies must not inspect hidden enemies, hidden ownership state, or encode
+internal hazard item ids.
+
+### Coverage matrix (labVersion 9+)
+
+- `--class infantry|cavalry|cleric|mage|sweep` (default `sweep`)
+- `--route nearest|sweep` (default `sweep`)
+- committed path-regression seeds use the explicit `infantry + nearest` baseline
+- cohort reports include class and extraction-town coverage plus engagement and
+  loot means; survival percentage alone is not a balance success metric
 
 ### Phase 3 — Stress Cohorts (balance lab)
 
-Once baseline policies clear 1k with 0 LEFT/DEAD, add hardship presets that
-probe survival under worse starting conditions — still on real `WorldSession`
-rules, still deterministic.
+Once baseline policies are deterministic and free of technical stalls or
+invariant violations, add hardship presets that probe survival under worse
+starting conditions — still on real `WorldSession` rules, still deterministic.
 
-1. `stress=low-hp` — join at ≈30% HP (heal/rest path pressure)
+1. `stress=low-hp` — join at ≈30% HP with no starter healing supply
 2. `stress=dense-nests` — shorter nest respawn, wider roam, higher spawn caps
 3. `stress=low-hp+dense-nests` — both presets combined
-4. Cluster new DEAD/LEFT → regression seeds → minimal policy/pathing fixes
+4. Cluster DEAD/LEFT by gameplay cause; fix only technical stalls, illegal
+   intents, or invariant failures. Expected deaths and manual leaves remain data.
 5. Do not tune combat formulas from a single stressed seed
 
 CLI: `--stress none|low-hp|dense-nests|low-hp+dense-nests` (default `none`).
@@ -90,3 +104,15 @@ npm: `raid-lab:smoke:stress:low-hp`, `:dense-nests`, `:combo`.
 - Bit-identical digests for the same `(seed, policy, labVersion[, stress])`
 - Invariant violations become regression tests then disappear
 - Outcome mix (SURVIVED / DEAD / MIA / LEFT) is stable across cohort re-runs
+- Matrix cohorts exercise every starting class and multiple destination towns
+- Stress cohorts create measurably different engagement, loot, death, or leave
+  distributions instead of being optimized back to 100% survival
+
+## Future breadth phases
+
+The current runner is an extraction-reliability foundation, not the complete
+game-balance program. The following remain separate deliverables:
+
+1. party composition, equipment/loadout, consumable and item-conservation matrix
+2. episode 1–31 story campaigns and exactly-once quest/reward persistence
+3. disconnect/reconnect, duplicated messages, delayed ticks, and save-conflict chaos

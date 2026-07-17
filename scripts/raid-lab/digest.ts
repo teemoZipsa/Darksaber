@@ -7,12 +7,15 @@ export function digestExperimentResult(result: Omit<RaidLabExperimentResult, 'di
         labVersion: result.labVersion,
         seed: result.seed,
         policy: result.policy,
-        // Omit default so unstressed digests stay comparable to labVersion 8.
+        classKey: result.classKey,
+        routeMode: result.routeMode,
+        // Keep the common unstressed payload compact; labVersion guards cross-version comparisons.
         ...(result.stress !== 'none' ? { stress: result.stress } : {}),
         result: result.result,
         elapsedSeconds: round3(result.elapsedSeconds),
         kills: result.kills,
         departureTownId: result.departureTownId,
+        targetTownId: result.targetTownId,
         extractionTownId: result.extractionTownId,
         completedDungeonIds: result.completedDungeonIds,
         telemetry: {

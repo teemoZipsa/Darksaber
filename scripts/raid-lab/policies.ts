@@ -1,12 +1,19 @@
 import { manhattan, type TilePoint } from '../../src/field/FieldPathing';
 import { normalizeBasicAttackRange } from '../../src/combat/BasicAttackRange';
-import { ATTACK_AP_COST, MOVE_ACTION_GAUGE_COST, REST_ACTION_GAUGE_COST } from '../../src/field/FieldActionEconomy';
+import {
+    ATTACK_AP_COST,
+    DEFEND_ACTION_GAUGE_COST,
+    MOVE_ACTION_GAUGE_COST,
+    REST_ACTION_GAUGE_COST,
+    getActionApCost,
+} from '../../src/field/FieldActionEconomy';
 import { pickIndex } from './rng';
 import type { RaidLabPolicyId } from './types';
 
 export type LabDecisionKind =
     | 'move'
     | 'attack'
+    | 'defend'
     | 'rest'
     | 'useItem'
     | 'loot'
@@ -68,6 +75,7 @@ export type RaidLabPolicy = (observation: LabObservation) => LabDecision;
 const EXTRACT_AFTER_KILLS = 3;
 const EXTRACT_AFTER_LOOT = 3;
 const EXTRACT_AFTER_ACTIONS = 100;
+const USE_ITEM_AP_COST = getActionApCost('tool');
 
 export function getRaidLabPolicy(id: RaidLabPolicyId): RaidLabPolicy {
     switch (id) {
@@ -97,10 +105,10 @@ function balancedPolicy(obs: LabObservation): LabDecision {
     if (!obs.actorReady) return { kind: 'wait' };
 
     const hpRatio = obs.hp / Math.max(1, obs.maxHp);
-    if (hpRatio <= 0.35 && obs.healItemId && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
+    if (hpRatio <= 0.35 && obs.healItemId && obs.remainingAp >= USE_ITEM_AP_COST) {
         return { kind: 'useItem', itemId: obs.healItemId, detail: 'heal' };
     }
-    if (hpRatio <= 0.25 && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
+    if (hpRatio <= 0.35 && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
         return { kind: 'rest', detail: 'low-hp-rest' };
     }
 
@@ -146,7 +154,7 @@ function cautiousPolicy(obs: LabObservation): LabDecision {
     if (!obs.actorReady) return { kind: 'wait' };
 
     const hpRatio = obs.hp / Math.max(1, obs.maxHp);
-    if (hpRatio <= 0.55 && obs.healItemId && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
+    if (hpRatio <= 0.55 && obs.healItemId && obs.remainingAp >= USE_ITEM_AP_COST) {
         return { kind: 'useItem', itemId: obs.healItemId, detail: 'heal' };
     }
     if (hpRatio <= 0.45 && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
@@ -194,63 +202,55 @@ function cautiousPolicy(obs: LabObservation): LabDecision {
 }
 
 function randomLegalPolicy(obs: LabObservation): LabDecision {
-    if (obs.currentTownId && obs.currentTownId !== obs.departureTownId && obs.random() < 0.5) {
-        return { kind: 'leave_town', detail: `extract:${obs.currentTownId}` };
-    }
     if (!obs.actorReady) return { kind: 'wait' };
 
-    const hpRatio = obs.hp / Math.max(1, obs.maxHp);
-    // Seed 973: random-rest beside aggro while low HP → enemy death. Survive bias first.
-    if (hpRatio <= 0.4) {
-        if (obs.healItemId && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
-            return { kind: 'useItem', itemId: obs.healItemId, detail: 'random-heal-lowhp' };
-        }
-        if (obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
-            return moveToward(obs, obs.extractionGoal, 'random-extract-lowhp');
-        }
-        const threatened = nearestEnemy(obs, 4) !== null;
-        if (!threatened && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
-            return { kind: 'rest', detail: 'random-rest-lowhp' };
-        }
-        if (obs.remainingAp > 0) return { kind: 'endTurn', detail: 'random-end-lowhp' };
-        return { kind: 'wait' };
-    }
+    // This policy is an intent fuzzer, not a survival policy. Every enumerated
+    // executable intent receives equal weight; no low-HP or outcome bias.
+    const options: Array<() => LabDecision> = [];
+    const add = (decision: LabDecision) => options.push(() => decision);
+    const moveGoalKeys = new Set<string>();
+    const addMove = (goal: TilePoint, detail: string) => {
+        const key = `${goal.x},${goal.y}`;
+        if (moveGoalKeys.has(key)) return;
+        moveGoalKeys.add(key);
+        options.push(() => moveToward(obs, goal, detail));
+    };
 
-    const options: LabDecision[] = [];
     if (obs.remainingAp >= MOVE_ACTION_GAUGE_COST) {
-        options.push(moveToward(obs, obs.extractionGoal, 'random-extract'));
-        if (!shouldExtract(obs)) {
-            const enemy = nearestEnemy(obs, Number.POSITIVE_INFINITY);
-            if (enemy) options.push(moveToward(obs, enemy.tile, 'random-chase'));
-            const loot = nearestLoot(obs, 24);
-            if (loot) options.push(moveToward(obs, loot.tile, 'random-loot'));
+        addMove(obs.extractionGoal, 'random-extract');
+        for (const enemy of obs.enemies) addMove(enemy.tile, `random-chase:${enemy.id}`);
+        for (const loot of obs.loot) {
+            if (!obs.ignoredLootIds.has(loot.id)) addMove(loot.tile, `random-loot:${loot.id}`);
         }
     }
-    const attackable = nearestAttackable(obs);
-    if (attackable && obs.remainingAp >= ATTACK_AP_COST) {
-        options.push({ kind: 'attack', targetId: attackable.id, detail: 'random-attack' });
+    if (obs.remainingAp >= ATTACK_AP_COST) {
+        for (const enemy of attackableEnemies(obs)) {
+            add({ kind: 'attack', targetId: enemy.id, detail: `random-attack:${enemy.id}` });
+        }
     }
-    if (obs.healItemId && obs.remainingAp >= REST_ACTION_GAUGE_COST && obs.hp < obs.maxHp) {
-        options.push({ kind: 'useItem', itemId: obs.healItemId, detail: 'random-heal' });
+    for (const loot of obs.loot) {
+        if (!obs.ignoredLootIds.has(loot.id) && manhattan(obs.tile, loot.tile) <= 1) {
+            add({ kind: 'loot', lootId: loot.id, detail: `random-loot-open:${loot.id}` });
+        }
     }
-    // Prefer not resting when an enemy is adjacent — rest burns gauge while they swing.
-    if (obs.remainingAp >= REST_ACTION_GAUGE_COST && nearestEnemy(obs, 1) === null) {
-        options.push({ kind: 'rest', detail: 'random-rest' });
+    if (obs.healItemId && obs.remainingAp >= USE_ITEM_AP_COST && obs.hp < obs.maxHp) {
+        add({ kind: 'useItem', itemId: obs.healItemId, detail: 'random-heal' });
     }
-    if (obs.remainingAp > 0) options.push({ kind: 'endTurn', detail: 'random-end' });
+    if (obs.remainingAp >= REST_ACTION_GAUGE_COST) add({ kind: 'rest', detail: 'random-rest' });
+    if (obs.remainingAp >= DEFEND_ACTION_GAUGE_COST) add({ kind: 'defend', detail: 'random-defend' });
+    if (obs.remainingAp > 0) add({ kind: 'endTurn', detail: 'random-end' });
     if (obs.currentTownId && obs.currentTownId !== obs.departureTownId) {
-        options.push({ kind: 'leave_town', detail: `extract:${obs.currentTownId}` });
+        add({ kind: 'leave_town', detail: `extract:${obs.currentTownId}` });
     }
-    // Do not offer early leave_manual — it made random-legal 100% LEFT in ~1s smokes.
-    // Max-actions still forces a manual leave via the runner.
+    add({ kind: 'leave_manual', detail: 'random-leave' });
 
     if (options.length === 0) return { kind: 'wait' };
-    return options[pickIndex(obs.random, options.length)]!;
+    return options[pickIndex(obs.random, options.length)]!();
 }
 
 function extractPhase(obs: LabObservation, hpRatio: number, detailPrefix: string): LabDecision {
     // Survive first — extractPhase used to skip heal/rest once entered.
-    if (hpRatio <= 0.5 && obs.healItemId && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
+    if (hpRatio <= 0.5 && obs.healItemId && obs.remainingAp >= USE_ITEM_AP_COST) {
         return { kind: 'useItem', itemId: obs.healItemId, detail: `${detailPrefix}-heal` };
     }
     if (hpRatio <= 0.35 && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
@@ -267,19 +267,14 @@ function extractPhase(obs: LabObservation, hpRatio: number, detailPrefix: string
 }
 
 function nearestAttackable(obs: LabObservation): LabEnemyView | null {
+    return attackableEnemies(obs)[0] ?? null;
+}
+
+function attackableEnemies(obs: LabObservation): LabEnemyView[] {
     const range = normalizeBasicAttackRange(obs.attackRange);
-    let best: LabEnemyView | null = null;
-    let bestDist = Infinity;
-    for (const enemy of obs.enemies) {
-        if (enemy.hp <= 0) continue;
-        const dist = manhattan(obs.tile, enemy.tile);
-        if (dist > range) continue;
-        if (dist < bestDist) {
-            best = enemy;
-            bestDist = dist;
-        }
-    }
-    return best;
+    return obs.enemies
+        .filter((enemy) => enemy.hp > 0 && manhattan(obs.tile, enemy.tile) <= range)
+        .sort((a, b) => manhattan(obs.tile, a.tile) - manhattan(obs.tile, b.tile) || a.id.localeCompare(b.id));
 }
 
 function nearestEnemy(obs: LabObservation, maxDist: number): LabEnemyView | null {
@@ -300,19 +295,12 @@ function nearestLoot(obs: LabObservation, maxDist: number): LabLootView | null {
     let bestDist = Infinity;
     for (const loot of obs.loot) {
         if (obs.ignoredLootIds.has(loot.id)) continue;
-        // Curse deaths (seeds 611/852) came from sealed reliquary pickups.
-        if (isHazardLootId(loot.id)) continue;
         const dist = manhattan(obs.tile, loot.tile);
         if (dist > maxDist || dist >= bestDist) continue;
         best = loot;
         bestDist = dist;
     }
     return best;
-}
-
-function isHazardLootId(lootId: string): boolean {
-    const id = lootId.toLowerCase();
-    return id.includes('reliquary') || id.includes('cursed') || id.includes('hex');
 }
 
 function moveToward(obs: LabObservation, goal: TilePoint, detail: string): LabDecision {

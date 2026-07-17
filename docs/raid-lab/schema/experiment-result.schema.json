@@ -8,16 +8,21 @@
     "labVersion",
     "seed",
     "policy",
+    "stress",
+    "classKey",
+    "routeMode",
     "result",
     "elapsedSeconds",
     "kills",
     "departureTownId",
+    "targetTownId",
     "extractionTownId",
     "telemetry",
     "actions",
     "invariantViolations",
     "digest",
-    "finishedAtSimMs"
+    "finishedAtSimMs",
+    "stopReason"
   ],
   "properties": {
     "labVersion": { "type": "integer", "minimum": 1 },
@@ -26,6 +31,18 @@
       "type": "string",
       "enum": ["balanced", "cautious", "random-legal"]
     },
+    "stress": {
+      "type": "string",
+      "enum": ["none", "low-hp", "dense-nests", "low-hp+dense-nests"]
+    },
+    "classKey": {
+      "type": "string",
+      "enum": ["infantry", "cavalry", "cleric", "mage"]
+    },
+    "routeMode": {
+      "type": "string",
+      "enum": ["nearest", "sweep"]
+    },
     "result": {
       "type": "string",
       "enum": ["SURVIVED", "DEAD", "MIA", "LEFT"]
@@ -33,6 +50,7 @@
     "elapsedSeconds": { "type": "number", "minimum": 0 },
     "kills": { "type": "integer", "minimum": 0 },
     "departureTownId": { "type": "string", "minLength": 1 },
+    "targetTownId": { "type": "string", "minLength": 1 },
     "extractionTownId": { "type": "string", "minLength": 1 },
     "completedDungeonIds": {
       "type": "array",
@@ -117,7 +135,8 @@
         "level": { "type": "integer" },
         "exp": { "type": "integer" },
         "tileX": { "type": "integer" },
-        "tileY": { "type": "integer" }
+        "tileY": { "type": "integer" },
+        "mov": { "type": "integer", "minimum": 0 }
       }
     },
     "stopReason": {

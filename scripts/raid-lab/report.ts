@@ -67,11 +67,21 @@ export function summarizeCohort(
     let invariantViolationCount = 0;
     let elapsedTotal = 0;
     let killsTotal = 0;
+    let engagementTotal = 0;
+    let lootTotal = 0;
+    const classCounts: Record<string, number> = {};
+    const targetTownCounts: Record<string, number> = {};
+    const extractionTownCounts: Record<string, number> = {};
 
     for (const result of results) {
         tallies[result.result] += 1;
         elapsedTotal += result.elapsedSeconds;
         killsTotal += result.kills;
+        engagementTotal += result.telemetry.engagementCount;
+        lootTotal += result.telemetry.lootItemsAcquired;
+        classCounts[result.classKey] = (classCounts[result.classKey] ?? 0) + 1;
+        targetTownCounts[result.targetTownId] = (targetTownCounts[result.targetTownId] ?? 0) + 1;
+        extractionTownCounts[result.extractionTownId] = (extractionTownCounts[result.extractionTownId] ?? 0) + 1;
         invariantViolationCount += result.invariantViolations.length;
         for (const violation of result.invariantViolations) {
             invariantCodes[violation.code] = (invariantCodes[violation.code] ?? 0) + 1;
@@ -91,6 +101,11 @@ export function summarizeCohort(
         invariantCodes,
         meanElapsedSeconds: elapsedTotal / count,
         meanKills: killsTotal / count,
+        meanEngagements: engagementTotal / count,
+        meanLootItemsAcquired: lootTotal / count,
+        classCounts,
+        targetTownCounts,
+        extractionTownCounts,
         digests: results.map((result) => ({
             seed: result.seed,
             digest: result.digest,
@@ -126,6 +141,8 @@ export function formatCohortMarkdown(summary: RaidLabCohortSummary): string {
         `- seeds: ${summary.seedStart}..${summary.seedEnd} (n=${summary.count})`,
         `- mean elapsedSeconds: ${summary.meanElapsedSeconds.toFixed(2)}`,
         `- mean kills: ${summary.meanKills.toFixed(2)}`,
+        `- mean engagements: ${summary.meanEngagements.toFixed(2)}`,
+        `- mean loot acquired: ${summary.meanLootItemsAcquired.toFixed(2)}`,
         '',
         '## Outcomes',
         '',
@@ -133,6 +150,12 @@ export function formatCohortMarkdown(summary: RaidLabCohortSummary): string {
         `- DEAD: ${ratio(summary.results.DEAD)}`,
         `- MIA: ${ratio(summary.results.MIA)}`,
         `- LEFT: ${ratio(summary.results.LEFT)}`,
+        '',
+        '## Coverage',
+        '',
+        `- classes: ${formatCounts(summary.classCounts)}`,
+        `- target towns: ${formatCounts(summary.targetTownCounts)}`,
+        `- final towns: ${formatCounts(summary.extractionTownCounts)}`,
         '',
         '## Invariant violations',
         '',
@@ -158,10 +181,13 @@ export function writeCohortReport(
     const compactResults = results.map((result) => ({
         seed: result.seed,
         policy: result.policy,
+        classKey: result.classKey,
+        routeMode: result.routeMode,
         result: result.result,
         elapsedSeconds: result.elapsedSeconds,
         kills: result.kills,
         departureTownId: result.departureTownId,
+        targetTownId: result.targetTownId,
         extractionTownId: result.extractionTownId,
         telemetry: result.telemetry,
         invariantViolationCount: result.invariantViolations.length,
@@ -178,4 +204,11 @@ export function writeCohortReport(
     }, null, 2), 'utf8');
     writeFileSync(mdPath, formatCohortMarkdown(summary), 'utf8');
     return { jsonPath, mdPath };
+}
+
+function formatCounts(counts: Record<string, number>): string {
+    return Object.entries(counts)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([key, count]) => `${key}=${count}`)
+        .join(', ') || 'none';
 }
