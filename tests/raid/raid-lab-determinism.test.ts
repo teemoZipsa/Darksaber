@@ -1,5 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { digestExperimentResult } from '../../scripts/raid-lab/digest';
+import {
+    resolveRaidLabClass,
+    resolveRaidLabConserve,
+    resolveRaidLabLoadout,
+    resolveRaidLabSupply,
+} from '../../scripts/raid-lab/matrix';
 import { runRaidLabExpedition } from '../../scripts/raid-lab/runner';
 import type { RaidLabPolicyId } from '../../scripts/raid-lab/types';
 
@@ -190,4 +197,74 @@ test('raid lab records class and route matrix inputs in the digest', () => {
     assert.equal(matrix.routeMode, 'sweep');
     assert.notEqual(matrix.targetTownId, matrix.departureTownId);
     assert.notEqual(matrix.digest, baseline.digest);
+});
+
+test('raid lab defaults loadout/supply/conserve for regression-safe baseline', () => {
+    const result = runRaidLabExpedition({ seed: 1, policy: 'balanced', maxActions: 0 });
+    assert.equal(result.loadout, 'bare');
+    assert.equal(result.supply, 'lab');
+    assert.equal(result.conserve, 'standard');
+    assert.equal(result.carriedWeight, 0);
+    assert.equal(result.healUses, 0);
+    assert.equal(result.healQtyRemaining, 3);
+});
+
+test('raid lab loadout/supply/conserve matrix stays deterministic and diverges', () => {
+    const baseline = runRaidLabExpedition({ seed: 12, policy: 'balanced', maxActions: 80 });
+    const first = runRaidLabExpedition({
+        seed: 12,
+        policy: 'balanced',
+        loadout: 'heavy',
+        supply: 'rich',
+        conserve: 'hoard',
+        maxActions: 80,
+    });
+    const second = runRaidLabExpedition({
+        seed: 12,
+        policy: 'balanced',
+        loadout: 'heavy',
+        supply: 'rich',
+        conserve: 'hoard',
+        maxActions: 80,
+    });
+    assert.equal(first.loadout, 'heavy');
+    assert.equal(first.supply, 'rich');
+    assert.equal(first.conserve, 'hoard');
+    assert.equal(first.digest, second.digest);
+    assert.notEqual(first.digest, baseline.digest);
+    assert.ok(first.carriedWeight > baseline.carriedWeight);
+    assert.ok(first.healQtyRemaining >= 0);
+});
+
+test('raid lab sweep covers every class/loadout/supply/conserve tuple once per 192 seeds', () => {
+    const combinations = new Set<string>();
+    for (let seed = 0; seed < 192; seed++) {
+        combinations.add([
+            resolveRaidLabClass('sweep', seed),
+            resolveRaidLabLoadout('sweep', seed),
+            resolveRaidLabSupply('sweep', seed),
+            resolveRaidLabConserve('sweep', seed),
+        ].join(':'));
+    }
+    assert.equal(combinations.size, 192);
+});
+
+test('raid lab digest covers loadout resource metrics', () => {
+    const result = runRaidLabExpedition({ seed: 1, policy: 'balanced', maxActions: 0 });
+    const { digest: _digest, ...base } = result;
+    assert.notEqual(digestExperimentResult({ ...base, carriedWeight: base.carriedWeight + 1 }), result.digest);
+    assert.notEqual(digestExperimentResult({ ...base, healUses: base.healUses + 1 }), result.digest);
+    assert.notEqual(digestExperimentResult({ ...base, healQtyRemaining: base.healQtyRemaining + 1 }), result.digest);
+});
+
+test('raid lab low-hp stress forces empty supply regardless of requested supply', () => {
+    const result = runRaidLabExpedition({
+        seed: 1,
+        policy: 'balanced',
+        stress: 'low-hp',
+        supply: 'rich',
+        maxActions: 0,
+    });
+    assert.equal(result.supply, 'none');
+    assert.equal(result.healQtyRemaining, 0);
 });

@@ -187,6 +187,8 @@
 - [x] WorldSession message dispatcher 추출. client message switch와 actor intent validation/dispatch를 전용 dispatcher로 옮겨 세션 본문을 더 줄인다.
 - [x] WorldSession combat attack resolution 추출. actor attack damage/guard/kill 결과 연결을 combat resolution helper로 옮겨 세션 본문을 더 줄인다.
 - [x] WorldEngine dev/network update 흐름 축소. local dev raid 시작과 network raid update 루프를 helper로 옮기고 compatibility accessor를 압축해 엔진 본문을 1000줄 아래로 줄인다.
+- [x] 레이드 랩 로드아웃·보급·절약 매트릭스 추가. 직업과 결합되지 않는 192-seed 순환으로 장비 4종·보급 4종·치유 절약 3종을 결정적으로 스윕하고, 실제 장비 보너스·중량·치유 사용량을 보고서와 digest에 기록한다.
+- [x] Playwright 월드 단축키 준비 조건 보강. `state === WORLD`뿐 아니라 전환 페이드의 입력 잠금이 풀린 뒤 KeyI/KeyK를 보내 데스크톱 E2E의 첫 키 유실을 막는다.
 
 ---
 

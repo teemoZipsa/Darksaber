@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
-import type { RaidLabExperimentResult } from './types';
+import {
+    RAID_LAB_DEFAULT_CONSERVE,
+    RAID_LAB_DEFAULT_LOADOUT,
+    RAID_LAB_DEFAULT_SUPPLY,
+    type RaidLabExperimentResult,
+} from './types';
 
 /** Stable digest of outcome-relevant fields (excludes wall-clock noise). */
 export function digestExperimentResult(result: Omit<RaidLabExperimentResult, 'digest'>): string {
@@ -9,8 +14,14 @@ export function digestExperimentResult(result: Omit<RaidLabExperimentResult, 'di
         policy: result.policy,
         classKey: result.classKey,
         routeMode: result.routeMode,
-        // Keep the common unstressed payload compact; labVersion guards cross-version comparisons.
+        // Keep the common unstressed/default-matrix payload compact; labVersion guards comparisons.
         ...(result.stress !== 'none' ? { stress: result.stress } : {}),
+        ...(result.loadout !== RAID_LAB_DEFAULT_LOADOUT ? { loadout: result.loadout } : {}),
+        ...(result.supply !== RAID_LAB_DEFAULT_SUPPLY ? { supply: result.supply } : {}),
+        ...(result.conserve !== RAID_LAB_DEFAULT_CONSERVE ? { conserve: result.conserve } : {}),
+        carriedWeight: round3(result.carriedWeight),
+        healUses: result.healUses,
+        healQtyRemaining: result.healQtyRemaining,
         result: result.result,
         elapsedSeconds: round3(result.elapsedSeconds),
         kills: result.kills,

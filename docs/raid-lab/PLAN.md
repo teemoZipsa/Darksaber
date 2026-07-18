@@ -113,6 +113,28 @@ npm: `raid-lab:smoke:stress:low-hp`, `:dense-nests`, `:combo`.
 The current runner is an extraction-reliability foundation, not the complete
 game-balance program. The following remain separate deliverables:
 
-1. party composition, equipment/loadout, consumable and item-conservation matrix
+1. ~~party composition, equipment/loadout, consumable and item-conservation matrix~~
+   - **Phase 4a (labVersion 10):** solo loadout / supply / conserve matrix — done
+   - Still deferred: multi-actor party composition (1–3 members + multi-ready policy)
 2. episode 1–31 story campaigns and exactly-once quest/reward persistence
 3. disconnect/reconnect, duplicated messages, delayed ticks, and save-conflict chaos
+
+### Phase 4a — Loadout / Supply / Conserve Matrix (labVersion 10)
+
+Solo-only balance axes orthogonal to class / route / stress / policy:
+
+| Axis | Values | Default (regression-safe) |
+|---|---|---|
+| `loadout` | `bare`, `light`, `standard`, `heavy` | `bare` |
+| `supply` | `none`, `lab`, `starter`, `rich` | `lab` |
+| `conserve` | `spend`, `standard`, `hoard` | `standard` |
+
+- `bare` + `lab` + `standard` preserves pre-matrix combat behavior (no equipment
+  bonuses, `herb_common×3`, historical heal thresholds).
+- Non-`bare` loadouts wire `createWorldJoinSaveState` equipment bonuses and
+  carried weight into `WorldSession.join`.
+- CLI: `--loadout` / `--supply` / `--conserve` (each accepts `sweep`).
+- Sweep scheduling uses a 192-seed mixed-radix cycle. The first 64 seeds cover
+  every class/loadout/supply tuple, and the full cycle covers every conserve
+  value without coupling class and loadout.
+- npm: `raid-lab:smoke:loadout`

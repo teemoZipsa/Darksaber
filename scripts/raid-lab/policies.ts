@@ -7,8 +7,14 @@ import {
     REST_ACTION_GAUGE_COST,
     getActionApCost,
 } from '../../src/field/FieldActionEconomy';
+import {
+    getCautiousHealThreshold,
+    getCautiousRestThreshold,
+    getConserveHealThreshold,
+    getExtractHealThreshold,
+} from './loadouts';
 import { pickIndex } from './rng';
-import type { RaidLabPolicyId } from './types';
+import type { RaidLabConserveId, RaidLabPolicyId } from './types';
 
 export type LabDecisionKind =
     | 'move'
@@ -62,6 +68,7 @@ export interface LabObservation {
     loot: LabLootView[];
     ignoredLootIds: ReadonlySet<string>;
     healItemId: string | null;
+    conserve: RaidLabConserveId;
     kills: number;
     lootItemsAcquired: number;
     actionCount: number;
@@ -105,10 +112,11 @@ function balancedPolicy(obs: LabObservation): LabDecision {
     if (!obs.actorReady) return { kind: 'wait' };
 
     const hpRatio = obs.hp / Math.max(1, obs.maxHp);
-    if (hpRatio <= 0.35 && obs.healItemId && obs.remainingAp >= USE_ITEM_AP_COST) {
+    const healAt = getConserveHealThreshold(obs.conserve);
+    if (hpRatio <= healAt && obs.healItemId && obs.remainingAp >= USE_ITEM_AP_COST) {
         return { kind: 'useItem', itemId: obs.healItemId, detail: 'heal' };
     }
-    if (hpRatio <= 0.35 && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
+    if (hpRatio <= healAt && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
         return { kind: 'rest', detail: 'low-hp-rest' };
     }
 
@@ -154,10 +162,12 @@ function cautiousPolicy(obs: LabObservation): LabDecision {
     if (!obs.actorReady) return { kind: 'wait' };
 
     const hpRatio = obs.hp / Math.max(1, obs.maxHp);
-    if (hpRatio <= 0.55 && obs.healItemId && obs.remainingAp >= USE_ITEM_AP_COST) {
+    const healAt = getCautiousHealThreshold(obs.conserve);
+    const restAt = getCautiousRestThreshold(obs.conserve);
+    if (hpRatio <= healAt && obs.healItemId && obs.remainingAp >= USE_ITEM_AP_COST) {
         return { kind: 'useItem', itemId: obs.healItemId, detail: 'heal' };
     }
-    if (hpRatio <= 0.45 && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
+    if (hpRatio <= restAt && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
         return { kind: 'rest', detail: 'cautious-rest' };
     }
 
@@ -234,7 +244,11 @@ function randomLegalPolicy(obs: LabObservation): LabDecision {
         }
     }
     if (obs.healItemId && obs.remainingAp >= USE_ITEM_AP_COST && obs.hp < obs.maxHp) {
-        add({ kind: 'useItem', itemId: obs.healItemId, detail: 'random-heal' });
+        const ratio = obs.hp / Math.max(1, obs.maxHp);
+        // Default conserve keeps historical "any missing HP" fuzzing.
+        if (obs.conserve !== 'hoard' || ratio <= getConserveHealThreshold(obs.conserve)) {
+            add({ kind: 'useItem', itemId: obs.healItemId, detail: 'random-heal' });
+        }
     }
     if (obs.remainingAp >= REST_ACTION_GAUGE_COST) add({ kind: 'rest', detail: 'random-rest' });
     if (obs.remainingAp >= DEFEND_ACTION_GAUGE_COST) add({ kind: 'defend', detail: 'random-defend' });
@@ -250,10 +264,12 @@ function randomLegalPolicy(obs: LabObservation): LabDecision {
 
 function extractPhase(obs: LabObservation, hpRatio: number, detailPrefix: string): LabDecision {
     // Survive first — extractPhase used to skip heal/rest once entered.
-    if (hpRatio <= 0.5 && obs.healItemId && obs.remainingAp >= USE_ITEM_AP_COST) {
+    const extractHealAt = getExtractHealThreshold(obs.conserve);
+    const extractRestAt = getConserveHealThreshold(obs.conserve);
+    if (hpRatio <= extractHealAt && obs.healItemId && obs.remainingAp >= USE_ITEM_AP_COST) {
         return { kind: 'useItem', itemId: obs.healItemId, detail: `${detailPrefix}-heal` };
     }
-    if (hpRatio <= 0.35 && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
+    if (hpRatio <= extractRestAt && obs.remainingAp >= REST_ACTION_GAUGE_COST) {
         return { kind: 'rest', detail: `${detailPrefix}-rest` };
     }
 

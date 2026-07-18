@@ -11,6 +11,12 @@
     "stress",
     "classKey",
     "routeMode",
+    "loadout",
+    "supply",
+    "conserve",
+    "carriedWeight",
+    "healUses",
+    "healQtyRemaining",
     "result",
     "elapsedSeconds",
     "kills",
@@ -43,6 +49,21 @@
       "type": "string",
       "enum": ["nearest", "sweep"]
     },
+    "loadout": {
+      "type": "string",
+      "enum": ["bare", "light", "standard", "heavy"]
+    },
+    "supply": {
+      "type": "string",
+      "enum": ["none", "lab", "starter", "rich"]
+    },
+    "conserve": {
+      "type": "string",
+      "enum": ["spend", "standard", "hoard"]
+    },
+    "carriedWeight": { "type": "number", "minimum": 0 },
+    "healUses": { "type": "integer", "minimum": 0 },
+    "healQtyRemaining": { "type": "integer", "minimum": 0 },
     "result": {
       "type": "string",
       "enum": ["SURVIVED", "DEAD", "MIA", "LEFT"]

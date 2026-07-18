@@ -69,7 +69,12 @@ export function summarizeCohort(
     let killsTotal = 0;
     let engagementTotal = 0;
     let lootTotal = 0;
+    let healUsesTotal = 0;
+    let healRemainingTotal = 0;
     const classCounts: Record<string, number> = {};
+    const loadoutCounts: Record<string, number> = {};
+    const supplyCounts: Record<string, number> = {};
+    const conserveCounts: Record<string, number> = {};
     const targetTownCounts: Record<string, number> = {};
     const extractionTownCounts: Record<string, number> = {};
 
@@ -79,7 +84,12 @@ export function summarizeCohort(
         killsTotal += result.kills;
         engagementTotal += result.telemetry.engagementCount;
         lootTotal += result.telemetry.lootItemsAcquired;
+        healUsesTotal += result.healUses;
+        healRemainingTotal += result.healQtyRemaining;
         classCounts[result.classKey] = (classCounts[result.classKey] ?? 0) + 1;
+        loadoutCounts[result.loadout] = (loadoutCounts[result.loadout] ?? 0) + 1;
+        supplyCounts[result.supply] = (supplyCounts[result.supply] ?? 0) + 1;
+        conserveCounts[result.conserve] = (conserveCounts[result.conserve] ?? 0) + 1;
         targetTownCounts[result.targetTownId] = (targetTownCounts[result.targetTownId] ?? 0) + 1;
         extractionTownCounts[result.extractionTownId] = (extractionTownCounts[result.extractionTownId] ?? 0) + 1;
         invariantViolationCount += result.invariantViolations.length;
@@ -103,7 +113,12 @@ export function summarizeCohort(
         meanKills: killsTotal / count,
         meanEngagements: engagementTotal / count,
         meanLootItemsAcquired: lootTotal / count,
+        meanHealUses: healUsesTotal / count,
+        meanHealQtyRemaining: healRemainingTotal / count,
         classCounts,
+        loadoutCounts,
+        supplyCounts,
+        conserveCounts,
         targetTownCounts,
         extractionTownCounts,
         digests: results.map((result) => ({
@@ -143,6 +158,8 @@ export function formatCohortMarkdown(summary: RaidLabCohortSummary): string {
         `- mean kills: ${summary.meanKills.toFixed(2)}`,
         `- mean engagements: ${summary.meanEngagements.toFixed(2)}`,
         `- mean loot acquired: ${summary.meanLootItemsAcquired.toFixed(2)}`,
+        `- mean heal uses: ${summary.meanHealUses.toFixed(2)}`,
+        `- mean heal remaining: ${summary.meanHealQtyRemaining.toFixed(2)}`,
         '',
         '## Outcomes',
         '',
@@ -154,6 +171,9 @@ export function formatCohortMarkdown(summary: RaidLabCohortSummary): string {
         '## Coverage',
         '',
         `- classes: ${formatCounts(summary.classCounts)}`,
+        `- loadouts: ${formatCounts(summary.loadoutCounts)}`,
+        `- supply: ${formatCounts(summary.supplyCounts)}`,
+        `- conserve: ${formatCounts(summary.conserveCounts)}`,
         `- target towns: ${formatCounts(summary.targetTownCounts)}`,
         `- final towns: ${formatCounts(summary.extractionTownCounts)}`,
         '',
@@ -183,6 +203,12 @@ export function writeCohortReport(
         policy: result.policy,
         classKey: result.classKey,
         routeMode: result.routeMode,
+        loadout: result.loadout,
+        supply: result.supply,
+        conserve: result.conserve,
+        carriedWeight: result.carriedWeight,
+        healUses: result.healUses,
+        healQtyRemaining: result.healQtyRemaining,
         result: result.result,
         elapsedSeconds: result.elapsedSeconds,
         kills: result.kills,

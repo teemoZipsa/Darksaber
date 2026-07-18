@@ -33,6 +33,18 @@ async function expectOverlayState(page: Page, expected: Partial<Record<string, b
     });
 }
 
+async function waitForWorldInputReady(page: Page) {
+    await page.waitForFunction(() => {
+        const gm = (window as unknown as {
+            __gm?: {
+                state?: string;
+                transitions?: { isInputLocked?: () => boolean };
+            };
+        }).__gm;
+        return gm?.state === 'WORLD' && gm.transitions?.isInputLocked?.() === false;
+    });
+}
+
 async function getNetworkRaidDebug(page: Page) {
     return page.evaluate(() => {
         const gm = (window as unknown as { __gm?: any }).__gm;
@@ -304,7 +316,7 @@ test('dev launcher buttons are readable and enter dev modes', async ({ page, isM
 
     await page.goto('/');
     await page.locator('.dev-launcher a[href="/?devStart=tutorial"]').click();
-    await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
+    await waitForWorldInputReady(page);
 });
 
 test('auth character select deletes the last character after exact-name confirmation', async ({ page, request }) => {
@@ -469,7 +481,7 @@ test('authenticated network raid survival returns to town and persists the serve
 test('dev tutorial can open and close the standalone inventory overlay', async ({ page }) => {
     await page.goto('/?devStart=tutorial');
     await expect(page.locator('#gameCanvas')).toBeVisible();
-    await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
+    await waitForWorldInputReady(page);
 
     await page.evaluate(() => {
         const sentinel = document.createElement('button');
@@ -495,7 +507,7 @@ test('dev tutorial can open and close the standalone inventory overlay', async (
 test('pause settings expose modal focus and persist the document language', async ({ page }) => {
     await page.goto('/?devStart=tutorial');
     await expect(page.locator('#gameCanvas')).toBeVisible();
-    await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
+    await waitForWorldInputReady(page);
 
     await page.evaluate(() => (window as unknown as { __gm?: { openPauseMenu: () => void } }).__gm?.openPauseMenu());
     const pauseDialog = page.getByRole('dialog', { name: /일시정지|Paused/ });
@@ -523,7 +535,7 @@ test('pause settings expose modal focus and persist the document language', asyn
 
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
+    await waitForWorldInputReady(page);
     await page.evaluate(() => (window as unknown as { __gm?: { openPauseMenu: () => void } }).__gm?.openPauseMenu());
     await expect(page.getByRole('dialog', { name: 'Paused' })).toBeVisible({ timeout: 10_000 });
 });
@@ -532,7 +544,7 @@ test('settings keep one scroll surface and reflow narrow controls', async ({ pag
     await page.setViewportSize({ width: 800, height: 240 });
     await page.goto('/?devStart=tutorial');
     await expect(page.locator('#gameCanvas')).toBeVisible();
-    await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
+    await waitForWorldInputReady(page);
     await page.evaluate(() => (window as unknown as { __gm?: { openPauseMenu: () => void } }).__gm?.openPauseMenu());
     await page.getByRole('button', { name: /설정|Settings/ }).click();
 
@@ -557,7 +569,7 @@ test('settings keep one scroll surface and reflow narrow controls', async ({ pag
 test('dev tutorial can swap magic loadout slots from the world hotkey overlay', async ({ page }) => {
     await page.goto('/?devStart=tutorial');
     await expect(page.locator('#gameCanvas')).toBeVisible();
-    await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
+    await waitForWorldInputReady(page);
 
     await page.keyboard.press('KeyK');
 
@@ -841,7 +853,7 @@ test('mobile viewport keeps town and standalone inventory overlays within the sc
 
     await page.goto('/?devStart=tutorial');
     await expect(page.locator('#gameCanvas')).toBeVisible();
-    await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
+    await waitForWorldInputReady(page);
     await page.evaluate(() => {
         const gm = (window as unknown as { __gm?: { inventoryUI?: { toggle: () => void } } }).__gm;
         gm?.inventoryUI?.toggle();
@@ -863,7 +875,7 @@ test('dev tutorial remains stable through repeated overlay toggles', async ({ pa
 
     await page.goto('/?devStart=tutorial');
     await expect(page.locator('#gameCanvas')).toBeVisible();
-    await page.waitForFunction(() => (window as unknown as { __gm?: { state?: string } }).__gm?.state === 'WORLD');
+    await waitForWorldInputReady(page);
 
     for (let cycle = 0; cycle < 4; cycle++) {
         await page.keyboard.press('KeyI');

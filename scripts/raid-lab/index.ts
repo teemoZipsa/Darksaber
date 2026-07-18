@@ -1,14 +1,30 @@
 import { runRaidLabExpedition } from './runner';
 import { formatCohortMarkdown, summarizeCohort, writeCohortReport } from './report';
 import type { StartingClassId } from '../../src/data/characterClasses';
+import {
+    RAID_LAB_CONSERVES,
+    RAID_LAB_LOADOUTS,
+    RAID_LAB_STARTING_CLASSES,
+    RAID_LAB_SUPPLIES,
+    resolveRaidLabClass,
+    resolveRaidLabConserve,
+    resolveRaidLabLoadout,
+    resolveRaidLabSupply,
+} from './matrix';
 import type {
+    RaidLabConserveId,
     RaidLabExperimentResult,
+    RaidLabLoadoutId,
     RaidLabPolicyId,
     RaidLabRouteMode,
     RaidLabStressMode,
+    RaidLabSupplyId,
 } from './types';
-
-const STARTING_CLASSES: StartingClassId[] = ['infantry', 'cavalry', 'cleric', 'mage'];
+import {
+    RAID_LAB_DEFAULT_CONSERVE,
+    RAID_LAB_DEFAULT_LOADOUT,
+    RAID_LAB_DEFAULT_SUPPLY,
+} from './types';
 
 function parseArgs(argv: string[]): {
     seeds: number;
@@ -17,6 +33,9 @@ function parseArgs(argv: string[]): {
     stress: RaidLabStressMode;
     classMode: StartingClassId | 'sweep';
     routeMode: RaidLabRouteMode;
+    loadoutMode: RaidLabLoadoutId | 'sweep';
+    supplyMode: RaidLabSupplyId | 'sweep';
+    conserveMode: RaidLabConserveId | 'sweep';
     maxActions: number;
     writeReport: boolean;
     singleSeed: number | null;
@@ -27,6 +46,9 @@ function parseArgs(argv: string[]): {
     let stress: RaidLabStressMode = 'none';
     let classMode: StartingClassId | 'sweep' = 'sweep';
     let routeMode: RaidLabRouteMode = 'sweep';
+    let loadoutMode: RaidLabLoadoutId | 'sweep' = RAID_LAB_DEFAULT_LOADOUT;
+    let supplyMode: RaidLabSupplyId | 'sweep' = RAID_LAB_DEFAULT_SUPPLY;
+    let conserveMode: RaidLabConserveId | 'sweep' = RAID_LAB_DEFAULT_CONSERVE;
     let maxActions = 1_500;
     let writeReport = true;
     let singleSeed: number | null = null;
@@ -57,12 +79,27 @@ function parseArgs(argv: string[]): {
             }
             i += 1;
         } else if (arg === '--class' && next) {
-            if (next === 'sweep' || STARTING_CLASSES.includes(next as StartingClassId)) {
+            if (next === 'sweep' || RAID_LAB_STARTING_CLASSES.includes(next as StartingClassId)) {
                 classMode = next as StartingClassId | 'sweep';
             }
             i += 1;
         } else if (arg === '--route' && next) {
             if (next === 'nearest' || next === 'sweep') routeMode = next;
+            i += 1;
+        } else if (arg === '--loadout' && next) {
+            if (next === 'sweep' || RAID_LAB_LOADOUTS.includes(next as RaidLabLoadoutId)) {
+                loadoutMode = next as RaidLabLoadoutId | 'sweep';
+            }
+            i += 1;
+        } else if (arg === '--supply' && next) {
+            if (next === 'sweep' || RAID_LAB_SUPPLIES.includes(next as RaidLabSupplyId)) {
+                supplyMode = next as RaidLabSupplyId | 'sweep';
+            }
+            i += 1;
+        } else if (arg === '--conserve' && next) {
+            if (next === 'sweep' || RAID_LAB_CONSERVES.includes(next as RaidLabConserveId)) {
+                conserveMode = next as RaidLabConserveId | 'sweep';
+            }
             i += 1;
         } else if (arg === '--max-actions' && next) {
             maxActions = Math.max(1, Number.parseInt(next, 10) || 400);
@@ -72,20 +109,35 @@ function parseArgs(argv: string[]): {
         }
     }
 
-    return { seeds, seedStart, policy, stress, classMode, routeMode, maxActions, writeReport, singleSeed };
+    return {
+        seeds,
+        seedStart,
+        policy,
+        stress,
+        classMode,
+        routeMode,
+        loadoutMode,
+        supplyMode,
+        conserveMode,
+        maxActions,
+        writeReport,
+        singleSeed,
+    };
 }
 
 function main(): void {
     const args = parseArgs(process.argv.slice(2));
     if (args.singleSeed !== null) {
-        const classKey = resolveClassKey(args.classMode, args.singleSeed);
         const result = runRaidLabExpedition({
             seed: args.singleSeed,
             policy: args.policy,
             maxActions: args.maxActions,
             stress: args.stress,
-            classKey,
+            classKey: resolveRaidLabClass(args.classMode, args.singleSeed),
             routeMode: args.routeMode,
+            loadout: resolveRaidLabLoadout(args.loadoutMode, args.singleSeed),
+            supply: resolveRaidLabSupply(args.supplyMode, args.singleSeed),
+            conserve: resolveRaidLabConserve(args.conserveMode, args.singleSeed),
         });
         process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
         return;
@@ -95,18 +147,19 @@ function main(): void {
     const results: RaidLabExperimentResult[] = [];
     for (let i = 0; i < args.seeds; i++) {
         const seed = args.seedStart + i;
-        const classKey = resolveClassKey(args.classMode, seed);
         results.push(runRaidLabExpedition({
             seed,
             policy: args.policy,
             maxActions: args.maxActions,
             stress: args.stress,
-            classKey,
+            classKey: resolveRaidLabClass(args.classMode, seed),
             routeMode: args.routeMode,
+            loadout: resolveRaidLabLoadout(args.loadoutMode, seed),
+            supply: resolveRaidLabSupply(args.supplyMode, seed),
+            conserve: resolveRaidLabConserve(args.conserveMode, seed),
         }));
         if ((i + 1) % 10 === 0 || i + 1 === args.seeds) {
             const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-            // stderr stays line-buffered when stdout is captured by the harness.
             process.stderr.write(`progress ${i + 1}/${args.seeds} seeds in ${elapsed}s\n`);
         }
     }
@@ -118,17 +171,17 @@ function main(): void {
         const stressTag = args.stress === 'none'
             ? ''
             : `-stress-${args.stress.replace(/\+/g, '-and-')}`;
-        const label = `smoke-${args.policy}${stressTag}-class-${args.classMode}-route-${args.routeMode}-s${args.seedStart}-n${args.seeds}-${stamp}`;
+        const matrixTag = [
+            args.loadoutMode !== RAID_LAB_DEFAULT_LOADOUT ? `loadout-${args.loadoutMode}` : null,
+            args.supplyMode !== RAID_LAB_DEFAULT_SUPPLY ? `supply-${args.supplyMode}` : null,
+            args.conserveMode !== RAID_LAB_DEFAULT_CONSERVE ? `conserve-${args.conserveMode}` : null,
+        ].filter(Boolean).join('-');
+        const matrixSuffix = matrixTag ? `-${matrixTag}` : '';
+        const label = `smoke-${args.policy}${stressTag}${matrixSuffix}-class-${args.classMode}-route-${args.routeMode}-s${args.seedStart}-n${args.seeds}-${stamp}`;
         const paths = writeCohortReport(summary, results, label);
         process.stdout.write(`Wrote ${paths.mdPath}\n`);
         process.stdout.write(`Wrote ${paths.jsonPath}\n`);
     }
-}
-
-function resolveClassKey(mode: StartingClassId | 'sweep', seed: number): StartingClassId {
-    if (mode !== 'sweep') return mode;
-    const index = ((seed % STARTING_CLASSES.length) + STARTING_CLASSES.length) % STARTING_CLASSES.length;
-    return STARTING_CLASSES[index]!;
 }
 
 main();

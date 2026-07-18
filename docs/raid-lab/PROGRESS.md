@@ -1,5 +1,58 @@
 # Raid Lab — Progress
 
+## Batch 2026-07-18 — Phase 4a loadout/supply/conserve matrix (labVersion 10)
+
+### Changes
+
+- Added solo `loadout` (`bare|light|standard|heavy`), `supply`
+  (`none|lab|starter|rich`), and `conserve` (`spend|standard|hoard`) axes.
+- Defaults remain regression-safe: `bare` + `lab` + `standard` (no equipment
+  bonuses, `herb_common×3`, historical heal thresholds).
+- Non-bare loadouts apply real equipment via `createWorldJoinSaveState` and pass
+  `equipmentStatBonuses` / `carriedWeight` into join.
+- Policies gate heals through conserve thresholds; reports track heal uses /
+  remaining and per-axis coverage tallies.
+- Sweep scheduling uses a 192-seed cycle so class and loadout are not coupled;
+  the first 64 seeds cover every class/loadout/supply tuple.
+- Determinism digests include carried weight, heal uses, and remaining heals.
+- CLI/npm: `--loadout` / `--supply` / `--conserve` (+ `sweep`);
+  `raid-lab:smoke:loadout`.
+
+### Smoke cohort (seeds 0..99 / balanced / loadout+supply+conserve sweep)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 65 | 65.0% |
+| DEAD | 26 | 26.0% |
+| LEFT | 9 | 9.0% |
+| MIA | 0 | 0.0% |
+
+- mean heal uses 0.69, mean heal remaining 2.65, invariants 0
+- 16/16 class×loadout pairs and 64/64 class×loadout×supply tuples covered;
+  wall time was about 51 minutes on the verification machine
+- Report: `smoke-balanced-loadout-sweep-supply-sweep-conserve-sweep-class-sweep-route-sweep-s0-n100-20260718.*`
+
+### Verification
+
+| Command | Result |
+|---|---|
+| `npm run typecheck` | pass |
+| `npm run lint` | pass |
+| raid-lab determinism suite | 25 pass |
+| `npm run raid-lab:smoke:loadout` | pass (100 seeds, 0 invariants, ~51m wall) |
+| `npm test` | 779 pass, 1 pre-existing skip |
+| `npm run test:coverage` | 84.64% lines / 82.42% branches / 71.53% functions |
+| client + server production builds / asset guard | pass |
+| `npm run test:e2e` | 26 pass (desktop + mobile) |
+
+### Next work queue
+
+1. Multi-actor party composition (1–3) on top of this matrix
+2. Story campaign / exactly-once quest persistence lab
+3. Disconnect / save-conflict chaos
+
+---
+
 ## Batch 2026-07-17j — Reliability audit corrections (labVersion 9)
 
 ### Corrections

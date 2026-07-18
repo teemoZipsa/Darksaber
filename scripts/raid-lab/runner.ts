@@ -1,5 +1,6 @@
 import { createBaseStats, getBaseStatsForClass } from '../../src/data/Stats';
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
+import { createWorldJoinSaveState } from '../../server/WorldJoinSave';
 import { getClassLine } from '../../src/data/ClassTree';
 import { WorldSession, WORLD_TICK_MS } from '../../server/WorldSession';
 import { WorldMap } from '../../src/map/WorldMap';
@@ -13,21 +14,33 @@ import type {
 import { FIELD_MAX_ACTION_GAUGE } from '../../src/field/FieldActionEconomy';
 import { digestExperimentResult } from './digest';
 import { checkRaidLabInvariants } from './invariants';
+import {
+    applyRaidLabLoadout,
+    applyRaidLabSupply,
+    carriedItemsFromStacks,
+    countHealQuantity,
+    pickHealItemId,
+} from './loadouts';
 import { planLocalStep, type PathCache } from './pathing';
 import { getRaidLabPolicy, type LabObservation } from './policies';
 import { createLabTokenFactory, createMulberry32, sessionEpochFromSeed } from './rng';
 import {
+    RAID_LAB_DEFAULT_CONSERVE,
+    RAID_LAB_DEFAULT_LOADOUT,
+    RAID_LAB_DEFAULT_SUPPLY,
     RAID_LAB_VERSION,
     type RaidLabActionRecord,
+    type RaidLabConserveId,
     type RaidLabExperimentResult,
     type RaidLabInvariantViolation,
+    type RaidLabLoadoutId,
     type RaidLabPolicyId,
     type RaidLabRunOptions,
+    type RaidLabSupplyId,
 } from './types';
 
 const DEFAULT_MAX_ACTIONS = 1_500;
 const DEFAULT_MAX_SIM_MS = 30 * 60 * 1000;
-const HEAL_ITEM_CANDIDATES = ['herb_common', 'herb_cheap', 'herb_rare'] as const;
 /** Phase 3 denser nests: faster respawn, wider roam, higher spawn caps. */
 const DENSE_NEST_TUNING = {
     respawnMs: 20_000,
@@ -56,6 +69,11 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
     const stressMode = options.stress ?? 'none';
     const classKey = options.classKey ?? 'infantry';
     const routeMode = options.routeMode ?? 'nearest';
+    const loadout: RaidLabLoadoutId = options.loadout ?? RAID_LAB_DEFAULT_LOADOUT;
+    const supply: RaidLabSupplyId = usesLowHpStress(stressMode)
+        ? 'none'
+        : (options.supply ?? RAID_LAB_DEFAULT_SUPPLY);
+    const conserve: RaidLabConserveId = options.conserve ?? RAID_LAB_DEFAULT_CONSERVE;
     const sessionEpoch = sessionEpochFromSeed(options.seed);
     const session = new WorldSession({
         sessionEpoch,
@@ -69,16 +87,36 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
     const extraction = pickExtractionTown(world, departureTownId, routeMode, options.seed);
     const character = createStarterCharacter(options.seed, classKey);
     const save = createDefaultCharacterSave(character, 'M', '2026-01-01T00:00:00.000Z');
-    const starterHealQuantity = usesLowHpStress(stressMode) ? 0 : 3;
-    configureStarterHealItems(save, starterHealQuantity);
+    applyRaidLabLoadout(save, classKey, loadout);
+    const supplyStacks = applyRaidLabSupply(save, supply);
+    const carriedItems = carriedItemsFromStacks(supplyStacks);
 
-    const joinMessage = createJoinMessage(character, departureTownId, starterHealQuantity);
+    const useGearJoin = loadout !== 'bare';
+    const joinSave = useGearJoin ? createWorldJoinSaveState(character, save) : null;
+    const joinMessage = createJoinMessage({
+        character,
+        originHubId: departureTownId,
+        carriedItems,
+        partyComposition: joinSave?.partyComposition,
+        carriedWeight: joinSave?.carriedWeight ?? 0,
+    });
     let now = 0;
     const joined = session.join(joinMessage, now, {
         accountId: character.accountId,
         characterId: character.id,
-        saveSnapshot: save,
+        saveSnapshot: joinSave?.saveSnapshot ?? save,
+        ...(joinSave ? {
+            equipmentStatBonuses: joinSave.equipmentStatBonuses,
+            equipmentAttackRanges: joinSave.equipmentAttackRanges,
+        } : {}),
     });
+    const carriedWeightAtJoin = joined.playerId
+        ? (session.getDebugState().players.get(joined.playerId)?.carriedWeight ?? joinMessage.carriedWeight ?? 0)
+        : 0;
+    let healUses = 0;
+    let healQtyRemaining = countHealQuantity(
+        session.getDebugState().players.get(joined.playerId)?.carriedItems ?? new Map()
+    );
 
     const actions: RaidLabActionRecord[] = [];
     const invariantViolations: RaidLabInvariantViolation[] = [];
@@ -140,10 +178,14 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
             actions.length,
             pathCache,
             now,
+            conserve,
         );
         if (!observation) {
             break;
         }
+        healQtyRemaining = countHealQuantity(
+            session.getDebugState().players.get(joined.playerId)?.carriedItems ?? new Map()
+        );
 
         if (!observation.actorReady) {
             now = advanceUntilReadyOrDone(session, joined.playerId, now, maxSimMs, applyMessages);
@@ -255,7 +297,9 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
                 payload: { itemId: decision.itemId },
             }, now);
             applyMessages([...result.replies, ...result.broadcasts]);
-            recordAction(hasActionRejected(result.replies) ? 'useItem_rejected' : 'useItem', decision.itemId);
+            const rejected = hasActionRejected(result.replies);
+            if (!rejected) healUses += 1;
+            recordAction(rejected ? 'useItem_rejected' : 'useItem', decision.itemId);
             handled = true;
         } else if (decision.kind === 'loot' && decision.lootId) {
             const interact = session.handleMessage(joined.playerId, {
@@ -324,6 +368,10 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
 
     const finalResult = raidResult!;
     const stopReason: RaidLabExperimentResult['stopReason'] = cappedStop ?? 'raid_result';
+    const stillPresent = session.getDebugState().players.get(joined.playerId);
+    if (stillPresent) {
+        healQtyRemaining = countHealQuantity(stillPresent.carriedItems);
+    }
 
     const base = {
         labVersion: RAID_LAB_VERSION,
@@ -332,6 +380,12 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
         stress: stressMode,
         classKey,
         routeMode,
+        loadout,
+        supply,
+        conserve,
+        carriedWeight: carriedWeightAtJoin,
+        healUses,
+        healQtyRemaining,
         result: finalResult.result,
         elapsedSeconds: finalResult.elapsedSeconds,
         kills: finalResult.kills,
@@ -381,6 +435,9 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
 
     function forceLeave(reason: 'town' | 'manual', detail: string): void {
         if (raidResult || !session.getDebugState().players.has(joined.playerId)) return;
+        healQtyRemaining = countHealQuantity(
+            session.getDebugState().players.get(joined.playerId)?.carriedItems ?? new Map()
+        );
         const leave = session.handleMessage(joined.playerId, { type: 'WORLD_LEAVE', reason }, now);
         applyMessages([...leave.replies, ...leave.broadcasts]);
         recordAction(`leave_${reason}`, detail);
@@ -424,33 +481,22 @@ function createStarterCharacter(seed: number, classKey: AuthCharacter['classKey'
     };
 }
 
-function configureStarterHealItems(
-    save: ReturnType<typeof createDefaultCharacterSave>,
-    quantity: number,
-): void {
-    save.inventory.items = save.inventory.items.filter((item) => (
-        !HEAL_ITEM_CANDIDATES.includes(item.itemId as typeof HEAL_ITEM_CANDIDATES[number])
-    ));
-    if (quantity <= 0) return;
-    save.inventory.items.push({
-        itemId: 'herb_common',
-        gridX: 0,
-        gridY: 0,
-        quantity,
-        durability: 1,
-    });
-}
-
-function createJoinMessage(character: AuthCharacter, originHubId: string, healQuantity: number): WorldJoinMessage {
+function createJoinMessage(input: {
+    character: AuthCharacter;
+    originHubId: string;
+    carriedItems: WorldJoinMessage['carriedItems'];
+    partyComposition?: ActorSnapshot[];
+    carriedWeight?: number;
+}): WorldJoinMessage {
     const partyActor: ActorSnapshot = {
-        id: character.id,
-        localActorId: character.id,
-        name: character.name,
-        classLineId: character.classKey,
+        id: input.character.id,
+        localActorId: input.character.id,
+        name: input.character.name,
+        classLineId: input.character.classKey,
         currentTier: 1,
         level: 1,
         tile: { x: 0, y: 0 },
-        stats: { ...character.baseStats },
+        stats: { ...input.character.baseStats },
         statuses: [],
         actionGauge: 0,
         remainingAp: 0,
@@ -459,10 +505,11 @@ function createJoinMessage(character: AuthCharacter, originHubId: string, healQu
     };
     return {
         type: 'WORLD_JOIN',
-        originHubId,
-        partyComposition: [partyActor],
+        originHubId: input.originHubId,
+        partyComposition: input.partyComposition ?? [partyActor],
         clientVersion: 'raid-lab',
-        carriedItems: healQuantity > 0 ? [{ itemId: 'herb_common', quantity: healQuantity }] : [],
+        carriedWeight: input.carriedWeight ?? 0,
+        carriedItems: input.carriedItems ?? [],
     };
 }
 
@@ -505,6 +552,7 @@ function buildObservation(
     actionCount: number,
     pathCache: PathCache,
     now: number,
+    conserve: RaidLabConserveId,
 ): LabObservation | null {
     const debug = session.getDebugState();
     const player = debug.players.get(playerId);
@@ -516,7 +564,7 @@ function buildObservation(
     if (!actor) return null;
 
     const currentTownId = world.getTownAtTile(actor.tile.x, actor.tile.y)?.id ?? null;
-    const healItemId = HEAL_ITEM_CANDIDATES.find((itemId) => (player.carriedItems.get(itemId) ?? 0) > 0) ?? null;
+    const healItemId = pickHealItemId(player.carriedItems);
     const lootItemsAcquired = (player.saveSnapshot?.inventory.items ?? [])
         .filter((item) => item.acquiredInRaid === true)
         .reduce((sum, item) => sum + Math.max(1, Math.floor(item.quantity ?? 1)), 0);
@@ -551,6 +599,7 @@ function buildObservation(
             })),
         ignoredLootIds,
         healItemId,
+        conserve,
         kills: player.kills,
         lootItemsAcquired,
         actionCount,
