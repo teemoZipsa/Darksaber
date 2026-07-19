@@ -57,7 +57,9 @@
     "raid-lab:smoke:stress:dense-nests": "node --import tsx scripts/raid-lab/index.ts --seeds 100 --policy balanced --class sweep --route sweep --stress dense-nests --max-actions 1500",
     "raid-lab:cohort1k:stress:dense-nests": "node --import tsx scripts/raid-lab/index.ts --seeds 1000 --policy balanced --class sweep --route sweep --stress dense-nests --max-actions 1500",
     "raid-lab:smoke:stress:combo": "node --import tsx scripts/raid-lab/index.ts --seeds 100 --policy balanced --class sweep --route sweep --stress low-hp+dense-nests --max-actions 1500",
-    "raid-lab:smoke:loadout": "node --import tsx scripts/raid-lab/index.ts --seeds 100 --policy balanced --class sweep --route sweep --loadout sweep --supply sweep --conserve sweep --max-actions 1500"
+    "raid-lab:smoke:loadout": "node --import tsx scripts/raid-lab/index.ts --seeds 100 --policy balanced --class sweep --route sweep --loadout sweep --supply sweep --conserve sweep --max-actions 1500",
+    "raid-lab:smoke:party": "node --import tsx scripts/raid-lab/index.ts --seeds 100 --policy balanced --class sweep --route sweep --party-size sweep --multi-ready sweep --loadout sweep --supply sweep --conserve sweep --max-actions 1500",
+    "raid-lab:cohort1k:party": "node --import tsx scripts/raid-lab/index.ts --seeds 1000 --policy balanced --class sweep --route sweep --party-size sweep --multi-ready sweep --loadout sweep --supply sweep --conserve sweep --max-actions 1500"
   },
   "keywords": [
     "srpg",

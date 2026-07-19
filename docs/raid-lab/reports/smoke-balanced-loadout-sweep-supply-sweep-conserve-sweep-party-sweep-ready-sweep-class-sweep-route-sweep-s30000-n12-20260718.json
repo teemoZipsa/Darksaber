@@ -1,0 +1,282 @@
+{
+  "summary": {
+    "labVersion": 11,
+    "policy": "balanced",
+    "stress": "none",
+    "seedStart": 30000,
+    "seedEnd": 30011,
+    "count": 12,
+    "results": {
+      "SURVIVED": 4,
+      "DEAD": 1,
+      "MIA": 0,
+      "LEFT": 7
+    },
+    "invariantViolationCount": 0,
+    "invariantCodes": {},
+    "meanElapsedSeconds": 340.9166666666633,
+    "meanKills": 0.25,
+    "meanEngagements": 0.9166666666666666,
+    "meanLootItemsAcquired": 3.25,
+    "meanHealUses": 0.5,
+    "meanHealQtyRemaining": 6.083333333333333,
+    "classCounts": {
+      "infantry": 3,
+      "cavalry": 3,
+      "cleric": 3,
+      "mage": 3
+    },
+    "loadoutCounts": {
+      "bare": 4,
+      "light": 4,
+      "standard": 4
+    },
+    "supplyCounts": {
+      "rich": 12
+    },
+    "conserveCounts": {
+      "spend": 4,
+      "standard": 4,
+      "hoard": 4
+    },
+    "partySizeCounts": {
+      "1": 4,
+      "2": 4,
+      "3": 4
+    },
+    "multiReadyCounts": {
+      "lowest-hp": 6,
+      "round-robin": 3,
+      "leader-first": 3
+    },
+    "companionClassCounts": {
+      "cavalry": 3,
+      "cleric": 3,
+      "mage": 3,
+      "infantry": 3
+    },
+    "pairwiseCoverage": {
+      "partySize×class:1×infantry": 1,
+      "partySize×loadout:1×bare": 4,
+      "partySize×supply:1×rich": 4,
+      "partySize×conserve:1×spend": 2,
+      "partySize×multiReady:1×lowest-hp": 3,
+      "partySize×route:1×sweep": 4,
+      "class×loadout:infantry×bare": 1,
+      "multiReady×loadout:lowest-hp×bare": 3,
+      "partySize×class:1×cavalry": 1,
+      "partySize×conserve:1×standard": 1,
+      "class×loadout:cavalry×bare": 1,
+      "partySize×class:1×cleric": 1,
+      "partySize×conserve:1×hoard": 1,
+      "class×loadout:cleric×bare": 1,
+      "partySize×class:1×mage": 1,
+      "partySize×multiReady:1×round-robin": 1,
+      "class×loadout:mage×bare": 1,
+      "multiReady×loadout:round-robin×bare": 1,
+      "partySize×class:2×infantry": 1,
+      "partySize×loadout:2×light": 4,
+      "partySize×supply:2×rich": 4,
+      "partySize×conserve:2×standard": 2,
+      "partySize×multiReady:2×round-robin": 2,
+      "partySize×route:2×sweep": 4,
+      "class×loadout:infantry×light": 1,
+      "multiReady×loadout:round-robin×light": 2,
+      "partySize×companion:2×cavalry": 1,
+      "leader×companion:infantry×cavalry": 2,
+      "partySize×class:2×cavalry": 1,
+      "partySize×conserve:2×hoard": 1,
+      "class×loadout:cavalry×light": 1,
+      "partySize×companion:2×cleric": 1,
+      "leader×companion:cavalry×cleric": 2,
+      "partySize×class:2×cleric": 1,
+      "partySize×conserve:2×spend": 1,
+      "partySize×multiReady:2×leader-first": 2,
+      "class×loadout:cleric×light": 1,
+      "multiReady×loadout:leader-first×light": 2,
+      "partySize×companion:2×mage": 1,
+      "leader×companion:cleric×mage": 2,
+      "partySize×class:2×mage": 1,
+      "class×loadout:mage×light": 1,
+      "partySize×companion:2×infantry": 1,
+      "leader×companion:mage×infantry": 2,
+      "partySize×class:3×infantry": 1,
+      "partySize×loadout:3×standard": 4,
+      "partySize×supply:3×rich": 4,
+      "partySize×conserve:3×hoard": 2,
+      "partySize×multiReady:3×leader-first": 1,
+      "partySize×route:3×sweep": 4,
+      "class×loadout:infantry×standard": 1,
+      "multiReady×loadout:leader-first×standard": 1,
+      "partySize×companion:3×cavalry": 2,
+      "partySize×companion:3×cleric": 2,
+      "leader×companion:infantry×cleric": 1,
+      "partySize×class:3×cavalry": 1,
+      "partySize×conserve:3×spend": 1,
+      "partySize×multiReady:3×lowest-hp": 3,
+      "class×loadout:cavalry×standard": 1,
+      "multiReady×loadout:lowest-hp×standard": 3,
+      "partySize×companion:3×mage": 2,
+      "leader×companion:cavalry×mage": 1,
+      "partySize×class:3×cleric": 1,
+      "partySize×conserve:3×standard": 1,
+      "class×loadout:cleric×standard": 1,
+      "partySize×companion:3×infantry": 2,
+      "leader×companion:cleric×infantry": 1,
+      "partySize×class:3×mage": 1,
+      "class×loadout:mage×standard": 1,
+      "leader×companion:mage×cavalry": 1
+    },
+    "targetTownCounts": {
+      "sw_hideout": 2,
+      "w_forest_village": 2,
+      "e_outpost": 2,
+      "e_stronghold": 2,
+      "nw_desert_city": 2,
+      "s_coast_town": 1,
+      "se_port": 1
+    },
+    "extractionTownCounts": {
+      "sw_hideout": 1,
+      "central_castle": 8,
+      "e_stronghold": 1,
+      "s_coast_town": 1,
+      "e_outpost": 1
+    },
+    "digests": [
+      {
+        "seed": 30000,
+        "digest": "20d55e328d48eb67eb9226238095c1bcd76b44292891464c025fbe6469f4bfa8",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 30001,
+        "digest": "ec467738371f329c81b058a59081bbd85cd92168dbdc88ae66c2d2cd1b12792e",
+        "result": "LEFT"
+      },
+      {
+        "seed": 30002,
+        "digest": "6287cfeaad365dbadcd1f100c55e8952dd65f83be96add4b158128e50eb40693",
+        "result": "DEAD"
+      },
+      {
+        "seed": 30003,
+        "digest": "404ca88b2ea6818bff160120a7af7dce193369524a61b3a0f2bed37b875a8323",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 30004,
+        "digest": "03596c8caf00edeb7fe265f57924dbfcffc01fc1f015f2f7d4644ccebfe107d8",
+        "result": "LEFT"
+      },
+      {
+        "seed": 30005,
+        "digest": "9dd82ae9a05715f1bab63a87f11f9e770191e7fd49d4d35de479eb7987edc5a0",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 30006,
+        "digest": "8d2d4376345fc6d917e0d90dedf981b01024dd55abb8ea61f2a629c8659e3b25",
+        "result": "LEFT"
+      },
+      {
+        "seed": 30007,
+        "digest": "2ee0267b56f0c2b97c6129de5b8082a486916cd8040c7727f30e68eb1a8619ff",
+        "result": "LEFT"
+      },
+      {
+        "seed": 30008,
+        "digest": "8fbcd5ff3258a18401ac9fb1f17737f9a12bbcc92ef1ca1d6f1099e86c0b28f9",
+        "result": "LEFT"
+      },
+      {
+        "seed": 30009,
+        "digest": "d73c31fdc442adad37582b3049702a2a814c00b1556a8ef76c184050227ab31c",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 30010,
+        "digest": "9cc5fda0a72afdd013a165aa7c0b553c39b3c6a4519edd1236a2faf5f5b98cc0",
+        "result": "LEFT"
+      },
+      {
+        "seed": 30011,
+        "digest": "d7eb920042aff5d87aeeb520bf8b4fc6617b22d5897f76299ddbe103c3520c94",
+        "result": "LEFT"
+      }
+    ],
+    "clusters": {
+      "byResult": {
+        "SURVIVED": 4,
+        "LEFT": 7,
+        "DEAD": 1
+      },
+      "byStopReason": {
+        "raid_result": 8,
+        "max_actions": 4
+      },
+      "byDeathCause": {
+        "none": 4,
+        "manual": 7,
+        "enemy": 1
+      },
+      "byInvariantCode": {
+        "none": 12
+      },
+      "sampleSeeds": {
+        "result:SURVIVED": [
+          30000,
+          30003,
+          30005,
+          30009
+        ],
+        "stop:raid_result": [
+          30000,
+          30002,
+          30003,
+          30004,
+          30005,
+          30009,
+          30010,
+          30011
+        ],
+        "death:none": [
+          30000,
+          30003,
+          30005,
+          30009
+        ],
+        "result:LEFT": [
+          30001,
+          30004,
+          30006,
+          30007,
+          30008,
+          30010,
+          30011
+        ],
+        "stop:max_actions": [
+          30001,
+          30006,
+          30007,
+          30008
+        ],
+        "death:manual": [
+          30001,
+          30004,
+          30006,
+          30007,
+          30008,
+          30010,
+          30011
+        ],
+        "result:DEAD": [
+          30002
+        ],
+        "death:enemy": [
+          30002
+        ]
+      }
+    }
+  }
+}

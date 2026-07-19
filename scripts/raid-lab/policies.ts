@@ -50,6 +50,8 @@ export interface LabLootView {
 }
 
 export interface LabObservation {
+    /** Server actor id currently selected to act (multi-ready). */
+    actorId: string;
     actorReady: boolean;
     remainingAp: number;
     actionGauge: number;
@@ -60,6 +62,7 @@ export interface LabObservation {
     tile: TilePoint;
     attackRange: number;
     mov: number;
+    partySize: number;
     currentTownId: string | null;
     departureTownId: string;
     extractionGoal: TilePoint;

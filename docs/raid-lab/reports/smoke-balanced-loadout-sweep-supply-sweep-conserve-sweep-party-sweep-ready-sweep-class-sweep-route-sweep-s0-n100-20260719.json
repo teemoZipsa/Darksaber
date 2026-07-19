@@ -1,0 +1,788 @@
+{
+  "summary": {
+    "labVersion": 11,
+    "policy": "balanced",
+    "stress": "none",
+    "seedStart": 0,
+    "seedEnd": 99,
+    "count": 100,
+    "results": {
+      "SURVIVED": 32,
+      "DEAD": 13,
+      "MIA": 0,
+      "LEFT": 55
+    },
+    "invariantViolationCount": 0,
+    "invariantCodes": {},
+    "meanElapsedSeconds": 255.30699999999968,
+    "meanKills": 0.38,
+    "meanEngagements": 1.22,
+    "meanLootItemsAcquired": 2.56,
+    "meanHealUses": 0.47,
+    "meanHealQtyRemaining": 2.77,
+    "classCounts": {
+      "infantry": 25,
+      "cavalry": 25,
+      "cleric": 25,
+      "mage": 25
+    },
+    "loadoutCounts": {
+      "bare": 28,
+      "light": 24,
+      "standard": 24,
+      "heavy": 24
+    },
+    "supplyCounts": {
+      "none": 32,
+      "lab": 32,
+      "starter": 20,
+      "rich": 16
+    },
+    "conserveCounts": {
+      "spend": 34,
+      "standard": 33,
+      "hoard": 33
+    },
+    "partySizeCounts": {
+      "1": 36,
+      "2": 32,
+      "3": 32
+    },
+    "multiReadyCounts": {
+      "leader-first": 34,
+      "lowest-hp": 33,
+      "round-robin": 33
+    },
+    "companionClassCounts": {
+      "cavalry": 24,
+      "cleric": 24,
+      "mage": 24,
+      "infantry": 24
+    },
+    "pairwiseCoverage": {
+      "partySize×class:1×infantry": 9,
+      "partySize×loadout:1×bare": 12,
+      "partySize×supply:1×none": 12,
+      "partySize×conserve:1×spend": 18,
+      "partySize×multiReady:1×leader-first": 12,
+      "partySize×route:1×sweep": 36,
+      "class×loadout:infantry×bare": 7,
+      "multiReady×loadout:leader-first×bare": 11,
+      "partySize×class:1×cavalry": 9,
+      "partySize×conserve:1×standard": 9,
+      "class×loadout:cavalry×bare": 7,
+      "partySize×class:1×cleric": 9,
+      "partySize×conserve:1×hoard": 9,
+      "class×loadout:cleric×bare": 7,
+      "partySize×class:1×mage": 9,
+      "partySize×multiReady:1×lowest-hp": 12,
+      "class×loadout:mage×bare": 7,
+      "multiReady×loadout:lowest-hp×bare": 7,
+      "partySize×class:2×infantry": 8,
+      "partySize×loadout:2×light": 8,
+      "partySize×supply:2×none": 12,
+      "partySize×conserve:2×standard": 16,
+      "partySize×multiReady:2×lowest-hp": 10,
+      "partySize×route:2×sweep": 32,
+      "class×loadout:infantry×light": 6,
+      "multiReady×loadout:lowest-hp×light": 10,
+      "partySize×companion:2×cavalry": 8,
+      "leader×companion:infantry×cavalry": 16,
+      "partySize×class:2×cavalry": 8,
+      "partySize×conserve:2×hoard": 8,
+      "class×loadout:cavalry×light": 6,
+      "partySize×companion:2×cleric": 8,
+      "leader×companion:cavalry×cleric": 16,
+      "partySize×class:2×cleric": 8,
+      "partySize×conserve:2×spend": 8,
+      "partySize×multiReady:2×round-robin": 12,
+      "class×loadout:cleric×light": 6,
+      "multiReady×loadout:round-robin×light": 8,
+      "partySize×companion:2×mage": 8,
+      "leader×companion:cleric×mage": 16,
+      "partySize×class:2×mage": 8,
+      "class×loadout:mage×light": 6,
+      "partySize×companion:2×infantry": 8,
+      "leader×companion:mage×infantry": 16,
+      "partySize×class:3×infantry": 8,
+      "partySize×loadout:3×standard": 8,
+      "partySize×supply:3×none": 8,
+      "partySize×conserve:3×hoard": 16,
+      "partySize×multiReady:3×round-robin": 9,
+      "partySize×route:3×sweep": 32,
+      "class×loadout:infantry×standard": 6,
+      "multiReady×loadout:round-robin×standard": 8,
+      "partySize×companion:3×cavalry": 16,
+      "partySize×companion:3×cleric": 16,
+      "leader×companion:infantry×cleric": 8,
+      "partySize×class:3×cavalry": 8,
+      "partySize×conserve:3×spend": 8,
+      "partySize×multiReady:3×leader-first": 12,
+      "class×loadout:cavalry×standard": 6,
+      "multiReady×loadout:leader-first×standard": 10,
+      "partySize×companion:3×mage": 16,
+      "leader×companion:cavalry×mage": 8,
+      "partySize×class:3×cleric": 8,
+      "partySize×conserve:3×standard": 8,
+      "class×loadout:cleric×standard": 6,
+      "partySize×companion:3×infantry": 16,
+      "leader×companion:cleric×infantry": 8,
+      "partySize×class:3×mage": 8,
+      "class×loadout:mage×standard": 6,
+      "leader×companion:mage×cavalry": 8,
+      "partySize×loadout:1×heavy": 8,
+      "class×loadout:infantry×heavy": 6,
+      "multiReady×loadout:lowest-hp×heavy": 10,
+      "class×loadout:cavalry×heavy": 6,
+      "class×loadout:cleric×heavy": 6,
+      "partySize×multiReady:1×round-robin": 12,
+      "class×loadout:mage×heavy": 6,
+      "multiReady×loadout:round-robin×heavy": 7,
+      "partySize×loadout:2×bare": 8,
+      "partySize×supply:2×lab": 12,
+      "multiReady×loadout:round-robin×bare": 10,
+      "partySize×multiReady:2×leader-first": 10,
+      "partySize×loadout:3×light": 8,
+      "partySize×supply:3×lab": 12,
+      "multiReady×loadout:leader-first×light": 6,
+      "partySize×multiReady:3×lowest-hp": 11,
+      "partySize×loadout:1×standard": 8,
+      "partySize×supply:1×lab": 8,
+      "partySize×loadout:2×heavy": 8,
+      "multiReady×loadout:leader-first×heavy": 7,
+      "partySize×loadout:3×bare": 8,
+      "partySize×supply:3×starter": 8,
+      "partySize×loadout:1×light": 8,
+      "partySize×supply:1×starter": 8,
+      "partySize×loadout:2×standard": 8,
+      "partySize×supply:2×starter": 4,
+      "multiReady×loadout:lowest-hp×standard": 6,
+      "partySize×loadout:3×heavy": 8,
+      "partySize×supply:1×rich": 8,
+      "partySize×supply:2×rich": 4,
+      "partySize×supply:3×rich": 4
+    },
+    "targetTownCounts": {
+      "e_outpost": 15,
+      "e_stronghold": 15,
+      "nw_desert_city": 14,
+      "s_coast_town": 14,
+      "se_port": 14,
+      "sw_hideout": 14,
+      "w_forest_village": 14
+    },
+    "extractionTownCounts": {
+      "central_castle": 68,
+      "e_stronghold": 9,
+      "sw_hideout": 5,
+      "e_outpost": 5,
+      "s_coast_town": 4,
+      "se_port": 4,
+      "w_forest_village": 2,
+      "nw_desert_city": 3
+    },
+    "digests": [
+      {
+        "seed": 0,
+        "digest": "83e3f7b3bd629fb60e12b4a3414698a463e36454968588f01043daded232eb76",
+        "result": "DEAD"
+      },
+      {
+        "seed": 1,
+        "digest": "b7d187478614eedb2976673d4aa6a6523b66984cf9b29ded6fbdf306c263a25d",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 2,
+        "digest": "dfb739432262481fa5fe035b3fcf138152501fdb039df5c5e65d0d5a39edb14c",
+        "result": "DEAD"
+      },
+      {
+        "seed": 3,
+        "digest": "cbe2b37e36a0f8c818b1edc7055acb7fb1b100500eaf94eacff016cf789655a0",
+        "result": "DEAD"
+      },
+      {
+        "seed": 4,
+        "digest": "2f25945e28ff67bc3a15bd0a96641c0d1f5adcb6b458a7faa7a0df22a94ad296",
+        "result": "LEFT"
+      },
+      {
+        "seed": 5,
+        "digest": "d271369c8fda1166dc32528a4f9d9e65da4fc5fb9b5c7ebaf7dd748450e688d1",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 6,
+        "digest": "64a64eb266ddad6ad311a94502e3c42d6880ebea8d52a9e459bb25cbe5f255a8",
+        "result": "LEFT"
+      },
+      {
+        "seed": 7,
+        "digest": "c13b5a5ed2d75d85d3b95def739f6c06dbda17ed526952fffc004db28e8ef27b",
+        "result": "LEFT"
+      },
+      {
+        "seed": 8,
+        "digest": "78b74dcc7ee81f057e1afbb50ad2ef0848627987a67ee6a934935afc5e08e107",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 9,
+        "digest": "d7a117115f1ec7e38b3b0e1ede15158a8a33cfea86108f38c49b950ee5bdfb0d",
+        "result": "LEFT"
+      },
+      {
+        "seed": 10,
+        "digest": "d44a6006a68a5e819b12e3c11621d85212b354b12c5c7a0fdec59953e13c9db6",
+        "result": "LEFT"
+      },
+      {
+        "seed": 11,
+        "digest": "97ff74722bb1fb351dddb10723b63a178bb562ea5f879ca3c755c84eb144420c",
+        "result": "LEFT"
+      },
+      {
+        "seed": 12,
+        "digest": "c79442dedf50b1e4e935bea9e16c26143dd8e0cbaf1fb8a39adc1d22c61886c6",
+        "result": "DEAD"
+      },
+      {
+        "seed": 13,
+        "digest": "c298f10620e142812a1a614874a363833753406a33fb2a73bdd14309e4b0d5d6",
+        "result": "LEFT"
+      },
+      {
+        "seed": 14,
+        "digest": "cbbdceb4497ad9ff6d83a17dc15a1f67a375175748a28e5baa93f6a2271279e0",
+        "result": "DEAD"
+      },
+      {
+        "seed": 15,
+        "digest": "de45c89fc9acfb054c6bb90c887b58fa161c74dde243515c95ef02bcff3b7f80",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 16,
+        "digest": "6100dbc959a2a01873d3b15c66db96af80903dc011310c09c802942ac0a6affa",
+        "result": "LEFT"
+      },
+      {
+        "seed": 17,
+        "digest": "421a6010d812daeeb894135e1db923233f4325b572dbd3f481c0737f7673b5ff",
+        "result": "LEFT"
+      },
+      {
+        "seed": 18,
+        "digest": "29170b63fa5b9e2d2e31c591d70b2a3d2e422e20d96ecce72dc2dd5c14e84a97",
+        "result": "LEFT"
+      },
+      {
+        "seed": 19,
+        "digest": "e02551c56b3fd85063b41715b5a6ce4ace61217696aaf03553a2b3bbb7b80344",
+        "result": "LEFT"
+      },
+      {
+        "seed": 20,
+        "digest": "1b9e15af5bb8aef928f263d0b5b1e1c5d03a6d1733732f3e196287b638e4248e",
+        "result": "LEFT"
+      },
+      {
+        "seed": 21,
+        "digest": "0a07df278133658f253561d8737d38397fc5880237f335e8853f2e5c5aac4c2a",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 22,
+        "digest": "05a087c3b04a8b278c5a8c7e04adbd5354362490e81d711fdf013230330bf6ef",
+        "result": "LEFT"
+      },
+      {
+        "seed": 23,
+        "digest": "5a74f6c442929d8391f2f88ac40d47270740c3c1fbd9877df4a99ec82ce08dee",
+        "result": "LEFT"
+      },
+      {
+        "seed": 24,
+        "digest": "c21b1ea2d8c3fa6860260debcfec972ced78af540dcc706a6a4cb62b97e5a87b",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 25,
+        "digest": "9d9756663f0e00dd929e0de203897588a604f927cae61f3d37e3a51e6fd78ba6",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 26,
+        "digest": "43131fa7cf0805dfad5774298ccde8ff4e74fc6b61e3067c35df49c9a76d94b6",
+        "result": "DEAD"
+      },
+      {
+        "seed": 27,
+        "digest": "81111dde5eab1d65049aeeee22f8a96a14afe6d9c34313ecf08b595e0f42a676",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 28,
+        "digest": "b2081c586de772fca1428363823fb1e688585262e8bbd273b152de45a9d19cb9",
+        "result": "LEFT"
+      },
+      {
+        "seed": 29,
+        "digest": "c2e8148747f8e80a82012bf088104af04133998e0d67b8b05bab4cb10bbefb2d",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 30,
+        "digest": "e399eb45ed106b86f02a4e226976479b770bd8b1f1a661678fc05c7c88040c4f",
+        "result": "LEFT"
+      },
+      {
+        "seed": 31,
+        "digest": "c99d3bcd62561734f0806395b1dffd2bf91fc279e3d622f93fb91acdcc92d737",
+        "result": "LEFT"
+      },
+      {
+        "seed": 32,
+        "digest": "bad235b3b61299c02415f8b13c0be16ed91ddfb727e6135273e61e8e2314117f",
+        "result": "LEFT"
+      },
+      {
+        "seed": 33,
+        "digest": "72221a2c582bbf78a275cae0c205bf633b77578ba67acb7019ec04ef0d1c82e9",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 34,
+        "digest": "8e714df54c946663f9de612a94b24f0ab5b18f210e8efd91b13317ed65ec6e65",
+        "result": "LEFT"
+      },
+      {
+        "seed": 35,
+        "digest": "10635fb33c6fb4d58c09166570813f475a9e8b3678c0c07b64e87e438eccca17",
+        "result": "LEFT"
+      },
+      {
+        "seed": 36,
+        "digest": "8047a74204380fd42ba18f62456ded8066e609faf561acbbe5c6b62dda0d6552",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 37,
+        "digest": "7da27746219415f73878e0b341226dabaaefa8502955e7f0887747d18cee6d99",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 38,
+        "digest": "58a76a8466edaf3c7849abff7cbf7c67467af7f3eaac60f8bff950283b0578ed",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 39,
+        "digest": "b9a2bb2e90482befe7b3f3a40d84b5243bfaa70d9f3ed69b55e67d84afaec07b",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 40,
+        "digest": "775c045f128dc379bf3389b0f98e84d1aefc29fcc2e923b2cb813723b2f6cd70",
+        "result": "LEFT"
+      },
+      {
+        "seed": 41,
+        "digest": "6a6f1a98a41f7699abf4761648a2264a551369729276b2161ad0d4e41593a09d",
+        "result": "DEAD"
+      },
+      {
+        "seed": 42,
+        "digest": "52106cafb2af6bcf2bbc48a1a32cf2691da60ddb22f90d4a67d92df166979532",
+        "result": "LEFT"
+      },
+      {
+        "seed": 43,
+        "digest": "dfe4d1f5d5d5e99604c9f610473de427f5f5427d0a8f57fdf1711fd42622671f",
+        "result": "LEFT"
+      },
+      {
+        "seed": 44,
+        "digest": "a0ef1812732b5c84db48b6cffb0e51f5775ab4c51a17278526b1f117139f2be4",
+        "result": "LEFT"
+      },
+      {
+        "seed": 45,
+        "digest": "a6d6b678fabafbec0e1b814dff5bedab8d3010b94075f3ccd40e51f26aa78e7f",
+        "result": "DEAD"
+      },
+      {
+        "seed": 46,
+        "digest": "9adc841067a557216f4d66401e10ef1f513f863d348f18754e59a6d5fc3de4f4",
+        "result": "LEFT"
+      },
+      {
+        "seed": 47,
+        "digest": "33c02618575f07048e086b9ddd2957b03963a908946da3480f4bd9c880779438",
+        "result": "LEFT"
+      },
+      {
+        "seed": 48,
+        "digest": "5941cb2a4cfecd7b0aec041d1c69f524ab6a1cf9cc1d97848e61c2ba4ae86a44",
+        "result": "LEFT"
+      },
+      {
+        "seed": 49,
+        "digest": "eedf912f143b727b02e0933b2a1273be784530a7ade419591131544c4e98cf8b",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 50,
+        "digest": "5a94402feb57d8f8a1198390980584fb4b4447f92716fec7b04fe03e68cf296c",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 51,
+        "digest": "8ab8404ae26a150f3736bf7a7ea0daaad5be9a4c1cdc9e7d06f044f919447a6c",
+        "result": "DEAD"
+      },
+      {
+        "seed": 52,
+        "digest": "3a35472c2f17d8e827767bcc07c34d0e198825ae1c8052f1951d69d0f343d43b",
+        "result": "LEFT"
+      },
+      {
+        "seed": 53,
+        "digest": "391cf70212ef666ca0d9e7b0a83b1ef018ae10727e2de91035b5a77ef84756e7",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 54,
+        "digest": "9a334f138dca0b439c9e4ad018367ea1559e43e25fca15c142916b01c59a337b",
+        "result": "LEFT"
+      },
+      {
+        "seed": 55,
+        "digest": "58efe29a858c8ab0473900ec5a2a306df99b15c9ee76cbecfb9915316b89ce4a",
+        "result": "LEFT"
+      },
+      {
+        "seed": 56,
+        "digest": "08b449d0111253c075af27f52cd46f80e649087c1f5751bf70d39db1027c3358",
+        "result": "LEFT"
+      },
+      {
+        "seed": 57,
+        "digest": "0b0715c4a06bd00d10c8860800b846100462c092aae13cf2652043e4a374266e",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 58,
+        "digest": "a66ad4885b429af8bfb45cb0f733b1d73c704433d3d9f42ff964aaa531179d34",
+        "result": "LEFT"
+      },
+      {
+        "seed": 59,
+        "digest": "3020be3effb5f7ec7a9d2ef7595a4a599351260ddc198b1301777385b2f365f9",
+        "result": "LEFT"
+      },
+      {
+        "seed": 60,
+        "digest": "470b5494e636e1e9286c93310c594377379aeb89dd2c9bcff7043dea393423f3",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 61,
+        "digest": "3d23d0ff7d2860f1ebf7eeb5644af147d0aafbe457dc987c6132b11135440c9c",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 62,
+        "digest": "e3a883d955e620d424402b5bb17a631287ef64b01ca343d240229664035680d7",
+        "result": "LEFT"
+      },
+      {
+        "seed": 63,
+        "digest": "8212393aebd7f1b977c09de962975d4c4ab6c673007ec05ab202275c6d22e273",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 64,
+        "digest": "e86783ed43e7ed0b4f774c534f913e581d9493ffe11e38c08fe9831e4940861b",
+        "result": "LEFT"
+      },
+      {
+        "seed": 65,
+        "digest": "f354986b03aaf21e294316c1ddd4926e4ebd601bd22dda8373a8e096a244857a",
+        "result": "LEFT"
+      },
+      {
+        "seed": 66,
+        "digest": "76d5fa712a672d69e0c6ba081068b823a4f2405b52063bd83246729c89dc258f",
+        "result": "LEFT"
+      },
+      {
+        "seed": 67,
+        "digest": "13a3cf4ffcaeba074e18a1f1d92b43d95c045a1f4aca59366fe3279d1fe0f160",
+        "result": "LEFT"
+      },
+      {
+        "seed": 68,
+        "digest": "c22f2fba456a505dc4119a3f80caf14fbc9f9ca2a276487bca1dd4180dea370c",
+        "result": "LEFT"
+      },
+      {
+        "seed": 69,
+        "digest": "753a676f2a23b7b511b7449795d75b5afff87b1986bef704f5a6173903cd6fa6",
+        "result": "LEFT"
+      },
+      {
+        "seed": 70,
+        "digest": "551d10d701dc9a2bc83cb42eff236590459496c70f8a13626b0490f9e6001d69",
+        "result": "LEFT"
+      },
+      {
+        "seed": 71,
+        "digest": "529465c9b61741e329092df0086356c9f228399c504c790d3c5f32c8a3187a2b",
+        "result": "LEFT"
+      },
+      {
+        "seed": 72,
+        "digest": "16aacf6b442e7bf1849495e5a129ba49702d02a6a1d923a65bbb721f30dddad5",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 73,
+        "digest": "e6a8f0b41865fd26f578f0f13ce3421677d274638b8649e7d3dca4ff3201e782",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 74,
+        "digest": "7b0fe9b42e377346ccb93f4f40b9b4e0537cdb1bf8b874a94b96f074fcd67be1",
+        "result": "DEAD"
+      },
+      {
+        "seed": 75,
+        "digest": "fb77b62913f543b438dc5c804add890fa929cfb840e02b8a567e85ece437edd6",
+        "result": "DEAD"
+      },
+      {
+        "seed": 76,
+        "digest": "ea9e40caf4af8221f1aea3915ce5b1e32be13428c0f069526c2d764b61d777df",
+        "result": "LEFT"
+      },
+      {
+        "seed": 77,
+        "digest": "42cbf83f4f5b54a643baaa695e839c47401ab64df8249756749ed6d41205c19f",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 78,
+        "digest": "2a684fa1ed4c4ddd7f30c76dac473ff526d6389070972564a23c2405c26b2d61",
+        "result": "LEFT"
+      },
+      {
+        "seed": 79,
+        "digest": "897308d566603f2c1851d0f313bedbdb85b92b8ae4b6c885b43aa88d20c27322",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 80,
+        "digest": "b0adf8123830ef7c021523372ec3e22adcba3a227944f1a7a17df40ae86836d7",
+        "result": "LEFT"
+      },
+      {
+        "seed": 81,
+        "digest": "587322b791db3bf7ad9ecfec4910cc9882e7720d2d747d4c299bd67c3225c175",
+        "result": "LEFT"
+      },
+      {
+        "seed": 82,
+        "digest": "20f73c3d161a13cf2b5fe5dea19d911c2a8ebfced1d1296deee64efd782b77d4",
+        "result": "LEFT"
+      },
+      {
+        "seed": 83,
+        "digest": "28a6117536d400458a9f2f7f88940558bce14535d91d89772ff534aaf4395c20",
+        "result": "LEFT"
+      },
+      {
+        "seed": 84,
+        "digest": "609a1bbaf937b73dec487479fe6843e0b17e81321294ff1b58163912ab761aee",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 85,
+        "digest": "1ee49907ccb9496e911febd16fbabef8c3dba510c4e7140d00ba9d34032d0234",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 86,
+        "digest": "8edc21db63404a044aad4d0857160bdfedbbf31aae7c6ac59e0eb63b08ec93ee",
+        "result": "DEAD"
+      },
+      {
+        "seed": 87,
+        "digest": "99abd59b7a4ca54467080b4f416882b3c60e9d1bf531ecc8395fd8f90c26d513",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 88,
+        "digest": "b51efcedaa4adc6de45d390cdd6460159c3b7cad6b9614c7d90f7c2af5193346",
+        "result": "LEFT"
+      },
+      {
+        "seed": 89,
+        "digest": "2ae22f4bbffa9f525ac67c377ee2c2ff74a2a8d35f1bdbe73e0a2d00cfe7f149",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 90,
+        "digest": "8932c9a5b6cf35536d608a341d67c62acdba05384ec36a624d14ed4223a7c2c9",
+        "result": "LEFT"
+      },
+      {
+        "seed": 91,
+        "digest": "1d0f1f072f3f8b93f65138c75e7745b3ed15a97141220a98518ae5a600a0c816",
+        "result": "LEFT"
+      },
+      {
+        "seed": 92,
+        "digest": "77613e6dd4e9bc8bcae4fe194e7e77dce27b1fabd0ed6b0d575ec4aaa26302c5",
+        "result": "LEFT"
+      },
+      {
+        "seed": 93,
+        "digest": "51bbb44158c975e6bc1ac717d9b8098822b03ce9fca845549df35d4abf59f0ad",
+        "result": "LEFT"
+      },
+      {
+        "seed": 94,
+        "digest": "c67b0c94807de14def270d418727985c0d6e6580983cd66f7b6d4d23dd0feed5",
+        "result": "LEFT"
+      },
+      {
+        "seed": 95,
+        "digest": "67bd9c1b9a071322203659dfa1ae6db7a4717358dcea073991ea934c177af3c7",
+        "result": "LEFT"
+      },
+      {
+        "seed": 96,
+        "digest": "3a3c1dac5cb2b2bb4b6373967a80225cf226bb5e916fea9943be01e6171293f5",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 97,
+        "digest": "813857ef0abb1e04d723efd5ec9b37832259cfa83be2390b22dccc39deea8791",
+        "result": "SURVIVED"
+      },
+      {
+        "seed": 98,
+        "digest": "6d65965d14842c2581130110c33708faa98954eaad5de66a4b7cc67109a30a45",
+        "result": "DEAD"
+      },
+      {
+        "seed": 99,
+        "digest": "846276e850e9e626afbb73a139112f36a1c32235e22d1d02a53889a0b8ecdbe6",
+        "result": "SURVIVED"
+      }
+    ],
+    "clusters": {
+      "byResult": {
+        "DEAD": 13,
+        "SURVIVED": 32,
+        "LEFT": 55
+      },
+      "byStopReason": {
+        "raid_result": 68,
+        "max_actions": 32
+      },
+      "byDeathCause": {
+        "enemy": 13,
+        "none": 32,
+        "manual": 55
+      },
+      "byInvariantCode": {
+        "none": 100
+      },
+      "sampleSeeds": {
+        "result:DEAD": [
+          0,
+          2,
+          3,
+          12,
+          14,
+          26,
+          41,
+          45
+        ],
+        "stop:raid_result": [
+          0,
+          1,
+          2,
+          3,
+          5,
+          7,
+          8,
+          12
+        ],
+        "death:enemy": [
+          0,
+          2,
+          3,
+          12,
+          14,
+          26,
+          41,
+          45
+        ],
+        "result:SURVIVED": [
+          1,
+          5,
+          8,
+          15,
+          21,
+          24,
+          25,
+          27
+        ],
+        "death:none": [
+          1,
+          5,
+          8,
+          15,
+          21,
+          24,
+          25,
+          27
+        ],
+        "result:LEFT": [
+          4,
+          6,
+          7,
+          9,
+          10,
+          11,
+          13,
+          16
+        ],
+        "stop:max_actions": [
+          4,
+          6,
+          9,
+          10,
+          11,
+          13,
+          17,
+          18
+        ],
+        "death:manual": [
+          4,
+          6,
+          7,
+          9,
+          10,
+          11,
+          13,
+          16
+        ]
+      }
+    }
+  }
+}

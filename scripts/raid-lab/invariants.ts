@@ -1,7 +1,7 @@
 import type { WorldSession } from '../../server/WorldSession';
 import type { ServerActor, ServerPlayer } from '../../server/WorldSessionTypes';
 import type { InventorySaveSnapshot } from '../../src/shared/CharacterSave';
-import type { RaidLabInvariantViolation } from './types';
+import type { RaidLabInvariantViolation, RaidLabPartySize } from './types';
 
 export interface InvariantCheckContext {
     session: WorldSession;
@@ -9,6 +9,8 @@ export interface InvariantCheckContext {
     simMs: number;
     actionIndex: number;
     raidFinished: boolean;
+    /** Expected party size when known (Phase 4b). */
+    expectedPartySize?: RaidLabPartySize;
 }
 
 export function checkRaidLabInvariants(context: InvariantCheckContext): RaidLabInvariantViolation[] {
@@ -39,6 +41,17 @@ export function checkRaidLabInvariants(context: InvariantCheckContext): RaidLabI
     if (new Set(player.actorIds).size !== player.actorIds.length) {
         push('duplicate_actor_id', `Player ${player.id} has duplicate actorIds`);
     }
+    if (context.expectedPartySize !== undefined && player.actorIds.length !== context.expectedPartySize) {
+        push(
+            'party_size_mismatch',
+            `Expected partySize=${context.expectedPartySize} got actorIds=${player.actorIds.length}`,
+        );
+    }
+    if (player.actorIds.length > 3) {
+        push('party_size_over_cap', `Player ${player.id} has ${player.actorIds.length} actors (cap 3)`);
+    }
+
+    const localIds = new Set<string>();
     for (const actorId of player.actorIds) {
         const actor = debug.actors.get(actorId);
         if (!actor) {
@@ -48,7 +61,33 @@ export function checkRaidLabInvariants(context: InvariantCheckContext): RaidLabI
         if (actor.ownerPlayerId !== player.id) {
             push('actor_owner_mismatch', `Actor ${actor.id} owner=${actor.ownerPlayerId} expected=${player.id}`);
         }
+        if (localIds.has(actor.localActorId)) {
+            push('duplicate_local_actor_id', `Player ${player.id} duplicate localActorId=${actor.localActorId}`);
+        }
+        localIds.add(actor.localActorId);
         checkActor(actor, push);
+    }
+
+    const entityKinds = new Map<string, string>();
+    const checkEntityId = (mapKey: string, entityId: string, kind: string) => {
+        if (mapKey !== entityId) {
+            push(`${kind}_map_key_mismatch`, `${kind} map key=${mapKey} entity.id=${entityId}`);
+        }
+        const previousKind = entityKinds.get(entityId);
+        if (previousKind) {
+            push('duplicate_entity_id', `Entity id=${entityId} reused by ${previousKind} and ${kind}`);
+        } else {
+            entityKinds.set(entityId, kind);
+        }
+    };
+    for (const [mapKey, actor] of debug.actors) {
+        checkEntityId(mapKey, actor.id, 'actor');
+    }
+    for (const [mapKey, enemy] of debug.enemies) {
+        checkEntityId(mapKey, enemy.enemy.id, 'enemy');
+    }
+    for (const [mapKey, loot] of debug.loot) {
+        checkEntityId(mapKey, loot.id, 'loot');
     }
 
     for (const enemy of debug.enemies.values()) {
@@ -127,10 +166,11 @@ function checkActor(actor: ServerActor, push: (code: string, message: string) =>
 }
 
 function checkInventory(
-    inventory: InventorySaveSnapshot,
+    inventory: InventorySaveSnapshot | undefined,
     label: string,
     push: (code: string, message: string) => void,
 ): void {
+    if (!inventory) return;
     if (!Number.isInteger(inventory.width) || inventory.width <= 0
         || !Number.isInteger(inventory.height) || inventory.height <= 0) {
         push('inventory_dimensions_invalid', `${label}=${inventory.width}x${inventory.height}`);

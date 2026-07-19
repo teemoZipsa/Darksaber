@@ -115,7 +115,7 @@ game-balance program. The following remain separate deliverables:
 
 1. ~~party composition, equipment/loadout, consumable and item-conservation matrix~~
    - **Phase 4a (labVersion 10):** solo loadout / supply / conserve matrix — done
-   - Still deferred: multi-actor party composition (1–3 members + multi-ready policy)
+   - **Phase 4b (labVersion 11):** multi-actor party composition (1–3) + multi-ready — done
 2. episode 1–31 story campaigns and exactly-once quest/reward persistence
 3. disconnect/reconnect, duplicated messages, delayed ticks, and save-conflict chaos
 
@@ -138,3 +138,25 @@ Solo-only balance axes orthogonal to class / route / stress / policy:
   every class/loadout/supply tuple, and the full cycle covers every conserve
   value without coupling class and loadout.
 - npm: `raid-lab:smoke:loadout`
+
+### Phase 4b — Multi-Actor Party Composition (labVersion 11)
+
+Builds on 4a with real production join/save party paths (`partySnapshot` /
+`rosterSnapshot` → `createWorldJoinSaveState` → `WorldSession.join`):
+
+| Axis | Values | Default (regression-safe) |
+|---|---|---|
+| `partySize` | `1`, `2`, `3` | `1` |
+| `multiReady` | `leader-first`, `lowest-hp`, `round-robin` | `leader-first` |
+| companion classes | derived per seed when `partySize > 1` | `[]` |
+
+- Solo `partySize=1` + `bare` still skips join-save gear wiring (4a regression path).
+- Multi-ready selects among independently ready ATB actors (not all-must-ready).
+- Sweep uses ÷4 partySize and ÷3 multiReady strides so they do not lock to
+  conserve's `seed % 3`; seeds `0..35` cover every `partySize×class`,
+  `partySize×conserve`, and `partySize×multiReady` pair.
+- Holdout seeds start at `30000` (`RAID_LAB_HOLDOUT_SEED_START`).
+- Invariants: party size, ownership, duplicate local/server/entity IDs,
+  exactly-once `RAID_RESULT`.
+- CLI: `--party-size` / `--multi-ready` (each accepts `sweep`).
+- npm: `raid-lab:smoke:party`, `raid-lab:cohort1k:party`

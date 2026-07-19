@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import {
     RAID_LAB_DEFAULT_CONSERVE,
     RAID_LAB_DEFAULT_LOADOUT,
+    RAID_LAB_DEFAULT_MULTI_READY,
+    RAID_LAB_DEFAULT_PARTY_SIZE,
     RAID_LAB_DEFAULT_SUPPLY,
     type RaidLabExperimentResult,
 } from './types';
@@ -19,6 +21,9 @@ export function digestExperimentResult(result: Omit<RaidLabExperimentResult, 'di
         ...(result.loadout !== RAID_LAB_DEFAULT_LOADOUT ? { loadout: result.loadout } : {}),
         ...(result.supply !== RAID_LAB_DEFAULT_SUPPLY ? { supply: result.supply } : {}),
         ...(result.conserve !== RAID_LAB_DEFAULT_CONSERVE ? { conserve: result.conserve } : {}),
+        ...(result.partySize !== RAID_LAB_DEFAULT_PARTY_SIZE ? { partySize: result.partySize } : {}),
+        ...(result.multiReady !== RAID_LAB_DEFAULT_MULTI_READY ? { multiReady: result.multiReady } : {}),
+        ...(result.companionClasses.length > 0 ? { companionClasses: result.companionClasses } : {}),
         carriedWeight: round3(result.carriedWeight),
         healUses: result.healUses,
         healQtyRemaining: result.healQtyRemaining,
@@ -49,6 +54,7 @@ export function digestExperimentResult(result: Omit<RaidLabExperimentResult, 'di
         invariantViolations: result.invariantViolations,
         finishedAtSimMs: result.finishedAtSimMs,
         actorFinal: result.actorFinal ?? null,
+        actorsFinal: result.actorsFinal ?? null,
         stopReason: result.stopReason,
     };
     return createHash('sha256').update(JSON.stringify(payload)).digest('hex');

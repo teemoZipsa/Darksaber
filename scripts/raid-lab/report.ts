@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { raidLabPairwiseKeys } from './matrix';
 import type {
     RaidLabCohortSummary,
     RaidLabExperimentResult,
@@ -75,6 +76,10 @@ export function summarizeCohort(
     const loadoutCounts: Record<string, number> = {};
     const supplyCounts: Record<string, number> = {};
     const conserveCounts: Record<string, number> = {};
+    const partySizeCounts: Record<string, number> = {};
+    const multiReadyCounts: Record<string, number> = {};
+    const companionClassCounts: Record<string, number> = {};
+    const pairwiseCoverage: Record<string, number> = {};
     const targetTownCounts: Record<string, number> = {};
     const extractionTownCounts: Record<string, number> = {};
 
@@ -90,6 +95,23 @@ export function summarizeCohort(
         loadoutCounts[result.loadout] = (loadoutCounts[result.loadout] ?? 0) + 1;
         supplyCounts[result.supply] = (supplyCounts[result.supply] ?? 0) + 1;
         conserveCounts[result.conserve] = (conserveCounts[result.conserve] ?? 0) + 1;
+        partySizeCounts[String(result.partySize)] = (partySizeCounts[String(result.partySize)] ?? 0) + 1;
+        multiReadyCounts[result.multiReady] = (multiReadyCounts[result.multiReady] ?? 0) + 1;
+        for (const companion of result.companionClasses) {
+            companionClassCounts[companion] = (companionClassCounts[companion] ?? 0) + 1;
+        }
+        for (const key of raidLabPairwiseKeys({
+            partySize: result.partySize,
+            classKey: result.classKey,
+            loadout: result.loadout,
+            supply: result.supply,
+            conserve: result.conserve,
+            multiReady: result.multiReady,
+            companionClasses: result.companionClasses,
+            routeMode: result.routeMode,
+        })) {
+            pairwiseCoverage[key] = (pairwiseCoverage[key] ?? 0) + 1;
+        }
         targetTownCounts[result.targetTownId] = (targetTownCounts[result.targetTownId] ?? 0) + 1;
         extractionTownCounts[result.extractionTownId] = (extractionTownCounts[result.extractionTownId] ?? 0) + 1;
         invariantViolationCount += result.invariantViolations.length;
@@ -119,6 +141,10 @@ export function summarizeCohort(
         loadoutCounts,
         supplyCounts,
         conserveCounts,
+        partySizeCounts,
+        multiReadyCounts,
+        companionClassCounts,
+        pairwiseCoverage,
         targetTownCounts,
         extractionTownCounts,
         digests: results.map((result) => ({
@@ -174,6 +200,10 @@ export function formatCohortMarkdown(summary: RaidLabCohortSummary): string {
         `- loadouts: ${formatCounts(summary.loadoutCounts)}`,
         `- supply: ${formatCounts(summary.supplyCounts)}`,
         `- conserve: ${formatCounts(summary.conserveCounts)}`,
+        `- partySize: ${formatCounts(summary.partySizeCounts)}`,
+        `- multiReady: ${formatCounts(summary.multiReadyCounts)}`,
+        `- companionClasses: ${formatCounts(summary.companionClassCounts)}`,
+        `- pairwise: ${formatCounts(summary.pairwiseCoverage)}`,
         `- target towns: ${formatCounts(summary.targetTownCounts)}`,
         `- final towns: ${formatCounts(summary.extractionTownCounts)}`,
         '',
@@ -192,42 +222,50 @@ export function writeCohortReport(
     summary: RaidLabCohortSummary,
     results: RaidLabExperimentResult[],
     label: string,
-    options: { includeFullResults?: boolean } = {}
+    options: { includeCompactResults?: boolean; includeFullResults?: boolean } = {}
 ): { jsonPath: string; mdPath: string } {
     const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'docs', 'raid-lab', 'reports');
     mkdirSync(root, { recursive: true });
     const jsonPath = join(root, `${label}.json`);
     const mdPath = join(root, `${label}.md`);
-    const compactResults = results.map((result) => ({
-        seed: result.seed,
-        policy: result.policy,
-        classKey: result.classKey,
-        routeMode: result.routeMode,
-        loadout: result.loadout,
-        supply: result.supply,
-        conserve: result.conserve,
-        carriedWeight: result.carriedWeight,
-        healUses: result.healUses,
-        healQtyRemaining: result.healQtyRemaining,
-        result: result.result,
-        elapsedSeconds: result.elapsedSeconds,
-        kills: result.kills,
-        departureTownId: result.departureTownId,
-        targetTownId: result.targetTownId,
-        extractionTownId: result.extractionTownId,
-        telemetry: result.telemetry,
-        invariantViolationCount: result.invariantViolations.length,
-        invariantCodes: [...new Set(result.invariantViolations.map((entry) => entry.code))],
-        actionCount: result.actions.length,
-        digest: result.digest,
-        stopReason: result.stopReason,
-        actorFinal: result.actorFinal ?? null,
-    }));
-    writeFileSync(jsonPath, JSON.stringify({
-        summary,
-        results: compactResults,
-        ...(options.includeFullResults ? { fullResults: results } : {}),
-    }, null, 2), 'utf8');
+    // Default: summary-only (digests + clusters already live on summary).
+    // Opt in to compact/full per-seed payloads for local debugging — do not commit those.
+    const payload: Record<string, unknown> = { summary };
+    if (options.includeCompactResults || options.includeFullResults) {
+        payload.results = results.map((result) => ({
+            seed: result.seed,
+            policy: result.policy,
+            classKey: result.classKey,
+            routeMode: result.routeMode,
+            loadout: result.loadout,
+            supply: result.supply,
+            conserve: result.conserve,
+            partySize: result.partySize,
+            multiReady: result.multiReady,
+            companionClasses: result.companionClasses,
+            carriedWeight: result.carriedWeight,
+            healUses: result.healUses,
+            healQtyRemaining: result.healQtyRemaining,
+            result: result.result,
+            elapsedSeconds: result.elapsedSeconds,
+            kills: result.kills,
+            departureTownId: result.departureTownId,
+            targetTownId: result.targetTownId,
+            extractionTownId: result.extractionTownId,
+            telemetry: result.telemetry,
+            invariantViolationCount: result.invariantViolations.length,
+            invariantCodes: [...new Set(result.invariantViolations.map((entry) => entry.code))],
+            actionCount: result.actions.length,
+            digest: result.digest,
+            stopReason: result.stopReason,
+            actorFinal: result.actorFinal ?? null,
+            actorsFinal: result.actorsFinal ?? null,
+        }));
+    }
+    if (options.includeFullResults) {
+        payload.fullResults = results;
+    }
+    writeFileSync(jsonPath, JSON.stringify(payload, null, 2), 'utf8');
     writeFileSync(mdPath, formatCohortMarkdown(summary), 'utf8');
     return { jsonPath, mdPath };
 }

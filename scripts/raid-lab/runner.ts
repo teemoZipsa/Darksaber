@@ -3,6 +3,7 @@ import { createDefaultCharacterSave, type AuthCharacter } from '../../server/Aut
 import { createWorldJoinSaveState } from '../../server/WorldJoinSave';
 import { getClassLine } from '../../src/data/ClassTree';
 import { WorldSession, WORLD_TICK_MS } from '../../server/WorldSession';
+import type { ServerActor } from '../../server/WorldSessionTypes';
 import { WorldMap } from '../../src/map/WorldMap';
 import type {
     ActorSnapshot,
@@ -12,6 +13,7 @@ import type {
     WorldServerMessage,
 } from '../../src/net/WorldProtocol';
 import { FIELD_MAX_ACTION_GAUGE } from '../../src/field/FieldActionEconomy';
+import type { StartingClassId } from '../../src/data/characterClasses';
 import { digestExperimentResult } from './digest';
 import { checkRaidLabInvariants } from './invariants';
 import {
@@ -21,19 +23,31 @@ import {
     countHealQuantity,
     pickHealItemId,
 } from './loadouts';
+import { resolveRaidLabCompanionClasses } from './matrix';
+import {
+    applyLabPartyToSave,
+    buildLabPartySpecs,
+    selectReadyActor,
+    type LabReadyActorView,
+} from './party';
 import { planLocalStep, type PathCache } from './pathing';
 import { getRaidLabPolicy, type LabObservation } from './policies';
 import { createLabTokenFactory, createMulberry32, sessionEpochFromSeed } from './rng';
 import {
     RAID_LAB_DEFAULT_CONSERVE,
     RAID_LAB_DEFAULT_LOADOUT,
+    RAID_LAB_DEFAULT_MULTI_READY,
+    RAID_LAB_DEFAULT_PARTY_SIZE,
     RAID_LAB_DEFAULT_SUPPLY,
     RAID_LAB_VERSION,
     type RaidLabActionRecord,
+    type RaidLabActorFinal,
     type RaidLabConserveId,
     type RaidLabExperimentResult,
     type RaidLabInvariantViolation,
     type RaidLabLoadoutId,
+    type RaidLabMultiReadyId,
+    type RaidLabPartySize,
     type RaidLabPolicyId,
     type RaidLabRunOptions,
     type RaidLabSupplyId,
@@ -74,6 +88,13 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
         ? 'none'
         : (options.supply ?? RAID_LAB_DEFAULT_SUPPLY);
     const conserve: RaidLabConserveId = options.conserve ?? RAID_LAB_DEFAULT_CONSERVE;
+    const partySize: RaidLabPartySize = options.partySize ?? RAID_LAB_DEFAULT_PARTY_SIZE;
+    const multiReady: RaidLabMultiReadyId = options.multiReady ?? RAID_LAB_DEFAULT_MULTI_READY;
+    const companionClasses: StartingClassId[] = resolveRaidLabCompanionClasses(
+        partySize,
+        options.seed,
+        options.companionClasses,
+    );
     const sessionEpoch = sessionEpochFromSeed(options.seed);
     const session = new WorldSession({
         sessionEpoch,
@@ -90,9 +111,11 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
     applyRaidLabLoadout(save, classKey, loadout);
     const supplyStacks = applyRaidLabSupply(save, supply);
     const carriedItems = carriedItemsFromStacks(supplyStacks);
+    const partySpecs = buildLabPartySpecs(options.seed, character, partySize, companionClasses);
+    applyLabPartyToSave(save, character, partySpecs, loadout);
 
-    const useGearJoin = loadout !== 'bare';
-    const joinSave = useGearJoin ? createWorldJoinSaveState(character, save) : null;
+    const useJoinSave = partySize > 1 || loadout !== 'bare';
+    const joinSave = useJoinSave ? createWorldJoinSaveState(character, save) : null;
     const joinMessage = createJoinMessage({
         character,
         originHubId: departureTownId,
@@ -123,17 +146,22 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
     let raidResult: RaidResultMessage | null = null;
     let raidResultCount = 0;
     let actorFinal: RaidLabExperimentResult['actorFinal'];
+    let actorsFinal: RaidLabExperimentResult['actorsFinal'];
     let intentOrdinal = 0;
+    let roundRobinCursor = 0;
     let cappedStop: 'max_actions' | 'max_sim_ms' | 'invariant_abort' | null = null;
     const ignoredLootIds = new Set<string>();
     const pathCache: PathCache = { goalKey: '', waypointKey: '', path: [], index: 0 };
 
-    const recordAction = (kind: string, detail?: string) => {
+    const recordAction = (kind: string, detail?: string, localActorId?: string) => {
+        const tagged = partySize > 1 && localActorId
+            ? (detail ? `${detail}|actor=${localActorId}` : `|actor=${localActorId}`)
+            : detail;
         actions.push({
             index: actions.length,
             kind,
             simMs: now,
-            ...(detail ? { detail } : {}),
+            ...(tagged ? { detail: tagged } : {}),
         });
     };
 
@@ -168,10 +196,35 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
             break;
         }
 
+        const owned = listOwnedActors(session, joined.playerId);
+        if (owned.length === 0) {
+            break;
+        }
+
+        const readyViews = buildReadyActorViews(owned, character.id);
+        if (readyViews.length === 0) {
+            now = advanceUntilAnyReady(session, joined.playerId, now, maxSimMs, applyMessages);
+            continue;
+        }
+
+        const selected = selectReadyActor(readyViews, multiReady, roundRobinCursor);
+        if (!selected) {
+            now = advanceUntilAnyReady(session, joined.playerId, now, maxSimMs, applyMessages);
+            continue;
+        }
+        roundRobinCursor = selected.nextCursor;
+
+        const serverActor = owned.find((entry) => entry.id === selected.actor.id);
+        if (!serverActor) {
+            break;
+        }
+
         const observation = buildObservation(
             session,
             world,
             joined.playerId,
+            serverActor,
+            partySize,
             extraction,
             policyRng,
             ignoredLootIds,
@@ -188,20 +241,11 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
         );
 
         if (!observation.actorReady) {
-            now = advanceUntilReadyOrDone(session, joined.playerId, now, maxSimMs, applyMessages);
+            now = advanceUntilAnyReady(session, joined.playerId, now, maxSimMs, applyMessages);
             continue;
         }
 
-        actorFinal = {
-            hp: observation.hp,
-            maxHp: observation.maxHp,
-            mp: observation.mp,
-            level: getActorLevel(session, joined.playerId),
-            exp: getActorExp(session, joined.playerId),
-            tileX: observation.tile.x,
-            tileY: observation.tile.y,
-            mov: observation.mov,
-        };
+        refreshActorFinals(owned, character.id);
 
         if (process.env.RAID_LAB_TRACE === '1' && actions.length % 50 === 0) {
             process.stderr.write(
@@ -210,6 +254,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
                 + `hp=${observation.hp} kills=${observation.kills} `
                 + `enemies=${observation.enemies.length} `
                 + `town=${observation.currentTownId ?? '-'} `
+                + `party=${partySize} actor=${serverActor.localActorId} `
                 + `credits=${pathCache.astarCredits ?? '-'}\n`
             );
         }
@@ -228,9 +273,8 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
             break;
         }
 
-        const actor = getOwnedActor(session, joined.playerId);
-        if (!actor) break;
-
+        const actorId = observation.actorId;
+        const localActorId = serverActor.localActorId;
         const intentId = `lab_${options.seed}_${intentOrdinal++}`;
         let handled = false;
 
@@ -241,8 +285,8 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
             const moveAttempt = attemptMove(
                 session,
                 joined.playerId,
-                actor.id,
-                actor.tile,
+                actorId,
+                serverActor.tile,
                 decision.tile,
                 intentId,
                 now,
@@ -252,60 +296,73 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
             applyMessages([...moveAttempt.replies, ...moveAttempt.broadcasts]);
             recordAction(
                 moveAttempt.rejected ? 'move_rejected' : 'move',
-                decision.detail ?? `${moveAttempt.tile.x},${moveAttempt.tile.y}`
+                decision.detail ?? `${moveAttempt.tile.x},${moveAttempt.tile.y}`,
+                localActorId,
             );
             handled = true;
         } else if (decision.kind === 'attack' && decision.targetId) {
             const result = session.handleMessage(joined.playerId, {
                 type: 'PLAYER_INTENT',
                 intentId,
-                actorId: actor.id,
+                actorId,
                 kind: 'attack',
                 payload: { targetId: decision.targetId },
             }, now);
             applyMessages([...result.replies, ...result.broadcasts]);
-            recordAction(hasActionRejected(result.replies) ? 'attack_rejected' : 'attack', decision.detail ?? decision.targetId);
+            recordAction(
+                hasActionRejected(result.replies) ? 'attack_rejected' : 'attack',
+                decision.detail ?? decision.targetId,
+                localActorId,
+            );
             handled = true;
         } else if (decision.kind === 'defend') {
             const result = session.handleMessage(joined.playerId, {
                 type: 'PLAYER_INTENT',
                 intentId,
-                actorId: actor.id,
+                actorId,
                 kind: 'defend',
                 payload: {},
             }, now);
             applyMessages([...result.replies, ...result.broadcasts]);
-            recordAction(hasActionRejected(result.replies) ? 'defend_rejected' : 'defend', decision.detail);
+            recordAction(
+                hasActionRejected(result.replies) ? 'defend_rejected' : 'defend',
+                decision.detail,
+                localActorId,
+            );
             handled = true;
         } else if (decision.kind === 'rest') {
             const result = session.handleMessage(joined.playerId, {
                 type: 'PLAYER_INTENT',
                 intentId,
-                actorId: actor.id,
+                actorId,
                 kind: 'rest',
                 payload: {},
             }, now);
             applyMessages([...result.replies, ...result.broadcasts]);
-            recordAction(hasActionRejected(result.replies) ? 'rest_rejected' : 'rest', decision.detail);
+            recordAction(
+                hasActionRejected(result.replies) ? 'rest_rejected' : 'rest',
+                decision.detail,
+                localActorId,
+            );
             handled = true;
         } else if (decision.kind === 'useItem' && decision.itemId) {
             const result = session.handleMessage(joined.playerId, {
                 type: 'PLAYER_INTENT',
                 intentId,
-                actorId: actor.id,
+                actorId,
                 kind: 'useItem',
                 payload: { itemId: decision.itemId },
             }, now);
             applyMessages([...result.replies, ...result.broadcasts]);
             const rejected = hasActionRejected(result.replies);
             if (!rejected) healUses += 1;
-            recordAction(rejected ? 'useItem_rejected' : 'useItem', decision.itemId);
+            recordAction(rejected ? 'useItem_rejected' : 'useItem', decision.itemId, localActorId);
             handled = true;
         } else if (decision.kind === 'loot' && decision.lootId) {
             const interact = session.handleMessage(joined.playerId, {
                 type: 'PLAYER_INTENT',
                 intentId: `${intentId}:interact`,
-                actorId: actor.id,
+                actorId,
                 kind: 'interact',
                 payload: { lootId: decision.lootId },
             }, now);
@@ -323,30 +380,34 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
                     applyMessages([...pickup.replies, ...pickup.broadcasts]);
                 }
                 ignoredLootIds.add(decision.lootId);
-                recordAction('loot', decision.lootId);
+                recordAction('loot', decision.lootId, localActorId);
             } else {
                 ignoredLootIds.add(decision.lootId);
                 const rejected = interact.replies.some((message) => message.type === 'ACTION_REJECTED');
-                recordAction(rejected ? 'loot_rejected' : 'loot', decision.lootId);
+                recordAction(rejected ? 'loot_rejected' : 'loot', decision.lootId, localActorId);
             }
             handled = true;
         } else if (decision.kind === 'endTurn') {
             const result = session.handleMessage(joined.playerId, {
                 type: 'PLAYER_INTENT',
                 intentId,
-                actorId: actor.id,
+                actorId,
                 kind: 'endTurn',
                 payload: { reason: decision.detail ?? 'lab' },
             }, now);
             applyMessages([...result.replies, ...result.broadcasts]);
-            recordAction(hasActionRejected(result.replies) ? 'endTurn_rejected' : 'endTurn', decision.detail);
+            recordAction(
+                hasActionRejected(result.replies) ? 'endTurn_rejected' : 'endTurn',
+                decision.detail,
+                localActorId,
+            );
             handled = true;
         }
 
         if (!handled) {
             now += WORLD_TICK_MS;
             applyMessages(flattenTick(session.tick(now)));
-            recordAction('noop', decision.kind);
+            recordAction('noop', decision.kind, localActorId);
         }
 
         collectInvariants();
@@ -371,6 +432,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
     const stillPresent = session.getDebugState().players.get(joined.playerId);
     if (stillPresent) {
         healQtyRemaining = countHealQuantity(stillPresent.carriedItems);
+        refreshActorFinals(listOwnedActors(session, joined.playerId), character.id);
     }
 
     const base = {
@@ -383,6 +445,9 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
         loadout,
         supply,
         conserve,
+        partySize,
+        multiReady,
+        companionClasses,
         carriedWeight: carriedWeightAtJoin,
         healUses,
         healQtyRemaining,
@@ -405,6 +470,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
         invariantViolations,
         finishedAtSimMs: now,
         actorFinal,
+        actorsFinal,
         stopReason,
     };
 
@@ -422,6 +488,24 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
         digest: digestExperimentResult(base),
     };
 
+    function refreshActorFinals(owned: readonly ServerActor[], leaderLocalId: string): void {
+        const mapped: RaidLabActorFinal[] = owned.map((entry) => ({
+            hp: entry.stats.hp,
+            maxHp: entry.stats.maxHp,
+            mp: entry.stats.mp,
+            level: entry.level,
+            exp: entry.exp ?? 0,
+            tileX: entry.tile.x,
+            tileY: entry.tile.y,
+            mov: Math.max(1, entry.stats.mov || 1),
+            localActorId: entry.localActorId,
+            isLeader: entry.localActorId === leaderLocalId,
+        }));
+        mapped.sort((a, b) => (a.localActorId ?? '').localeCompare(b.localActorId ?? ''));
+        actorsFinal = mapped;
+        actorFinal = mapped.find((entry) => entry.isLeader) ?? mapped[0];
+    }
+
     function collectInvariants(): void {
         const finished = !session.getDebugState().players.has(joined.playerId);
         invariantViolations.push(...checkRaidLabInvariants({
@@ -430,6 +514,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
             simMs: now,
             actionIndex: actions.length,
             raidFinished: finished,
+            expectedPartySize: partySize,
         }));
     }
 
@@ -438,6 +523,7 @@ export function runRaidLabExpedition(options: RaidLabRunOptions): RaidLabExperim
         healQtyRemaining = countHealQuantity(
             session.getDebugState().players.get(joined.playerId)?.carriedItems ?? new Map()
         );
+        refreshActorFinals(listOwnedActors(session, joined.playerId), character.id);
         const leave = session.handleMessage(joined.playerId, { type: 'WORLD_LEAVE', reason }, now);
         applyMessages([...leave.replies, ...leave.broadcasts]);
         recordAction(`leave_${reason}`, detail);
@@ -546,6 +632,8 @@ function buildObservation(
     session: WorldSession,
     world: WorldMap,
     playerId: string,
+    serverActor: ServerActor,
+    partySize: number,
     extraction: { townId: string; tile: { x: number; y: number } },
     policyRng: () => number,
     ignoredLootIds: ReadonlySet<string>,
@@ -557,8 +645,6 @@ function buildObservation(
     const debug = session.getDebugState();
     const player = debug.players.get(playerId);
     if (!player) return null;
-    const serverActor = [...debug.actors.values()].find((entry) => entry.ownerPlayerId === playerId);
-    if (!serverActor) return null;
     const snapshot = session.createSnapshot(playerId, now);
     const actor = snapshot.partyActors.find((entry) => entry.id === serverActor.id);
     if (!actor) return null;
@@ -570,6 +656,7 @@ function buildObservation(
         .reduce((sum, item) => sum + Math.max(1, Math.floor(item.quantity ?? 1)), 0);
 
     return {
+        actorId: serverActor.id,
         actorReady: actor.actionGauge >= FIELD_MAX_ACTION_GAUGE && actor.remainingAp > 0 && !actor.isDead,
         remainingAp: actor.remainingAp,
         actionGauge: actor.actionGauge,
@@ -580,6 +667,7 @@ function buildObservation(
         tile: { ...actor.tile },
         attackRange: serverActor.attackRange ?? 1,
         mov: Math.max(1, actor.stats.mov || 1),
+        partySize,
         currentTownId,
         departureTownId: player.departureTownId,
         extractionGoal: extraction.tile,
@@ -623,16 +711,55 @@ function buildObservation(
     };
 }
 
-function getOwnedActor(session: WorldSession, playerId: string) {
-    return [...session.getDebugState().actors.values()].find((entry) => entry.ownerPlayerId === playerId);
+function listOwnedActors(session: WorldSession, playerId: string): ServerActor[] {
+    const debug = session.getDebugState();
+    const player = debug.players.get(playerId);
+    if (!player) return [];
+    const actors: ServerActor[] = [];
+    for (const actorId of player.actorIds) {
+        const actor = debug.actors.get(actorId);
+        if (actor) actors.push(actor);
+    }
+    return actors;
 }
 
-/** Phase 3 stress: start the expedition already wounded (≈30% HP). */
+function buildReadyActorViews(
+    owned: readonly ServerActor[],
+    leaderLocalId: string,
+): LabReadyActorView[] {
+    const ready: LabReadyActorView[] = [];
+    for (const actor of owned) {
+        if (actor.isDead) continue;
+        if (actor.remainingAp <= 0) continue;
+        if (actor.actionGauge < FIELD_MAX_ACTION_GAUGE) continue;
+        ready.push({
+            id: actor.id,
+            localActorId: actor.localActorId,
+            hp: actor.stats.hp,
+            maxHp: actor.stats.maxHp,
+            mp: actor.stats.mp,
+            maxMp: actor.stats.maxMp,
+            tile: { ...actor.tile },
+            remainingAp: actor.remainingAp,
+            actionGauge: actor.actionGauge,
+            attackRange: actor.attackRange ?? 1,
+            mov: Math.max(1, actor.stats.mov || 1),
+            level: actor.level,
+            exp: actor.exp ?? 0,
+            isDead: actor.isDead,
+            isLeader: actor.localActorId === leaderLocalId,
+        });
+    }
+    return ready;
+}
+
+/** Phase 3 stress: start the expedition already wounded (≈30% HP) for every living party member. */
 function applyLowHpStress(session: WorldSession, playerId: string): void {
-    const actor = getOwnedActor(session, playerId);
-    if (!actor) return;
-    const maxHp = Math.max(1, actor.stats.maxHp);
-    actor.stats.hp = Math.max(1, Math.floor(maxHp * 0.3));
+    for (const actor of listOwnedActors(session, playerId)) {
+        if (actor.isDead) continue;
+        const maxHp = Math.max(1, actor.stats.maxHp);
+        actor.stats.hp = Math.max(1, Math.floor(maxHp * 0.3));
+    }
 }
 
 function usesLowHpStress(stress: RaidLabRunOptions['stress']): boolean {
@@ -641,14 +768,6 @@ function usesLowHpStress(stress: RaidLabRunOptions['stress']): boolean {
 
 function usesDenseNestStress(stress: RaidLabRunOptions['stress']): boolean {
     return stress === 'dense-nests' || stress === 'low-hp+dense-nests';
-}
-
-function getActorLevel(session: WorldSession, playerId: string): number {
-    return getOwnedActor(session, playerId)?.level ?? 1;
-}
-
-function getActorExp(session: WorldSession, playerId: string): number {
-    return getOwnedActor(session, playerId)?.exp ?? 0;
 }
 
 function flattenTick(tick: {
@@ -779,7 +898,8 @@ function stepTowardWalkableTile(
     return null;
 }
 
-function advanceUntilReadyOrDone(
+/** Advance sim time until any owned living actor is gauge+AP ready, or player leaves / cap. */
+function advanceUntilAnyReady(
     session: WorldSession,
     playerId: string,
     now: number,
@@ -793,9 +913,13 @@ function advanceUntilReadyOrDone(
         applyMessages(flattenTick(session.tick(cursor)));
         const player = session.getDebugState().players.get(playerId);
         if (!player) return cursor;
-        const actor = getOwnedActor(session, playerId);
-        if (!actor || actor.isDead) return cursor;
-        if (actor.actionGauge >= FIELD_MAX_ACTION_GAUGE && actor.remainingAp > 0) return cursor;
+        const owned = listOwnedActors(session, playerId);
+        const living = owned.filter((actor) => !actor.isDead);
+        if (living.length === 0) return cursor;
+        const anyReady = living.some(
+            (actor) => actor.actionGauge >= FIELD_MAX_ACTION_GAUGE && actor.remainingAp > 0
+        );
+        if (anyReady) return cursor;
         if (cursor >= maxSimMs) return cursor;
     }
     return cursor;

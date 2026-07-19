@@ -1,5 +1,109 @@
 # Raid Lab — Progress
 
+## Batch 2026-07-19 — Phase 4b multi-actor party composition (labVersion 11)
+
+### Changes
+
+- Added `partySize` (`1|2|3`) and `multiReady`
+  (`leader-first|lowest-hp|round-robin`) axes on top of the Phase 4a matrix.
+- Defaults remain regression-safe: `partySize=1` + `multiReady=leader-first`
+  (solo bare path still skips `createWorldJoinSaveState`).
+- Multi-member parties use the production save/join path:
+  `partySnapshot` / `rosterSnapshot` → `createWorldJoinSaveState` → join.
+- Runner selects among independently ready ATB actors; intents carry the
+  chosen `actorId`. Digests include party fields + `actorsFinal`.
+- Sweep strides keep partySize/multiReady independent of conserve's `seed%3`
+  so seeds `0..35` cover every `partySize×class`, `partySize×conserve`, and
+  `partySize×multiReady` pair. Holdout seeds start at `30000`.
+- Invariants: `party_size_mismatch`, `duplicate_local_actor_id`,
+  `party_size_over_cap`, ownership, entity map-key/cross-kind identity,
+  exactly-once `RAID_RESULT`.
+- Final review normalizes explicit companion-class inputs to the actual party
+  size, checks entity map-key/cross-kind identity, and pins shared scenario
+  rewards so two party members cannot claim the same reward twice.
+- CLI/npm: `--party-size` / `--multi-ready` (+ `sweep`);
+  `raid-lab:smoke:party`, `raid-lab:cohort1k:party`.
+- Cohort JSON reports default to summary-only (no multi-MB per-seed dumps).
+
+### Smoke cohort (seeds 0..99 / balanced / party+loadout matrix sweep)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 32 | 32.0% |
+| DEAD | 13 | 13.0% |
+| LEFT | 55 | 55.0% |
+| MIA | 0 | 0.0% |
+
+- mean elapsedSeconds 255.3; mean kills 0.38; invariants 0; wall ~44 min
+- pairwise: partySize×class 12/12, ×loadout 12/12, ×supply 12/12,
+  ×conserve 9/9, ×multiReady 9/9; class×loadout 16/16
+- all 100 result/digest pairs match the corresponding seeds in the 1k cohort
+- Report: `…party-sweep-ready-sweep-…-s0-n100-20260719.*`
+
+### 1k cohort (seeds 0..999 / balanced / party+loadout matrix sweep)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 336 | 33.6% |
+| DEAD | 96 | 9.6% |
+| LEFT | 568 | 56.8% |
+| MIA | 0 | 0.0% |
+
+- mean elapsedSeconds 260.6; mean kills 0.38; invariants **0**
+- pairwise: partySize×class 12/12, ×loadout 12/12, ×supply 12/12,
+  ×conserve 9/9, ×multiReady 9/9; class×loadout 16/16
+- deathCause: manual 568, none 336, enemy 94, curse 2 (611, 852)
+- wall ~7.5 h; Report: `…-s0-n1000-20260718.*`
+
+### Holdout (seeds 30000..30011)
+
+| Result | Count | Share |
+|---|---:|---:|
+| SURVIVED | 4 | 33.3% |
+| DEAD | 1 | 8.3% |
+| LEFT | 7 | 58.3% |
+| MIA | 0 | 0.0% |
+
+- invariants 0; partySize×class 12/12 within the 12-seed window
+
+### Regression pins (swept matrix)
+
+| Seed | Pin |
+|---|---|
+| 0 | DEAD / enemy |
+| 4 | LEFT / max_actions / manual |
+| 8 | SURVIVED / partySize=3 / actorsFinal length 3 / digest×2 |
+| 611 | DEAD / curse / digest×2 |
+
+### Focused production tests
+
+- `tests/net/world-session-party.test.ts`: 2–3 actor join ownership,
+  multi-ready companion intent, disconnect AP wipe + ghost reject + resume,
+  duplicate local id invariant, exactly-once RAID_RESULT, shared scenario reward
+- `tests/raid/raid-lab-party.test.ts`: party save wiring, companion-class
+  normalization, ready selection, pairwise schedule, deterministic outcome pins
+
+### Verification
+
+| Command | Result |
+|---|---|
+| `npm run typecheck` | pass |
+| `npm run lint` | pass |
+| raid-lab determinism + party + world-session-party | 46 pass |
+| `npm test` | 800 pass, 1 pre-existing skip |
+| `npm run test:coverage` | pass (lines 84.64%, branches 82.55%, functions 71.55%) |
+| client + server production builds | pass |
+| `npm run verify:assets` | pass (230 required references) |
+| `npm run raid-lab:smoke:party` | pass (100 seeds, 0 invariants) |
+| party 1k cohort | pass (1000 seeds, 0 invariants) |
+
+### Next work queue
+
+1. Story campaign / exactly-once quest persistence lab
+2. Disconnect / save-conflict chaos (beyond the party AP-wipe fixture)
+
+---
+
 ## Batch 2026-07-18 — Phase 4a loadout/supply/conserve matrix (labVersion 10)
 
 ### Changes
