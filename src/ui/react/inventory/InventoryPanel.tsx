@@ -570,7 +570,7 @@ export function InventoryPanel({
                 )}
             </div>
 
-            <div className="ds-inv__feedback">{feedback}</div>
+            <div className="ds-inv__feedback" role="status" aria-live="polite">{feedback}</div>
             {dragPreview && dragLayer && createPortal(
                 <div
                     className={`inv-drag-ghost ${itemRarityClass(dragPreview.placed)}`}

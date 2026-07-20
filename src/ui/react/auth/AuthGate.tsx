@@ -211,7 +211,7 @@ function AuthForm({ client, error, onError, onSession }: {
                 <span>{t('auth.password')}</span>
                 <input value={password} type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} maxLength={128} onChange={(event) => setPassword(event.target.value)} />
             </label>
-            {error && <div className="auth-error">{error}</div>}
+            {error && <div className="auth-error" role="alert" aria-live="assertive">{error}</div>}
             <button className="auth-primary" disabled={busy}>{busy ? t('auth.busy') : mode === 'login' ? t('auth.login') : t('auth.register')}</button>
         </form>
     );
@@ -327,7 +327,7 @@ function CharacterSelect({ characters, lastSelectedCharacterId, error, onSelect,
                     </div>
                 </form>
             )}
-            {error && <div className="auth-error">{error}</div>}
+            {error && <div className="auth-error" role="alert" aria-live="assertive">{error}</div>}
             <div className="auth-actions">
                 <button type="button" disabled={selectBusy} onClick={onCreate}>{t('auth.createCharacter')}</button>
                 <button type="button" disabled={selectBusy} onClick={onLogout}>{t('auth.logout')}</button>
@@ -379,7 +379,7 @@ function CharacterCreate({ error, onCreate, onBack, onLogout }: {
                         <button type="button" role="radio" aria-checked={gender === 'F'} disabled={busy} className={gender === 'F' ? 'is-active' : ''} onClick={() => setGender('F')}>{t('create.female')}</button>
                     </div>
                     <div className="auth-selected-class">{t(selectedClass.labelKey)}</div>
-                    {error && <div className="auth-error">{error}</div>}
+                    {error && <div className="auth-error" role="alert" aria-live="assertive">{error}</div>}
                     <button className="auth-primary" disabled={busy} onClick={() => { void create(); }}>
                         {busy ? t('auth.busy') : t('create.confirm')}
                     </button>
