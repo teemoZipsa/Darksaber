@@ -28,7 +28,7 @@ export function CharacterPanel() {
     const gold = store.getGold();
     const uiScale = SettingsManager.getUIScale();
 
-    const panelStyle = { width: 560, '--ds-scale': uiScale } as CSSProperties;
+    const panelStyle = { width: 'min(560px, 94vw)', '--ds-scale': uiScale } as CSSProperties;
 
     return (
         <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('info.title')} tabIndex={-1} className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
@@ -36,7 +36,7 @@ export function CharacterPanel() {
 
             {!char ? (
                 <div style={{ padding: 40, textAlign: 'center', color: 'var(--ds-text-muted)' }}>
-                    {t('info.title')}
+                    {t('info.noCharacter')}
                 </div>
             ) : (
                 <>

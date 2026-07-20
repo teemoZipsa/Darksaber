@@ -132,7 +132,12 @@ export function AuthGate({ client, gameManager }: AuthGateProps) {
     return (
         <div className="auth-root">
             <div className="auth-shell">
-                {screen === 'loading' && <div className="auth-status">{t('auth.loading')}</div>}
+                {screen === 'loading' && (
+                    <div className="auth-status" role="status" aria-live="polite">
+                        <span className="auth-spinner" aria-hidden="true" />
+                        {t('auth.loading')}
+                    </div>
+                )}
                 {screen === 'auth' && (
                     <AuthForm
                         error={error}
@@ -195,8 +200,8 @@ function AuthForm({ client, error, onError, onSession }: {
         <form className="auth-panel" onSubmit={submit}>
             <div className="auth-panel__title">{t('auth.title')}</div>
             <div className="auth-tabs" role="tablist">
-                <button type="button" className={mode === 'login' ? 'is-active' : ''} onClick={() => setMode('login')}>{t('auth.login')}</button>
-                <button type="button" className={mode === 'register' ? 'is-active' : ''} onClick={() => setMode('register')}>{t('auth.register')}</button>
+                <button type="button" role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'is-active' : ''} onClick={() => setMode('login')}>{t('auth.login')}</button>
+                <button type="button" role="tab" aria-selected={mode === 'register'} className={mode === 'register' ? 'is-active' : ''} onClick={() => setMode('register')}>{t('auth.register')}</button>
             </div>
             <label className="auth-field">
                 <span>{t('auth.loginName')}</span>
@@ -289,7 +294,7 @@ function CharacterSelect({ characters, lastSelectedCharacterId, error, onSelect,
                         <button type="button" className="auth-character-card__select" disabled={selectBusy} onClick={() => { void select(character.id); }}>
                             <span className="auth-character-card__slot">{t('auth.slot')} {character.slotNo + 1}</span>
                             <strong>{character.name}</strong>
-                            <span>{classLabel(character.classKey)} · Lv {character.level}</span>
+                            <span>{classLabel(character.classKey)} · {t('char.level')} {character.level}</span>
                         </button>
                         <button type="button" className="auth-character-card__delete" disabled={selectBusy} onClick={() => openDeleteConfirm(character)}>
                             {t('auth.deleteCharacter')}
@@ -356,9 +361,9 @@ function CharacterCreate({ error, onCreate, onBack, onLogout }: {
         <div className="auth-panel auth-panel--wide">
             <div className="auth-panel__title">{t('auth.createCharacter')}</div>
             <div className="auth-create-layout">
-                <div className="auth-class-list">
+                <div className="auth-class-list" role="radiogroup" aria-label={t('auth.createCharacter')}>
                     {CHAR_CLASSES.map((entry) => (
-                        <button key={entry.id} disabled={busy} className={entry.id === classKey ? 'is-active' : ''} onClick={() => setClassKey(entry.id)}>
+                        <button key={entry.id} type="button" role="radio" aria-checked={entry.id === classKey} disabled={busy} className={entry.id === classKey ? 'is-active' : ''} onClick={() => setClassKey(entry.id)}>
                             <img src={entry.imageSrc} alt="" />
                             <span>{t(entry.labelKey)}</span>
                         </button>
@@ -370,8 +375,8 @@ function CharacterCreate({ error, onCreate, onBack, onLogout }: {
                         <input value={name} maxLength={24} disabled={busy} onChange={(event) => setName(event.target.value)} />
                     </label>
                     <div className="auth-tabs" role="radiogroup" aria-label={t('create.genderPrompt')}>
-                        <button type="button" disabled={busy} className={gender === 'M' ? 'is-active' : ''} onClick={() => setGender('M')}>{t('create.male')}</button>
-                        <button type="button" disabled={busy} className={gender === 'F' ? 'is-active' : ''} onClick={() => setGender('F')}>{t('create.female')}</button>
+                        <button type="button" role="radio" aria-checked={gender === 'M'} disabled={busy} className={gender === 'M' ? 'is-active' : ''} onClick={() => setGender('M')}>{t('create.male')}</button>
+                        <button type="button" role="radio" aria-checked={gender === 'F'} disabled={busy} className={gender === 'F' ? 'is-active' : ''} onClick={() => setGender('F')}>{t('create.female')}</button>
                     </div>
                     <div className="auth-selected-class">{t(selectedClass.labelKey)}</div>
                     {error && <div className="auth-error">{error}</div>}

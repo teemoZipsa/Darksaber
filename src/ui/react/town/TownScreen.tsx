@@ -118,7 +118,7 @@ export function TownScreen() {
                         {hubSaveError}
                     </div>
                 )}
-                {deployError && <div className="ds-town__deploy-error">{deployError}</div>}
+                {deployError && <div className="ds-town__deploy-error" role="alert">{deployError}</div>}
                 <button
                     type="button"
                     className={`ds-town__insurance${insured ? ' is-active' : ''}`}

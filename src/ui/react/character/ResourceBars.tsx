@@ -19,7 +19,15 @@ function Bar({
     const pct = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
     const cls = `ds-bar ds-bar--${kind}${low ? ' is-low' : ''}`;
     return (
-        <div className={cls}>
+        <div
+            className={cls}
+            role="progressbar"
+            aria-label={label}
+            aria-valuemin={0}
+            aria-valuemax={Math.round(max)}
+            aria-valuenow={Math.round(value)}
+            aria-valuetext={`${Math.round(value)} / ${Math.round(max)}`}
+        >
             <div className="ds-bar__fill" style={{ width: `${pct * 100}%` }} />
             <div className="ds-bar__label">
                 <span>{label}</span>

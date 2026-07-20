@@ -5,6 +5,7 @@ import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
 import type { BlacksmithEntry } from '../UiStore';
 import { useStore, useUiVersion } from '../UiContext';
+import { ConfirmModal } from '../ConfirmModal';
 import { canUnsocket } from '../../../inventory/Socketing';
 import { ItemSwatch, itemName, statSummary } from './itemView';
 
@@ -14,6 +15,7 @@ export function BlacksmithPanel() {
     const entries = store.getBlacksmithEntries();
     const gold = store.getBlacksmithGold();
     const [feedback, setFeedback] = useState('');
+    const [pendingExtract, setPendingExtract] = useState<BlacksmithEntry | null>(null);
 
     useEffect(() => {
         if (!feedback) return;
@@ -64,10 +66,10 @@ export function BlacksmithPanel() {
                                     </div>
                                 </div>
                                 <div className="ds-blacksmith__actions">
-                                    <button className="ds-btn" disabled={repairDisabled} onClick={() => repair(entry)}>
+                                    <button type="button" className="ds-btn" disabled={repairDisabled} onClick={() => repair(entry)}>
                                         {t('blacksmith.repair')} · {entry.repairCost}G
                                     </button>
-                                    <button className="ds-btn" disabled={extractDisabled} onClick={() => extract(entry)}>
+                                    <button type="button" className="ds-btn" disabled={extractDisabled} onClick={() => setPendingExtract(entry)}>
                                         {t('blacksmith.extract')} · {entry.unsocketCost}G
                                     </button>
                                 </div>
@@ -75,8 +77,20 @@ export function BlacksmithPanel() {
                         );
                     })}
                 </div>
-                <div className="ds-blacksmith__feedback">{feedback}</div>
+                <div className="ds-blacksmith__feedback" role="status" aria-live="polite">{feedback}</div>
             </div>
+
+            {pendingExtract && (
+                <ConfirmModal
+                    title={t('blacksmith.extractConfirm')}
+                    confirmLabel={t('blacksmith.extract')}
+                    onConfirm={() => { const entry = pendingExtract; setPendingExtract(null); extract(entry); }}
+                    onCancel={() => setPendingExtract(null)}
+                >
+                    <div className="ds-modal__line">{itemName(pendingExtract.placed.item)}</div>
+                    <div className="ds-modal__line ds-modal__line--sub">{t('blacksmith.extractConfirmDesc')}</div>
+                </ConfirmModal>
+            )}
         </div>
     );
 }

@@ -8,10 +8,12 @@ export function PartyTabs({ party, activeIndex }: { party: Character[]; activeIn
     if (party.length <= 1) return null;
 
     return (
-        <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px' }}>
+        <div role="tablist" style={{ display: 'flex', gap: 6, padding: '0 16px 12px' }}>
             {party.map((char, i) => (
                 <button
                     key={char.id}
+                    type="button"
+                    role="tab"
                     className="ds-btn"
                     aria-selected={i === activeIndex}
                     disabled={char.isDead}

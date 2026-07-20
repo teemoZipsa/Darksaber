@@ -91,6 +91,18 @@ export class SettingsManager {
         this.vsync = safeStorageGet('setting_vsync') !== 'false';
         this.keybindings = normalizeSavedKeybindings(safeStorageGet(KEYBINDING_STORAGE_KEY));
         this.persistKeybindings();
+        this.applyMotionPreference();
+    }
+
+    /**
+     * Reflect the reduce-motion preference onto the document so the scoped CSS
+     * (`html[data-ds-motion="reduce"] #ui-overlay …`) can disable UI animations.
+     * No-op outside a DOM environment (e.g. unit tests).
+     */
+    private static applyMotionPreference(): void {
+        if (typeof document === 'undefined' || !document.documentElement) return;
+        if (this.motionReduce) document.documentElement.dataset.dsMotion = 'reduce';
+        else delete document.documentElement.dataset.dsMotion;
     }
 
     /** Subscribe to setting changes. Returns an unsubscribe function. */
@@ -131,7 +143,11 @@ export class SettingsManager {
     public static setUiVolume(v: number) { this.uiVolume = clamp01(v); safeStorageSet('setting_uiVolume', this.uiVolume.toString()); this.notifyChange(); }
 
     public static getMotionReduce(): boolean { return this.motionReduce; }
-    public static setMotionReduce(v: boolean) { this.motionReduce = v; safeStorageSet('setting_motionReduce', v.toString()); this.notifyChange(); }
+    public static setMotionReduce(v: boolean) { this.motionReduce = v; safeStorageSet('setting_motionReduce', v.toString()); this.applyMotionPreference(); this.notifyChange(); }
+
+    /** Latest changelog version the player has viewed (drives the "new updates" badge). */
+    public static getLastSeenChangelog(): string { return safeStorageGet('setting_changelogSeen') ?? ''; }
+    public static setLastSeenChangelog(version: string): void { safeStorageSet('setting_changelogSeen', version); }
 
     public static getUIScale(): number { return this.uiScale; }
     public static setUIScale(v: number) { this.uiScale = v; safeStorageSet('setting_uiScale', v.toString()); this.notifyChange(); }

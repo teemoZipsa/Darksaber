@@ -13,6 +13,7 @@ import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
 import { getRestMenu } from '../../../data/RestFacilityData';
 import { useStore, useUiVersion } from '../UiContext';
+import { ConfirmModal } from '../ConfirmModal';
 import { restIcon } from './restIcon';
 
 interface RestPanelProps {
@@ -29,6 +30,7 @@ export function RestPanel({ showMenus = true, showTreatment = true }: RestPanelP
     const treatmentPrice = store.getInjuryTreatmentPrice();
 
     const [confirmId, setConfirmId] = useState<string | null>(null);
+    const [confirmTreat, setConfirmTreat] = useState(false);
     const [feedback, setFeedback] = useState('');
     useEffect(() => {
         if (!feedback) return;
@@ -83,7 +85,7 @@ export function RestPanel({ showMenus = true, showTreatment = true }: RestPanelP
                                     <div className="ds-rest__carddesc">{t(menu.descKey)}</div>
                                     <div className="ds-rest__cardfoot">
                                         <span className="ds-rest__price">{menu.price}G</span>
-                                        <button className={`ds-btn${isCurrent ? ' is-active' : ''}`} onClick={() => clickMenu(menu.id)}>
+                                        <button type="button" className={`ds-btn${isCurrent ? ' is-active' : ''}`} onClick={() => clickMenu(menu.id)}>
                                             {isCurrent ? t('rest.current') : t('rest.purchase')}
                                         </button>
                                     </div>
@@ -103,28 +105,39 @@ export function RestPanel({ showMenus = true, showTreatment = true }: RestPanelP
                                     : t('rest.injuryNone')}
                             </div>
                         </div>
-                        {injured > 0 && <button className="ds-btn is-active" onClick={treat}>{t('rest.treat')}</button>}
+                        {injured > 0 && <button type="button" className="ds-btn is-active" onClick={() => setConfirmTreat(true)}>{t('rest.treat')}</button>}
                     </div>
                 )}
 
-                <div className="ds-rest__feedback">{feedback}</div>
+                <div className="ds-rest__feedback" role="status" aria-live="polite">{feedback}</div>
             </div>
 
             {confirmId && (
-                <div className="ds-modal" onClick={() => setConfirmId(null)}>
-                    <div className="ds-modal__box" onClick={(e) => e.stopPropagation()}>
-                        <div className="ds-modal__title">{t('rest.replaceTitle')}</div>
-                        <div className="ds-modal__line">
-                            {t(getRestMenu(confirmId)?.nameKey ?? '')} — {t('rest.replaceDesc')}
-                        </div>
-                        <div className="ds-modal__btns">
-                            <button className="ds-btn is-active" onClick={() => { const id = confirmId; setConfirmId(null); purchase(id); }}>
-                                {t('rest.confirm')}
-                            </button>
-                            <button className="ds-btn" onClick={() => setConfirmId(null)}>{t('rest.cancel')}</button>
-                        </div>
+                <ConfirmModal
+                    title={t('rest.replaceTitle')}
+                    confirmLabel={t('rest.confirm')}
+                    cancelLabel={t('rest.cancel')}
+                    onConfirm={() => { const id = confirmId; setConfirmId(null); purchase(id); }}
+                    onCancel={() => setConfirmId(null)}
+                >
+                    <div className="ds-modal__line">
+                        {t(getRestMenu(confirmId)?.nameKey ?? '')} — {t('rest.replaceDesc')}
                     </div>
-                </div>
+                </ConfirmModal>
+            )}
+
+            {confirmTreat && (
+                <ConfirmModal
+                    title={t('rest.injuryTitle')}
+                    confirmLabel={t('rest.treat')}
+                    cancelLabel={t('rest.cancel')}
+                    onConfirm={() => { setConfirmTreat(false); treat(); }}
+                    onCancel={() => setConfirmTreat(false)}
+                >
+                    <div className="ds-modal__line">
+                        {`${t('rest.injuryCount')}: ${injured} (${injured * treatmentPrice}G)`}
+                    </div>
+                </ConfirmModal>
             )}
         </div>
     );

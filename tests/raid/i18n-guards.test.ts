@@ -4,6 +4,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import ts from 'typescript';
 import { CHAR_CLASSES } from '../../src/data/characterClasses';
+import { CHANGELOG } from '../../src/data/changelog';
 import { MASTER_CLASSES } from '../../src/data/ClassTree';
 import { getFacilityUpgradeDefinitions } from '../../src/data/FacilityUpgradeData';
 import { REST_FACILITIES } from '../../src/data/RestFacilityData';
@@ -136,6 +137,9 @@ function collectDataDrivenUiKeys(): Set<string> {
     };
 
     for (const cfg of CHAR_CLASSES) add(cfg.labelKey);
+    for (const entry of CHANGELOG) {
+        for (const key of entry.itemKeys) add(key);
+    }
     for (const entry of EQUIP_SLOT_LIST) add(entry.labelKey);
     for (const tab of SHOP_KIND_TABS) add(tab.labelKey);
     for (const meta of Object.values(TOWN_FACILITY_META)) add(meta.labelKey);
@@ -340,6 +344,7 @@ test('dynamic UI translation key calls are reviewed by the guard allowlist', () 
         "src/ui/react/quest/QuestList.tsx: t(quest.summaryKey)",
         "src/ui/react/quest/QuestList.tsx: t(quest.titleKey)",
         "src/ui/react/quest/QuestList.tsx: t(reward.nameKey)",
+        "src/ui/react/settings/ChangelogPanel.tsx: t(key)",
         "src/ui/react/settings/SettingsPanel.tsx: t(definition.labelKey)",
         "src/ui/react/town/BlacksmithPanel.tsx: t(entry.sourceLabel)",
         "src/ui/react/town/FacilityUpgradePanel.tsx: t(view.definition.descKey)",

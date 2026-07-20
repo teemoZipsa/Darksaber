@@ -33,6 +33,9 @@ export function QuestList() {
 
     return (
         <div className="ds-quest__body">
+            {quests.length === 0 && (
+                <div className="ds-quest__empty">{t('quest.empty')}</div>
+            )}
             {quests.map(({ quest, status, rewardView, sideObjectives }) => {
                 return (
                     <div key={quest.id} className={`ds-quest__row is-${status}`}>

@@ -24,6 +24,11 @@ export function RumorsPanel() {
 
             <div className="ds-rumors__body">
                 <div className="ds-rumors__npc" aria-hidden>👤</div>
+                {rumors.length === 0 && (
+                    <div className="ds-rumors__bubble">
+                        <span className="ds-rumors__text">{t('rumors.empty')}</span>
+                    </div>
+                )}
                 {rumors.map((rumor, i) => (
                     <div key={i} className="ds-rumors__bubble">
                         <span className="ds-rumors__quote" aria-hidden>❝</span>

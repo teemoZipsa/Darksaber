@@ -47,7 +47,7 @@ export function StatGrid({ char, gold }: { char: Character; gold: number }) {
                 <Row label={t('info.class')} value={char.getTierName()} />
                 <Row label={t('info.level')} value={char.level} />
                 <Row label={t('info.age')} value={char.age} />
-                <Row label={t('info.gender')} value={char.gender} />
+                <Row label={t('info.gender')} value={char.gender === 'F' ? t('create.female') : t('create.male')} />
                 <Row label={t('info.money')} value={gold} />
             </div>
 

@@ -36,6 +36,9 @@ export function FacilityUpgradePanel() {
                 <span className="ds-facility__gold">{gold}G</span>
             </div>
             <div className="ds-facility__body">
+                {upgrades.length === 0 && (
+                    <div className="ds-facility__empty">{t('facility.empty')}</div>
+                )}
                 {upgrades.map((view) => (
                     <div key={view.definition.id} className="ds-facility__row">
                         <div className="ds-facility__main">
@@ -74,7 +77,7 @@ export function FacilityUpgradePanel() {
                         </button>
                     </div>
                 ))}
-                <div className="ds-facility__feedback">{feedback}</div>
+                <div className="ds-facility__feedback" role="status" aria-live="polite">{feedback}</div>
             </div>
         </div>
     );

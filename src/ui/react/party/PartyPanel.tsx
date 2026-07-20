@@ -8,7 +8,7 @@
  */
 
 import { useRef, useState } from 'react';
-import type { CSSProperties, DragEvent } from 'react';
+import type { CSSProperties, DragEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Character } from '../../../character/Character';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { t } from '../../../i18n/LanguageManager';
@@ -72,6 +72,15 @@ export function PartyPanel() {
         handleMutationResult(store.partyUndeploy(charId));
     };
 
+    // Enter/Space activate the card's primary action for keyboard users, since
+    // drag-and-drop is pointer-only.
+    const onCardKey = (fn: () => void) => (e: ReactKeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+            e.preventDefault();
+            fn();
+        }
+    };
+
     const dropOnSlot = (slotIdx: number) => (e: DragEvent) => {
         e.preventDefault();
         setOverSlot(null);
@@ -107,7 +116,7 @@ export function PartyPanel() {
         handleMutationResult(store.partyDeploy(ch));
     };
 
-    const panelStyle = { width: 660, '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
+    const panelStyle = { width: 'min(660px, 94vw)', '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
     const rosterEmptyStyle: CSSProperties = { gridColumn: '1 / -1', textAlign: 'center', color: 'var(--ds-text-dim)', fontSize: 12, padding: '12px 0' };
 
     return (
@@ -150,13 +159,16 @@ export function PartyPanel() {
                                 <div
                                     key={i}
                                     className={cls}
+                                    role="button"
+                                    tabIndex={0}
                                     draggable
                                     onDragStart={startDrag({ source: 'active', index: i, charId: ch.id })}
                                     onDragOver={(e) => { e.preventDefault(); setOverSlot(i); }}
                                     onDragLeave={() => setOverSlot(null)}
                                     onDrop={dropOnSlot(i)}
                                     onClick={() => undeploy(i, ch.id)}
-                                    title={`${ch.name} · Lv.${ch.level}`}
+                                    onKeyDown={onCardKey(() => undeploy(i, ch.id))}
+                                    title={`${ch.name} · ${t('char.level')} ${ch.level}`}
                                     aria-label={`${ch.name} · ${t('char.level')} ${ch.level}`}
                                 >
                                     {i === 0 && <span className="ds-leader-tag">★ {t('party.leader')}</span>}
@@ -183,13 +195,16 @@ export function PartyPanel() {
                                 <div
                                     key={ch.id}
                                     className={`ds-pcard${overRoster === fullIdx ? ' drag-over' : ''}`}
+                                    role="button"
+                                    tabIndex={0}
                                     draggable
                                     onDragStart={startDrag({ source: 'roster', index: fullIdx, charId: ch.id })}
                                     onDragOver={(e) => { e.preventDefault(); setOverRoster(fullIdx); }}
                                     onDragLeave={() => setOverRoster(null)}
                                     onDrop={dropOnRosterCard(fullIdx)}
                                     onClick={clickRoster(ch)}
-                                    title={`${ch.name} · Lv.${ch.level}`}
+                                    onKeyDown={onCardKey(clickRoster(ch))}
+                                    title={`${ch.name} · ${t('char.level')} ${ch.level}`}
                                     aria-label={`${ch.name} · ${t('char.level')} ${ch.level}`}
                                 >
                                     <Portrait char={ch} />
@@ -206,7 +221,7 @@ export function PartyPanel() {
                     </div>
                 </div>
 
-                <div className="ds-party__error">{error}</div>
+                <div className="ds-party__error" role="alert" aria-live="assertive">{error}</div>
             </div>
         </div>
     );

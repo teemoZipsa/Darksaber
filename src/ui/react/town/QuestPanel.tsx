@@ -81,7 +81,7 @@ export function QuestPanel() {
                         </div>
                     ))}
                 </div>
-                <div className="ds-contracts__feedback">{feedback}</div>
+                <div className="ds-contracts__feedback" role="status" aria-live="polite">{feedback}</div>
             </div>
         </div>
     );

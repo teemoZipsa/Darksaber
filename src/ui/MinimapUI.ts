@@ -50,7 +50,10 @@ const FULL_MIN_ZOOM = 1;
 const FULL_MAX_ZOOM = 5;
 const FULL_MIN_OPACITY = 0.25;
 const FULL_MAX_OPACITY = 1;
-const FULL_MAP_BUILD_BUDGET_MS = 4;
+const FULL_MAP_BUILD_BUDGET_MS = 6;
+// Small per-frame budget used to pre-build the full map in the background while
+// the mini map is showing, so opening the full map (M) feels instant.
+const FULL_MAP_WARM_BUDGET_MS = 1.5;
 const FULL_CLOSE_BUTTON_SIZE = 22;
 const FULL_CLOSE_BUTTON_HIT_SIZE = 28;
 const FOOTER_INFO_H = 50;            // base footer height (gold/world + coords)
@@ -249,6 +252,10 @@ export class MinimapUI {
     }
 
     private renderMiniMap(ctx: CanvasRenderingContext2D, vw: number, footer?: MinimapFooter): void {
+
+        // Pre-build the full map in the background so pressing M feels instant.
+        // Self-terminating: once the cache is ready for this world it does nothing.
+        this.getFullMapCache(this.config.getBounds(), footer?.worldName, FULL_MAP_WARM_BUDGET_MS);
 
         const footerMaxW = PANEL_W - 28;
         const terrainRows = footer ? this.buildMiniTerrainRows(ctx, footer.terrainLines, footerMaxW) : [];
@@ -603,7 +610,7 @@ export class MinimapUI {
         ctx.restore();
     }
 
-    private getFullMapCache(bounds: { width: number; height: number }, worldName?: string): FullMapCache | null {
+    private getFullMapCache(bounds: { width: number; height: number }, worldName?: string, budgetMs: number = FULL_MAP_BUILD_BUDGET_MS): FullMapCache | null {
         if (bounds.width <= 0 || bounds.height <= 0) return null;
 
         const key = `${worldName ?? 'world'}:${bounds.width}x${bounds.height}`;
@@ -615,7 +622,7 @@ export class MinimapUI {
         const build = this.fullMapBuild;
         if (!build) return null;
 
-        this.advanceFullMapBuild(build);
+        this.advanceFullMapBuild(build, budgetMs);
 
         const ready = build.nextRow >= build.cacheH;
         this.fullMapCache = {
@@ -655,7 +662,7 @@ export class MinimapUI {
         };
     }
 
-    private advanceFullMapBuild(build: FullMapBuild): void {
+    private advanceFullMapBuild(build: FullMapBuild, budgetMs: number = FULL_MAP_BUILD_BUDGET_MS): void {
         const start = this.now();
         const startRow = build.nextRow;
 
@@ -674,7 +681,7 @@ export class MinimapUI {
             }
 
             build.nextRow++;
-            if (build.nextRow > startRow && this.now() - start >= FULL_MAP_BUILD_BUDGET_MS) break;
+            if (build.nextRow > startRow && this.now() - start >= budgetMs) break;
         }
 
         const rows = build.nextRow - startRow;

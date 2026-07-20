@@ -11,8 +11,11 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { SettingsManager, type KeybindingDefinition, type KeybindingId } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
 import { i18n, t } from '../../../i18n/LanguageManager';
+import { CURRENT_VERSION } from '../../../data/changelog';
 import { useStore, useUiVersion } from '../UiContext';
 import { useModalDialog } from '../useModalDialog';
+import { ConfirmModal } from '../ConfirmModal';
+import { ChangelogPanel } from './ChangelogPanel';
 
 const S = SettingsManager;
 
@@ -129,6 +132,7 @@ function KeybindingButton({
 function KeybindingSection({ capturing, setCapturing }: { capturing: KeybindingId | null; setCapturing: (id: KeybindingId | null) => void }) {
     const actionBindings = S.getKeybindingDefinitions('action');
     const worldBindings = S.getKeybindingDefinitions('world');
+    const [confirmReset, setConfirmReset] = useState(false);
 
     return (
         <Section title={t('settings.keybindings')}>
@@ -148,12 +152,22 @@ function KeybindingSection({ capturing, setCapturing }: { capturing: KeybindingI
                 <button
                     type="button"
                     className="ds-btn"
-                    onClick={() => { S.resetKeybindings(); setCapturing(null); AudioManager.playUi('ui.confirm'); }}
+                    onClick={() => setConfirmReset(true)}
                     title={t('settings.keyResetAll')}
                 >
                     {t('settings.keyResetAll')}
                 </button>
             </div>
+
+            {confirmReset && (
+                <ConfirmModal
+                    title={t('settings.keyResetConfirm')}
+                    confirmLabel={t('settings.keyResetAll')}
+                    danger
+                    onConfirm={() => { S.resetKeybindings(); setCapturing(null); setConfirmReset(false); AudioManager.playUi('ui.confirm'); }}
+                    onCancel={() => setConfirmReset(false)}
+                />
+            )}
         </Section>
     );
 }
@@ -163,6 +177,15 @@ export function SettingsPanel() {
     const store = useStore();
     const dialogRef = useModalDialog<HTMLDivElement>();
     const [capturing, setCapturing] = useState<KeybindingId | null>(null);
+    const [tab, setTab] = useState<'general' | 'updates'>('general');
+    const [hasNewUpdates, setHasNewUpdates] = useState(() => S.getLastSeenChangelog() !== CURRENT_VERSION);
+
+    const openUpdates = () => {
+        setTab('updates');
+        setHasNewUpdates(false);
+        S.setLastSeenChangelog(CURRENT_VERSION);
+        AudioManager.playUi('ui.hover');
+    };
 
     useEffect(() => {
         if (!capturing) return undefined;
@@ -192,6 +215,31 @@ export function SettingsPanel() {
                 <button type="button" className="ds-close-btn" onClick={() => store.closeSettings()} aria-label={t('ui.close')} title={t('ui.close')}>✕</button>
             </div>
 
+            <div className="ds-settings-tabs" role="tablist">
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === 'general'}
+                    className={`ds-btn${tab === 'general' ? ' is-active' : ''}`}
+                    onClick={() => setTab('general')}
+                >
+                    {t('settings.tab.general')}
+                </button>
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === 'updates'}
+                    className={`ds-btn${tab === 'updates' ? ' is-active' : ''}`}
+                    onClick={openUpdates}
+                >
+                    {t('settings.tab.updates')}
+                    {hasNewUpdates && <span className="ds-tab-badge" aria-label={t('settings.updatesNew')} />}
+                </button>
+            </div>
+
+            {tab === 'updates' ? (
+                <div className="ds-settings"><ChangelogPanel /></div>
+            ) : (
             <div className="ds-settings">
                 <Section title={t('settings.sound')}>
                     <Row label={t('settings.muteBGM')}><Toggle label={t('settings.muteBGM')} on={S.getMuteBGM()} onToggle={() => S.setMuteBGM(!S.getMuteBGM())} /></Row>
@@ -218,6 +266,7 @@ export function SettingsPanel() {
 
                 <KeybindingSection capturing={capturing} setCapturing={setCapturing} />
             </div>
+            )}
 
             <div className="ds-settings__footer">
                 {t('ui.closeHint')}

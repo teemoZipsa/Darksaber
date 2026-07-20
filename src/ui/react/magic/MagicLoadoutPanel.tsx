@@ -9,6 +9,7 @@
 
 import { useState, type CSSProperties } from 'react';
 import { SettingsManager } from '../../../engine/SettingsManager';
+import { AudioManager } from '../../../engine/AudioManager';
 import { formatSkillDescription, formatSkillName } from '../../../i18n/DisplayNames';
 import { t, formatT } from '../../../i18n/LanguageManager';
 import { getSkill, type Skill } from '../../../data/SkillDB';
@@ -20,9 +21,10 @@ import {
 import { useStore, useUiVersion } from '../UiContext';
 import { PartyTabs } from '../character/PartyTabs';
 import { useModalDialog } from '../useModalDialog';
+import { ConfirmModal } from '../ConfirmModal';
 
 function skillTags(skill: Skill): string {
-    return `T${skill.tier} · ${t(`magic.type.${skill.type}`)} · ${t(`magic.element.${skill.element}`)}`;
+    return `${formatT('magic.tierShort', { tier: skill.tier })} · ${t(`magic.type.${skill.type}`)} · ${t(`magic.element.${skill.element}`)}`;
 }
 
 export function MagicLoadoutPanel() {
@@ -39,6 +41,7 @@ export function MagicLoadoutPanel() {
     const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
     const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
     const [toast, setToast] = useState<string | null>(null);
+    const [pendingUpgrade, setPendingUpgrade] = useState(false);
 
     const panelStyle = { width: 'min(640px, calc(100vw - 18px))', '--ds-scale': uiScale } as CSSProperties;
 
@@ -52,7 +55,7 @@ export function MagicLoadoutPanel() {
             <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('magic.loadout.title')} tabIndex={-1} className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
                 <div className="ds-panel__header">
                     <span className="ds-panel__title">{t('magic.loadout.title')}</span>
-                    <button className="ds-close-btn" onClick={() => store.closeMagicLoadout()} aria-label={t('ui.close')}>✕</button>
+                    <button type="button" className="ds-close-btn" onClick={() => store.closeMagicLoadout()} aria-label={t('ui.close')} title={t('ui.close')}>✕</button>
                 </div>
                 <div style={{ padding: 40, textAlign: 'center', color: 'var(--ds-text-muted)' }}>
                     {t('magic.loadout.none')}
@@ -78,6 +81,7 @@ export function MagicLoadoutPanel() {
 
     const onUpgrade = (skillId: string) => {
         const result = store.upgradeMagic(skillId);
+        AudioManager.playUi(result.ok ? 'ui.confirm' : 'ui.cancel');
         if (!result.ok && result.reasonKey) showToast(t(result.reasonKey));
     };
 
@@ -89,7 +93,7 @@ export function MagicLoadoutPanel() {
             <div className="ds-panel__header">
                 <span className="ds-panel__title">{t('magic.loadout.title')}</span>
                 <span style={{ marginLeft: 'auto', marginRight: 12, color: 'var(--ds-accent)' }}>{gold} G</span>
-                <button className="ds-close-btn" onClick={() => store.closeMagicLoadout()} aria-label={t('ui.close')}>✕</button>
+                <button type="button" className="ds-close-btn" onClick={() => store.closeMagicLoadout()} aria-label={t('ui.close')} title={t('ui.close')}>✕</button>
             </div>
 
             <PartyTabs party={party} activeIndex={activeIndex} />
@@ -109,6 +113,7 @@ export function MagicLoadoutPanel() {
                             return (
                                 <button
                                     key={i}
+                                    type="button"
                                     className="ds-btn"
                                     aria-selected={isSelected}
                                     data-magic-slot={i}
@@ -158,6 +163,7 @@ export function MagicLoadoutPanel() {
                             return (
                                 <button
                                     key={skill.id}
+                                    type="button"
                                     className="ds-btn"
                                     aria-selected={isSel}
                                     data-magic-skill={skill.id}
@@ -190,13 +196,14 @@ export function MagicLoadoutPanel() {
                                 </span>
                             </div>
                             <div style={{ color: 'var(--ds-text-muted)', fontSize: 12, margin: '6px 0' }}>
-                                {skillTags(detail)} · MP {detail.mpCost}
+                                {skillTags(detail)} · {t('magic.mp')} {detail.mpCost}
                             </div>
                             <div style={{ fontSize: 12, marginBottom: 10 }}>{formatSkillDescription(detail)}</div>
                             <button
+                                type="button"
                                 className="ds-btn"
                                 disabled={detailLevel >= MAX_UPGRADE_LEVEL}
-                                onClick={() => onUpgrade(detail.id)}
+                                onClick={() => setPendingUpgrade(true)}
                             >
                                 {detailLevel >= MAX_UPGRADE_LEVEL
                                     ? t('magic.upgrade.max')
@@ -205,9 +212,21 @@ export function MagicLoadoutPanel() {
                         </div>
                     )}
 
-                    {toast && <div style={{ color: 'var(--ds-danger)', fontSize: 12 }}>{toast}</div>}
+                    <div role="status" aria-live="polite" style={{ color: 'var(--ds-danger)', fontSize: 12, minHeight: 16 }}>{toast}</div>
                 </div>
             </div>
+
+            {pendingUpgrade && detail && detailLevel < MAX_UPGRADE_LEVEL && (
+                <ConfirmModal
+                    title={t('magic.upgrade.confirm')}
+                    confirmLabel={t('magic.upgrade.button')}
+                    onConfirm={() => { setPendingUpgrade(false); onUpgrade(detail.id); }}
+                    onCancel={() => setPendingUpgrade(false)}
+                >
+                    <div className="ds-modal__line">{formatSkillName(detail)}</div>
+                    <div className="ds-modal__line ds-modal__line--sub">{formatT('magic.upgrade.confirmCost', { cost: detailNextCost })}</div>
+                </ConfirmModal>
+            )}
         </div>
     );
 }

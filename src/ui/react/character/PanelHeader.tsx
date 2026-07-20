@@ -6,7 +6,7 @@ export function PanelHeader({ onClose }: { onClose: () => void }) {
     return (
         <div className="ds-panel__header">
             <span className="ds-panel__title">{t('info.title')}</span>
-            <button className="ds-close-btn" onClick={onClose} aria-label={t('ui.close')}>
+            <button type="button" className="ds-close-btn" onClick={onClose} aria-label={t('ui.close')} title={t('ui.close')}>
                 ✕
             </button>
         </div>

@@ -16,6 +16,7 @@ import { SHOP_KIND_TABS, type ShopEntry, type SellEntry } from '../../../ui/Shop
 import type { ItemDef } from '../../../data/ItemDB';
 import type { PlacedItem } from '../../../inventory/GridInventory';
 import { useStore, useUiVersion } from '../UiContext';
+import { ConfirmModal } from '../ConfirmModal';
 import {
     ItemCompareTooltip,
     ItemSwatch,
@@ -44,6 +45,7 @@ export function ShopPanel() {
         return <ItemTooltip item={item} placed={placed} />;
     };
 
+    const [pendingBuy, setPendingBuy] = useState<ShopEntry | null>(null);
     const [pendingSell, setPendingSell] = useState<SellEntry | null>(null);
     const [feedback, setFeedback] = useState('');
     useEffect(() => {
@@ -52,18 +54,29 @@ export function ShopPanel() {
         return () => window.clearTimeout(id);
     }, [feedback]);
 
-    const buy = (entry: ShopEntry) => {
+    const requestBuy = (entry: ShopEntry) => {
         if (entry.remaining === 0) return;
         if (gold < entry.price) { setFeedback(t('shop.noGold')); AudioManager.playUi('ui.cancel'); return; }
-        if (store.shopBuy(entry)) { AudioManager.playUi('ui.confirm'); setFeedback(''); }
-        else { setFeedback(t('shop.backpackFull')); AudioManager.playUi('ui.cancel'); }
+        tip.hide();
+        setPendingBuy(entry);
+    };
+
+    const confirmBuy = () => {
+        if (!pendingBuy) return;
+        const entry = pendingBuy;
+        setPendingBuy(null);
+        const ok = store.shopBuy(entry);
+        AudioManager.playUi(ok ? 'ui.confirm' : 'ui.cancel');
+        if (ok) setFeedback('');
+        else setFeedback(t('shop.backpackFull'));
     };
 
     const confirmSell = () => {
         if (!pendingSell) return;
         const ok = store.shopSell(pendingSell);
         setPendingSell(null);
-        if (ok) { setFeedback(t('shop.soldItem')); AudioManager.playUi('ui.confirm'); }
+        AudioManager.playUi(ok ? 'ui.confirm' : 'ui.cancel');
+        if (ok) setFeedback(t('shop.soldItem'));
     };
 
     const panelStyle = { width: 'min(960px, 94vw)', '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
@@ -79,6 +92,7 @@ export function ShopPanel() {
                 {SHOP_KIND_TABS.map((tab) => (
                     <button
                         key={tab.id}
+                        type="button"
                         role="tab"
                         aria-selected={kind === tab.id}
                         className={`ds-btn${kind === tab.id ? ' is-active' : ''}`}
@@ -101,11 +115,14 @@ export function ShopPanel() {
                                 <button
                                     key={`${entry.item.id}-${i}`}
                                     className={`ds-shop__row${soldOut ? ' is-out' : ''}${!afford && !soldOut ? ' is-poor' : ''}`}
+                                    type="button"
                                     disabled={soldOut}
-                                    onClick={() => buy(entry)}
+                                    onClick={() => requestBuy(entry)}
                                     onPointerEnter={tip.show(tipFor(entry.item))}
                                     onPointerMove={tip.move}
                                     onPointerLeave={tip.hide}
+                                    onFocus={tip.showFor(tipFor(entry.item))}
+                                    onBlur={tip.hide}
                                     aria-label={`${itemName(entry.item)} · ${entry.price}G`}
                                 >
                                     <ItemSwatch item={entry.item} dim={soldOut} />
@@ -134,11 +151,14 @@ export function ShopPanel() {
                             return (
                                 <button
                                     key={`${entry.placed.item.id}-${entry.source.id}-${i}`}
+                                    type="button"
                                     className="ds-shop__row"
                                     onClick={() => { setPendingSell(entry); tip.hide(); }}
                                     onPointerEnter={tip.show(tipFor(entry.placed.item, entry.placed))}
                                     onPointerMove={tip.move}
                                     onPointerLeave={tip.hide}
+                                    onFocus={tip.showFor(tipFor(entry.placed.item, entry.placed))}
+                                    onBlur={tip.hide}
                                     aria-label={`${itemName(entry.placed.item)} · ${entry.price}G`}
                                 >
                                     <ItemSwatch item={entry.placed.item} />
@@ -162,30 +182,46 @@ export function ShopPanel() {
                 </div>
             </div>
 
-            <div className="ds-shop__feedback">{feedback}</div>
+            <div className="ds-shop__feedback" role="status" aria-live="polite">{feedback}</div>
             {tip.node}
 
-            {pendingSell && (
-                <div className="ds-modal" onClick={() => setPendingSell(null)}>
-                    <div className="ds-modal__box" onClick={(e) => e.stopPropagation()}>
-                        <div className="ds-modal__title">{t('shop.sellConfirm')}</div>
-                        <div className="ds-modal__line">
-                            {itemName(pendingSell.placed.item)} → <strong>{pendingSell.price}G</strong>
-                        </div>
-                        {statSummary(pendingSell.placed.item) && (
-                            <div className="ds-modal__line ds-modal__line--sub">{statSummary(pendingSell.placed.item)}</div>
-                        )}
-                        {pendingSell.bonusPrice > 0 && (
-                            <div className="ds-modal__line">
-                                {pendingSell.basePrice}G + {t('shop.contractBonus')} {pendingSell.bonusPrice}G
-                            </div>
-                        )}
-                        <div className="ds-modal__btns">
-                            <button className="ds-btn is-active" onClick={confirmSell}>{t('shop.sell')}</button>
-                            <button className="ds-btn" onClick={() => setPendingSell(null)}>{t('shop.cancel')}</button>
-                        </div>
+            {pendingBuy && (
+                <ConfirmModal
+                    title={t('shop.buyConfirm')}
+                    confirmLabel={t('shop.buy')}
+                    cancelLabel={t('shop.cancel')}
+                    onConfirm={confirmBuy}
+                    onCancel={() => setPendingBuy(null)}
+                >
+                    <div className="ds-modal__line">
+                        {itemName(pendingBuy.item)} → <strong>{pendingBuy.price}G</strong>
                     </div>
-                </div>
+                    {statSummary(pendingBuy.item) && (
+                        <div className="ds-modal__line ds-modal__line--sub">{statSummary(pendingBuy.item)}</div>
+                    )}
+                </ConfirmModal>
+            )}
+
+            {pendingSell && (
+                <ConfirmModal
+                    title={t('shop.sellConfirm')}
+                    confirmLabel={t('shop.sell')}
+                    cancelLabel={t('shop.cancel')}
+                    onConfirm={confirmSell}
+                    onCancel={() => setPendingSell(null)}
+                >
+                    <div className="ds-modal__line">
+                        {itemName(pendingSell.placed.item)} → <strong>{pendingSell.price}G</strong>
+                    </div>
+                    {statSummary(pendingSell.placed.item) && (
+                        <div className="ds-modal__line ds-modal__line--sub">{statSummary(pendingSell.placed.item)}</div>
+                    )}
+                    {pendingSell.bonusPrice > 0 && (
+                        <div className="ds-modal__line">
+                            {pendingSell.basePrice}G + {t('shop.contractBonus')} {pendingSell.bonusPrice}G
+                        </div>
+                    )}
+                </ConfirmModal>
             )}
         </div>
     );

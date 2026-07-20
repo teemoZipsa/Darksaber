@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { CSSProperties, MouseEvent, PointerEvent, ReactNode } from 'react';
+import type { CSSProperties, FocusEvent, MouseEvent, PointerEvent, ReactNode } from 'react';
 import type { ItemDef, ItemRarity, ItemSlot } from '../../../data/ItemDB';
 import type { PlacedItem } from '../../../inventory/GridInventory';
 import { i18n, t } from '../../../i18n/LanguageManager';
@@ -307,6 +307,12 @@ export function useItemTooltip() {
     const move = (e: PointerEvent | MouseEvent) =>
         setState((s) => (s ? { ...s, x: e.clientX, y: e.clientY } : s));
     const hide = () => setState(null);
+    // Keyboard-focus variant: anchor the tooltip to the focused element's box so
+    // it is reachable without a pointer.
+    const showFor = (content: ReactNode) => (e: FocusEvent<HTMLElement>) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        setState({ content, x: r.right, y: r.top });
+    };
     const node = state ? <TooltipHost x={state.x} y={state.y}>{state.content}</TooltipHost> : null;
-    return { show, move, hide, node };
+    return { show, move, hide, showFor, node };
 }

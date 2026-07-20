@@ -180,6 +180,25 @@
     width: min(860px, 100%);
 }
 
+#auth-overlay .auth-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    text-align: center;
+}
+#auth-overlay .auth-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--ds-hairline);
+    border-top-color: var(--ds-accent);
+    border-radius: 50%;
+    animation: ds-spin 0.8s linear infinite;
+}
+@keyframes ds-spin {
+    to { transform: rotate(360deg); }
+}
+
 #auth-overlay .auth-panel__title {
     font-family: var(--ds-font-title, "DOSMyungjo", serif);
     font-size: 24px;
@@ -442,6 +461,7 @@
 #ui-overlay .ds-scrim {
     position: absolute;
     inset: 0;
+    z-index: 40; /* modal scrims sit above base screens (e.g. town, z:1) */
     pointer-events: auto;
     display: flex;
     align-items: center;
@@ -658,20 +678,41 @@
     outline-offset: 2px;
 }
 #ui-overlay .ds-section__title {
-    font-size: 12px;
-    letter-spacing: 1.5px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 11px;
+    letter-spacing: 2px;
     color: var(--ds-accent);
-    border-bottom: 1px solid var(--ds-border-shadow);
-    padding-bottom: 5px;
-    margin-bottom: 6px;
+    margin: 2px 0 9px;
+}
+#ui-overlay .ds-section__title::before {
+    content: '';
+    flex: none;
+    width: 5px;
+    height: 5px;
+    transform: rotate(45deg);
+    background: var(--ds-accent);
+    box-shadow: 0 0 5px var(--ds-accent-soft);
+}
+#ui-overlay .ds-section__title::after {
+    content: '';
+    flex: 1 1 auto;
+    height: 1px;
+    background: linear-gradient(to right, var(--ds-border-shadow), transparent);
 }
 #ui-overlay .ds-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    min-height: 30px;
+    min-height: 32px;
+    padding: 2px 8px;
+    margin: 0 -8px;
+    border-radius: 6px;
+    transition: background 120ms ease;
 }
+#ui-overlay .ds-row:hover { background: rgba(240, 192, 80, 0.055); }
 #ui-overlay .ds-row__label { color: var(--ds-text); font-size: 13px; }
 #ui-overlay .ds-row__value {
     color: var(--ds-text-muted);
@@ -698,10 +739,15 @@
     position: absolute; top: 2px; left: 2px;
     width: 18px; height: 18px;
     border-radius: 50%;
-    background: var(--ds-text-muted);
-    transition: transform 150ms, background 150ms;
+    background: var(--ds-text-dim);
+    box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.35);
+    transition: transform 150ms, background 150ms, box-shadow 150ms;
 }
-#ui-overlay .ds-toggle.is-on .ds-toggle__knob { transform: translateX(22px); background: var(--ds-accent-bright); }
+#ui-overlay .ds-toggle.is-on .ds-toggle__knob {
+    transform: translateX(22px);
+    background: var(--ds-accent-bright);
+    box-shadow: 0 0 6px var(--ds-accent);
+}
 
 /* Range slider */
 #ui-overlay .ds-range {
@@ -725,6 +771,89 @@
     background: var(--ds-accent-bright);
     border: 1px solid var(--ds-border-shadow);
     cursor: pointer;
+}
+
+/* Settings tab bar (General / Updates) */
+#ui-overlay .ds-settings-tabs {
+    display: flex;
+    gap: 8px;
+    flex: none;
+    padding: 14px 24px 12px;
+    border-bottom: 1px solid var(--ds-border-shadow);
+}
+#ui-overlay .ds-settings-tabs .ds-btn {
+    position: relative;
+    flex: 1 1 auto;
+    padding: 9px 0;
+    letter-spacing: 1px;
+}
+#ui-overlay .ds-settings-tabs .ds-btn.is-active {
+    background: linear-gradient(180deg, var(--ds-accent-soft), rgba(0, 0, 0, 0));
+    border-color: var(--ds-accent);
+    color: var(--ds-accent-bright);
+}
+#ui-overlay .ds-settings-tabs .ds-btn.is-active::after {
+    content: '';
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: -13px;
+    height: 2px;
+    background: var(--ds-accent);
+    box-shadow: 0 0 6px var(--ds-accent);
+}
+#ui-overlay .ds-tab-badge {
+    display: inline-block;
+    width: 7px; height: 7px;
+    margin-left: 7px;
+    border-radius: 50%;
+    background: var(--ds-danger);
+    box-shadow: 0 0 6px var(--ds-danger);
+    vertical-align: middle;
+    animation: ds-badge-pulse 1.8s ease-in-out infinite;
+}
+@keyframes ds-badge-pulse {
+    0%, 100% { box-shadow: 0 0 4px var(--ds-danger); opacity: 0.85; }
+    50% { box-shadow: 0 0 9px var(--ds-danger); opacity: 1; }
+}
+
+/* Changelog (Settings → Updates) */
+#ui-overlay .ds-changelog {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+#ui-overlay .ds-changelog__entry {
+    border-left: 2px solid var(--ds-border-shadow);
+    padding-left: 12px;
+}
+#ui-overlay .ds-changelog__head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+#ui-overlay .ds-changelog__version {
+    color: var(--ds-accent-bright);
+    font-size: 15px;
+    font-weight: 700;
+}
+#ui-overlay .ds-changelog__date {
+    color: var(--ds-text-dim);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+#ui-overlay .ds-changelog__list {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+#ui-overlay .ds-changelog__list li {
+    color: var(--ds-text-muted);
+    font-size: 13px;
+    line-height: 1.5;
 }
 
 @media (max-width: 390px) {
@@ -876,6 +1005,7 @@
 
 #ui-overlay .ds-town__tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     transform: scale(var(--ds-scale));
 }
@@ -1124,6 +1254,8 @@
     overflow-y: auto; max-height: 54vh; min-height: 180px; padding: 2px 4px;
 }
 #ui-overlay .ds-blacksmith__empty { text-align: center; color: var(--ds-text-dim); font-size: 13px; padding: 32px 0; }
+#ui-overlay .ds-facility__empty,
+#ui-overlay .ds-quest__empty { text-align: center; color: var(--ds-text-dim); font-size: 13px; padding: 28px 0; }
 #ui-overlay .ds-blacksmith__row {
     display: flex; align-items: center; gap: 10px;
     background: var(--ds-panel-inset);
@@ -2099,4 +2231,58 @@
 @keyframes ds-pop-in {
     from { opacity: 0; transform: scale(calc(var(--ds-scale) * 0.96)); }
     to { opacity: 1; transform: scale(var(--ds-scale)); }
+}
+
+/* ─── Reduce motion ─────────────────────────────────────────────
+ * Honored both via the OS-level media query and the accessibility
+ * toggle (SettingsManager writes html[data-ds-motion="reduce"]). */
+@media (prefers-reduced-motion: reduce) {
+    #ui-overlay *,
+    #auth-overlay * {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+html[data-ds-motion="reduce"] #ui-overlay *,
+html[data-ds-motion="reduce"] #auth-overlay * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+}
+
+/* ─── Keyboard focus ring (additive, does not alter mouse states) ── */
+#ui-overlay button:focus-visible,
+#ui-overlay a:focus-visible,
+#ui-overlay input:focus-visible,
+#ui-overlay select:focus-visible,
+#ui-overlay [tabindex]:focus-visible,
+#auth-overlay button:focus-visible,
+#auth-overlay a:focus-visible,
+#auth-overlay input:focus-visible {
+    outline: 2px solid var(--ds-accent-bright);
+    outline-offset: 2px;
+}
+
+/* Persistent danger tint so destructive confirms read as risky before hover. */
+#ui-overlay .ds-btn--danger {
+    color: var(--ds-danger);
+    border-color: rgba(228, 63, 90, 0.55);
+}
+
+/* ─── Narrow-screen column stacking ─────────────────────────── */
+@media (max-width: 720px) {
+    #ui-overlay .ds-shop__cols {
+        grid-template-columns: 1fr;
+    }
+    #ui-overlay .cc__classes {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 420px) {
+    #ui-overlay .cc__classes {
+        grid-template-columns: 1fr;
+    }
 }
