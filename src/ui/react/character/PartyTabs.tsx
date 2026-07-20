@@ -8,7 +8,7 @@ export function PartyTabs({ party, activeIndex }: { party: Character[]; activeIn
     if (party.length <= 1) return null;
 
     return (
-        <div role="tablist" style={{ display: 'flex', gap: 6, padding: '0 16px 12px' }}>
+        <div role="tablist" className="ds-character__tabs">
             {party.map((char, i) => (
                 <button
                     key={char.id}

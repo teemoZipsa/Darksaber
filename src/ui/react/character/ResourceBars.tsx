@@ -40,7 +40,7 @@ function Bar({
 export function ResourceBars({ char }: { char: Character }) {
     const st = char.stats;
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="ds-character__resources">
             <Bar
                 kind="hp"
                 label={t('stat.hp')}

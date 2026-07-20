@@ -517,47 +517,49 @@ export function InventoryPanel({
     };
 
     const renderGrid = (grid: GridInventory, kind: InvGridKind) => (
-        <div
-            key={`${kind}-${mutationSeq}`}
-            className={`inv-grid${dragPreview ? ' is-drop-active' : ''}`}
-            style={{ width: grid.width * CELL, height: grid.height * CELL } as CSSProperties}
-            data-inv-grid={kind}
-        >
-            {grid.items.map((placed) => {
-                const itemKey = placedItemKey(placed);
-                const source: InvDragSource = { kind: 'grid', grid: kind, gridX: placed.gridX, gridY: placed.gridY };
-                const keyboardAction = keyboardActionFor(placed, source);
-                const tooltip = tipFor(placed, false);
-                return (
-                    <InvItem
-                        key={`${kind}-${itemKey}`}
-                        placed={placed}
-                        itemKey={itemKey}
-                        spanned
-                        dragging={dragPreview?.placed === placed}
-                        keyboardAction={keyboardAction}
-                        keyboardActionLabel={keyboardActionLabelFor(placed, keyboardAction)}
-                        onKeyboardActivate={() => activateWithKeyboard(placed, source, keyboardAction)}
-                        onPointerDown={beginPointerDrag(placed, source)}
-                        onHoverEnter={tip.show(tooltip)}
-                        onHoverMove={tip.move}
-                        onHoverLeave={tip.hide}
-                        onFocus={tip.showFor(tooltip)}
-                        onBlur={tip.hide}
+        <div className="ds-inv__grid-scroll" data-inv-grid-scroll={kind}>
+            <div
+                key={`${kind}-${mutationSeq}`}
+                className={`inv-grid${dragPreview ? ' is-drop-active' : ''}`}
+                style={{ width: grid.width * CELL, height: grid.height * CELL } as CSSProperties}
+                data-inv-grid={kind}
+            >
+                {grid.items.map((placed) => {
+                    const itemKey = placedItemKey(placed);
+                    const source: InvDragSource = { kind: 'grid', grid: kind, gridX: placed.gridX, gridY: placed.gridY };
+                    const keyboardAction = keyboardActionFor(placed, source);
+                    const tooltip = tipFor(placed, false);
+                    return (
+                        <InvItem
+                            key={`${kind}-${itemKey}`}
+                            placed={placed}
+                            itemKey={itemKey}
+                            spanned
+                            dragging={dragPreview?.placed === placed}
+                            keyboardAction={keyboardAction}
+                            keyboardActionLabel={keyboardActionLabelFor(placed, keyboardAction)}
+                            onKeyboardActivate={() => activateWithKeyboard(placed, source, keyboardAction)}
+                            onPointerDown={beginPointerDrag(placed, source)}
+                            onHoverEnter={tip.show(tooltip)}
+                            onHoverMove={tip.move}
+                            onHoverLeave={tip.hide}
+                            onFocus={tip.showFor(tooltip)}
+                            onBlur={tip.hide}
+                        />
+                    );
+                })}
+                {dropHint?.kind === kind && drag.current && (
+                    <div
+                        className={`inv-drop-cell ${dropHint.valid ? 'is-valid' : 'is-invalid'}`}
+                        style={{
+                            left: dropHint.gx * CELL,
+                            top: dropHint.gy * CELL,
+                            width: drag.current.placed.item.gridW * CELL,
+                            height: drag.current.placed.item.gridH * CELL,
+                        } as CSSProperties}
                     />
-                );
-            })}
-            {dropHint?.kind === kind && drag.current && (
-                <div
-                    className={`inv-drop-cell ${dropHint.valid ? 'is-valid' : 'is-invalid'}`}
-                    style={{
-                        left: dropHint.gx * CELL,
-                        top: dropHint.gy * CELL,
-                        width: drag.current.placed.item.gridW * CELL,
-                        height: drag.current.placed.item.gridH * CELL,
-                    } as CSSProperties}
-                />
-            )}
+                )}
+            </div>
         </div>
     );
 

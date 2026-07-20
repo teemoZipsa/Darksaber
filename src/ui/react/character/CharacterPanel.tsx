@@ -31,7 +31,7 @@ export function CharacterPanel() {
     const panelStyle = { width: 'min(560px, 94vw)', '--ds-scale': uiScale } as CSSProperties;
 
     return (
-        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('info.title')} tabIndex={-1} className="ds-panel" style={panelStyle} onClick={(e) => e.stopPropagation()}>
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('info.title')} tabIndex={-1} className="ds-panel ds-character" style={panelStyle} onClick={(e) => e.stopPropagation()}>
             <PanelHeader onClose={() => store.closeCharPanel()} />
 
             {!char ? (
@@ -41,21 +41,10 @@ export function CharacterPanel() {
             ) : (
                 <>
                     <PartyTabs party={party} activeIndex={activeIndex} />
-                    <div style={{ display: 'flex', gap: 16, padding: '0 16px 16px' }}>
+                    <div className="ds-character__body">
                         {/* Left column: portrait + resources + equipment */}
-                        <div style={{ width: 190, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            <div
-                                style={{
-                                    height: 150,
-                                    background: 'var(--ds-panel-inset)',
-                                    border: '1px solid var(--ds-border-shadow)',
-                                    borderRadius: 'var(--ds-radius-sm)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    overflow: 'hidden',
-                                }}
-                            >
+                        <div className="ds-character__left">
+                            <div className="ds-character__portrait">
                                 {char.portraitImage?.src ? (
                                     <img
                                         src={char.portraitImage.src}
@@ -69,7 +58,7 @@ export function CharacterPanel() {
                         </div>
 
                         {/* Right column: basic info + stat grid */}
-                        <div style={{ flex: 1 }}>
+                        <div className="ds-character__stats">
                             <StatGrid char={char} gold={gold} />
                         </div>
                     </div>

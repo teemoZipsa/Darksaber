@@ -632,6 +632,101 @@
 #ui-overlay .ds-slot__item { color: var(--ds-accent); }
 #ui-overlay .ds-slot__item.is-empty { color: var(--ds-text-dim); }
 
+/* ─── Character panel ───────────────────────────────────────── */
+#ui-overlay .ds-character {
+    display: flex;
+    flex-direction: column;
+    max-height: 88vh;
+}
+#ui-overlay .ds-character__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: none;
+    padding: 0 16px 12px;
+}
+#ui-overlay .ds-character__tabs .ds-btn { min-width: 0; }
+#ui-overlay .ds-character__body {
+    display: flex;
+    gap: 16px;
+    min-height: 0;
+    padding: 0 16px 16px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+#ui-overlay .ds-character__left {
+    display: flex;
+    flex: 0 0 190px;
+    width: 190px;
+    min-width: 0;
+    flex-direction: column;
+    gap: 12px;
+}
+#ui-overlay .ds-character__portrait {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 150px;
+    flex: none;
+    overflow: hidden;
+    background: var(--ds-panel-inset);
+    border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+}
+#ui-overlay .ds-character__resources,
+#ui-overlay .ds-character__equipment,
+#ui-overlay .ds-character__stat-content {
+    display: flex;
+    flex-direction: column;
+}
+#ui-overlay .ds-character__resources { gap: 6px; }
+#ui-overlay .ds-character__equipment { gap: 5px; }
+#ui-overlay .ds-character__stats { flex: 1 1 auto; min-width: 0; }
+#ui-overlay .ds-character__stat-content { gap: 12px; }
+#ui-overlay .ds-character__stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 14px;
+}
+#ui-overlay .ds-character .ds-stat-row { min-width: 0; gap: 8px; }
+#ui-overlay .ds-character .ds-stat-row__label,
+#ui-overlay .ds-character .ds-stat-row__value { min-width: 0; }
+#ui-overlay .ds-character .ds-stat-row__value {
+    overflow-wrap: anywhere;
+    text-align: right;
+}
+
+@media (max-width: 560px) {
+    #ui-overlay .ds-character {
+        width: calc(100vw - 16px) !important;
+        max-height: calc(100vh - 16px);
+    }
+    #ui-overlay .ds-character__tabs { padding: 0 12px 10px; }
+    #ui-overlay .ds-character__tabs .ds-btn { flex: 1 1 110px; }
+    #ui-overlay .ds-character__body {
+        flex-direction: column;
+        gap: 12px;
+        padding: 0 12px 12px;
+    }
+    #ui-overlay .ds-character__left {
+        flex-basis: auto;
+        width: 100%;
+    }
+    #ui-overlay .ds-character__portrait { height: 112px; }
+    #ui-overlay .ds-character__equipment {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 420px) {
+    #ui-overlay .ds-character__stat-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 340px) {
+    #ui-overlay .ds-character__equipment { grid-template-columns: 1fr; }
+}
+
 /* ─── Settings panel ────────────────────────────────────────── */
 #ui-overlay .ds-settings {
     display: flex;
@@ -1642,6 +1737,13 @@
     letter-spacing: 0;
     white-space: nowrap;
 }
+#ui-overlay .ds-inv__grid-scroll {
+    width: fit-content;
+    max-width: 100%;
+    overflow: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-gutter: stable;
+}
 
 #ui-overlay .inv-grid {
     position: relative; flex: none;
@@ -1872,6 +1974,18 @@
     }
     #ui-overlay .ds-inv__body.is-town-storage {
         display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        overflow-x: hidden;
+    }
+    #ui-overlay .ds-inv__body.is-town-storage > .ds-inv__col,
+    #ui-overlay .ds-inv__body.is-town-storage .ds-inv__town-side,
+    #ui-overlay .ds-inv__body.is-town-storage .ds-inv__col {
+        width: 100%;
+        max-width: 100%;
+    }
+    #ui-overlay .ds-inv__body.is-town-storage .ds-inv__grid-scroll {
+        width: 100%;
     }
     #ui-overlay .ds-inv__coltitle {
         align-items: flex-start;
@@ -1882,6 +1996,18 @@
     #ui-overlay .ds-inv__weight {
         white-space: normal;
         line-height: 1.25;
+    }
+}
+
+@media (max-width: 720px) {
+    #ui-overlay .ds-town__content {
+        padding-inline: 8px;
+        scrollbar-gutter: auto;
+    }
+    #ui-overlay .ds-town__storage {
+        width: 100%;
+        max-width: 100%;
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 

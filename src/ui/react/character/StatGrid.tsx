@@ -40,7 +40,7 @@ export function StatGrid({ char, gold }: { char: Character; gold: number }) {
     ];
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="ds-character__stat-content">
             {/* Basic info */}
             <div>
                 <Row label={t('info.name')} value={char.name} />
@@ -52,7 +52,7 @@ export function StatGrid({ char, gold }: { char: Character; gold: number }) {
             </div>
 
             {/* 16-stat detail grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 14 }}>
+            <div className="ds-character__stat-grid">
                 <div>{left.map(([k, v]) => <Row key={k} label={t(k)} value={v} />)}</div>
                 <div>{right.map(([k, v]) => <Row key={k} label={t(k)} value={v} />)}</div>
             </div>

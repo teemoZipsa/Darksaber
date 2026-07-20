@@ -16,7 +16,7 @@ const SLOTS: Array<{ slot: ItemSlot; labelKey: string }> = [
 
 export function EquipmentSlots({ char }: { char: Character }) {
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <div className="ds-character__equipment">
             {SLOTS.map(({ slot, labelKey }) => {
                 const placed = char.equipment.get(slot);
                 const itemName = placed

@@ -894,6 +894,44 @@ test('mobile viewport keeps town and standalone inventory overlays within the sc
     await expectFitsViewport(page, inventory);
 });
 
+test('narrow viewport contains stash scrolling and stacks the character panel', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/?devStart=town');
+
+    const townContent = page.locator('#ui-overlay .ds-town__content');
+    const storage = page.locator('#ui-overlay .ds-town__storage');
+    const stashScroller = storage.locator('[data-inv-grid-scroll="ext"]');
+    await expect(stashScroller).toBeVisible({ timeout: 20_000 });
+    await expect.poll(() => townContent.evaluate((content) => (
+        content.scrollWidth <= content.clientWidth
+    ))).toBe(true);
+    await expect.poll(() => stashScroller.evaluate((scroller) => (
+        getComputedStyle(scroller).overflowX === 'auto'
+        && scroller.scrollWidth > scroller.clientWidth
+    ))).toBe(true);
+
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto('/?devStart=tutorial');
+    await expect(page.locator('#gameCanvas')).toBeVisible();
+    await waitForWorldInputReady(page);
+    await page.keyboard.press('KeyC');
+
+    const character = page.getByRole('dialog', { name: /자기 정보|Self Information/ });
+    await expect(character).toBeVisible({ timeout: 10_000 });
+    await expectFitsViewport(page, character);
+    await expect.poll(() => character.locator('.ds-character__body').evaluate((body) => (
+        getComputedStyle(body).flexDirection
+    ))).toBe('column');
+    await expect.poll(() => character.locator('.ds-character__stat-grid').evaluate((grid) => (
+        getComputedStyle(grid).gridTemplateColumns.trim().split(/\s+/).length
+    ))).toBe(1);
+    const characterWidths = await character.evaluate((panel) => ({
+        clientWidth: panel.clientWidth,
+        scrollWidth: panel.scrollWidth,
+    }));
+    expect(characterWidths.scrollWidth).toBeLessThanOrEqual(characterWidths.clientWidth);
+});
+
 test('dev tutorial remains stable through repeated overlay toggles', async ({ page }) => {
     test.setTimeout(45_000);
 
