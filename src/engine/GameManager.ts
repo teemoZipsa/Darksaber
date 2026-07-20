@@ -992,6 +992,14 @@ export class GameManager {
                     break;
                 }
 
+                // Character / party / inventory DOM panels close on Escape too,
+                // matching the settings / pause / journal / magic overlays.
+                if (this.input.justPressed('Escape')) {
+                    if (this.inventoryUI.isVisible()) { this.inventoryUI.toggle(); break; }
+                    if (this.charUI.isVisible()) { this.charUI.toggle(); break; }
+                    if (this.partyUI.isVisible()) { this.togglePartyPanel(); break; }
+                }
+
                 // DOM overlays own their pointer handling and freeze world input.
                 if (this.isDomModalOpen()) break;
 
