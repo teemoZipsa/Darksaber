@@ -7,11 +7,11 @@
  * card to deploy, click an active card to undeploy (leader slot is protected).
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Character } from '../../../character/Character';
 import { SettingsManager } from '../../../engine/SettingsManager';
-import { t } from '../../../i18n/LanguageManager';
+import { formatT, t } from '../../../i18n/LanguageManager';
 import { useStore, useUiVersion } from '../UiContext';
 import { useModalDialog } from '../useModalDialog';
 import type { UiMutationResult } from '../UiStore';
@@ -39,8 +39,10 @@ export function PartyPanel() {
     const store = useStore();
     const dialogRef = useModalDialog<HTMLDivElement>();
     const drag = useRef<DragInfo | null>(null);
+    const focusSlotAfterDeploy = useRef<number | null>(null);
     const errorTimer = useRef<number | undefined>(undefined);
     const [error, setError] = useState('');
+    const [, setMutationSeq] = useState(0);
     const [overSlot, setOverSlot] = useState<number | null>(null);
     const [overRoster, setOverRoster] = useState<number | null>(null);
 
@@ -49,6 +51,16 @@ export function PartyPanel() {
     const activeIndex = store.getActiveIndex();
     const available = roster.filter((c) => !active.includes(c));
 
+    useEffect(() => {
+        const slot = focusSlotAfterDeploy.current;
+        if (slot === null) return undefined;
+        const frame = window.requestAnimationFrame(() => {
+            dialogRef.current?.querySelector<HTMLElement>(`[data-party-slot="${slot}"]`)?.focus();
+            focusSlotAfterDeploy.current = null;
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, [active.length, dialogRef]);
+
     const showError = (msg: string) => {
         setError(msg);
         window.clearTimeout(errorTimer.current);
@@ -56,6 +68,10 @@ export function PartyPanel() {
     };
 
     const handleMutationResult = (result: UiMutationResult) => {
+        if (result.ok) {
+            setMutationSeq((seq) => seq + 1);
+            return;
+        }
         if (!result.ok && result.reasonKey === 'raid.editingLocked') {
             showError(t('raid.editingLocked'));
         }
@@ -74,7 +90,7 @@ export function PartyPanel() {
 
     // Enter/Space activate the card's primary action for keyboard users, since
     // drag-and-drop is pointer-only.
-    const onCardKey = (fn: () => void) => (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const onCardKey = (fn: () => void) => (e: ReactKeyboardEvent<HTMLElement>) => {
         if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
             e.preventDefault();
             fn();
@@ -116,6 +132,13 @@ export function PartyPanel() {
         handleMutationResult(store.partyDeploy(ch));
     };
 
+    const deployToEmptySlot = (slotIdx: number, ch: Character) => {
+        focusSlotAfterDeploy.current = slotIdx;
+        const result = store.partyReplaceActive(slotIdx, ch);
+        if (!result.ok) focusSlotAfterDeploy.current = null;
+        handleMutationResult(result);
+    };
+
     const panelStyle = { width: 'min(660px, 94vw)', '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
     const rosterEmptyStyle: CSSProperties = { gridColumn: '1 / -1', textAlign: 'center', color: 'var(--ds-text-dim)', fontSize: 12, padding: '12px 0' };
 
@@ -134,10 +157,36 @@ export function PartyPanel() {
                         {[0, 1, 2].map((i) => {
                             const ch = active[i];
                             if (!ch) {
+                                const nextCharacter = i === active.length ? available[0] : undefined;
+                                if (nextCharacter) {
+                                    const accessibleLabel = formatT('party.deployToSlot', {
+                                        name: nextCharacter.name,
+                                        slot: i + 1,
+                                    });
+                                    return (
+                                        <button
+                                            key={i}
+                                            type="button"
+                                            className={`ds-slot-card is-empty is-fillable${overSlot === i ? ' drag-over' : ''}`}
+                                            data-party-slot={i}
+                                            onDragOver={(e) => { e.preventDefault(); setOverSlot(i); }}
+                                            onDragLeave={() => setOverSlot(null)}
+                                            onDrop={dropOnSlot(i)}
+                                            onClick={() => deployToEmptySlot(i, nextCharacter)}
+                                            onKeyDown={onCardKey(() => deployToEmptySlot(i, nextCharacter))}
+                                            aria-label={accessibleLabel}
+                                            title={accessibleLabel}
+                                        >
+                                            <span>{t('party.emptySlot')}</span>
+                                            <span className="ds-slot-card__fill-hint">+ {nextCharacter.name}</span>
+                                        </button>
+                                    );
+                                }
                                 return (
                                     <div
                                         key={i}
                                         className={`ds-slot-card is-empty${overSlot === i ? ' drag-over' : ''}`}
+                                        data-party-slot={i}
                                         onDragOver={(e) => { e.preventDefault(); setOverSlot(i); }}
                                         onDragLeave={() => setOverSlot(null)}
                                         onDrop={dropOnSlot(i)}
@@ -161,6 +210,8 @@ export function PartyPanel() {
                                     className={cls}
                                     role="button"
                                     tabIndex={0}
+                                    data-party-slot={i}
+                                    data-party-character-id={ch.id}
                                     draggable
                                     onDragStart={startDrag({ source: 'active', index: i, charId: ch.id })}
                                     onDragOver={(e) => { e.preventDefault(); setOverSlot(i); }}

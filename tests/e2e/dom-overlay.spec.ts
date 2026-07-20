@@ -631,6 +631,52 @@ test('inventory items can be unequipped and equipped with Enter while keeping ke
     await expect(reequippedItem).toBeFocused();
 });
 
+test('the next empty party slot deploys a roster character with Enter and keeps focus', async ({ page }) => {
+    await page.goto('/?devStart=tutorial');
+    await expect(page.locator('#gameCanvas')).toBeVisible();
+    await waitForWorldInputReady(page);
+
+    await page.evaluate(() => {
+        type CharacterLike = { constructor: new (id: string, name: string, classLineId: string) => unknown };
+        type DevManager = {
+            party: {
+                getRoster: () => CharacterLike[];
+                getCharacters: () => Array<{ id: string }>;
+                addToRoster: (character: unknown) => void;
+            };
+            uiStore?: { tick: () => void };
+        };
+        const gm = (window as unknown as { __gm?: DevManager }).__gm;
+        const lead = gm?.party.getRoster()[0];
+        if (!gm || !lead) throw new Error('DEV party is unavailable');
+        const Recruit = lead.constructor;
+        gm.party.addToRoster(new Recruit('dev_keyboard_recruit', 'Keyboard Recruit', 'infantry'));
+        gm.uiStore?.tick();
+    });
+
+    await page.keyboard.press('KeyP');
+    const party = page.getByRole('dialog', { name: /파티 편성|Party Assembly/ });
+    await expect(party).toBeVisible({ timeout: 10_000 });
+
+    const nextEmptySlot = party.locator('[data-party-slot="1"]');
+    await expect(nextEmptySlot).toHaveClass(/is-fillable/);
+    await expect(nextEmptySlot).toHaveAttribute('aria-label', /Keyboard Recruit/);
+    await nextEmptySlot.focus();
+    await expect(nextEmptySlot).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    await expect.poll(() => page.evaluate(() => {
+        const gm = (window as unknown as {
+            __gm?: { party: { getCharacters: () => Array<{ id: string }> } };
+        }).__gm;
+        return gm?.party.getCharacters().map((character) => character.id) ?? [];
+    })).toContain('dev_keyboard_recruit');
+
+    const deployed = party.locator('[data-party-slot="1"][data-party-character-id="dev_keyboard_recruit"]');
+    await expect(deployed).toContainText('Keyboard Recruit');
+    await expect(deployed).toBeFocused();
+});
+
 test('dev raid loot can be transferred into the backpack with pointer input', async ({ page, isMobile }) => {
     await page.goto(isMobile ? '/?devStart=raid&devScenario=loot&devLocal=1' : '/?devStart=raid&devScenario=loot');
 
