@@ -67,7 +67,7 @@ export function ShopPanel() {
         setPendingBuy(null);
         const ok = store.shopBuy(entry);
         AudioManager.playUi(ok ? 'ui.confirm' : 'ui.cancel');
-        if (ok) setFeedback('');
+        if (ok) setFeedback(t('shop.purchased'));
         else setFeedback(t('shop.backpackFull'));
     };
 
@@ -94,7 +94,9 @@ export function ShopPanel() {
                         key={tab.id}
                         type="button"
                         role="tab"
+                        id={`shop-kind-${tab.id}`}
                         aria-selected={kind === tab.id}
+                        aria-controls="shop-tabpanel"
                         className={`ds-btn${kind === tab.id ? ' is-active' : ''}`}
                         onClick={() => { store.shopSetKind(tab.id); AudioManager.playUi('ui.hover'); }}
                     >
@@ -103,7 +105,7 @@ export function ShopPanel() {
                 ))}
             </div>
 
-            <div className="ds-shop__cols">
+            <div className="ds-shop__cols" role="tabpanel" id="shop-tabpanel" aria-labelledby={`shop-kind-${kind}`}>
                 <div className="ds-shop__col">
                     <div className="ds-shop__colhead"><span>{t('shop.buyPanel')}</span><span>{t('shop.gold')}</span></div>
                     <div className="ds-shop__list">

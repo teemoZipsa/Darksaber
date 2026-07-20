@@ -6,7 +6,7 @@
  * React drives it through the store.
  */
 
-import type { CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { i18n, t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
@@ -42,6 +42,12 @@ export function TownScreen() {
     const hubSaveError = store.getHubSaveError();
     const insurancePrice = store.getRaidInsurancePrice();
     const insured = store.hasRaidInsurance();
+    const [insuranceFeedback, setInsuranceFeedback] = useState('');
+    useEffect(() => {
+        if (!insuranceFeedback) return undefined;
+        const id = window.setTimeout(() => setInsuranceFeedback(''), 2600);
+        return () => window.clearTimeout(id);
+    }, [insuranceFeedback]);
     if (!town) return null;
 
     const facilities = getTownFacilities(town.id);
@@ -67,6 +73,7 @@ export function TownScreen() {
         if (insured || deployPending) return;
         const ok = store.buyRaidInsurance();
         AudioManager.playUi(ok ? 'ui.confirm' : 'ui.cancel');
+        setInsuranceFeedback(ok ? t('insurance.purchased') : t('insurance.noGold'));
     };
 
     return (
@@ -83,8 +90,11 @@ export function TownScreen() {
                 {tabs.map((tb) => (
                     <button
                         key={tb.id}
+                        type="button"
                         role="tab"
+                        id={`town-tab-${tb.id}`}
                         aria-selected={tab === tb.id}
+                        aria-controls="town-tabpanel"
                         className={`ds-town__tab${tab === tb.id ? ' is-active' : ''}`}
                         onClick={() => {
                             if (tab === tb.id) return;
@@ -97,7 +107,7 @@ export function TownScreen() {
                 ))}
             </div>
 
-            <div className="ds-town__content" inert={deployPending}>
+            <div className="ds-town__content" role="tabpanel" id="town-tabpanel" aria-labelledby={`town-tab-${tab}`} inert={deployPending}>
                 {tab === 'storage' && townInv && (
                     <div className="ds-town__storage">
                         <FacilityUpgradePanel />
@@ -119,6 +129,11 @@ export function TownScreen() {
                     </div>
                 )}
                 {deployError && <div className="ds-town__deploy-error" role="alert">{deployError}</div>}
+                {insuranceFeedback && (
+                    <div className="ds-town__insurance-feedback" role="status" aria-live="polite">
+                        {insuranceFeedback}
+                    </div>
+                )}
                 <button
                     type="button"
                     className={`ds-town__insurance${insured ? ' is-active' : ''}`}

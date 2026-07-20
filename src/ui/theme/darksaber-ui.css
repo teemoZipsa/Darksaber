@@ -1091,6 +1091,12 @@
     text-align: center;
     text-shadow: 0 1px 2px #000;
 }
+#ui-overlay .ds-town__insurance-feedback {
+    color: var(--ds-accent);
+    font-size: 12px;
+    text-align: center;
+    text-shadow: 0 1px 2px #000;
+}
 #ui-overlay .ds-town__deploy {
     pointer-events: auto;
     font-family: var(--ds-font-title, "DOSMyungjo", serif);
