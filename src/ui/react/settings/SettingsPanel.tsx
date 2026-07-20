@@ -219,7 +219,9 @@ export function SettingsPanel() {
                 <button
                     type="button"
                     role="tab"
+                    id="settings-tab-general"
                     aria-selected={tab === 'general'}
+                    aria-controls="settings-tabpanel"
                     className={`ds-btn${tab === 'general' ? ' is-active' : ''}`}
                     onClick={() => setTab('general')}
                 >
@@ -228,7 +230,9 @@ export function SettingsPanel() {
                 <button
                     type="button"
                     role="tab"
+                    id="settings-tab-updates"
                     aria-selected={tab === 'updates'}
+                    aria-controls="settings-tabpanel"
                     className={`ds-btn${tab === 'updates' ? ' is-active' : ''}`}
                     onClick={openUpdates}
                 >
@@ -238,9 +242,9 @@ export function SettingsPanel() {
             </div>
 
             {tab === 'updates' ? (
-                <div className="ds-settings"><ChangelogPanel /></div>
+                <div className="ds-settings" role="tabpanel" id="settings-tabpanel" aria-labelledby="settings-tab-updates" tabIndex={0}><ChangelogPanel /></div>
             ) : (
-            <div className="ds-settings">
+            <div className="ds-settings" role="tabpanel" id="settings-tabpanel" aria-labelledby="settings-tab-general">
                 <Section title={t('settings.sound')}>
                     <Row label={t('settings.muteBGM')}><Toggle label={t('settings.muteBGM')} on={S.getMuteBGM()} onToggle={() => S.setMuteBGM(!S.getMuteBGM())} /></Row>
                     <Row label={t('settings.muteSFX')}><Toggle label={t('settings.muteSFX')} on={S.getMuteSFX()} onToggle={() => S.setMuteSFX(!S.getMuteSFX())} /></Row>
