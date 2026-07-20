@@ -601,6 +601,36 @@ test('dev tutorial can swap magic loadout slots from the world hotkey overlay', 
     await expect(reopened.locator('[data-magic-slot="0"]')).toHaveAttribute('data-magic-slot-skill', secondSkill!);
 });
 
+test('inventory items can be unequipped and equipped with Enter while keeping keyboard focus', async ({ page }) => {
+    await page.goto('/?devStart=tutorial');
+    await expect(page.locator('#gameCanvas')).toBeVisible();
+    await waitForWorldInputReady(page);
+
+    await page.keyboard.press('KeyI');
+    const inventory = page.getByRole('dialog', { name: /장비 및 소지품|Inventory/ });
+    await expect(inventory).toBeVisible({ timeout: 10_000 });
+
+    const weaponSlot = inventory.locator('[data-inv-equip="weapon"]');
+    const equippedItem = weaponSlot.locator('.inv-item');
+    await expect(equippedItem).toBeVisible();
+    const itemId = await equippedItem.getAttribute('data-inv-item-id');
+    expect(itemId).toBeTruthy();
+
+    await equippedItem.focus();
+    await expect(equippedItem).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    await expect(weaponSlot.locator('.inv-item')).toHaveCount(0);
+    const backpackItem = inventory.locator(`[data-inv-grid="bag"] [data-inv-item-id="${itemId}"]`);
+    await expect(backpackItem).toBeVisible();
+    await expect(backpackItem).toBeFocused();
+
+    await page.keyboard.press('Enter');
+    const reequippedItem = weaponSlot.locator(`[data-inv-item-id="${itemId}"]`);
+    await expect(reequippedItem).toBeVisible();
+    await expect(reequippedItem).toBeFocused();
+});
+
 test('dev raid loot can be transferred into the backpack with pointer input', async ({ page, isMobile }) => {
     await page.goto(isMobile ? '/?devStart=raid&devScenario=loot&devLocal=1' : '/?devStart=raid&devScenario=loot');
 

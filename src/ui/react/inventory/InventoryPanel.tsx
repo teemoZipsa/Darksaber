@@ -18,7 +18,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
+import type {
+    CSSProperties,
+    FocusEvent as ReactFocusEvent,
+    KeyboardEvent as ReactKeyboardEvent,
+    MouseEvent as ReactMouseEvent,
+    PointerEvent as ReactPointerEvent,
+} from 'react';
 import { formatT, t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
@@ -71,6 +77,7 @@ type GridMetrics = {
     cellW: number;
     cellH: number;
 };
+type KeyboardItemAction = 'equip' | 'unequip' | 'move-to-bag' | 'move-to-external';
 
 const RARITY_CLASS: Record<ItemRarity, string> = {
     common: 'is-rarity-common',
@@ -151,20 +158,32 @@ function gridCellFromPoint(
 
 function InvItem({
     placed,
+    itemKey,
     spanned,
     dragging,
+    keyboardAction,
+    keyboardActionLabel,
+    onKeyboardActivate,
     onPointerDown,
     onHoverEnter,
     onHoverMove,
     onHoverLeave,
+    onFocus,
+    onBlur,
 }: {
     placed: PlacedItem;
+    itemKey: number;
     spanned: boolean; // true = positioned on a grid; false = fills an equip slot
     dragging: boolean;
+    keyboardAction: KeyboardItemAction | null;
+    keyboardActionLabel: string;
+    onKeyboardActivate: () => void;
     onPointerDown: (e: ReactPointerEvent) => void;
     onHoverEnter?: (e: ReactPointerEvent | ReactMouseEvent) => void;
     onHoverMove?: (e: ReactPointerEvent | ReactMouseEvent) => void;
     onHoverLeave?: () => void;
+    onFocus?: (e: ReactFocusEvent<HTMLDivElement>) => void;
+    onBlur?: () => void;
 }) {
     const it = placed.item;
     const posStyle: CSSProperties = spanned
@@ -184,7 +203,20 @@ function InvItem({
             onMouseEnter={onHoverEnter}
             onMouseMove={onHoverMove}
             onMouseLeave={onHoverLeave}
-            aria-label={itemName(it)}
+            onFocus={onFocus}
+            onBlur={onBlur}
+            onKeyDown={(e: ReactKeyboardEvent<HTMLDivElement>) => {
+                if (!keyboardAction || (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar')) return;
+                e.preventDefault();
+                e.stopPropagation();
+                onKeyboardActivate();
+            }}
+            role={keyboardAction ? 'button' : undefined}
+            tabIndex={0}
+            aria-label={keyboardActionLabel}
+            title={keyboardActionLabel}
+            data-inv-item-id={it.id}
+            data-inv-item-key={itemKey}
         >
             <span className="inv-item__rarity" aria-hidden />
             <span className="inv-item__shine" aria-hidden />
@@ -216,6 +248,7 @@ export function InventoryPanel({
     const dialogRef = useModalDialog<HTMLDivElement>(!embedded);
     const tip = useItemTooltip();
     const drag = useRef<DragState>(null);
+    const keyboardFocusKey = useRef<number | null>(null);
     const [dragPreview, setDragPreview] = useState<DragPreview>(null);
     const [dropHint, setDropHint] = useState<DropHint>(null);
     const [equipHint, setEquipHint] = useState<ItemSlot | null>(null);
@@ -226,6 +259,32 @@ export function InventoryPanel({
     const char = inv.getActiveCharacter();
     const carryWeight = getPartyCarriedWeight(bag.items, store.getActiveParty());
     const carryAtbPercent = getCarryAtbPercent(carryWeight);
+
+    const keyboardActionFor = (placed: PlacedItem, source: InvDragSource): KeyboardItemAction | null => {
+        if (source.kind === 'equip') return 'unequip';
+        if (source.grid === 'ext' && inv.isExternalRaidLoot()) return 'move-to-bag';
+        if (char && isEquippable(placed.item)) return 'equip';
+        if (source.grid === 'ext') return 'move-to-bag';
+        return ext ? 'move-to-external' : null;
+    };
+
+    const preferredEquipSlot = (placed: PlacedItem): ItemSlot => {
+        if (placed.item.slot === 'accessory' && char?.equipment.has('accessory') && !char.equipment.has('accessory2')) {
+            return 'accessory2';
+        }
+        return placed.item.slot;
+    };
+
+    const keyboardActionLabelFor = (placed: PlacedItem, action: KeyboardItemAction | null): string => {
+        const item = itemName(placed.item);
+        if (action === 'equip') return formatT('inventory.action.equip', { item });
+        if (action === 'unequip') return formatT('inventory.action.unequip', { item });
+        if (action === 'move-to-bag') return formatT('inventory.action.moveToBackpack', { item });
+        if (action === 'move-to-external') {
+            return formatT('inventory.action.moveToExternal', { item, destination: inv.getExternalTitle() });
+        }
+        return item;
+    };
 
     // Tooltip content for a hovered item — equippables in a grid compare against
     // the currently-worn item in that slot; everything else shows a plain card.
@@ -423,6 +482,34 @@ export function InventoryPanel({
         };
     }, [inv, store]);
 
+    useEffect(() => {
+        const itemKey = keyboardFocusKey.current;
+        if (itemKey === null) return undefined;
+        const frame = window.requestAnimationFrame(() => {
+            dialogRef.current
+                ?.querySelector<HTMLElement>(`[data-inv-item-key="${itemKey}"]`)
+                ?.focus();
+            keyboardFocusKey.current = null;
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, [dialogRef, mutationSeq]);
+
+    const activateWithKeyboard = (placed: PlacedItem, source: InvDragSource, action: KeyboardItemAction | null) => {
+        if (!action) return;
+        tip.hide();
+        const success = action === 'equip'
+            ? inv.moveToEquip(placed, source, preferredEquipSlot(placed))
+            : inv.quickMove(placed, source);
+        if (success) {
+            if (action === 'equip') AudioManager.playSfx('sfx.equip');
+            else if (action === 'unequip') AudioManager.playSfx('sfx.unequip');
+            else AudioManager.playUi('ui.hover');
+            keyboardFocusKey.current = placedItemKey(placed);
+            setMutationSeq((seq) => seq + 1);
+        }
+        store.refresh();
+    };
+
     const mutateInventory = (action: () => void) => {
         action();
         setMutationSeq((seq) => seq + 1);
@@ -436,18 +523,30 @@ export function InventoryPanel({
             style={{ width: grid.width * CELL, height: grid.height * CELL } as CSSProperties}
             data-inv-grid={kind}
         >
-            {grid.items.map((placed) => (
-                <InvItem
-                    key={`${kind}-${placedItemKey(placed)}`}
-                    placed={placed}
-                    spanned
-                    dragging={dragPreview?.placed === placed}
-                    onPointerDown={beginPointerDrag(placed, { kind: 'grid', grid: kind, gridX: placed.gridX, gridY: placed.gridY })}
-                    onHoverEnter={tip.show(tipFor(placed, false))}
-                    onHoverMove={tip.move}
-                    onHoverLeave={tip.hide}
-                />
-            ))}
+            {grid.items.map((placed) => {
+                const itemKey = placedItemKey(placed);
+                const source: InvDragSource = { kind: 'grid', grid: kind, gridX: placed.gridX, gridY: placed.gridY };
+                const keyboardAction = keyboardActionFor(placed, source);
+                const tooltip = tipFor(placed, false);
+                return (
+                    <InvItem
+                        key={`${kind}-${itemKey}`}
+                        placed={placed}
+                        itemKey={itemKey}
+                        spanned
+                        dragging={dragPreview?.placed === placed}
+                        keyboardAction={keyboardAction}
+                        keyboardActionLabel={keyboardActionLabelFor(placed, keyboardAction)}
+                        onKeyboardActivate={() => activateWithKeyboard(placed, source, keyboardAction)}
+                        onPointerDown={beginPointerDrag(placed, source)}
+                        onHoverEnter={tip.show(tooltip)}
+                        onHoverMove={tip.move}
+                        onHoverLeave={tip.hide}
+                        onFocus={tip.showFor(tooltip)}
+                        onBlur={tip.hide}
+                    />
+                );
+            })}
             {dropHint?.kind === kind && drag.current && (
                 <div
                     className={`inv-drop-cell ${dropHint.valid ? 'is-valid' : 'is-invalid'}`}
@@ -492,6 +591,10 @@ export function InventoryPanel({
             <div className="inv-equip">
                 {EQUIP_SLOT_LIST.map(({ slot, labelKey }) => {
                     const equipped = char?.equipment.get(slot);
+                    const itemKey = equipped ? placedItemKey(equipped) : null;
+                    const source: InvDragSource = { kind: 'equip', slot };
+                    const keyboardAction = equipped ? keyboardActionFor(equipped, source) : null;
+                    const tooltip = equipped ? tipFor(equipped, true) : null;
                     return (
                         <div
                             key={slot}
@@ -502,13 +605,19 @@ export function InventoryPanel({
                             {equipped ? (
                                 <InvItem
                                     placed={equipped}
-                                    key={`equip-${slot}-${placedItemKey(equipped)}`}
+                                    itemKey={itemKey!}
+                                    key={`equip-${slot}-${itemKey}`}
                                     spanned={false}
                                     dragging={dragPreview?.placed === equipped}
-                                    onPointerDown={beginPointerDrag(equipped, { kind: 'equip', slot })}
-                                    onHoverEnter={tip.show(tipFor(equipped, true))}
+                                    keyboardAction={keyboardAction}
+                                    keyboardActionLabel={keyboardActionLabelFor(equipped, keyboardAction)}
+                                    onKeyboardActivate={() => activateWithKeyboard(equipped, source, keyboardAction)}
+                                    onPointerDown={beginPointerDrag(equipped, source)}
+                                    onHoverEnter={tip.show(tooltip!)}
                                     onHoverMove={tip.move}
                                     onHoverLeave={tip.hide}
+                                    onFocus={tip.showFor(tooltip!)}
+                                    onBlur={tip.hide}
                                 />
                             ) : (
                                 <span className="inv-eqslot__label">{t(labelKey)}</span>
