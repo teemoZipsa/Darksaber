@@ -9,6 +9,7 @@ import type { FieldNestState } from '../src/field/SpawnResolver';
 import type { WorldLootContainerType } from '../src/loot/WorldLootTypes';
 import type { WorldRealm } from '../src/map/BiomeMask';
 import type { RaidModifier } from '../src/raid/RaidModifiers';
+import type { EliteAffixId } from '../src/field/EliteAffixes';
 import type {
     AutoLootGrantMessage,
     CombatEventMessage,
@@ -72,6 +73,15 @@ export interface ServerPlayer {
     disconnectedAt: number | null;
     actorIds: string[];
     saveSnapshot?: CharacterSave;
+    bounty?: ServerBountyState;
+}
+
+export interface ServerBountyState {
+    contractId: string;
+    targetEnemyId: string | null;
+    proofEarned: boolean;
+    hadActorDown: boolean;
+    riskCompleted: boolean | null;
 }
 
 export interface ServerEnemy {
@@ -81,6 +91,8 @@ export interface ServerEnemy {
     scenarioPlayerId?: string;
     scenarioDungeonId?: string;
     scenarioObjective?: boolean;
+    bountyPlayerId?: string;
+    bountyContractId?: string;
     home: TilePoint;
     wanderSeed: number;
 }
@@ -176,6 +188,7 @@ export interface WorldSessionPersistentPlayer {
     disconnectedAt: number | null;
     actorIds: string[];
     saveSnapshot?: CharacterSave;
+    bounty?: ServerBountyState;
 }
 
 export interface ServerRaidBalanceState {
@@ -214,6 +227,9 @@ export interface WorldSessionPersistentEnemy {
     scenarioPlayerId?: string;
     scenarioDungeonId?: string;
     scenarioObjective?: boolean;
+    bountyPlayerId?: string;
+    bountyContractId?: string;
+    eliteAffixes?: EliteAffixId[];
     wanderSeed: number;
 }
 
@@ -227,6 +243,7 @@ export interface WorldSessionPersistentLoot {
     unlocked?: boolean;
     gridSnapshot: GridSnapshot;
     overflowItemIds: string[];
+    ownerPlayerId?: string;
 }
 
 export interface WorldSessionPersistentSnapshot {

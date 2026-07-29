@@ -193,6 +193,7 @@ export class WorldSession {
                 const player = this.players.get(actor.ownerPlayerId);
                 if (player) {
                     player.lastDamageCause = cause;
+                    if (player.bounty) player.bounty.hadActorDown = true;
                     resetWorldSessionActorExp(actor, player, this.saveState);
                     this.saveState.markCharacterInjured(player, actor.localActorId);
                 }
@@ -247,6 +248,10 @@ export class WorldSession {
             allocateLootId: (containerType) => containerType
                 ? `loot_${containerType}_${this.nextLootId++}`
                 : `loot_${this.nextLootId++}`,
+            allocateEnemyId: () => {
+                const id = `bounty_${this.nextEnemyId++}`;
+                return { id, seedOrdinal: this.nextEnemyId };
+            },
             findNearbyWalkableTile: (tile, actorId, ownerPlayerId) => this.findNearbyWalkableTile(tile, actorId, ownerPlayerId),
         });
         this.playerIntentResolver = new WorldSessionPlayerIntentResolver({
@@ -422,6 +427,7 @@ export class WorldSession {
         this.contentSpawner.ensureContentNear(spawnTile, player.departureTownId, now);
         this.contentSpawner.spawnRaidModifierSupplyDrop(player, spawnTile);
         this.contentSpawner.spawnMarkedCache(player, spawnTile);
+        this.contentSpawner.spawnBountyTarget(player, spawnTile);
         this.log(`join player=${playerId} origin=${originHubId} actors=${player.actorIds.length}`);
         return {
             playerId,
@@ -659,6 +665,14 @@ export class WorldSession {
         const player = this.players.get(playerId);
         if (!player) return;
         this.scenarioRuntime.removePlayerRuntime(playerId);
+        for (const [enemyId, entry] of this.enemies) {
+            if (entry.bountyPlayerId === playerId) this.enemies.delete(enemyId);
+        }
+        for (const [lootId, lootObject] of this.loot) {
+            if (lootObject.ownerPlayerId !== playerId) continue;
+            this.loot.delete(lootId);
+            this.lootState.releaseLoot(lootId);
+        }
         for (const actorId of player.actorIds) this.actors.delete(actorId);
         this.players.delete(playerId);
         this.lootResolver.releaseLocksForPlayer(playerId);
@@ -713,6 +727,7 @@ export class WorldSession {
         const event = applyWorldSessionCursedArtifactTurnDamage(player, actor);
         if (event?.kind === 'down') {
             player.lastDamageCause = 'curse';
+            if (player.bounty) player.bounty.hadActorDown = true;
             resetWorldSessionActorExp(actor, player, this.saveState);
             this.saveState.markCharacterInjured(player, actor.localActorId);
         }

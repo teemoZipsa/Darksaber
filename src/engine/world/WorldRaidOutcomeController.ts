@@ -38,6 +38,12 @@ import type { InputManager } from '../InputManager';
 import type { WorldPhase, WorldRaidSession } from './WorldRaidSession';
 import type { WorldTownSession } from './WorldTownSession';
 import type { RaidFailureSummary } from '../../net/WorldProtocol';
+import type { BountySettlementSummary } from '../../net/WorldProtocol';
+import {
+    BOUNTY_PROOF_ITEM_ID,
+    isBountyRiskCompleted,
+    resolveBountyContract,
+} from '../../data/BountyContractData';
 
 function displayTownName(town: TownInfo): string {
     return i18n.lang === 'ko' ? town.nameKr : town.name;
@@ -78,6 +84,7 @@ export interface CompleteSuccessOptions {
      * the result screen (the client no longer decides this for network raids).
      */
     firstSurvivalBonus?: boolean;
+    bounty?: BountySettlementSummary;
 }
 
 export interface CompleteFailureOptions {
@@ -121,8 +128,15 @@ export class WorldRaidOutcomeController {
 
         const serverRewards = options.serverAuthoritativeRewards === true;
         const heroStatuses = this.createHeroStatuses();
-        const secured = serverRewards ? this.snapshotRaidLootForDisplay() : this.secureRaidLoot();
         const questRewards: string[] = [];
+        if (!serverRewards) questRewards.push(...this.settleLocalBounty());
+        if (serverRewards && options.bounty) {
+            questRewards.push(formatT('bounty.completed', { gold: options.bounty.baseReward }));
+            questRewards.push(options.bounty.riskCompleted
+                ? formatT('bounty.bonusCompleted', { gold: options.bounty.bonusReward })
+                : t('bounty.bonusFailed'));
+        }
+        const secured = serverRewards ? this.snapshotRaidLootForDisplay() : this.secureRaidLoot();
         const episode1WasCleared = this.context.playerData.isCleared(MAIN_QUEST_EPISODE_01_ID);
         const burgosObjectiveCleared = raidSession.isDungeonCleared(BURGOS_CASTLE_DUNGEON_ID);
         const raidGoldReward = raidSession.consumeRaidGoldReward();
@@ -180,6 +194,32 @@ export class WorldRaidOutcomeController {
         };
         this.showRaidResult(outcome, destination);
         this.context.log(formatT('raid.outcome.survivedLog', { town: displayTownName(destination) }));
+    }
+
+    private settleLocalBounty(): string[] {
+        const contract = resolveBountyContract(this.context.playerData.activeBountyContractId);
+        if (!contract) return [];
+        const bag = this.context.gameManager.inventory;
+        const proof = bag.items.find((placed) => (
+            placed.item.id === BOUNTY_PROOF_ITEM_ID && placed.acquiredInRaid === true
+        ));
+        if (!proof) return [];
+        bag.remove(proof);
+        const riskCompleted = isBountyRiskCompleted(contract, {
+            elapsedSeconds: this.context.raidSession.elapsedSeconds,
+            hadActorDown: this.context.raidSession.downedCharacterIds.size > 0,
+            killsIncludingTarget: this.context.raidSession.kills,
+        });
+        this.context.raidSession.addRaidGoldReward(
+            contract.rewardGold + (riskCompleted ? contract.bonusGold : 0),
+        );
+        this.context.playerData.activeBountyContractId = null;
+        return [
+            formatT('bounty.completed', { gold: contract.rewardGold }),
+            riskCompleted
+                ? formatT('bounty.bonusCompleted', { gold: contract.bonusGold })
+                : t('bounty.bonusFailed'),
+        ];
     }
 
     public completeFailure(

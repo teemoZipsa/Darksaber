@@ -130,6 +130,7 @@ export function reconcileNetworkEnemies(
         enemy.isAggro = enemySnapshot.isAggro;
         enemy.isBoss = enemySnapshot.isBoss;
         enemy.color = enemySnapshot.color;
+        enemy.setEliteAffixes(enemySnapshot.eliteAffixes, enemySnapshot.bountyContractId);
         enemy.setLocalizedNames(localizedNames.ko, localizedNames.en);
         applyMonsterSprite(enemy, enemySnapshot.monsterId);
         return {

@@ -3,6 +3,7 @@ import type { CharacterStats } from '../data/Stats';
 import type { ItemSlot } from '../data/ItemDB';
 import type { PlacedItem } from '../inventory/GridInventory';
 import { applyEquipmentStatBonuses } from '../inventory/Socketing';
+import { applyEliteAffixStats, type EliteAffixId } from '../field/EliteAffixes';
 
 export const STATUS_KINDS = [
     'guard',
@@ -54,6 +55,7 @@ export interface StatusCarrier {
     stats: CharacterStats;
     statuses?: StatusEffect[];
     equipment?: Map<ItemSlot, PlacedItem>;
+    eliteAffixes?: EliteAffixId[];
 }
 
 export interface TurnStartStatusResult {
@@ -361,7 +363,7 @@ export function getEffectiveStatsForCharacter(character: StatusCarrier): Charact
 }
 
 export function getEffectiveStatsForEnemy(enemy: StatusCarrier): CharacterStats {
-    return getEffectiveStats(enemy.stats, enemy.statuses);
+    return applyEliteAffixStats(getEffectiveStats(enemy.stats, enemy.statuses), enemy.eliteAffixes);
 }
 
 export function getEffectiveStats(stats: CharacterStats, statuses: StatusEffect[] | undefined = []): CharacterStats {

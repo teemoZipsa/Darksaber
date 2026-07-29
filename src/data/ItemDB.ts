@@ -877,6 +877,19 @@ const RAW_ITEMS: RawItemDef[] = [
 
     // ─── Quest Items ──────
     {
+        id: 'bounty_elite_proof', name: 'Elite Bounty Proof', nameKr: '정예 토벌 증표',
+        slot: 'material', gridW: 1, gridH: 1, color: '#c9a95b', icon: '✦',
+        maxDurability: 1,
+        description: 'Proof cut from a wanted elite. The bounty is paid only if it returns with a surviving party.',
+        descriptionKr: '수배된 정예에게서 떼어낸 증표입니다. 파티가 생환해 게시판에 가져와야 현상금을 받습니다.',
+        rarity: 'unique',
+        maxStack: 1,
+        weight: 0.1,
+        baseValue: 1,
+        sellable: false,
+        itemCategory: 'material'
+    },
+    {
         id: 'quest_bomb', name: 'Bomb', nameKr: '폭탄',
         slot: 'material', gridW: 1, gridH: 1, color: '#c05032', icon: '●',
         maxDurability: 1,

@@ -10,6 +10,10 @@ import { TILE_PROPERTIES, type TileType } from '../map/Tile';
 import type { StatusEffect } from '../combat/StatusEffects';
 import { createEnemyAIProfile, type EnemyAIProfile, type EnemyRole } from '../field/EnemyAI';
 import { i18n } from '../i18n/LanguageManager';
+import {
+    normalizeEliteAffixes,
+    type EliteAffixId,
+} from '../field/EliteAffixes';
 
 export interface EnemyAIMemory {
     turnCount: number;
@@ -26,6 +30,8 @@ export class Enemy extends Entity {
     public isAggro: boolean = false;
     public isBoss: boolean = false;
     public lootTableId: string = '';
+    public eliteAffixes: EliteAffixId[] = [];
+    public bountyContractId: string | null = null;
     public statuses: StatusEffect[] = [];
     public role: EnemyRole;
     public aiProfile: EnemyAIProfile;
@@ -165,6 +171,15 @@ export class Enemy extends Entity {
         const damage = Number.isFinite(amount) ? Math.max(0, amount) : 0;
         this.stats.hp = Math.max(0, Math.min(this.stats.maxHp, this.stats.hp - damage));
         return this.stats.hp <= 0; // returns true if dead
+    }
+
+    public setEliteAffixes(value: unknown, bountyContractId?: string | null): void {
+        this.eliteAffixes = normalizeEliteAffixes(value);
+        this.bountyContractId = typeof bountyContractId === 'string' ? bountyContractId : null;
+    }
+
+    public get isElite(): boolean {
+        return this.eliteAffixes.length > 0;
     }
 
     private applyRoleTuning(role: EnemyRole): void {

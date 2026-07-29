@@ -19,10 +19,16 @@ import {
     WorldSessionFieldNests,
 } from './WorldSessionFieldNests';
 import type { ServerEnemy, ServerPlayer } from './WorldSessionTypes';
+import {
+    BOUNTY_PROOF_ITEM_ID,
+    resolveBountyContract,
+} from '../src/data/BountyContractData';
+import { getMonsterDefinition } from '../src/data/MonsterCatalog';
+import { applyBountyEliteBaseline } from '../src/field/EliteAffixes';
 
 export interface WorldSessionContentSpawnerContext {
     worldMap: WorldMap;
-    enemies: ReadonlyMap<string, ServerEnemy>;
+    enemies: Map<string, ServerEnemy>;
     loot: Map<string, LootObject>;
     lootState: WorldSessionLootState;
     fieldNests: WorldSessionFieldNests;
@@ -30,6 +36,7 @@ export interface WorldSessionContentSpawnerContext {
     sessionEpoch: number;
     shardId: string;
     allocateLootId: (containerType?: string) => string;
+    allocateEnemyId: () => { id: string; seedOrdinal: number };
     findNearbyWalkableTile: (tile: TilePoint, actorId: string, ownerPlayerId?: string) => TilePoint;
 }
 
@@ -104,6 +111,42 @@ export class WorldSessionContentSpawner {
         }));
     }
 
+    public spawnBountyTarget(player: ServerPlayer, spawnTile: TilePoint): void {
+        const bounty = player.bounty;
+        if (!bounty || bounty.proofEarned) return;
+        if (bounty.targetEnemyId && this.context.enemies.has(bounty.targetEnemyId)) return;
+        const contract = resolveBountyContract(bounty.contractId);
+        if (!contract) return;
+        const definition = getMonsterDefinition(contract.monsterId);
+        const allocated = this.context.allocateEnemyId();
+        const tile = this.context.findNearbyWalkableTile({
+            x: spawnTile.x + 16,
+            y: spawnTile.y + 9,
+        }, allocated.id, player.id);
+        const enemy = new Enemy(
+            allocated.id,
+            tile.x,
+            tile.y,
+            definition.name,
+            contract.monsterLevel,
+            definition.color,
+            definition.role,
+            definition.id,
+        );
+        enemy.stats = applyBountyEliteBaseline(enemy.stats);
+        enemy.aggroRange = Math.max(8, definition.aggroRange);
+        enemy.setEliteAffixes(contract.affixIds, contract.id);
+        this.context.enemies.set(enemy.id, {
+            enemy,
+            monsterId: definition.id,
+            bountyPlayerId: player.id,
+            bountyContractId: contract.id,
+            home: { ...tile },
+            wanderSeed: allocated.seedOrdinal,
+        });
+        bounty.targetEnemyId = enemy.id;
+    }
+
     public spawnEnemyLoot(enemy: Enemy, tile: TilePoint = { x: enemy.gridX, y: enemy.gridY }): void {
         const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
         if (!herb) return;
@@ -122,6 +165,25 @@ export class WorldSessionContentSpawner {
         const loot = new LootObject(id, enemy.gridX, enemy.gridY, [herb], {
             sourceLabel: getEnemyLootSourceLabel(enemy.name),
             kind: 'corpse',
+        });
+        this.context.loot.set(id, loot);
+        this.context.lootState.createAutoLootPending(id, playerId, now);
+        return {
+            type: 'AUTO_LOOT_GRANT',
+            lootId: id,
+            sourceName: enemy.name,
+            gridSnapshot: gridToSnapshot(loot.inventory),
+        };
+    }
+
+    public spawnBountyProofAutoLoot(enemy: Enemy, playerId: string, now: number): AutoLootGrantMessage | undefined {
+        const proof = getItemDef(BOUNTY_PROOF_ITEM_ID);
+        if (!proof) return undefined;
+        const id = this.context.allocateLootId();
+        const loot = new LootObject(id, enemy.gridX, enemy.gridY, [proof], {
+            sourceLabel: getEnemyLootSourceLabel(enemy.name),
+            kind: 'corpse',
+            ownerPlayerId: playerId,
         });
         this.context.loot.set(id, loot);
         this.context.lootState.createAutoLootPending(id, playerId, now);

@@ -17,6 +17,10 @@ import { getLearnedSkillIdSet, normalizeLoadout, normalizeUpgradeLevels } from '
 import type { CharacterSave, CharacterSavePatch, InventorySaveSnapshot } from '../src/shared/CharacterSave';
 import { HttpError } from './HttpError';
 import { normalizeInventorySnapshot } from './AuthStore';
+import {
+    isCurrentBountyOffer,
+    normalizeActiveBountyContractId,
+} from '../src/data/BountyContractData';
 
 export const CLIENT_HUB_PATCH_FIELDS = new Set([
     'hubLocation',
@@ -37,6 +41,7 @@ const CLIENT_QUEST_STATE_FIELDS = new Set([
     'marketContracts',
     'facilityUpgrades',
     'raidInsuranceActive',
+    'activeBountyContractId',
 ]);
 
 const EQUIPMENT_SLOTS = ['weapon', 'shield', 'head', 'body', 'boots', 'accessory', 'accessory2'] as const;
@@ -56,7 +61,14 @@ export function buildHubSavePatch(
         next.hubLocation = sanitizeHubLocation(patch.hubLocation, currentSave.hubLocation);
     }
     if (isRecord(patch.questState)) {
-        next.questState = sanitizeClientQuestState(patch.questState, currentSave.questState);
+        const currentTownId = typeof currentSave.hubLocation.townId === 'string'
+            ? currentSave.hubLocation.townId
+            : 'central_castle';
+        next.questState = sanitizeClientQuestState(
+            patch.questState,
+            currentSave.questState,
+            currentTownId,
+        );
     }
     if (isRecord(patch.inventory)) {
         next.inventory = sanitizeClientInventorySnapshot(patch.inventory);
@@ -110,6 +122,7 @@ function sanitizeHubLocation(
 function sanitizeClientQuestState(
     incoming: Record<string, unknown>,
     current: Record<string, unknown>,
+    currentTownId: string,
 ): Record<string, unknown> {
     for (const key of Object.keys(incoming)) {
         if (key === 'completedQuestIds' || key === 'clearedStageIds') {
@@ -148,6 +161,26 @@ function sanitizeClientQuestState(
     }
     if (typeof incoming.raidInsuranceActive === 'boolean') {
         next.raidInsuranceActive = incoming.raidInsuranceActive;
+    }
+    if (incoming.activeBountyContractId === null) {
+        next.activeBountyContractId = null;
+    } else if (typeof incoming.activeBountyContractId === 'string') {
+        const incomingId = normalizeActiveBountyContractId(incoming.activeBountyContractId);
+        if (!incomingId) {
+            throw new HttpError(400, 'invalid_bounty_contract', 'Bounty contract is invalid.');
+        }
+        const currentId = normalizeActiveBountyContractId(current.activeBountyContractId);
+        if (currentId && currentId !== incomingId) {
+            throw new HttpError(400, 'bounty_contract_active', 'Abandon the active bounty before accepting another.');
+        }
+        if (!currentId) {
+            const marketCycle = normalizeMarketCycle(current.marketCycle);
+            const completedQuestCount = normalizeStringArray(current.completedQuestIds ?? current.clearedStageIds).length;
+            if (!isCurrentBountyOffer(incomingId, currentTownId, marketCycle, completedQuestCount)) {
+                throw new HttpError(400, 'invalid_bounty_offer', 'Bounty is not offered by the current board.');
+            }
+        }
+        next.activeBountyContractId = incomingId;
     }
     return next;
 }

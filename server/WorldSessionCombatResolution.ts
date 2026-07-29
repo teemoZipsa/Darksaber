@@ -24,6 +24,7 @@ import { recordPlayerKillDangerBand } from './WorldSessionBalanceTelemetry';
 import { getEffectiveServerActorStats } from './WorldSessionHelpers';
 import { awardWorldSessionEnemyExp } from './WorldSessionActorProgression';
 import type { WorldSessionSaveState } from './WorldSessionSaveState';
+import { recordBountyTargetKill } from './WorldSessionBounty';
 
 export interface WorldSessionEnemyKillContext {
     scenarioRuntime: WorldSessionScenarioRuntime;
@@ -113,9 +114,12 @@ export function completeWorldSessionEnemyKill(
             saveState: context.saveState,
         });
     }
-    const autoLootGrant: AutoLootGrantMessage | undefined = enemy.isBoss
-        ? undefined
-        : context.contentSpawner.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
+    const bountyTargetKilled = player ? recordBountyTargetKill(player, target) : false;
+    const autoLootGrant: AutoLootGrantMessage | undefined = bountyTargetKilled
+        ? context.contentSpawner.spawnBountyProofAutoLoot(enemy, actor.ownerPlayerId, now)
+        : enemy.isBoss
+            ? undefined
+            : context.contentSpawner.spawnEnemyAutoLoot(enemy, actor.ownerPlayerId, now);
     if (enemy.isBoss || !autoLootGrant) context.contentSpawner.spawnEnemyLoot(enemy, scenarioKillResult.bossLootTile);
     return { expAward, autoLootGrant, scenarioEnemyDefeatEvent: scenarioKillResult.scenarioEnemyDefeatEvent };
 }

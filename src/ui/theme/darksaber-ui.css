@@ -1490,6 +1490,80 @@
 #ui-overlay .ds-quest__state { font-size: 11px; color: var(--ds-accent-bright); white-space: nowrap; }
 #ui-overlay .ds-quest__reward { font-size: 12px; color: var(--ds-accent); flex: none; }
 #ui-overlay .ds-quest__note { text-align: center; font-size: 11px; color: var(--ds-text-dim); padding-top: 6px; }
+#ui-overlay .ds-bounty-board {
+    border-top: 1px solid var(--ds-border-shadow);
+    padding: 14px 18px 16px;
+    background:
+        radial-gradient(circle at 20% 10%, rgba(153, 111, 48, 0.1), transparent 42%),
+        var(--ds-panel-inset);
+}
+#ui-overlay .ds-bounty-board__head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    color: var(--ds-accent); font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
+    margin-bottom: 10px;
+}
+#ui-overlay .ds-bounty-board__head span:last-child {
+    color: var(--ds-text-dim); font-size: 11px; font-weight: 400; letter-spacing: 0;
+}
+#ui-overlay .ds-bounty-board__papers {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 9px;
+}
+#ui-overlay .ds-bounty-paper {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    min-width: 0; padding: 18px 9px 10px;
+    color: #2c2116;
+    background:
+        linear-gradient(93deg, transparent 0 4%, rgba(91, 62, 29, 0.08) 4.5% 5%, transparent 5.5%),
+        linear-gradient(167deg, #d9c491, #bda36c);
+    border: 1px solid #785f35;
+    clip-path: polygon(1% 2%, 9% 0, 18% 2%, 29% 0, 42% 2%, 54% 0, 67% 2%, 78% 0, 91% 2%, 99% 0, 100% 94%, 93% 92%, 84% 96%, 73% 93%, 62% 97%, 51% 94%, 39% 98%, 28% 94%, 16% 97%, 5% 94%, 0 97%);
+    box-shadow: 0 5px 12px rgba(0, 0, 0, 0.42);
+    transform-origin: 50% 8%;
+    transition: filter 160ms, transform 160ms, opacity 160ms;
+}
+#ui-overlay .ds-bounty-paper:hover:not(.is-disabled) { transform: translateY(-2px) rotate(-0.4deg); filter: brightness(1.06); }
+#ui-overlay .ds-bounty-paper.is-active { box-shadow: 0 0 0 2px var(--ds-accent), 0 7px 16px rgba(0, 0, 0, 0.55); }
+#ui-overlay .ds-bounty-paper.is-disabled { opacity: 0.36; filter: grayscale(0.7); }
+#ui-overlay .ds-bounty-paper.is-tearing { animation: ds-bounty-tear 360ms ease-in forwards; }
+#ui-overlay .ds-bounty-paper__pin {
+    position: absolute; top: 5px; left: 50%; width: 7px; height: 7px;
+    transform: translateX(-50%); border-radius: 50%;
+    background: #8f1f1f; border: 1px solid #421010; box-shadow: 0 1px 2px #0008;
+}
+#ui-overlay .ds-bounty-paper__wanted { font-size: 9px; font-weight: 800; letter-spacing: 0.2em; }
+#ui-overlay .ds-bounty-paper__target {
+    width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    text-align: center; font-size: 13px; font-weight: 800;
+}
+#ui-overlay .ds-bounty-paper__affixes { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
+#ui-overlay .ds-bounty-paper__affixes span {
+    padding: 1px 4px; border: 1px solid #66502f; border-radius: 2px;
+    font-size: 9px; font-weight: 700; background: rgba(55, 37, 20, 0.1);
+}
+#ui-overlay .ds-bounty-paper__risk { min-height: 24px; text-align: center; font-size: 9px; line-height: 1.25; }
+#ui-overlay .ds-bounty-paper__reward { color: #563511; font-size: 10px; font-weight: 800; text-align: center; }
+#ui-overlay .ds-bounty-paper .ds-btn {
+    width: 100%; min-width: 0; padding: 6px 5px; margin-top: auto; font-size: 10px;
+}
+#ui-overlay .ds-bounty-paper__stamp {
+    position: absolute; right: 7px; top: 28px; transform: rotate(-14deg);
+    color: #7a1717; border: 2px solid #7a1717; padding: 2px 4px;
+    font-size: 9px; font-weight: 900; opacity: 0.78;
+}
+#ui-overlay .ds-bounty-board__rule {
+    margin-top: 8px; color: var(--ds-text-dim); font-size: 10px; text-align: center;
+}
+@keyframes ds-bounty-tear {
+    0% { transform: translateY(0) rotate(0); opacity: 1; }
+    45% { transform: translateY(5px) rotate(2deg) scaleX(0.98); opacity: 1; }
+    100% { transform: translateY(34px) rotate(7deg) scale(0.94); opacity: 0; }
+}
+@media (max-width: 640px) {
+    #ui-overlay .ds-bounty-board__papers { grid-template-columns: 1fr; max-height: 260px; overflow-y: auto; }
+}
 #ui-overlay .ds-contracts {
     border-top: 1px solid var(--ds-border-shadow);
     padding: 12px 22px 14px;

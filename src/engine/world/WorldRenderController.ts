@@ -28,6 +28,14 @@ import type { WorldTacticalController } from './WorldTacticalController';
 import { getStoryInteriorBriefingLineKeys } from '../../data/StoryInteriorBriefingData';
 import { MIN_FIELD_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
 import { formatT, t } from '../../i18n/LanguageManager';
+import {
+    BOUNTY_PROOF_ITEM_ID,
+    resolveBountyContract,
+    type BountyRiskId,
+} from '../../data/BountyContractData';
+import { getMonsterDefinition } from '../../data/MonsterCatalog';
+import { formatMonsterName } from '../../i18n/DisplayNames';
+import type { EliteAffixId } from '../../field/EliteAffixes';
 
 export interface WorldRenderContext {
     party: PartyManager;
@@ -61,6 +69,7 @@ export interface WorldRenderContext {
     getPathPreviewTiles: (actor: FieldActor | null) => TilePoint[];
     getAttackCues: () => AttackCue[];
     getCombatLog: () => string[];
+    hasBackpackItem?: (itemId: string) => boolean;
     getActorTerrainTraits: (actor: FieldActor) => TerrainActorTraits;
     isTurnCombatActive: () => boolean;
 }
@@ -161,6 +170,15 @@ export class WorldRenderController {
 
         const storyInteriorDungeonId = storyInteriorActive ? activeDungeonId : null;
         const briefingLines = getStoryInteriorBriefingLineKeys(storyInteriorDungeonId);
+        const activeBounty = resolveBountyContract(this.context.playerData.activeBountyContractId);
+        const bountyTargetAlive = activeBounty
+            ? this.context.getFieldEnemies().some((entry) => (
+                entry.enemy.bountyContractId === activeBounty.id && entry.enemy.stats.hp > 0
+            ))
+            : false;
+        const bountyProofSecured = activeBounty
+            ? this.context.hasBackpackItem?.(BOUNTY_PROOF_ITEM_ID) ?? false
+            : false;
 
         return {
             worldTime: this.context.getWorldTime(),
@@ -206,6 +224,13 @@ export class WorldRenderController {
                     resultVisible: this.context.raidOutcomeController.isVisible(),
                     turnCombatActive: this.context.isTurnCombatActive(),
                 }),
+                bounty: activeBounty ? {
+                    targetName: formatMonsterName(getMonsterDefinition(activeBounty.monsterId)),
+                    affixLabels: activeBounty.affixIds.map(eliteAffixLabel),
+                    riskLabel: bountyRiskLabel(activeBounty.riskId),
+                    proofSecured: bountyProofSecured,
+                    targetAlive: bountyTargetAlive,
+                } : null,
             },
             storyInterior: {
                 active: storyInteriorActive,
@@ -287,5 +312,23 @@ export class WorldRenderController {
             const cursorType = active && this.context.playerActionController.hasExecutableAttack(actor) ? 'attack' : 'move';
             this.context.actionMenuUI.renderReadyIndicator(ctx, px, py, this.context.getWorldTime(), cursorType);
         }
+    }
+}
+
+function eliteAffixLabel(affix: EliteAffixId): string {
+    switch (affix) {
+        case 'berserker': return t('bounty.affix.berserker');
+        case 'vampiric': return t('bounty.affix.vampiric');
+        case 'ironclad': return t('bounty.affix.ironclad');
+        case 'executioner': return t('bounty.affix.executioner');
+        case 'swift': return t('bounty.affix.swift');
+    }
+}
+
+function bountyRiskLabel(risk: BountyRiskId): string {
+    switch (risk) {
+        case 'swift_hunt': return t('bounty.risk.swift_hunt');
+        case 'unbroken': return t('bounty.risk.unbroken');
+        case 'blood_trail': return t('bounty.risk.blood_trail');
     }
 }

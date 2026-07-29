@@ -13,7 +13,7 @@
 
 import type { GameManager } from '../../engine/GameManager';
 import type { Character } from '../../character/Character';
-import type { MerchantContractView, WorldTownSession } from '../../engine/world/WorldTownSession';
+import type { BountyContractView, MerchantContractView, WorldTownSession } from '../../engine/world/WorldTownSession';
 import type { TownTab } from '../../ui/TownUI';
 import type { ShopEntry, SellEntry } from '../../ui/ShopUI';
 import type { ShopKind } from '../../data/ShopData';
@@ -128,6 +128,7 @@ export class UiStore {
             `shop:${this.shopSignature()}`,
             `facilities:${this.getFacilityUpgradeViews().map((view) => `${view.definition.id}:${view.level}:${view.canUpgrade ? 1 : 0}:${view.items.map((item) => `${item.itemId}:${item.owned}`).join(',')}`).join(';')}`,
             `contracts:${this.getMerchantContractViews().map((contract) => `${contract.id}:${contract.canComplete ? 1 : 0}`).join(';')}`,
+            `bounties:${this.getBountyContractViews().map((view) => `${view.contract.id}:${view.active ? 1 : 0}`).join(';')}`,
             townInv ? `inv:${this.inventorySignature(townInv)}` : '',
             `quests:${this.questSignature()}`,
         ].join('/');
@@ -355,6 +356,7 @@ export class UiStore {
     hasRaidInsurance = (): boolean => this.town()?.hasRaidInsurance() ?? false;
     isQuestDone = (questId: string): boolean => this.townUi()?.getQuestDone?.(questId) ?? false;
     getMerchantContractViews = (): MerchantContractView[] => this.town()?.getMerchantContractViews() ?? [];
+    getBountyContractViews = (): BountyContractView[] => this.town()?.getBountyContractViews() ?? [];
 
     getShopKind = (): ShopKind => this.shop()?.getActiveKind() ?? 'weapon';
     getShopGold = (): number => this.shop()?.getGoldValue() ?? this.gm.playerData.gold;
@@ -411,6 +413,16 @@ export class UiStore {
     };
     completeMerchantContract = (id: string): boolean => {
         const ok = this.town()?.completeMerchantContract(id) ?? false;
+        this.tick();
+        return ok;
+    };
+    acceptBountyContract = (id: string): boolean => {
+        const ok = this.town()?.acceptBountyContract(id) ?? false;
+        this.tick();
+        return ok;
+    };
+    abandonBountyContract = (): boolean => {
+        const ok = this.town()?.abandonBountyContract() ?? false;
         this.tick();
         return ok;
     };

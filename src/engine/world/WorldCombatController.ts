@@ -18,6 +18,7 @@ import type { PlacedItem } from '../../inventory/GridInventory';
 import { AudioManager } from '../AudioManager';
 import { formatT, t } from '../../i18n/LanguageManager';
 import { formatItemName } from '../../i18n/DisplayNames';
+import { applyExecutionerDamage } from '../../field/EliteAffixes';
 
 let nextFeedbackGroupId = 1;
 
@@ -186,7 +187,13 @@ export class WorldCombatController {
             return result;
         }
 
-        const guarded = applyGuardToDamage(actor.character.statuses, damageResult.damage);
+        const executionerDamage = applyExecutionerDamage(
+            damageResult.damage,
+            enemy.eliteAffixes,
+            actor.character.stats.hp,
+            actor.character.stats.maxHp,
+        );
+        const guarded = applyGuardToDamage(actor.character.statuses, executionerDamage);
         actor.character.statuses = guarded.statuses;
         actor.character.stats.hp = Math.max(0, actor.character.stats.hp - guarded.damage);
         this.sink.spawnDamage(actor.entity.gridX, actor.entity.gridY, guarded.damage, damageResult.isCrit, false);

@@ -13,6 +13,7 @@ import type { WorldMap } from '../../map/WorldMap';
 import type { WorldNetworkSyncController } from './WorldNetworkSyncController';
 import type { WorldSelectionController } from './WorldSelectionController';
 import type { WorldStoryScenarioController } from './WorldStoryScenarioController';
+import { BOUNTY_PROOF_ITEM_ID } from '../../data/BountyContractData';
 
 export interface WorldLootContext {
     gameManager: GameManager;
@@ -45,8 +46,9 @@ export class WorldLootController {
 
     public spawnEnemyLoot(enemy: Enemy): void {
         const herb = getItemDef('herb_common') ?? getItemDef('herb_cheap');
+        const bountyProof = enemy.bountyContractId ? getItemDef(BOUNTY_PROOF_ITEM_ID) : null;
         const bossRune = enemy.isBoss ? rollBossRune(enemy.level) : null;
-        const items = [bossRune, herb].filter((item): item is NonNullable<typeof item> => Boolean(item));
+        const items = [bountyProof, bossRune, herb].filter((item): item is NonNullable<typeof item> => Boolean(item));
         if (items.length === 0) return;
         const storyInteriorBossReturn = enemy.isBoss ? this.context.storyScenarioController.getActiveInterior() : null;
         const lootMap = storyInteriorBossReturn?.previousWorldMap ?? this.context.getWorldMap();

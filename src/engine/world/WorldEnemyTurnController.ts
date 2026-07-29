@@ -27,7 +27,12 @@ import {
     createCombatResult,
     mergeCombatResult,
 } from './WorldCombatController';
-import { WorldMovementController, isEntityMoving } from './WorldMovementController';
+import {
+    WorldMovementController,
+    areLocalEnemiesAllied,
+    isEntityMoving,
+} from './WorldMovementController';
+import { getVampiricHealing } from '../../field/EliteAffixes';
 
 export type EnemySpellElement = 'dark' | 'fire' | 'ice' | 'lightning' | 'wind' | 'earth';
 
@@ -122,6 +127,7 @@ export class WorldEnemyTurnController {
             targets: aliveActors.map((actor) => this.toActorAIUnit(actor)),
             allies: this.context.getFieldEnemies()
                 .map((candidate) => candidate.enemy)
+                .filter((candidate) => areLocalEnemiesAllied(enemy, candidate))
                 .filter((candidate) => candidate.stats.hp > 0)
                 .map((candidate) => this.toEnemyAIUnit(candidate)),
             profile: enemy.aiProfile,
@@ -221,7 +227,8 @@ export class WorldEnemyTurnController {
     }
 
     private enemyAttack(enemy: Enemy, actor: FieldActor, range: number, feedbackGroupId?: string): CombatResult {
-        return this.combat.enemyAttack({
+        const hpBefore = actor.character.stats.hp;
+        const result = this.combat.enemyAttack({
             enemy,
             actor,
             range,
@@ -236,6 +243,19 @@ export class WorldEnemyTurnController {
                 getTileAt: (tile) => this.context.getTileAt(tile),
             }),
         });
+        const dealtDamage = Math.max(0, hpBefore - actor.character.stats.hp);
+        const healing = enemy.stats.hp > 0 ? getVampiricHealing(
+            dealtDamage,
+            enemy.eliteAffixes,
+            enemy.stats.hp,
+            enemy.stats.maxHp,
+        ) : 0;
+        if (healing > 0) {
+            enemy.stats.hp += healing;
+            this.sink.spawnHeal(enemy.gridX, enemy.gridY, healing);
+            this.sink.spawnHealEffect(enemy.gridX, enemy.gridY);
+        }
+        return result;
     }
 
     private enemyIsImmobilized(enemy: Enemy): boolean {

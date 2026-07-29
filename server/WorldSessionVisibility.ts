@@ -7,9 +7,10 @@ export function isEnemyVisibleToViewer(
 ): boolean {
     const viewer = viewerPlayerId ? players.get(viewerPlayerId) : undefined;
     if (viewer?.activeDungeonId) return entry.scenarioPlayerId === viewer.id;
-    if (!entry.scenarioPlayerId) return true;
+    const privateOwnerId = entry.scenarioPlayerId ?? entry.bountyPlayerId;
+    if (!privateOwnerId) return true;
     if (!viewerPlayerId) return true;
-    return entry.scenarioPlayerId === viewerPlayerId;
+    return privateOwnerId === viewerPlayerId;
 }
 
 export function isActorVisibleToViewer(
@@ -27,7 +28,8 @@ export function isActorVisibleToViewer(
 }
 
 export function canActorTargetEnemy(actor: ServerActor, entry: ServerEnemy): boolean {
-    return !entry.scenarioPlayerId || entry.scenarioPlayerId === actor.ownerPlayerId;
+    const privateOwnerId = entry.scenarioPlayerId ?? entry.bountyPlayerId;
+    return !privateOwnerId || privateOwnerId === actor.ownerPlayerId;
 }
 
 export function getTargetableActors(
@@ -40,7 +42,9 @@ export function getTargetableActors(
         .filter((actor) => {
             const owner = players.get(actor.ownerPlayerId);
             if (!owner?.active) return false;
-            if (entry?.scenarioPlayerId) return actor.ownerPlayerId === entry.scenarioPlayerId;
+            if (entry?.bountyPlayerId && owner.activeDungeonId) return false;
+            const privateOwnerId = entry?.scenarioPlayerId ?? entry?.bountyPlayerId;
+            if (privateOwnerId) return actor.ownerPlayerId === privateOwnerId;
             return !owner.activeDungeonId;
         })
         .sort((a, b) => {

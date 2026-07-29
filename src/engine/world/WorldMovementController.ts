@@ -364,6 +364,7 @@ export class WorldMovementController {
         const selfTile = this.enemyTile(entry.enemy);
         return this.context.getFieldEnemies().some((candidate) =>
             candidate !== entry &&
+            areLocalEnemiesAllied(entry.enemy, candidate.enemy) &&
             candidate.enemy.stats.hp > 0 &&
             candidate.enemy.isAggro &&
             manhattan(selfTile, this.enemyTile(candidate.enemy)) <= range
@@ -381,6 +382,10 @@ export class WorldMovementController {
 
 export function isEntityMoving(entity: Player | Enemy): boolean {
     return Math.abs(entity.pixelX - entity.gridX) > 0.01 || Math.abs(entity.pixelY - entity.gridY) > 0.01;
+}
+
+export function areLocalEnemiesAllied(left: Enemy, right: Enemy): boolean {
+    return (left.bountyContractId ?? null) === (right.bountyContractId ?? null);
 }
 
 export function directionFromTo(from: TilePoint, to: TilePoint): 'up' | 'down' | 'left' | 'right' {

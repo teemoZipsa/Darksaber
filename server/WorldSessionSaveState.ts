@@ -126,6 +126,18 @@ export class WorldSessionSaveState {
         }
     }
 
+    public tryRemoveItemQuantity(player: WorldSessionSavePlayer, itemId: string, quantity: number): boolean {
+        const inventory = player.saveSnapshot?.inventory;
+        const required = Math.max(0, Math.floor(quantity));
+        if (!inventory || required <= 0) return false;
+        const available = inventory.items.reduce((total, item) => (
+            item.itemId === itemId ? total + Math.max(1, item.quantity) : total
+        ), 0);
+        if (available < required) return false;
+        this.removeItemQuantity(player, itemId, required);
+        return true;
+    }
+
     public canAddPlacedItems(player: WorldSessionSavePlayer, placedItems: readonly WorldSessionPlacedSaveItem[]): boolean {
         const inventory = player.saveSnapshot?.inventory;
         if (!inventory) return true;

@@ -441,6 +441,7 @@ export class WorldEngine {
             actionControllers: this.actionControllers,
             networkState: this.getNetworkState(),
             party: this.party,
+            playerData: this.playerData,
             raidSession: this.raidSession,
             runtimeState: this.getRuntimeState(),
             scenarioNetworkControllers: this.scenarioNetworkControllers,
@@ -451,6 +452,9 @@ export class WorldEngine {
             clearFieldTurnState: () => this.clearFieldTurnState(),
             closeFieldOverlays: () => this.closeFieldOverlays(),
             getControlledActor: () => this.getControlledActor(),
+            getFieldActors: () => this.partyActors,
+            getFieldEnemies: () => this.fieldEnemies,
+            setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
             placePartyNearTown: (town) => this.placePartyNear(this.worldMap.getTownSpawnTile(town)),
             syncControlledPlayer: () => this.syncControlledPlayer(),
         });

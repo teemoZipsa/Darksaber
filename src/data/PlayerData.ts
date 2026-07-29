@@ -18,6 +18,7 @@ import {
 import { getItemDef } from './ItemDB';
 import type { CharacterSave, CharacterSavePatch, InventorySaveItem } from '../net/AuthClient';
 import { createDefaultStashSnapshot } from '../shared/CharacterSaveDefaults';
+import { normalizeActiveBountyContractId } from './BountyContractData';
 
 export interface InventoryItem {
     uid: string;         // Unique ID for this specific instance
@@ -40,6 +41,7 @@ export interface SaveData {
     marketContracts?: MarketContract[];
     facilityUpgrades?: FacilityUpgradeState;
     raidInsuranceActive?: boolean;
+    activeBountyContractId?: string | null;
     currentHubTownId?: string;
     pendingRestMenuId?: string | null;
     inventory?: InventoryItem[];
@@ -71,6 +73,7 @@ export class PlayerData {
     public marketContracts: MarketContract[] = [];
     public facilityUpgrades: FacilityUpgradeState = {};
     public raidInsuranceActive: boolean = false;
+    public activeBountyContractId: string | null = null;
     public currentHubTownId: string = 'central_castle';
     public pendingRestMenuId: string | null = null;
     public inventory: InventoryItem[] = [];
@@ -182,6 +185,7 @@ export class PlayerData {
             this.marketContracts = normalizeMarketContracts(data.marketContracts, this.marketCycle);
             this.facilityUpgrades = normalizeFacilityUpgradeState(data.facilityUpgrades);
             this.raidInsuranceActive = data.raidInsuranceActive === true;
+            this.activeBountyContractId = normalizeActiveBountyContractId(data.activeBountyContractId);
             this.currentHubTownId = typeof data.currentHubTownId === 'string' ? data.currentHubTownId : 'central_castle';
             this.pendingRestMenuId = typeof data.pendingRestMenuId === 'string' ? data.pendingRestMenuId : null;
             this.inventory = normalizeInventory(data.inventory);
@@ -210,6 +214,7 @@ export class PlayerData {
                 marketContracts: this.marketContracts,
                 facilityUpgrades: this.facilityUpgrades,
                 raidInsuranceActive: this.raidInsuranceActive,
+                activeBountyContractId: this.activeBountyContractId,
             },
             inventory: {
                 width: 10,
@@ -250,6 +255,7 @@ export class PlayerData {
         this.marketContracts = normalizeMarketContracts(questState.marketContracts, this.marketCycle);
         this.facilityUpgrades = normalizeFacilityUpgradeState(questState.facilityUpgrades);
         this.raidInsuranceActive = questState.raidInsuranceActive === true;
+        this.activeBountyContractId = normalizeActiveBountyContractId(questState.activeBountyContractId);
         this.currentHubTownId = typeof hubLocation.townId === 'string' ? hubLocation.townId : 'central_castle';
         this.pendingRestMenuId = typeof hubLocation.pendingRestMenuId === 'string' ? hubLocation.pendingRestMenuId : null;
         this.inventory = normalizeInventorySnapshot(save.inventory);

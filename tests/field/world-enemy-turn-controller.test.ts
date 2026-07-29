@@ -234,6 +234,37 @@ test('enemy intent preview is shown before the stored decision is consumed', () 
     }
 });
 
+test('private bounty support AI only considers allies from the same bounty group', () => {
+    const actor = makeActor('hero', 3, 0);
+    const bountyHealer = makeEnemyEntry('bounty-healer', 0, 0, 'healer');
+    bountyHealer.enemy.setEliteAffixes(['vampiric', 'ironclad'], 'bounty-v1~central_castle~0~0~0');
+    const ordinaryAlly = makeEnemyEntry('ordinary-ally', 1, 0, 'tank');
+    ordinaryAlly.enemy.stats.hp = 1;
+    ordinaryAlly.enemy.stats.maxHp = 50;
+
+    const isolatedDecision = makeHarness(
+        [actor],
+        [bountyHealer, ordinaryAlly],
+    ).controller.previewEnemyIntent(bountyHealer);
+    assert.notEqual(
+        isolatedDecision?.kind === 'healAlly' ? isolatedDecision.allyId : null,
+        ordinaryAlly.enemy.id,
+    );
+
+    const bountyAlly = makeEnemyEntry('bounty-ally', 1, 0, 'tank');
+    bountyAlly.enemy.setEliteAffixes(['ironclad', 'executioner'], bountyHealer.enemy.bountyContractId);
+    bountyAlly.enemy.stats.hp = 1;
+    bountyAlly.enemy.stats.maxHp = 50;
+    const groupedDecision = makeHarness(
+        [actor],
+        [bountyHealer, ordinaryAlly, bountyAlly],
+    ).controller.previewEnemyIntent(bountyHealer);
+    assert.equal(groupedDecision?.kind, 'healAlly');
+    if (groupedDecision?.kind === 'healAlly') {
+        assert.equal(groupedDecision.allyId, bountyAlly.enemy.id);
+    }
+});
+
 test('immobilized move decision emits root feedback without moving', () => {
     const previousLang: Language = i18n.lang;
     try {

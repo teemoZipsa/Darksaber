@@ -3,6 +3,7 @@ import type { MarketSnapshot } from '../data/MarketData';
 import type { CharacterStats } from '../data/Stats';
 import type { StoryScenarioEventStep } from '../data/StoryScenarioEventData';
 import type { EnemyRole } from '../field/EnemyAI';
+import type { EliteAffixId } from '../field/EliteAffixes';
 import type { WorldLootContainerType } from '../loot/WorldLootTypes';
 import type { WorldMapAmbientSiteKind } from '../map/WorldMap';
 import type { RaidModifier } from '../raid/RaidModifiers';
@@ -104,6 +105,8 @@ export interface EnemySnapshot {
     facing: NetFacing;
     isAggro: boolean;
     isBoss: boolean;
+    eliteAffixes?: EliteAffixId[];
+    bountyContractId?: string;
 }
 
 export interface LootSnapshot {
@@ -357,9 +360,18 @@ export interface RaidResultMessage {
     completedDungeonIds: string[];
     /** Set when this survival granted the one-time first-survival gold bonus. */
     firstSurvivalBonusGranted?: boolean;
+    bounty?: BountySettlementSummary;
     /** Server-authoritative losses and recovery applied for DEAD/MIA/LEFT. */
     failure?: RaidFailureSummary;
     telemetry?: RaidBalanceTelemetry;
+}
+
+export interface BountySettlementSummary {
+    contractId: string;
+    baseReward: number;
+    bonusReward: number;
+    riskCompleted: boolean;
+    totalReward: number;
 }
 
 export type RaidDangerBand = 'starter' | 'low' | 'mid' | 'high' | 'scenario';

@@ -35,6 +35,7 @@ import type { WorldEngineScenarioNetworkControllers } from './WorldEngineScenari
 import type { WorldEngineSharedControllerPorts } from './WorldEngineSharedControllerPorts';
 import type { WorldEngineUiState } from './WorldEngineUiState';
 import type { WorldEngineWorldControllers } from './WorldEngineWorldControllers';
+import type { GameManager } from '../GameManager';
 
 type WorldPresentationFieldHit = FieldHit<FieldHitParty, Enemy, LootObject>;
 
@@ -42,6 +43,7 @@ export interface WorldEnginePresentationControllerPorts {
     canvas: HTMLCanvasElement;
     party: PartyManager;
     playerData: PlayerData;
+    gameManager: GameManager;
     townSession: WorldTownSession;
     raidSession: WorldRaidSession;
     fusionTempleUI: FusionTempleUI;
@@ -195,6 +197,7 @@ export function createWorldEnginePresentationControllers(
         getPathPreviewTiles: (actor) => ports.getPathPreviewTiles(actor),
         getAttackCues: () => ports.fieldFeedback.attackCues,
         getCombatLog: () => ports.fieldFeedback.combatLog,
+        hasBackpackItem: (itemId) => ports.gameManager.inventory.items.some((placed) => placed.item.id === itemId),
         getActorTerrainTraits: (actor) => getWorldActorTerrainTraits(actor),
         isTurnCombatActive: () => ports.isTurnCombatActive(),
     });

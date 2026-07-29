@@ -1,4 +1,4 @@
-import { formatItemName } from '../../i18n/DisplayNames';
+import { formatItemName, formatMonsterName } from '../../i18n/DisplayNames';
 import { formatT, t } from '../../i18n/LanguageManager';
 import type { PartyManager } from '../../character/PartyManager';
 import type { PlayerData } from '../../data/PlayerData';
@@ -33,6 +33,13 @@ import {
     removeStatusesFromCarrier,
     type StatusEffect,
 } from '../../combat/StatusEffects';
+import {
+    BOUNTY_OFFER_COUNT,
+    getBountyOffers,
+    resolveBountyContract,
+    type BountyContract,
+} from '../../data/BountyContractData';
+import { getMonsterDefinition, type MonsterDefinition } from '../../data/MonsterCatalog';
 
 type WorldTownSessionGameManager = Pick<GameManager, 'inventory' | 'stash'>;
 type FacilityInventoryGrid = { items: PlacedItem[]; remove: (placed: PlacedItem) => void };
@@ -58,6 +65,12 @@ export interface MerchantContractView {
     totalReward: number;
     expiresInCycles: number;
     canComplete: boolean;
+}
+
+export interface BountyContractView {
+    contract: BountyContract;
+    monster: MonsterDefinition;
+    active: boolean;
 }
 
 export class WorldTownSession {
@@ -263,6 +276,43 @@ export class WorldTownSession {
         this.marketService.recordSell(townId, item.id, quantity);
         this.playerData.save();
         this.log(formatT('merchantContract.completedLog', { item: formatItemName(item), gold: quote.totalPrice }));
+        return true;
+    }
+
+    public getBountyContractViews(): BountyContractView[] {
+        const townId = this.ui.getCurrentTown()?.id;
+        if (!townId) return [];
+        const offers = getBountyOffers(townId, this.playerData.marketCycle, this.playerData.clearedStages.size);
+        const activeId = this.playerData.activeBountyContractId;
+        const active = resolveBountyContract(activeId);
+        const contracts = active && !offers.some((offer) => offer.id === active.id)
+            ? [active, ...offers.slice(0, BOUNTY_OFFER_COUNT - 1)]
+            : offers;
+        return contracts.map((contract) => ({
+            contract,
+            monster: getMonsterDefinition(contract.monsterId),
+            active: contract.id === activeId,
+        }));
+    }
+
+    public acceptBountyContract(contractId: string): boolean {
+        if (this.playerData.activeBountyContractId) {
+            return this.playerData.activeBountyContractId === contractId;
+        }
+        const offered = this.getBountyContractViews()
+            .find((view) => !view.active && view.contract.id === contractId);
+        if (!offered) return false;
+        this.playerData.activeBountyContractId = offered.contract.id;
+        this.playerData.save();
+        this.log(formatT('bounty.acceptedLog', { target: formatMonsterName(offered.monster) }));
+        return true;
+    }
+
+    public abandonBountyContract(): boolean {
+        if (!this.playerData.activeBountyContractId) return false;
+        this.playerData.activeBountyContractId = null;
+        this.playerData.save();
+        this.log(t('bounty.abandonedLog'));
         return true;
     }
 

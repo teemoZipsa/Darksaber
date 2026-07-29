@@ -33,6 +33,10 @@ import type {
     ServerPlayer,
 } from './WorldSessionTypes';
 import type { WorldSessionEnemyState } from './WorldSessionEnemyState';
+import {
+    applyExecutionerDamage,
+    getVampiricHealing,
+} from '../src/field/EliteAffixes';
 
 export interface WorldSessionEnemyTurnContext {
     players: ReadonlyMap<string, ServerPlayer>;
@@ -65,13 +69,15 @@ export class WorldSessionEnemyTurnResolver {
         }
 
         enemy.aiMemory.turnCount += 1;
+        const privateOwnerId = entry.scenarioPlayerId ?? entry.bountyPlayerId;
         const decision = decideEnemyAction({
             self: toEnemyAIUnit(enemy),
             targets: targets.map((actor) => toActorAIUnit(actor)),
             allies: [...this.context.enemies.values()]
-                .filter((candidate) => entry.scenarioPlayerId
-                    ? candidate.scenarioPlayerId === entry.scenarioPlayerId
-                    : !candidate.scenarioPlayerId)
+                .filter((candidate) => {
+                    const candidateOwnerId = candidate.scenarioPlayerId ?? candidate.bountyPlayerId;
+                    return privateOwnerId ? candidateOwnerId === privateOwnerId : !candidateOwnerId;
+                })
                 .map((candidate) => candidate.enemy)
                 .filter((candidate) => candidate.stats.hp > 0)
                 .map((candidate) => toEnemyAIUnit(candidate)),
@@ -88,7 +94,7 @@ export class WorldSessionEnemyTurnResolver {
             case 'attack': {
                 const actor = this.context.actors.get(decision.targetId);
                 if (!actor || !this.canEnemyAttack(enemy, actor, decision.range)) return [];
-                return [this.resolveEnemyAttack(enemy, actor, decision.range)];
+                return this.resolveEnemyAttack(enemy, actor, decision.range);
             }
             case 'moveToward': {
                 const actor = this.context.actors.get(decision.targetId);
@@ -118,7 +124,7 @@ export class WorldSessionEnemyTurnResolver {
                     return [createEnemySelfStatusEvent(enemy, status)];
                 }
                 if (this.canEnemyAttack(enemy, actor, enemy.aiProfile.attackRange)) {
-                    return [this.resolveEnemyAttack(enemy, actor, enemy.aiProfile.attackRange)];
+                    return this.resolveEnemyAttack(enemy, actor, enemy.aiProfile.attackRange);
                 }
                 this.enemyStepToward(entry, actor, enemy.aiProfile.preferredRange);
                 return [];
@@ -128,7 +134,7 @@ export class WorldSessionEnemyTurnResolver {
         }
     }
 
-    private resolveEnemyAttack(enemy: Enemy, actor: ServerActor, range: number): CombatEventMessage {
+    private resolveEnemyAttack(enemy: Enemy, actor: ServerActor, range: number): CombatEventMessage[] {
         this.context.onCombatActivity?.(actor);
         const result = CombatFormulas.calcPhysicalDamage(
             getEffectiveStatsForEnemy(enemy),
@@ -140,9 +146,14 @@ export class WorldSessionEnemyTurnResolver {
             }
         );
         enemy.facing = directionFromTo({ x: enemy.gridX, y: enemy.gridY }, actor.tile);
-        let dealtDamage = result.damage;
+        let dealtDamage = applyExecutionerDamage(
+            result.damage,
+            enemy.eliteAffixes,
+            actor.stats.hp,
+            actor.stats.maxHp,
+        );
         if (!result.isMiss) {
-            const guarded = applyGuardToDamage(actor.statuses, result.damage);
+            const guarded = applyGuardToDamage(actor.statuses, dealtDamage);
             actor.statuses = guarded.statuses;
             dealtDamage = guarded.damage;
             actor.stats.hp = Math.max(0, actor.stats.hp - dealtDamage);
@@ -155,7 +166,7 @@ export class WorldSessionEnemyTurnResolver {
                 this.context.onActorDown?.(actor, 'enemy');
             }
         }
-        return {
+        const events: CombatEventMessage[] = [{
             type: 'COMBAT_EVENT',
             kind: result.isMiss ? 'miss' : actor.isDead ? 'down' : 'damage',
             sourceId: enemy.id,
@@ -163,7 +174,28 @@ export class WorldSessionEnemyTurnResolver {
             sourceName: enemy.name,
             targetName: actor.name,
             value: dealtDamage,
-        };
+        }];
+        if (!result.isMiss && dealtDamage > 0) {
+            const healing = getVampiricHealing(
+                dealtDamage,
+                enemy.eliteAffixes,
+                enemy.stats.hp,
+                enemy.stats.maxHp,
+            );
+            if (healing > 0) {
+                enemy.stats.hp += healing;
+                events.push({
+                    type: 'COMBAT_EVENT',
+                    kind: 'heal',
+                    sourceId: enemy.id,
+                    targetId: enemy.id,
+                    sourceName: enemy.name,
+                    targetName: enemy.name,
+                    value: healing,
+                });
+            }
+        }
+        return events;
     }
 
     private canEnemyAttack(enemy: Enemy, actor: ServerActor, range: number): boolean {

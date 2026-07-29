@@ -16,6 +16,13 @@ export interface WorldRaidRenderModel {
     departureTownId: string;
     timerAdvancing: boolean;
     modifier: RaidModifier | null;
+    bounty: {
+        targetName: string;
+        affixLabels: string[];
+        riskLabel: string;
+        proofSecured: boolean;
+        targetAlive: boolean;
+    } | null;
 }
 
 export interface WorldStoryInteriorRenderModel {

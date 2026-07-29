@@ -35,6 +35,7 @@ export function toPersistentPlayer(player: ServerPlayer): WorldSessionPersistent
         fieldEventFlagsByDungeonId: [...player.fieldEventFlagsByDungeonId.entries()]
             .map(([dungeonId, flags]) => [dungeonId, [...flags]]),
         inspectedAmbientSiteIds: [...player.inspectedAmbientSiteIds],
+        bounty: player.bounty ? { ...player.bounty } : undefined,
         balanceTelemetry: player.balanceTelemetry ? {
             ...player.balanceTelemetry,
             killsByDangerBand: { ...player.balanceTelemetry.killsByDangerBand },
@@ -70,6 +71,7 @@ export function restorePersistentPlayer(player: WorldSessionPersistentPlayer): S
             player.fieldEventFlagsByDungeonId.map(([dungeonId, flags]) => [dungeonId, new Set(flags)])
         ),
         inspectedAmbientSiteIds: new Set(player.inspectedAmbientSiteIds ?? []),
+        bounty: player.bounty ? { ...player.bounty } : undefined,
         balanceTelemetry: player.balanceTelemetry ? {
             ...player.balanceTelemetry,
             killsByDangerBand: { ...player.balanceTelemetry.killsByDangerBand },
@@ -124,6 +126,9 @@ export function toPersistentEnemy(entry: ServerEnemy): WorldSessionPersistentEne
         scenarioPlayerId: entry.scenarioPlayerId,
         scenarioDungeonId: entry.scenarioDungeonId,
         scenarioObjective: entry.scenarioObjective,
+        bountyPlayerId: entry.bountyPlayerId,
+        bountyContractId: entry.bountyContractId,
+        eliteAffixes: [...entry.enemy.eliteAffixes],
         wanderSeed: entry.wanderSeed,
     };
 }
@@ -153,6 +158,7 @@ export function restorePersistentEnemy(snapshot: WorldSessionPersistentEnemy): S
         cooldowns: { ...snapshot.aiMemory.cooldowns },
         lastPattern: snapshot.aiMemory.lastPattern,
     };
+    enemy.setEliteAffixes(snapshot.eliteAffixes, snapshot.bountyContractId);
     return {
         enemy,
         monsterId: snapshot.monsterId,
@@ -160,6 +166,8 @@ export function restorePersistentEnemy(snapshot: WorldSessionPersistentEnemy): S
         scenarioPlayerId: snapshot.scenarioPlayerId,
         scenarioDungeonId: snapshot.scenarioDungeonId,
         scenarioObjective: snapshot.scenarioObjective,
+        bountyPlayerId: snapshot.bountyPlayerId,
+        bountyContractId: snapshot.bountyContractId,
         home: { ...snapshot.home },
         wanderSeed: snapshot.wanderSeed,
     };
@@ -192,6 +200,7 @@ export function toPersistentLoot(lootObject: LootObject): WorldSessionPersistent
         unlocked: lootObject.unlocked || undefined,
         gridSnapshot: gridToSnapshot(lootObject.inventory),
         overflowItemIds: lootObject.overflowItems.map((item) => item.id),
+        ownerPlayerId: lootObject.ownerPlayerId,
     };
 }
 
@@ -202,6 +211,7 @@ export function restorePersistentLoot(snapshot: WorldSessionPersistentLoot): Loo
         containerType: snapshot.containerType,
         gridW: snapshot.gridSnapshot.width,
         gridH: snapshot.gridSnapshot.height,
+        ownerPlayerId: snapshot.ownerPlayerId,
     });
     lootObject.opened = snapshot.opened;
     lootObject.unlocked = snapshot.unlocked ?? false;

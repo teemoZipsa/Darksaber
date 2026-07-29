@@ -172,6 +172,7 @@ export class WorldFieldRenderer {
             const px = enemy.pixelX * TILE_SIZE - camX;
             const py = enemy.pixelY * TILE_SIZE - camY;
 
+            if (enemy.isElite) renderEliteMarker(ctx, enemy, model.worldTime, px, py);
             const spriteRendered = renderWalkSprite(ctx, enemy, model.worldTime, px, py, { drawIdle: true });
             if (!spriteRendered && enemy.image && enemy.imageLoaded) {
                 ctx.drawImage(enemy.image, px, py, TILE_SIZE, TILE_SIZE);
@@ -345,6 +346,61 @@ export class WorldFieldRenderer {
         ctx.textBaseline = 'alphabetic';
 
         return infoY;
+    }
+}
+
+function renderEliteMarker(
+    ctx: CanvasRenderingContext2D,
+    enemy: WorldRenderModel['fieldEnemies'][number]['enemy'],
+    worldTime: number,
+    px: number,
+    py: number,
+): void {
+    const enraged = enemy.eliteAffixes.includes('berserker') && enemy.stats.hp <= enemy.stats.maxHp * 0.5;
+    const pulse = enraged ? 0.72 + Math.sin(worldTime * 8) * 0.22 : 0.86;
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.strokeStyle = enraged ? '#b83232' : '#f0c050';
+    ctx.shadowColor = ctx.strokeStyle;
+    ctx.shadowBlur = enraged ? 12 : 8;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.ellipse(
+        px + TILE_SIZE / 2,
+        py + TILE_SIZE * 0.83,
+        TILE_SIZE * 0.47,
+        TILE_SIZE * 0.22,
+        0,
+        0,
+        Math.PI * 2,
+    );
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+    ctx.font = `bold 9px ${UI.fontMono}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    enemy.eliteAffixes.forEach((affix, index) => {
+        const x = px + TILE_SIZE - 7 - index * 12;
+        const y = py + 5;
+        ctx.fillStyle = '#17120b';
+        ctx.strokeStyle = '#f0c050';
+        ctx.lineWidth = 1;
+        ctx.fillRect(x - 5, y - 5, 10, 10);
+        ctx.strokeRect(x - 5.5, y - 5.5, 11, 11);
+        ctx.fillStyle = '#f7d77a';
+        ctx.fillText(eliteAffixGlyph(affix), x, y + 0.5);
+    });
+    ctx.restore();
+}
+
+function eliteAffixGlyph(affix: WorldRenderModel['fieldEnemies'][number]['enemy']['eliteAffixes'][number]): string {
+    switch (affix) {
+        case 'berserker': return '!';
+        case 'vampiric': return 'V';
+        case 'ironclad': return '◆';
+        case 'executioner': return 'X';
+        case 'swift': return '»';
     }
 }
 
@@ -676,8 +732,8 @@ function renderHpBar(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
 function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number): void {
     if (!model.raid.active) return;
 
-    const bannerW = model.raid.modifier ? 430 : 340;
-    const bannerH = 58;
+    const bannerW = model.raid.bounty ? 580 : model.raid.modifier ? 430 : 340;
+    const bannerH = model.raid.bounty ? 84 : 58;
     const x = Math.floor((vw - bannerW) / 2);
     const y = 16;
     const urgent = model.raid.timerAdvancing;
@@ -704,7 +760,25 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
     ctx.fillStyle = Parchment.textMid;
     ctx.font = `12px ${UI.fontPrimary}`;
     const subtitle = formatRaidBannerSubtitle(model.raid.departureTownId, model.raid.modifier);
-    ctx.fillText(subtitle, x + bannerW / 2, y + bannerH - 14);
+    ctx.fillText(subtitle, x + bannerW / 2, y + 44);
+
+    if (model.raid.bounty) {
+        const bounty = model.raid.bounty;
+        const status = bounty.proofSecured
+            ? t('bounty.proofSecured')
+            : bounty.targetAlive
+                ? t('bounty.targetAlive')
+                : t('bounty.target');
+        const affixes = bounty.affixLabels.join(' · ');
+        ctx.fillStyle = bounty.targetAlive && !bounty.proofSecured ? '#8c2626' : '#6d5018';
+        ctx.font = `bold 11px ${UI.fontPrimary}`;
+        ctx.fillText(
+            `⚔ ${bounty.targetName} [${affixes}] — ${bounty.riskLabel} — ${status}`,
+            x + bannerW / 2,
+            y + 66,
+            bannerW - 28,
+        );
+    }
 
     ctx.textAlign = 'start';
     ctx.textBaseline = 'alphabetic';

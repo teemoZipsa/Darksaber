@@ -74,10 +74,13 @@ export function buildWorldSessionSnapshot(input: {
             facing: entry.enemy.facing,
             isAggro: entry.enemy.isAggro,
             isBoss: entry.enemy.isBoss,
+            eliteAffixes: [...entry.enemy.eliteAffixes],
+            ...(entry.bountyContractId ? { bountyContractId: entry.bountyContractId } : {}),
         }));
     const loot = [...input.loot]
         .filter((lootObject) => !input.lootState.isAutoLootPending(lootObject.id))
         .filter(() => !viewer?.activeDungeonId)
+        .filter((lootObject) => !lootObject.ownerPlayerId || lootObject.ownerPlayerId === input.viewerPlayerId)
         .map((lootObject) => toLootSnapshot(lootObject, input.lootState.getLockPlayerId(lootObject.id)));
     const readyActors = partyActors
         .filter((actor) => !actor.isDead && !actor.isGhost && actor.remainingAp >= MIN_FIELD_ACTION_GAUGE_COST)

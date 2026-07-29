@@ -33,7 +33,10 @@ export function isWorldSessionFieldPassableForOwner(
 ): boolean {
     const queryOwnerPlayerId = ownerPlayerId ?? getWorldSessionEntityOwnerPlayerId(context, query.actorId);
     const queryScenarioPlayerId = ownerPlayerId ?? getWorldSessionScenarioOwnerPlayerId(context, query.actorId);
-    const tile = getWorldSessionServerTileAt(context, query, queryScenarioPlayerId ?? queryOwnerPlayerId ?? undefined);
+    const queryIsPlayerActor = query.actorId ? context.actors.has(query.actorId) : false;
+    const terrainOwnerPlayerId = queryScenarioPlayerId
+        ?? (queryIsPlayerActor ? queryOwnerPlayerId : undefined);
+    const tile = getWorldSessionServerTileAt(context, query, terrainOwnerPlayerId);
     if (!isTerrainPassable(tile)) return false;
     for (const actor of context.actors.values()) {
         if (actor.id === query.actorId || actor.isDead) continue;
@@ -45,7 +48,9 @@ export function isWorldSessionFieldPassableForOwner(
     for (const entry of context.enemies.values()) {
         const enemy = entry.enemy;
         if (enemy.id === query.actorId || enemy.stats.hp <= 0) continue;
-        if (entry.scenarioPlayerId && entry.scenarioPlayerId !== queryOwnerPlayerId) continue;
+        const privateOwnerId = entry.scenarioPlayerId ?? entry.bountyPlayerId;
+        if (privateOwnerId && privateOwnerId !== queryOwnerPlayerId) continue;
+        if (entry.bountyPlayerId && context.players.get(queryOwnerPlayerId ?? '')?.activeDungeonId) continue;
         if (queryScenarioPlayerId && entry.scenarioPlayerId !== queryScenarioPlayerId) continue;
         if (enemy.gridX === query.x && enemy.gridY === query.y) return false;
     }
@@ -85,7 +90,8 @@ export function getWorldSessionEntityOwnerPlayerId(
     if (!entityId) return null;
     const actor = context.actors.get(entityId);
     if (actor) return actor.ownerPlayerId;
-    return getWorldSessionScenarioOwnerPlayerId(context, entityId);
+    const enemy = context.enemies.get(entityId);
+    return enemy?.scenarioPlayerId ?? enemy?.bountyPlayerId ?? null;
 }
 
 export function getWorldSessionScenarioOwnerPlayerId(

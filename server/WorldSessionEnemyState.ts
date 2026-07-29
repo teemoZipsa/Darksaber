@@ -19,6 +19,7 @@ export interface WorldSessionEnemyEntry {
     enemy: Enemy;
     home: TilePoint;
     scenarioPlayerId?: string;
+    bountyPlayerId?: string;
 }
 
 export interface WorldSessionEnemyStateContext<
@@ -85,8 +86,13 @@ export class WorldSessionEnemyState<
 
     private isSimulationActive(entry: EnemyEntry): boolean {
         const enemy = entry.enemy;
+        if (this.context.getTargetableActors(entry).length === 0) return false;
         const range = enemy.isAggro ? ENEMY_COMBAT_SIMULATION_RANGE : ENEMY_SIMULATION_ACTIVE_RANGE;
-        return this.context.hasActiveActorWithin(this.enemyTile(enemy), range, entry.scenarioPlayerId);
+        return this.context.hasActiveActorWithin(
+            this.enemyTile(enemy),
+            range,
+            entry.scenarioPlayerId ?? entry.bountyPlayerId,
+        );
     }
 
     private resetEnemy(enemy: Enemy): void {

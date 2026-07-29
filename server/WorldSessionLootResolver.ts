@@ -48,6 +48,7 @@ export class WorldSessionLootResolver {
         if (player?.activeDungeonId) return reject(intentId, 'Loot is not visible.');
         const lootObject = this.context.loot.get(lootId);
         if (!lootObject || lootObject.opened || this.context.lootState.isAutoLootPending(lootId)) return reject(intentId, 'Loot is not available.');
+        if (lootObject.ownerPlayerId && lootObject.ownerPlayerId !== playerId) return reject(intentId, 'Loot is not visible.');
         if (actor.remainingAp < INTERACT_AP_COST) return reject(intentId, 'No action available to inspect loot.');
         if (manhattan(actor.tile, { x: lootObject.x, y: lootObject.y }) > 1) return reject(intentId, 'Loot is too far away.');
         if (lootObject.containerType === 'marked_cache' && !lootObject.unlocked) {
@@ -90,16 +91,19 @@ export class WorldSessionLootResolver {
     ): WorldSessionMessageResult {
         const lootObject = this.context.loot.get(lootId);
         if (!lootObject || this.context.lootState.isAutoLootPending(lootId)) return reject(intentId, 'Loot does not exist.');
+        if (lootObject.ownerPlayerId && lootObject.ownerPlayerId !== playerId) return reject(intentId, 'Loot does not exist.');
         if (!this.context.lootState.isOccupiedBy(lootId, playerId)) return reject(intentId, 'Loot is not occupied by this player.');
 
         const placed = lootObject.inventory.getAt(gridX, gridY);
         if (!placed) return reject(intentId, 'No item at requested loot cell.');
         const player = this.context.players.get(playerId);
+        if (player && !this.context.saveState.addPlacedItem(player, placed)) {
+            return reject(intentId, 'Inventory is full.');
+        }
         lootObject.inventory.remove(placed);
         addCarriedWeight(player, getPlacedItemWeight(placed));
         addCarriedItemQuantity(player, placed.item.id, placed.quantity);
         if (player) {
-            this.context.saveState.addPlacedItem(player, placed);
             this.context.saveState.markDirty(playerId);
         }
         this.context.lootState.touch(lootId, now);
@@ -130,11 +134,11 @@ export class WorldSessionLootResolver {
         for (const cell of acceptedCells) {
             const placed = lootObject.inventory.getAt(cell.gridX, cell.gridY);
             if (!placed || removed.has(placed)) continue;
+            if (player && !this.context.saveState.addPlacedItem(player, placed)) continue;
             lootObject.inventory.remove(placed);
             removed.add(placed);
             acceptedWeight += getPlacedItemWeight(placed);
             addCarriedItemQuantity(player, placed.item.id, placed.quantity);
-            if (player) this.context.saveState.addPlacedItem(player, placed);
         }
         addCarriedWeight(player, acceptedWeight);
         if (acceptedWeight > 0 || removed.size > 0) this.context.saveState.markDirty(playerId);

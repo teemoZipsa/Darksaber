@@ -8,6 +8,7 @@ import { cloneStatuses, formationOffset, syncStatsMovementToClass } from './Worl
 import { cloneCharacterSave } from './WorldSessionSaveState';
 import type { ServerActor, ServerPlayer, WorldJoinContext } from './WorldSessionTypes';
 import { createServerRaidBalanceState } from './WorldSessionBalanceTelemetry';
+import { resolveBountyContract } from '../src/data/BountyContractData';
 
 export interface WorldSessionJoinedPlayerInput {
     message: WorldJoinMessage;
@@ -27,6 +28,7 @@ export interface WorldSessionJoinedPlayerResult {
 
 export function buildWorldSessionJoinedPlayer(input: WorldSessionJoinedPlayerInput): WorldSessionJoinedPlayerResult {
     const { message, context, playerId, resumeToken, originHubId, spawnTile, raidModifier } = input;
+    const acceptedBounty = resolveBountyContract(context.saveSnapshot?.questState.activeBountyContractId);
     const player: ServerPlayer = {
         id: playerId,
         accountId: context.accountId,
@@ -52,6 +54,15 @@ export function buildWorldSessionJoinedPlayer(input: WorldSessionJoinedPlayerInp
         disconnectedAt: null,
         actorIds: [],
         saveSnapshot: cloneCharacterSave(context.saveSnapshot),
+        ...(acceptedBounty ? {
+            bounty: {
+                contractId: acceptedBounty.id,
+                targetEnemyId: null,
+                proofEarned: false,
+                hadActorDown: false,
+                riskCompleted: null,
+            },
+        } : {}),
     };
     const composition = message.partyComposition.length > 0 ? message.partyComposition : [createFallbackActorSnapshot()];
     const actors = composition.map((snapshot, index): ServerActor => {

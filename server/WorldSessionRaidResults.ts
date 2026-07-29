@@ -13,6 +13,7 @@ import type {
     ServerPlayer,
 } from './WorldSessionTypes';
 import { buildRaidBalanceTelemetry } from './WorldSessionBalanceTelemetry';
+import { settleSurvivedBounty } from './WorldSessionBounty';
 
 export interface WorldSessionRaidResultsContext {
     players: ReadonlyMap<string, ServerPlayer>;
@@ -30,7 +31,11 @@ export class WorldSessionRaidResults {
         const player = this.context.players.get(playerId);
         const extractionTownId = this.resolveExtractionTownId(player);
         const finalResult = this.coerceRaidResultForPlayer(result, player);
+        const bounty = player && finalResult === 'SURVIVED'
+            ? settleSurvivedBounty(player, this.context.saveState)
+            : undefined;
         const message = this.createRaidResultMessage(playerId, finalResult, player, extractionTownId);
+        if (bounty) message.bounty = bounty;
         this.context.log(`raid result player=${playerId} result=${finalResult} kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
         if (player) {
             const survived = finalResult === 'SURVIVED';

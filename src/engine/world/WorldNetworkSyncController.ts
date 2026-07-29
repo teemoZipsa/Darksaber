@@ -263,6 +263,7 @@ export class WorldNetworkSyncController {
             enemy.isAggro = enemySnapshot.isAggro;
             enemy.isBoss = enemySnapshot.isBoss;
             enemy.color = enemySnapshot.color;
+            enemy.setEliteAffixes(enemySnapshot.eliteAffixes, enemySnapshot.bountyContractId);
             enemy.setLocalizedNames(localizedNames.ko, localizedNames.en);
             if (enemySnapshot.monsterId && !enemy.walkSprite) this.context.applyMonsterSprite(enemy, enemySnapshot.monsterId);
             return {
@@ -436,6 +437,10 @@ export class WorldNetworkSyncController {
             if (event.kind === 'kill') {
                 this.context.spawnKillEffect(targetEnemy, feedbackGroupId, sourceActor, event.expAward);
                 this.context.registerCombatFeedback('kill', feedbackGroupId);
+            } else if (event.kind === 'heal') {
+                this.context.spawnHeal(targetEnemy.gridX, targetEnemy.gridY, event.value ?? 0);
+                this.context.spawnHealEffect(targetEnemy.gridX, targetEnemy.gridY);
+                this.context.registerCombatFeedback('normal', feedbackGroupId);
             } else if (event.kind === 'status') {
                 this.context.spawnStatus(targetEnemy.gridX, targetEnemy.gridY, 'WEAK');
                 this.context.spawnDebuffEffect(targetEnemy.gridX, targetEnemy.gridY);

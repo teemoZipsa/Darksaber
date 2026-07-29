@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { buildHubSavePatch } from '../../server/HubSavePatch';
 import { createDefaultCharacterSave, type AuthCharacter } from '../../server/AuthStore';
 import { HttpError } from '../../server/HttpError';
+import { getBountyOffers } from '../../src/data/BountyContractData';
 
 function authCharacter(overrides: Partial<AuthCharacter> = {}): AuthCharacter {
     return {
@@ -154,6 +155,54 @@ test('buildHubSavePatch accepts normalized facility upgrades', () => {
         infirmary: 1,
         workshop: 2,
     });
+});
+
+test('buildHubSavePatch accepts only a current board bounty and requires abandon before replacement', () => {
+    const current = createDefaultCharacterSave(authCharacter());
+    const offers = getBountyOffers('central_castle', 0, 0);
+    const accepted = buildHubSavePatch({
+        questState: { activeBountyContractId: offers[0].id },
+    }, current);
+    assert.equal(accepted.questState?.activeBountyContractId, offers[0].id);
+
+    current.questState.activeBountyContractId = offers[0].id;
+    assert.throws(
+        () => buildHubSavePatch({
+            questState: { activeBountyContractId: offers[1].id },
+        }, current),
+        (error: unknown) => error instanceof HttpError && error.code === 'bounty_contract_active',
+    );
+    const abandoned = buildHubSavePatch({
+        questState: { activeBountyContractId: null },
+    }, current);
+    assert.equal(abandoned.questState?.activeBountyContractId, null);
+    assert.throws(
+        () => buildHubSavePatch({
+            questState: { activeBountyContractId: 'bounty-v1~central_castle~0~0~9' },
+        }, current),
+        (error: unknown) => error instanceof HttpError && error.code === 'invalid_bounty_contract',
+    );
+
+    const futureOffer = getBountyOffers('central_castle', 999_999, 0)[0];
+    current.questState.activeBountyContractId = null;
+    assert.throws(
+        () => buildHubSavePatch({
+            questState: {
+                marketCycle: 999_999,
+                activeBountyContractId: futureOffer.id,
+            },
+        }, current),
+        (error: unknown) => error instanceof HttpError && error.code === 'invalid_bounty_offer',
+    );
+
+    const otherTownOffer = getBountyOffers('w_forest_village', 0, 0)[0];
+    assert.throws(
+        () => buildHubSavePatch({
+            hubLocation: { townId: 'w_forest_village' },
+            questState: { activeBountyContractId: otherTownOffer.id },
+        }, current),
+        (error: unknown) => error instanceof HttpError && error.code === 'invalid_bounty_offer',
+    );
 });
 
 test('buildHubSavePatch persists normalized learned skill upgrade levels', () => {

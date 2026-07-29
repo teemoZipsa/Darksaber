@@ -278,6 +278,7 @@ export class WorldRaidLifecycleController {
                 serverAuthoritativeRewards: true,
                 displayGoldReward,
                 firstSurvivalBonus: result.firstSurvivalBonusGranted === true,
+                bounty: result.bounty,
             });
         } else if (result.result === 'DEAD' || result.result === 'MIA') {
             this.context.raidOutcomeController.completeFailure(result.result, {

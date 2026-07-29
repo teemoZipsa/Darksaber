@@ -3,7 +3,7 @@ import type { ServerActor, ServerEnemy, ServerPlayer } from './WorldSessionTypes
 
 export function hasNearbyLiveEnemy(enemies: Iterable<ServerEnemy>, tile: TilePoint, distance: number): boolean {
     for (const entry of enemies) {
-        if (entry.scenarioPlayerId) continue;
+        if (entry.scenarioPlayerId || entry.bountyPlayerId) continue;
         if (entry.enemy.stats.hp <= 0) continue;
         if (manhattan({ x: entry.enemy.gridX, y: entry.enemy.gridY }, tile) <= distance) return true;
     }
@@ -18,7 +18,8 @@ export function hasNearbyAggroEnemy(
 ): boolean {
     for (const entry of enemies) {
         if (entry.enemy.stats.hp <= 0 || !entry.enemy.isAggro) continue;
-        if (entry.scenarioPlayerId && entry.scenarioPlayerId !== viewerPlayerId) continue;
+        const privateOwnerId = entry.scenarioPlayerId ?? entry.bountyPlayerId;
+        if (privateOwnerId && privateOwnerId !== viewerPlayerId) continue;
         if (manhattan({ x: entry.enemy.gridX, y: entry.enemy.gridY }, tile) <= distance) return true;
     }
     return false;

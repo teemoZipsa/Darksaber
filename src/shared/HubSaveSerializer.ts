@@ -34,6 +34,7 @@ export function buildHubSavePatch(input: HubSaveSerializerInput): CharacterSaveP
             marketContracts: input.playerData.marketContracts,
             facilityUpgrades: input.playerData.facilityUpgrades,
             raidInsuranceActive: input.playerData.raidInsuranceActive,
+            activeBountyContractId: input.playerData.activeBountyContractId,
         },
         inventory: serializeGridInventory(input.inventory),
         stashSnapshot: serializeGridInventory(input.stash),

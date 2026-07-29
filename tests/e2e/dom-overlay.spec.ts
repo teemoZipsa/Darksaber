@@ -280,6 +280,16 @@ test('dev town renders the React town overlay with embedded inventory', async ({
 
     await page.getByRole('tab', { name: /무기점|Weapon Shop/ }).click();
     await expect(page.locator('#ui-overlay .ds-shop')).toBeVisible();
+
+    await page.getByRole('tab', { name: /퀘스트|Quest/ }).click();
+    const bountyPapers = page.locator('#ui-overlay .ds-bounty-paper');
+    await expect(bountyPapers).toHaveCount(3);
+    await bountyPapers.first().getByRole('button', { name: /의뢰서 뜯기|Tear Down Notice/ }).click();
+    await expect(bountyPapers.first()).toHaveClass(/is-active/);
+    await expect(bountyPapers.first()).not.toHaveClass(/is-tearing/, { timeout: 2_000 });
+    await expect(bountyPapers.first().locator('.ds-bounty-paper__stamp')).toBeVisible();
+    await expect(bountyPapers.nth(1).getByRole('button')).toBeDisabled();
+    await expect(bountyPapers.nth(2).getByRole('button')).toBeDisabled();
 });
 
 test('dev launcher buttons are readable and enter dev modes', async ({ page, isMobile }) => {

@@ -9,6 +9,7 @@ export interface LootObjectOptions {
     containerType?: WorldLootContainerType;
     gridW?: number;
     gridH?: number;
+    ownerPlayerId?: string;
 }
 
 export const LOOT_CHEST_SPRITE_SRC = '/assets/images/decor/loot_chest.png';
@@ -29,6 +30,7 @@ export class LootObject {
     public containerType?: WorldLootContainerType;
     public overflowItems: ItemDef[] = [];
     public unlocked: boolean = false;
+    public ownerPlayerId?: string;
 
     constructor(id: string, x: number, y: number, items: ItemDef[], options: LootObjectOptions = {}) {
         this.id = id;
@@ -37,6 +39,7 @@ export class LootObject {
         this.sourceLabel = options.sourceLabel || getDefaultLootSourceLabel();
         this.kind = options.kind || 'chest';
         this.containerType = options.containerType;
+        this.ownerPlayerId = options.ownerPlayerId;
         this.inventory = new GridInventory(
             sanitizeGridSize(options.gridW, 5),
             sanitizeGridSize(options.gridH, 5)
