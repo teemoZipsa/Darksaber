@@ -17,6 +17,7 @@ import { formatT, t } from '../../i18n/LanguageManager';
 import { SettingsManager } from '../SettingsManager';
 
 const PARTY_ACTOR_IMAGE_RENDER_SCALE = 1.12;
+const ZERO_MOTION_OFFSET = { x: 0, y: 0 };
 
 export class WorldFieldRenderer {
     public static renderPathPreview(ctx: CanvasRenderingContext2D, model: WorldRenderModel, camX: number, camY: number): void {
@@ -145,10 +146,11 @@ export class WorldFieldRenderer {
 
     public static renderPartyActors(ctx: CanvasRenderingContext2D, model: WorldRenderModel, camX: number, camY: number): void {
         for (const actor of model.partyActors) {
-            if (actor.character.isDead) continue;
             const entity = actor.entity;
-            const px = entity.pixelX * TILE_SIZE - camX;
-            const py = entity.pixelY * TILE_SIZE - camY;
+            if (actor.character.isDead && !entity.isDefeatedPresentationHeld()) continue;
+            const motion = SettingsManager.getMotionReduce() ? ZERO_MOTION_OFFSET : entity.getCombatMotionOffset();
+            const px = (entity.pixelX + motion.x) * TILE_SIZE - camX;
+            const py = (entity.pixelY + motion.y) * TILE_SIZE - camY;
 
             const walkSpriteRendered = renderWalkSprite(ctx, entity, model.worldTime, px, py, { drawIdle: true });
             if (!walkSpriteRendered && entity.image && entity.imageLoaded) {
@@ -184,8 +186,9 @@ export class WorldFieldRenderer {
 
     public static renderTutorialActors(ctx: CanvasRenderingContext2D, model: WorldRenderModel, camX: number, camY: number): void {
         for (const entity of model.tutorialActors) {
-            const px = entity.pixelX * TILE_SIZE - camX;
-            const py = entity.pixelY * TILE_SIZE - camY;
+            const motion = SettingsManager.getMotionReduce() ? ZERO_MOTION_OFFSET : entity.getCombatMotionOffset();
+            const px = (entity.pixelX + motion.x) * TILE_SIZE - camX;
+            const py = (entity.pixelY + motion.y) * TILE_SIZE - camY;
 
             const walkSpriteRendered = renderWalkSprite(ctx, entity, model.worldTime, px, py, { drawIdle: true });
             if (!walkSpriteRendered && entity.image && entity.imageLoaded) {
@@ -212,9 +215,10 @@ export class WorldFieldRenderer {
         const sortedEnemies = [...model.fieldEnemies].sort((a, b) => a.enemy.pixelY - b.enemy.pixelY);
         for (const entry of sortedEnemies) {
             const enemy = entry.enemy;
-            if (enemy.stats.hp <= 0) continue;
-            const px = enemy.pixelX * TILE_SIZE - camX;
-            const py = enemy.pixelY * TILE_SIZE - camY;
+            if (enemy.stats.hp <= 0 && !enemy.isDefeatedPresentationHeld()) continue;
+            const motion = SettingsManager.getMotionReduce() ? ZERO_MOTION_OFFSET : enemy.getCombatMotionOffset();
+            const px = (enemy.pixelX + motion.x) * TILE_SIZE - camX;
+            const py = (enemy.pixelY + motion.y) * TILE_SIZE - camY;
 
             if (enemy.isElite) renderEliteMarker(ctx, enemy, model.worldTime, px, py);
             const spriteRendered = renderWalkSprite(ctx, enemy, model.worldTime, px, py, { drawIdle: true });

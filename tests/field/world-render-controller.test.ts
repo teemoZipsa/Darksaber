@@ -65,6 +65,7 @@ function buildStoryInteriorRenderModel(dungeonId: string): WorldRenderModel {
         getPathPreviewTiles: () => [],
         getAttackCues: () => [],
         getCombatLog: () => [],
+        isCombatPresentationBusy: () => false,
         getActorTerrainTraits: () => ({}),
         isTurnCombatActive: () => false,
     });

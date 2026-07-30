@@ -61,6 +61,7 @@ export interface WorldInputContext {
     clearIntent: () => void;
     log: (message: string) => void;
     getCombatLog: () => string[];
+    isCombatPresentationBusy: () => boolean;
     onUnhandledEscape: () => void;
 }
 
@@ -103,6 +104,8 @@ export class WorldInputController {
         this.context.toolController.onMouseMove(input.mouseScreenX, input.mouseScreenY);
         this.context.tacticalController.onMouseMove(input.uiMouseX, input.uiMouseY);
         this.context.magicController.updateHoverPreview(hoverTile);
+
+        if (this.context.isCombatPresentationBusy()) return;
 
         if (input.mouseJustDown && this.context.actionMenuUI.getIsOpen()) {
             if (this.handleActionMenuSlotClick(input, camera)) return;

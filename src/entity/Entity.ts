@@ -29,6 +29,14 @@ interface ActionMotionState {
     framesPerSecond: number;
 }
 
+interface HitReactionState {
+    elapsed: number;
+    duration: number;
+    directionX: number;
+    directionY: number;
+    strength: number;
+}
+
 export class Entity {
     public static readonly WALK_ROW_BY_FACING: Record<EntityFacing, number> = {
         down: 0,
@@ -55,6 +63,8 @@ export class Entity {
     public walkSprite?: WalkSpriteData;
     public walkSpriteLoaded: boolean = false;
     private actionMotion: ActionMotionState | null = null;
+    private hitReaction: HitReactionState | null = null;
+    private defeatedPresentationHeld = false;
 
     // ── Tile-step movement state ──
     /** Current step target (one tile away from current integer position) */
@@ -137,9 +147,70 @@ export class Entity {
     }
 
     public playActionMotion(kind: EntityActionMotionKind, duration: number = 0.36, framesPerSecond: number = 8): boolean {
-        if (!this.hasActionMotionForFacing(this.facing)) return false;
-        this.actionMotion = { kind, elapsed: 0, duration, framesPerSecond };
-        return true;
+        this.actionMotion = {
+            kind,
+            elapsed: 0,
+            duration: Math.max(0.01, duration),
+            framesPerSecond: Math.max(1, framesPerSecond),
+        };
+        return this.hasActionMotionForFacing(this.facing);
+    }
+
+    public playHitReaction(
+        sourceGridX: number,
+        sourceGridY: number,
+        duration: number = 0.18,
+        strength: number = 0.1
+    ): void {
+        const dx = this.gridX - sourceGridX;
+        const dy = this.gridY - sourceGridY;
+        const distance = Math.hypot(dx, dy);
+        const fallback = facingVector(oppositeFacing(this.facing));
+        this.hitReaction = {
+            elapsed: 0,
+            duration: Math.max(0.01, duration),
+            directionX: distance > 0.001 ? dx / distance : fallback.x,
+            directionY: distance > 0.001 ? dy / distance : fallback.y,
+            strength: Math.max(0, strength),
+        };
+    }
+
+    /**
+     * Presentation-only offset in tile units. Grid position and pathing never
+     * read this value, so attack recoil cannot affect authoritative movement.
+     */
+    public getCombatMotionOffset(): { x: number; y: number } {
+        let x = 0;
+        let y = 0;
+
+        if (this.actionMotion?.kind === 'attack') {
+            const progress = Math.min(1, this.actionMotion.elapsed / this.actionMotion.duration);
+            const direction = facingVector(this.facing);
+            const distance = attackLungeDistance(progress);
+            x += direction.x * distance;
+            y += direction.y * distance;
+        }
+
+        if (this.hitReaction) {
+            const progress = Math.min(1, this.hitReaction.elapsed / this.hitReaction.duration);
+            const distance = Math.sin(progress * Math.PI) * this.hitReaction.strength;
+            x += this.hitReaction.directionX * distance;
+            y += this.hitReaction.directionY * distance;
+        }
+
+        return { x, y };
+    }
+
+    public holdDefeatedPresentation(): void {
+        this.defeatedPresentationHeld = true;
+    }
+
+    public releaseDefeatedPresentation(): void {
+        this.defeatedPresentationHeld = false;
+    }
+
+    public isDefeatedPresentationHeld(): boolean {
+        return this.defeatedPresentationHeld;
     }
 
     public faceToward(gridX: number, gridY: number): void {
@@ -192,6 +263,7 @@ export class Entity {
 
     public update(dt: number): void {
         this.updateActionMotion(dt);
+        this.updateHitReaction(dt);
         if (this.isRealtime) return; // WorldEngine handles real-time position updates manually
 
         if (!this.stepping) {
@@ -261,6 +333,12 @@ export class Entity {
         if (this.actionMotion.elapsed >= this.actionMotion.duration) this.actionMotion = null;
     }
 
+    private updateHitReaction(dt: number): void {
+        if (!this.hitReaction) return;
+        this.hitReaction.elapsed += dt;
+        if (this.hitReaction.elapsed >= this.hitReaction.duration) this.hitReaction = null;
+    }
+
     private detectActionRows(sprite: WalkSpriteData): Partial<Record<EntityFacing, boolean>> {
         const rows: Partial<Record<EntityFacing, boolean>> = {};
         if (!sprite.actionRowByFacing || typeof document === 'undefined') return rows;
@@ -298,6 +376,41 @@ export class Entity {
 
         return rows;
     }
+}
+
+function facingVector(facing: EntityFacing): { x: number; y: number } {
+    switch (facing) {
+        case 'up': return { x: 0, y: -1 };
+        case 'down': return { x: 0, y: 1 };
+        case 'left': return { x: -1, y: 0 };
+        case 'right': return { x: 1, y: 0 };
+    }
+}
+
+function oppositeFacing(facing: EntityFacing): EntityFacing {
+    switch (facing) {
+        case 'up': return 'down';
+        case 'down': return 'up';
+        case 'left': return 'right';
+        case 'right': return 'left';
+    }
+}
+
+function attackLungeDistance(progress: number): number {
+    if (progress < 0.24) {
+        return -0.045 * smoothStep(progress / 0.24);
+    }
+    if (progress < 0.44) {
+        const t = smoothStep((progress - 0.24) / 0.2);
+        return -0.045 + (0.14 + 0.045) * t;
+    }
+    const t = smoothStep((progress - 0.44) / 0.56);
+    return 0.14 * (1 - t);
+}
+
+function smoothStep(value: number): number {
+    const clamped = Math.max(0, Math.min(1, value));
+    return clamped * clamped * (3 - 2 * clamped);
 }
 
 function hasVisiblePixels(pixels: Uint8ClampedArray): boolean {

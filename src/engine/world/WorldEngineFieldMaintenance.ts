@@ -37,13 +37,15 @@ export interface WorldEngineFieldTurnResetPorts {
     fieldState: WorldEngineFieldState;
     flowState: WorldEngineFlowState;
     runtimeState: WorldEngineRuntimeState;
+    uiState: WorldEngineUiState;
     worldControllers: WorldEngineWorldControllers;
     closeActionMenu(): void;
 }
 
 export function clearWorldEngineFieldTurnState(ports: WorldEngineFieldTurnResetPorts): void {
-    const { actionControllers, fieldState, flowState, runtimeState, worldControllers } = ports;
+    const { actionControllers, fieldState, flowState, runtimeState, uiState, worldControllers } = ports;
     flowState.turnStateController.clear();
+    uiState.fieldFeedback.clearCombatPresentation();
     runtimeState.fanfareLeaderActorId = null;
     worldControllers.restingController.clearTimers();
     ports.closeActionMenu();
@@ -53,6 +55,7 @@ export function clearWorldEngineFieldTurnState(ports: WorldEngineFieldTurnResetP
         actor.path = [];
         actor.queuedIntent = null;
         actor.entity.actionGauge = 0;
+        actor.entity.releaseDefeatedPresentation();
         removeStatusesFromCarrier(actor.character, (status) => status.kind === 'resting');
     }
     for (const entry of fieldState.fieldEnemies) {
@@ -60,6 +63,7 @@ export function clearWorldEngineFieldTurnState(ports: WorldEngineFieldTurnResetP
         entry.previewIntent = null;
         entry.enemy.actionGauge = 0;
         entry.enemy.isAggro = false;
+        entry.enemy.releaseDefeatedPresentation();
     }
 }
 

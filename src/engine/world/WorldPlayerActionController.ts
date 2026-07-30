@@ -312,8 +312,7 @@ export class WorldPlayerActionController {
                 const enemy = this.context.getEnemyById(actor.queuedIntent.enemyId);
                 if (enemy && enemy.stats.hp > 0) {
                     actor.entity.faceToward(enemy.gridX, enemy.gridY);
-                    const attacked = this.context.tryActorAttack(actor, enemy);
-                    if (attacked) actor.entity.playActionMotion('attack');
+                    this.context.tryActorAttack(actor, enemy);
                 }
                 else this.context.clearActorIntent(actor);
             }
@@ -505,7 +504,6 @@ export class WorldPlayerActionController {
         if (!this.spendActionCost(ATTACK_ACTION_GAUGE_COST)) return false;
 
         if (this.context.tryActorAttack(actor, enemy)) {
-            actor.entity.playActionMotion('attack');
             this.context.onActionCompleted?.('attack');
             this.context.resumeOrEndActiveTurn(actor);
         }

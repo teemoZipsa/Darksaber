@@ -562,6 +562,7 @@ export class WorldEngine {
             fieldState: this.getFieldState(),
             flowState: this.getFlowState(),
             runtimeState: this.getRuntimeState(),
+            uiState: this.getUiState(),
             worldControllers: this.worldControllers,
             closeActionMenu: () => this.closeActionMenu(),
         });

@@ -172,6 +172,25 @@ test('entity starts each queued tile step without an extra prepare or settle fra
     assert.ok(entity.pixelX < 2);
 });
 
+test('entity procedural attack and hit reactions work without an action sprite', () => {
+    const attacker = new Entity('attacker', 0, 0, '#fff');
+    attacker.facing = 'right';
+
+    assert.equal(attacker.playActionMotion('attack', 0.34, 10), false);
+    attacker.update(0.05);
+    assert.ok(attacker.getCombatMotionOffset().x < 0);
+    attacker.update(0.08);
+    assert.ok(attacker.getCombatMotionOffset().x > 0);
+    attacker.update(0.3);
+    assert.deepEqual(attacker.getCombatMotionOffset(), { x: 0, y: 0 });
+
+    const target = new Entity('target', 1, 0, '#fff');
+    target.playHitReaction(0, 0, 0.18, 0.1);
+    target.update(0.09);
+    assert.ok(target.getCombatMotionOffset().x > 0.09);
+    assert.equal(target.getCombatMotionOffset().y, 0);
+});
+
 test('loot objects retain overflow items and sanitize grid sizes', () => {
     const sword = getItemDef('short_sword');
     assert.ok(sword);

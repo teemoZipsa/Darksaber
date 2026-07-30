@@ -257,6 +257,9 @@ export function createWorldEngineScenarioNetworkControllers(
         spawnStatus: (x, y, text) => ports.floatingText.spawnStatus(x, y, text),
         recordCharacterDown: (characterId) => ports.raidSession.recordCharacterDown(characterId),
         log: (message) => ports.addCombatLog(message),
+        schedulePresentation: (delaySeconds, action) => {
+            ports.fieldFeedback.scheduleCombatPresentation(delaySeconds, action);
+        },
     });
 
     return {

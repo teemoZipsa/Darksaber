@@ -69,6 +69,7 @@ export interface WorldRenderContext {
     getPathPreviewTiles: (actor: FieldActor | null) => TilePoint[];
     getAttackCues: () => AttackCue[];
     getCombatLog: () => string[];
+    isCombatPresentationBusy: () => boolean;
     hasBackpackItem?: (itemId: string) => boolean;
     getActorTerrainTraits: (actor: FieldActor) => TerrainActorTraits;
     isTurnCombatActive: () => boolean;
@@ -318,7 +319,7 @@ export class WorldRenderController {
 
     private renderActionMenu(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
         const actor = this.context.getControlledActor();
-        if (!actor || actor.character.isDead) return;
+        if (!actor || actor.character.isDead || this.context.isCombatPresentationBusy()) return;
 
         const px = actor.entity.pixelX * TILE_SIZE - camX;
         const py = actor.entity.pixelY * TILE_SIZE - camY;

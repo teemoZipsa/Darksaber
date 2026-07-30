@@ -9,6 +9,7 @@ import type { FieldActor } from '../../src/field/FieldTypes';
 import type { AttackPatternProfile } from '../../src/field/TargetPatterns';
 import { WorldCombatController, type CombatEventSink } from '../../src/engine/world/WorldCombatController';
 import { WorldCombatFeedbackController } from '../../src/engine/world/WorldCombatFeedbackController';
+import { WorldFieldFeedbackState } from '../../src/engine/world/WorldFieldFeedbackState';
 
 class ImageStub {
     public src = '';
@@ -200,6 +201,71 @@ test('missed direct hit does not consume counter readiness', () => {
 
         assert.equal(hasStatus(actor.character.statuses, 'guard'), true);
         assert.equal(hasStatus(actor.character.statuses, 'counterReady'), true);
+    } finally {
+        Math.random = previousRandom;
+    }
+});
+
+test('world combat controller keeps authoritative damage synchronous and presents impact after anticipation', () => {
+    const previousRandom = Math.random;
+    Math.random = () => 0;
+
+    try {
+        const character = new Character('hero-1', 'Hero', 'infantry');
+        character.stats.atk = 30;
+        character.stats.hitRate = 200;
+        character.stats.critRate = 0;
+        const actor: FieldActor = {
+            id: character.id,
+            character,
+            entity: new Player(0, 0),
+            path: [],
+            queuedIntent: null,
+        };
+        const enemy = new Enemy('enemy-1', 1, 0, 'Enemy', 1);
+        enemy.stats.hp = 100;
+        enemy.stats.def = 0;
+        const presentation = new WorldFieldFeedbackState();
+        const events: string[] = [];
+        const controller = new WorldCombatController({
+            log: () => undefined,
+            spawnDamage: () => events.push('damage'),
+            spawnStatus: () => undefined,
+            spawnHitEffect: () => events.push('hit'),
+            spawnKillEffect: () => undefined,
+            spawnAttackCue: () => events.push('anticipation'),
+            spawnLoot: () => undefined,
+            flushFeedbackGroup: () => events.push('hitstop'),
+            schedulePresentation: (delaySeconds, action) => {
+                presentation.scheduleCombatPresentation(delaySeconds, action);
+            },
+        });
+
+        controller.tryActorAttack({
+            actor,
+            selectedEnemy: enemy,
+            targetEnemies: [enemy],
+            profile: {
+                select: { kind: 'adjacent', maxRange: 1 },
+                effect: { kind: 'single' },
+            },
+            getTileAt: () => TileType.GRASS,
+            directionFromTo: () => 'right',
+            tryEnemyCounterAttack: () => ({ executed: false, killedEnemyIds: [], downedCharacterIds: [] }),
+        });
+
+        assert.ok(enemy.stats.hp < 100);
+        assert.deepEqual(events, ['anticipation']);
+        assert.equal(presentation.isCombatPresentationBusy(), true);
+
+        presentation.updateAttackCues(0.099);
+        assert.deepEqual(events, ['anticipation']);
+        presentation.updateAttackCues(0.002);
+        assert.deepEqual(events, ['anticipation', 'damage', 'hit', 'hitstop']);
+        assert.equal(presentation.isCombatPresentationBusy(), true);
+
+        presentation.updateAttackCues(1);
+        assert.equal(presentation.isCombatPresentationBusy(), false);
     } finally {
         Math.random = previousRandom;
     }

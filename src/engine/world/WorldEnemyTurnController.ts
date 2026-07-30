@@ -33,6 +33,7 @@ import {
     isEntityMoving,
 } from './WorldMovementController';
 import { getVampiricHealing } from '../../field/EliteAffixes';
+import { COMBAT_IMPACT_DELAY_SECONDS } from './CombatPresentationTimeline';
 
 export type EnemySpellElement = 'dark' | 'fire' | 'ice' | 'lightning' | 'wind' | 'earth';
 
@@ -49,6 +50,7 @@ export interface WorldEnemyEventSink {
     spawnAttackCue(from: TilePoint, to: TilePoint, color: string, label?: string): void;
     beginFeedbackGroup?(): string;
     flushFeedbackGroup?(feedbackGroupId: string): void;
+    schedulePresentation?(delaySeconds: number, action: () => void): void;
 }
 
 export interface WorldEnemyTurnContext {
@@ -326,7 +328,14 @@ export class WorldEnemyTurnController {
                 this.logEnemy('field.enemyLog.cleave', { enemy: enemy.name });
                 const feedbackGroupId = this.sink.beginFeedbackGroup?.();
                 for (const victim of victims) mergeCombatResult(result, this.enemyAttack(enemy, victim, 1, feedbackGroupId));
-                if (feedbackGroupId) this.sink.flushFeedbackGroup?.(feedbackGroupId);
+                if (feedbackGroupId) {
+                    const flush = () => this.sink.flushFeedbackGroup?.(feedbackGroupId);
+                    if (this.sink.schedulePresentation) {
+                        this.sink.schedulePresentation(COMBAT_IMPACT_DELAY_SECONDS + 0.001, flush);
+                    } else {
+                        flush();
+                    }
+                }
                 return result;
             }
             case 'voidBolt':

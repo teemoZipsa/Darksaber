@@ -159,6 +159,9 @@ export function createWorldEngineCombatControllers(
             ports.storyScenarioController.completeDungeonIfBossDefeated(enemy);
         },
         flushFeedbackGroup: (feedbackGroupId) => ports.flushCombatFeedbackGroup(feedbackGroupId),
+        schedulePresentation: (delaySeconds, action) => {
+            ports.fieldFeedback.scheduleCombatPresentation(delaySeconds, action);
+        },
     });
 
     const combatFlow = new WorldEngineCombatFlow({
@@ -237,6 +240,9 @@ export function createWorldEngineCombatControllers(
             spawnAttackCue: (from, to, color, label) => ports.fieldFeedback.spawnAttackCue(from, to, color, label),
             beginFeedbackGroup: () => ports.beginCombatFeedbackGroup(),
             flushFeedbackGroup: (feedbackGroupId) => ports.flushCombatFeedbackGroup(feedbackGroupId),
+            schedulePresentation: (delaySeconds, action) => {
+                ports.fieldFeedback.scheduleCombatPresentation(delaySeconds, action);
+            },
         }
     );
 

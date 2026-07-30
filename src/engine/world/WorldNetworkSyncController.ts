@@ -35,6 +35,10 @@ import type { CombatFeedbackKind } from './CombatFeedback';
 import type { WorldStoryScenarioController } from './WorldStoryScenarioController';
 import { classifyNetworkActorSnapshots } from './NetworkSnapshotOwnership';
 import { getNetworkEnemyLocalizedNames } from './NetworkSnapshotMapping';
+import { AudioManager } from '../AudioManager';
+import { COMBAT_IMPACT_DELAY_SECONDS } from './CombatPresentationTimeline';
+
+const NETWORK_ATTACK_RECOVERY_SECONDS = 0.34;
 
 interface PendingNetworkMoveReopen {
     intentId: string;
@@ -103,6 +107,7 @@ export interface WorldNetworkSyncContext {
     spawnStatus(x: number, y: number, text: string): void;
     recordCharacterDown(characterId: string): void;
     log(message: string): void;
+    schedulePresentation?(delaySeconds: number, action: () => void): void;
 }
 
 export class WorldNetworkSyncController {
@@ -434,51 +439,100 @@ export class WorldNetworkSyncController {
         const sourceEnemy = this.context.getEnemyById(event.sourceId);
         const feedbackGroupId = this.context.beginCombatFeedbackGroup();
 
-        if (targetEnemy) {
-            if (event.kind === 'kill') {
-                this.context.spawnKillEffect(targetEnemy, feedbackGroupId, sourceActor, event.expAward);
-                this.context.registerCombatFeedback('kill', feedbackGroupId);
-            } else if (event.kind === 'heal') {
-                this.context.spawnHeal(targetEnemy.gridX, targetEnemy.gridY, event.value ?? 0);
-                this.context.spawnHealEffect(targetEnemy.gridX, targetEnemy.gridY);
-                this.context.registerCombatFeedback('normal', feedbackGroupId);
-            } else if (event.kind === 'status') {
-                this.context.spawnStatus(targetEnemy.gridX, targetEnemy.gridY, 'WEAK');
-                this.context.spawnDebuffEffect(targetEnemy.gridX, targetEnemy.gridY);
-                this.context.registerCombatFeedback('status', feedbackGroupId);
-            } else {
-                this.context.spawnDamage(targetEnemy.gridX, targetEnemy.gridY, event.value ?? 0, false, event.kind === 'miss');
-                if (event.kind !== 'miss' && (event.value ?? 0) > 0) {
-                    this.context.spawnHitEffect(targetEnemy.gridX, targetEnemy.gridY);
+        const actorAttack = sourceActor && targetEnemy
+            ? {
+                entity: sourceActor.entity,
+                from: this.context.actorTile(sourceActor),
+                to: this.context.enemyTile(targetEnemy),
+                color: '#72e8ff',
+            }
+            : null;
+        const enemyAttack = sourceEnemy && targetActor
+            ? {
+                entity: sourceEnemy,
+                from: this.context.enemyTile(sourceEnemy),
+                to: this.context.actorTile(targetActor),
+                color: '#ff8a55',
+            }
+            : null;
+        const attack = actorAttack ?? enemyAttack;
+        const isAttackEvent = Boolean(attack && event.kind !== 'heal' && event.kind !== 'status');
+        const impactDelay = isAttackEvent ? COMBAT_IMPACT_DELAY_SECONDS : 0;
+
+        if (isAttackEvent && attack) {
+            attack.entity.faceToward(attack.to.x, attack.to.y);
+            attack.entity.playActionMotion('attack', NETWORK_ATTACK_RECOVERY_SECONDS, 10);
+            this.context.spawnAttackCue(attack.from, attack.to, attack.color);
+            AudioManager.playSfx('sfx.swing', { volume: sourceEnemy?.isBoss ? 0.78 : 0.68, rate: 0.04 });
+            this.schedulePresentation(NETWORK_ATTACK_RECOVERY_SECONDS, () => undefined);
+        }
+
+        if (event.kind === 'kill' && targetEnemy) targetEnemy.holdDefeatedPresentation();
+        if (event.kind === 'down' && targetActor) targetActor.entity.holdDefeatedPresentation();
+        if (event.kind === 'down' && targetActor && this.context.party.getCharacters().includes(targetActor.character)) {
+            this.context.recordCharacterDown(targetActor.character.id);
+        }
+
+        this.schedulePresentation(impactDelay, () => {
+            const attackSource = attack?.from;
+            if (attackSource && event.kind !== 'miss' && (event.value ?? 0) > 0) {
+                targetEnemy?.playHitReaction(attackSource.x, attackSource.y);
+                targetActor?.entity.playHitReaction(attackSource.x, attackSource.y);
+            }
+
+            if (targetEnemy) {
+                if (event.kind === 'kill') {
+                    this.context.spawnKillEffect(targetEnemy, feedbackGroupId, sourceActor ?? undefined, event.expAward);
+                    this.context.registerCombatFeedback('kill', feedbackGroupId);
+                    targetEnemy.releaseDefeatedPresentation();
+                } else if (event.kind === 'heal') {
+                    this.context.spawnHeal(targetEnemy.gridX, targetEnemy.gridY, event.value ?? 0);
+                    this.context.spawnHealEffect(targetEnemy.gridX, targetEnemy.gridY);
                     this.context.registerCombatFeedback('normal', feedbackGroupId);
+                } else if (event.kind === 'status') {
+                    this.context.spawnStatus(targetEnemy.gridX, targetEnemy.gridY, 'WEAK');
+                    this.context.spawnDebuffEffect(targetEnemy.gridX, targetEnemy.gridY);
+                    this.context.registerCombatFeedback('status', feedbackGroupId);
+                } else {
+                    this.context.spawnDamage(targetEnemy.gridX, targetEnemy.gridY, event.value ?? 0, false, event.kind === 'miss');
+                    if (event.kind !== 'miss' && (event.value ?? 0) > 0) {
+                        this.context.spawnHitEffect(targetEnemy.gridX, targetEnemy.gridY);
+                        this.context.registerCombatFeedback('normal', feedbackGroupId);
+                    }
                 }
             }
-        }
-        if (targetActor) {
-            if (event.kind === 'heal') {
-                this.context.spawnHeal(targetActor.entity.gridX, targetActor.entity.gridY, event.value ?? 0);
-                this.context.spawnHealEffect(targetActor.entity.gridX, targetActor.entity.gridY);
-                this.context.registerCombatFeedback('normal', feedbackGroupId);
-            } else if (event.kind === 'status') {
-                this.context.spawnStatus(targetActor.entity.gridX, targetActor.entity.gridY, 'BUFF');
-            } else {
-                this.context.spawnDamage(targetActor.entity.gridX, targetActor.entity.gridY, event.value ?? 0, false, event.kind === 'miss');
-            }
-            if (event.kind !== 'miss' && event.kind !== 'heal' && (event.value ?? 0) > 0) {
-                this.context.spawnHitEffect(targetActor.entity.gridX, targetActor.entity.gridY);
-                this.context.registerCombatFeedback(event.kind === 'down' ? 'kill' : 'normal', feedbackGroupId);
-            }
-            if (event.kind === 'down') {
-                this.context.spawnStatus(targetActor.entity.gridX, targetActor.entity.gridY, 'DOWN');
-                if (this.context.party.getCharacters().includes(targetActor.character)) {
-                    this.context.recordCharacterDown(targetActor.character.id);
+            if (targetActor) {
+                if (event.kind === 'heal') {
+                    this.context.spawnHeal(targetActor.entity.gridX, targetActor.entity.gridY, event.value ?? 0);
+                    this.context.spawnHealEffect(targetActor.entity.gridX, targetActor.entity.gridY);
+                    this.context.registerCombatFeedback('normal', feedbackGroupId);
+                } else if (event.kind === 'status') {
+                    this.context.spawnStatus(targetActor.entity.gridX, targetActor.entity.gridY, 'BUFF');
+                } else {
+                    this.context.spawnDamage(targetActor.entity.gridX, targetActor.entity.gridY, event.value ?? 0, false, event.kind === 'miss');
+                }
+                if (event.kind !== 'miss' && event.kind !== 'heal' && (event.value ?? 0) > 0) {
+                    this.context.spawnHitEffect(targetActor.entity.gridX, targetActor.entity.gridY);
+                    this.context.registerCombatFeedback(event.kind === 'down' ? 'kill' : 'normal', feedbackGroupId);
+                }
+                if (event.kind === 'down') {
+                    this.context.spawnStatus(targetActor.entity.gridX, targetActor.entity.gridY, 'DOWN');
+                    targetActor.entity.releaseDefeatedPresentation();
                 }
             }
-        }
-        if (sourceActor && targetEnemy) this.context.spawnAttackCue(this.context.actorTile(sourceActor), this.context.enemyTile(targetEnemy), '#72e8ff');
-        if (sourceEnemy && targetActor) this.context.spawnAttackCue(this.context.enemyTile(sourceEnemy), this.context.actorTile(targetActor), '#ff8a55');
-        this.context.flushCombatFeedbackGroup(feedbackGroupId);
+        });
+        this.schedulePresentation(impactDelay + 0.001, () => {
+            this.context.flushCombatFeedbackGroup(feedbackGroupId);
+        });
         this.context.log(this.formatCombatEvent(event));
+    }
+
+    private schedulePresentation(delaySeconds: number, action: () => void): void {
+        if (this.context.schedulePresentation) {
+            this.context.schedulePresentation(delaySeconds, action);
+            return;
+        }
+        action();
     }
 
     public resolveSnapshotRemainingGauge(remainingGauge: number, actionGauge: number): number {

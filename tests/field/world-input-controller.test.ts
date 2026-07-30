@@ -113,6 +113,7 @@ function makeContext(actor: FieldActor, calls: string[]): WorldInputContext {
         clearIntent: () => calls.push('clearIntent'),
         log: (message: string) => calls.push(`log:${message}`),
         getCombatLog: () => [],
+        isCombatPresentationBusy: () => false,
         onUnhandledEscape: () => calls.push('escape'),
     };
 }
@@ -127,6 +128,28 @@ test('clicking the active actor body while action menu is open does not dismiss 
     assert.ok(calls.includes(`selectActor:${actor.id}`));
     assert.ok(!calls.includes('dismissActionMenuTurn'));
     assert.ok(!calls.includes('switchParty'));
+});
+
+test('combat presentation lock blocks a second action while hitstop input still updates', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.isCombatPresentationBusy = () => true;
+    context.actionMenuUI = {
+        getIsOpen: () => true,
+        onClick: () => {
+            calls.push('hiddenAction');
+            return 'attack';
+        },
+        onMouseMove: () => undefined,
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput(), makeCamera());
+
+    assert.ok(!calls.includes('hiddenAction'));
+    assert.ok(!calls.includes('executeAction'));
+    assert.ok(!calls.includes('dismissActionMenuTurn'));
 });
 
 test('clicking unrelated loot closes an open action menu without ending the turn', () => {

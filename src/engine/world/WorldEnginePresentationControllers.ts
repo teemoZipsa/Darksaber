@@ -197,6 +197,7 @@ export function createWorldEnginePresentationControllers(
         getPathPreviewTiles: (actor) => ports.getPathPreviewTiles(actor),
         getAttackCues: () => ports.fieldFeedback.attackCues,
         getCombatLog: () => ports.fieldFeedback.combatLog,
+        isCombatPresentationBusy: () => ports.fieldFeedback.isCombatPresentationBusy(),
         hasBackpackItem: (itemId) => ports.gameManager.inventory.items.some((placed) => placed.item.id === itemId),
         getActorTerrainTraits: (actor) => getWorldActorTerrainTraits(actor),
         isTurnCombatActive: () => ports.isTurnCombatActive(),
@@ -233,6 +234,7 @@ export function createWorldEnginePresentationControllers(
         clearIntent: () => ports.clearIntent(),
         log: (message) => ports.addCombatLog(message),
         getCombatLog: () => ports.fieldFeedback.combatLog,
+        isCombatPresentationBusy: () => ports.fieldFeedback.isCombatPresentationBusy(),
         onUnhandledEscape: () => ports.openPauseMenu(),
     });
 
