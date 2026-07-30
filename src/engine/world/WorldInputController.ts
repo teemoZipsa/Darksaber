@@ -43,6 +43,7 @@ export interface WorldInputContext {
     selectionController: WorldSelectionController;
     tacticalController: WorldTacticalController;
     getCanvasSize: () => { width: number; height: number };
+    isFieldHudInteractive: () => boolean;
     getActivePartyTurnActor: () => FieldActor | null;
     getActiveTurnActorId: () => string | null;
     getReservedAction: () => FieldIntent | null;
@@ -73,14 +74,60 @@ export class WorldInputController {
     }
 
     public process(input: InputManager, camera: Camera): void {
-        if (SettingsManager.isKeybindingJustPressed('world.minimap', input)) {
+        const fieldHudInteractive = this.context.isFieldHudInteractive();
+        if (fieldHudInteractive && SettingsManager.isKeybindingJustPressed('world.minimap', input)) {
             this.context.minimapUI.toggle();
             return;
         }
 
-        if (this.context.minimapUI.handleInput(input)) return;
+        if (fieldHudInteractive && this.context.minimapUI.handleInput(input)) return;
 
-        // Combat log claims wheel/drag inside its region first.
+        if (fieldHudInteractive) {
+            this.context.entityInfoUI.onMouseMove(input.uiMouseX, input.uiMouseY);
+            this.context.tacticalController.onMouseMove(input.uiMouseX, input.uiMouseY);
+        }
+        this.context.toolController.onMouseMove(input.uiMouseX, input.uiMouseY);
+
+        // Overlay pointer priority mirrors render order: the mini map is drawn
+        // above tool/tactical panels, entity info, and finally the combat log.
+        if (
+            fieldHudInteractive
+            && input.mouseJustDown
+            && this.context.minimapUI.onClick(input.uiMouseX, input.uiMouseY)
+        ) {
+            return;
+        }
+
+        if (this.context.toolController.isVisible()) {
+            if (input.mouseWheelDelta !== 0) {
+                this.context.toolController.onScroll(input.mouseWheelDelta);
+                return;
+            }
+            if (input.mouseJustDown) {
+                this.context.toolController.handleMenuMouseDown(input.uiMouseX, input.uiMouseY);
+                return;
+            }
+            if (input.mouseJustUp) {
+                this.context.toolController.onMouseUp();
+                return;
+            }
+        }
+
+        if (fieldHudInteractive && this.context.tacticalController.isOpen() && input.mouseJustDown) {
+            this.context.tacticalController.handleClick(input.uiMouseX, input.uiMouseY);
+            return;
+        }
+
+        if (fieldHudInteractive && input.mouseJustDown && this.context.selectionController.hasSelection()) {
+            const entityInfoHit = this.context.entityInfoUI.hitTest(input.uiMouseX, input.uiMouseY);
+            if (entityInfoHit === 'close') {
+                this.context.selectionController.clear();
+                return;
+            }
+            if (entityInfoHit === 'consume') return;
+        }
+
+        // Combat log claims wheel/drag inside its region before field controls.
         const canvasSize = this.context.getCanvasSize();
         const logConsumed = CombatLogUI.update(
             input,
@@ -98,11 +145,8 @@ export class WorldInputController {
         const screenTile = camera.screenToTile(input.mouseScreenX, input.mouseScreenY);
         const hoverTile = { x: screenTile.tileX, y: screenTile.tileY };
         this.context.setHoverTile(hoverTile);
-        this.context.entityInfoUI.onMouseMove(input.mouseScreenX, input.mouseScreenY);
         this.context.actionMenuUI.onMouseMove(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
         this.context.magicController.onMouseMove(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
-        this.context.toolController.onMouseMove(input.mouseScreenX, input.mouseScreenY);
-        this.context.tacticalController.onMouseMove(input.uiMouseX, input.uiMouseY);
         this.context.magicController.updateHoverPreview(hoverTile);
 
         if (this.context.isCombatPresentationBusy()) return;
@@ -118,10 +162,6 @@ export class WorldInputController {
             return;
         }
 
-        if (input.mouseJustDown && this.context.minimapUI.onClick(input.uiMouseX, input.uiMouseY)) {
-            return;
-        }
-
         if (input.mouseRightJustDown && !this.context.magicController.isVisible() && !this.context.toolController.isVisible()) {
             this.handleFieldRightClick(hoverTile, input);
         } else if (input.justPressed('Escape')) {
@@ -132,7 +172,7 @@ export class WorldInputController {
             else if (this.context.playerActionController.getMode()) this.cancelActionTargeting();
             else if (this.context.getReservedAction()) this.context.clearIntent();
             else this.context.onUnhandledEscape();
-        } else if (this.context.tacticalController.isOpen()) {
+        } else if (fieldHudInteractive && this.context.tacticalController.isOpen()) {
             if (input.mouseJustDown) this.context.tacticalController.handleClick(input.uiMouseX, input.uiMouseY);
         } else if (this.context.magicController.isVisible()) {
             this.context.magicController.updateMp(this.context.getControlledActor()?.character.stats.mp ?? 0);
@@ -147,11 +187,7 @@ export class WorldInputController {
             }
             if (input.mouseJustUp) this.context.magicController.onMouseUp();
         } else if (this.context.toolController.isVisible()) {
-            if (input.mouseWheelDelta !== 0) this.context.toolController.onScroll(input.mouseWheelDelta);
-            if (input.mouseJustDown) {
-                this.context.toolController.handleMenuMouseDown(input.mouseScreenX, input.mouseScreenY);
-            }
-            if (input.mouseJustUp) this.context.toolController.onMouseUp();
+            // Pointer events were handled above in UI-scaled coordinates.
         } else if (this.context.magicController.getState().mode === 'targeting') {
             if (input.mouseJustDown) this.context.magicController.handleTargetClick(this.context.getHoverTile());
         } else {
@@ -162,11 +198,6 @@ export class WorldInputController {
 
     private handleFieldClick(tile: TilePoint, input: InputManager, camera: Camera): void {
         const hit = this.context.resolveFieldHitAt(tile);
-
-        if (this.context.selectionController.hasSelection() && this.context.entityInfoUI.onClick(input.mouseScreenX, input.mouseScreenY)) {
-            this.context.selectionController.clear();
-            return;
-        }
 
         if (this.context.actionMenuUI.getIsOpen()) {
             if (this.handleActionMenuSlotClick(input, camera)) return;

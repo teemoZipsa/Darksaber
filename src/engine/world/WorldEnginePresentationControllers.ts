@@ -36,6 +36,7 @@ import type { WorldEngineSharedControllerPorts } from './WorldEngineSharedContro
 import type { WorldEngineUiState } from './WorldEngineUiState';
 import type { WorldEngineWorldControllers } from './WorldEngineWorldControllers';
 import type { GameManager } from '../GameManager';
+import { SettingsManager } from '../SettingsManager';
 
 type WorldPresentationFieldHit = FieldHit<FieldHitParty, Enemy, LootObject>;
 
@@ -212,10 +213,14 @@ export function createWorldEnginePresentationControllers(
         playerActionController: ports.playerActionController,
         selectionController: ports.selectionController,
         tacticalController,
-        getCanvasSize: () => ({
-            width: ports.canvas.clientWidth || ports.canvas.width,
-            height: ports.canvas.clientHeight || ports.canvas.height,
-        }),
+        getCanvasSize: () => {
+            const uiScale = SettingsManager.getUIScale();
+            return {
+                width: Math.floor((ports.canvas.clientWidth || ports.canvas.width) / uiScale),
+                height: Math.floor((ports.canvas.clientHeight || ports.canvas.height) / uiScale),
+            };
+        },
+        isFieldHudInteractive: () => !ports.tutorialController.isActive(),
         getActivePartyTurnActor: () => ports.getActivePartyTurnActor(),
         getActiveTurnActorId: () => ports.turnStateController.getActiveTurnActorId(),
         getReservedAction: () => ports.turnStateController.getReservedAction(),

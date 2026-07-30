@@ -1,4 +1,3 @@
-import { SettingsManager } from '../SettingsManager';
 import { t } from '../../i18n/LanguageManager';
 import type { Enemy } from '../../entity/Enemy';
 import type { LootObject } from '../../entity/LootObject';
@@ -51,14 +50,11 @@ export class WorldTacticalController {
         this.menuUI.render(ctx);
     }
 
-    public open(tile: TilePoint, uiX: number, uiY: number, canvasWidth: number, canvasHeight: number): void {
+    public open(tile: TilePoint, uiX: number, uiY: number, uiWidth: number, uiHeight: number): void {
         const target = this.getTacticalTarget(tile);
         const items = buildTacticalMenuItems(target);
-        const scale = SettingsManager.getUIScale();
-        const vw = Math.floor(canvasWidth / scale);
-        const vh = Math.floor(canvasHeight / scale);
         this.menuTarget = target;
-        this.menuUI.open(uiX, uiY, items, vw, vh);
+        this.menuUI.open(uiX, uiY, items, uiWidth, uiHeight);
     }
 
     public handleClick(x: number, y: number): void {

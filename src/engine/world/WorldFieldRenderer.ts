@@ -15,6 +15,7 @@ import { getSkillIconCell } from '../../ui/DarksaberIconRegistry';
 import { DarksaberSpriteAtlas } from '../../ui/DarksaberSpriteAtlas';
 import { formatT, t } from '../../i18n/LanguageManager';
 import { SettingsManager } from '../SettingsManager';
+import { getFieldHudLayout, type FieldHudLayout } from './FieldHudLayout';
 
 const PARTY_ACTOR_IMAGE_RENDER_SCALE = 1.12;
 const ZERO_MOTION_OFFSET = { x: 0, y: 0 };
@@ -322,85 +323,138 @@ export class WorldFieldRenderer {
         vw: number,
         vh: number,
         options: { combatLogOnly?: boolean } = {}
-    ): number {
+    ): FieldHudLayout {
         // ── HUD layout ─────────────────────────────────────────────
         // LEFT column   : title logo + character status
         // TOP-CENTER    : raid timer banner (only when raid active)
         // TOP-RIGHT     : minimap + integrated info footer (rendered separately
         //                 by MinimapUI; gold/world/coords/terrain live there)
         // BOTTOM-RIGHT  : compact key-hint strip
-        const HUD_X       = 16;
-        const HUD_W       = 232;
-        const TEXT_X      = HUD_X + 14;          // 30 — left text column
-        const RIGHT_X     = HUD_X + HUD_W - 92;  // 156 — right text column
+        const raidLayout = model.raid.active
+            ? getRaidBannerLayout(vw, {
+                hasBounty: Boolean(model.raid.bounty),
+                hasModifier: Boolean(model.raid.modifier),
+            })
+            : null;
+        const layout = getFieldHudLayout(vw, raidLayout
+            ? {
+                x: raidLayout.x,
+                y: raidLayout.y,
+                w: raidLayout.width,
+                h: raidLayout.height,
+            }
+            : null);
 
         if (options.combatLogOnly) {
             renderCombatLog(ctx, model, vw, vh);
-            return 0;
+            return layout;
         }
 
-        renderGameTitle(ctx, HUD_X, 12, { scale: 0.7, subtitle: '' });
+        if (layout.showTitle) {
+            renderGameTitle(ctx, layout.character.x, 12, { scale: 0.7, subtitle: '' });
+        }
 
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
 
         // ── Character status (left column, single panel) ──────────
-        const charY = 56;
-        const charH = 116;
         if (model.activeCharacter) {
             const active = model.activeCharacter;
             const effective = getEffectiveStatsForCharacter(active);
-            drawParchmentPanel(ctx, HUD_X, charY, HUD_W, charH, { headerH: 28, darksaberFrame: true });
-
-            ctx.fillStyle = Parchment.textDark;
-            ctx.font = `bold 14px ${UI.fontPrimary}`;
-            ctx.fillText(`${active.name}  T${active.currentTier} Lv.${active.level}`, TEXT_X, charY + 8);
-
-            ctx.fillStyle = Parchment.textMid;
-            ctx.font = `12px ${UI.fontPrimary}`;
-            ctx.fillText(`[ ${active.getTierName()} ]`, TEXT_X, charY + 34);
-
-            ctx.font = `bold 13px ${UI.fontPrimary}`;
-            ctx.fillStyle = '#7a2030';
-            ctx.fillText(`HP ${active.stats.hp}/${effective.maxHp}`, TEXT_X, charY + 56);
-            ctx.fillStyle = '#1f4878';
-            ctx.fillText(`MP ${active.stats.mp}/${effective.maxMp}`, RIGHT_X, charY + 56);
-            ctx.fillStyle = '#7a4c10';
-            ctx.fillText(formatT('ui.actionGaugeValue', { value: Math.floor(model.player.actionGauge) }), TEXT_X, charY + 76);
             const actionText = model.controlledActor?.id === model.activeTurnActorId && model.remainingActionPoints > 0
                 ? t('field.action.ready')
                 : model.player.actionGauge >= 100
                     ? t('field.action.waiting')
                     : t('field.action.charging');
-            ctx.fillStyle = '#5c3a08';
-            ctx.fillText(actionText, RIGHT_X, charY + 76);
-            if (model.controlledActor?.id === model.activeTurnActorId) {
+
+            if (layout.compact) {
+                const { x, y, w, h } = layout.character;
+                const textX = x + 9;
+                const textW = Math.max(1, w - 18);
+                drawParchmentPanel(ctx, x, y, w, h, { headerH: 24, darksaberFrame: true });
+                ctx.fillStyle = Parchment.textDark;
+                ctx.font = `bold 12px ${UI.fontPrimary}`;
+                ctx.fillText(`${active.name}  T${active.currentTier} Lv.${active.level}`, textX, y + 7, textW);
+                ctx.font = `bold 11px ${UI.fontPrimary}`;
+                ctx.fillStyle = '#7a2030';
+                ctx.fillText(`HP ${active.stats.hp}/${effective.maxHp}`, textX, y + 31, textW * 0.55);
+                ctx.fillStyle = '#1f4878';
+                ctx.textAlign = 'right';
+                ctx.fillText(`MP ${active.stats.mp}/${effective.maxMp}`, x + w - 9, y + 31, textW * 0.45);
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#7a4c10';
+                ctx.fillText(
+                    formatT('ui.actionGaugeValue', { value: Math.floor(model.player.actionGauge) }),
+                    textX,
+                    y + 50,
+                    textW * 0.58,
+                );
+                ctx.fillStyle = '#5c3a08';
+                ctx.textAlign = 'right';
+                ctx.fillText(actionText, x + w - 9, y + 50, textW * 0.4);
+                ctx.textAlign = 'left';
                 ctx.fillStyle = model.remainingActionPoints > 0 ? '#3f6f38' : '#8f2f3d';
                 ctx.fillText(
-                    model.remainingActionPoints > 0
-                        ? formatT('field.action.remaining', { value: Math.floor(model.remainingActionPoints) })
-                        : t('field.action.done'),
-                    TEXT_X,
-                    charY + 94
+                    model.controlledActor?.id === model.activeTurnActorId
+                        ? model.remainingActionPoints > 0
+                            ? formatT('field.action.remaining', { value: Math.floor(model.remainingActionPoints) })
+                            : t('field.action.done')
+                        : `[ ${active.getTierName()} ]`,
+                    textX,
+                    y + 68,
+                    textW,
                 );
+            } else {
+                const { x, y, w, h } = layout.character;
+                const textX = x + 14;
+                const rightX = x + w - 92;
+                drawParchmentPanel(ctx, x, y, w, h, { headerH: 28, darksaberFrame: true });
+
+                ctx.fillStyle = Parchment.textDark;
+                ctx.font = `bold 14px ${UI.fontPrimary}`;
+                ctx.fillText(`${active.name}  T${active.currentTier} Lv.${active.level}`, textX, y + 8);
+
                 ctx.fillStyle = Parchment.textMid;
-                ctx.fillText(t('field.action.partial'), RIGHT_X, charY + 94);
+                ctx.font = `12px ${UI.fontPrimary}`;
+                ctx.fillText(`[ ${active.getTierName()} ]`, textX, y + 34);
+
+                ctx.font = `bold 13px ${UI.fontPrimary}`;
+                ctx.fillStyle = '#7a2030';
+                ctx.fillText(`HP ${active.stats.hp}/${effective.maxHp}`, textX, y + 56);
+                ctx.fillStyle = '#1f4878';
+                ctx.fillText(`MP ${active.stats.mp}/${effective.maxMp}`, rightX, y + 56);
+                ctx.fillStyle = '#7a4c10';
+                ctx.fillText(formatT('ui.actionGaugeValue', { value: Math.floor(model.player.actionGauge) }), textX, y + 76);
+                ctx.fillStyle = '#5c3a08';
+                ctx.fillText(actionText, rightX, y + 76);
+                if (model.controlledActor?.id === model.activeTurnActorId) {
+                    ctx.fillStyle = model.remainingActionPoints > 0 ? '#3f6f38' : '#8f2f3d';
+                    ctx.fillText(
+                        model.remainingActionPoints > 0
+                            ? formatT('field.action.remaining', { value: Math.floor(model.remainingActionPoints) })
+                            : t('field.action.done'),
+                        textX,
+                        y + 94
+                    );
+                    ctx.fillStyle = Parchment.textMid;
+                    ctx.fillText(t('field.action.partial'), rightX, y + 94);
+                }
             }
         }
 
-        // infoY is where downstream UIs (selected entity info) anchor.
-        // No more gold/raid panels below — entity info sits right under the character panel.
-        const infoY = charY + charH + 6;
-
         renderRaidBanner(ctx, model, vw);
         renderActionModeHint(ctx, model, vw, vh);
-        renderCombatLog(ctx, model, vw, vh);
-        renderKeyHintStrip(ctx, vw, vh);
+        if (!layout.compact || (!model.actionMode && model.fieldMagicState.mode !== 'targeting')) {
+            renderCombatLog(ctx, model, vw, vh);
+        }
+        if (!layout.compact || (!model.actionMode && model.fieldMagicState.mode !== 'targeting')) {
+            renderKeyHintStrip(ctx, vw, vh);
+        }
 
         ctx.textAlign = 'start';
         ctx.textBaseline = 'alphabetic';
 
-        return infoY;
+        return layout;
     }
 }
 
@@ -1042,20 +1096,27 @@ function renderCenterHint(
     fg: string
 ): void {
     ctx.save();
-    ctx.font = `bold 13px ${UI.fontMono}`;
+    const compact = vw < 520;
+    ctx.font = `bold ${compact ? 11 : 13}px ${UI.fontMono}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const w = ctx.measureText(text).width + 34;
+    const horizontalMargin = compact ? 8 : 16;
+    const horizontalPadding = compact ? 20 : 34;
+    const w = Math.min(
+        Math.max(0, vw - horizontalMargin * 2),
+        ctx.measureText(text).width + horizontalPadding,
+    );
     const x = vw / 2 - w / 2;
-    const y = vh - 70;
+    const h = compact ? 30 : 34;
+    const y = vh - (compact ? 64 : 70);
     // Semantic banner: keep colored bg (red/blue/gold) — UX state cue, not generic panel
     ctx.fillStyle = bg;
     ctx.beginPath();
     const r = 6;
     ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + 34, r);
-    ctx.arcTo(x + w, y + 34, x, y + 34, r);
-    ctx.arcTo(x, y + 34, x, y, r);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
     ctx.fill();
@@ -1063,6 +1124,6 @@ function renderCenterHint(
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.fillStyle = fg;
-    ctx.fillText(text, vw / 2, y + 17);
+    ctx.fillText(text, vw / 2, y + h / 2, Math.max(0, w - 12));
     ctx.restore();
 }

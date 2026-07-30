@@ -41,6 +41,20 @@ export interface EntityDisplayInfo {
     spriteImage?: HTMLImageElement;  // character portrait image
 }
 
+export type EntityInfoPanelHitResult = 'close' | 'consume' | 'miss';
+
+export interface EntityInfoPanelBounds {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+export const ENTITY_INFO_DESKTOP_WIDTH = 210;
+export const ENTITY_INFO_DESKTOP_HEIGHT = 320;
+export const ENTITY_INFO_COMPACT_WIDTH = 172;
+export const ENTITY_INFO_COMPACT_HEIGHT = 100;
+
 export function getEntityInfoHeaderLines(info: EntityDisplayInfo): { title: string; subtitle: string } {
     const level = t('info.level');
     return {
@@ -65,8 +79,10 @@ interface StatusSlotHitbox {
 export class EntityInfoUI {
     private x = 16;
     private y = 180;
-    private w = 210;
-    private h = 320;
+    private w = ENTITY_INFO_DESKTOP_WIDTH;
+    private h = ENTITY_INFO_DESKTOP_HEIGHT;
+    private layoutMode: 'desktop' | 'compact' = 'desktop';
+    private interactive = true;
 
     /** Allow dynamic repositioning from the active engine */
     public setPosition(x: number, y: number): void {
@@ -90,28 +106,170 @@ export class EntityInfoUI {
     public onMouseMove(mx: number, my: number): void {
         this.mouseX = mx;
         this.mouseY = my;
-        const cx = this.x + this.w - 16;
-        const cy = this.y + 16;
+        if (!this.interactive) {
+            this.closeHovered = false;
+            this.hoveredStatus = null;
+            return;
+        }
+        const { x: cx, y: cy } = this.getCloseButtonCenter();
         this.closeHovered = isCloseButtonHit(mx, my, cx, cy);
         this.hoveredStatus = this.findHoveredStatus(mx, my);
     }
 
     public onClick(mx: number, my: number): boolean {
-        const cx = this.x + this.w - 16;
-        const cy = this.y + 16;
-        return isCloseButtonHit(mx, my, cx, cy);
+        return this.hitTest(mx, my) === 'close';
+    }
+
+    /**
+     * Resolve pointer input against the entire visible panel.
+     * `consume` prevents taps on the card body from leaking into the world.
+     */
+    public hitTest(mx: number, my: number): EntityInfoPanelHitResult {
+        if (!this.interactive) return 'miss';
+        const { x: cx, y: cy } = this.getCloseButtonCenter();
+        if (isCloseButtonHit(mx, my, cx, cy)) return 'close';
+        if (mx >= this.x && mx <= this.x + this.w && my >= this.y && my <= this.y + this.h) {
+            return 'consume';
+        }
+        return 'miss';
+    }
+
+    public getBounds(): EntityInfoPanelBounds {
+        return {
+            x: this.x,
+            y: this.y,
+            width: this.w,
+            height: this.h,
+        };
+    }
+
+    public setInteractive(interactive: boolean): void {
+        this.interactive = interactive;
+        if (!interactive) {
+            this.closeHovered = false;
+            this.hoveredStatus = null;
+            this.statusSlotHitboxes = [];
+        }
+    }
+
+    /**
+     * Narrow viewport variant. Position remains controlled through setPosition,
+     * while width is allowed to follow the responsive HUD layout.
+     */
+    public renderCompact(
+        ctx: CanvasRenderingContext2D,
+        info: EntityDisplayInfo,
+        width = ENTITY_INFO_COMPACT_WIDTH
+    ): void {
+        this.interactive = true;
+        this.layoutMode = 'compact';
+        // Follow the responsive HUD column instead of forcing the legacy
+        // compact width back over the adjacent minimap at high UI scales.
+        this.w = Math.max(104, Math.round(width));
+        this.h = ENTITY_INFO_COMPACT_HEIGHT;
+        this.advanceBars(info);
+
+        ctx.save();
+        drawParchmentPanel(ctx, this.x, this.y, this.w, this.h, {
+            compact: true,
+            shadow: false,
+            headerH: 23,
+        });
+
+        const pad = 8;
+        const headerMaxW = this.w - 50;
+        ctx.fillStyle = Parchment.textDark;
+        ctx.font = `bold 12px ${UI.fontPrimary}`;
+        ctx.textBaseline = 'top';
+        ctx.fillText(this.fitText(ctx, info.name, headerMaxW), this.x + pad, this.y + 6);
+        ctx.font = `9px ${UI.fontMono}`;
+        ctx.fillStyle = Parchment.textMid;
+        ctx.fillText(`${t('info.level')} ${info.level}`, this.x + pad, this.y + 19);
+        this.drawCloseButton(ctx);
+
+        const labelX = this.x + pad;
+        const barX = this.x + 40;
+        const barW = this.w - 48;
+        const barH = 11;
+        this.drawCompactBar(
+            ctx,
+            t('stat.hp'),
+            labelX,
+            barX,
+            this.y + 33,
+            barW,
+            barH,
+            info.maxHp > 0 ? this.displayHp / info.maxHp : 0,
+            '#e53935',
+            `${Math.ceil(this.displayHp)}/${info.maxHp}`
+        );
+        this.drawCompactBar(
+            ctx,
+            t('stat.mp'),
+            labelX,
+            barX,
+            this.y + 48,
+            barW,
+            barH,
+            info.maxMp > 0 ? this.displayMp / info.maxMp : 0,
+            '#d2a83f',
+            info.maxMp > 0 ? `${Math.ceil(this.displayMp)}/${info.maxMp}` : '—'
+        );
+        this.drawCompactBar(
+            ctx,
+            t('ui.actionGauge'),
+            labelX,
+            barX,
+            this.y + 63,
+            barW,
+            barH,
+            Math.min(1, this.displayAtb / 100),
+            info.actionGauge >= 100 ? '#39d96b' : '#e67e22',
+            `${Math.round(this.displayAtb)}%`
+        );
+
+        const footerY = this.y + 83;
+        ctx.font = `bold 9px ${UI.fontPrimary}`;
+        ctx.fillStyle = Parchment.textDark;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${t('create.atk')} ${Math.floor(info.atk)}`, this.x + pad, footerY);
+        ctx.fillText(`${t('create.def')} ${Math.floor(info.def)}`, this.x + 55, footerY);
+
+        this.statusSlotHitboxes = [];
+        const compactStatusCapacity = Math.max(0, Math.min(3, Math.floor((this.w - 96) / 16)));
+        const compactStatuses = info.buffs?.slice(0, compactStatusCapacity) ?? [];
+        const statusStartX = this.x + this.w - pad - compactStatuses.length * 16;
+        for (let index = 0; index < compactStatuses.length; index++) {
+            const icon = compactStatuses[index];
+            const kind = info.statusKinds?.[index];
+            const iconCell = getStatusIconCell(kind ?? icon);
+            const iconX = statusStartX + index * 16;
+            const iconY = footerY - 7;
+            this.statusSlotHitboxes.push({ x: iconX, y: iconY, size: 14, kind, icon });
+            const iconDrawn = iconCell
+                ? DarksaberSpriteAtlas.drawIconCell(ctx, iconCell.col, iconCell.row, iconX, iconY, 14)
+                : false;
+            if (!iconDrawn) {
+                ctx.fillStyle = '#64451f';
+                ctx.fillRect(iconX, iconY, 14, 14);
+                ctx.fillStyle = '#f6d090';
+                ctx.font = `bold 8px ${UI.fontPrimary}`;
+                ctx.textAlign = 'center';
+                ctx.fillText(icon.slice(0, 1), iconX + 7, iconY + 7);
+                ctx.textAlign = 'start';
+            }
+        }
+        this.hoveredStatus = this.findHoveredStatus(this.mouseX, this.mouseY);
+        this.drawStatusTooltip(ctx);
+        ctx.restore();
     }
 
     public render(ctx: CanvasRenderingContext2D, info: EntityDisplayInfo): void {
-        this.flashTime += 0.05;
-
-        // Lerp bars for smooth animation
-        if (this.displayHp < 0) this.displayHp = info.hp;
-        if (this.displayMp < 0) this.displayMp = info.mp;
-        if (this.displayAtb < 0) this.displayAtb = info.actionGauge;
-        this.displayHp += (info.hp - this.displayHp) * 0.12;
-        this.displayMp += (info.mp - this.displayMp) * 0.12;
-        this.displayAtb += (info.actionGauge - this.displayAtb) * 0.15;
+        this.interactive = true;
+        this.layoutMode = 'desktop';
+        this.w = ENTITY_INFO_DESKTOP_WIDTH;
+        this.h = ENTITY_INFO_DESKTOP_HEIGHT;
+        this.advanceBars(info);
 
         ctx.save();
 
@@ -119,22 +277,7 @@ export class EntityInfoUI {
         drawParchmentPanel(ctx, this.x, this.y, this.w, this.h);
 
         // ── Close button (retro red circle with X) ──
-        const closeX = this.x + this.w - 20;
-        const closeY = this.y + 14;
-        ctx.beginPath();
-        ctx.arc(closeX, closeY, 10, 0, Math.PI * 2);
-        ctx.fillStyle = this.closeHovered ? '#cc3333' : '#a03030';
-        ctx.fill();
-        ctx.strokeStyle = Parchment.borderDark;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 11px "DOSMyungjo", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('✕', closeX, closeY);
-        ctx.textBaseline = 'alphabetic';
-        ctx.textAlign = 'start';
+        this.drawCloseButton(ctx);
 
         // ── Header: Name & Level ──
         const header = getEntityInfoHeaderLines(info);
@@ -358,6 +501,81 @@ export class EntityInfoUI {
         ctx.restore();
     }
 
+    private advanceBars(info: EntityDisplayInfo): void {
+        this.flashTime += 0.05;
+        if (this.displayHp < 0) this.displayHp = info.hp;
+        if (this.displayMp < 0) this.displayMp = info.mp;
+        if (this.displayAtb < 0) this.displayAtb = info.actionGauge;
+        this.displayHp += (info.hp - this.displayHp) * 0.12;
+        this.displayMp += (info.mp - this.displayMp) * 0.12;
+        this.displayAtb += (info.actionGauge - this.displayAtb) * 0.15;
+    }
+
+    private getCloseButtonCenter(): { x: number; y: number } {
+        return this.layoutMode === 'compact'
+            ? { x: this.x + this.w - 13, y: this.y + 13 }
+            : { x: this.x + this.w - 20, y: this.y + 14 };
+    }
+
+    private drawCloseButton(ctx: CanvasRenderingContext2D): void {
+        const { x: closeX, y: closeY } = this.getCloseButtonCenter();
+        const radius = this.layoutMode === 'compact' ? 8 : 10;
+        ctx.beginPath();
+        ctx.arc(closeX, closeY, radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.closeHovered ? '#cc3333' : '#a03030';
+        ctx.fill();
+        ctx.strokeStyle = Parchment.borderDark;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${this.layoutMode === 'compact' ? 9 : 11}px "DOSMyungjo", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('✕', closeX, closeY);
+        ctx.textBaseline = 'alphabetic';
+        ctx.textAlign = 'start';
+    }
+
+    private fitText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+        if (ctx.measureText(text).width <= maxWidth) return text;
+        let fitted = text;
+        while (fitted.length > 1 && ctx.measureText(`${fitted}…`).width > maxWidth) {
+            fitted = fitted.slice(0, -1);
+        }
+        return `${fitted}…`;
+    }
+
+    private drawCompactBar(
+        ctx: CanvasRenderingContext2D,
+        label: string,
+        labelX: number,
+        barX: number,
+        y: number,
+        width: number,
+        height: number,
+        pct: number,
+        color: string,
+        value: string
+    ): void {
+        ctx.fillStyle = TEXT_DARK;
+        ctx.font = `bold 9px ${UI.fontPrimary}`;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, labelX, y + height / 2);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.34)';
+        ctx.fillRect(barX, y, width, height);
+        ctx.fillStyle = color;
+        ctx.fillRect(barX + 1, y + 1, Math.max(0, (width - 2) * Math.max(0, Math.min(1, pct))), height - 2);
+        ctx.strokeStyle = 'rgba(58, 38, 24, 0.45)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(barX, y, width, height);
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold 8px ${UI.fontMono}`;
+        ctx.textAlign = 'center';
+        ctx.fillText(value, barX + width / 2, y + height / 2);
+        ctx.textAlign = 'start';
+        ctx.textBaseline = 'alphabetic';
+    }
+
     private findHoveredStatus(mx: number, my: number): StatusSlotHitbox | null {
         return this.statusSlotHitboxes.find((slot) =>
             mx >= slot.x && mx <= slot.x + slot.size && my >= slot.y && my <= slot.y + slot.size
@@ -371,11 +589,11 @@ export class EntityInfoUI {
         const desc = kind ? t(`status.${kind}.desc`) : '';
         ctx.save();
         ctx.font = `11px ${UI.fontPrimary}`;
-        const lines = this.wrapTooltipText(ctx, desc, 148);
-        const tooltipW = 164;
+        const tooltipW = this.layoutMode === 'compact' ? Math.max(80, this.w - 16) : 164;
+        const lines = this.wrapTooltipText(ctx, desc, tooltipW - 16);
         const tooltipH = 30 + lines.length * 14;
-        const cursorGapX = 28;
-        const cursorGapY = 22;
+        const cursorGapX = this.layoutMode === 'compact' ? 10 : 28;
+        const cursorGapY = this.layoutMode === 'compact' ? 10 : 22;
         const panelPad = 8;
         let tx = this.mouseX + cursorGapX;
         let ty = this.mouseY + cursorGapY;
@@ -393,7 +611,7 @@ export class EntityInfoUI {
         ctx.fillStyle = '#ffd76a';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText(title, tx + 8, ty + 7);
+        ctx.fillText(title, tx + 8, ty + 7, tooltipW - 16);
         ctx.font = `11px ${UI.fontPrimary}`;
         ctx.fillStyle = '#ead7b0';
         let lineY = ty + 24;

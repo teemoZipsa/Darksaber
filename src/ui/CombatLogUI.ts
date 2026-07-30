@@ -20,6 +20,31 @@ const SCROLLED_LINES = 14;        // how many lines visible while user is intera
 const REGION_W = 460;             // hit region width
 const REGION_PAD_X = 18;
 const REGION_PAD_BOTTOM = 32;
+const COMPACT_BREAKPOINT = 520;
+const COMPACT_VISIBLE_LINES = 2;
+
+export interface CombatLogRegion {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
+
+export function getCombatLogRegion(
+    vw: number,
+    vh: number,
+    interacting: boolean = false,
+): CombatLogRegion {
+    const compact = vw < COMPACT_BREAKPOINT;
+    const lines = compact ? COMPACT_VISIBLE_LINES : interacting ? SCROLLED_LINES : VISIBLE_LINES;
+    const h = lines * LINE_HEIGHT;
+    return {
+        x: REGION_PAD_X,
+        y: vh - REGION_PAD_BOTTOM - h,
+        w: Math.min(REGION_W, Math.max(0, vw - REGION_PAD_X * 2)),
+        h,
+    };
+}
 
 class CombatLogUIClass {
     private scrollOffset = 0;            // 0 = newest at bottom, higher = scrolled up into history
@@ -30,15 +55,8 @@ class CombatLogUIClass {
     private interacting = false;
 
     /** Region rect for hit testing and rendering bounds. */
-    private getRegion(_vw: number, vh: number): { x: number; y: number; w: number; h: number } {
-        const lines = this.interacting ? SCROLLED_LINES : VISIBLE_LINES;
-        const h = lines * LINE_HEIGHT;
-        return {
-            x: REGION_PAD_X,
-            y: vh - REGION_PAD_BOTTOM - h,
-            w: REGION_W,
-            h,
-        };
+    private getRegion(vw: number, vh: number): CombatLogRegion {
+        return getCombatLogRegion(vw, vh, this.interacting);
     }
 
     private isInside(mx: number, my: number, r: { x: number; y: number; w: number; h: number }): boolean {
@@ -58,6 +76,13 @@ class CombatLogUIClass {
             this.scrollOffset = 0;
         }
         this.lastKnownLength = logLen;
+
+        if (vw < COMPACT_BREAKPOINT) {
+            this.dragging = false;
+            this.interacting = false;
+            this.scrollOffset = 0;
+            return false;
+        }
 
         const region = this.getRegion(vw, vh);
         const inside = this.isInside(input.uiMouseX, input.uiMouseY, region);
@@ -98,7 +123,11 @@ class CombatLogUIClass {
         if (lines.length === 0) return;
 
         const region = this.getRegion(vw, vh);
-        const visibleCount = this.interacting ? SCROLLED_LINES : VISIBLE_LINES;
+        const visibleCount = vw < COMPACT_BREAKPOINT
+            ? COMPACT_VISIBLE_LINES
+            : this.interacting
+                ? SCROLLED_LINES
+                : VISIBLE_LINES;
         const totalLines = lines.length;
 
         // Determine slice: newest index = totalLines - 1 - scrollOffset (bottom-most visible)
@@ -133,7 +162,7 @@ class CombatLogUIClass {
         }
 
         // Scroll indicator (small dot column on the left edge) — only when scrolled or hovering
-        if (this.interacting && totalLines > VISIBLE_LINES) {
+        if (vw >= COMPACT_BREAKPOINT && this.interacting && totalLines > VISIBLE_LINES) {
             ctx.globalAlpha = 0.55;
             ctx.shadowBlur = 0;
             const trackX = region.x - 6;

@@ -40,6 +40,22 @@ export interface MinimapFooter {
     terrainLines: string[];
 }
 
+/** Optional placement and sizing overrides for the in-field mini map only. */
+export interface MinimapMiniRenderOptions {
+    compact?: boolean;
+    x?: number;
+    y?: number;
+    panelWidth?: number;
+    mapSize?: number;
+}
+
+export interface MinimapPanelRect {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
 const MAP_SIZE = 168;
 const VIEW_RANGE = 26;
 export const MINIMAP_LOOT_REVEAL_RANGE = 18;
@@ -65,6 +81,22 @@ const PANEL_W = 216;
 const FOOTER_MAX_ROWS = 5;
 const MARGIN_TOP = 16;
 const MARGIN_RIGHT = 16;
+const COMPACT_PANEL_W = 148;
+const COMPACT_MAP_SIZE = 104;
+const COMPACT_MAP_GAP = 6;
+const COMPACT_FOOTER_GAP = 8;
+const COMPACT_FOOTER_H = 24;
+const COMPACT_BOTTOM_PAD = 8;
+
+/** Deterministic compact height so the field HUD can reserve space before drawing. */
+export function getCompactMinimapPanelHeight(mapSize: number = COMPACT_MAP_SIZE): number {
+    return HEADER_H
+        + COMPACT_MAP_GAP
+        + Math.max(1, Math.round(mapSize))
+        + COMPACT_FOOTER_GAP
+        + COMPACT_FOOTER_H
+        + COMPACT_BOTTOM_PAD;
+}
 
 type MinimapMode = 'mini' | 'full' | 'hidden';
 
@@ -136,8 +168,10 @@ export class MinimapUI {
     private fullMapViewRect: Rect = { x: 0, y: 0, w: 0, h: 0 };
     private opacitySliderRect: Rect = { x: 0, y: 0, w: 0, h: 0 };
     private fullMapCloseButtonRect: Rect = { x: 0, y: 0, w: 0, h: 0 };
+    private lastMiniWasCompact = false;
     private isDraggingFullMap = false;
     private isDraggingOpacity = false;
+    private returnToCompactMiniOnClose = false;
     private lastDragX = 0;
     private lastDragY = 0;
 
@@ -153,15 +187,22 @@ export class MinimapUI {
     }
 
     public cycleMode(): void {
-        if (this.mode === 'mini') this.mode = 'full';
-        else if (this.mode === 'full') this.mode = 'hidden';
-        else this.mode = 'mini';
+        if (this.mode === 'mini') {
+            this.mode = 'full';
+            this.returnToCompactMiniOnClose = false;
+        } else if (this.mode === 'full') {
+            this.mode = 'hidden';
+            this.returnToCompactMiniOnClose = false;
+        } else {
+            this.mode = 'mini';
+        }
         this.stopFullMapDrag();
     }
 
     public closeFullMap(): void {
         if (this.mode !== 'full') return;
-        this.mode = 'hidden';
+        this.mode = this.returnToCompactMiniOnClose ? 'mini' : 'hidden';
+        this.returnToCompactMiniOnClose = false;
         this.stopFullMapDrag();
     }
 
@@ -169,13 +210,32 @@ export class MinimapUI {
         return this.mode !== 'hidden';
     }
 
-    /** Click handler. Returns true if the click landed on the panel (so map clicks below it are suppressed). */
+    public getLastPanelRect(): MinimapPanelRect | null {
+        if (this.currentWidth <= 0 || this.currentHeight <= 0) return null;
+        return {
+            x: this.panelX,
+            y: this.panelY,
+            width: this.currentWidth,
+            height: this.currentHeight,
+        };
+    }
+
+    /**
+     * Click handler. Compact touch layouts promote a panel tap to the full map;
+     * every panel hit is consumed so field controls below never receive it.
+     */
     public onClick(mx: number, my: number): boolean {
         if (!this.isVisible()) return false;
-        return mx >= this.panelX
+        const hit = mx >= this.panelX
             && mx <= this.panelX + this.currentWidth
             && my >= this.panelY
             && my <= this.panelY + this.currentHeight;
+        if (hit && this.mode === 'mini' && this.lastMiniWasCompact) {
+            this.mode = 'full';
+            this.returnToCompactMiniOnClose = true;
+            this.stopFullMapDrag();
+        }
+        return hit;
     }
 
     public handleInput(input: MinimapPointerInput): boolean {
@@ -244,63 +304,88 @@ export class MinimapUI {
      * coords, and terrain hover lines). Snaps to the top-right corner with
      * a natural margin.
      */
-    public render(ctx: CanvasRenderingContext2D, vw: number, vh: number, footer?: MinimapFooter): void {
+    public render(
+        ctx: CanvasRenderingContext2D,
+        vw: number,
+        vh: number,
+        footer?: MinimapFooter,
+        miniOptions?: MinimapMiniRenderOptions,
+    ): void {
         if (this.mode === 'hidden') return;
         if (this.mode === 'full') {
             this.renderFullMap(ctx, vw, vh, footer);
             return;
         }
 
-        this.renderMiniMap(ctx, vw, footer);
+        this.renderMiniMap(ctx, vw, footer, miniOptions);
     }
 
-    private renderMiniMap(ctx: CanvasRenderingContext2D, vw: number, footer?: MinimapFooter): void {
+    private renderMiniMap(
+        ctx: CanvasRenderingContext2D,
+        vw: number,
+        footer?: MinimapFooter,
+        options: MinimapMiniRenderOptions = {},
+    ): void {
 
         // Pre-build the full map in the background so pressing M feels instant.
         // Self-terminating: once the cache is ready for this world it does nothing.
         this.getFullMapCache(this.config.getBounds(), footer?.worldName, FULL_MAP_WARM_BUDGET_MS);
 
-        const footerMaxW = PANEL_W - 28;
-        const terrainRows = footer ? this.buildMiniTerrainRows(ctx, footer.terrainLines, footerMaxW) : [];
-        const footerH = FOOTER_INFO_H + (terrainRows.length > 0 ? 8 + terrainRows.length * FOOTER_TERRAIN_LINE_H : 0);
-        const panelH = HEADER_H + 8 + MAP_SIZE + 10 + footerH + FRAME_PAD;
+        const compact = options.compact === true;
+        this.lastMiniWasCompact = compact;
+        const panelWidth = Math.max(96, Math.round(options.panelWidth ?? (compact ? COMPACT_PANEL_W : PANEL_W)));
+        const requestedMapSize = Math.round(options.mapSize ?? (compact ? COMPACT_MAP_SIZE : MAP_SIZE));
+        const mapSize = Math.max(48, Math.min(requestedMapSize, panelWidth - 16));
+        const footerMaxW = panelWidth - 28;
+        const terrainRows = !compact && footer
+            ? this.buildMiniTerrainRows(ctx, footer.terrainLines, footerMaxW)
+            : [];
+        const footerH = FOOTER_INFO_H
+            + (terrainRows.length > 0 ? 8 + terrainRows.length * FOOTER_TERRAIN_LINE_H : 0);
+        const panelH = compact
+            ? getCompactMinimapPanelHeight(mapSize)
+            : HEADER_H + 8 + mapSize + 10 + footerH + FRAME_PAD;
+        const mapGap = compact ? COMPACT_MAP_GAP : 8;
 
-        this.panelX = vw - PANEL_W - MARGIN_RIGHT;
-        this.panelY = MARGIN_TOP;
-        this.currentWidth = PANEL_W;
+        this.panelX = Math.round(options.x ?? (vw - panelWidth - MARGIN_RIGHT));
+        this.panelY = Math.round(options.y ?? MARGIN_TOP);
+        this.currentWidth = panelWidth;
         this.currentHeight = panelH;
 
-        const mapX = this.panelX + Math.floor((PANEL_W - MAP_SIZE) / 2);
-        const mapY = this.panelY + HEADER_H + 8;
-        const tilePx = MAP_SIZE / (VIEW_RANGE * 2);
+        const mapX = this.panelX + Math.floor((panelWidth - mapSize) / 2);
+        const mapY = this.panelY + HEADER_H + mapGap;
+        const tilePx = mapSize / (VIEW_RANGE * 2);
         const player = this.config.getPlayerPos();
 
         ctx.save();
-        drawParchmentPanel(ctx, this.panelX, this.panelY, PANEL_W, panelH, {
+        drawParchmentPanel(ctx, this.panelX, this.panelY, panelWidth, panelH, {
             radius: 8,
             headerH: HEADER_H,
+            compact,
             darksaberFrame: true,
         });
 
         // Header label
         ctx.fillStyle = Parchment.textDark;
-        ctx.font = `bold 13px ${UI.fontPrimary}`;
+        ctx.font = `bold ${compact ? 12 : 13}px ${UI.fontPrimary}`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
         ctx.fillText(t('minimap.title.mini'), this.panelX + 14, this.panelY + HEADER_H / 2);
 
         // Header right hint
-        ctx.fillStyle = Parchment.textMid;
-        ctx.font = `11px ${UI.fontPrimary}`;
-        ctx.textAlign = 'right';
-        ctx.fillText(t('minimap.cycle'), this.panelX + PANEL_W - 14, this.panelY + HEADER_H / 2);
+        if (!compact) {
+            ctx.fillStyle = Parchment.textMid;
+            ctx.font = `11px ${UI.fontPrimary}`;
+            ctx.textAlign = 'right';
+            ctx.fillText(t('minimap.cycle'), this.panelX + panelWidth - 14, this.panelY + HEADER_H / 2);
+        }
 
         // ─── Map area ───────────────────────────────────────────
         ctx.fillStyle = '#1a140c';
-        ctx.fillRect(mapX, mapY, MAP_SIZE, MAP_SIZE);
+        ctx.fillRect(mapX, mapY, mapSize, mapSize);
         ctx.strokeStyle = Parchment.borderDark;
         ctx.lineWidth = 1;
-        ctx.strokeRect(mapX, mapY, MAP_SIZE, MAP_SIZE);
+        ctx.strokeRect(mapX, mapY, mapSize, mapSize);
 
         for (let dy = -VIEW_RANGE; dy < VIEW_RANGE; dy++) {
             for (let dx = -VIEW_RANGE; dx < VIEW_RANGE; dx++) {
@@ -317,10 +402,21 @@ export class MinimapUI {
 
         ctx.strokeStyle = 'rgba(232, 210, 150, 0.55)';
         ctx.lineWidth = 1;
-        ctx.strokeRect(mapX - 0.5, mapY - 0.5, MAP_SIZE + 1, MAP_SIZE + 1);
+        ctx.strokeRect(mapX - 0.5, mapY - 0.5, mapSize + 1, mapSize + 1);
 
         for (const zone of this.config.getExtractionZones()) {
-            this.drawRectMarker(ctx, mapX, mapY, tilePx, player, zone.x, zone.y, '#57ff86', Math.max(2, zone.radius * tilePx));
+            this.drawRectMarker(
+                ctx,
+                mapX,
+                mapY,
+                mapSize,
+                tilePx,
+                player,
+                zone.x,
+                zone.y,
+                '#57ff86',
+                Math.max(2, zone.radius * tilePx),
+            );
         }
 
         const bountyHunt = this.config.getBountyHunt?.() ?? null;
@@ -329,6 +425,7 @@ export class MinimapUI {
                 ctx,
                 mapX,
                 mapY,
+                mapSize,
                 tilePx,
                 player,
                 bountyHunt.searchArea.center.x,
@@ -342,6 +439,7 @@ export class MinimapUI {
                 ctx,
                 mapX,
                 mapY,
+                mapSize,
                 tilePx,
                 player,
                 bountyHunt.nearbyClue.tile.x,
@@ -352,7 +450,9 @@ export class MinimapUI {
         }
 
         for (const loot of this.getVisibleLoot()) {
-            if (!loot.opened) this.drawDot(ctx, mapX, mapY, tilePx, player, loot.x, loot.y, '#ffe45c', 2.6);
+            if (!loot.opened) {
+                this.drawDot(ctx, mapX, mapY, mapSize, tilePx, player, loot.x, loot.y, '#ffe45c', 2.6);
+            }
         }
 
         for (const enemy of this.config.getEnemies()) {
@@ -360,6 +460,7 @@ export class MinimapUI {
                 ctx,
                 mapX,
                 mapY,
+                mapSize,
                 tilePx,
                 player,
                 enemy.gridX,
@@ -370,8 +471,8 @@ export class MinimapUI {
         }
 
         // Player marker
-        const cx = mapX + MAP_SIZE / 2;
-        const cy = mapY + MAP_SIZE / 2;
+        const cx = mapX + mapSize / 2;
+        const cy = mapY + mapSize / 2;
         ctx.fillStyle = '#f8f06a';
         ctx.strokeStyle = '#2b1e00';
         ctx.lineWidth = 2;
@@ -386,10 +487,22 @@ export class MinimapUI {
 
         // ─── Info footer ────────────────────────────────────────
         const footerX = this.panelX + 14;
-        const footerRight = this.panelX + PANEL_W - 14;
-        let footerY = mapY + MAP_SIZE + 14;
+        const footerRight = this.panelX + panelWidth - 14;
+        let footerY = mapY + mapSize + (compact ? COMPACT_FOOTER_GAP : 14);
 
-        if (footer) {
+        if (compact) {
+            ctx.fillStyle = Parchment.textMid;
+            ctx.font = `11px ${UI.fontPrimary}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            this.fillClampedText(
+                ctx,
+                formatT('minimap.coords', { x: player.x, y: player.y }),
+                this.panelX + panelWidth / 2,
+                footerY + COMPACT_FOOTER_H / 2,
+                panelWidth - 20,
+            );
+        } else if (footer) {
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
             ctx.fillStyle = '#7a5410';
@@ -993,6 +1106,7 @@ export class MinimapUI {
         ctx: CanvasRenderingContext2D,
         mapX: number,
         mapY: number,
+        mapSize: number,
         tilePx: number,
         player: { x: number; y: number },
         gx: number,
@@ -1002,7 +1116,7 @@ export class MinimapUI {
     ): void {
         const x = mapX + (gx - player.x + VIEW_RANGE) * tilePx;
         const y = mapY + (gy - player.y + VIEW_RANGE) * tilePx;
-        if (x < mapX || x > mapX + MAP_SIZE || y < mapY || y > mapY + MAP_SIZE) return;
+        if (x < mapX || x > mapX + mapSize || y < mapY || y > mapY + mapSize) return;
         ctx.fillStyle = color;
         ctx.fillRect(x - size / 2, y - size / 2, size, size);
     }
@@ -1011,6 +1125,7 @@ export class MinimapUI {
         ctx: CanvasRenderingContext2D,
         mapX: number,
         mapY: number,
+        mapSize: number,
         tilePx: number,
         player: { x: number; y: number },
         gx: number,
@@ -1020,7 +1135,12 @@ export class MinimapUI {
     ): void {
         const x = mapX + (gx - player.x + VIEW_RANGE) * tilePx;
         const y = mapY + (gy - player.y + VIEW_RANGE) * tilePx;
-        if (x + radiusPx < mapX || x - radiusPx > mapX + MAP_SIZE || y + radiusPx < mapY || y - radiusPx > mapY + MAP_SIZE) return;
+        if (
+            x + radiusPx < mapX
+            || x - radiusPx > mapX + mapSize
+            || y + radiusPx < mapY
+            || y - radiusPx > mapY + mapSize
+        ) return;
         ctx.strokeStyle = color;
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x - radiusPx, y - radiusPx, radiusPx * 2, radiusPx * 2);

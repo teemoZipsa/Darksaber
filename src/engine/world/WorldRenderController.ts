@@ -36,6 +36,7 @@ import {
 import { getMonsterDefinition } from '../../data/MonsterCatalog';
 import { formatMonsterName } from '../../i18n/DisplayNames';
 import type { EliteAffixId } from '../../field/EliteAffixes';
+import type { FieldHudLayout } from './FieldHudLayout';
 
 export interface WorldRenderContext {
     party: PartyManager;
@@ -127,11 +128,28 @@ export class WorldRenderController {
         ctx.scale(scale, scale);
         const uiW = Math.floor(width / scale);
         const uiH = Math.floor(height / scale);
-        const infoY = WorldFieldRenderer.renderHudPanels(ctx, model, uiW, uiH, { combatLogOnly: options.hideWorldHud });
-        if (!options.hideWorldHud && model.storyInterior.active) this.renderStoryInteriorBanner(ctx, model, uiW);
-        if (!options.hideWorldHud && model.selectedDisplayInfo) {
-            this.context.entityInfoUI.setPosition(16, infoY + 18);
-            this.context.entityInfoUI.render(ctx, model.selectedDisplayInfo);
+        const hudLayout = WorldFieldRenderer.renderHudPanels(ctx, model, uiW, uiH, {
+            combatLogOnly: options.hideWorldHud,
+        });
+        if (!options.hideWorldHud && model.storyInterior.active) {
+            this.renderStoryInteriorBanner(ctx, model, uiW, hudLayout);
+        }
+        const hidesDuplicateActorCard = hudLayout.compact
+            && model.actionMenuOpen
+            && model.selectedActorId === model.controlledActor?.id;
+        if (!options.hideWorldHud && model.selectedDisplayInfo && !hidesDuplicateActorCard) {
+            this.context.entityInfoUI.setPosition(hudLayout.entityInfo.x, hudLayout.entityInfo.y);
+            if (hudLayout.compact) {
+                this.context.entityInfoUI.renderCompact(
+                    ctx,
+                    model.selectedDisplayInfo,
+                    hudLayout.entityInfo.w,
+                );
+            } else {
+                this.context.entityInfoUI.render(ctx, model.selectedDisplayInfo);
+            }
+        } else {
+            this.context.entityInfoUI.setInteractive(false);
         }
         if (!options.hideWorldHud) {
             this.context.tacticalController.render(ctx);
@@ -140,7 +158,13 @@ export class WorldRenderController {
                 gold: model.gold,
                 worldName: model.worldName,
                 terrainLines: model.terrainHoverLines,
-            });
+            }, hudLayout.compact ? {
+                compact: true,
+                x: hudLayout.minimap.x,
+                y: hudLayout.minimap.y,
+                panelWidth: hudLayout.minimap.w,
+                mapSize: hudLayout.minimap.mapSize,
+            } : undefined);
         } else {
             if (this.context.toolController.isVisible()) this.context.toolController.render(ctx, uiW, uiH);
         }
@@ -271,11 +295,23 @@ export class WorldRenderController {
         };
     }
 
-    private renderStoryInteriorBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel, uiW: number): void {
+    private renderStoryInteriorBanner(
+        ctx: CanvasRenderingContext2D,
+        model: WorldRenderModel,
+        uiW: number,
+        hudLayout: FieldHudLayout,
+    ): void {
         const briefingLines = model.storyInterior.briefingLines;
-        const bannerW = Math.min(520, Math.max(300, uiW - 40));
+        const horizontalMargin = hudLayout.compact ? 8 : 20;
+        const bannerW = Math.max(0, Math.min(520, uiW - horizontalMargin * 2));
+        if (bannerW <= 0) return;
         const x = Math.floor((uiW - bannerW) / 2);
-        const y = 14;
+        const y = hudLayout.compact
+            ? Math.max(
+                hudLayout.entityInfo.y + hudLayout.entityInfo.h,
+                hudLayout.minimap.y + hudLayout.minimap.h,
+            ) + 8
+            : 14;
         const briefingLineHeight = 14;
         const h = briefingLines
             ? 24 + briefingLines.length * briefingLineHeight + 20

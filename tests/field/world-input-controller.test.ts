@@ -60,6 +60,7 @@ function makeContext(actor: FieldActor, calls: string[]): WorldInputContext {
         entityInfoUI: {
             onMouseMove: () => undefined,
             onClick: () => false,
+            hitTest: () => 'miss',
         } as any,
         magicController: {
             isVisible: () => false,
@@ -85,6 +86,7 @@ function makeContext(actor: FieldActor, calls: string[]): WorldInputContext {
         selectionController: {
             hasSelection: () => false,
             selectActor: (id: string | null) => calls.push(`selectActor:${id}`),
+            clear: () => calls.push('clearSelection'),
         } as any,
         tacticalController: {
             isOpen: () => false,
@@ -92,6 +94,7 @@ function makeContext(actor: FieldActor, calls: string[]): WorldInputContext {
             open: () => calls.push('openTacticalMenu'),
         } as any,
         getCanvasSize: () => ({ width: 800, height: 600 }),
+        isFieldHudInteractive: () => true,
         getActivePartyTurnActor: () => actor,
         getActiveTurnActorId: () => actor.id,
         getReservedAction: () => null,
@@ -150,6 +153,248 @@ test('combat presentation lock blocks a second action while hitstop input still 
     assert.ok(!calls.includes('hiddenAction'));
     assert.ok(!calls.includes('executeAction'));
     assert.ok(!calls.includes('dismissActionMenuTurn'));
+});
+
+test('compact minimap panel consumes a tap before entity info and hidden action slots', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.minimapUI = {
+        handleInput: () => false,
+        onClick: () => {
+            calls.push('minimap');
+            return true;
+        },
+        toggle: () => undefined,
+    } as any;
+    context.entityInfoUI = {
+        onMouseMove: () => undefined,
+        hitTest: () => {
+            calls.push('entityInfo');
+            return 'consume';
+        },
+    } as any;
+    context.selectionController = {
+        hasSelection: () => true,
+        clear: () => calls.push('clearSelection'),
+    } as any;
+    context.actionMenuUI = {
+        getIsOpen: () => true,
+        onClick: () => {
+            calls.push('hiddenAction');
+            return null;
+        },
+        onMouseMove: () => undefined,
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput(), makeCamera());
+
+    assert.deepEqual(calls, ['minimap']);
+});
+
+test('full minimap pointer handling precedes compact panel and entity info hit tests', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.minimapUI = {
+        handleInput: () => {
+            calls.push('fullMinimap');
+            return true;
+        },
+        onClick: () => {
+            calls.push('miniPanel');
+            return true;
+        },
+        toggle: () => undefined,
+    } as any;
+    context.entityInfoUI = {
+        onMouseMove: () => undefined,
+        hitTest: () => {
+            calls.push('entityInfo');
+            return 'consume';
+        },
+    } as any;
+    context.selectionController = {
+        hasSelection: () => true,
+        clear: () => calls.push('clearSelection'),
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput(), makeCamera());
+
+    assert.deepEqual(calls, ['fullMinimap']);
+});
+
+test('hidden field HUD does not let an invisible full minimap consume input', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.isFieldHudInteractive = () => false;
+    context.minimapUI = {
+        handleInput: () => {
+            calls.push('invisibleFullMinimap');
+            return true;
+        },
+        onClick: () => {
+            calls.push('invisibleMiniPanel');
+            return true;
+        },
+        toggle: () => calls.push('invisibleToggle'),
+    } as any;
+    context.resolveFieldHitAt = () => {
+        calls.push('worldHit');
+        return { kind: 'ground', tile: { x: 0, y: 0 } };
+    };
+    context.actionMenuUI = {
+        getIsOpen: () => false,
+        onClick: () => null,
+        onMouseMove: () => undefined,
+    } as any;
+    context.tacticalController = {
+        isOpen: () => true,
+        onMouseMove: () => calls.push('invisibleTacticalHover'),
+        handleClick: () => calls.push('invisibleTacticalClick'),
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput(), makeCamera());
+
+    assert.ok(calls.includes('worldHit'));
+    assert.ok(!calls.includes('invisibleFullMinimap'));
+    assert.ok(!calls.includes('invisibleMiniPanel'));
+    assert.ok(!calls.includes('invisibleToggle'));
+    assert.ok(!calls.includes('invisibleTacticalHover'));
+    assert.ok(!calls.includes('invisibleTacticalClick'));
+});
+
+test('tool overlay consumes taps in logical UI coordinates before lower panels', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.toolController = {
+        isVisible: () => true,
+        isActive: () => true,
+        onMouseMove: (x: number, y: number) => calls.push(`toolHover:${x},${y}`),
+        handleMenuMouseDown: (x: number, y: number) => calls.push(`toolDown:${x},${y}`),
+    } as any;
+    context.entityInfoUI = {
+        onMouseMove: () => undefined,
+        hitTest: () => {
+            calls.push('entityInfo');
+            return 'consume';
+        },
+    } as any;
+    context.selectionController = {
+        hasSelection: () => true,
+        clear: () => calls.push('clearSelection'),
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput({
+        mouseScreenX: 240,
+        mouseScreenY: 360,
+        uiMouseX: 120,
+        uiMouseY: 180,
+    }), makeCamera());
+
+    assert.deepEqual(calls, ['toolHover:120,180', 'toolDown:120,180']);
+});
+
+test('tactical overlay consumes taps before entity info', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.tacticalController = {
+        isOpen: () => true,
+        onMouseMove: () => undefined,
+        handleClick: (x: number, y: number) => calls.push(`tactical:${x},${y}`),
+    } as any;
+    context.entityInfoUI = {
+        onMouseMove: () => undefined,
+        hitTest: () => {
+            calls.push('entityInfo');
+            return 'consume';
+        },
+    } as any;
+    context.selectionController = {
+        hasSelection: () => true,
+        clear: () => calls.push('clearSelection'),
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput({
+        uiMouseX: 120,
+        uiMouseY: 180,
+    }), makeCamera());
+
+    assert.deepEqual(calls, ['tactical:120,180']);
+});
+
+test('entity info body consumes logical-coordinate taps before action menu and world', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.entityInfoUI = {
+        onMouseMove: (x: number, y: number) => calls.push(`hover:${x},${y}`),
+        hitTest: (x: number, y: number) => {
+            calls.push(`info:${x},${y}`);
+            return 'consume';
+        },
+    } as any;
+    context.selectionController = {
+        hasSelection: () => true,
+        clear: () => calls.push('clearSelection'),
+    } as any;
+    context.actionMenuUI = {
+        getIsOpen: () => true,
+        onClick: () => {
+            calls.push('hiddenAction');
+            return null;
+        },
+        onMouseMove: () => undefined,
+    } as any;
+    context.resolveFieldHitAt = () => {
+        calls.push('worldHit');
+        return { kind: 'ground', tile: { x: 0, y: 0 } };
+    };
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput({
+        mouseScreenX: 240,
+        mouseScreenY: 360,
+        uiMouseX: 120,
+        uiMouseY: 180,
+    }), makeCamera());
+
+    assert.deepEqual(calls, ['hover:120,180', 'info:120,180']);
+});
+
+test('entity info close clears selection without leaking the tap', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.entityInfoUI = {
+        onMouseMove: () => undefined,
+        hitTest: () => 'close',
+    } as any;
+    context.selectionController = {
+        hasSelection: () => true,
+        clear: () => calls.push('clearSelection'),
+    } as any;
+    context.actionMenuUI = {
+        getIsOpen: () => true,
+        onClick: () => {
+            calls.push('hiddenAction');
+            return null;
+        },
+        onMouseMove: () => undefined,
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput(), makeCamera());
+
+    assert.deepEqual(calls, ['clearSelection']);
 });
 
 test('clicking unrelated loot closes an open action menu without ending the turn', () => {
