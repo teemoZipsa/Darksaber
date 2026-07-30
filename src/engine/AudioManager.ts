@@ -15,6 +15,7 @@
 
 import { SettingsManager } from './SettingsManager';
 import { renderMidiToAudioBuffer } from './MidiSynth';
+import type { FieldFootstepSurface } from '../field/FieldFootsteps';
 
 type Channel = 'bgm' | 'sfx' | 'ui';
 
@@ -220,6 +221,43 @@ class AudioManagerClass {
 
     public playUi(key: string, options: PlayOptions = {}): void {
         this.playOnChannel(key, 'ui', options);
+    }
+
+    /**
+     * Lightweight procedural field step. It remains available even when the
+     * optional recorded footstep assets are not installed.
+     */
+    public playFootstep(surface: FieldFootstepSurface): void {
+        if (!this.ensureContext() || SettingsManager.getMuteSFX()) return;
+        const ctx = this.ctx!;
+        const profile = surface === 'hard'
+            ? { duration: 0.028, frequency: 1450, gain: 0.075, filter: 'bandpass' as BiquadFilterType }
+            : surface === 'wet'
+                ? { duration: 0.075, frequency: 720, gain: 0.065, filter: 'lowpass' as BiquadFilterType }
+                : { duration: 0.05, frequency: 520, gain: 0.055, filter: 'lowpass' as BiquadFilterType };
+        const frameCount = Math.max(1, Math.floor(ctx.sampleRate * profile.duration));
+        const buffer = ctx.createBuffer(1, frameCount, ctx.sampleRate);
+        const samples = buffer.getChannelData(0);
+
+        for (let i = 0; i < frameCount; i++) {
+            const progress = i / frameCount;
+            const envelope = Math.pow(1 - progress, surface === 'wet' ? 1.5 : 2.4);
+            samples[i] = (Math.random() * 2 - 1) * envelope;
+        }
+
+        const source = ctx.createBufferSource();
+        const filter = ctx.createBiquadFilter();
+        const gain = ctx.createGain();
+        source.buffer = buffer;
+        source.playbackRate.value = 0.94 + Math.random() * 0.12;
+        filter.type = profile.filter;
+        filter.frequency.value = profile.frequency * (0.9 + Math.random() * 0.2);
+        filter.Q.value = surface === 'hard' ? 0.9 : 0.5;
+        gain.gain.value = profile.gain;
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.sfxGain!);
+        source.start();
     }
 
     /**

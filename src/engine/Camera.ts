@@ -4,6 +4,14 @@
 
 import { TILE_SIZE } from '../map/Chunk';
 
+export interface CameraFollowOptions {
+    /** Directional lead in tile units. Keep small so the tracked actor remains anchored. */
+    lookAheadX?: number;
+    lookAheadY?: number;
+    /** Radius in tile units where target changes do not move the camera. */
+    deadZoneTiles?: number;
+}
+
 export class Camera {
     public x: number = 0;
     public y: number = 0;
@@ -60,12 +68,24 @@ export class Camera {
         this.followTilePosition(tileX, tileY);
     }
 
-    /** Follow a fractional tile position for smooth movement */
-    public followTilePosition(tileX: number, tileY: number): void {
+    /** Follow a fractional tile position for smooth movement. */
+    public followTilePosition(tileX: number, tileY: number, options: CameraFollowOptions = {}): void {
         const scaledW = this.viewWidth / this.zoom;
         const scaledH = this.viewHeight / this.zoom;
-        this.targetX = (tileX * TILE_SIZE) + (TILE_SIZE / 2) - (scaledW / 2);
-        this.targetY = (tileY * TILE_SIZE) + (TILE_SIZE / 2) - (scaledH / 2);
+        const focusX = ((tileX + (options.lookAheadX ?? 0)) * TILE_SIZE) + (TILE_SIZE / 2);
+        const focusY = ((tileY + (options.lookAheadY ?? 0)) * TILE_SIZE) + (TILE_SIZE / 2);
+        const deadZone = Math.max(0, options.deadZoneTiles ?? 0) * TILE_SIZE;
+
+        if (deadZone <= 0) {
+            this.targetX = focusX - (scaledW / 2);
+            this.targetY = focusY - (scaledH / 2);
+            return;
+        }
+
+        const targetCenterX = this.targetX + (scaledW / 2);
+        const targetCenterY = this.targetY + (scaledH / 2);
+        this.targetX += getDeadZoneCorrection(focusX - targetCenterX, deadZone);
+        this.targetY += getDeadZoneCorrection(focusY - targetCenterY, deadZone);
     }
 
     /** Follow a pixel-space entity/tile position */
@@ -143,4 +163,9 @@ export class Camera {
             tileY: Math.floor(worldY / TILE_SIZE)
         };
     }
+}
+
+function getDeadZoneCorrection(delta: number, radius: number): number {
+    if (Math.abs(delta) <= radius) return 0;
+    return delta - Math.sign(delta) * radius;
 }

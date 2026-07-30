@@ -159,6 +159,19 @@ test('entity movement speed multipliers shorten tile interpolation without chang
     assert.equal(road.gridY, normal.gridY);
 });
 
+test('entity starts each queued tile step without an extra prepare or settle frame', () => {
+    const entity = new Entity('walker', 0, 0, '#fff');
+
+    entity.setGridPosition(1, 0);
+    entity.update(0.125);
+    assert.equal(entity.pixelX, 1);
+
+    entity.setGridPosition(2, 0);
+    entity.update(1 / 60);
+    assert.ok(entity.pixelX > 1);
+    assert.ok(entity.pixelX < 2);
+});
+
 test('loot objects retain overflow items and sanitize grid sizes', () => {
     const sword = getItemDef('short_sword');
     assert.ok(sword);

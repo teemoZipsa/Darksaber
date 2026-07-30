@@ -5,6 +5,8 @@
 
 import { Camera } from './Camera';
 import { InputManager } from './InputManager';
+import { SettingsManager } from './SettingsManager';
+import { AudioManager } from './AudioManager';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
 import { PartyManager } from '../character/PartyManager';
@@ -135,6 +137,11 @@ import {
     type WorldRealmId,
     type WorldSnapshot,
 } from '../net/WorldProtocol';
+import { getFieldFootstepSurface } from '../field/FieldFootsteps';
+
+const CAMERA_LOOK_AHEAD_TILES = 0.28;
+const CAMERA_DEAD_ZONE_TILES = 0.12;
+const CAMERA_REDUCED_MOTION_DEAD_ZONE_TILES = 0.24;
 
 export interface WorldEngineOptions {
     startIntroTutorial?: boolean;
@@ -148,6 +155,7 @@ export class WorldEngine {
     private runtimeState?: WorldEngineRuntimeState;
     private flowState?: WorldEngineFlowState;
     private controllerState?: WorldEngineControllerState;
+    private lastFootstepTile: { actorId: string; x: number; y: number } | null = null;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -402,8 +410,41 @@ export class WorldEngine {
     }
 
     private followPlayerCamera(camera: Camera, dt: number): void {
-        camera.followTile(this.player.gridX, this.player.gridY);
+        this.updatePlayerFootstep();
+        const motionX = this.player.gridX - this.player.pixelX;
+        const motionY = this.player.gridY - this.player.pixelY;
+        const motionDistance = Math.hypot(motionX, motionY);
+        const reduceMotion = SettingsManager.getMotionReduce();
+        const lookAhead = !reduceMotion && motionDistance > 0.01
+            ? CAMERA_LOOK_AHEAD_TILES / motionDistance
+            : 0;
+
+        camera.followTilePosition(this.player.pixelX, this.player.pixelY, {
+            lookAheadX: motionX * lookAhead,
+            lookAheadY: motionY * lookAhead,
+            deadZoneTiles: reduceMotion
+                ? CAMERA_REDUCED_MOTION_DEAD_ZONE_TILES
+                : CAMERA_DEAD_ZONE_TILES,
+        });
         camera.update(dt);
+    }
+
+    private updatePlayerFootstep(): void {
+        const actor = this.getControlledActor();
+        if (!actor) {
+            this.lastFootstepTile = null;
+            return;
+        }
+
+        const x = Math.round(actor.entity.pixelX);
+        const y = Math.round(actor.entity.pixelY);
+        const previous = this.lastFootstepTile;
+        this.lastFootstepTile = { actorId: actor.id, x, y };
+        if (!previous || previous.actorId !== actor.id) return;
+        if (previous.x === x && previous.y === y) return;
+        if (Math.abs(previous.x - x) + Math.abs(previous.y - y) !== 1) return;
+
+        AudioManager.playFootstep(getFieldFootstepSurface(this.worldMap.getTileAt(x, y)));
     }
 
     public isModalOverlayVisible(): boolean {
