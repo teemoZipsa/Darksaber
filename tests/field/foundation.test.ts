@@ -100,6 +100,7 @@ test('full minimap close button hides the map immediately', () => {
         getLoot: () => [],
     });
     minimap.toggle();
+    assert.equal(minimap.isFullMapVisible(), true);
     (minimap as any).fullMapCloseButtonRect = { x: 10, y: 10, w: 28, h: 28 };
 
     const consumed = minimap.handleInput({
@@ -113,6 +114,7 @@ test('full minimap close button hides the map immediately', () => {
 
     assert.equal(consumed, true);
     assert.equal(minimap.isVisible(), false);
+    assert.equal(minimap.isFullMapVisible(), false);
 });
 
 test('pathing treats enemies as hard blockers while allowing allied soft collision', () => {

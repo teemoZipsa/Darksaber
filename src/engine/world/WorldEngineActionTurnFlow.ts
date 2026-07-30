@@ -66,7 +66,7 @@ export class WorldEngineActionTurnFlow {
             this.context.closeActionMenu();
             return;
         }
-        this.context.openActionMenu(this.context.getActionMenuStates(actor));
+        this.context.updateActionMenuStates(this.context.getActionMenuStates(actor));
     }
 
     public dismissActionMenuTurn(): void {

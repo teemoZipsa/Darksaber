@@ -4,7 +4,7 @@ import type { Player } from '../../entity/Player';
 import { TILE_SIZE } from '../../map/Chunk';
 import { StoryInteriorMap } from '../../map/StoryInteriorMap';
 import type { WorldMap } from '../../map/WorldMap';
-import type { ActionMenuUI } from '../../ui/ActionMenuUI';
+import { ACTION_MENU_COMPACT_BREAKPOINT, type ActionMenuUI } from '../../ui/ActionMenuUI';
 import type { EntityInfoUI } from '../../ui/EntityInfoUI';
 import type { EffectManager } from '../../ui/EffectManager';
 import type { FusionTempleUI } from '../../ui/FusionTempleUI';
@@ -120,7 +120,7 @@ export class WorldRenderController {
         this.context.effectManager.render(ctx, camera);
         this.context.floatingText.render(ctx, camX, camY);
         WorldFieldRenderer.renderHoverTile(ctx, model, camX, camY);
-        this.renderActionMenu(ctx, camX, camY);
+        this.renderWorldActionMenu(ctx, camX, camY, width);
 
         ctx.restore();
 
@@ -128,16 +128,20 @@ export class WorldRenderController {
         ctx.scale(scale, scale);
         const uiW = Math.floor(width / scale);
         const uiH = Math.floor(height / scale);
+        const compactViewport = width < ACTION_MENU_COMPACT_BREAKPOINT;
+        const fullMapVisible = this.context.minimapUI.isFullMapVisible?.() ?? false;
+        const compactActionMenuOpen = compactViewport
+            && model.actionMenuOpen
+            && !fullMapVisible;
         const hudLayout = WorldFieldRenderer.renderHudPanels(ctx, model, uiW, uiH, {
             combatLogOnly: options.hideWorldHud,
+            compactActionMenu: compactActionMenuOpen,
         });
-        if (!options.hideWorldHud && model.storyInterior.active) {
+        if (!options.hideWorldHud && model.storyInterior.active && !compactActionMenuOpen) {
             this.renderStoryInteriorBanner(ctx, model, uiW, hudLayout);
         }
-        const hidesDuplicateActorCard = hudLayout.compact
-            && model.actionMenuOpen
-            && model.selectedActorId === model.controlledActor?.id;
-        if (!options.hideWorldHud && model.selectedDisplayInfo && !hidesDuplicateActorCard) {
+        const hidesCompactEntityCard = compactActionMenuOpen;
+        if (!options.hideWorldHud && model.selectedDisplayInfo && !hidesCompactEntityCard) {
             this.context.entityInfoUI.setPosition(hudLayout.entityInfo.x, hudLayout.entityInfo.y);
             if (hudLayout.compact) {
                 this.context.entityInfoUI.renderCompact(
@@ -154,19 +158,47 @@ export class WorldRenderController {
         if (!options.hideWorldHud) {
             this.context.tacticalController.render(ctx);
             this.context.toolController.render(ctx, uiW, uiH);
-            this.context.minimapUI.render(ctx, uiW, uiH, {
-                gold: model.gold,
-                worldName: model.worldName,
-                terrainLines: model.terrainHoverLines,
-            }, hudLayout.compact ? {
-                compact: true,
-                x: hudLayout.minimap.x,
-                y: hudLayout.minimap.y,
-                panelWidth: hudLayout.minimap.w,
-                mapSize: hudLayout.minimap.mapSize,
-            } : undefined);
+            if (!compactActionMenuOpen) {
+                this.context.minimapUI.render(ctx, uiW, uiH, {
+                    gold: model.gold,
+                    worldName: model.worldName,
+                    terrainLines: model.terrainHoverLines,
+                }, hudLayout.compact ? {
+                    compact: true,
+                    x: hudLayout.minimap.x,
+                    y: hudLayout.minimap.y,
+                    panelWidth: hudLayout.minimap.w,
+                    mapSize: hudLayout.minimap.mapSize,
+                } : undefined);
+            }
         } else {
             if (this.context.toolController.isVisible()) this.context.toolController.render(ctx, uiW, uiH);
+        }
+        if (compactViewport && !fullMapVisible) {
+            const actor = this.context.getControlledActor();
+            const actorCenterX = actor
+                ? (
+                    (actor.entity.pixelX * TILE_SIZE - camX + TILE_SIZE / 2)
+                    * camera.zoom
+                    / scale
+                )
+                : uiW / 2;
+            const actorCenterY = actor
+                ? (
+                    (actor.entity.pixelY * TILE_SIZE - camY + TILE_SIZE / 2)
+                    * camera.zoom
+                    / scale
+                )
+                : uiH / 2;
+            this.renderCompactActionMenu(
+                ctx,
+                uiW,
+                uiH,
+                actorCenterX,
+                actorCenterY,
+            );
+        } else if (fullMapVisible) {
+            this.context.actionMenuUI.clearCompactLayout();
         }
         if (this.context.townSession.isVisible()) this.context.townSession.render(ctx, uiW, uiH);
         if (this.context.fusionTempleUI.isVisible()) this.context.fusionTempleUI.render(ctx, uiW, uiH);
@@ -353,7 +385,15 @@ export class WorldRenderController {
         ctx.restore();
     }
 
-    private renderActionMenu(ctx: CanvasRenderingContext2D, camX: number, camY: number): void {
+    private renderWorldActionMenu(
+        ctx: CanvasRenderingContext2D,
+        camX: number,
+        camY: number,
+        viewportWidth: number
+    ): void {
+        if (viewportWidth >= ACTION_MENU_COMPACT_BREAKPOINT) {
+            this.context.actionMenuUI.clearCompactLayout();
+        }
         const actor = this.context.getControlledActor();
         if (!actor || actor.character.isDead || this.context.isCombatPresentationBusy()) return;
 
@@ -369,11 +409,46 @@ export class WorldRenderController {
             ? this.context.getRemainingActionPoints() >= MIN_FIELD_ACTION_GAUGE_COST
             : actor.entity.actionGauge >= 100;
         if (this.context.actionMenuUI.getIsOpen()) {
-            this.context.actionMenuUI.render(ctx, px, py, ready);
+            if (viewportWidth >= ACTION_MENU_COMPACT_BREAKPOINT) {
+                this.context.actionMenuUI.render(ctx, px, py, ready);
+            }
         } else if (ready) {
             const cursorType = active && this.context.playerActionController.hasExecutableAttack(actor) ? 'attack' : 'move';
             this.context.actionMenuUI.renderReadyIndicator(ctx, px, py, this.context.getWorldTime(), cursorType);
         }
+    }
+
+    private renderCompactActionMenu(
+        ctx: CanvasRenderingContext2D,
+        viewportWidth: number,
+        viewportHeight: number,
+        actorCenterX: number,
+        actorCenterY: number,
+    ): void {
+        const actor = this.context.getControlledActor();
+        if (
+            !actor
+            || actor.character.isDead
+            || this.context.isCombatPresentationBusy()
+            || this.context.magicController.isVisible()
+            || !this.context.actionMenuUI.getIsOpen()
+        ) {
+            this.context.actionMenuUI.clearCompactLayout();
+            return;
+        }
+
+        const active = actor.id === this.context.getActiveTurnActorId();
+        const ready = active
+            ? this.context.getRemainingActionPoints() >= MIN_FIELD_ACTION_GAUGE_COST
+            : actor.entity.actionGauge >= 100;
+        this.context.actionMenuUI.renderCompact(
+            ctx,
+            viewportWidth,
+            viewportHeight,
+            actorCenterX,
+            actorCenterY,
+            ready,
+        );
     }
 }
 

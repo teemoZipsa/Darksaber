@@ -210,6 +210,10 @@ export class MinimapUI {
         return this.mode !== 'hidden';
     }
 
+    public isFullMapVisible(): boolean {
+        return this.mode === 'full';
+    }
+
     public getLastPanelRect(): MinimapPanelRect | null {
         if (this.currentWidth <= 0 || this.currentHeight <= 0) return null;
         return {

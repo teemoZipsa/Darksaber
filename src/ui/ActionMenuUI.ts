@@ -14,9 +14,30 @@ import { AudioManager } from '../engine/AudioManager';
 
 const ACTION_ICON_ANIMATION_ROWS = 5;
 const ACTION_ICON_ANIMATION_MS = 280;
+export const ACTION_MENU_COMPACT_BREAKPOINT = 520;
+
+const COMPACT_RADIAL_MARGIN = 8;
+const COMPACT_RADIAL_GAP = 10;
+const COMPACT_RADIAL_SLOT_MAX_WIDTH = 100;
+const COMPACT_RADIAL_SLOT_MAX_HEIGHT = 72;
 
 export type ActionType = 'tool' | 'attack' | 'rest' | 'defend' | 'magic' | 'move' | 'open' | 'fanfare';
 export type ReadyCursorType = 'move' | 'attack';
+
+const COMPACT_ACTION_GRID: readonly {
+    type: ActionType;
+    column: number;
+    row: number;
+}[] = [
+    { type: 'move', column: 0, row: 0 },
+    { type: 'tool', column: 1, row: 0 },
+    { type: 'attack', column: 2, row: 0 },
+    { type: 'magic', column: 0, row: 1 },
+    { type: 'defend', column: 2, row: 1 },
+    { type: 'rest', column: 0, row: 2 },
+    { type: 'fanfare', column: 1, row: 2 },
+    { type: 'open', column: 2, row: 2 },
+];
 
 const ACTION_KEYBINDING_IDS: Record<ActionType, KeybindingId> = {
     move: 'action.move',
@@ -42,6 +63,71 @@ export interface ActionMenuClickResult {
     type: ActionType;
     enabled: boolean;
     disabledReason?: string;
+}
+
+export interface ActionMenuCompactChipBounds {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+export interface ActionMenuCompactSlotBounds extends ActionMenuCompactChipBounds {
+    type: ActionType;
+}
+
+export interface ActionMenuCompactLayout {
+    panel: ActionMenuCompactChipBounds;
+    center: ActionMenuCompactChipBounds;
+    slots: ActionMenuCompactSlotBounds[];
+}
+
+export function getCompactActionMenuLayout(
+    viewWidth: number,
+    viewHeight: number,
+    actorCenterX: number = viewWidth / 2,
+    actorCenterY: number = viewHeight / 2,
+): ActionMenuCompactLayout {
+    const safeWidth = Math.max(1, viewWidth);
+    const safeHeight = Math.max(1, viewHeight);
+    const margin = Math.min(COMPACT_RADIAL_MARGIN, safeWidth / 10, safeHeight / 10);
+    const gap = Math.min(COMPACT_RADIAL_GAP, safeWidth / 30, safeHeight / 30);
+    const slotWidth = Math.min(
+        COMPACT_RADIAL_SLOT_MAX_WIDTH,
+        Math.max(1, (safeWidth - margin * 2 - gap * 2) / 3),
+    );
+    const slotHeight = Math.min(
+        COMPACT_RADIAL_SLOT_MAX_HEIGHT,
+        Math.max(1, (safeHeight - margin * 2 - gap * 2) / 3),
+    );
+    const panelWidth = slotWidth * 3 + gap * 2;
+    const panelHeight = slotHeight * 3 + gap * 2;
+    const anchorX = Number.isFinite(actorCenterX) ? actorCenterX : safeWidth / 2;
+    const anchorY = Number.isFinite(actorCenterY) ? actorCenterY : safeHeight / 2;
+    const maxPanelX = Math.max(margin, safeWidth - margin - panelWidth);
+    const maxPanelY = Math.max(margin, safeHeight - margin - panelHeight);
+    const panel = {
+        x: Math.min(maxPanelX, Math.max(margin, anchorX - panelWidth / 2)),
+        y: Math.min(maxPanelY, Math.max(margin, anchorY - panelHeight / 2)),
+        width: panelWidth,
+        height: panelHeight,
+    };
+    const center = {
+        x: panel.x + slotWidth + gap,
+        y: panel.y + slotHeight + gap,
+        width: slotWidth,
+        height: slotHeight,
+    };
+    const slots = COMPACT_ACTION_GRID.map(({ type, column, row }) => {
+        return {
+            type,
+            x: panel.x + column * (slotWidth + gap),
+            y: panel.y + row * (slotHeight + gap),
+            width: slotWidth,
+            height: slotHeight,
+        };
+    });
+    return { panel, center, slots };
 }
 
 export function normalizeLegacyActionType(action: string): ActionType | null {
@@ -109,6 +195,9 @@ export class ActionMenuUI {
     private centerX = 0;
     private centerY = 0;
     private hoveredSlot: ActionType | null = null;
+    private compactChipBounds = new Map<ActionType, ActionMenuCompactChipBounds>();
+    private compactPanelBounds: ActionMenuCompactChipBounds | null = null;
+    private compactLayoutActive = false;
 
     constructor() {
         this.slots = [
@@ -126,6 +215,7 @@ export class ActionMenuUI {
 
     public open(states?: ActionMenuSlotState[] | ActionType[]): void {
         this.isOpen = true;
+        this.clearCompactLayout();
         this.setSlotStates(states);
     }
 
@@ -163,12 +253,17 @@ export class ActionMenuUI {
         }
     }
 
-    public close(): void { this.isOpen = false; this.hoveredSlot = null; }
+    public close(): void {
+        this.isOpen = false;
+        this.hoveredSlot = null;
+        this.clearCompactLayout();
+    }
     public toggle(states?: ActionMenuSlotState[] | ActionType[]): void {
         if (this.isOpen) this.close();
         else this.open(states);
     }
     public getIsOpen(): boolean { return this.isOpen; }
+    public usesCompactLayout(): boolean { return this.isOpen && this.compactLayoutActive; }
 
     public onMouseMove(mx: number, my: number): void {
         if (!this.isOpen) { this.hoveredSlot = null; return; }
@@ -176,7 +271,7 @@ export class ActionMenuUI {
         this.hoveredSlot = null;
         for (const slot of this.slots) {
             const { x: ix, y: iy } = this.getSlotPosition(slot);
-            if (this.isSlotHit(mx, my, ix, iy)) {
+            if (this.isSlotHit(mx, my, slot, ix, iy)) {
                 this.hoveredSlot = slot.type;
                 break;
             }
@@ -191,7 +286,7 @@ export class ActionMenuUI {
         for (const slot of this.slots) {
             const state = this.getSlotState(slot.type);
             const { x: ix, y: iy } = this.getSlotPosition(slot);
-            if (this.isSlotHit(mx, my, ix, iy)) {
+            if (this.isSlotHit(mx, my, slot, ix, iy)) {
                 AudioManager.playUi(state.enabled ? 'ui.confirm' : 'ui.error', { volume: 0.7 });
                 return {
                     type: slot.type,
@@ -213,6 +308,23 @@ export class ActionMenuUI {
         };
     }
 
+    public getCompactChipBounds(type: ActionType): ActionMenuCompactChipBounds | null {
+        const bounds = this.compactChipBounds.get(type);
+        return bounds ? { ...bounds } : null;
+    }
+
+    public hitTestCompactPanel(mx: number, my: number): boolean {
+        const panel = this.compactPanelBounds;
+        return Boolean(
+            this.usesCompactLayout()
+            && panel
+            && mx >= panel.x
+            && mx <= panel.x + panel.width
+            && my >= panel.y
+            && my <= panel.y + panel.height
+        );
+    }
+
     public render(
         ctx: CanvasRenderingContext2D,
         playerScreenX: number,
@@ -221,6 +333,7 @@ export class ActionMenuUI {
     ): void {
         if (!this.isOpen) return;
 
+        this.clearCompactLayout();
         this.centerX = playerScreenX + TILE_SIZE / 2;
         this.centerY = playerScreenY + TILE_SIZE / 2;
 
@@ -248,7 +361,7 @@ export class ActionMenuUI {
             this.drawHotkeyLabel(ctx, slot.type, ix, iy, r, enabled);
 
             if (isHovered || isHighlighted) {
-                const slotLabel = t(slot.labelKey);
+                const slotLabel = this.getSlotLabel(slot);
                 const label = isHighlighted ? state.emphasisLabel ?? slotLabel : slotLabel;
                 ctx.font = `bold 13px ${UI.fontPrimary}`;
                 ctx.textAlign = 'center';
@@ -265,6 +378,58 @@ export class ActionMenuUI {
 
         this.renderHoveredDisabledReason(ctx);
 
+        ctx.restore();
+    }
+
+    public renderCompact(
+        ctx: CanvasRenderingContext2D,
+        viewportWidth: number,
+        viewportHeight: number,
+        actorCenterX: number,
+        actorCenterY: number,
+        isReady: boolean
+    ): void {
+        if (!this.isOpen) {
+            this.clearCompactLayout();
+            return;
+        }
+
+        const layout = getCompactActionMenuLayout(
+            viewportWidth,
+            viewportHeight,
+            actorCenterX,
+            actorCenterY,
+        );
+        this.compactLayoutActive = true;
+        this.compactPanelBounds = { ...layout.panel };
+        this.compactChipBounds.clear();
+        for (const bounds of layout.slots) {
+            this.compactChipBounds.set(bounds.type, {
+                x: bounds.x,
+                y: bounds.y,
+                width: bounds.width,
+                height: bounds.height,
+            });
+        }
+
+        ctx.save();
+        this.drawCompactRadialFrame(ctx, layout, actorCenterX, actorCenterY);
+
+        for (const bounds of layout.slots) {
+            const slot = this.slots.find((candidate) => candidate.type === bounds.type);
+            if (!slot) continue;
+            const state = this.getSlotState(slot.type);
+            const enabled = isReady && state.enabled;
+            this.drawCompactSlot(
+                ctx,
+                slot,
+                state,
+                bounds,
+                enabled,
+                this.hoveredSlot === slot.type,
+                enabled && Boolean(state.highlighted)
+            );
+        }
         ctx.restore();
     }
 
@@ -400,8 +565,251 @@ export class ActionMenuUI {
         };
     }
 
-    private isSlotHit(mx: number, my: number, ix: number, iy: number): boolean {
-        return Math.abs(mx - ix) <= this.hitHalfSize && Math.abs(my - iy) <= this.hitHalfSize;
+    private isSlotHit(mx: number, my: number, slot: ActionSlot, ix: number, iy: number): boolean {
+        if (!this.compactLayoutActive) {
+            return Math.abs(mx - ix) <= this.hitHalfSize && Math.abs(my - iy) <= this.hitHalfSize;
+        }
+
+        const bounds = this.compactChipBounds.get(slot.type);
+        return Boolean(
+            bounds
+            && mx >= bounds.x
+            && mx <= bounds.x + bounds.width
+            && my >= bounds.y
+            && my <= bounds.y + bounds.height
+        );
+    }
+
+    private drawCompactSlot(
+        ctx: CanvasRenderingContext2D,
+        slot: ActionSlot,
+        state: ActionMenuSlotState,
+        bounds: ActionMenuCompactChipBounds,
+        enabled: boolean,
+        hovered: boolean,
+        highlighted: boolean
+    ): void {
+        const disabled = !state.enabled;
+        const innerWidth = Math.max(1, bounds.width - 8);
+        const iconX = bounds.x + bounds.width / 2;
+        const iconY = bounds.y + bounds.height * 0.18;
+        const labelY = bounds.y + bounds.height * 0.41;
+        const costY = bounds.y + bounds.height * 0.56;
+        const detailY = bounds.y + bounds.height * 0.73;
+        const detailLineHeight = Math.max(7, Math.min(10, bounds.height * 0.14));
+        const labelFontSize = Math.max(7, Math.min(9, bounds.height / 8));
+        const detailFontSize = Math.max(6, Math.min(8, bounds.height / 9));
+
+        ctx.save();
+        ctx.fillStyle = disabled
+            ? 'rgba(36, 17, 20, 0.96)'
+            : hovered ? 'rgba(53, 40, 18, 0.98)' : 'rgba(25, 19, 12, 0.96)';
+        ctx.strokeStyle = disabled
+            ? 'rgba(228, 63, 90, 0.82)'
+            : highlighted ? '#f0c050' : 'rgba(194, 146, 62, 0.82)';
+        ctx.lineWidth = highlighted ? 2 : 1;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.72)';
+        ctx.shadowBlur = 5;
+        this.traceCompactPetal(ctx, bounds);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.stroke();
+
+        slot.iconDraw(ctx, iconX, iconY, Math.max(6, Math.min(8, bounds.height / 9)), enabled);
+        this.drawCompactHotkeyBadge(ctx, slot.type, bounds.x + 9, bounds.y + 9, enabled);
+
+        ctx.font = `bold ${labelFontSize}px ${UI.fontPrimary}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = enabled ? '#ffe3a0' : disabled ? '#f0a0a8' : '#9c8c70';
+        ctx.fillText(
+            this.fitCompactText(ctx, this.getSlotLabel(slot), innerWidth),
+            iconX,
+            labelY
+        );
+
+        ctx.font = `bold ${detailFontSize}px ${UI.fontPrimary}`;
+        ctx.fillStyle = enabled ? '#d4a050' : '#9c8c70';
+        if (state.costLabel) {
+            ctx.fillText(
+                this.fitCompactText(ctx, state.costLabel, innerWidth),
+                iconX,
+                costY
+            );
+        }
+
+        if (disabled && state.disabledReason) {
+            ctx.font = `bold ${detailFontSize}px ${UI.fontPrimary}`;
+            ctx.fillStyle = '#ffd6d6';
+            const reasonLines = this.wrapCompactText(ctx, state.disabledReason, innerWidth, 2);
+            reasonLines.forEach((line, index) => {
+                ctx.fillText(line, iconX, detailY + index * detailLineHeight);
+            });
+        } else if (state.emphasisLabel) {
+            ctx.font = `bold ${detailFontSize}px ${UI.fontPrimary}`;
+            ctx.fillStyle = '#f0c050';
+            ctx.fillText(
+                this.fitCompactText(ctx, state.emphasisLabel, innerWidth),
+                iconX,
+                detailY
+            );
+        }
+        ctx.restore();
+    }
+
+    private drawCompactRadialFrame(
+        ctx: CanvasRenderingContext2D,
+        layout: ActionMenuCompactLayout,
+        actorCenterX: number,
+        actorCenterY: number,
+    ): void {
+        const centerX = layout.center.x + layout.center.width / 2;
+        const centerY = layout.center.y + layout.center.height / 2;
+        const actorX = Number.isFinite(actorCenterX) ? actorCenterX : centerX;
+        const actorY = Number.isFinite(actorCenterY) ? actorCenterY : centerY;
+
+        ctx.save();
+        ctx.strokeStyle = 'rgba(194, 146, 62, 0.48)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (const bounds of layout.slots) {
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+        }
+        ctx.stroke();
+
+        const anchorDistance = Math.hypot(actorX - centerX, actorY - centerY);
+        if (anchorDistance > 2) {
+            ctx.strokeStyle = 'rgba(240, 192, 80, 0.68)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(actorX, actorY);
+            ctx.lineTo(centerX, centerY);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(actorX, actorY, 7, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        const ringRadius = Math.max(
+            9,
+            Math.min(layout.center.width, layout.center.height) * 0.31,
+        );
+        ctx.strokeStyle = Parchment.borderGold;
+        ctx.lineWidth = 1.5;
+        ctx.shadowColor = 'rgba(240, 192, 80, 0.55)';
+        ctx.shadowBlur = 5;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = 'rgba(240, 192, 80, 0.38)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, ringRadius + 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    private traceCompactPetal(
+        ctx: CanvasRenderingContext2D,
+        bounds: ActionMenuCompactChipBounds,
+    ): void {
+        const cut = Math.max(4, Math.min(9, bounds.width * 0.09, bounds.height * 0.14));
+        const x = bounds.x;
+        const y = bounds.y;
+        const right = x + bounds.width;
+        const bottom = y + bounds.height;
+        ctx.beginPath();
+        ctx.moveTo(x + cut, y);
+        ctx.lineTo(right - cut, y);
+        ctx.lineTo(right, y + cut);
+        ctx.lineTo(right, bottom - cut);
+        ctx.lineTo(right - cut, bottom);
+        ctx.lineTo(x + cut, bottom);
+        ctx.lineTo(x, bottom - cut);
+        ctx.lineTo(x, y + cut);
+        ctx.closePath();
+    }
+
+    private fitCompactText(
+        ctx: CanvasRenderingContext2D,
+        text: string,
+        maxWidth: number
+    ): string {
+        if (ctx.measureText(text).width <= maxWidth) return text;
+        let fitted = text;
+        while (fitted && ctx.measureText(`${fitted}…`).width > maxWidth) {
+            fitted = fitted.slice(0, -1);
+        }
+        return `${fitted.trimEnd()}…`;
+    }
+
+    private getSlotLabel(slot: ActionSlot): string {
+        return t(slot.labelKey);
+    }
+
+    private drawCompactHotkeyBadge(
+        ctx: CanvasRenderingContext2D,
+        type: ActionType,
+        x: number,
+        y: number,
+        enabled: boolean
+    ): void {
+        const label = SettingsManager.getKeyLabel(SettingsManager.getKeybinding(ACTION_KEYBINDING_IDS[type]));
+        ctx.save();
+        ctx.font = `bold 8px ${UI.fontPrimary}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const width = Math.max(12, ctx.measureText(label).width + 5);
+        ctx.fillStyle = 'rgba(8, 7, 6, 0.9)';
+        ctx.strokeStyle = enabled ? '#d4a050' : '#6f6048';
+        ctx.lineWidth = 1;
+        ctx.fillRect(x - width / 2, y - 5, width, 10);
+        ctx.strokeRect(x - width / 2, y - 5, width, 10);
+        ctx.fillStyle = enabled ? '#f0c050' : '#9c8c70';
+        ctx.fillText(label, x, y + 0.5);
+        ctx.restore();
+    }
+
+    public clearCompactLayout(): void {
+        if (this.compactLayoutActive) this.hoveredSlot = null;
+        this.compactLayoutActive = false;
+        this.compactPanelBounds = null;
+        this.compactChipBounds.clear();
+    }
+
+    private wrapCompactText(
+        ctx: CanvasRenderingContext2D,
+        text: string,
+        maxWidth: number,
+        maxLines: number
+    ): string[] {
+        const characters = Array.from(text);
+        const lines: string[] = [];
+        let current = '';
+
+        for (const character of characters) {
+            const candidate = current + character;
+            if (current && ctx.measureText(candidate).width > maxWidth) {
+                lines.push(current.trim());
+                current = character.trimStart();
+                if (lines.length === maxLines) break;
+            } else {
+                current = candidate;
+            }
+        }
+
+        if (lines.length < maxLines && current) lines.push(current.trim());
+        const consumed = lines.join('').replace(/ /g, '').length;
+        const sourceLength = text.replace(/ /g, '').length;
+        if (consumed < sourceLength && lines.length > 0) {
+            const lastIndex = lines.length - 1;
+            let last = lines[lastIndex] ?? '';
+            while (last && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
+            lines[lastIndex] = `${last}…`;
+        }
+        return lines;
     }
 
     private drawSlotFocus(ctx: CanvasRenderingContext2D, ix: number, iy: number, r: number, enabled: boolean): void {

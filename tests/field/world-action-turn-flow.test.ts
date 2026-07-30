@@ -117,6 +117,20 @@ test('clicking a full-gauge actor begins the turn without immediately dismissing
     assert.ok(!calls.includes('closeActionMenu'));
 });
 
+test('refreshing an open action menu updates states without reopening its rendered layout', () => {
+    const { calls, flow, getActionMenuOpen } = makeFlow({
+        activeTurnActorId: 'hero',
+        actionMenuOpen: true,
+    });
+
+    flow.refreshOpenActionMenuState();
+
+    assert.equal(getActionMenuOpen(), true);
+    assert.ok(calls.includes('updateActionMenuStates'));
+    assert.ok(!calls.includes('openActionMenu'));
+    assert.ok(!calls.includes('closeActionMenu'));
+});
+
 test('toggling an open action menu only closes the menu and preserves the active turn', () => {
     const { actor, calls, flow, getActionMenuOpen, getActiveTurnActorId } = makeFlow({
         activeTurnActorId: 'hero',

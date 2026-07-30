@@ -54,6 +54,8 @@ function makeContext(actor: FieldActor, calls: string[]): WorldInputContext {
     return {
         actionMenuUI: {
             getIsOpen: () => true,
+            usesCompactLayout: () => false,
+            hitTestCompactPanel: () => false,
             onClick: () => null,
             onMouseMove: () => undefined,
         } as any,
@@ -93,6 +95,7 @@ function makeContext(actor: FieldActor, calls: string[]): WorldInputContext {
             onMouseMove: () => undefined,
             open: () => calls.push('openTacticalMenu'),
         } as any,
+        getViewportWidth: () => 800,
         getCanvasSize: () => ({ width: 800, height: 600 }),
         isFieldHudInteractive: () => true,
         getActivePartyTurnActor: () => actor,
@@ -564,6 +567,60 @@ test('M key toggles the full minimap before full-map pointer handling can consum
     assert.equal(minimapHandleCalls, 0);
 });
 
+test('M key closes the compact radial before opening the full minimap', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.getViewportWidth = () => 390;
+    context.actionMenuUI = {
+        getIsOpen: () => true,
+        usesCompactLayout: () => true,
+    } as any;
+    context.minimapUI = {
+        handleInput: () => false,
+        onClick: () => false,
+        toggle: () => calls.push('toggleMinimap'),
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput({
+        justPressed: (code: string) => code === 'KeyM',
+    }), makeCamera());
+
+    assert.deepEqual(calls, ['closeActionMenu', 'toggleMinimap']);
+});
+
+test('full minimap remains modal when a compact radial reopens behind it', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.getViewportWidth = () => 390;
+    context.actionMenuUI = {
+        getIsOpen: () => true,
+        usesCompactLayout: () => true,
+        onMouseMove: () => calls.push('actionHover'),
+        onClick: () => {
+            calls.push('actionClick');
+            return { type: 'attack', enabled: true };
+        },
+    } as any;
+    context.minimapUI = {
+        isFullMapVisible: () => true,
+        handleInput: () => false,
+        onClick: () => false,
+        toggle: () => undefined,
+    } as any;
+    context.resolveFieldHitAt = () => {
+        calls.push('worldHit');
+        return { kind: 'ground', tile: { x: 2, y: 3 } };
+    };
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput(), makeCamera());
+
+    assert.deepEqual(calls, []);
+});
+
 test('action menu hotkeys execute the matching radial slot', () => {
     const actor = makeActor('hero');
     const calls: string[] = [];
@@ -585,6 +642,132 @@ test('action menu hotkeys execute the matching radial slot', () => {
     }), makeCamera());
 
     assert.deepEqual(calls, ['execute:attack']);
+});
+
+test('compact radial action menu uses UI-scaled pointer coordinates for hover and activation', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.getViewportWidth = () => 390;
+    context.actionMenuUI = {
+        getIsOpen: () => true,
+        usesCompactLayout: () => true,
+        hitTestCompactPanel: () => false,
+        onMouseMove: (x: number, y: number) => calls.push(`hover:${x},${y}`),
+        onClick: (x: number, y: number) => {
+            calls.push(`click:${x},${y}`);
+            return { type: 'attack', enabled: true };
+        },
+    } as any;
+    context.playerActionController = {
+        getMode: () => null,
+        execute: (type: string) => calls.push(`execute:${type}`),
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput({
+        mouseScreenX: 300,
+        mouseScreenY: 240,
+        uiMouseX: 100,
+        uiMouseY: 80,
+    }), {
+        ...makeCamera(),
+        zoom: 2,
+    });
+
+    assert.deepEqual(calls, [
+        'hover:100,80',
+        'click:100,80',
+        'execute:attack',
+    ]);
+});
+
+test('compact radial surface consumes its center hole and gaps before field hit handling', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.getViewportWidth = () => 390;
+    context.actionMenuUI = {
+        getIsOpen: () => true,
+        usesCompactLayout: () => true,
+        hitTestCompactPanel: (x: number, y: number) => {
+            calls.push(`panel:${x},${y}`);
+            return true;
+        },
+        onMouseMove: (x: number, y: number) => calls.push(`hover:${x},${y}`),
+        onClick: (x: number, y: number) => {
+            calls.push(`click:${x},${y}`);
+            return null;
+        },
+    } as any;
+    context.resolveFieldHitAt = () => {
+        calls.push('worldHit');
+        return { kind: 'ground', tile: { x: 4, y: 5 } };
+    };
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput({
+        mouseScreenX: 288,
+        mouseScreenY: 216,
+        uiMouseX: 96,
+        uiMouseY: 72,
+    }), {
+        ...makeCamera(),
+        zoom: 2,
+        screenToTile: () => ({ tileX: 4, tileY: 5 }),
+    });
+
+    assert.deepEqual(calls, [
+        'hover:96,72',
+        'click:96,72',
+        'panel:96,72',
+    ]);
+    assert.ok(!calls.includes('worldHit'));
+    assert.ok(!calls.includes('closeActionMenu'));
+});
+
+test('physical desktop width keeps radial coordinates even when logical UI width is compact-sized', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.getViewportWidth = () => 600;
+    context.getCanvasSize = () => ({ width: 500, height: 600 });
+    context.actionMenuUI = {
+        getIsOpen: () => true,
+        // A stale compact flag must not override the physical viewport breakpoint.
+        usesCompactLayout: () => true,
+        hitTestCompactPanel: () => {
+            calls.push('compactPanel');
+            return false;
+        },
+        onMouseMove: (x: number, y: number) => calls.push(`hover:${x},${y}`),
+        onClick: (x: number, y: number) => {
+            calls.push(`click:${x},${y}`);
+            return { type: 'move', enabled: true };
+        },
+    } as any;
+    context.playerActionController = {
+        getMode: () => null,
+        execute: (type: string) => calls.push(`execute:${type}`),
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput({
+        mouseScreenX: 300,
+        mouseScreenY: 240,
+        uiMouseX: 100,
+        uiMouseY: 80,
+    }), {
+        ...makeCamera(),
+        zoom: 2,
+    });
+
+    assert.deepEqual(calls, [
+        'hover:150,120',
+        'click:150,120',
+        'execute:move',
+    ]);
+    assert.ok(!calls.includes('compactPanel'));
 });
 
 test('magic menu hotkeys select the matching radial magic slot', () => {

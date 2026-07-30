@@ -322,7 +322,7 @@ export class WorldFieldRenderer {
         model: WorldRenderModel,
         vw: number,
         vh: number,
-        options: { combatLogOnly?: boolean } = {}
+        options: { combatLogOnly?: boolean; compactActionMenu?: boolean } = {}
     ): FieldHudLayout {
         // ── HUD layout ─────────────────────────────────────────────
         // LEFT column   : title logo + character status
@@ -358,7 +358,8 @@ export class WorldFieldRenderer {
         ctx.textBaseline = 'top';
 
         // ── Character status (left column, single panel) ──────────
-        if (model.activeCharacter) {
+        const compactRadialFocus = Boolean(options.compactActionMenu);
+        if (model.activeCharacter && !compactRadialFocus) {
             const active = model.activeCharacter;
             const effective = getEffectiveStatsForCharacter(active);
             const actionText = model.controlledActor?.id === model.activeTurnActorId && model.remainingActionPoints > 0
@@ -444,10 +445,14 @@ export class WorldFieldRenderer {
 
         renderRaidBanner(ctx, model, vw);
         renderActionModeHint(ctx, model, vw, vh);
-        if (!layout.compact || (!model.actionMode && model.fieldMagicState.mode !== 'targeting')) {
+        const compactBottomHudObscured = compactRadialFocus || (
+            layout.compact
+            && (Boolean(model.actionMode) || model.fieldMagicState.mode === 'targeting')
+        );
+        if (!compactBottomHudObscured) {
             renderCombatLog(ctx, model, vw, vh);
         }
-        if (!layout.compact || (!model.actionMode && model.fieldMagicState.mode !== 'targeting')) {
+        if (!compactBottomHudObscured) {
             renderKeyHintStrip(ctx, vw, vh);
         }
 

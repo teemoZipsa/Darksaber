@@ -123,12 +123,21 @@ async function getCombatUxDebug(page: Page) {
             return acc;
         }, {});
         const logs = engine?.fieldFeedback?.combatLog ?? [];
-        const actionStates = Array.from(uiState?.actionMenuUI?.slotStates ?? []).map(([type, state]: any) => ({
-            type,
-            enabled: Boolean(state?.enabled),
-            disabledReason: state?.disabledReason ?? null,
-            highlighted: Boolean(state?.highlighted),
-        }));
+        const actionStates = Array.from(uiState?.actionMenuUI?.slotStates ?? []).map(([type, state]: any) => {
+            const bounds = uiState?.actionMenuUI?.getCompactChipBounds?.(type) ?? null;
+            return {
+                type,
+                enabled: Boolean(state?.enabled),
+                disabledReason: state?.disabledReason ?? null,
+                highlighted: Boolean(state?.highlighted),
+                screen: rect && bounds
+                    ? {
+                        x: rect.left + (bounds.x + bounds.width / 2) * uiScale,
+                        y: rect.top + (bounds.y + bounds.height / 2) * uiScale,
+                    }
+                    : null,
+            };
+        });
         return {
             state: gm?.state,
             status: document.querySelector('.dev-scenario-status')?.textContent ?? '',
@@ -137,6 +146,7 @@ async function getCombatUxDebug(page: Page) {
             partyActorCharacterIds: (engine?.partyActors ?? []).map((entry: any) => entry.character?.id ?? null),
             isNetworkRaid: engine?.isNetworkRaidActive?.() ?? engine?.isNetworkRaid ?? null,
             actionMenuOpen: uiState?.actionMenuUI?.getIsOpen?.() ?? false,
+            combatPresentationBusy: engine?.fieldFeedback?.isCombatPresentationBusy?.() ?? false,
             playerActionMode: actionControllers?.playerActionController?.getMode?.() ?? null,
             magicMode: actionControllers?.magicController?.getState?.().mode ?? null,
             toolVisible: actionControllers?.toolController?.isVisible?.() ?? false,
@@ -227,15 +237,6 @@ async function clickCombatToolOption(page: Page, isMobile = false): Promise<void
 
 type CombatAction = 'tool' | 'attack' | 'rest' | 'defend' | 'magic' | 'fanfare';
 
-const COMBAT_ACTION_OFFSETS: Record<CombatAction, readonly [number, number]> = {
-    tool: [0, -1],
-    attack: [1, -1],
-    magic: [-1, 0],
-    defend: [1, 0],
-    rest: [-1, 1],
-    fanfare: [0, 1],
-};
-
 const COMBAT_ACTION_KEYS: Record<CombatAction, string> = {
     tool: 'KeyW',
     attack: 'KeyE',
@@ -246,15 +247,18 @@ const COMBAT_ACTION_KEYS: Record<CombatAction, string> = {
 };
 
 async function chooseCombatAction(page: Page, isMobile: boolean, action: CombatAction): Promise<void> {
+    await expect.poll(() => getCombatUxDebug(page)).toMatchObject({
+        actionMenuOpen: true,
+        combatPresentationBusy: false,
+    });
     if (!isMobile) {
         await page.keyboard.press(COMBAT_ACTION_KEYS[action]);
         return;
     }
     const current = await getCombatUxDebug(page);
-    const actorScreen = current.actor?.screen;
-    expect(actorScreen).toBeTruthy();
-    const [gridX, gridY] = COMBAT_ACTION_OFFSETS[action];
-    await page.touchscreen.tap(actorScreen!.x + gridX * 48, actorScreen!.y + gridY * 48);
+    const compactSlot = current.actionStates.find((state: any) => state.type === action)?.screen;
+    expect(compactSlot).toBeTruthy();
+    await page.touchscreen.tap(compactSlot!.x, compactSlot!.y);
 }
 
 async function chooseFirstMagic(page: Page, isMobile: boolean): Promise<void> {

@@ -1,6 +1,10 @@
 import type { Enemy } from '../../entity/Enemy';
 import type { LootObject } from '../../entity/LootObject';
-import type { ActionMenuUI, ActionType } from '../../ui/ActionMenuUI';
+import {
+    ACTION_MENU_COMPACT_BREAKPOINT,
+    type ActionMenuUI,
+    type ActionType,
+} from '../../ui/ActionMenuUI';
 import type { EntityInfoUI } from '../../ui/EntityInfoUI';
 import type { Camera } from '../Camera';
 import type { InputManager } from '../InputManager';
@@ -43,6 +47,7 @@ export interface WorldInputContext {
     selectionController: WorldSelectionController;
     tacticalController: WorldTacticalController;
     getCanvasSize: () => { width: number; height: number };
+    getViewportWidth: () => number;
     isFieldHudInteractive: () => boolean;
     getActivePartyTurnActor: () => FieldActor | null;
     getActiveTurnActorId: () => string | null;
@@ -75,12 +80,27 @@ export class WorldInputController {
 
     public process(input: InputManager, camera: Camera): void {
         const fieldHudInteractive = this.context.isFieldHudInteractive();
+        const compactViewport = this.context.getViewportWidth() < ACTION_MENU_COMPACT_BREAKPOINT;
+        const compactActionMenuRequested = compactViewport && this.context.actionMenuUI.getIsOpen();
         if (fieldHudInteractive && SettingsManager.isKeybindingJustPressed('world.minimap', input)) {
+            if (compactActionMenuRequested) {
+                this.context.closeActionMenu();
+            }
             this.context.minimapUI.toggle();
             return;
         }
 
         if (fieldHudInteractive && this.context.minimapUI.handleInput(input)) return;
+        const fullMapVisible = this.context.minimapUI.isFullMapVisible?.() ?? false;
+        if (fieldHudInteractive && fullMapVisible) return;
+
+        if (!compactViewport && (this.context.actionMenuUI.usesCompactLayout?.() ?? false)) {
+            this.context.actionMenuUI.clearCompactLayout?.();
+        }
+        const compactActionMenuOpen = (
+            compactActionMenuRequested
+            && (this.context.actionMenuUI.usesCompactLayout?.() ?? false)
+        );
 
         if (fieldHudInteractive) {
             this.context.entityInfoUI.onMouseMove(input.uiMouseX, input.uiMouseY);
@@ -88,10 +108,11 @@ export class WorldInputController {
         }
         this.context.toolController.onMouseMove(input.uiMouseX, input.uiMouseY);
 
-        // Overlay pointer priority mirrors render order: the mini map is drawn
-        // above tool/tactical panels, entity info, and finally the combat log.
+        // The full map remains modal. The compact mini map is hidden while the
+        // mobile radial is open, so its previous-frame bounds must not claim taps.
         if (
             fieldHudInteractive
+            && !compactActionMenuRequested
             && input.mouseJustDown
             && this.context.minimapUI.onClick(input.uiMouseX, input.uiMouseY)
         ) {
@@ -127,14 +148,33 @@ export class WorldInputController {
             if (entityInfoHit === 'consume') return;
         }
 
+        if (compactActionMenuOpen) {
+            this.context.actionMenuUI.onMouseMove(input.uiMouseX, input.uiMouseY);
+            if (this.context.isCombatPresentationBusy()) return;
+            if (input.mouseJustDown) {
+                if (this.handleActionMenuSlotClick(input, camera)) return;
+                if (this.context.actionMenuUI.hitTestCompactPanel(input.uiMouseX, input.uiMouseY)) return;
+            }
+            if (this.handleActionMenuHotkey(input)) return;
+        } else if (
+            compactActionMenuRequested
+            && input.mouseJustDown
+        ) {
+            // The viewport changed before the UI pass rebuilt the compact radial.
+            // Swallow this one-frame pointer gap instead of hitting stale radial cells.
+            return;
+        }
+
         // Combat log claims wheel/drag inside its region before field controls.
         const canvasSize = this.context.getCanvasSize();
-        const logConsumed = CombatLogUI.update(
-            input,
-            this.context.getCombatLog().length,
-            canvasSize.width,
-            canvasSize.height,
-        );
+        const logConsumed = compactActionMenuOpen
+            ? false
+            : CombatLogUI.update(
+                input,
+                this.context.getCombatLog().length,
+                canvasSize.width,
+                canvasSize.height,
+            );
         if (logConsumed) return;
 
         if (input.mouseWheelDelta !== 0 && !this.context.magicController.isVisible() && !this.context.toolController.isVisible()) {
@@ -145,16 +185,24 @@ export class WorldInputController {
         const screenTile = camera.screenToTile(input.mouseScreenX, input.mouseScreenY);
         const hoverTile = { x: screenTile.tileX, y: screenTile.tileY };
         this.context.setHoverTile(hoverTile);
-        this.context.actionMenuUI.onMouseMove(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
+        if (!compactActionMenuOpen) {
+            this.context.actionMenuUI.onMouseMove(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
+        }
         this.context.magicController.onMouseMove(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
         this.context.magicController.updateHoverPreview(hoverTile);
 
         if (this.context.isCombatPresentationBusy()) return;
 
-        if (input.mouseJustDown && this.context.actionMenuUI.getIsOpen()) {
+        if (!compactViewport && input.mouseJustDown && this.context.actionMenuUI.getIsOpen()) {
             if (this.handleActionMenuSlotClick(input, camera)) return;
         }
-        if (this.context.actionMenuUI.getIsOpen() && this.handleActionMenuHotkey(input)) return;
+        if (
+            !compactViewport
+            && this.context.actionMenuUI.getIsOpen()
+            && this.handleActionMenuHotkey(input)
+        ) {
+            return;
+        }
 
         if (this.isInputLockedByReservation()) return;
         if (input.justPressed('Space') && this.context.getActivePartyTurnActor()) {
@@ -299,7 +347,13 @@ export class WorldInputController {
     }
 
     private handleActionMenuSlotClick(input: InputManager, camera: Camera): boolean {
-        const result = this.context.actionMenuUI.onClick(input.mouseScreenX / camera.zoom, input.mouseScreenY / camera.zoom);
+        const compactViewport = this.context.getViewportWidth() < ACTION_MENU_COMPACT_BREAKPOINT;
+        const compact = compactViewport && (this.context.actionMenuUI.usesCompactLayout?.() ?? false);
+        if (compactViewport && !compact) return false;
+        const result = this.context.actionMenuUI.onClick(
+            compact ? input.uiMouseX : input.mouseScreenX / camera.zoom,
+            compact ? input.uiMouseY : input.mouseScreenY / camera.zoom,
+        );
         if (!result) return false;
         this.executeActionMenuResult(result);
         return true;

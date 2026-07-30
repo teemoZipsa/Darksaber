@@ -220,6 +220,7 @@ export function createWorldEnginePresentationControllers(
                 height: Math.floor((ports.canvas.clientHeight || ports.canvas.height) / uiScale),
             };
         },
+        getViewportWidth: () => ports.canvas.clientWidth || ports.canvas.width,
         isFieldHudInteractive: () => !ports.tutorialController.isActive(),
         getActivePartyTurnActor: () => ports.getActivePartyTurnActor(),
         getActiveTurnActorId: () => ports.turnStateController.getActiveTurnActorId(),
