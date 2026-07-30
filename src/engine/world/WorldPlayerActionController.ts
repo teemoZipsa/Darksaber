@@ -60,11 +60,14 @@ export interface WorldPlayerActionContext {
     isFieldPassable: (query: FieldPassableQuery) => boolean;
     getBlockedMoveMessage?: (tile: TilePoint, actor: FieldActor) => string | null;
     spendAp: (cost: number) => boolean;
+    restoreAp?: (actor: FieldActor, points: number) => void;
     isMajorActionUsed: () => boolean;
     markMajorActionUsed: () => void;
     getFanfareLeaderId?: () => string | null;
     setFanfareLeaderId?: (actorId: string | null) => void;
     getFanfareFollowerCount?: (actor: FieldActor) => number;
+    isNetworkRaid?: () => boolean;
+    canSubmitMoveIntent?: () => boolean;
     submitMoveIntent?: (actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number) => boolean;
     submitActionIntent?: (actor: FieldActor, action: 'defend' | 'rest') => boolean;
     tryActorAttack: (actor: FieldActor, enemy: Enemy) => boolean;
@@ -97,11 +100,21 @@ export interface WorldPlayerActionEventSink {
     spawnBuffEffect(x: number, y: number): void;
 }
 
+export interface MoveTargetPreview {
+    path: TilePoint[];
+    pathCost: number;
+    movementBudget: number;
+}
+
 export class WorldPlayerActionController {
     private readonly context: WorldPlayerActionContext;
     private readonly sink: WorldPlayerActionEventSink;
     private actionMode: 'move' | 'attack' | 'interact' | null = null;
     private actionTiles: Set<string> = new Set();
+    private moveTargetPreviewCache: {
+        key: string;
+        preview: MoveTargetPreview;
+    } | null = null;
 
     constructor(context: WorldPlayerActionContext, sink: WorldPlayerActionEventSink) {
         this.context = context;
@@ -116,9 +129,43 @@ export class WorldPlayerActionController {
         return this.actionTiles;
     }
 
+    public getMoveTargetPreview(tile: TilePoint): MoveTargetPreview | null {
+        if (this.actionMode !== 'move') return null;
+
+        const actor = this.context.getActivePartyTurnActor();
+        if (!actor || this.context.getActiveTurnActorId() !== actor.id) return null;
+        if (!this.actionTiles.has(tileKey(tile.x, tile.y))) return null;
+
+        const start = this.actorTile(actor);
+        const movementBudget = this.context.getActorTerrainMovementBudget(actor);
+        const cacheKey = [
+            actor.id,
+            start.x,
+            start.y,
+            tile.x,
+            tile.y,
+            movementBudget,
+        ].join(':');
+        if (this.moveTargetPreviewCache?.key === cacheKey) {
+            return this.moveTargetPreviewCache.preview;
+        }
+
+        const pathResult = this.findMovePath(actor, tile, movementBudget);
+        if (pathResult.path.length === 0) return null;
+
+        const preview = {
+            path: pathResult.path,
+            pathCost: pathResult.cost,
+            movementBudget,
+        };
+        this.moveTargetPreviewCache = { key: cacheKey, preview };
+        return preview;
+    }
+
     public clearTargeting(): void {
         this.actionMode = null;
         this.actionTiles.clear();
+        this.moveTargetPreviewCache = null;
     }
 
     public execute(action: ActionType | string): void {
@@ -219,8 +266,7 @@ export class WorldPlayerActionController {
         if (!actor) return;
 
         if (this.actionMode === 'attack') {
-            this.handleAttackTarget(actor, hit);
-            this.clearTargeting();
+            if (this.handleAttackTarget(actor, hit)) this.clearTargeting();
             return;
         }
 
@@ -230,7 +276,6 @@ export class WorldPlayerActionController {
                 ? this.context.getBlockedMoveMessage?.(tile, actor)
                 : null;
             this.sink.log(blockedMessage ?? t('field.action.moveInvalid'));
-            this.clearTargeting();
             return;
         }
 
@@ -238,14 +283,13 @@ export class WorldPlayerActionController {
             const queued = this.queueMoveIntent(actor, tile);
             if (queued) {
                 this.sink.log(formatT('field.action.moveStarted', { x: tile.x, y: tile.y }));
+                this.clearTargeting();
             }
-            this.clearTargeting();
             return;
         }
 
         if (this.actionMode === 'interact') {
-            this.handleInteractTarget(actor, tile, hit);
-            this.clearTargeting();
+            if (this.handleInteractTarget(actor, tile, hit)) this.clearTargeting();
         }
     }
 
@@ -439,53 +483,57 @@ export class WorldPlayerActionController {
         this.context.reopenActionMenu(actor);
     }
 
-    private handleAttackTarget(actor: FieldActor, hit: FieldHit): void {
+    private handleAttackTarget(actor: FieldActor, hit: FieldHit): boolean {
         if (hit.kind !== 'enemy') {
             this.sink.log(t('field.action.attackNone'));
-            return;
+            return false;
         }
 
         const enemy = this.context.getEnemyById(hit.enemy.id);
         if (!enemy) {
             this.sink.log(t('field.action.attackNone'));
-            return;
+            return false;
         }
 
         this.context.selectEnemy(enemy.id);
         const failure = this.context.getActorAttackTargetFailure(actor, enemy);
         if (failure) {
             this.sink.log(getAttackFailureMessage(failure));
-            return;
+            return false;
         }
         actor.entity.faceToward(enemy.gridX, enemy.gridY);
-        if (this.spendActionCost(ATTACK_ACTION_GAUGE_COST) && this.context.tryActorAttack(actor, enemy)) {
+        if (!this.spendActionCost(ATTACK_ACTION_GAUGE_COST)) return false;
+
+        if (this.context.tryActorAttack(actor, enemy)) {
             actor.entity.playActionMotion('attack');
             this.context.onActionCompleted?.('attack');
             this.context.resumeOrEndActiveTurn(actor);
         }
+        return true;
     }
 
-    private handleInteractTarget(actor: FieldActor, tile: TilePoint, hit: FieldHit): void {
+    private handleInteractTarget(actor: FieldActor, tile: TilePoint, hit: FieldHit): boolean {
         if (hit.kind !== 'loot') {
-            if (this.tryAdditionalInteract(actor, tile)) return;
+            if (this.tryAdditionalInteract(actor, tile)) return true;
             this.sink.log(t('field.action.interactNoTarget'));
-            return;
+            return false;
         }
 
         const loot = this.context.getLootById(hit.loot.id);
         if (!loot) {
-            if (this.tryAdditionalInteract(actor, tile)) return;
+            if (this.tryAdditionalInteract(actor, tile)) return true;
             this.sink.log(t('field.action.interactNoTarget'));
-            return;
+            return false;
         }
 
         this.context.selectLoot(loot.id);
         if (!this.spendActionCost(INTERACT_ACTION_GAUGE_COST)) {
             this.sink.log(t('field.action.interactNoAp'));
-            return;
+            return false;
         }
         this.context.openLoot(loot);
         this.context.resumeOrEndActiveTurn(actor);
+        return true;
     }
 
     private tryAdditionalInteract(actor: FieldActor, tile: TilePoint): boolean {
@@ -507,12 +555,7 @@ export class WorldPlayerActionController {
 
     private queueMoveIntent(actor: FieldActor, tile: TilePoint): boolean {
         const movementBudget = this.context.getActorTerrainMovementBudget(actor);
-        const pathResult = findPathWithCost(this.actorTile(actor), tile, (query) => this.context.isFieldPassable(query), (step) => this.context.getActorTerrainStepCost(actor, step), {
-            actorId: actor.id,
-            intent: 'move',
-            maxNodes: 8000,
-            maxCost: movementBudget,
-        });
+        const pathResult = this.findMovePath(actor, tile, movementBudget);
         const path = pathResult.path;
         if (path.length === 0 && !this.context.isActorAt(actor, tile)) {
             this.context.clearActorIntent(actor);
@@ -521,6 +564,12 @@ export class WorldPlayerActionController {
         }
 
         const apCost = getActionApCost('move');
+        const networkRaid = this.context.isNetworkRaid?.() ?? false;
+        if (networkRaid && !(this.context.canSubmitMoveIntent?.() ?? false)) {
+            this.sink.log(t('mp.error.socketNotOpen'));
+            return false;
+        }
+        const remainingActionPointsBeforeMove = this.context.getRemainingActionPoints();
         if (!this.spendActionCost(MOVE_ACTION_GAUGE_COST)) {
             this.sink.log(t('field.action.moveNoAp'));
             return false;
@@ -530,12 +579,32 @@ export class WorldPlayerActionController {
             this.context.closeActionMenu();
             return true;
         }
+        if (networkRaid) {
+            this.context.restoreAp?.(actor, remainingActionPointsBeforeMove);
+            this.sink.log(t('mp.error.socketNotOpen'));
+            return false;
+        }
 
         actor.path = path;
         actor.queuedIntent = { kind: 'move', tile, path, apCost, pathCost: pathResult.cost };
         this.context.setReservedAction(actor.queuedIntent);
         this.context.closeActionMenu();
         return true;
+    }
+
+    private findMovePath(actor: FieldActor, tile: TilePoint, movementBudget: number) {
+        return findPathWithCost(
+            this.actorTile(actor),
+            tile,
+            (query) => this.context.isFieldPassable(query),
+            (step) => this.context.getActorTerrainStepCost(actor, step),
+            {
+                actorId: actor.id,
+                intent: 'move',
+                maxNodes: 8000,
+                maxCost: movementBudget,
+            }
+        );
     }
 
     private computeWalkableTiles(actor: FieldActor): Set<string> {

@@ -7,6 +7,7 @@ import { Player } from '../../src/entity/Player';
 import { ATTACK_AP_COST, MAGIC_AP_COST, getActionApCost } from '../../src/field/FieldActionEconomy';
 import type { FieldActor, FieldEnemy } from '../../src/field/FieldTypes';
 import { WorldPlayerActionController, type WorldPlayerActionContext } from '../../src/engine/world/WorldPlayerActionController';
+import { t } from '../../src/i18n/LanguageManager';
 
 class ImageStub {
     public src = '';
@@ -53,6 +54,12 @@ interface ControllerOptions {
     interactAtTile?: WorldPlayerActionContext['interactAtTile'];
     isFieldPassable?: WorldPlayerActionContext['isFieldPassable'];
     getBlockedMoveMessage?: WorldPlayerActionContext['getBlockedMoveMessage'];
+    movementBudget?: number;
+    getActorTerrainStepCost?: WorldPlayerActionContext['getActorTerrainStepCost'];
+    isNetworkRaid?: boolean;
+    canSubmitMoveIntent?: boolean;
+    submitMoveIntent?: WorldPlayerActionContext['submitMoveIntent'];
+    restoreAp?: WorldPlayerActionContext['restoreAp'];
 }
 
 function makeController(actor: FieldActor, remainingAp: number, options: ControllerOptions = {}): WorldPlayerActionController {
@@ -63,8 +70,8 @@ function makeController(actor: FieldActor, remainingAp: number, options: Control
         getRemainingActionPoints: () => remainingAp,
         getReservedAction: () => null,
         getActiveTurnActorId: () => actor.id,
-        getActorTerrainMovementBudget: () => 4,
-        getActorTerrainStepCost: () => 1,
+        getActorTerrainMovementBudget: () => options.movementBudget ?? 4,
+        getActorTerrainStepCost: options.getActorTerrainStepCost ?? (() => 1),
         getActorAttackProfile: () => ({ select: { kind: 'adjacent', maxRange: 1 }, effect: { kind: 'single' } }),
         getPatternContext: () => ({ casterTile: { x: actor.entity.gridX, y: actor.entity.gridY } }),
         getActorAttackTargetFailure: options.getActorAttackTargetFailure ?? (() => null),
@@ -79,6 +86,7 @@ function makeController(actor: FieldActor, remainingAp: number, options: Control
             options.spentCosts?.push(cost);
             return true;
         },
+        restoreAp: options.restoreAp,
         isMajorActionUsed: () => options.majorActionUsed?.value ?? false,
         markMajorActionUsed: () => {
             if (options.majorActionUsed) options.majorActionUsed.value = true;
@@ -88,6 +96,9 @@ function makeController(actor: FieldActor, remainingAp: number, options: Control
             if (options.fanfareLeaderId) options.fanfareLeaderId.value = actorId;
         },
         getFanfareFollowerCount: options.fanfareFollowerCount,
+        isNetworkRaid: () => options.isNetworkRaid ?? false,
+        canSubmitMoveIntent: () => options.canSubmitMoveIntent ?? true,
+        submitMoveIntent: options.submitMoveIntent,
         tryActorAttack: () => false,
         openLoot: () => undefined,
         openMagic: () => undefined,
@@ -287,6 +298,109 @@ test('blocked story door reports a scenario-specific movement message', () => {
     controller.handleTargetClick({ x: 1, y: 0 }, { kind: 'ground', tile: { x: 1, y: 0 } });
 
     assert.equal(logs[logs.length - 1], '문이 잠겨 있습니다.');
+    assert.equal(controller.getMode(), 'move');
+});
+
+test('move targeting previews the weighted route and caches an unchanged hover tile', () => {
+    const actor = makeActor('hero', 0, 0);
+    const stepCostCalls = { value: 0 };
+    const controller = makeController(actor, getActionApCost('move'), {
+        movementBudget: 4,
+        getActorTerrainStepCost: (_actor, tile) => {
+            stepCostCalls.value += 1;
+            return tile.x === 1 && tile.y === 0 ? 4 : 1;
+        },
+    });
+
+    controller.execute('move');
+    const callsAfterReachableTiles = stepCostCalls.value;
+    const preview = controller.getMoveTargetPreview({ x: 2, y: 0 });
+
+    assert.ok(preview);
+    assert.equal(preview.pathCost, 4);
+    assert.equal(preview.movementBudget, 4);
+    assert.equal(preview.path.length, 4);
+    assert.deepEqual(preview.path[preview.path.length - 1], { x: 2, y: 0 });
+    assert.equal(preview.path.some((tile) => tile.x === 1 && tile.y === 0), false);
+    assert.ok(stepCostCalls.value > callsAfterReachableTiles);
+
+    const callsAfterFirstPreview = stepCostCalls.value;
+    assert.equal(controller.getMoveTargetPreview({ x: 2, y: 0 }), preview);
+    assert.equal(stepCostCalls.value, callsAfterFirstPreview);
+    assert.equal(controller.getMoveTargetPreview({ x: 9, y: 9 }), null);
+});
+
+test('invalid attack clicks keep targeting active for an immediate retry', () => {
+    const actor = makeActor('hero', 0, 0);
+    const enemy = makeEnemyEntry('enemy', 1, 0);
+    const logs: string[] = [];
+    const controller = makeController(actor, ATTACK_AP_COST, {
+        fieldEnemies: [enemy],
+        logs,
+    });
+
+    controller.execute('attack');
+    controller.handleTargetClick({ x: 1, y: 0 }, { kind: 'ground', tile: { x: 1, y: 0 } });
+
+    assert.equal(controller.getMode(), 'attack');
+    assert.equal(logs[logs.length - 1], t('field.action.attackNone'));
+});
+
+test('successful move clicks clear targeting after the path is queued', () => {
+    const actor = makeActor('hero', 0, 0);
+    const controller = makeController(actor, getActionApCost('move'));
+
+    controller.execute('move');
+    controller.handleTargetClick({ x: 1, y: 0 }, { kind: 'ground', tile: { x: 1, y: 0 } });
+
+    assert.equal(controller.getMode(), null);
+    assert.deepEqual(actor.path, [{ x: 1, y: 0 }]);
+});
+
+test('closed network transport keeps move targeting active without spending AP or queuing local movement', () => {
+    const actor = makeActor('hero', 0, 0);
+    const logs: string[] = [];
+    const spentCosts: number[] = [];
+    const controller = makeController(actor, getActionApCost('move'), {
+        logs,
+        spentCosts,
+        isNetworkRaid: true,
+        canSubmitMoveIntent: false,
+    });
+
+    controller.execute('move');
+    controller.handleTargetClick({ x: 1, y: 0 }, { kind: 'ground', tile: { x: 1, y: 0 } });
+
+    assert.equal(controller.getMode(), 'move');
+    assert.deepEqual(spentCosts, []);
+    assert.deepEqual(actor.path, []);
+    assert.equal(logs[logs.length - 1], t('mp.error.socketNotOpen'));
+});
+
+test('network move submission failure restores AP and keeps targeting active', () => {
+    const actor = makeActor('hero', 0, 0);
+    const logs: string[] = [];
+    const spentCosts: number[] = [];
+    const restored: number[] = [];
+    const controller = makeController(actor, 80, {
+        logs,
+        spentCosts,
+        isNetworkRaid: true,
+        canSubmitMoveIntent: true,
+        submitMoveIntent: () => false,
+        restoreAp: (_actor, points) => {
+            restored.push(points);
+        },
+    });
+
+    controller.execute('move');
+    controller.handleTargetClick({ x: 1, y: 0 }, { kind: 'ground', tile: { x: 1, y: 0 } });
+
+    assert.equal(controller.getMode(), 'move');
+    assert.deepEqual(spentCosts, [getActionApCost('move')]);
+    assert.deepEqual(restored, [80]);
+    assert.deepEqual(actor.path, []);
+    assert.equal(logs[logs.length - 1], t('mp.error.socketNotOpen'));
 });
 
 test('defend applies guard and the integrated counter readiness', () => {

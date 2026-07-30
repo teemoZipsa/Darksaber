@@ -26,7 +26,7 @@ export class WorldNetworkIntentController {
     }
 
     public submitMove(actor: FieldActor, tile: TilePoint, path: TilePoint[], apCost: number, pathCost: number): boolean {
-        const client = this.getClient();
+        const client = this.getOpenClient();
         if (!client) return false;
         const intentId = client.sendIntent(actor.id, 'move', createMoveIntentPayload(tile, path, apCost, pathCost));
         this.context.networkSyncController.trackPendingMove(intentId, actor.id, tile, path);
@@ -46,24 +46,29 @@ export class WorldNetworkIntentController {
     }
 
     public submitAttack(actor: FieldActor, enemy: Enemy): boolean {
-        const client = this.getClient();
+        const client = this.getOpenClient();
         if (!client) return false;
         client.sendIntent(actor.id, 'attack', createAttackIntentPayload(enemy.id));
         return true;
     }
 
     public submitEndTurn(actor: FieldActor, reason: string): boolean {
-        const client = this.getClient();
+        const client = this.getOpenClient();
         if (!client) return false;
         client.sendIntent(actor.id, 'endTurn', createEndTurnIntentPayload(reason));
         return true;
     }
 
     private submitOpenIntent(actor: FieldActor, kind: PlayerIntentKind, payload: unknown): boolean {
-        const client = this.getClient();
-        if (!client?.getIsOpen()) return false;
+        const client = this.getOpenClient();
+        if (!client) return false;
         client.sendIntent(actor.id, kind, payload);
         return true;
+    }
+
+    private getOpenClient(): NetworkRaidClient | null {
+        const client = this.getClient();
+        return client?.getIsOpen() ? client : null;
     }
 
     private getClient(): NetworkRaidClient | null {

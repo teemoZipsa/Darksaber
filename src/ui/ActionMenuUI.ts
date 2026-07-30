@@ -10,6 +10,7 @@ import { ACTION_ICON_CELLS } from './DarksaberIconRegistry';
 import { DarksaberSpriteAtlas, MICON_CELL_SIZE } from './DarksaberSpriteAtlas';
 import { UI, Parchment } from './UITheme';
 import { SettingsManager, type KeybindingId } from '../engine/SettingsManager';
+import { AudioManager } from '../engine/AudioManager';
 
 const ACTION_ICON_ANIMATION_ROWS = 5;
 const ACTION_ICON_ANIMATION_MS = 280;
@@ -171,6 +172,7 @@ export class ActionMenuUI {
 
     public onMouseMove(mx: number, my: number): void {
         if (!this.isOpen) { this.hoveredSlot = null; return; }
+        const previous = this.hoveredSlot;
         this.hoveredSlot = null;
         for (const slot of this.slots) {
             const { x: ix, y: iy } = this.getSlotPosition(slot);
@@ -178,6 +180,9 @@ export class ActionMenuUI {
                 this.hoveredSlot = slot.type;
                 break;
             }
+        }
+        if (this.hoveredSlot && this.hoveredSlot !== previous) {
+            AudioManager.playUi('ui.hover', { volume: 0.45 });
         }
     }
 
@@ -187,6 +192,7 @@ export class ActionMenuUI {
             const state = this.getSlotState(slot.type);
             const { x: ix, y: iy } = this.getSlotPosition(slot);
             if (this.isSlotHit(mx, my, ix, iy)) {
+                AudioManager.playUi(state.enabled ? 'ui.confirm' : 'ui.error', { volume: 0.7 });
                 return {
                     type: slot.type,
                     enabled: state.enabled,

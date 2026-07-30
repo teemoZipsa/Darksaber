@@ -26,7 +26,7 @@ import type { WorldRaidOutcomeController } from './WorldRaidOutcomeController';
 import type { WorldSelectionController } from './WorldSelectionController';
 import type { WorldTacticalController } from './WorldTacticalController';
 import { getStoryInteriorBriefingLineKeys } from '../../data/StoryInteriorBriefingData';
-import { MIN_FIELD_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
+import { MIN_FIELD_ACTION_GAUGE_COST, MOVE_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
 import { formatT, t } from '../../i18n/LanguageManager';
 import {
     BOUNTY_PROOF_ITEM_ID,
@@ -152,6 +152,9 @@ export class WorldRenderController {
     private buildRenderModel(): WorldRenderModel {
         const activeActor = this.context.getControlledActor();
         const hoverTile = this.context.getHoverTile();
+        const moveTargetPreview = activeActor?.id === this.context.getActiveTurnActorId()
+            ? this.context.playerActionController.getMoveTargetPreview(hoverTile)
+            : null;
         const worldMap = this.context.getWorldMap();
         const terrainHoverLines = hoverTile.x >= 0 && hoverTile.y >= 0
             ? describeTerrainForHover(
@@ -210,6 +213,15 @@ export class WorldRenderController {
             actionMode: this.context.playerActionController.getMode(),
             actionTiles: this.context.playerActionController.getTiles(),
             pathPreviewTiles: this.context.getPathPreviewTiles(activeActor),
+            moveTargetPreview: moveTargetPreview ? {
+                tiles: moveTargetPreview.path,
+                pathCost: moveTargetPreview.pathCost,
+                movementBudget: moveTargetPreview.movementBudget,
+                remainingActionPointsAfterMove: Math.max(
+                    0,
+                    this.context.getRemainingActionPoints() - MOVE_ACTION_GAUGE_COST
+                ),
+            } : null,
             actionMenuOpen: this.context.actionMenuUI.getIsOpen(),
             fieldMagicState: this.context.magicController.getState(),
             hoverTile,

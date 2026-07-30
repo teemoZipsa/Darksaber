@@ -51,7 +51,7 @@ export class WorldEngineActionTurnFlow {
         }
 
         if (this.context.getActionMenuIsOpen()) {
-            this.dismissActionMenuTurn();
+            this.context.closeActionMenu();
             return;
         }
 

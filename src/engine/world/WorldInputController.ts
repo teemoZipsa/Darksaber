@@ -18,6 +18,7 @@ import type { MinimapUI } from '../../ui/MinimapUI';
 import { CombatLogUI } from '../../ui/CombatLogUI';
 import { SettingsManager, type KeybindingId } from '../SettingsManager';
 import { getLootSourceLabelForDisplay } from '../../loot/LootLabels';
+import { AudioManager } from '../AudioManager';
 
 type WorldInputFieldHit = FieldHit<FieldHitParty, Enemy, LootObject>;
 
@@ -109,6 +110,10 @@ export class WorldInputController {
         if (this.context.actionMenuUI.getIsOpen() && this.handleActionMenuHotkey(input)) return;
 
         if (this.isInputLockedByReservation()) return;
+        if (input.justPressed('Space') && this.context.getActivePartyTurnActor()) {
+            this.context.dismissActionMenuTurn();
+            return;
+        }
 
         if (input.mouseJustDown && this.context.minimapUI.onClick(input.uiMouseX, input.uiMouseY)) {
             return;
@@ -120,7 +125,8 @@ export class WorldInputController {
             if (this.context.tacticalController.isOpen()) this.context.closeTacticalMenu();
             else if (this.context.magicController.isActive()) this.cancelMagicSelection();
             else if (this.context.toolController.isActive()) this.context.toolController.reset();
-            else if (this.context.actionMenuUI.getIsOpen()) this.context.dismissActionMenuTurn();
+            else if (this.context.actionMenuUI.getIsOpen()) this.context.closeActionMenu();
+            else if (this.context.playerActionController.getMode()) this.cancelActionTargeting();
             else if (this.context.getReservedAction()) this.context.clearIntent();
             else this.context.onUnhandledEscape();
         } else if (this.context.tacticalController.isOpen()) {
@@ -165,7 +171,8 @@ export class WorldInputController {
                 this.context.selectionController.selectActor(hit.party.id);
                 return;
             }
-            this.context.dismissActionMenuTurn();
+            if ((hit.kind === 'ground' || hit.kind === 'blocked') && this.tryQuickMove(tile, hit)) return;
+            this.context.closeActionMenu();
             return;
         }
 
@@ -173,6 +180,8 @@ export class WorldInputController {
             this.context.playerActionController.handleTargetClick(tile, hit);
             return;
         }
+
+        if ((hit.kind === 'ground' || hit.kind === 'blocked') && this.tryQuickMove(tile, hit)) return;
 
         switch (hit.kind) {
             case 'enemy':
@@ -199,6 +208,39 @@ export class WorldInputController {
                 this.context.clearIntent();
                 this.context.log(t('field.input.blockedTile'));
                 break;
+        }
+    }
+
+    /**
+     * A ready party actor can commit a valid ground move directly from the
+     * field. The radial menu remains available for every other tactical
+     * action, while movement no longer requires clicking its slot first.
+     */
+    private tryQuickMove(
+        tile: TilePoint,
+        hit: Extract<WorldInputFieldHit, { kind: 'ground' } | { kind: 'blocked' }>
+    ): boolean {
+        const activeActor = this.context.getActivePartyTurnActor();
+        const controlledActor = this.context.getControlledActor();
+        if (!activeActor || controlledActor?.id !== activeActor.id) return false;
+        this.context.playerActionController.execute('move');
+        if (this.context.playerActionController.getMode() !== 'move') {
+            AudioManager.playUi('ui.error', { volume: 0.65 });
+            return true;
+        }
+        this.context.playerActionController.handleTargetClick(tile, hit);
+        AudioManager.playUi(
+            this.context.playerActionController.getMode() === 'move' ? 'ui.error' : 'ui.confirm',
+            { volume: 0.65 }
+        );
+        return true;
+    }
+
+    private cancelActionTargeting(): void {
+        this.context.playerActionController.clearTargeting();
+        const activeActor = this.context.getActivePartyTurnActor();
+        if (activeActor?.id === this.context.getControlledActor()?.id) {
+            this.context.toggleActionMenuForControlled();
         }
     }
 
@@ -275,8 +317,6 @@ export class WorldInputController {
 
         if (disposition === 'reopenTacticalMenu') {
             this.context.closeTacticalMenu();
-        } else if (mode.kind === 'actionMenu') {
-            this.context.dismissActionMenuTurn();
         } else {
             this.context.closeActionMenu();
         }

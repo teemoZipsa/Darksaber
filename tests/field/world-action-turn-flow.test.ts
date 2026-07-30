@@ -116,3 +116,31 @@ test('clicking a full-gauge actor begins the turn without immediately dismissing
     assert.ok(!calls.some((call) => call.startsWith('submitEndTurn')));
     assert.ok(!calls.includes('closeActionMenu'));
 });
+
+test('toggling an open action menu only closes the menu and preserves the active turn', () => {
+    const { actor, calls, flow, getActionMenuOpen, getActiveTurnActorId } = makeFlow({
+        activeTurnActorId: 'hero',
+        actionMenuOpen: true,
+    });
+
+    flow.toggleActionMenuForControlled();
+
+    assert.equal(getActionMenuOpen(), false);
+    assert.equal(getActiveTurnActorId(), actor.id);
+    assert.ok(calls.includes('closeActionMenu'));
+    assert.ok(!calls.some((call) => call.startsWith('submitEndTurn')));
+    assert.ok(!calls.includes('endActiveTurn'));
+});
+
+test('explicit action-menu turn dismissal still submits a wait turn end', () => {
+    const { calls, flow, getActiveTurnActorId } = makeFlow({
+        activeTurnActorId: 'hero',
+        actionMenuOpen: true,
+    });
+
+    flow.dismissActionMenuTurn();
+
+    assert.equal(getActiveTurnActorId(), null);
+    assert.ok(calls.includes('submitEndTurn:wait'));
+    assert.ok(calls.includes('endActiveTurn'));
+});

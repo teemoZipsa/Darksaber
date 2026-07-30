@@ -89,6 +89,7 @@ function makeContext(actor: FieldActor, calls: string[]): WorldInputContext {
         tacticalController: {
             isOpen: () => false,
             onMouseMove: () => undefined,
+            open: () => calls.push('openTacticalMenu'),
         } as any,
         getCanvasSize: () => ({ width: 800, height: 600 }),
         getActivePartyTurnActor: () => actor,
@@ -126,6 +127,149 @@ test('clicking the active actor body while action menu is open does not dismiss 
     assert.ok(calls.includes(`selectActor:${actor.id}`));
     assert.ok(!calls.includes('dismissActionMenuTurn'));
     assert.ok(!calls.includes('switchParty'));
+});
+
+test('clicking unrelated loot closes an open action menu without ending the turn', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.resolveFieldHitAt = () => ({ kind: 'loot', loot: {} as any });
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput(), makeCamera());
+
+    assert.ok(calls.includes('closeActionMenu'));
+    assert.ok(!calls.includes('dismissActionMenuTurn'));
+});
+
+test('Escape closes an open action menu without ending the turn', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const controller = new WorldInputController(makeContext(actor, calls));
+
+    controller.process(makeInput({
+        mouseJustDown: false,
+        justPressed: (code: string) => code === 'Escape',
+    }), makeCamera());
+
+    assert.ok(calls.includes('closeActionMenu'));
+    assert.ok(!calls.includes('dismissActionMenuTurn'));
+    assert.ok(!calls.includes('escape'));
+});
+
+test('Escape cancels action targeting and reopens the active actor menu', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.actionMenuUI = {
+        getIsOpen: () => false,
+        onClick: () => null,
+        onMouseMove: () => undefined,
+    } as any;
+    context.playerActionController = {
+        getMode: () => 'move',
+        clearTargeting: () => calls.push('clearTargeting'),
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput({
+        mouseJustDown: false,
+        justPressed: (code: string) => code === 'Escape',
+    }), makeCamera());
+
+    assert.deepEqual(calls, ['clearTargeting', 'toggleActionMenu']);
+    assert.ok(!calls.includes('escape'));
+    assert.ok(!calls.includes('dismissActionMenuTurn'));
+});
+
+test('right click closes an open action menu without ending the turn before opening tactics', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const controller = new WorldInputController(makeContext(actor, calls));
+
+    controller.process(makeInput({
+        mouseJustDown: false,
+        mouseRightJustDown: true,
+    }), makeCamera());
+
+    assert.ok(calls.includes('closeActionMenu'));
+    assert.ok(calls.includes('openTacticalMenu'));
+    assert.ok(!calls.includes('dismissActionMenuTurn'));
+});
+
+test('Space explicitly ends the active party turn as wait', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const controller = new WorldInputController(makeContext(actor, calls));
+
+    controller.process(makeInput({
+        mouseJustDown: false,
+        justPressed: (code: string) => code === 'Space',
+    }), makeCamera());
+
+    assert.ok(calls.includes('dismissActionMenuTurn'));
+    assert.ok(!calls.includes('closeActionMenu'));
+});
+
+test('clicking valid ground with an active party turn executes movement directly', () => {
+    const actor = makeActor('hero');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    let mode: 'move' | null = null;
+    let hoverTile = { x: 0, y: 0 };
+    context.setHoverTile = (tile) => { hoverTile = { ...tile }; };
+    context.getHoverTile = () => hoverTile;
+    context.resolveFieldHitAt = () => ({ kind: 'ground', tile: { x: 3, y: 0 } });
+    context.actionMenuUI = {
+        getIsOpen: () => true,
+        onClick: () => null,
+        onMouseMove: () => undefined,
+    } as any;
+    context.playerActionController = {
+        getMode: () => mode,
+        execute: (action: string) => {
+            calls.push(`execute:${action}`);
+            mode = action === 'move' ? 'move' : null;
+        },
+        handleTargetClick: (tile: { x: number; y: number }) => calls.push(`target:${tile.x},${tile.y}`),
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput(), {
+        ...makeCamera(),
+        screenToTile: () => ({ tileX: 3, tileY: 0 }),
+    });
+
+    assert.deepEqual(calls, ['execute:move', 'target:3,0']);
+    assert.ok(!calls.includes('closeActionMenu'));
+    assert.ok(!calls.includes('dismissActionMenuTurn'));
+});
+
+test('ground click does not quick-move an active actor that is not controlled', () => {
+    const actor = makeActor('active');
+    const controlledActor = makeActor('controlled');
+    const calls: string[] = [];
+    const context = makeContext(actor, calls);
+    context.actionMenuUI = {
+        getIsOpen: () => false,
+        onClick: () => null,
+        onMouseMove: () => undefined,
+    } as any;
+    context.getControlledActor = () => controlledActor;
+    context.resolveFieldHitAt = () => ({ kind: 'ground', tile: { x: 3, y: 0 } });
+    context.playerActionController = {
+        getMode: () => null,
+        execute: (action: string) => calls.push(`execute:${action}`),
+    } as any;
+    const controller = new WorldInputController(context);
+
+    controller.process(makeInput(), {
+        ...makeCamera(),
+        screenToTile: () => ({ tileX: 3, tileY: 0 }),
+    });
+
+    assert.ok(!calls.includes('execute:move'));
+    assert.deepEqual(calls, ['closeActionMenu']);
 });
 
 test('M key toggles the full minimap before full-map pointer handling can consume input', () => {

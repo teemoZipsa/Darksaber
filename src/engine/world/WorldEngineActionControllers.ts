@@ -261,11 +261,17 @@ export function createWorldEngineActionControllers(
             isFieldPassable: (query) => ports.movementController.isFieldPassable(query),
             getBlockedMoveMessage: (tile) => ports.storyScenarioController.getLockedDoorMessage(tile),
             spendAp: (cost) => ports.spendAp(cost),
+            restoreAp: (actor, points) => {
+                ports.turnStateController.setRemainingActionPoints(points);
+                actor.entity.actionGauge = points;
+            },
             isMajorActionUsed: () => ports.turnStateController.isMajorActionUsed(),
             markMajorActionUsed: () => ports.turnStateController.markMajorActionUsed(),
             getFanfareLeaderId: () => ports.getFanfareLeaderId(),
             setFanfareLeaderId: (actorId) => ports.setFanfareLeaderId(actorId),
             getFanfareFollowerCount: (actor) => ports.getFanfareFollowerCount(actor),
+            isNetworkRaid: () => ports.isNetworkRaid(),
+            canSubmitMoveIntent: () => !ports.isNetworkRaid() || Boolean(ports.getNetworkRaidClient()?.getIsOpen()),
             submitMoveIntent: (actor, tile, path, apCost, pathCost) =>
                 ports.submitNetworkMoveIntent(actor, tile, path, apCost, pathCost),
             submitActionIntent: (actor, action) => ports.submitNetworkActionIntent(actor, action),

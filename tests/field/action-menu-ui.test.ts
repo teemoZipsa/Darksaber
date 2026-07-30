@@ -5,6 +5,7 @@ import { FieldMagicMenu, type FieldMagicSlot } from '../../src/ui/FieldMagicMenu
 import { ACTION_ICON_CELLS } from '../../src/ui/DarksaberIconRegistry';
 import { getSkill } from '../../src/data/SkillDB';
 import { TILE_SIZE } from '../../src/map/Chunk';
+import { AudioManager } from '../../src/engine/AudioManager';
 
 function clickSlot(menu: ActionMenuUI, type: ActionMenuSlotState['type']) {
     const runtime = menu as unknown as {
@@ -51,6 +52,38 @@ test('open action menu can refresh a disabled attack slot after targets change',
     assert.equal(result?.type, 'attack');
     assert.equal(result?.enabled, true);
     assert.equal(result?.disabledReason, undefined);
+});
+
+test('action menu hover feedback fires once when entering a different slot', () => {
+    const menu = new ActionMenuUI();
+    menu.open();
+    const runtime = menu as unknown as {
+        centerX: number;
+        centerY: number;
+        slots: Array<{ type: ActionMenuSlotState['type'] }>;
+        getSlotPosition(slot: { type: ActionMenuSlotState['type'] }): { x: number; y: number };
+    };
+    runtime.centerX = 100;
+    runtime.centerY = 100;
+    const moveSlot = runtime.slots.find((slot) => slot.type === 'move');
+    const attackSlot = runtime.slots.find((slot) => slot.type === 'attack');
+    assert.ok(moveSlot);
+    assert.ok(attackSlot);
+    const movePos = runtime.getSlotPosition(moveSlot);
+    const attackPos = runtime.getSlotPosition(attackSlot);
+    const played: string[] = [];
+    const originalPlayUi = AudioManager.playUi.bind(AudioManager);
+    AudioManager.playUi = (key: string) => { played.push(key); };
+
+    try {
+        menu.onMouseMove(movePos.x, movePos.y);
+        menu.onMouseMove(movePos.x, movePos.y);
+        menu.onMouseMove(attackPos.x, attackPos.y);
+    } finally {
+        AudioManager.playUi = originalPlayUi;
+    }
+
+    assert.deepEqual(played, ['ui.hover', 'ui.hover']);
 });
 
 test('fanfare slot remains visible and disabled when no state enables it', () => {

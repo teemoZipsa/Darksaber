@@ -778,6 +778,7 @@ test('network move stores a render-only path preview without queuing local movem
     const sent: unknown[] = [];
     engine.isNetworkRaid = true;
     engine.networkRaidClient = {
+        getIsOpen: () => true,
         sendIntent: (...args: unknown[]) => {
             sent.push(args);
             return 'move-1';
@@ -794,6 +795,32 @@ test('network move stores a render-only path preview without queuing local movem
     const previewPath = engine.getPathPreviewTiles(actor);
     assert.deepEqual(previewPath, path);
     assert.notEqual(previewPath, path);
+});
+
+test('network move is not accepted locally while the world socket is closed', () => {
+    const actor = makeActor('hero');
+    const { engine } = makeEngineHarness(actor);
+    const sent: unknown[] = [];
+    engine.isNetworkRaid = true;
+    engine.networkRaidClient = {
+        getIsOpen: () => false,
+        sendIntent: (...args: unknown[]) => {
+            sent.push(args);
+            return 'move-closed';
+        },
+    };
+
+    const submitted = engine.submitNetworkMoveIntent(
+        actor,
+        { x: 2, y: 0 },
+        [{ x: 1, y: 0 }, { x: 2, y: 0 }],
+        getActionApCost('move'),
+        2,
+    );
+
+    assert.equal(submitted, false);
+    assert.deepEqual(sent, []);
+    assert.deepEqual(engine.getPathPreviewTiles(actor), []);
 });
 
 test('network move path preview remains through confirmed interpolation and clears on arrival', () => {

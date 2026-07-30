@@ -20,6 +20,50 @@ const PARTY_ACTOR_IMAGE_RENDER_SCALE = 1.12;
 
 export class WorldFieldRenderer {
     public static renderPathPreview(ctx: CanvasRenderingContext2D, model: WorldRenderModel, camX: number, camY: number): void {
+        const targetPreview = model.moveTargetPreview;
+        if (targetPreview && targetPreview.tiles.length > 0 && model.controlledActor) {
+            const route = [
+                { x: model.controlledActor.entity.gridX, y: model.controlledActor.entity.gridY },
+                ...targetPreview.tiles,
+            ];
+
+            ctx.save();
+            ctx.strokeStyle = 'rgba(240, 192, 80, 0.92)';
+            ctx.fillStyle = 'rgba(240, 192, 80, 0.34)';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([7, 5]);
+            ctx.beginPath();
+            route.forEach((tile, index) => {
+                const x = tile.x * TILE_SIZE - camX + TILE_SIZE / 2;
+                const y = tile.y * TILE_SIZE - camY + TILE_SIZE / 2;
+                if (index === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            targetPreview.tiles.forEach((tile, index) => {
+                const inset = index === targetPreview.tiles.length - 1 ? 6 : 11;
+                ctx.fillRect(
+                    tile.x * TILE_SIZE - camX + inset,
+                    tile.y * TILE_SIZE - camY + inset,
+                    TILE_SIZE - inset * 2,
+                    TILE_SIZE - inset * 2
+                );
+            });
+
+            const destination = targetPreview.tiles[targetPreview.tiles.length - 1];
+            ctx.strokeStyle = '#f0c050';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(
+                destination.x * TILE_SIZE - camX + 4,
+                destination.y * TILE_SIZE - camY + 4,
+                TILE_SIZE - 8,
+                TILE_SIZE - 8
+            );
+            ctx.restore();
+        }
+
         const path = model.pathPreviewTiles;
         if (path.length === 0) return;
 
@@ -256,7 +300,14 @@ export class WorldFieldRenderer {
 
     public static renderHoverTile(ctx: CanvasRenderingContext2D, model: WorldRenderModel, camX: number, camY: number): void {
         if (model.hoverTile.x < 0 || model.hoverTile.y < 0) return;
-        ctx.strokeStyle = model.hoverTileWalkable ? 'rgba(255,255,255,0.32)' : 'rgba(255,70,70,0.35)';
+        const moveTargetValid = model.actionMode === 'move'
+            ? model.moveTargetPreview !== null
+            : model.hoverTileWalkable;
+        ctx.strokeStyle = moveTargetValid
+            ? model.actionMode === 'move'
+                ? 'rgba(240, 192, 80, 0.9)'
+                : 'rgba(255,255,255,0.32)'
+            : 'rgba(255,70,70,0.35)';
         ctx.lineWidth = 2;
         ctx.strokeRect(model.hoverTile.x * TILE_SIZE - camX + 1, model.hoverTile.y * TILE_SIZE - camY + 1, TILE_SIZE - 2, TILE_SIZE - 2);
     }
@@ -878,11 +929,15 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
  * pairs — no parchment chrome, just text with a subtle shadow for readability.
  */
 function renderKeyHintStrip(ctx: CanvasRenderingContext2D, vw: number, vh: number): void {
-    const segments: { key: string; label: string }[] = [
+    const essentialSegments: { key: string; label: string }[] = [
+        { key: 'SPACE', label: t('field.keyHint.wait') },
+        { key: 'ESC', label: t('field.keyHint.menu') },
+    ];
+    const segments: { key: string; label: string }[] = vw < 520 ? essentialSegments : [
         { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.nextActor')), label: t('field.keyHint.swap') },
         { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.minimap')), label: t('field.keyHint.map') },
         { key: SettingsManager.getKeyLabel(SettingsManager.getKeybinding('world.inventory')), label: t('field.keyHint.inventory') },
-        { key: 'ESC', label: t('field.keyHint.menu') },
+        ...essentialSegments,
     ];
 
     ctx.save();
@@ -942,7 +997,14 @@ function renderActionModeHint(ctx: CanvasRenderingContext2D, model: WorldRenderM
     if (!model.actionMode) return;
 
     const text = model.actionMode === 'move'
-        ? formatT('field.hint.moveTarget', { cost: formatT('ui.actionGaugeCost', { cost: 20 }) })
+        ? model.moveTargetPreview
+            ? formatT('field.hint.movePreview', {
+                steps: model.moveTargetPreview.tiles.length,
+                pathCost: formatMovementLoad(model.moveTargetPreview.pathCost),
+                budget: formatMovementLoad(model.moveTargetPreview.movementBudget),
+                remaining: Math.floor(model.moveTargetPreview.remainingActionPointsAfterMove),
+            })
+            : formatT('field.hint.moveTarget', { cost: formatT('ui.actionGaugeCost', { cost: 20 }) })
         : model.actionMode === 'attack'
             ? formatT('field.hint.attackTarget', { cost: formatT('ui.actionGaugeCost', { cost: 25 }) })
             : formatT('field.hint.interactTarget', { cost: formatT('ui.actionGaugeCost', { cost: 15 }) });
@@ -957,6 +1019,10 @@ function renderActionModeHint(ctx: CanvasRenderingContext2D, model: WorldRenderM
             ? '#d8f5ff'
             : '#ffe59a';
     renderCenterHint(ctx, vw, vh, text, bg, fg);
+}
+
+function formatMovementLoad(value: number): string {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function renderCombatLog(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number, vh: number): void {

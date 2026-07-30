@@ -9,6 +9,13 @@ import type { WorldPhase } from './WorldRaidSession';
 
 export type WorldActionMode = 'move' | 'attack' | 'interact';
 
+export interface WorldMoveTargetPreview {
+    tiles: TilePoint[];
+    pathCost: number;
+    movementBudget: number;
+    remainingActionPointsAfterMove: number;
+}
+
 export interface WorldRaidRenderModel {
     active: boolean;
     elapsedSeconds: number;
@@ -57,6 +64,7 @@ export interface WorldRenderModel {
     actionMode: WorldActionMode | null;
     actionTiles: Set<string>;
     pathPreviewTiles: TilePoint[];
+    moveTargetPreview: WorldMoveTargetPreview | null;
     actionMenuOpen: boolean;
     fieldMagicState: FieldMagicState;
     hoverTile: TilePoint;
