@@ -594,6 +594,7 @@ function shouldSendImmediateSnapshots(message: WorldClientMessage, replies: read
         && message.type !== 'SCENARIO_ENTER'
         && message.type !== 'SCENARIO_FIELD_EVENT_INTERACT'
         && message.type !== 'AMBIENT_SITE_INTERACT'
+        && message.type !== 'BOUNTY_CLUE_INTERACT'
     ) {
         return false;
     }

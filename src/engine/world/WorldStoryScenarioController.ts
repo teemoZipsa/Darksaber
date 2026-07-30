@@ -18,6 +18,11 @@ import {
 } from '../../data/StoryScenarioEventData';
 import { getStoryScenarioMonsterLayout } from '../../data/StoryScenarioMonsterData';
 import { getMonsterDefinition } from '../../data/MonsterCatalog';
+import {
+    getBountyHuntLayout,
+    type BountyHuntLayout,
+} from '../../data/BountyHuntPlacement';
+import { resolveBountyContract } from '../../data/BountyContractData';
 import { getStoryInteriorLayout, isStoryInteriorDungeon, type StoryInteriorLayout } from '../../data/StoryInteriorData';
 import { formatT, i18n, t } from '../../i18n/LanguageManager';
 import { formatItemName, formatMonsterName, formatStoryBossName } from '../../i18n/DisplayNames';
@@ -35,6 +40,9 @@ import type { WorldDungeonInfo, WorldInspectMarker, WorldMap } from '../../map/W
 import { getAmbientSiteOutcome } from '../../raid/AmbientSiteRules';
 import type {
     AmbientSiteResultMessage,
+    BountyClueKind,
+    BountyClueResultMessage,
+    BountyHuntSnapshot,
     ScenarioEnemyDefeatEventMessage,
     ScenarioFieldEventBroadcastMessage,
     ScenarioFieldEventResultMessage,
@@ -42,6 +50,7 @@ import type {
 } from '../../net/WorldProtocol';
 import { AudioManager } from '../AudioManager';
 import type { WorldRaidSession } from './WorldRaidSession';
+import { applyBountyEliteBaseline } from '../../field/EliteAffixes';
 
 export interface WorldStoryInteriorState {
     dungeonId: string;
@@ -54,6 +63,7 @@ export interface WorldStoryScenarioNetworkClient {
     sendScenarioEnter(actorId: string, dungeonId: string): string;
     sendScenarioFieldEventInteract(actorId: string, dungeonId: string, eventId: string): string;
     sendAmbientSiteInteract?(actorId: string, siteId: string): string;
+    sendBountyClueInteract?(actorId: string, clueId: string): string;
 }
 
 export interface WorldStoryScenarioPendingEnter {
@@ -69,6 +79,8 @@ function displayDungeonName(dungeon: WorldDungeonInfo): string {
 function displayScenarioDungeonName(scenario: StoryScenarioDefinition): string {
     return i18n.lang === 'ko' ? scenario.dungeonNameKr : scenario.dungeonNameEn;
 }
+
+const BOUNTY_CLUE_DISCOVERY_DISTANCE = 6;
 
 export interface WorldStoryScenarioContext {
     playerData: PlayerData;
@@ -110,6 +122,7 @@ export class WorldStoryScenarioController {
     private pendingNetworkScenarioEnter: WorldStoryScenarioPendingEnter | null = null;
     private readonly pendingNetworkFieldEventIntentIds: Set<string> = new Set();
     private readonly pendingNetworkAmbientSiteIntentIds: Map<string, string> = new Map();
+    private readonly pendingNetworkBountyClueIntentIds: Map<string, string> = new Map();
     private readonly completedAmbientSiteIds: Set<string> = new Set();
     private readonly networkScenarioEnteredDungeonIds: Set<string> = new Set();
     private readonly completedFieldEventKeys: Set<string> = new Set();
@@ -150,6 +163,7 @@ export class WorldStoryScenarioController {
         this.pendingNetworkScenarioEnter = null;
         this.pendingNetworkFieldEventIntentIds.clear();
         this.pendingNetworkAmbientSiteIntentIds.clear();
+        this.pendingNetworkBountyClueIntentIds.clear();
         this.networkScenarioEnteredDungeonIds.clear();
     }
 
@@ -160,11 +174,14 @@ export class WorldStoryScenarioController {
         this.pendingNetworkScenarioEnter = null;
         this.pendingNetworkFieldEventIntentIds.clear();
         this.pendingNetworkAmbientSiteIntentIds.clear();
+        this.pendingNetworkBountyClueIntentIds.clear();
         this.networkScenarioEnteredDungeonIds.clear();
         this.completedFieldEventKeys.clear();
         this.completedAmbientSiteIds.clear();
         this.context.getWorldMap().setInspectedAmbientSiteIds([]);
         this.context.getWorldMap().setInspectMarkers([]);
+        this.context.getWorldMap().setBountyMarkers([]);
+        this.context.raidSession.bountyHunt = null;
     }
 
     public enterInteriorMap(dungeonId: string, returnTile: TilePoint): StoryInteriorLayout | null {
@@ -197,6 +214,7 @@ export class WorldStoryScenarioController {
 
         const dungeonId = this.getFieldEventDungeonId();
         const actorTile = this.context.actorTile(actor);
+        this.refreshLocalBountyClueDiscovery(actor, actorTile);
         const sequence = dungeonId ? getStoryScenarioEventSequence(dungeonId) : null;
         if (dungeonId && sequence) {
             for (const event of sequence.fieldEvents) {
@@ -208,6 +226,10 @@ export class WorldStoryScenarioController {
         }
 
         if (!this.activeInterior && !this.context.raidSession.activeDungeonId) {
+            const bountyClue = this.context.raidSession.bountyHunt?.nearbyClue;
+            if (bountyClue && manhattan(actorTile, bountyClue.tile) <= 1) {
+                result.add(`${bountyClue.tile.x},${bountyClue.tile.y}`);
+            }
             for (const site of this.context.getWorldMap().getAmbientSitesNearTile(actorTile, 1)) {
                 if (!this.completedAmbientSiteIds.has(site.id)) {
                     result.add(`${site.anchorTile.x},${site.anchorTile.y}`);
@@ -268,6 +290,9 @@ export class WorldStoryScenarioController {
     public playFieldEventAt(tile: TilePoint, actor: FieldActor | null = this.context.getControlledActor()): boolean {
         const dungeonId = this.getFieldEventDungeonId();
         if (!actor || manhattan(this.context.actorTile(actor), tile) > 1) return false;
+        this.refreshLocalBountyClueDiscovery(actor);
+
+        if (this.playBountyClueAt(tile, actor)) return true;
 
         const sequence = dungeonId ? getStoryScenarioEventSequence(dungeonId) : null;
         const event = dungeonId && sequence
@@ -317,6 +342,254 @@ export class WorldStoryScenarioController {
         return true;
     }
 
+    public beginLocalBountyHunt(): void {
+        this.pendingNetworkBountyClueIntentIds.clear();
+        const withoutOldBounties = this.context.getFieldEnemies()
+            .filter((entry) => !entry.enemy.bountyContractId);
+        this.context.setFieldEnemies(withoutOldBounties);
+
+        const contract = resolveBountyContract(this.context.playerData.activeBountyContractId);
+        const layout = contract
+            ? getBountyHuntLayout(contract, this.context.getWorldMap())
+            : null;
+        if (!contract || !layout) {
+            this.context.raidSession.bountyHunt = null;
+            this.context.getWorldMap().setBountyMarkers([]);
+            return;
+        }
+
+        this.context.raidSession.bountyHunt = this.createLocalBountyHuntSnapshot(layout, 0);
+        this.syncBountyMarkers();
+        this.context.log(t('bounty.hunt.searching'));
+    }
+
+    public applyNetworkBountyHuntSnapshot(snapshot: BountyHuntSnapshot | undefined): void {
+        this.context.raidSession.bountyHunt = snapshot ? {
+            ...snapshot,
+            searchArea: snapshot.searchArea ? {
+                center: { ...snapshot.searchArea.center },
+                radius: snapshot.searchArea.radius,
+            } : null,
+            nearbyClue: snapshot.nearbyClue ? {
+                ...snapshot.nearbyClue,
+                tile: { ...snapshot.nearbyClue.tile },
+            } : undefined,
+        } : null;
+        this.syncBountyMarkers();
+    }
+
+    public applyNetworkBountyClueResult(result: BountyClueResultMessage): void {
+        this.pendingNetworkBountyClueIntentIds.delete(result.intentId);
+        const current = this.context.raidSession.bountyHunt;
+        if (!current || current.contractId !== result.contractId) return;
+        const kind = current.nearbyClue?.clueId === result.clueId
+            ? current.nearbyClue.kind
+            : null;
+        this.context.raidSession.bountyHunt = {
+            ...current,
+            cluesFound: result.cluesFound,
+            targetRevealed: result.targetRevealed,
+            searchArea: result.targetRevealed ? null : current.searchArea,
+            nearbyClue: undefined,
+        };
+        if (kind) this.logBountyClue(kind, result.cluesFound, current.totalClues);
+        if (result.targetRevealed) this.context.log(t('bounty.hunt.lairRevealed'));
+        this.syncBountyMarkers();
+    }
+
+    private playBountyClueAt(tile: TilePoint, actor: FieldActor): boolean {
+        if (this.activeInterior || this.context.raidSession.activeDungeonId) return false;
+        const hunt = this.context.raidSession.bountyHunt;
+        const clue = hunt?.nearbyClue;
+        if (
+            !hunt
+            || !clue
+            || clue.tile.x !== tile.x
+            || clue.tile.y !== tile.y
+        ) {
+            return false;
+        }
+
+        if (this.context.isNetworkRaid()) {
+            const client = this.context.getNetworkRaidClient();
+            if (!client?.sendBountyClueInteract) return false;
+            const intentId = client.sendBountyClueInteract(actor.id, clue.clueId);
+            this.pendingNetworkBountyClueIntentIds.set(intentId, clue.clueId);
+            return true;
+        }
+
+        const contract = resolveBountyContract(hunt.contractId);
+        const layout = contract
+            ? getBountyHuntLayout(contract, this.context.getWorldMap())
+            : null;
+        const expected = layout?.clues[hunt.cluesFound];
+        if (!contract || !layout || !expected || expected.id !== clue.clueId) return false;
+
+        const cluesFound = Math.min(2, hunt.cluesFound + 1);
+        this.context.raidSession.bountyHunt = this.createLocalBountyHuntSnapshot(layout, cluesFound);
+        this.logBountyClue(clue.kind, cluesFound, 2);
+        if (cluesFound >= 2) {
+            this.spawnLocalBountyTarget(layout);
+            this.context.log(t('bounty.hunt.lairRevealed'));
+        }
+        this.syncBountyMarkers();
+        return true;
+    }
+
+    private createLocalBountyHuntSnapshot(layout: BountyHuntLayout, cluesFound: number): BountyHuntSnapshot {
+        const nextClue = cluesFound < 2 ? layout.clues[cluesFound] : undefined;
+        const actor = this.context.getControlledActor();
+        const nearbyClue = nextClue
+            && actor
+            && manhattan(this.context.actorTile(actor), nextClue.tile) <= BOUNTY_CLUE_DISCOVERY_DISTANCE
+            ? nextClue
+            : undefined;
+        return {
+            contractId: layout.contractId,
+            cluesFound,
+            totalClues: 2,
+            searchArea: cluesFound >= 2
+                ? null
+                : cluesFound === 0
+                    ? {
+                        center: { ...layout.lastSeenArea.center },
+                        radius: layout.lastSeenArea.radius,
+                    }
+                    : {
+                        center: { ...nextClue!.tile },
+                        radius: 10,
+                    },
+            nearbyClue: nearbyClue ? {
+                clueId: nearbyClue.id,
+                kind: nearbyClue.kind,
+                tile: { ...nearbyClue.tile },
+            } : undefined,
+            targetRevealed: cluesFound >= 2,
+            proofEarned: false,
+        };
+    }
+
+    private refreshLocalBountyClueDiscovery(
+        actor: FieldActor,
+        actorTile: TilePoint = this.context.actorTile(actor),
+    ): void {
+        if (
+            this.context.isNetworkRaid()
+            || this.activeInterior
+            || this.context.raidSession.activeDungeonId
+        ) return;
+        const hunt = this.context.raidSession.bountyHunt;
+        if (!hunt || hunt.targetRevealed || hunt.cluesFound >= hunt.totalClues) return;
+
+        const contract = resolveBountyContract(hunt.contractId);
+        const layout = contract
+            ? getBountyHuntLayout(contract, this.context.getWorldMap())
+            : null;
+        const nextClue = layout?.clues[hunt.cluesFound];
+        if (!nextClue) return;
+        const shouldReveal = manhattan(actorTile, nextClue.tile) <= BOUNTY_CLUE_DISCOVERY_DISTANCE;
+        const currentClueId = hunt.nearbyClue?.clueId;
+        if (
+            (shouldReveal && currentClueId === nextClue.id)
+            || (!shouldReveal && currentClueId === undefined)
+        ) return;
+
+        this.context.raidSession.bountyHunt = {
+            ...hunt,
+            nearbyClue: shouldReveal ? {
+                clueId: nextClue.id,
+                kind: nextClue.kind,
+                tile: { ...nextClue.tile },
+            } : undefined,
+        };
+        this.syncBountyMarkers();
+    }
+
+    private syncBountyMarkers(): void {
+        const worldMap = this.context.getWorldMap();
+        const hunt = this.context.raidSession.bountyHunt;
+        if (worldMap instanceof StoryInteriorMap || !hunt?.nearbyClue) {
+            worldMap.setBountyMarkers([]);
+            return;
+        }
+        const clue = hunt.nearbyClue;
+        worldMap.setBountyMarkers([{
+            id: clue.clueId,
+            tile: clue.tile,
+            labelKey: `bounty.clue.${clue.kind}`,
+            kind: clue.kind === 'remains' ? 'corpse' : clue.kind,
+        }]);
+    }
+
+    private logBountyClue(kind: BountyClueKind, found: number, total: number): void {
+        this.context.log(formatT('bounty.clue.inspected', {
+            clue: t(`bounty.clue.${kind}`),
+            found,
+            total,
+        }));
+    }
+
+    private spawnLocalBountyTarget(layout: BountyHuntLayout): void {
+        const contract = resolveBountyContract(layout.contractId);
+        if (!contract) return;
+        const existing = this.context.getFieldEnemies()
+            .find((entry) => entry.enemy.bountyContractId === contract.id && entry.enemy.stats.hp > 0);
+        if (existing) return;
+        const definition = getMonsterDefinition(contract.monsterId);
+        const occupied = new Set(this.context.getFieldEnemies().map((entry) => (
+            `${entry.enemy.gridX},${entry.enemy.gridY}`
+        )));
+        const controlled = this.context.getControlledActor();
+        if (controlled) {
+            const tile = this.context.actorTile(controlled);
+            occupied.add(`${tile.x},${tile.y}`);
+        }
+        const tile = this.findLocalBountyTile(layout.lair.tile, occupied);
+        if (!tile) return;
+        const enemy = new Enemy(
+            `local_${contract.id}`,
+            tile.x,
+            tile.y,
+            formatMonsterName(definition),
+            contract.monsterLevel,
+            definition.color,
+            definition.role,
+            definition.id,
+        );
+        enemy.stats = applyBountyEliteBaseline(enemy.stats);
+        enemy.aggroRange = Math.max(8, definition.aggroRange);
+        enemy.setEliteAffixes(contract.affixIds, contract.id);
+        this.context.applyMonsterSprite(enemy, definition.id);
+        this.context.setFieldEnemies([
+            ...this.context.getFieldEnemies().filter((entry) => !entry.enemy.bountyContractId),
+            {
+                enemy,
+                home: { ...tile },
+                path: [],
+            },
+        ]);
+        this.context.log(t('bounty.targetAlive'));
+    }
+
+    private findLocalBountyTile(target: TilePoint, occupiedTiles: ReadonlySet<string>): TilePoint | null {
+        const worldMap = this.context.getWorldMap();
+        for (let radius = 0; radius <= 16; radius++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+                for (let dx = -radius; dx <= radius; dx++) {
+                    if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
+                    const candidate = { x: target.x + dx, y: target.y + dy };
+                    if (
+                        worldMap.isWalkable(candidate.x, candidate.y)
+                        && !occupiedTiles.has(`${candidate.x},${candidate.y}`)
+                    ) {
+                        return candidate;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     public exitActiveInterior(options: { placePartyAtReturn?: boolean } = {}): void {
         const active = this.activeInterior;
         if (!active) return;
@@ -342,6 +615,7 @@ export class WorldStoryScenarioController {
 
         const actor = this.context.getControlledActor();
         if (!actor) return;
+        this.refreshLocalBountyClueDiscovery(actor);
 
         const worldMap = this.context.getWorldMap();
         const dungeon = worldMap.getDungeonAtTile(actor.entity.gridX, actor.entity.gridY);
@@ -753,6 +1027,10 @@ export class WorldStoryScenarioController {
             return true;
         }
         if (this.pendingNetworkAmbientSiteIntentIds.delete(intentId)) {
+            this.context.log(formatT('field.ambient.failed', { reason }));
+            return true;
+        }
+        if (this.pendingNetworkBountyClueIntentIds.delete(intentId)) {
             this.context.log(formatT('field.ambient.failed', { reason }));
             return true;
         }

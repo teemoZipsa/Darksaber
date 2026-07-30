@@ -261,6 +261,7 @@ test('literal UI translation keys exist in both languages', () => {
 
 test('template-composed UI translation key families are covered by the data-driven guard', () => {
     assert.deepEqual([...collectTemplateUiKeyPatterns()].sort(), [
+        'bounty.clue.${}',
         'field.log.reason.${}',
         'inv.${}',
         'magic.element.${}',

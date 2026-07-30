@@ -111,18 +111,18 @@ export class WorldSessionContentSpawner {
         }));
     }
 
-    public spawnBountyTarget(player: ServerPlayer, spawnTile: TilePoint): void {
+    public spawnBountyTarget(player: ServerPlayer, targetAnchor: TilePoint): ServerEnemy | null {
         const bounty = player.bounty;
-        if (!bounty || bounty.proofEarned) return;
-        if (bounty.targetEnemyId && this.context.enemies.has(bounty.targetEnemyId)) return;
+        if (!bounty || bounty.proofEarned || (bounty.cluesFound ?? 0) < 2) return null;
+        if (bounty.targetEnemyId) {
+            const existing = this.context.enemies.get(bounty.targetEnemyId);
+            if (existing) return existing;
+        }
         const contract = resolveBountyContract(bounty.contractId);
-        if (!contract) return;
+        if (!contract) return null;
         const definition = getMonsterDefinition(contract.monsterId);
         const allocated = this.context.allocateEnemyId();
-        const tile = this.context.findNearbyWalkableTile({
-            x: spawnTile.x + 16,
-            y: spawnTile.y + 9,
-        }, allocated.id, player.id);
+        const tile = this.context.findNearbyWalkableTile(targetAnchor, allocated.id, player.id);
         const enemy = new Enemy(
             allocated.id,
             tile.x,
@@ -136,15 +136,17 @@ export class WorldSessionContentSpawner {
         enemy.stats = applyBountyEliteBaseline(enemy.stats);
         enemy.aggroRange = Math.max(8, definition.aggroRange);
         enemy.setEliteAffixes(contract.affixIds, contract.id);
-        this.context.enemies.set(enemy.id, {
+        const entry: ServerEnemy = {
             enemy,
             monsterId: definition.id,
             bountyPlayerId: player.id,
             bountyContractId: contract.id,
             home: { ...tile },
             wanderSeed: allocated.seedOrdinal,
-        });
+        };
+        this.context.enemies.set(enemy.id, entry);
         bounty.targetEnemyId = enemy.id;
+        return entry;
     }
 
     public spawnEnemyLoot(enemy: Enemy, tile: TilePoint = { x: enemy.gridX, y: enemy.gridY }): void {

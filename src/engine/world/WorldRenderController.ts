@@ -179,6 +179,16 @@ export class WorldRenderController {
         const bountyProofSecured = activeBounty
             ? this.context.hasBackpackItem?.(BOUNTY_PROOF_ITEM_ID) ?? false
             : false;
+        const bountyHunt = this.context.raidSession.bountyHunt?.contractId === activeBounty?.id
+            ? this.context.raidSession.bountyHunt
+            : null;
+        const bountyPhase = bountyProofSecured
+            ? 'proof'
+            : bountyHunt?.targetRevealed || bountyTargetAlive
+                ? 'target'
+                : (bountyHunt?.cluesFound ?? 0) > 0
+                    ? 'track'
+                    : 'search';
 
         return {
             worldTime: this.context.getWorldTime(),
@@ -230,6 +240,9 @@ export class WorldRenderController {
                     riskLabel: bountyRiskLabel(activeBounty.riskId),
                     proofSecured: bountyProofSecured,
                     targetAlive: bountyTargetAlive,
+                    phase: bountyPhase,
+                    cluesFound: bountyHunt?.cluesFound ?? 0,
+                    cluesRequired: bountyHunt?.totalClues ?? 2,
                 } : null,
             },
             storyInterior: {

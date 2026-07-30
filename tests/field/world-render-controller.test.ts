@@ -8,6 +8,10 @@ import { getStoryInteriorLayout } from '../../src/data/StoryInteriorData';
 import { Player } from '../../src/entity/Player';
 import { StoryInteriorMap } from '../../src/map/StoryInteriorMap';
 import { WorldRenderController } from '../../src/engine/world/WorldRenderController';
+import {
+    getRaidBannerLayout,
+    getRaidBountyBannerLines,
+} from '../../src/engine/world/WorldFieldRenderer';
 import { WorldRaidSession } from '../../src/engine/world/WorldRaidSession';
 import type { WorldRenderModel } from '../../src/engine/world/WorldRenderModel';
 import { t } from '../../src/i18n/LanguageManager';
@@ -67,6 +71,31 @@ function buildStoryInteriorRenderModel(dungeonId: string): WorldRenderModel {
 
     return (controller as unknown as { buildRenderModel: () => WorldRenderModel }).buildRenderModel();
 }
+
+test('bounty raid banner remains inside a 320px viewport at 120% UI scale', () => {
+    const physicalWidth = 320;
+    const uiScale = 1.2;
+    const uiWidth = Math.floor(physicalWidth / uiScale);
+    const layout = getRaidBannerLayout(uiWidth, {
+        hasBounty: true,
+        hasModifier: true,
+    });
+
+    assert.ok(layout.x >= 0);
+    assert.ok(layout.width >= 0);
+    assert.ok(layout.x + layout.width <= uiWidth);
+    assert.ok((layout.x + layout.width) * uiScale <= physicalWidth);
+    assert.equal(layout.height, 122);
+
+    const lines = getRaidBountyBannerLines(layout.width, {
+        targetName: 'Elite Target',
+        affixLabels: ['Swift', 'Vampiric'],
+        riskLabel: 'Risk: Unbroken',
+        status: 'Clues 1/2',
+    });
+    assert.equal(lines.risk, 'Risk: Unbroken');
+    assert.equal(lines.status, 'Clues 1/2');
+});
 
 test('story interiors expose dedicated objective HUD models through episode 31', () => {
     for (const scenario of STORY_SCENARIOS.filter((entry) => entry.missionKind === 'soloInterior')) {

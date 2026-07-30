@@ -22,6 +22,9 @@ export interface WorldRaidRenderModel {
         riskLabel: string;
         proofSecured: boolean;
         targetAlive: boolean;
+        phase: 'search' | 'track' | 'target' | 'proof';
+        cluesFound: number;
+        cluesRequired: number;
     } | null;
 }
 

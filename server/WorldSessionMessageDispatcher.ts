@@ -2,6 +2,7 @@ import { MIN_FIELD_ACTION_GAUGE_COST } from '../src/field/FieldActionEconomy';
 import type { WorldClientMessage } from '../src/net/WorldProtocol';
 import { reject } from './WorldSessionHelpers';
 import type { WorldSessionLootResolver } from './WorldSessionLootResolver';
+import type { WorldSessionBountyRuntime } from './WorldSessionBountyRuntime';
 import type { WorldSessionPlayerIntentResolver } from './WorldSessionPlayerIntentResolver';
 import type { WorldSessionRaidResults } from './WorldSessionRaidResults';
 import type { WorldSessionScenarioRuntime } from './WorldSessionScenarioRuntime';
@@ -12,6 +13,7 @@ export interface WorldSessionMessageDispatcherContext {
     players: Map<string, ServerPlayer>;
     actors: Map<string, ServerActor>;
     lootResolver: WorldSessionLootResolver;
+    bountyRuntime: WorldSessionBountyRuntime;
     playerIntentResolver: WorldSessionPlayerIntentResolver;
     raidResults: WorldSessionRaidResults;
     scenarioRuntime: WorldSessionScenarioRuntime;
@@ -39,6 +41,8 @@ export function handleWorldSessionMessage(
             return context.scenarioRuntime.handleFieldEventInteract(playerId, message);
         case 'AMBIENT_SITE_INTERACT':
             return context.scenarioRuntime.handleAmbientSiteInteract(playerId, message);
+        case 'BOUNTY_CLUE_INTERACT':
+            return context.bountyRuntime.handleClueInteract(playerId, message);
         case 'WORLD_LEAVE':
             context.log(`leave player=${playerId} reason=${message.reason}`);
             return {

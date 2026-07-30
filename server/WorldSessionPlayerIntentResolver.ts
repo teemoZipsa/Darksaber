@@ -138,6 +138,10 @@ export class WorldSessionPlayerIntentResolver {
         const replies: WorldServerMessage[] = [];
         if (autoLootGrant) replies.push(autoLootGrant);
         if (scenarioEnemyDefeatEvent) replies.push(scenarioEnemyDefeatEvent);
+        if (target.bountyPlayerId) {
+            replies.push(event);
+            return { replies, broadcasts: [] };
+        }
         return { replies, broadcasts: [event] };
     }
 

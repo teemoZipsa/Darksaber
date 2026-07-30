@@ -62,6 +62,7 @@ function killJoinedBountyTarget(session: WorldSession, playerId: string, intentI
     const debug = session.getDebugState();
     const player = debug.players.get(playerId);
     const serverActor = [...debug.actors.values()].find((entry) => entry.ownerPlayerId === playerId);
+    revealJoinedBountyTarget(session, playerId, `${intentId}-reveal`);
     const target = [...debug.enemies.values()].find((entry) => entry.bountyPlayerId === playerId);
     assert.ok(player);
     assert.ok(serverActor);
@@ -82,7 +83,48 @@ function killJoinedBountyTarget(session: WorldSession, playerId: string, intentI
         (message): message is AutoLootGrantMessage => message.type === 'AUTO_LOOT_GRANT',
     );
     assert.ok(grant);
+    assert.equal(attack.replies.some((message) => message.type === 'COMBAT_EVENT'), true);
+    assert.equal(attack.broadcasts.length, 0);
     return { player, serverActor, grant };
+}
+
+function inspectJoinedBountyClue(
+    session: WorldSession,
+    playerId: string,
+    clueIndex: number,
+    intentId: string,
+) {
+    const debug = session.getDebugState();
+    const player = debug.players.get(playerId);
+    const serverActor = [...debug.actors.values()].find((entry) => entry.ownerPlayerId === playerId);
+    const clue = player?.bounty?.clueSites?.[clueIndex];
+    assert.ok(player);
+    assert.ok(serverActor);
+    assert.ok(clue);
+    serverActor.tile = { ...clue.tile };
+    serverActor.actionGauge = 100;
+    serverActor.remainingAp = 100;
+    return session.handleMessage(playerId, {
+        type: 'BOUNTY_CLUE_INTERACT',
+        intentId,
+        actorId: serverActor.id,
+        clueId: clue.id,
+    }, 500 + clueIndex);
+}
+
+function revealJoinedBountyTarget(session: WorldSession, playerId: string, intentPrefix: string): void {
+    const bounty = session.getDebugState().players.get(playerId)?.bounty;
+    assert.ok(bounty);
+    while ((bounty.cluesFound ?? 0) < 2) {
+        const clueIndex = bounty.cluesFound ?? 0;
+        const result = inspectJoinedBountyClue(
+            session,
+            playerId,
+            clueIndex,
+            `${intentPrefix}-${clueIndex}`,
+        );
+        assert.equal(result.replies[0]?.type, 'BOUNTY_CLUE_RESULT');
+    }
 }
 
 test('accepted bounty spawns a private elite and pays only after proof is carried to survival', () => {
@@ -100,18 +142,41 @@ test('accepted bounty spawns a private elite and pays only after proof is carrie
     const debug = session.getDebugState();
     const player = debug.players.get(joined.playerId);
     const serverActor = [...debug.actors.values()].find((entry) => entry.ownerPlayerId === joined.playerId);
-    const target = [...debug.enemies.values()].find((entry) => entry.bountyPlayerId === joined.playerId);
     assert.ok(player);
     assert.ok(serverActor);
+    assert.equal(
+        [...debug.enemies.values()].some((entry) => entry.bountyPlayerId === joined.playerId),
+        false,
+    );
+    const initialSnapshot = session.createSnapshot(joined.playerId, 10);
+    assert.equal(initialSnapshot.bountyHunt?.contractId, contract.id);
+    assert.equal(initialSnapshot.bountyHunt?.cluesFound, 0);
+    assert.ok(initialSnapshot.bountyHunt?.searchArea);
+    const firstClue = player.bounty?.clueSites?.[0];
+    assert.ok(firstClue);
+    serverActor.tile = { ...firstClue.tile };
+    assert.equal(
+        session.createSnapshot(joined.playerId, 10).bountyHunt?.nearbyClue?.clueId,
+        firstClue.id,
+    );
+
+    const viewer = session.join(joinMessage('other-hero'), 0);
+    assert.equal(session.createSnapshot(viewer.playerId, 10).bountyHunt, undefined);
+    revealJoinedBountyTarget(session, joined.playerId, 'reveal-private-target');
+    const target = [...debug.enemies.values()].find((entry) => entry.bountyPlayerId === joined.playerId);
     assert.ok(target);
     assert.equal(target.bountyContractId, contract.id);
     assert.deepEqual(target.enemy.eliteAffixes, contract.affixIds);
 
-    const viewer = session.join(joinMessage('other-hero'), 0);
     assert.equal(
         session.createSnapshot(viewer.playerId, 10).enemies.some((enemy) => enemy.id === target.enemy.id),
         false,
     );
+    assert.equal(
+        session.createSnapshot(null, 10).enemies.some((enemy) => enemy.id === target.enemy.id),
+        false,
+    );
+    assert.equal(session.createSnapshot(null, 10).bountyHunt, undefined);
     const ownerSnapshot = session.createSnapshot(joined.playerId, 10).enemies.find((enemy) => enemy.id === target.enemy.id);
     assert.ok(ownerSnapshot);
     assert.deepEqual(ownerSnapshot.eliteAffixes, contract.affixIds);
@@ -169,6 +234,120 @@ test('accepted bounty spawns a private elite and pays only after proof is carrie
     );
 });
 
+test('bounty clues reject forged, distant, unordered, duplicate, spent, and interior interactions', () => {
+    const session = new WorldSession({ random: () => 0 });
+    const character = authCharacter('bounty-tracker');
+    const save = createDefaultCharacterSave(character);
+    const contract = getBountyOffers('central_castle', 0, 0)[1];
+    save.questState.activeBountyContractId = contract.id;
+    const joined = session.join(joinMessage(character.id), 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        saveSnapshot: save,
+    });
+    const debug = session.getDebugState();
+    const player = debug.players.get(joined.playerId);
+    const serverActor = [...debug.actors.values()].find((entry) => entry.ownerPlayerId === joined.playerId);
+    const firstClue = player?.bounty?.clueSites?.[0];
+    const secondClue = player?.bounty?.clueSites?.[1];
+    assert.ok(player);
+    assert.ok(serverActor);
+    assert.ok(firstClue);
+    assert.ok(secondClue);
+
+    serverActor.tile = { x: firstClue.tile.x + 10, y: firstClue.tile.y };
+    serverActor.remainingAp = 100;
+    const far = session.handleMessage(joined.playerId, {
+        type: 'BOUNTY_CLUE_INTERACT',
+        intentId: 'bounty-clue-far',
+        actorId: serverActor.id,
+        clueId: firstClue.id,
+    });
+    assert.equal(far.replies[0]?.type, 'ACTION_REJECTED');
+    assert.equal(player.bounty?.cluesFound, 0);
+    assert.equal(serverActor.remainingAp, 100);
+
+    serverActor.tile = { ...firstClue.tile };
+    serverActor.remainingAp = 0;
+    const spent = session.handleMessage(joined.playerId, {
+        type: 'BOUNTY_CLUE_INTERACT',
+        intentId: 'bounty-clue-spent',
+        actorId: serverActor.id,
+        clueId: firstClue.id,
+    });
+    assert.equal(spent.replies[0]?.type, 'ACTION_REJECTED');
+    assert.equal(player.bounty?.cluesFound, 0);
+
+    serverActor.remainingAp = 100;
+    for (const [intentId, clueId] of [
+        ['bounty-clue-forged', `${contract.id}:clue:forged`],
+        ['bounty-clue-out-of-order', secondClue.id],
+    ]) {
+        const rejected = session.handleMessage(joined.playerId, {
+            type: 'BOUNTY_CLUE_INTERACT',
+            intentId,
+            actorId: serverActor.id,
+            clueId,
+        });
+        assert.equal(rejected.replies[0]?.type, 'ACTION_REJECTED');
+        assert.equal(player.bounty?.cluesFound, 0);
+        assert.equal(serverActor.remainingAp, 100);
+    }
+
+    player.activeDungeonId = 'test-interior';
+    const interior = session.handleMessage(joined.playerId, {
+        type: 'BOUNTY_CLUE_INTERACT',
+        intentId: 'bounty-clue-interior',
+        actorId: serverActor.id,
+        clueId: firstClue.id,
+    });
+    assert.equal(interior.replies[0]?.type, 'ACTION_REJECTED');
+    assert.equal(player.bounty?.cluesFound, 0);
+    player.activeDungeonId = null;
+
+    const other = session.join(joinMessage('bounty-clue-thief'), 0);
+    const wrongOwner = session.handleMessage(other.playerId, {
+        type: 'BOUNTY_CLUE_INTERACT',
+        intentId: 'bounty-clue-wrong-owner',
+        actorId: serverActor.id,
+        clueId: firstClue.id,
+    });
+    assert.equal(wrongOwner.replies[0]?.type, 'ACTION_REJECTED');
+    assert.equal(player.bounty?.cluesFound, 0);
+
+    const first = inspectJoinedBountyClue(session, joined.playerId, 0, 'bounty-clue-first');
+    assert.equal(first.replies[0]?.type, 'BOUNTY_CLUE_RESULT');
+    assert.equal(player.bounty?.cluesFound, 1);
+    assert.equal(
+        [...debug.enemies.values()].some((entry) => entry.bountyPlayerId === joined.playerId),
+        false,
+    );
+
+    serverActor.tile = { ...firstClue.tile };
+    serverActor.remainingAp = 100;
+    const duplicate = session.handleMessage(joined.playerId, {
+        type: 'BOUNTY_CLUE_INTERACT',
+        intentId: 'bounty-clue-duplicate',
+        actorId: serverActor.id,
+        clueId: firstClue.id,
+    });
+    assert.equal(duplicate.replies[0]?.type, 'ACTION_REJECTED');
+    assert.equal(player.bounty?.cluesFound, 1);
+    assert.equal(serverActor.remainingAp, 100);
+
+    const second = inspectJoinedBountyClue(session, joined.playerId, 1, 'bounty-clue-second');
+    assert.equal(second.replies[0]?.type, 'BOUNTY_CLUE_RESULT');
+    assert.equal(
+        second.replies[0]?.type === 'BOUNTY_CLUE_RESULT' && second.replies[0].targetRevealed,
+        true,
+    );
+    assert.equal(player.bounty?.cluesFound, 2);
+    assert.equal(
+        [...debug.enemies.values()].filter((entry) => entry.bountyPlayerId === joined.playerId).length,
+        1,
+    );
+});
+
 test('bounty elite and runtime identity survive a server session snapshot round trip', () => {
     const session = new WorldSession();
     const character = authCharacter('persistent-bounty');
@@ -180,6 +359,7 @@ test('bounty elite and runtime identity survive a server session snapshot round 
         characterId: character.id,
         saveSnapshot: save,
     });
+    revealJoinedBountyTarget(session, joined.playerId, 'persistent-reveal');
     const before = [...session.getDebugState().enemies.values()]
         .find((entry) => entry.bountyPlayerId === joined.playerId);
     assert.ok(before);
@@ -195,6 +375,81 @@ test('bounty elite and runtime identity survive a server session snapshot round 
     assert.equal(afterPlayer.bounty.targetEnemyId, after.enemy.id);
     assert.equal(after.bountyContractId, contract.id);
     assert.deepEqual(after.enemy.eliteAffixes, contract.affixIds);
+});
+
+test('bounty clue progress survives a session snapshot and resumes at the next clue', () => {
+    const session = new WorldSession();
+    const character = authCharacter('persistent-bounty-clues');
+    const save = createDefaultCharacterSave(character);
+    const contract = getBountyOffers('central_castle', 0, 0)[0];
+    save.questState.activeBountyContractId = contract.id;
+    const joined = session.join(joinMessage(character.id), 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        saveSnapshot: save,
+    });
+    const beforeBounty = session.getDebugState().players.get(joined.playerId)?.bounty;
+    assert.ok(beforeBounty?.clueSites);
+    const firstClueId = beforeBounty.clueSites[0].id;
+    const secondClueId = beforeBounty.clueSites[1].id;
+    const firstSearchArea = session.createSnapshot(joined.playerId).bountyHunt?.searchArea;
+    inspectJoinedBountyClue(session, joined.playerId, 0, 'persist-first-clue');
+    const secondSearchArea = session.createSnapshot(joined.playerId).bountyHunt?.searchArea;
+    assert.notDeepEqual(secondSearchArea?.center, firstSearchArea?.center);
+    assert.deepEqual(secondSearchArea?.center, beforeBounty.clueSites[1].tile);
+    assert.equal(secondSearchArea?.radius, 10);
+
+    const restored = WorldSession.restorePersistentSnapshot(
+        JSON.parse(JSON.stringify(session.createPersistentSnapshot())),
+    );
+    const restoredBounty = restored.getDebugState().players.get(joined.playerId)?.bounty;
+    assert.equal(restoredBounty?.cluesFound, 1);
+    assert.equal(restoredBounty?.clueSites?.[0]?.id, firstClueId);
+    assert.equal(restoredBounty?.clueSites?.[1]?.id, secondClueId);
+    assert.equal(
+        [...restored.getDebugState().enemies.values()]
+            .some((entry) => entry.bountyPlayerId === joined.playerId),
+        false,
+    );
+
+    inspectJoinedBountyClue(restored, joined.playerId, 1, 'persist-second-clue');
+    assert.equal(
+        [...restored.getDebugState().enemies.values()]
+            .filter((entry) => entry.bountyPlayerId === joined.playerId).length,
+        1,
+    );
+});
+
+test('legacy bounty snapshot with an existing target normalizes to revealed progress', () => {
+    const session = new WorldSession();
+    const character = authCharacter('legacy-bounty-target');
+    const save = createDefaultCharacterSave(character);
+    save.questState.activeBountyContractId = getBountyOffers('central_castle', 0, 0)[2].id;
+    const joined = session.join(joinMessage(character.id), 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        saveSnapshot: save,
+    });
+    revealJoinedBountyTarget(session, joined.playerId, 'legacy-target-reveal');
+    const snapshot = session.createPersistentSnapshot();
+    const persistedPlayer = snapshot.players.find((player) => player.id === joined.playerId);
+    assert.ok(persistedPlayer?.bounty);
+    delete persistedPlayer.bounty.cluesFound;
+    delete persistedPlayer.bounty.clueSites;
+    delete persistedPlayer.bounty.searchAreas;
+    delete persistedPlayer.bounty.targetAnchor;
+
+    const restored = WorldSession.restorePersistentSnapshot(
+        JSON.parse(JSON.stringify(snapshot)),
+    );
+    const restoredBounty = restored.getDebugState().players.get(joined.playerId)?.bounty;
+    assert.equal(restoredBounty?.cluesFound, 2);
+    assert.equal(restoredBounty?.clueSites?.length, 2);
+    assert.equal(
+        [...restored.getDebugState().enemies.values()]
+            .filter((entry) => entry.bountyPlayerId === joined.playerId).length,
+        1,
+    );
 });
 
 test('full inventory cannot forge proof carry or bounty settlement', () => {

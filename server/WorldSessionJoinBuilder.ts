@@ -61,6 +61,7 @@ export function buildWorldSessionJoinedPlayer(input: WorldSessionJoinedPlayerInp
                 proofEarned: false,
                 hadActorDown: false,
                 riskCompleted: null,
+                cluesFound: 0,
             },
         } : {}),
     };

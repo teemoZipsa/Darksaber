@@ -15,7 +15,7 @@ const configuredAuthServerUrl = import.meta.env?.VITE_AUTH_SERVER_URL?.trim();
 export const DEFAULT_WORLD_SERVER_URL = configuredWorldServerUrl
     || deriveWorldServerUrl(configuredAuthServerUrl)
     || (import.meta.env?.DEV ? 'ws://localhost:8765' : '');
-export const WORLD_PROTOCOL_VERSION = 'world-pve-v3';
+export const WORLD_PROTOCOL_VERSION = 'world-pve-v4';
 
 export function deriveWorldServerUrl(authServerUrl: string | undefined): string {
     if (!authServerUrl) return '';
@@ -145,6 +145,25 @@ export interface ScenarioSnapshot {
     inspectedAmbientSiteIds?: string[];
 }
 
+export type BountyClueKind = 'tracks' | 'remains' | 'witness';
+
+export interface BountyHuntSnapshot {
+    contractId: string;
+    cluesFound: number;
+    totalClues: 2;
+    searchArea: {
+        center: NetTilePoint;
+        radius: number;
+    } | null;
+    nearbyClue?: {
+        clueId: string;
+        kind: BountyClueKind;
+        tile: NetTilePoint;
+    };
+    targetRevealed: boolean;
+    proofEarned: boolean;
+}
+
 export interface WorldSnapshot {
     seq: number;
     serverTime: number;
@@ -156,6 +175,8 @@ export interface WorldSnapshot {
     remainingApByActor: Record<string, number>;
     raidTimer: RaidTimerSnapshot;
     scenario: ScenarioSnapshot;
+    /** Viewer-private bounty tracking state. Never populated for another player. */
+    bountyHunt?: BountyHuntSnapshot;
 }
 
 export interface WorldJoinMessage {
@@ -240,6 +261,13 @@ export interface AmbientSiteInteractMessage {
     siteId: string;
 }
 
+export interface BountyClueInteractMessage {
+    type: 'BOUNTY_CLUE_INTERACT';
+    intentId: string;
+    actorId: string;
+    clueId: string;
+}
+
 export interface MarketHelloMessage {
     type: 'MARKET_HELLO';
     clientId: string;
@@ -291,6 +319,7 @@ export type WorldClientMessage =
     | ScenarioEnterMessage
     | ScenarioFieldEventInteractMessage
     | AmbientSiteInteractMessage
+    | BountyClueInteractMessage
     | MarketClientMessage;
 
 export interface WorldWelcomeMessage {
@@ -433,6 +462,15 @@ export interface AmbientSiteResultMessage {
     trapDamage?: { actorId: string; damage: number };
 }
 
+export interface BountyClueResultMessage {
+    type: 'BOUNTY_CLUE_RESULT';
+    intentId: string;
+    contractId: string;
+    clueId: string;
+    cluesFound: number;
+    targetRevealed: boolean;
+}
+
 export interface ScenarioFieldEventBroadcastMessage {
     type: 'SCENARIO_FIELD_EVENT_BROADCAST';
     dungeonId: string;
@@ -490,6 +528,7 @@ export type WorldServerMessage =
     | CombatEventMessage
     | ScenarioFieldEventResultMessage
     | AmbientSiteResultMessage
+    | BountyClueResultMessage
     | ScenarioFieldEventBroadcastMessage
     | ScenarioEnemyDefeatEventMessage
     | RaidResultMessage

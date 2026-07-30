@@ -268,7 +268,7 @@ async function chooseFirstMagic(page: Page, isMobile: boolean): Promise<void> {
     await page.touchscreen.tap(actorScreen!.x - 48, actorScreen!.y - 48);
 }
 
-test('dev town renders the React town overlay with embedded inventory', async ({ page }) => {
+test('dev town renders the React town overlay with embedded inventory', async ({ page, isMobile }) => {
     await page.goto('/?devStart=town');
 
     await expect(page.locator('#ui-overlay .ds-town')).toBeVisible({ timeout: 20_000 });
@@ -284,12 +284,139 @@ test('dev town renders the React town overlay with embedded inventory', async ({
     await page.getByRole('tab', { name: /퀘스트|Quest/ }).click();
     const bountyPapers = page.locator('#ui-overlay .ds-bounty-paper');
     await expect(bountyPapers).toHaveCount(3);
+    await expect(page.locator('#ui-overlay .ds-bounty-paper__last-seen')).toHaveCount(3);
+    const firstBountyAffixes = bountyPapers.first().locator('.ds-bounty-paper__affix');
+    await expect(firstBountyAffixes).toHaveCount(2);
+    await expect(firstBountyAffixes.first()).toHaveAttribute('title', /.+: .+/);
+    await expect(firstBountyAffixes.first()).toHaveAttribute('aria-label', /.+: .+/);
+    const firstAffix = firstBountyAffixes.first();
+    const accessibleAffixLabel = await firstAffix.getAttribute('aria-label');
+    expect(accessibleAffixLabel).toBeTruthy();
+    if (isMobile) {
+        await firstAffix.tap();
+    } else {
+        await firstAffix.focus();
+        await expect(firstAffix).toBeFocused();
+    }
+    await expect(firstAffix).toHaveAttribute('aria-expanded', 'true');
+    await expect(bountyPapers.first().locator('.ds-bounty-paper__affix-detail'))
+        .toHaveText(accessibleAffixLabel!);
     await bountyPapers.first().getByRole('button', { name: /의뢰서 뜯기|Tear Down Notice/ }).click();
     await expect(bountyPapers.first()).toHaveClass(/is-active/);
     await expect(bountyPapers.first()).not.toHaveClass(/is-tearing/, { timeout: 2_000 });
     await expect(bountyPapers.first().locator('.ds-bounty-paper__stamp')).toBeVisible();
-    await expect(bountyPapers.nth(1).getByRole('button')).toBeDisabled();
-    await expect(bountyPapers.nth(2).getByRole('button')).toBeDisabled();
+    await expect(
+        bountyPapers.nth(1).getByRole('button', { name: /의뢰서 뜯기|Tear Down Notice/ }),
+    ).toBeDisabled();
+    await expect(
+        bountyPapers.nth(2).getByRole('button', { name: /의뢰서 뜯기|Tear Down Notice/ }),
+    ).toBeDisabled();
+});
+
+test('local bounty investigates two clues before revealing one elite target', async ({ page }) => {
+    await page.goto('/?devStart=town');
+    await expect(page.locator('#ui-overlay .ds-town')).toBeVisible({ timeout: 20_000 });
+    await page.getByRole('tab', { name: /퀘스트|Quest/ }).click();
+    await page.locator('#ui-overlay .ds-bounty-paper').first()
+        .getByRole('button', { name: /의뢰서 뜯기|Tear Down Notice/ })
+        .click();
+
+    const started = await page.evaluate(() => (
+        (window as unknown as { __gm?: any }).__gm?.worldEngine?.beginLocalDevRaidFromCurrentHub?.() ?? false
+    ));
+    expect(started).toBe(true);
+    await waitForWorldInputReady(page);
+    await expect.poll(() => page.evaluate(() => {
+        const engine = (window as unknown as { __gm?: any }).__gm?.worldEngine;
+        return {
+            cluesFound: engine?.getRaidSession?.()?.bountyHunt?.cluesFound ?? null,
+            searchAreaVisible: Boolean(engine?.getRaidSession?.()?.bountyHunt?.searchArea),
+            nearbyClueVisible: Boolean(engine?.getRaidSession?.()?.bountyHunt?.nearbyClue),
+            markerCount: engine?.getCoreState?.()?.worldMap?.getBountyMarkers?.().length ?? 0,
+            targetCount: (engine?.fieldEnemies ?? [])
+                .filter((entry: any) => Boolean(entry.enemy?.bountyContractId)).length,
+        };
+    })).toEqual({
+        cluesFound: 0,
+        searchAreaVisible: true,
+        nearbyClueVisible: false,
+        markerCount: 0,
+        targetCount: 0,
+    });
+
+    const discoverNextClue = () => page.evaluate(() => {
+        const engine = (window as unknown as { __gm?: any }).__gm?.worldEngine;
+        const actor = engine?.partyActors?.[0];
+        const worldMap = engine?.getCoreState?.()?.worldMap;
+        const controller = engine?.getControllerState?.()
+            ?.scenarioNetworkControllers?.storyScenarioController;
+        const hunt = engine?.getRaidSession?.()?.bountyHunt;
+        if (!actor || !worldMap || !controller || !hunt?.searchArea) return null;
+
+        let marker = worldMap.getBountyMarkers?.()[0];
+        const { center, radius } = hunt.searchArea;
+        for (let dy = -radius; !marker && dy <= radius; dy++) {
+            for (let dx = -radius; !marker && dx <= radius; dx++) {
+                if (Math.abs(dx) + Math.abs(dy) > radius) continue;
+                actor.entity.setGridPosition(center.x + dx, center.y + dy, true);
+                controller.getInspectableFieldEventTiles(actor);
+                marker = worldMap.getBountyMarkers?.()[0];
+            }
+        }
+        return {
+            cluesFound: engine.getRaidSession().bountyHunt?.cluesFound ?? null,
+            markerCount: worldMap.getBountyMarkers().length,
+            found: Boolean(marker),
+        };
+    });
+
+    const inspectDiscoveredClue = () => page.evaluate(() => {
+        const engine = (window as unknown as { __gm?: any }).__gm?.worldEngine;
+        const actor = engine?.partyActors?.[0];
+        const worldMap = engine?.getCoreState?.()?.worldMap;
+        const marker = worldMap?.getBountyMarkers?.()[0];
+        const controller = engine?.getControllerState?.()
+            ?.scenarioNetworkControllers?.storyScenarioController;
+        if (!actor || !marker || !controller) return null;
+        actor.entity.setGridPosition(marker.tile.x - 1, marker.tile.y, true);
+        const handled = controller.playFieldEventAt(marker.tile, actor);
+        return {
+            handled,
+            cluesFound: engine.getRaidSession().bountyHunt?.cluesFound ?? null,
+            targetCount: (engine.fieldEnemies ?? [])
+                .filter((entry: any) => Boolean(entry.enemy?.bountyContractId)).length,
+        };
+    });
+
+    await expect.poll(discoverNextClue).toEqual({
+        cluesFound: 0,
+        markerCount: 1,
+        found: true,
+    });
+    await expect.poll(inspectDiscoveredClue).toEqual({
+        handled: true,
+        cluesFound: 1,
+        targetCount: 0,
+    });
+    await expect.poll(discoverNextClue).toEqual({
+        cluesFound: 1,
+        markerCount: 1,
+        found: true,
+    });
+    await expect.poll(inspectDiscoveredClue).toEqual({
+        handled: true,
+        cluesFound: 2,
+        targetCount: 1,
+    });
+    await expect.poll(() => page.evaluate(() => {
+        const engine = (window as unknown as { __gm?: any }).__gm?.worldEngine;
+        const target = (engine?.fieldEnemies ?? [])
+            .find((entry: any) => Boolean(entry.enemy?.bountyContractId))?.enemy;
+        return {
+            affixes: target?.eliteAffixes?.length ?? 0,
+            targetRevealed: engine?.getRaidSession?.()?.bountyHunt?.targetRevealed ?? false,
+        };
+    })).toEqual({ affixes: 2, targetRevealed: true });
 });
 
 test('dev launcher buttons are readable and enter dev modes', async ({ page, isMobile }) => {

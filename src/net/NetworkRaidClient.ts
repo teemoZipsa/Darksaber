@@ -6,6 +6,7 @@ import {
     type AmbientSiteResultMessage,
     type AutoLootCell,
     type AutoLootGrantMessage,
+    type BountyClueResultMessage,
     type CombatEventMessage,
     type InventoryConsumedMessage,
     type InventoryItemCountSnapshot,
@@ -51,6 +52,7 @@ export interface NetworkRaidClientOptions {
     onInventoryConsumed?: (message: InventoryConsumedMessage) => void;
     onScenarioFieldEventResult?: (message: ScenarioFieldEventResultMessage) => void;
     onAmbientSiteResult?: (message: AmbientSiteResultMessage) => void;
+    onBountyClueResult?: (message: BountyClueResultMessage) => void;
     onScenarioFieldEventBroadcast?: (message: ScenarioFieldEventBroadcastMessage) => void;
     onScenarioEnemyDefeatEvent?: (message: ScenarioEnemyDefeatEventMessage) => void;
     onRaidResult?: (result: RaidResultMessage) => void;
@@ -308,6 +310,16 @@ export class NetworkRaidClient {
         return intentId;
     }
 
+    public sendBountyClueInteract(actorId: string, clueId: string, intentId: string = createIntentId()): string {
+        this.send({
+            type: 'BOUNTY_CLUE_INTERACT',
+            intentId,
+            actorId,
+            clueId,
+        });
+        return intentId;
+    }
+
     public leave(reason: WorldLeaveMessage['reason']): void {
         const sent = this.send({ type: 'WORLD_LEAVE', reason });
         this.clearStoredResumeToken(this.joinInput?.characterId);
@@ -395,6 +407,13 @@ export class NetworkRaidClient {
                     return;
                 }
                 this.options.onAmbientSiteResult?.(message);
+                break;
+            case 'BOUNTY_CLUE_RESULT':
+                if (!isBountyClueResultMessage(message)) {
+                    this.reportBadMessage('Malformed BOUNTY_CLUE_RESULT message.');
+                    return;
+                }
+                this.options.onBountyClueResult?.(message);
                 break;
             case 'SCENARIO_FIELD_EVENT_BROADCAST':
                 if (!isScenarioFieldEventBroadcastMessage(message)) {
@@ -704,6 +723,19 @@ function isAmbientSiteResultMessage(message: unknown): message is AmbientSiteRes
                 && message.trapDamage.damage > 0
             )
         );
+}
+
+function isBountyClueResultMessage(message: unknown): message is BountyClueResultMessage {
+    if (!isRecord(message)) return false;
+    return message.type === 'BOUNTY_CLUE_RESULT'
+        && typeof message.intentId === 'string'
+        && typeof message.contractId === 'string'
+        && typeof message.clueId === 'string'
+        && typeof message.cluesFound === 'number'
+        && Number.isInteger(message.cluesFound)
+        && message.cluesFound >= 1
+        && message.cluesFound <= 2
+        && typeof message.targetRevealed === 'boolean';
 }
 
 function isScenarioFieldEventBroadcastMessage(message: unknown): message is ScenarioFieldEventBroadcastMessage {

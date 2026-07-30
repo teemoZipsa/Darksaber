@@ -98,6 +98,15 @@ export interface WorldInspectMarker {
     kind?: 'person' | 'chest';
 }
 
+export type WorldBountyMarkerKind = 'tracks' | 'corpse' | 'witness' | 'lair';
+
+export interface WorldBountyMarker {
+    id: string;
+    tile: TilePoint;
+    labelKey?: string;
+    kind: WorldBountyMarkerKind;
+}
+
 export interface WorldDungeonInfo {
     id: string;
     name: string;
@@ -585,6 +594,7 @@ export class WorldMap {
     private neutralBirdImage: HTMLImageElement | null = null;
     private neutralBirdImageLoaded = false;
     private worldInspectMarkers: WorldInspectMarker[] = [];
+    private worldBountyMarkers: WorldBountyMarker[] = [];
 
     public loot: LootObject[] = [];
     public extractionZones: ExtractionZone[] = [];
@@ -618,6 +628,8 @@ export class WorldMap {
         this.ambientSiteChunks.clear();
         this.inspectedAmbientSiteIds.clear();
         this.townExitTileCache.clear();
+        this.worldInspectMarkers = [];
+        this.worldBountyMarkers = [];
         this.loot = [];
         this.extractionZones = [];
         this.validateTownSpawns();
@@ -1387,6 +1399,25 @@ export class WorldMap {
         }));
     }
 
+    /**
+     * Bounty clues intentionally use their own channel. Story scenario refreshes
+     * replace the inspect marker list, so sharing that list would make an active
+     * hunt trail disappear whenever a story objective updates.
+     */
+    public setBountyMarkers(markers: readonly WorldBountyMarker[]): void {
+        this.worldBountyMarkers = markers.map((marker) => ({
+            ...marker,
+            tile: { ...marker.tile },
+        }));
+    }
+
+    public getBountyMarkers(): WorldBountyMarker[] {
+        return this.worldBountyMarkers.map((marker) => ({
+            ...marker,
+            tile: { ...marker.tile },
+        }));
+    }
+
     public render(ctx: CanvasRenderingContext2D, cameraX: number, cameraY: number, vw: number, vh: number, renderScale: number = 1): void {
         for (const chunk of this.chunks.values()) {
             const sx = chunk.chunkX * CHUNK_SIZE * TILE_SIZE - cameraX;
@@ -1404,6 +1435,7 @@ export class WorldMap {
         this.renderStoryInteriorEntrances(ctx, cameraX, cameraY, vw, vh);
         this.renderNeutralBirds(ctx, cameraX, cameraY, vw, vh);
         this.renderWorldInspectMarkers(ctx, cameraX, cameraY, vw, vh);
+        this.renderWorldBountyMarkers(ctx, cameraX, cameraY, vw, vh);
 
         for (const zone of this.extractionZones) {
             zone.render(ctx, (gx, gy) => ({
@@ -1986,6 +2018,21 @@ export class WorldMap {
         }
     }
 
+    private renderWorldBountyMarkers(
+        ctx: CanvasRenderingContext2D,
+        cameraX: number,
+        cameraY: number,
+        vw: number,
+        vh: number
+    ): void {
+        for (const marker of this.worldBountyMarkers) {
+            const sx = marker.tile.x * TILE_SIZE - cameraX;
+            const sy = marker.tile.y * TILE_SIZE - cameraY;
+            if (sx + TILE_SIZE < 0 || sx > vw || sy + TILE_SIZE < 0 || sy > vh) continue;
+            this.renderWorldBountyMarker(ctx, marker, sx, sy);
+        }
+    }
+
     private renderGroundDetails(
         ctx: CanvasRenderingContext2D,
         cameraX: number,
@@ -2239,6 +2286,108 @@ export class WorldMap {
         ctx.restore();
     }
 
+    private renderWorldBountyMarker(ctx: CanvasRenderingContext2D, marker: WorldBountyMarker, sx: number, sy: number): void {
+        const cx = sx + TILE_SIZE / 2;
+        const gold = '#f0c050';
+        const paleGold = '#f5dc92';
+        const bronze = '#8d6428';
+        const dark = '#2d2113';
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(6, 7, 10, 0.62)';
+        ctx.beginPath();
+        ctx.ellipse(cx, sy + TILE_SIZE - 7, 16, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = gold;
+        ctx.fillStyle = bronze;
+        ctx.lineWidth = 2;
+        ctx.shadowColor = 'rgba(240, 192, 80, 0.72)';
+        ctx.shadowBlur = marker.kind === 'lair' ? 10 : 6;
+
+        if (marker.kind === 'tracks') {
+            ctx.save();
+            ctx.translate(cx, sy + 23);
+            ctx.rotate(-0.35);
+            for (const [x, y] of [[-7, 4], [2, -4], [8, 6]] as const) {
+                ctx.beginPath();
+                ctx.ellipse(x, y, 3.5, 6, 0.22, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
+            ctx.restore();
+        } else if (marker.kind === 'corpse') {
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(cx - 10, sy + 14);
+            ctx.lineTo(cx + 10, sy + 31);
+            ctx.moveTo(cx + 10, sy + 14);
+            ctx.lineTo(cx - 10, sy + 31);
+            ctx.stroke();
+            for (const [x, y] of [[-10, 14], [10, 31], [10, 14], [-10, 31]] as const) {
+                ctx.beginPath();
+                ctx.arc(cx + x, sy + y, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        } else if (marker.kind === 'witness') {
+            ctx.beginPath();
+            ctx.arc(cx, sy + 14, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx, sy + 20);
+            ctx.lineTo(cx - 9, sy + 34);
+            ctx.lineTo(cx + 9, sy + 34);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        } else {
+            ctx.fillStyle = dark;
+            ctx.beginPath();
+            ctx.moveTo(cx - 13, sy + 35);
+            ctx.lineTo(cx - 10, sy + 17);
+            ctx.lineTo(cx - 4, sy + 11);
+            ctx.lineTo(cx, sy + 16);
+            ctx.lineTo(cx + 5, sy + 10);
+            ctx.lineTo(cx + 11, sy + 18);
+            ctx.lineTo(cx + 13, sy + 35);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = bronze;
+            ctx.beginPath();
+            ctx.arc(cx, sy + 29, 5, Math.PI, 0);
+            ctx.lineTo(cx + 5, sy + 35);
+            ctx.lineTo(cx - 5, sy + 35);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = gold;
+        ctx.strokeStyle = dark;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx, sy + 2);
+        ctx.lineTo(cx + 5, sy + 7);
+        ctx.lineTo(cx, sy + 12);
+        ctx.lineTo(cx - 5, sy + 7);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = 'bold 10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.88)';
+        ctx.fillStyle = paleGold;
+        const label = bountyMarkerLabel(marker.kind);
+        ctx.strokeText(label, cx, sy - 2);
+        ctx.fillText(label, cx, sy - 2);
+        ctx.restore();
+    }
+
     private renderStoryInteriorEntrances(
         ctx: CanvasRenderingContext2D,
         cameraX: number,
@@ -2334,5 +2483,14 @@ export class WorldMap {
                 console.warn(`Town spawn is not walkable: ${town.id} (${spawn.x}, ${spawn.y})`);
             }
         }
+    }
+}
+
+function bountyMarkerLabel(kind: WorldBountyMarkerKind): string {
+    switch (kind) {
+        case 'tracks': return t('bounty.clue.tracks');
+        case 'corpse': return t('bounty.clue.remains');
+        case 'witness': return t('bounty.clue.witness');
+        case 'lair': return t('bounty.clue.lair');
     }
 }

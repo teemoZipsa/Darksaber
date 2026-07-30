@@ -7,6 +7,7 @@ import { cloneCharacterSave } from './WorldSessionSaveState';
 import { cloneStats, cloneStatuses, gridToSnapshot } from './WorldSessionHelpers';
 import type {
     ServerActor,
+    ServerBountyState,
     ServerEnemy,
     ServerPlayer,
     ServerScenarioState,
@@ -35,7 +36,7 @@ export function toPersistentPlayer(player: ServerPlayer): WorldSessionPersistent
         fieldEventFlagsByDungeonId: [...player.fieldEventFlagsByDungeonId.entries()]
             .map(([dungeonId, flags]) => [dungeonId, [...flags]]),
         inspectedAmbientSiteIds: [...player.inspectedAmbientSiteIds],
-        bounty: player.bounty ? { ...player.bounty } : undefined,
+        bounty: cloneBountyState(player.bounty),
         balanceTelemetry: player.balanceTelemetry ? {
             ...player.balanceTelemetry,
             killsByDangerBand: { ...player.balanceTelemetry.killsByDangerBand },
@@ -71,7 +72,7 @@ export function restorePersistentPlayer(player: WorldSessionPersistentPlayer): S
             player.fieldEventFlagsByDungeonId.map(([dungeonId, flags]) => [dungeonId, new Set(flags)])
         ),
         inspectedAmbientSiteIds: new Set(player.inspectedAmbientSiteIds ?? []),
-        bounty: player.bounty ? { ...player.bounty } : undefined,
+        bounty: cloneBountyState(player.bounty),
         balanceTelemetry: player.balanceTelemetry ? {
             ...player.balanceTelemetry,
             killsByDangerBand: { ...player.balanceTelemetry.killsByDangerBand },
@@ -83,6 +84,22 @@ export function restorePersistentPlayer(player: WorldSessionPersistentPlayer): S
         disconnectedAt: player.disconnectedAt,
         actorIds: [...player.actorIds],
         saveSnapshot: cloneCharacterSave(player.saveSnapshot),
+    };
+}
+
+function cloneBountyState(bounty: ServerBountyState | undefined): ServerBountyState | undefined {
+    if (!bounty) return undefined;
+    return {
+        ...bounty,
+        clueSites: bounty.clueSites?.map((clue) => ({
+            ...clue,
+            tile: { ...clue.tile },
+        })),
+        searchAreas: bounty.searchAreas?.map((area) => ({
+            center: { ...area.center },
+            radius: area.radius,
+        })),
+        targetAnchor: bounty.targetAnchor ? { ...bounty.targetAnchor } : undefined,
     };
 }
 

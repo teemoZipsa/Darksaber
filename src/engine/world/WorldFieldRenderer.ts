@@ -729,13 +729,71 @@ function renderHpBar(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
  * Top-center raid timer banner. Only renders when a raid is active.
  * Positioned high so it doesn't fight with the title logo or character panel.
  */
+export interface RaidBannerLayout {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+export interface RaidBountyBannerLines {
+    target: string;
+    risk: string | null;
+    status: string;
+}
+
+export function getRaidBannerLayout(
+    viewWidth: number,
+    options: { hasBounty: boolean; hasModifier: boolean },
+): RaidBannerLayout {
+    const safeViewWidth = Math.max(0, viewWidth);
+    const preferredWidth = options.hasBounty ? 580 : options.hasModifier ? 430 : 340;
+    const availableWidth = Math.max(0, safeViewWidth - 24);
+    const width = Math.min(preferredWidth, availableWidth);
+    const compactBounty = options.hasBounty && width < 420;
+    return {
+        x: Math.floor((safeViewWidth - width) / 2),
+        y: 16,
+        width,
+        height: options.hasBounty ? (compactBounty ? 122 : 104) : 58,
+    };
+}
+
+export function getRaidBountyBannerLines(
+    bannerWidth: number,
+    copy: {
+        targetName: string;
+        affixLabels: readonly string[];
+        riskLabel: string;
+        status: string;
+    },
+): RaidBountyBannerLines {
+    const target = `⚔ ${copy.targetName} [${copy.affixLabels.join(' · ')}]`;
+    if (bannerWidth < 420) {
+        return {
+            target,
+            risk: copy.riskLabel,
+            status: copy.status,
+        };
+    }
+    return {
+        target,
+        risk: null,
+        status: `${copy.riskLabel} — ${copy.status}`,
+    };
+}
+
 function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel, vw: number): void {
     if (!model.raid.active) return;
 
-    const bannerW = model.raid.bounty ? 580 : model.raid.modifier ? 430 : 340;
-    const bannerH = model.raid.bounty ? 84 : 58;
-    const x = Math.floor((vw - bannerW) / 2);
-    const y = 16;
+    const layout = getRaidBannerLayout(vw, {
+        hasBounty: Boolean(model.raid.bounty),
+        hasModifier: Boolean(model.raid.modifier),
+    });
+    const bannerW = layout.width;
+    const bannerH = layout.height;
+    const x = layout.x;
+    const y = layout.y;
     const urgent = model.raid.timerAdvancing;
 
     ctx.save();
@@ -764,19 +822,49 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
 
     if (model.raid.bounty) {
         const bounty = model.raid.bounty;
-        const status = bounty.proofSecured
+        const status = bounty.phase === 'proof'
             ? t('bounty.proofSecured')
-            : bounty.targetAlive
-                ? t('bounty.targetAlive')
-                : t('bounty.target');
-        const affixes = bounty.affixLabels.join(' · ');
-        ctx.fillStyle = bounty.targetAlive && !bounty.proofSecured ? '#8c2626' : '#6d5018';
+            : bounty.phase === 'target'
+                ? t('bounty.hunt.lairRevealed')
+                : bounty.phase === 'track'
+                    ? formatT('bounty.hunt.clues', {
+                        found: bounty.cluesFound,
+                        total: bounty.cluesRequired,
+                    })
+                    : t('bounty.hunt.searching');
+        const compact = bannerW < 420;
+        const lines = getRaidBountyBannerLines(bannerW, {
+            targetName: bounty.targetName,
+            affixLabels: bounty.affixLabels,
+            riskLabel: bounty.riskLabel,
+            status,
+        });
+        const contentWidth = Math.max(1, bannerW - 28);
+        ctx.fillStyle = Parchment.textDark;
         ctx.font = `bold 11px ${UI.fontPrimary}`;
         ctx.fillText(
-            `⚔ ${bounty.targetName} [${affixes}] — ${bounty.riskLabel} — ${status}`,
+            lines.target,
             x + bannerW / 2,
-            y + 66,
-            bannerW - 28,
+            y + (compact ? 64 : 66),
+            contentWidth,
+        );
+        if (lines.risk) {
+            ctx.fillStyle = '#6d5018';
+            ctx.font = `bold 10px ${UI.fontPrimary}`;
+            ctx.fillText(
+                lines.risk,
+                x + bannerW / 2,
+                y + 84,
+                contentWidth,
+            );
+        }
+        ctx.fillStyle = bounty.phase === 'target' ? '#8c2626' : '#6d5018';
+        ctx.font = `bold ${compact ? 10 : 11}px ${UI.fontPrimary}`;
+        ctx.fillText(
+            lines.status,
+            x + bannerW / 2,
+            y + (compact ? 104 : 86),
+            contentWidth,
         );
     }
 

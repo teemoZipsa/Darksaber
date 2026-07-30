@@ -31,6 +31,7 @@ import { WorldSessionRaidResults } from './WorldSessionRaidResults';
 import { WorldSessionLootResolver } from './WorldSessionLootResolver';
 import { WorldSessionSkillResolver } from './WorldSessionSkillResolver';
 import { WorldSessionContentSpawner } from './WorldSessionContentSpawner';
+import { WorldSessionBountyRuntime } from './WorldSessionBountyRuntime';
 import {
     firstActorTile,
     hasActiveActorWithin,
@@ -153,6 +154,7 @@ export class WorldSession {
     private readonly lootResolver: WorldSessionLootResolver;
     private readonly skillResolver: WorldSessionSkillResolver;
     private readonly contentSpawner: WorldSessionContentSpawner;
+    private readonly bountyRuntime: WorldSessionBountyRuntime;
     private readonly restingRecoveryTimers = new Map<string, number>();
     private seq = 0;
     private nextPlayerId = 1;
@@ -254,6 +256,16 @@ export class WorldSession {
             },
             findNearbyWalkableTile: (tile, actorId, ownerPlayerId) => this.findNearbyWalkableTile(tile, actorId, ownerPlayerId),
         });
+        this.bountyRuntime = new WorldSessionBountyRuntime({
+            players: this.players,
+            actors: this.actors,
+            enemies: this.enemies,
+            worldMap: this.worldMap,
+            contentSpawner: this.contentSpawner,
+            spendActorGauge: (actor, cost) => this.spendActorGauge(actor, cost),
+            finishActorIfSpent: (actor) => this.finishActorIfSpent(actor),
+            log: (message) => this.log(message),
+        });
         this.playerIntentResolver = new WorldSessionPlayerIntentResolver({
             players: this.players,
             enemies: this.enemies,
@@ -351,6 +363,7 @@ export class WorldSession {
         session.generatedLootChunks.clear();
         for (const chunkKey of snapshot.generatedLootChunks) session.generatedLootChunks.add(chunkKey);
         session.saveState.restoreDirtyPlayerIds(snapshot.dirtyPlayerIds);
+        session.bountyRuntime.reconcileRestoredPlayers();
         return session;
     }
 
@@ -427,7 +440,7 @@ export class WorldSession {
         this.contentSpawner.ensureContentNear(spawnTile, player.departureTownId, now);
         this.contentSpawner.spawnRaidModifierSupplyDrop(player, spawnTile);
         this.contentSpawner.spawnMarkedCache(player, spawnTile);
-        this.contentSpawner.spawnBountyTarget(player, spawnTile);
+        this.bountyRuntime.initializePlayer(player);
         this.log(`join player=${playerId} origin=${originHubId} actors=${player.actorIds.length}`);
         return {
             playerId,
@@ -510,6 +523,7 @@ export class WorldSession {
             playerIntentResolver: this.playerIntentResolver,
             raidResults: this.raidResults,
             scenarioRuntime: this.scenarioRuntime,
+            bountyRuntime: this.bountyRuntime,
             skillResolver: this.skillResolver,
             endActorTurn: (actor) => this.endActorTurn(actor),
             log: (entry) => this.log(entry),
@@ -556,6 +570,7 @@ export class WorldSession {
             loot: this.loot.values(),
             lootState: this.lootState,
             sharedScenarioFieldEventFlags: this.sharedScenarioFieldEventFlags,
+            bountyHunt: this.bountyRuntime.createSnapshot(viewerPlayerId),
         });
     }
 

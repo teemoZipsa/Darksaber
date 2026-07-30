@@ -1,5 +1,6 @@
 import type { LootObject } from '../src/entity/LootObject';
 import type {
+    BountyHuntSnapshot,
     WorldPlayerSnapshot,
     WorldSnapshot,
 } from '../src/net/WorldProtocol';
@@ -35,6 +36,7 @@ export function buildWorldSessionSnapshot(input: {
     loot: Iterable<LootObject>;
     lootState: WorldSessionLootState;
     sharedScenarioFieldEventFlags: ReadonlyMap<string, Set<string>>;
+    bountyHunt?: BountyHuntSnapshot;
 }): WorldSnapshot {
     const viewer = input.viewerPlayerId ? input.players.get(input.viewerPlayerId) : undefined;
     const players: WorldPlayerSnapshot[] = [...input.players.values()]
@@ -115,5 +117,6 @@ export function buildWorldSessionSnapshot(input: {
             sharedFieldEventFlagsByDungeonId: scenarioFlagSnapshot(input.sharedScenarioFieldEventFlags),
             inspectedAmbientSiteIds: fallbackPlayer ? [...fallbackPlayer.inspectedAmbientSiteIds] : [],
         },
+        ...(input.bountyHunt ? { bountyHunt: input.bountyHunt } : {}),
     };
 }

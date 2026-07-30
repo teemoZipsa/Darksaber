@@ -12,6 +12,7 @@ import type { RaidModifier } from '../src/raid/RaidModifiers';
 import type { EliteAffixId } from '../src/field/EliteAffixes';
 import type {
     AutoLootGrantMessage,
+    BountyClueKind,
     CombatEventMessage,
     GridSnapshot,
     NetFacing,
@@ -82,6 +83,25 @@ export interface ServerBountyState {
     proofEarned: boolean;
     hadActorDown: boolean;
     riskCompleted: boolean | null;
+    /** Optional only for compatibility with bounty-v1 session snapshots. */
+    cluesFound?: number;
+    /** Server-private exact clue locations. Optional only for legacy snapshots. */
+    clueSites?: ServerBountyClueSite[];
+    /** Coarse map areas exposed one stage at a time to the owning player. */
+    searchAreas?: ServerBountySearchArea[];
+    /** Exact lair spawn anchor, never exposed before both clues are complete. */
+    targetAnchor?: TilePoint;
+}
+
+export interface ServerBountyClueSite {
+    id: string;
+    kind: BountyClueKind;
+    tile: TilePoint;
+}
+
+export interface ServerBountySearchArea {
+    center: TilePoint;
+    radius: number;
 }
 
 export interface ServerEnemy {

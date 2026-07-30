@@ -9,7 +9,7 @@ export function isEnemyVisibleToViewer(
     if (viewer?.activeDungeonId) return entry.scenarioPlayerId === viewer.id;
     const privateOwnerId = entry.scenarioPlayerId ?? entry.bountyPlayerId;
     if (!privateOwnerId) return true;
-    if (!viewerPlayerId) return true;
+    if (!viewerPlayerId) return false;
     return privateOwnerId === viewerPlayerId;
 }
 

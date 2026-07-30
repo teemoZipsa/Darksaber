@@ -73,7 +73,15 @@ export function tickWorldSession(context: WorldSessionTickProcessorContext): Wor
         const enemy = entry.enemy;
         if (enemy.stats.hp <= 0) continue;
         if (context.enemyState.advanceEnemy(entry, context.dt) === 'ready') {
-            events.push(...context.enemyTurnResolver.resolveEnemyTurn(entry, context.now));
+            const turnEvents = context.enemyTurnResolver.resolveEnemyTurn(entry, context.now);
+            const privateOwnerId = entry.bountyPlayerId;
+            if (privateOwnerId) {
+                for (const message of turnEvents) {
+                    perPlayerMessages.push({ playerId: privateOwnerId, message });
+                }
+            } else {
+                events.push(...turnEvents);
+            }
             enemy.actionGauge = 0;
         }
     }

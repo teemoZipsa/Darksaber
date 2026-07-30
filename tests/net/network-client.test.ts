@@ -535,6 +535,36 @@ test('client reports malformed server messages instead of throwing', () => {
     assert.deepEqual(errors, ['BAD_JSON', 'BAD_MESSAGE', 'BAD_MESSAGE']);
 });
 
+test('client validates and dispatches bounty clue results', () => {
+    const seen: number[] = [];
+    const errors: string[] = [];
+    const client = new NetworkRaidClient({
+        onBountyClueResult: (message) => seen.push(message.cluesFound),
+        onErrorMessage: (error) => errors.push(error.code),
+    });
+    const harness = client as unknown as { handleMessage(raw: string): void };
+
+    harness.handleMessage(JSON.stringify({
+        type: 'BOUNTY_CLUE_RESULT',
+        intentId: 'bounty-clue-1',
+        contractId: 'bounty-v1~central_castle~0~0~0',
+        clueId: 'bounty-v1~central_castle~0~0~0:clue:0',
+        cluesFound: 1,
+        targetRevealed: false,
+    }));
+    harness.handleMessage(JSON.stringify({
+        type: 'BOUNTY_CLUE_RESULT',
+        intentId: 'bounty-clue-invalid',
+        contractId: 'bounty-v1~central_castle~0~0~0',
+        clueId: 'bounty-v1~central_castle~0~0~0:clue:1',
+        cluesFound: 3,
+        targetRevealed: true,
+    }));
+
+    assert.deepEqual(seen, [1]);
+    assert.deepEqual(errors, ['BAD_MESSAGE']);
+});
+
 test('client validates scenario field reward payloads with original item ids', () => {
     const seen: unknown[] = [];
     const errors: string[] = [];

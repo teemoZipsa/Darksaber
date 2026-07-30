@@ -80,9 +80,16 @@ export function createWorldEngineWorldControllers(
         },
         getBounds: () => ports.getWorldMap().getBoundsTiles(),
         getLandmarks: () => ports.getWorldMap().getMapLandmarks(),
-        getEnemies: () => ports.getFieldEnemies().map((entry) => entry.enemy),
+        getEnemies: () => ports.getFieldEnemies().map((entry) => ({
+            gridX: entry.enemy.gridX,
+            gridY: entry.enemy.gridY,
+            color: entry.enemy.color,
+            isBoss: entry.enemy.isBoss,
+            isBountyTarget: Boolean(entry.enemy.bountyContractId),
+        })),
         getExtractionZones: () => ports.getWorldMap().extractionZones,
         getLoot: () => ports.getWorldMap().loot,
+        getBountyHunt: () => ports.raidSession.bountyHunt,
     });
 
     const combatFeedbackController = new WorldCombatFeedbackController({

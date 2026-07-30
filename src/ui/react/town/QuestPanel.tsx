@@ -13,7 +13,12 @@ import { useStore, useUiVersion } from '../UiContext';
 import { QuestList } from '../quest/QuestList';
 import { itemName } from './itemView';
 import { formatMonsterName } from '../../../i18n/DisplayNames';
+import { formatTownName } from '../../../i18n/TownMessages';
 import type { BountyRiskId } from '../../../data/BountyContractData';
+import {
+    getBountyHuntDirectionKey,
+    type BountyHuntDirectionKey,
+} from '../../../data/BountyHuntPlacement';
 import type { EliteAffixId } from '../../../field/EliteAffixes';
 
 export function QuestPanel() {
@@ -24,6 +29,9 @@ export function QuestPanel() {
     const hasActiveBounty = bounties.some((view) => view.active);
     const [feedback, setFeedback] = useState('');
     const [tearingId, setTearingId] = useState<string | null>(null);
+    const [selectedAffixKey, setSelectedAffixKey] = useState<string | null>(null);
+    const [hoveredAffixKey, setHoveredAffixKey] = useState<string | null>(null);
+    const visibleAffixKey = hoveredAffixKey ?? selectedAffixKey;
     const panelStyle = { width: 'min(560px, 92vw)', '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
 
     useEffect(() => {
@@ -72,6 +80,13 @@ export function QuestPanel() {
                 <div className="ds-bounty-board__papers">
                     {bounties.map(({ contract, monster, active }) => {
                         const disabled = hasActiveBounty && !active;
+                        const detailId = `bounty-affix-detail-${contract.id}`;
+                        const visibleAffix = contract.affixIds.find(
+                            (affix) => bountyAffixKey(contract.id, affix) === visibleAffixKey,
+                        );
+                        const visibleAffixText = visibleAffix
+                            ? `${eliteAffixLabel(visibleAffix)}: ${eliteAffixEffect(visibleAffix)}`
+                            : t('bounty.affixHint');
                         return (
                             <article
                                 key={contract.id}
@@ -85,10 +100,52 @@ export function QuestPanel() {
                                 <div className="ds-bounty-paper__pin" aria-hidden="true" />
                                 <div className="ds-bounty-paper__wanted">{t('bounty.wanted')}</div>
                                 <div className="ds-bounty-paper__target">{formatMonsterName(monster)}</div>
+                                <div className="ds-bounty-paper__last-seen">
+                                    {formatT('bounty.lastSeen', {
+                                        town: formatTownName(contract.originTownId),
+                                        direction: bountyDirectionLabel(getBountyHuntDirectionKey(contract.id)),
+                                    })}
+                                </div>
                                 <div className="ds-bounty-paper__affixes">
-                                    {contract.affixIds.map((affix) => (
-                                        <span key={affix}>{eliteAffixLabel(affix)}</span>
-                                    ))}
+                                    {contract.affixIds.map((affix) => {
+                                        const label = eliteAffixLabel(affix);
+                                        const effect = eliteAffixEffect(affix);
+                                        const accessibleLabel = `${label}: ${effect}`;
+                                        const affixKey = bountyAffixKey(contract.id, affix);
+                                        return (
+                                            <button
+                                                type="button"
+                                                key={affix}
+                                                className="ds-bounty-paper__affix"
+                                                title={accessibleLabel}
+                                                aria-label={accessibleLabel}
+                                                aria-controls={detailId}
+                                                aria-expanded={visibleAffixKey === affixKey}
+                                                onFocus={() => setSelectedAffixKey(affixKey)}
+                                                onBlur={() => setSelectedAffixKey((current) => (
+                                                    current === affixKey ? null : current
+                                                ))}
+                                                onClick={() => setSelectedAffixKey(affixKey)}
+                                                onMouseEnter={() => setHoveredAffixKey(affixKey)}
+                                                onMouseLeave={() => setHoveredAffixKey((current) => (
+                                                    current === affixKey ? null : current
+                                                ))}
+                                            >
+                                                {label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <div
+                                    id={detailId}
+                                    className={[
+                                        'ds-bounty-paper__affix-detail',
+                                        visibleAffix ? 'is-visible' : '',
+                                    ].filter(Boolean).join(' ')}
+                                    aria-live="polite"
+                                    aria-atomic="true"
+                                >
+                                    {visibleAffixText}
                                 </div>
                                 <div className="ds-bounty-paper__risk">
                                     {t('bounty.risk')} · {bountyRiskLabel(contract.riskId)}
@@ -165,6 +222,10 @@ export function QuestPanel() {
     );
 }
 
+function bountyAffixKey(contractId: string, affix: EliteAffixId): string {
+    return `${contractId}:${affix}`;
+}
+
 function eliteAffixLabel(affix: EliteAffixId): string {
     switch (affix) {
         case 'berserker': return t('bounty.affix.berserker');
@@ -172,6 +233,29 @@ function eliteAffixLabel(affix: EliteAffixId): string {
         case 'ironclad': return t('bounty.affix.ironclad');
         case 'executioner': return t('bounty.affix.executioner');
         case 'swift': return t('bounty.affix.swift');
+    }
+}
+
+function eliteAffixEffect(affix: EliteAffixId): string {
+    switch (affix) {
+        case 'berserker': return t('bounty.affix.berserker.effect');
+        case 'vampiric': return t('bounty.affix.vampiric.effect');
+        case 'ironclad': return t('bounty.affix.ironclad.effect');
+        case 'executioner': return t('bounty.affix.executioner.effect');
+        case 'swift': return t('bounty.affix.swift.effect');
+    }
+}
+
+function bountyDirectionLabel(direction: BountyHuntDirectionKey): string {
+    switch (direction) {
+        case 'n': return t('bounty.direction.n');
+        case 'ne': return t('bounty.direction.ne');
+        case 'e': return t('bounty.direction.e');
+        case 'se': return t('bounty.direction.se');
+        case 's': return t('bounty.direction.s');
+        case 'sw': return t('bounty.direction.sw');
+        case 'w': return t('bounty.direction.w');
+        case 'nw': return t('bounty.direction.nw');
     }
 }
 

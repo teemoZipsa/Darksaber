@@ -138,6 +138,10 @@ export class WorldSessionSkillResolver {
     ): WorldSessionMessageResult {
         const broadcasts: CombatEventMessage[] = [];
         const replies: WorldServerMessage[] = [];
+        const emitEnemyEvent = (target: ServerEnemy, event: CombatEventMessage): void => {
+            if (target.bountyPlayerId) replies.push(event);
+            else broadcasts.push(event);
+        };
         applyActorResourceDelta(actor, effect.casterHpDelta, effect.casterMpDelta);
         if (effect.casterHpDelta > 0) {
             broadcasts.push(createActorEvent('heal', actor, actor, effect.casterHpDelta));
@@ -166,20 +170,20 @@ export class WorldSessionSkillResolver {
             const enemy = target.enemy;
 
             if (enemyResult.isMiss) {
-                broadcasts.push(createEnemyEvent('miss', actor, enemy, 0));
+                emitEnemyEvent(target, createEnemyEvent('miss', actor, enemy, 0));
                 continue;
             }
 
             if (enemyResult.statusEffects && enemyResult.statusEffects.length > 0) {
                 enemy.statuses = applyStatuses(enemy.statuses, enemyResult.statusEffects);
-                broadcasts.push(createEnemyEvent('status', actor, enemy, undefined, enemyResult.statusEffects[0]));
+                emitEnemyEvent(target, createEnemyEvent('status', actor, enemy, undefined, enemyResult.statusEffects[0]));
             }
 
             if (enemyResult.mpDamage !== undefined && enemyResult.mpDamage > 0) {
                 const drainedMp = Math.min(enemy.stats.mp, enemyResult.mpDamage);
                 enemy.stats.mp = Math.max(0, enemy.stats.mp - drainedMp);
                 applyActorResourceDelta(actor, 0, drainedMp);
-                if (drainedMp > 0) broadcasts.push(createEnemyEvent('status', actor, enemy, drainedMp));
+                if (drainedMp > 0) emitEnemyEvent(target, createEnemyEvent('status', actor, enemy, drainedMp));
             }
 
             const guarded = applyGuardToDamage(enemy.statuses, enemyResult.damage);
@@ -197,11 +201,11 @@ export class WorldSessionSkillResolver {
                 const killResult = this.context.completeEnemyKill(actor, target, now);
                 const killEvent = createEnemyEvent('kill', actor, enemy, guarded.damage);
                 killEvent.expAward = killResult.expAward;
-                broadcasts.push(killEvent);
+                emitEnemyEvent(target, killEvent);
                 if (killResult.autoLootGrant) replies.push(killResult.autoLootGrant);
                 if (killResult.scenarioEnemyDefeatEvent) replies.push(killResult.scenarioEnemyDefeatEvent);
             } else if (guarded.damage > 0 || (!enemyResult.statusEffects && enemyResult.mpDamage === undefined)) {
-                broadcasts.push(createEnemyEvent('damage', actor, enemy, guarded.damage));
+                emitEnemyEvent(target, createEnemyEvent('damage', actor, enemy, guarded.damage));
             }
         }
 

@@ -298,6 +298,7 @@ export class WorldNetworkSyncController {
         }
         this.reopenPendingMoveMenu(ownSnapshots);
         this.context.storyScenarioController.applyNetworkScenarioSnapshot(snapshot.scenario);
+        this.context.storyScenarioController.applyNetworkBountyHuntSnapshot?.(snapshot.bountyHunt);
     }
 
     private takeOwnSnapshotForCharacter(

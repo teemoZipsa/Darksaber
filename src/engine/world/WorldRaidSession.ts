@@ -1,5 +1,6 @@
 import { shouldAdvanceRaidTimer } from '../../raid/RaidRules';
 import { rollRaidModifier, type RaidModifier } from '../../raid/RaidModifiers';
+import type { BountyHuntSnapshot } from '../../net/WorldProtocol';
 
 export type WorldPhase = 'town' | 'raid' | 'lobby' | 'master';
 
@@ -23,6 +24,7 @@ export class WorldRaidSession {
     public kills = 0;
     public raidGoldReward = 0;
     public raidModifier: RaidModifier | null = null;
+    public bountyHunt: BountyHuntSnapshot | null = null;
     public activeDungeonId: string | null = null;
     public readonly downedCharacterIds: Set<string> = new Set();
     public readonly clearedDungeonIds: Set<string> = new Set();
@@ -43,6 +45,7 @@ export class WorldRaidSession {
         this.clearScenarioFlags();
         this.raidGoldReward = 0;
         this.raidModifier = null;
+        this.bountyHunt = null;
         this.currentHubTownId = townId;
     }
 
@@ -53,6 +56,7 @@ export class WorldRaidSession {
         this.kills = 0;
         this.raidGoldReward = 0;
         this.raidModifier = modifier;
+        this.bountyHunt = null;
         this.activeDungeonId = null;
         this.downedCharacterIds.clear();
         this.clearedDungeonIds.clear();
@@ -87,6 +91,7 @@ export class WorldRaidSession {
         this.clearScenarioFlags();
         this.raidGoldReward = 0;
         this.raidModifier = null;
+        this.bountyHunt = null;
         this.currentHubTownId = townId;
     }
 
@@ -97,6 +102,7 @@ export class WorldRaidSession {
         this.clearScenarioFlags();
         this.raidGoldReward = 0;
         this.raidModifier = null;
+        this.bountyHunt = null;
         this.currentHubTownId = townId;
     }
 

@@ -2,12 +2,14 @@ import { TILE_PROPERTIES, TileType } from '../map/Tile';
 import type { WorldMapLandmark } from '../map/WorldMap';
 import { formatT, t } from '../i18n/LanguageManager';
 import { drawParchmentPanel, Parchment, UI } from './UITheme';
+import type { BountyHuntSnapshot } from '../net/WorldProtocol';
 
 interface MinimapEntity {
     gridX: number;
     gridY: number;
     color: string;
     isBoss?: boolean;
+    isBountyTarget?: boolean;
 }
 
 interface MinimapConfig {
@@ -18,6 +20,7 @@ interface MinimapConfig {
     getEnemies: () => MinimapEntity[];
     getExtractionZones: () => { x: number; y: number; radius: number }[];
     getLoot: () => { x: number; y: number; opened: boolean }[];
+    getBountyHunt?: () => BountyHuntSnapshot | null;
 }
 
 interface MinimapPointerInput {
@@ -320,12 +323,50 @@ export class MinimapUI {
             this.drawRectMarker(ctx, mapX, mapY, tilePx, player, zone.x, zone.y, '#57ff86', Math.max(2, zone.radius * tilePx));
         }
 
+        const bountyHunt = this.config.getBountyHunt?.() ?? null;
+        if (bountyHunt?.searchArea) {
+            this.drawRectMarker(
+                ctx,
+                mapX,
+                mapY,
+                tilePx,
+                player,
+                bountyHunt.searchArea.center.x,
+                bountyHunt.searchArea.center.y,
+                '#d7a94d',
+                Math.max(3, bountyHunt.searchArea.radius * tilePx),
+            );
+        }
+        if (bountyHunt?.nearbyClue) {
+            this.drawDot(
+                ctx,
+                mapX,
+                mapY,
+                tilePx,
+                player,
+                bountyHunt.nearbyClue.tile.x,
+                bountyHunt.nearbyClue.tile.y,
+                '#f5d57b',
+                4,
+            );
+        }
+
         for (const loot of this.getVisibleLoot()) {
             if (!loot.opened) this.drawDot(ctx, mapX, mapY, tilePx, player, loot.x, loot.y, '#ffe45c', 2.6);
         }
 
         for (const enemy of this.config.getEnemies()) {
-            this.drawDot(ctx, mapX, mapY, tilePx, player, enemy.gridX, enemy.gridY, enemy.isBoss ? '#ff2d75' : '#ff6248', enemy.isBoss ? 4 : 3);
+            this.drawDot(
+                ctx,
+                mapX,
+                mapY,
+                tilePx,
+                player,
+                enemy.gridX,
+                enemy.gridY,
+                enemy.isBountyTarget ? '#f0c050' : enemy.isBoss ? '#ff2d75' : '#ff6248',
+                enemy.isBountyTarget || enemy.isBoss ? 4 : 3,
+            );
         }
 
         // Player marker
@@ -757,6 +798,22 @@ export class MinimapUI {
             this.drawFullRing(ctx, pos.x, pos.y, Math.max(4, zone.radius * scale), '#57ff86');
         }
 
+        const bountyHunt = this.config.getBountyHunt?.() ?? null;
+        if (bountyHunt?.searchArea) {
+            const pos = toScreen(bountyHunt.searchArea.center.x, bountyHunt.searchArea.center.y);
+            this.drawFullRing(
+                ctx,
+                pos.x,
+                pos.y,
+                Math.max(6, bountyHunt.searchArea.radius * scale),
+                '#d7a94d',
+            );
+        }
+        if (bountyHunt?.nearbyClue) {
+            const pos = toScreen(bountyHunt.nearbyClue.tile.x, bountyHunt.nearbyClue.tile.y);
+            this.drawFullDot(ctx, pos.x, pos.y, '#f5d57b', 4.2);
+        }
+
         for (const loot of this.getVisibleLoot()) {
             if (!loot.opened) {
                 const pos = toScreen(loot.x, loot.y);
@@ -766,7 +823,13 @@ export class MinimapUI {
 
         for (const enemy of this.config.getEnemies()) {
             const pos = toScreen(enemy.gridX, enemy.gridY);
-            this.drawFullDot(ctx, pos.x, pos.y, enemy.isBoss ? '#ff2d75' : '#ff6248', enemy.isBoss ? 5 : 3.4);
+            this.drawFullDot(
+                ctx,
+                pos.x,
+                pos.y,
+                enemy.isBountyTarget ? '#f0c050' : enemy.isBoss ? '#ff2d75' : '#ff6248',
+                enemy.isBountyTarget || enemy.isBoss ? 5 : 3.4,
+            );
         }
 
         const player = this.config.getPlayerPos();
