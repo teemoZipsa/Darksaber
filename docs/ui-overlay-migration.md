@@ -1,5 +1,7 @@
 # UI 리빌드 — React DOM 오버레이 (진행 상황 & 인수인계)
 
+**현행 기준**: 2026-08-28
+
 > 캔버스에 손으로 그리던 메뉴/패널 UI를 **React DOM 오버레이**로 옮기면서
 > **"풀 다크 Darkest Dungeon"** 룩으로 통일하는 작업. 월드 렌더링과 월드 좌표에
 > 붙은 HUD(적 체력바·플로팅 데미지·전술 마커·방사형 액션메뉴)는 캔버스 유지.
@@ -22,7 +24,7 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
 - **입력 격리**: `InputManager`가 클릭을 캔버스에 바인딩 → DOM 패널이 위에 뜨면 자연히 흡수. 추가로 `GameManager.isDomModalOpen()`가 true면 `worldEngine.update()` 스킵(월드 동결). 각 패널은 풀스크린 `.ds-scrim`(클릭 시 닫힘) 위에 렌더.
 - **열림/닫힘 주인은 GameManager**: 기존 캔버스 UI 객체(`charUI`/`pauseMenu`/`settingsUI`/`partyUI`)의 `isVisible()` 비트를 그대로 재사용(키 토글·상호배제 유지). 캔버스 render/input만 우회하고 React가 대신 그림.
 
-## 완료 (커밋·푸시됨)
+## 현재 React DOM 패널
 | 패널 | React 파일 | 비고 |
 |---|---|---|
 | 캐릭터창 (C) | `src/ui/react/character/*` | 스탯·HP/MP·장비·파티탭 |
@@ -32,9 +34,14 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
 | 캐릭생성 | `src/ui/react/charcreate/CharacterCreation.tsx` | 독립 state 기반 DOM 패널 |
 | 마을 (Town) | `src/ui/react/town/*` | **화면 전체 DOM 이전**: 헤더·탭바·출격 + 창고/상점/휴식/퀘스트/소문. `TownUI`는 상태 홀더로 축소, `WorldEngine.getTownSession()`→`GameManager.getTownSession()`로 노출. |
 | 인벤토리 | `src/ui/react/inventory/InventoryPanel.tsx` | 월드(I)·마을 창고 공용 DOM 패널. 드래그 해석은 `InventoryUI` 모델 액션에 유지. |
+| 스토리 저널 (J) | `src/ui/react/quest/StoryJournalPanel.tsx` | 퀘스트 목록과 캐릭터별 최근 출격 20건을 함께 표시. |
 
-## 남음 (다음 순서)
-- 없음. DOM 주요 패널 이전 후속 점검은 현재 체크리스트 기준 완료.
+## 남은 독립 Canvas 차단형 패널
+
+- `src/ui/RaidResultUI.ts`: 생환·사망·실종·중도 복귀 결과를 표시하는 레이드 결과 패널. React 결과 패널로 이전하고 최근 출격 기록과 동일한 결과 용어를 사용한다.
+- `src/ui/FusionTempleUI.ts`: 합체 후보·비용·확인 흐름을 표시하는 신전 패널. React dialog로 이전하고 키보드/터치 포커스 계약을 적용한다.
+
+두 패널을 이전한 뒤에도 적 체력바·플로팅 데미지·전술 마커·방사형 액션 메뉴처럼 월드/카메라 좌표에 붙는 HUD는 Canvas에 유지한다. 우선순위와 완료 조건은 `docs/roadmap.md`를 따른다.
 
 ## 완료된 최종 수동 검증
 - **레이드 전리품 end-to-end** — `devStart=raid&devScenario=loot` 실제 레이드 화면에서 DOM 전리품 패널을 열고 Browser 포인터 드래그로 전리품을 배낭에 드롭. 외부 전리품 1→0, 배낭 4→5, DEV 상태 `picked:dev_raid_loot:0,0` 확인.
@@ -73,7 +80,7 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
   - 집(실제 브라우저 포커스 탭)에선 그냥 정상 60fps로 보임.
 
 ## 알려진 함정 (시간 절약용)
-- **i18n 키 누락 주의**: `t('key')`는 없는 키면 키 문자열을 그대로 반환(`|| '기본값'` 폴백 안 통함). 새 패널 텍스트는 `LanguageManager.ts`의 ko/en 양쪽에 키 추가 확인. (pause.* 키가 누락돼 있어 추가한 전례 있음.)
+- **i18n 키 누락 주의**: `t('key')`는 없는 키면 키 문자열을 그대로 반환(`|| '기본값'` 폴백 안 통함). 새 패널 텍스트는 `src/i18n/translations.ts`의 ko/en 양쪽에 키를 추가하고 `LanguageManager.ts`의 `t()`를 통해 사용한다. (pause.* 키가 누락돼 있어 추가한 전례 있음.)
 - **SettingsManager는 static + `this` 사용**: 메서드를 bare 참조로 넘기지 말고 `() => S.setX(v)`로 감쌀 것(안 그러면 `this` undefined).
 - **WorldEngine이 월드 진입 시 `partyUI`를 자동으로 닫음**(WorldEngine.ts ~590) — 검증 시 WORLD 안정화 후 열 것.
 - **드래그앤드롭은 합성이벤트 검증이 불안정** → 검증은 실제 포인터 입력 기준. 마을 창고/배낭/장비/소켓 주요 동선은 Browser 포인터 입력으로 확인됨.
