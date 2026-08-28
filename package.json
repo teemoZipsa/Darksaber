@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "assets:pixellab": "node scripts/generate-pixellab-sprites.mjs",
+    "assets:pixellab:actions": "node scripts/repair-pixellab-actions.mjs",
     "dev": "vite",
     "dev:town": "node scripts/dev-town.mjs",
     "dev:raid": "node scripts/dev-town.mjs raid",
