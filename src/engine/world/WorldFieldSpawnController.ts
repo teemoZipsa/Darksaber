@@ -46,6 +46,7 @@ const PARTY_THREE_FRAME_WALK_SPRITES: Partial<Record<string, Record<number, stri
     priest: { 2: 'priest_t2_walk.png', 3: 'priest_t3_walk.png', 4: 'priest_t4_walk.png', 5: 'priest_t5_walk.png', 6: 'priest_t6_walk.png', 7: 'priest_t7_walk.png' },
     shrine: { 1: 'shrine_t1_walk.png', 5: 'shrine_t5_walk.png' },
     mage: { 1: 'mage_t1_walk.png', 2: 'mage_t2_walk.png', 3: 'mage_t3_walk.png', 4: 'mage_t4_walk.png', 5: 'mage_t5_walk.png', 6: 'mage_t6_walk.png', 7: 'mage_t7_walk.png' },
+    alchemist: { 1: 'alchemist_t1_walk.png' },
     cultist: { 2: 'cultist_t2_walk.png', 3: 'cultist_t3_walk.png', 4: 'cultist_t4_walk.png', 5: 'cultist_t5_walk.png', 6: 'cultist_t6_walk.png', 7: 'cultist_t7_walk.png' },
 };
 

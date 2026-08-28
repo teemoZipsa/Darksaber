@@ -10,3 +10,4 @@ test-results/
 *.log
 server/.runtime/
 .vercel
+.pixellab/

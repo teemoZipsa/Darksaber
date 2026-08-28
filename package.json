@@ -4,6 +4,7 @@
   "description": "Darksaber : Extraction — grid-based SRPG extraction RPG",
   "type": "module",
   "scripts": {
+    "assets:pixellab": "node scripts/generate-pixellab-sprites.mjs",
     "dev": "vite",
     "dev:town": "node scripts/dev-town.mjs",
     "dev:raid": "node scripts/dev-town.mjs raid",
@@ -83,6 +84,7 @@
     "esbuild": "^0.28.0",
     "eslint": "^10.6.0",
     "globals": "^17.7.0",
+    "sharp": "^0.35.4",
     "tsx": "^4.22.4",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.63.0",
