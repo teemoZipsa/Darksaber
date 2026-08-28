@@ -50,14 +50,20 @@ test('buildHubSavePatch rejects completedQuestIds in questState', () => {
     );
 });
 
-test('buildHubSavePatch preserves server raid history and rejects client-authored records', () => {
+test('buildHubSavePatch preserves server raid history and monster codex while rejecting client-authored records', () => {
     const current = createDefaultCharacterSave(authCharacter());
     current.questState.raidHistory = [{ id: 'server-raid', result: 'SURVIVED' }];
+    current.questState.monsterCodex = [{ monsterId: '302R', encounters: 1, kills: 1 }];
 
     const patch = buildHubSavePatch({ questState: { gold: 500 } }, current);
     assert.deepEqual(patch.questState?.raidHistory, current.questState.raidHistory);
+    assert.deepEqual(patch.questState?.monsterCodex, current.questState.monsterCodex);
     assert.throws(
         () => buildHubSavePatch({ questState: { raidHistory: [] } }, current),
+        (error: unknown) => error instanceof HttpError && error.code === 'forbidden_save_field',
+    );
+    assert.throws(
+        () => buildHubSavePatch({ questState: { monsterCodex: [] } }, current),
         (error: unknown) => error instanceof HttpError && error.code === 'forbidden_save_field',
     );
 });

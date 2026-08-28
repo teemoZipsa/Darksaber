@@ -36,9 +36,12 @@ import {
     firstActorTile,
     hasActiveActorWithin,
 } from './WorldSessionSpatialQueries';
+import { getEnemyAggroRanges } from '../src/field/FieldConfig';
 import {
     getTargetableActors,
+    isEnemyVisibleToViewer,
 } from './WorldSessionVisibility';
+import { recordWorldSessionMonsterEncounter } from './WorldSessionMonsterCodex';
 import {
     clonePersistentActor,
     clonePersistentNestState,
@@ -559,6 +562,16 @@ export class WorldSession {
 
     public createSnapshot(viewerPlayerId: string | null = null, now: number = Date.now()): WorldSnapshot {
         this.seq += 1;
+        const viewer = viewerPlayerId ? this.players.get(viewerPlayerId) : undefined;
+        if (viewer) {
+            for (const target of this.enemies.values()) {
+                if (target.enemy.stats.hp <= 0 || !isEnemyVisibleToViewer(this.players, target, viewerPlayerId)) continue;
+                const enemyTile = { x: target.enemy.gridX, y: target.enemy.gridY };
+                const encounterRange = getEnemyAggroRanges(target.enemy.aggroRange).enter;
+                if (!hasActiveActorWithin(this.players.values(), this.actors, enemyTile, encounterRange, viewer.id)) continue;
+                recordWorldSessionMonsterEncounter(viewer, target, this.saveState, now);
+            }
+        }
         return buildWorldSessionSnapshot({
             seq: this.seq,
             now,

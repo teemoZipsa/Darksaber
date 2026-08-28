@@ -66,6 +66,8 @@ export interface ServerPlayer {
     completedDungeonIds: Set<string>;
     fieldEventFlagsByDungeonId: Map<string, Set<string>>;
     inspectedAmbientSiteIds: Set<string>;
+    /** Enemy instance ids already counted as codex encounters in this raid. */
+    monsterCodexEncounteredEnemyIds?: Set<string>;
     balanceTelemetry?: ServerRaidBalanceState;
     lastDamageCause?: 'enemy' | 'curse';
     activeDungeonId: string | null;
@@ -200,6 +202,7 @@ export interface WorldSessionPersistentPlayer {
     completedDungeonIds: string[];
     fieldEventFlagsByDungeonId: Array<[string, string[]]>;
     inspectedAmbientSiteIds?: string[];
+    monsterCodexEncounteredEnemyIds?: string[];
     balanceTelemetry?: ServerRaidBalanceState;
     lastDamageCause?: 'enemy' | 'curse';
     activeDungeonId: string | null;

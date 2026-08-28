@@ -24,6 +24,13 @@ import {
     prependRaidHistory,
     type RaidHistoryEntry,
 } from '../raid/RaidHistory';
+import {
+    normalizeMonsterCodex,
+    recordMonsterDefeat,
+    recordMonsterEncounter,
+    type MonsterCodexEntry,
+} from '../raid/MonsterCodex';
+import { isMonsterId } from './MonsterCatalog';
 
 export interface InventoryItem {
     uid: string;         // Unique ID for this specific instance
@@ -48,6 +55,7 @@ export interface SaveData {
     raidInsuranceActive?: boolean;
     activeBountyContractId?: string | null;
     raidHistory?: RaidHistoryEntry[];
+    monsterCodex?: MonsterCodexEntry[];
     currentHubTownId?: string;
     pendingRestMenuId?: string | null;
     inventory?: InventoryItem[];
@@ -81,6 +89,7 @@ export class PlayerData {
     public raidInsuranceActive: boolean = false;
     public activeBountyContractId: string | null = null;
     public raidHistory: RaidHistoryEntry[] = [];
+    public monsterCodex: MonsterCodexEntry[] = [];
     public currentHubTownId: string = 'central_castle';
     public pendingRestMenuId: string | null = null;
     public inventory: InventoryItem[] = [];
@@ -89,6 +98,8 @@ export class PlayerData {
     private characterSaveProvider: CharacterSaveProvider | null = null;
     private authenticatedSession = false;
     private hubPersistCallback: (() => void) | null = null;
+    private readonly codexEncounteredEnemyIds = new Set<string>();
+    private readonly codexDefeatedEnemyIds = new Set<string>();
 
     public setAuthenticatedSession(active: boolean): void {
         this.authenticatedSession = active;
@@ -148,6 +159,36 @@ export class PlayerData {
         this.raidHistory = prependRaidHistory(this.raidHistory, entry);
     }
 
+    public beginMonsterCodexRaid(): void {
+        this.codexEncounteredEnemyIds.clear();
+        this.codexDefeatedEnemyIds.clear();
+    }
+
+    public recordMonsterEncounter(
+        monsterId: string | undefined,
+        level: number,
+        enemyInstanceId: string,
+        timestamp: number = Date.now(),
+    ): boolean {
+        if (!isMonsterId(monsterId) || !enemyInstanceId || this.codexEncounteredEnemyIds.has(enemyInstanceId)) return false;
+        this.codexEncounteredEnemyIds.add(enemyInstanceId);
+        this.monsterCodex = recordMonsterEncounter(this.monsterCodex, { monsterId, level, timestamp });
+        return true;
+    }
+
+    public recordMonsterDefeat(
+        monsterId: string | undefined,
+        level: number,
+        enemyInstanceId: string,
+        timestamp: number = Date.now(),
+    ): boolean {
+        if (!isMonsterId(monsterId) || !enemyInstanceId || this.codexDefeatedEnemyIds.has(enemyInstanceId)) return false;
+        this.recordMonsterEncounter(monsterId, level, enemyInstanceId, timestamp);
+        this.codexDefeatedEnemyIds.add(enemyInstanceId);
+        this.monsterCodex = recordMonsterDefeat(this.monsterCodex, { monsterId, level, timestamp });
+        return true;
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  Save / Load (localStorage for now, Firebase later)
     // ═══════════════════════════════════════════════════════════
@@ -198,6 +239,8 @@ export class PlayerData {
             this.raidInsuranceActive = data.raidInsuranceActive === true;
             this.activeBountyContractId = normalizeActiveBountyContractId(data.activeBountyContractId);
             this.raidHistory = normalizeRaidHistory(data.raidHistory);
+            this.monsterCodex = normalizeMonsterCodex(data.monsterCodex);
+            this.beginMonsterCodexRaid();
             this.currentHubTownId = typeof data.currentHubTownId === 'string' ? data.currentHubTownId : 'central_castle';
             this.pendingRestMenuId = typeof data.pendingRestMenuId === 'string' ? data.pendingRestMenuId : null;
             this.inventory = normalizeInventory(data.inventory);
@@ -228,6 +271,7 @@ export class PlayerData {
                 raidInsuranceActive: this.raidInsuranceActive,
                 activeBountyContractId: this.activeBountyContractId,
                 raidHistory: this.raidHistory,
+                monsterCodex: this.monsterCodex,
             },
             inventory: {
                 width: 10,
@@ -270,6 +314,8 @@ export class PlayerData {
         this.raidInsuranceActive = questState.raidInsuranceActive === true;
         this.activeBountyContractId = normalizeActiveBountyContractId(questState.activeBountyContractId);
         this.raidHistory = normalizeRaidHistory(questState.raidHistory);
+        this.monsterCodex = normalizeMonsterCodex(questState.monsterCodex);
+        this.beginMonsterCodexRaid();
         this.currentHubTownId = typeof hubLocation.townId === 'string' ? hubLocation.townId : 'central_castle';
         this.pendingRestMenuId = typeof hubLocation.pendingRestMenuId === 'string' ? hubLocation.pendingRestMenuId : null;
         this.inventory = normalizeInventorySnapshot(save.inventory);

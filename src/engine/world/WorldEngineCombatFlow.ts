@@ -29,7 +29,7 @@ export interface WorldEngineCombatFlowContext {
     combatController: WorldCombatController;
     snapshotPartyHp: () => Map<string, number>;
     interruptRestingForDamage: (beforeHpByActorId: Map<string, number>) => void;
-    recordKill: () => void;
+    recordKill: (enemy?: Enemy) => void;
     recordCharacterDown: (characterId: string) => void;
     clearEnemyIfSelected: (enemyId: string) => void;
     spawnKillEffect: (enemy: Enemy, exp: number) => void;
@@ -46,7 +46,8 @@ export class WorldEngineCombatFlow {
 
     public applyCombatResult(result: CombatResult): void {
         for (const enemyId of result.killedEnemyIds) {
-            this.context.recordKill();
+            const defeated = this.context.getFieldEnemies().find((entry) => entry.enemy.id === enemyId)?.enemy;
+            this.context.recordKill(defeated);
             this.context.clearEnemyIfSelected(enemyId);
         }
         for (const characterId of result.downedCharacterIds) {
@@ -118,7 +119,7 @@ export class WorldEngineCombatFlow {
         }
 
         this.awardDefeatExp(actor, enemy);
-        this.context.recordKill();
+        this.context.recordKill(enemy);
         const killExp = enemy.calcExpFor(actor.character.level);
         this.context.spawnKillEffect(enemy, killExp);
         this.context.registerCombatFeedback('kill', feedbackGroupId);

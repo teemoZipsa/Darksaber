@@ -1542,6 +1542,131 @@
 #ui-overlay .ds-raid-history__stats dd {
     margin: 2px 0 0; color: var(--ds-text); font-size: 12px; font-variant-numeric: tabular-nums;
 }
+#ui-overlay .ds-sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+#ui-overlay .ds-monster-codex {
+    display: flex; flex: 1; min-height: 0; height: min(590px, 65vh); flex-direction: column;
+    background: var(--ds-bg-1); overflow: hidden;
+}
+#ui-overlay .ds-monster-codex__summary {
+    display: flex; flex: none; align-items: center; justify-content: space-between; gap: 18px;
+    padding: 13px 18px; border-bottom: 1px solid var(--ds-border-shadow);
+    background: linear-gradient(180deg, var(--ds-panel-inset), var(--ds-bg-1));
+}
+#ui-overlay .ds-monster-codex__summary > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+#ui-overlay .ds-monster-codex__summary strong { color: var(--ds-accent-bright); font-size: 15px; letter-spacing: .04em; }
+#ui-overlay .ds-monster-codex__summary span { color: var(--ds-text-dim); font-size: 11px; line-height: 1.4; }
+#ui-overlay .ds-monster-codex__summary dl { display: flex; flex: none; gap: 8px; margin: 0; }
+#ui-overlay .ds-monster-codex__summary dl > div {
+    min-width: 74px; padding: 6px 9px; text-align: center;
+    border: 1px solid var(--ds-border-shadow); background: var(--ds-bg-0);
+}
+#ui-overlay .ds-monster-codex__summary dt { color: var(--ds-text-dim); font-size: 9px; text-transform: uppercase; }
+#ui-overlay .ds-monster-codex__summary dd { margin: 2px 0 0; color: var(--ds-accent-bright); font-size: 15px; font-variant-numeric: tabular-nums; }
+#ui-overlay .ds-monster-codex__controls {
+    display: grid; flex: none; grid-template-columns: minmax(180px, 1fr) minmax(150px, .4fr); gap: 9px;
+    padding: 10px 18px; border-bottom: 1px solid var(--ds-border-shadow);
+}
+#ui-overlay .ds-monster-codex__controls label { min-width: 0; }
+#ui-overlay .ds-monster-codex__controls input,
+#ui-overlay .ds-monster-codex__controls select {
+    width: 100%; height: 34px; padding: 0 10px; color: var(--ds-text);
+    border: 1px solid var(--ds-border-shadow); border-radius: var(--ds-radius-sm);
+    background: var(--ds-panel-inset); font: inherit; font-size: 12px;
+}
+#ui-overlay .ds-monster-codex__controls input:focus-visible,
+#ui-overlay .ds-monster-codex__controls select:focus-visible { outline: 2px solid var(--ds-accent); outline-offset: 1px; }
+#ui-overlay .ds-monster-codex__body {
+    display: grid; flex: 1; min-height: 0; grid-template-columns: minmax(250px, 310px) minmax(0, 1fr);
+}
+#ui-overlay .ds-monster-codex__list {
+    min-height: 0; overflow-y: auto; padding: 10px;
+    border-right: 1px solid var(--ds-border-shadow); background: var(--ds-bg-0);
+}
+#ui-overlay .ds-monster-codex__entry {
+    display: grid; width: 100%; grid-template-columns: 54px minmax(0, 1fr) 16px; align-items: center; gap: 9px;
+    margin-bottom: 7px; padding: 7px; text-align: left; color: var(--ds-text-muted);
+    border: 1px solid var(--ds-border-shadow); border-left: 3px solid transparent;
+    border-radius: var(--ds-radius-sm); background: var(--ds-panel-inset); cursor: pointer;
+}
+#ui-overlay .ds-monster-codex__entry:hover { border-color: var(--ds-border); }
+#ui-overlay .ds-monster-codex__entry:focus-visible { outline: 2px solid var(--ds-accent); outline-offset: 1px; }
+#ui-overlay .ds-monster-codex__entry.is-selected {
+    border-color: var(--ds-accent); border-left-color: var(--ds-accent-bright);
+    background: linear-gradient(90deg, var(--ds-accent-soft), var(--ds-panel-inset) 45%);
+}
+#ui-overlay .ds-monster-codex__entry.is-locked { color: var(--ds-text-dim); }
+#ui-overlay .ds-monster-codex__entry-copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+#ui-overlay .ds-monster-codex__entry-copy small { color: var(--ds-text-dim); font-size: 9px; }
+#ui-overlay .ds-monster-codex__entry-copy strong { overflow: hidden; color: var(--ds-text); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+#ui-overlay .ds-monster-codex__entry.is-locked strong { color: var(--ds-text-dim); }
+#ui-overlay .ds-monster-codex__entry-copy > span { color: var(--ds-text-dim); font-size: 10px; }
+#ui-overlay .ds-monster-codex__entry.is-defeated .ds-monster-codex__entry-copy > span,
+#ui-overlay .ds-monster-codex__entry.is-defeated .ds-monster-codex__entry-mark { color: var(--ds-accent-bright); }
+#ui-overlay .ds-monster-codex__entry-mark { color: var(--ds-accent); font-size: 14px; text-align: center; }
+#ui-overlay .ds-monster-codex__portrait {
+    position: relative; display: grid; flex: none; place-items: center; overflow: hidden;
+    border: 1px solid var(--ds-border-shadow); background:
+        radial-gradient(circle at 50% 60%, var(--ds-accent-soft), transparent 65%), var(--ds-bg-0);
+}
+#ui-overlay .ds-monster-codex__portrait.is-small { width: 52px; height: 52px; }
+#ui-overlay .ds-monster-codex__portrait.is-large { width: 118px; height: 118px; border-color: var(--ds-border); }
+#ui-overlay .ds-monster-codex__sprite {
+    display: block; flex: none; image-rendering: pixelated;
+    transform: scale(var(--codex-sprite-scale, 1)); transform-origin: center;
+}
+#ui-overlay .ds-monster-codex__portrait.is-locked .ds-monster-codex__sprite {
+    filter: grayscale(1) brightness(0); opacity: .65;
+}
+#ui-overlay .ds-monster-codex__detail {
+    min-width: 0; min-height: 0; overflow-y: auto; padding: 18px;
+    background: linear-gradient(135deg, var(--ds-panel-inset), var(--ds-bg-1) 52%);
+}
+#ui-overlay .ds-monster-codex__detail.is-empty,
+#ui-overlay .ds-monster-codex__detail.is-locked {
+    display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 7px;
+    color: var(--ds-text-dim); text-align: center;
+}
+#ui-overlay .ds-monster-codex__detail.is-locked small { margin-top: 8px; color: var(--ds-text-dim); }
+#ui-overlay .ds-monster-codex__detail.is-locked h3 { margin: 0; color: var(--ds-text-muted); font-size: 24px; letter-spacing: .2em; }
+#ui-overlay .ds-monster-codex__locked-state { color: var(--ds-accent); font-size: 11px; letter-spacing: .08em; }
+#ui-overlay .ds-monster-codex__detail.is-locked p { max-width: 390px; margin: 5px 0 0; font-size: 12px; line-height: 1.55; }
+#ui-overlay .ds-monster-codex__identity { display: flex; align-items: center; gap: 18px; }
+#ui-overlay .ds-monster-codex__identity > div { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+#ui-overlay .ds-monster-codex__identity small { color: var(--ds-text-dim); font-size: 10px; }
+#ui-overlay .ds-monster-codex__identity h3 { margin: 0; color: var(--ds-accent-bright); font-size: clamp(20px, 3vw, 28px); }
+#ui-overlay .ds-monster-codex__identity > div > span { color: var(--ds-accent); font-size: 11px; }
+#ui-overlay .ds-monster-codex__facts {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 16px 0 0;
+}
+#ui-overlay .ds-monster-codex__facts > div {
+    min-width: 0; padding: 7px 8px; border: 1px solid var(--ds-border-shadow); background: var(--ds-bg-0);
+}
+#ui-overlay .ds-monster-codex__facts dt { color: var(--ds-text-dim); font-size: 9px; }
+#ui-overlay .ds-monster-codex__facts dd { margin: 3px 0 0; color: var(--ds-text); font-size: 11px; line-height: 1.35; }
+#ui-overlay .ds-monster-codex__lore {
+    margin-top: 12px; padding: 10px 12px; color: var(--ds-text-muted); font-size: 11px; line-height: 1.55;
+    border-left: 2px solid var(--ds-accent); background: var(--ds-bg-0);
+}
+#ui-overlay .ds-monster-codex__lore p { margin: 0; }
+#ui-overlay .ds-monster-codex__lore p + p { margin-top: 6px; }
+#ui-overlay .ds-monster-codex__combat {
+    margin-top: 12px; padding: 11px 12px; border: 1px solid var(--ds-border-shadow); background: var(--ds-bg-0);
+}
+#ui-overlay .ds-monster-codex__combat.is-locked {
+    display: flex; flex-direction: column; gap: 4px; color: var(--ds-text-dim); text-align: center;
+}
+#ui-overlay .ds-monster-codex__combat.is-locked strong { color: var(--ds-text-muted); font-size: 12px; }
+#ui-overlay .ds-monster-codex__combat.is-locked span { font-size: 10px; }
+#ui-overlay .ds-monster-codex__subhead { display: flex; justify-content: space-between; gap: 12px; color: var(--ds-accent); font-size: 11px; }
+#ui-overlay .ds-monster-codex__combat > dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin: 9px 0 0; }
+#ui-overlay .ds-monster-codex__combat > dl > div { padding: 5px; text-align: center; background: var(--ds-panel-inset); }
+#ui-overlay .ds-monster-codex__combat dt { color: var(--ds-text-dim); font-size: 8px; }
+#ui-overlay .ds-monster-codex__combat dd { margin: 2px 0 0; color: var(--ds-text); font-size: 11px; font-variant-numeric: tabular-nums; }
+#ui-overlay .ds-monster-codex__record { margin-top: 8px; color: var(--ds-text-dim); font-size: 9px; text-align: right; }
+#ui-overlay .ds-monster-codex__empty { padding: 30px 10px; color: var(--ds-text-dim); font-size: 11px; text-align: center; }
 #ui-overlay .ds-bounty-board {
     border-top: 1px solid var(--ds-border-shadow);
     padding: 14px 18px 16px;
@@ -1744,9 +1869,35 @@
     text-align: center;
 }
 
+@media (max-width: 760px) {
+    #ui-overlay .ds-monster-codex { height: min(650px, 68vh); }
+    #ui-overlay .ds-monster-codex__summary { padding: 9px 11px; }
+    #ui-overlay .ds-monster-codex__summary > div > span { display: none; }
+    #ui-overlay .ds-monster-codex__summary dl > div { min-width: 62px; padding: 5px 7px; }
+    #ui-overlay .ds-monster-codex__controls { grid-template-columns: minmax(0, 1fr) 128px; padding: 8px 10px; }
+    #ui-overlay .ds-monster-codex__body { grid-template-columns: 1fr; grid-template-rows: minmax(126px, 31%) minmax(0, 1fr); }
+    #ui-overlay .ds-monster-codex__list {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 6px;
+        padding: 7px; border-right: 0; border-bottom: 1px solid var(--ds-border-shadow);
+    }
+    #ui-overlay .ds-monster-codex__entry {
+        grid-template-columns: 44px minmax(0, 1fr) 12px; gap: 6px; margin: 0; padding: 5px;
+    }
+    #ui-overlay .ds-monster-codex__portrait.is-small { width: 42px; height: 42px; }
+    #ui-overlay .ds-monster-codex__detail { padding: 12px; }
+    #ui-overlay .ds-monster-codex__portrait.is-large { width: 92px; height: 92px; }
+    #ui-overlay .ds-monster-codex__identity { gap: 12px; }
+    #ui-overlay .ds-monster-codex__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; }
+    #ui-overlay .ds-monster-codex__lore { margin-top: 9px; }
+}
+
 @media (max-width: 640px) {
     #ui-overlay .ds-raid-history__stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     #ui-overlay .ds-raid-history__head { align-items: flex-start; flex-direction: column; gap: 3px; }
+    #ui-overlay .ds-quest-tabs { gap: 5px; padding: 8px 10px; }
+    #ui-overlay .ds-quest-tabs .ds-btn { padding: 7px 5px; font-size: 10px; }
+    #ui-overlay .ds-monster-codex__combat > dl { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    #ui-overlay .ds-monster-codex__record { text-align: left; }
 }
 
 /* ─── Rumors ────────────────────────────────────────────────── */

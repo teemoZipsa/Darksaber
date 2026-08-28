@@ -191,6 +191,17 @@ function collectDataDrivenUiKeys(): Set<string> {
 
     for (const type of ['damage', 'heal', 'buff', 'debuff', 'aoe']) add(`magic.type.${type}`);
     for (const element of ['fire', 'ice', 'lightning', 'holy', 'dark', 'earth', 'wind', 'physical', 'none']) add(`magic.element.${element}`);
+    for (const family of ['human', 'undead', 'beast', 'beastfolk', 'demon', 'giant', 'reptile', 'fae']) {
+        add(`codex.family.${family}`);
+        add(`codex.family.${family}.desc`);
+    }
+    for (const role of ['bruiser', 'tank', 'archer', 'healer', 'coward', 'support', 'boss']) {
+        add(`codex.role.${role}`);
+        add(`codex.role.${role}.desc`);
+    }
+    for (const habitat of ['grass', 'castle', 'cave', 'stone', 'lava', 'forest', 'sand', 'snow', 'special', 'ament']) {
+        add(`codex.habitat.${habitat}`);
+    }
     for (const rarity of ['common', 'uncommon', 'rare', 'epic', 'legend', 'unique']) add(`rarity.${rarity}`);
     for (const slot of ['weapon', 'shield', 'head', 'body', 'boots', 'accessory', 'accessory2']) add(`inv.${slot}`);
     for (const branch of MASTER_CLASSES.map((master) => master.branch)) add(`tierChart.branch.${branch}`);
@@ -262,6 +273,11 @@ test('literal UI translation keys exist in both languages', () => {
 test('template-composed UI translation key families are covered by the data-driven guard', () => {
     assert.deepEqual([...collectTemplateUiKeyPatterns()].sort(), [
         'bounty.clue.${}',
+        'codex.family.${}',
+        'codex.family.${}.desc',
+        'codex.habitat.${}',
+        'codex.role.${}',
+        'codex.role.${}.desc',
         'field.log.reason.${}',
         'inv.${}',
         'magic.element.${}',

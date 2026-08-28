@@ -43,6 +43,7 @@ import {
     normalizeLoadout,
 } from '../../magic/MagicLoadout';
 import type { RaidHistoryEntry } from '../../raid/RaidHistory';
+import type { MonsterCodexEntry } from '../../raid/MonsterCodex';
 
 export interface BlacksmithEntry {
     id: string;
@@ -165,7 +166,17 @@ export class UiStore {
                 entry.goldReward,
             ].join(':'))
             .join(',');
-        return `${quests}|history:${history}`;
+        const codex = this.getMonsterCodex()
+            .map((entry) => [
+                entry.monsterId,
+                entry.encounters,
+                entry.kills,
+                entry.highestDefeatedLevel,
+                entry.lastEncounteredAt,
+                entry.lastDefeatedAt ?? 0,
+            ].join(':'))
+            .join(',');
+        return `${quests}|history:${history}|codex:${codex}`;
     }
 
     private magicSignature(): string {
@@ -236,6 +247,7 @@ export class UiStore {
     isQuestJournalOpen = (): boolean => this.isOverlayOpen('journal');
     getStoryQuestViews = (): StoryQuestView[] => buildStoryQuestViews(this.gm.playerData, this.gm.getRaidSession());
     getRaidHistory = (): readonly RaidHistoryEntry[] => this.gm.playerData.raidHistory;
+    getMonsterCodex = (): readonly MonsterCodexEntry[] => this.gm.playerData.monsterCodex;
     isRaidPreparationEditingLocked = (): boolean => this.gm.isRaidPreparationEditingLocked();
 
     private raidPreparationEditGuard(): UiMutationResult | null {

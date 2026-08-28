@@ -25,6 +25,7 @@ import { getEffectiveServerActorStats } from './WorldSessionHelpers';
 import { awardWorldSessionEnemyExp } from './WorldSessionActorProgression';
 import type { WorldSessionSaveState } from './WorldSessionSaveState';
 import { recordBountyTargetKill } from './WorldSessionBounty';
+import { recordWorldSessionMonsterDefeat } from './WorldSessionMonsterCodex';
 
 export interface WorldSessionEnemyKillContext {
     scenarioRuntime: WorldSessionScenarioRuntime;
@@ -105,6 +106,7 @@ export function completeWorldSessionEnemyKill(
     let expAward = 0;
     if (player) {
         player.kills += 1;
+        recordWorldSessionMonsterDefeat(player, target, context.saveState, now);
         recordPlayerKillDangerBand(player, target, context.worldMap);
         expAward = awardWorldSessionEnemyExp({
             actor,

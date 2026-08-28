@@ -34,7 +34,7 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
 | 캐릭생성 | `src/ui/react/charcreate/CharacterCreation.tsx` | 독립 state 기반 DOM 패널 |
 | 마을 (Town) | `src/ui/react/town/*` | **화면 전체 DOM 이전**: 헤더·탭바·출격 + 창고/상점/휴식/퀘스트/소문. `TownUI`는 상태 홀더로 축소, `WorldEngine.getTownSession()`→`GameManager.getTownSession()`로 노출. |
 | 인벤토리 | `src/ui/react/inventory/InventoryPanel.tsx` | 월드(I)·마을 창고 공용 DOM 패널. 드래그 해석은 `InventoryUI` 모델 액션에 유지. |
-| 스토리 저널 (J) | `src/ui/react/quest/StoryJournalPanel.tsx` | 퀘스트 목록과 캐릭터별 최근 출격 20건을 함께 표시. |
+| 스토리 저널 (J) | `src/ui/react/quest/StoryJournalPanel.tsx` | 퀘스트 목록, 캐릭터별 최근 출격 20건, 전체 61종 몬스터 도감을 함께 표시. 도감은 마을 퀘스트 게시판과 같은 검색·계열 필터·상세 보기를 공유. |
 
 ## 남은 독립 Canvas 차단형 패널
 

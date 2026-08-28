@@ -12,6 +12,7 @@ import { AudioManager } from '../../../engine/AudioManager';
 import { useStore, useUiVersion } from '../UiContext';
 import { QuestList } from '../quest/QuestList';
 import { RaidHistoryList } from '../quest/RaidHistoryList';
+import { MonsterCodexPanel } from '../quest/MonsterCodexPanel';
 import { itemName } from './itemView';
 import { formatMonsterName } from '../../../i18n/DisplayNames';
 import { formatTownName } from '../../../i18n/TownMessages';
@@ -32,9 +33,12 @@ export function QuestPanel() {
     const [tearingId, setTearingId] = useState<string | null>(null);
     const [selectedAffixKey, setSelectedAffixKey] = useState<string | null>(null);
     const [hoveredAffixKey, setHoveredAffixKey] = useState<string | null>(null);
-    const [tab, setTab] = useState<'quests' | 'history'>('quests');
+    const [tab, setTab] = useState<'quests' | 'history' | 'codex'>('quests');
     const visibleAffixKey = hoveredAffixKey ?? selectedAffixKey;
-    const panelStyle = { width: 'min(560px, 92vw)', '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
+    const panelStyle = {
+        width: tab === 'codex' ? 'min(900px, 94vw)' : 'min(560px, 92vw)',
+        '--ds-scale': SettingsManager.getUIScale(),
+    } as CSSProperties;
 
     useEffect(() => {
         if (!feedback) return;
@@ -91,9 +95,18 @@ export function QuestPanel() {
                 >
                     {t('raid.history.title')}
                 </button>
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === 'codex'}
+                    className={`ds-btn${tab === 'codex' ? ' is-active' : ''}`}
+                    onClick={() => setTab('codex')}
+                >
+                    {t('codex.title')}
+                </button>
             </div>
 
-            {tab === 'history' ? <RaidHistoryList /> : <>
+            {tab === 'history' ? <RaidHistoryList /> : tab === 'codex' ? <MonsterCodexPanel /> : <>
                 <QuestList />
 
             <section className="ds-bounty-board" aria-label={t('bounty.title')}>

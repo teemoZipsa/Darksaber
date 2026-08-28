@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { FIRST_SURVIVAL_QUEST_ID } from '../../src/shared/FirstSurvivalReward';
+import { MONSTER_DEFINITIONS, MONSTER_IDS } from '../../src/data/MonsterCatalog';
 
 async function expectFitsViewport(page: Page, locator: Locator) {
     const box = await locator.boundingBox();
@@ -290,6 +291,25 @@ test('dev town renders the React town overlay with embedded inventory', async ({
     await raidLogTab.click();
     await expect(page.locator('#ui-overlay .ds-raid-history')).toBeVisible();
     await expect(page.locator('#ui-overlay .ds-raid-history__empty, #ui-overlay .ds-raid-history__entry').first()).toBeVisible();
+    await page.getByRole('tab', { name: /몬스터 도감|Monster Codex/ }).click();
+    const codex = page.locator('#ui-overlay .ds-monster-codex');
+    await expect(codex).toBeVisible();
+    await expectFitsViewport(page, codex);
+    expect(await codex.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    await expect(codex.locator('.ds-monster-codex__entry')).toHaveCount(MONSTER_IDS.length);
+    await expect(codex.getByRole('searchbox')).toBeVisible();
+    await expect(codex.locator('.ds-monster-codex__detail')).toBeVisible();
+    await expect(codex.locator('.ds-monster-codex__detail')).toContainText(/미발견|Undiscovered/);
+    const familyFilter = codex.getByRole('combobox');
+    await familyFilter.selectOption('undead');
+    await expect(codex.locator('.ds-monster-codex__entry')).toHaveCount(
+        MONSTER_IDS.filter((monsterId) => MONSTER_DEFINITIONS[monsterId].family === 'undead').length,
+    );
+    await familyFilter.selectOption('all');
+    await codex.getByRole('searchbox').fill('302R');
+    await expect(codex.locator('.ds-monster-codex__entry')).toHaveCount(0);
+    await expect(codex.locator('.ds-monster-codex__empty')).toBeVisible();
+    await codex.getByRole('searchbox').fill('');
     await page.getByRole('tab', { name: /메인 퀘스트|Main Quests/ }).click();
     const bountyPapers = page.locator('#ui-overlay .ds-bounty-paper');
     await expect(bountyPapers).toHaveCount(3);
@@ -320,6 +340,27 @@ test('dev town renders the React town overlay with embedded inventory', async ({
     await expect(
         bountyPapers.nth(2).getByRole('button', { name: /의뢰서 뜯기|Tear Down Notice/ }),
     ).toBeDisabled();
+});
+
+test('J-key journal exposes the shared monster codex within desktop and mobile viewports', async ({ page }) => {
+    await page.goto('/?devStart=tutorial');
+    await expect(page.locator('#gameCanvas')).toBeVisible();
+    await waitForWorldInputReady(page);
+
+    await page.keyboard.press('KeyJ');
+    const journal = page.getByRole('dialog', { name: /퀘스트 저널|Quest Journal/ });
+    await expect(journal).toBeVisible({ timeout: 10_000 });
+    await journal.getByRole('tab', { name: /몬스터 도감|Monster Codex/ }).click();
+
+    const codex = journal.locator('.ds-monster-codex');
+    await expect(codex).toBeVisible();
+    await expectFitsViewport(page, journal);
+    await expectFitsViewport(page, codex);
+    await expect(codex.locator('.ds-monster-codex__entry')).toHaveCount(MONSTER_IDS.length);
+    expect(await codex.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+
+    await page.keyboard.press('Escape');
+    await expect(journal).toBeHidden();
 });
 
 test('local bounty investigates two clues before revealing one elite target', async ({ page }) => {

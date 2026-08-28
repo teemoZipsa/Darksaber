@@ -17,6 +17,7 @@
 | 저장·온라인 | 운영 기준선 완료 | 계정/캐릭터, Postgres, 서버 권위 결과, 재접속, 월드 snapshot, 단일 shard |
 | UI·접근성 | 주요 패널 완료 | Canvas 필드 + React DOM 차단형 UI, ko/en, 데스크톱·모바일 |
 | 출격 기록 | V1 완료 | 캐릭터별 최신 20건을 로컬/서버 최종 저장과 마을·저널 UI에서 확인 |
+| 몬스터 도감 | V1 완료 | 전체 61종의 조우·토벌을 서버 권위로 캐릭터별 저장하고 마을·저널에서 검색·필터·상세 확인 |
 | 자동 검증 | 기준선 완료 | lint, client/server/test typecheck, unit/integration, coverage, desktop/mobile E2E |
 
 ## 지금: 안정성 게이트

@@ -23,6 +23,8 @@ export interface EnemyAIMemory {
 
 export class Enemy extends Entity {
     public name: string;
+    /** Stable catalog identity used by sprites, balance, and the monster codex. */
+    public monsterId?: string;
     public stats: CharacterStats;
     public aggroRange: number;     // tiles within which enemy detects player
     public level: number;
@@ -55,6 +57,7 @@ export class Enemy extends Entity {
     ) {
         super(id, gridX, gridY, color, name.charAt(0).toUpperCase());
         this.name = name;
+        this.monsterId = monsterId;
         this.level = level;
         this.aggroRange = 5;
         this.expReward = CombatFormulas.calcExpGain(level, level);

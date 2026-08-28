@@ -18,8 +18,9 @@ import { formatStoryCompanionName } from '../i18n/DisplayNames';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
-import type { TilePoint } from '../field/FieldPathing';
+import { manhattan, type TilePoint } from '../field/FieldPathing';
 import type { FieldActor, FieldEnemy, FieldTurnEndReason } from '../field/FieldTypes';
+import { getEnemyAggroRanges } from '../field/FieldConfig';
 import { WorldRaidSession } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
 import type { CombatResult } from './world/WorldCombatController';
@@ -355,6 +356,7 @@ export class WorldEngine {
 
     public update(dt: number, input: InputManager, camera: Camera): void {
         this.getUpdateFlow().update(dt, input, camera);
+        this.recordLocalMonsterEncounters();
     }
 
     private getUpdateFlow(): WorldEngineUpdateFlow {
@@ -540,6 +542,7 @@ export class WorldEngine {
     }
 
     private async beginRaidFromCurrentHub(requestedRealm?: WorldRealmId): Promise<void> {
+        this.playerData.beginMonsterCodexRaid();
         return this.raidLifecycleControllers.raidLifecycleController.beginRaidFromCurrentHub(requestedRealm);
     }
 
@@ -597,6 +600,7 @@ export class WorldEngine {
 
     private applyNetworkSnapshot(snapshot: WorldSnapshot): void {
         applyWorldEngineNetworkSnapshot(this.scenarioNetworkControllers, this.raidSession, snapshot);
+        this.recordNearbyMonsterEncounters('network', snapshot.serverTime);
     }
 
     private openNetworkLoot(grant: LootGrantMessage): void {
@@ -616,7 +620,42 @@ export class WorldEngine {
     }
 
     private handleNetworkCombatEvent(event: CombatEventMessage): void {
+        if (event.kind === 'kill') {
+            const enemy = this.getEnemyById(event.targetId);
+            if (enemy) this.playerData.recordMonsterDefeat(enemy.monsterId, enemy.level, `network:${enemy.id}`);
+        }
         handleWorldEngineNetworkCombatEvent(this.scenarioNetworkControllers, event);
+    }
+
+    private recordLocalMonsterEncounters(): void {
+        if (
+            this.scenarioNetworkControllers.storyScenarioController.isPresentationActive()
+            || !this.raidSession.active
+            || this.getNetworkState().isRaid
+        ) return;
+        this.recordNearbyMonsterEncounters('local');
+    }
+
+    private recordNearbyMonsterEncounters(source: 'local' | 'network', timestamp: number = Date.now()): void {
+        const partyActors = this.partyActors.filter((actor) => (
+            actor.character.stats.hp > 0
+            && (source === 'local' || !this.remotePartyActors.has(actor.id))
+        ));
+        for (const { enemy } of this.fieldEnemies) {
+            const enemyTile = { x: enemy.gridX, y: enemy.gridY };
+            const encounterRange = getEnemyAggroRanges(enemy.aggroRange).enter;
+            const isNearby = partyActors.some((actor) => manhattan(
+                { x: actor.entity.gridX, y: actor.entity.gridY },
+                enemyTile,
+            ) <= encounterRange);
+            if (!isNearby) continue;
+            this.playerData.recordMonsterEncounter(
+                enemy.monsterId,
+                enemy.level,
+                `${source}:${enemy.id}`,
+                timestamp,
+            );
+        }
     }
 
     private getPathPreviewTiles(actor: FieldActor | null): TilePoint[] {

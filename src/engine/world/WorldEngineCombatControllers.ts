@@ -1,4 +1,5 @@
 import type { PartyManager } from '../../character/PartyManager';
+import type { PlayerData } from '../../data/PlayerData';
 import type { Enemy } from '../../entity/Enemy';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
 import { getCarryAtbMultiplier, getPartyCarriedWeight } from '../../inventory/CarryWeight';
@@ -35,6 +36,7 @@ import type { WorldTutorialController } from './WorldTutorialController';
 
 export interface WorldEngineCombatControllerPorts {
     party: PartyManager;
+    playerData: PlayerData;
     gameManager: GameManager;
     raidSession: WorldRaidSession;
     tutorialController: WorldTutorialController;
@@ -179,7 +181,10 @@ export function createWorldEngineCombatControllers(
         combatController,
         snapshotPartyHp: () => ports.snapshotPartyHp(),
         interruptRestingForDamage: (beforeHpByActorId) => ports.interruptRestingForDamage(beforeHpByActorId),
-        recordKill: () => ports.raidSession.recordKill(),
+        recordKill: (enemy) => {
+            ports.raidSession.recordKill();
+            if (enemy) ports.playerData.recordMonsterDefeat(enemy.monsterId, enemy.level, enemy.id);
+        },
         recordCharacterDown: (characterId) => ports.raidSession.recordCharacterDown(characterId),
         clearEnemyIfSelected: (enemyId) => ports.clearEnemyIfSelected(enemyId),
         spawnKillEffect: (enemy, exp) => ports.effectManager.spawnKillEffect(enemy.gridX, enemy.gridY, enemy.color, exp, enemy),

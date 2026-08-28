@@ -47,6 +47,7 @@ export function buildWorldSessionJoinedPlayer(input: WorldSessionJoinedPlayerInp
         completedDungeonIds: new Set(),
         fieldEventFlagsByDungeonId: new Map(),
         inspectedAmbientSiteIds: new Set(),
+        monsterCodexEncounteredEnemyIds: new Set(),
         balanceTelemetry: createServerRaidBalanceState(),
         activeDungeonId: null,
         active: true,

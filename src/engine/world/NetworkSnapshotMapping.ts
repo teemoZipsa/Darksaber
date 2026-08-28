@@ -119,7 +119,8 @@ export function reconcileNetworkEnemies(
             displayName,
             enemySnapshot.level,
             enemySnapshot.color,
-            enemySnapshot.role
+            enemySnapshot.role,
+            enemySnapshot.monsterId,
         );
         enemy.gridX = enemySnapshot.tile.x;
         enemy.gridY = enemySnapshot.tile.y;

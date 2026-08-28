@@ -4,14 +4,18 @@ import { t } from '../../../i18n/LanguageManager';
 import { useStore, useUiVersion } from '../UiContext';
 import { QuestList } from './QuestList';
 import { RaidHistoryList } from './RaidHistoryList';
+import { MonsterCodexPanel } from './MonsterCodexPanel';
 import { useModalDialog } from '../useModalDialog';
 
 export function StoryJournalPanel() {
     useUiVersion();
     const store = useStore();
     const dialogRef = useModalDialog<HTMLDivElement>();
-    const [tab, setTab] = useState<'quests' | 'history'>('quests');
-    const panelStyle = { width: 'min(720px, 94vw)', '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
+    const [tab, setTab] = useState<'quests' | 'history' | 'codex'>('quests');
+    const panelStyle = {
+        width: tab === 'codex' ? 'min(980px, 96vw)' : 'min(720px, 94vw)',
+        '--ds-scale': SettingsManager.getUIScale(),
+    } as CSSProperties;
 
     return (
         <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('quest.journal')} tabIndex={-1} className="ds-panel ds-quest ds-journal" style={panelStyle} onClick={(e) => e.stopPropagation()}>
@@ -38,10 +42,23 @@ export function StoryJournalPanel() {
                 >
                     {t('raid.history.title')}
                 </button>
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === 'codex'}
+                    className={`ds-btn${tab === 'codex' ? ' is-active' : ''}`}
+                    onClick={() => setTab('codex')}
+                >
+                    {t('codex.title')}
+                </button>
             </div>
-            {tab === 'quests' ? <QuestList /> : <RaidHistoryList />}
+            {tab === 'quests' ? <QuestList /> : tab === 'history' ? <RaidHistoryList /> : <MonsterCodexPanel />}
             <div className="ds-journal__footer">
-                {tab === 'quests' ? t('quest.journalHint') : t('raid.history.footer')}
+                {tab === 'quests'
+                    ? t('quest.journalHint')
+                    : tab === 'history'
+                        ? t('raid.history.footer')
+                        : t('codex.footer')}
             </div>
         </div>
     );

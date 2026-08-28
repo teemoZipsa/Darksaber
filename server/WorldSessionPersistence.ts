@@ -36,6 +36,7 @@ export function toPersistentPlayer(player: ServerPlayer): WorldSessionPersistent
         fieldEventFlagsByDungeonId: [...player.fieldEventFlagsByDungeonId.entries()]
             .map(([dungeonId, flags]) => [dungeonId, [...flags]]),
         inspectedAmbientSiteIds: [...player.inspectedAmbientSiteIds],
+        monsterCodexEncounteredEnemyIds: [...(player.monsterCodexEncounteredEnemyIds ?? [])],
         bounty: cloneBountyState(player.bounty),
         balanceTelemetry: player.balanceTelemetry ? {
             ...player.balanceTelemetry,
@@ -72,6 +73,7 @@ export function restorePersistentPlayer(player: WorldSessionPersistentPlayer): S
             player.fieldEventFlagsByDungeonId.map(([dungeonId, flags]) => [dungeonId, new Set(flags)])
         ),
         inspectedAmbientSiteIds: new Set(player.inspectedAmbientSiteIds ?? []),
+        monsterCodexEncounteredEnemyIds: new Set(player.monsterCodexEncounteredEnemyIds ?? []),
         bounty: cloneBountyState(player.bounty),
         balanceTelemetry: player.balanceTelemetry ? {
             ...player.balanceTelemetry,
