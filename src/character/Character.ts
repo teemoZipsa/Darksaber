@@ -237,9 +237,9 @@ export class Character {
             10: '/assets/images/characters/darksaber/master_tactics_t10.png',
         },
         'master_healer': {
-            8: '/assets/images/characters/darksaber/cleric_t7.png',
-            9: '/assets/images/characters/darksaber/priest_t7.png',
-            10: '/assets/images/characters/darksaber/cleric_t7.png',
+            8: '/assets/images/characters/darksaber/master_healer_t8.png',
+            9: '/assets/images/characters/darksaber/master_healer_t9.png',
+            10: '/assets/images/characters/darksaber/master_healer_t10.png',
         },
         'master_magic': {
             8: '/assets/images/characters/darksaber/master_magic_t8.png',

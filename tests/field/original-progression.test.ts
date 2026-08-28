@@ -42,6 +42,18 @@ test('classes without original data keep the formula fallback', () => {
     assert.ok(c.expToNext > 0);
 });
 
+test('healer master tiers use dedicated portrait sprites', () => {
+    const c = new Character('m', 'Master', 'master_healer');
+    assert.equal(c.currentTier, 8);
+    assert.equal(c.getPortraitSrc(), '/assets/images/characters/darksaber/master_healer_t8.png');
+
+    c.currentTier = 9;
+    assert.equal(c.getPortraitSrc(), '/assets/images/characters/darksaber/master_healer_t9.png');
+
+    c.currentTier = 10;
+    assert.equal(c.getPortraitSrc(), '/assets/images/characters/darksaber/master_healer_t10.png');
+});
+
 test('character tier display name follows the active language', () => {
     const previousLang = i18n.lang;
     try {
