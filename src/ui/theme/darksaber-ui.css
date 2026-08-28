@@ -1490,6 +1490,58 @@
 #ui-overlay .ds-quest__state { font-size: 11px; color: var(--ds-accent-bright); white-space: nowrap; }
 #ui-overlay .ds-quest__reward { font-size: 12px; color: var(--ds-accent); flex: none; }
 #ui-overlay .ds-quest__note { text-align: center; font-size: 11px; color: var(--ds-text-dim); padding-top: 6px; }
+#ui-overlay .ds-quest-tabs {
+    display: flex; gap: 8px; flex: none;
+    padding: 12px 18px 10px;
+    border-bottom: 1px solid var(--ds-border-shadow);
+}
+#ui-overlay .ds-quest-tabs .ds-btn { flex: 1; padding: 8px 12px; }
+#ui-overlay .ds-quest-tabs .ds-btn.is-active {
+    color: var(--ds-accent-bright);
+    border-color: var(--ds-accent);
+    background: linear-gradient(180deg, var(--ds-accent-soft), var(--ds-panel-inset));
+}
+#ui-overlay .ds-raid-history {
+    display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 10px;
+    padding: 14px 18px 16px; overflow-y: auto;
+}
+#ui-overlay .ds-raid-history__intro {
+    color: var(--ds-text-dim); font-size: 12px; text-align: center; line-height: 1.4;
+}
+#ui-overlay .ds-raid-history__empty {
+    color: var(--ds-text-dim); font-size: 13px; text-align: center; padding: 34px 12px;
+}
+#ui-overlay .ds-raid-history__entry {
+    display: flex; flex-direction: column; gap: 7px;
+    background: var(--ds-panel-inset); border: 1px solid var(--ds-border-shadow);
+    border-left: 3px solid var(--ds-text-dim); border-radius: var(--ds-radius-sm);
+    padding: 11px 13px;
+}
+#ui-overlay .ds-raid-history__entry.is-survived { border-left-color: var(--ds-accent); }
+#ui-overlay .ds-raid-history__entry.is-dead,
+#ui-overlay .ds-raid-history__entry.is-mia { border-left-color: var(--ds-danger); }
+#ui-overlay .ds-raid-history__head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+}
+#ui-overlay .ds-raid-history__result { color: var(--ds-text-muted); font-size: 14px; font-weight: 700; }
+#ui-overlay .ds-raid-history__entry.is-survived .ds-raid-history__result { color: var(--ds-accent-bright); }
+#ui-overlay .ds-raid-history__entry.is-dead .ds-raid-history__result,
+#ui-overlay .ds-raid-history__entry.is-mia .ds-raid-history__result { color: var(--ds-danger); }
+#ui-overlay .ds-raid-history__head time { color: var(--ds-text-dim); font-size: 11px; }
+#ui-overlay .ds-raid-history__route { color: var(--ds-text-muted); font-size: 12px; }
+#ui-overlay .ds-raid-history__stats {
+    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px;
+    margin: 0;
+}
+#ui-overlay .ds-raid-history__stats > div {
+    min-width: 0; padding: 6px 7px; text-align: center;
+    background: var(--ds-bg-1); border: 1px solid var(--ds-border-shadow);
+    border-radius: var(--ds-radius-sm);
+}
+#ui-overlay .ds-raid-history__stats dt { color: var(--ds-text-dim); font-size: 10px; }
+#ui-overlay .ds-raid-history__stats dd {
+    margin: 2px 0 0; color: var(--ds-text); font-size: 12px; font-variant-numeric: tabular-nums;
+}
 #ui-overlay .ds-bounty-board {
     border-top: 1px solid var(--ds-border-shadow);
     padding: 14px 18px 16px;
@@ -1690,6 +1742,11 @@
     font-size: 12px;
     padding: 10px 18px 12px;
     text-align: center;
+}
+
+@media (max-width: 640px) {
+    #ui-overlay .ds-raid-history__stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    #ui-overlay .ds-raid-history__head { align-items: flex-start; flex-direction: column; gap: 3px; }
 }
 
 /* ─── Rumors ────────────────────────────────────────────────── */

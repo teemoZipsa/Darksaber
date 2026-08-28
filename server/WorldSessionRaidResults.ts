@@ -14,6 +14,8 @@ import type {
 } from './WorldSessionTypes';
 import { buildRaidBalanceTelemetry } from './WorldSessionBalanceTelemetry';
 import { settleSurvivedBounty } from './WorldSessionBounty';
+import { createRaidHistoryEntry } from '../src/raid/RaidHistory';
+import { FIRST_SURVIVAL_GOLD_REWARD } from '../src/shared/FirstSurvivalReward';
 
 export interface WorldSessionRaidResultsContext {
     players: ReadonlyMap<string, ServerPlayer>;
@@ -39,13 +41,32 @@ export class WorldSessionRaidResults {
         this.context.log(`raid result player=${playerId} result=${finalResult} kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
         if (player) {
             const survived = finalResult === 'SURVIVED';
+            let goldReward = 0;
             if (survived) {
                 message.firstSurvivalBonusGranted = this.context.saveState.grantsFirstSurvivalBonus(player);
+                goldReward = player.raidGoldReward
+                    + (message.firstSurvivalBonusGranted ? FIRST_SURVIVAL_GOLD_REWARD : 0);
                 this.context.saveState.captureFinalPatch(player, extractionTownId, true);
             } else {
                 const failure = this.context.saveState.captureFinalPatch(player);
                 if (failure) message.failure = failure;
             }
+            this.context.saveState.addFinalRaidHistory(playerId, createRaidHistoryEntry({
+                id: `server:${player.resumeToken}`,
+                completedAt: Date.now(),
+                result: finalResult,
+                elapsedSeconds: message.elapsedSeconds,
+                kills: message.kills,
+                departureTownId: message.departureTownId,
+                extractionTownId: message.extractionTownId,
+                securedItems: message.telemetry?.lootItemsSecured ?? 0,
+                lostItems: message.failure?.backpackLost.reduce(
+                    (total, item) => total + Math.max(1, Math.floor(item.quantity)),
+                    0,
+                ) ?? 0,
+                equipmentLost: message.failure?.equipmentLost.length ?? 0,
+                goldReward,
+            }));
             this.context.saveState.markDirty(playerId);
         }
         this.context.removePlayer(playerId);

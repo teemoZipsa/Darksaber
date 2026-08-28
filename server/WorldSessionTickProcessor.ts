@@ -5,6 +5,7 @@ import { advanceAtb } from '../src/field/FieldCombat';
 import { getCarryAtbMultiplier } from '../src/inventory/CarryWeight';
 import { getRaidModifierEffects } from '../src/raid/RaidModifiers';
 import { getCursedArtifactAtbMultiplier } from '../src/raid/CursedArtifact';
+import { createRaidHistoryEntry } from '../src/raid/RaidHistory';
 import type { CombatEventMessage, WorldServerMessage } from '../src/net/WorldProtocol';
 import { isPlayerWiped } from './WorldSessionVisibility';
 import type { WorldSessionEnemyState } from './WorldSessionEnemyState';
@@ -48,7 +49,23 @@ export function tickWorldSession(context: WorldSessionTickProcessorContext): Wor
         if (!player.active) continue;
         if (player.ghost && player.disconnectedAt !== null && context.now - player.disconnectedAt >= context.ghostGraceMs) {
             context.log(`despawn player=${player.id} reason=ghost_expired`);
-            context.saveState.captureFinalPatch(player);
+            const failure = context.saveState.captureFinalPatch(player);
+            context.saveState.addFinalRaidHistory(player.id, createRaidHistoryEntry({
+                id: `server:${player.resumeToken}`,
+                completedAt: context.now,
+                result: 'MIA',
+                elapsedSeconds: player.elapsedSeconds,
+                kills: player.kills,
+                departureTownId: player.departureTownId,
+                extractionTownId: player.departureTownId,
+                securedItems: 0,
+                lostItems: failure?.backpackLost.reduce(
+                    (total, item) => total + Math.max(1, Math.floor(item.quantity)),
+                    0,
+                ) ?? 0,
+                equipmentLost: failure?.equipmentLost.length ?? 0,
+                goldReward: 0,
+            }));
             context.saveState.markDirty(player.id);
             context.removePlayer(player.id);
             continue;

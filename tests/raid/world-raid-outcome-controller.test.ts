@@ -190,6 +190,8 @@ test('raid gold rewards are secured only after survival', () => {
     assert.equal(survived.playerData.gold, 800);
     assert.equal(survived.raidSession.raidGoldReward, 0);
     assert.equal(survived.getOutcome()?.goldReward, 300);
+    assert.equal(survived.playerData.raidHistory[0]?.result, 'SURVIVED');
+    assert.equal(survived.playerData.raidHistory[0]?.goldReward, 300);
 
     const failed = createController();
     failed.raidSession.beginRaidFromTown('central_castle');
@@ -200,6 +202,7 @@ test('raid gold rewards are secured only after survival', () => {
     assert.equal(failed.playerData.gold, 500);
     assert.equal(failed.raidSession.raidGoldReward, 0);
     assert.equal(failed.getOutcome()?.goldReward, undefined);
+    assert.equal(failed.playerData.raidHistory[0]?.result, 'DEAD');
 });
 
 test('server-authoritative success does not double-apply raid gold after sync', () => {
@@ -213,6 +216,7 @@ test('server-authoritative success does not double-apply raid gold after sync', 
     assert.equal(playerData.gold, 800);
     assert.equal(raidSession.raidGoldReward, 0);
     assert.equal(getOutcome()?.goldReward, 300);
+    assert.equal(playerData.raidHistory.length, 0);
 });
 
 test('raid result clears story scenario runtime state before town placement', () => {

@@ -11,6 +11,7 @@ import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
 import { useStore, useUiVersion } from '../UiContext';
 import { QuestList } from '../quest/QuestList';
+import { RaidHistoryList } from '../quest/RaidHistoryList';
 import { itemName } from './itemView';
 import { formatMonsterName } from '../../../i18n/DisplayNames';
 import { formatTownName } from '../../../i18n/TownMessages';
@@ -31,6 +32,7 @@ export function QuestPanel() {
     const [tearingId, setTearingId] = useState<string | null>(null);
     const [selectedAffixKey, setSelectedAffixKey] = useState<string | null>(null);
     const [hoveredAffixKey, setHoveredAffixKey] = useState<string | null>(null);
+    const [tab, setTab] = useState<'quests' | 'history'>('quests');
     const visibleAffixKey = hoveredAffixKey ?? selectedAffixKey;
     const panelStyle = { width: 'min(560px, 92vw)', '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;
 
@@ -70,7 +72,29 @@ export function QuestPanel() {
                 <span className="ds-panel__title">📜 {t('quest.board')}</span>
             </div>
 
-            <QuestList />
+            <div className="ds-quest-tabs" role="tablist" aria-label={t('quest.board')}>
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === 'quests'}
+                    className={`ds-btn${tab === 'quests' ? ' is-active' : ''}`}
+                    onClick={() => setTab('quests')}
+                >
+                    {t('quest.tab.story')}
+                </button>
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === 'history'}
+                    className={`ds-btn${tab === 'history' ? ' is-active' : ''}`}
+                    onClick={() => setTab('history')}
+                >
+                    {t('raid.history.title')}
+                </button>
+            </div>
+
+            {tab === 'history' ? <RaidHistoryList /> : <>
+                <QuestList />
 
             <section className="ds-bounty-board" aria-label={t('bounty.title')}>
                 <div className="ds-bounty-board__head">
@@ -218,6 +242,7 @@ export function QuestPanel() {
                 </div>
                 <div className="ds-contracts__feedback" role="status" aria-live="polite">{feedback}</div>
             </div>
+            </>}
         </div>
     );
 }

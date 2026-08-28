@@ -19,6 +19,11 @@ import { getItemDef } from './ItemDB';
 import type { CharacterSave, CharacterSavePatch, InventorySaveItem } from '../net/AuthClient';
 import { createDefaultStashSnapshot } from '../shared/CharacterSaveDefaults';
 import { normalizeActiveBountyContractId } from './BountyContractData';
+import {
+    normalizeRaidHistory,
+    prependRaidHistory,
+    type RaidHistoryEntry,
+} from '../raid/RaidHistory';
 
 export interface InventoryItem {
     uid: string;         // Unique ID for this specific instance
@@ -42,6 +47,7 @@ export interface SaveData {
     facilityUpgrades?: FacilityUpgradeState;
     raidInsuranceActive?: boolean;
     activeBountyContractId?: string | null;
+    raidHistory?: RaidHistoryEntry[];
     currentHubTownId?: string;
     pendingRestMenuId?: string | null;
     inventory?: InventoryItem[];
@@ -74,6 +80,7 @@ export class PlayerData {
     public facilityUpgrades: FacilityUpgradeState = {};
     public raidInsuranceActive: boolean = false;
     public activeBountyContractId: string | null = null;
+    public raidHistory: RaidHistoryEntry[] = [];
     public currentHubTownId: string = 'central_castle';
     public pendingRestMenuId: string | null = null;
     public inventory: InventoryItem[] = [];
@@ -137,6 +144,10 @@ export class PlayerData {
         return this.storyCompanions.has(companionId);
     }
 
+    public addRaidHistoryEntry(entry: RaidHistoryEntry): void {
+        this.raidHistory = prependRaidHistory(this.raidHistory, entry);
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  Save / Load (localStorage for now, Firebase later)
     // ═══════════════════════════════════════════════════════════
@@ -186,6 +197,7 @@ export class PlayerData {
             this.facilityUpgrades = normalizeFacilityUpgradeState(data.facilityUpgrades);
             this.raidInsuranceActive = data.raidInsuranceActive === true;
             this.activeBountyContractId = normalizeActiveBountyContractId(data.activeBountyContractId);
+            this.raidHistory = normalizeRaidHistory(data.raidHistory);
             this.currentHubTownId = typeof data.currentHubTownId === 'string' ? data.currentHubTownId : 'central_castle';
             this.pendingRestMenuId = typeof data.pendingRestMenuId === 'string' ? data.pendingRestMenuId : null;
             this.inventory = normalizeInventory(data.inventory);
@@ -215,6 +227,7 @@ export class PlayerData {
                 facilityUpgrades: this.facilityUpgrades,
                 raidInsuranceActive: this.raidInsuranceActive,
                 activeBountyContractId: this.activeBountyContractId,
+                raidHistory: this.raidHistory,
             },
             inventory: {
                 width: 10,
@@ -256,6 +269,7 @@ export class PlayerData {
         this.facilityUpgrades = normalizeFacilityUpgradeState(questState.facilityUpgrades);
         this.raidInsuranceActive = questState.raidInsuranceActive === true;
         this.activeBountyContractId = normalizeActiveBountyContractId(questState.activeBountyContractId);
+        this.raidHistory = normalizeRaidHistory(questState.raidHistory);
         this.currentHubTownId = typeof hubLocation.townId === 'string' ? hubLocation.townId : 'central_castle';
         this.pendingRestMenuId = typeof hubLocation.pendingRestMenuId === 'string' ? hubLocation.pendingRestMenuId : null;
         this.inventory = normalizeInventorySnapshot(save.inventory);

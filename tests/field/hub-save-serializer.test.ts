@@ -7,6 +7,7 @@ import { PlayerData } from '../../src/data/PlayerData';
 import { PartyManager } from '../../src/character/PartyManager';
 import { Character } from '../../src/character/Character';
 import { createStatus } from '../../src/combat/StatusEffects';
+import { createRaidHistoryEntry } from '../../src/raid/RaidHistory';
 
 class ImageStub {
     public src = '';
@@ -22,6 +23,19 @@ test('buildHubSavePatch round-trips grid inventory dimensions and item ids', () 
     playerData.currentHubTownId = 'central_castle';
     playerData.facilityUpgrades.infirmary = 1;
     playerData.raidInsuranceActive = true;
+    playerData.addRaidHistoryEntry(createRaidHistoryEntry({
+        id: 'server-owned-history',
+        completedAt: 1,
+        result: 'SURVIVED',
+        elapsedSeconds: 60,
+        kills: 1,
+        departureTownId: 'central_castle',
+        extractionTownId: 'w_forest_village',
+        securedItems: 1,
+        lostItems: 0,
+        equipmentLost: 0,
+        goldReward: 10,
+    }));
     const inventory = new GridInventory(10, 6);
     const stash = new GridInventory(15, 10);
     const potion = ITEMS.find((item) => item.id === 'herb_cheap');
@@ -40,6 +54,7 @@ test('buildHubSavePatch round-trips grid inventory dimensions and item ids', () 
     assert.equal((patch.questState as Record<string, unknown>).gold, 900);
     assert.deepEqual((patch.questState as Record<string, unknown>).facilityUpgrades, { infirmary: 1 });
     assert.equal((patch.questState as Record<string, unknown>).raidInsuranceActive, true);
+    assert.equal('raidHistory' in (patch.questState as Record<string, unknown>), false);
     assert.equal(patch.inventory?.width, 10);
     assert.equal(patch.stashSnapshot?.width, 15);
     assert.equal(patch.inventory?.items[0]?.itemId, 'herb_cheap');

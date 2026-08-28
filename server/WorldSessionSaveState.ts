@@ -2,6 +2,7 @@ import { getItemDef, type ItemSlot } from '../src/data/ItemDB';
 import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../src/data/StarterKitData';
 import type { RaidFailureEquipmentSummary, RaidFailureSummary } from '../src/net/WorldProtocol';
 import { FIRST_SURVIVAL_GOLD_REWARD, FIRST_SURVIVAL_QUEST_ID } from '../src/shared/FirstSurvivalReward';
+import { prependRaidHistory, type RaidHistoryEntry } from '../src/raid/RaidHistory';
 import type { CharacterSave, CharacterSavePatch, InventorySaveItem, InventorySaveSnapshot } from './AuthStore';
 import { applyStoryQuestRewardsToSaveState } from './StoryRewardSave';
 
@@ -98,6 +99,16 @@ export class WorldSessionSaveState {
 
     public hasFinalPatch(playerId: string): boolean {
         return this.finalPatches.has(playerId);
+    }
+
+    /** Attach a server-authoritative raid summary to an already captured final patch. */
+    public addFinalRaidHistory(playerId: string, entry: RaidHistoryEntry): boolean {
+        const patch = this.finalPatches.get(playerId);
+        if (!patch) return false;
+        const questState = cloneRecord(patch.questState ?? {});
+        questState.raidHistory = prependRaidHistory(questState.raidHistory, entry);
+        patch.questState = questState;
+        return true;
     }
 
     /** Whether a survival flush for this player would grant the first-survival bonus. */

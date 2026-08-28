@@ -42,6 +42,7 @@ import {
     getUpgradeLevel,
     normalizeLoadout,
 } from '../../magic/MagicLoadout';
+import type { RaidHistoryEntry } from '../../raid/RaidHistory';
 
 export interface BlacksmithEntry {
     id: string;
@@ -146,9 +147,25 @@ export class UiStore {
     }
 
     private questSignature(): string {
-        return this.getStoryQuestViews()
+        const quests = this.getStoryQuestViews()
             .map((view) => `${view.quest.id}:${view.status}:${view.rewardView.owned ? 1 : 0}:${view.sideObjectives.map((side) => `${side.labelKey}:${side.completed ? 1 : 0}`).join('~')}`)
             .join(',');
+        const history = this.getRaidHistory()
+            .map((entry) => [
+                entry.id,
+                entry.completedAt,
+                entry.result,
+                entry.elapsedSeconds,
+                entry.kills,
+                entry.departureTownId,
+                entry.extractionTownId,
+                entry.securedItems,
+                entry.lostItems,
+                entry.equipmentLost,
+                entry.goldReward,
+            ].join(':'))
+            .join(',');
+        return `${quests}|history:${history}`;
     }
 
     private magicSignature(): string {
@@ -218,6 +235,7 @@ export class UiStore {
     isPartyOpen = (): boolean => this.isOverlayOpen('party');
     isQuestJournalOpen = (): boolean => this.isOverlayOpen('journal');
     getStoryQuestViews = (): StoryQuestView[] => buildStoryQuestViews(this.gm.playerData, this.gm.getRaidSession());
+    getRaidHistory = (): readonly RaidHistoryEntry[] => this.gm.playerData.raidHistory;
     isRaidPreparationEditingLocked = (): boolean => this.gm.isRaidPreparationEditingLocked();
 
     private raidPreparationEditGuard(): UiMutationResult | null {

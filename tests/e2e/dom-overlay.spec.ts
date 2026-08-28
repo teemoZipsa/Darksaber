@@ -286,6 +286,11 @@ test('dev town renders the React town overlay with embedded inventory', async ({
     await expect(page.locator('#ui-overlay .ds-shop')).toBeVisible();
 
     await page.getByRole('tab', { name: /퀘스트|Quest/ }).click();
+    const raidLogTab = page.getByRole('tab', { name: /출격 기록|Raid Log/ });
+    await raidLogTab.click();
+    await expect(page.locator('#ui-overlay .ds-raid-history')).toBeVisible();
+    await expect(page.locator('#ui-overlay .ds-raid-history__empty, #ui-overlay .ds-raid-history__entry').first()).toBeVisible();
+    await page.getByRole('tab', { name: /메인 퀘스트|Main Quests/ }).click();
     const bountyPapers = page.locator('#ui-overlay .ds-bounty-paper');
     await expect(bountyPapers).toHaveCount(3);
     await expect(page.locator('#ui-overlay .ds-bounty-paper__last-seen')).toHaveCount(3);
@@ -513,7 +518,7 @@ test('authenticated network raid survival returns to town and persists the serve
     const loginName = `survive_${Date.now().toString(36)}`;
     const password = 'password-1234';
     const characterName = 'Survivor';
-    const extractionTownId = 'w_forest_village';
+    const extractionTownId = 's_coast_town';
 
     const registered = await request.post('http://127.0.0.1:8765/auth/register', {
         data: { loginName, password },
@@ -594,27 +599,40 @@ test('authenticated network raid survival returns to town and persists the serve
                 townId: null,
                 goldIncreased: false,
                 firstSurvival: false,
+                raidRecorded: false,
             };
         }
         const save = snapshot.save;
         const completed = Array.isArray(save.questState?.completedQuestIds)
             ? save.questState.completedQuestIds
             : [];
+        const raidHistory = Array.isArray(save.questState?.raidHistory)
+            ? save.questState.raidHistory
+            : [];
         return {
             ok: true,
             townId: save.hubLocation?.townId ?? null,
             goldIncreased: Number(save.questState?.gold) > initialGold,
             firstSurvival: completed.includes(FIRST_SURVIVAL_QUEST_ID),
+            raidRecorded: raidHistory[0]?.result === 'SURVIVED'
+                && raidHistory[0]?.extractionTownId === extractionTownId,
         };
     }, { timeout: 20_000 }).toMatchObject({
         ok: true,
         townId: extractionTownId,
         goldIncreased: true,
         firstSurvival: true,
+        raidRecorded: true,
     });
 
     await page.keyboard.press('Enter');
     await expect(page.locator('#ui-overlay .ds-town')).toBeVisible({ timeout: 10_000 });
+    await page.locator('#ui-overlay .ds-town__tab').filter({ hasText: /퀘스트|Quest/ }).click();
+    await page.getByRole('tab', { name: /출격 기록|Raid Log/ }).click();
+    const recordedRaid = page.locator('#ui-overlay .ds-raid-history__entry').first();
+    await expect(recordedRaid).toBeVisible();
+    await expect(recordedRaid).toContainText(/생환|Extracted/);
+    await expect(recordedRaid).toContainText(/시시리오|Sicilio/);
 
     expect(clientErrors).toEqual([]);
 });

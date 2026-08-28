@@ -621,6 +621,10 @@ test('server-authoritative down resets accumulated EXP in the final save patch',
     assert.ok(patchedCharacter && typeof patchedCharacter === 'object');
     assert.equal('exp' in patchedCharacter ? patchedCharacter.exp : undefined, 0);
     assert.equal('injured' in patchedCharacter ? patchedCharacter.injured : undefined, true);
+    const history = patch?.questState?.raidHistory;
+    assert.ok(Array.isArray(history));
+    assert.equal(history[0]?.result, 'DEAD');
+    assert.equal(history[0]?.departureTownId, 'central_castle');
 });
 
 test('enemy-caused down persists a server-authoritative injury', () => {
@@ -869,6 +873,26 @@ test('disconnect grace resumes same actor before expiry and starts fresh after e
         () => session.join(joinMessage('central_castle', 'hero-a', first.welcome.resumeToken), 1_800),
         WorldResumeFailedError,
     );
+});
+
+test('disconnect grace expiry records a server-authoritative MIA raid', () => {
+    const character = authCharacter('ghost-mia');
+    const save = createDefaultCharacterSave(character);
+    const session = new WorldSession({ ghostGraceMs: 1_000 });
+    const joined = session.join(joinMessage('central_castle', character.id), 0, {
+        accountId: character.accountId,
+        characterId: character.id,
+        saveSnapshot: save,
+    });
+
+    session.disconnect(joined.playerId, 100);
+    session.tick(1_700);
+
+    const patch = session.createCharacterSavePatch(joined.playerId);
+    const history = patch?.questState?.raidHistory;
+    assert.ok(Array.isArray(history));
+    assert.equal(history[0]?.result, 'MIA');
+    assert.equal(history[0]?.departureTownId, 'central_castle');
 });
 
 test('disconnect grace rejects resume token for a different account or character', () => {
@@ -2514,6 +2538,10 @@ test('server-authoritative SCENECLEAR field events complete scenario objectives'
     const finalPatch = session.createCharacterSavePatch(joined.playerId);
     assert.ok(finalPatch?.questState);
     assert.deepEqual(finalPatch.questState.completedQuestIds, [...completedQuestIds, scenario.questId, FIRST_SURVIVAL_QUEST_ID]);
+    const history = finalPatch.questState.raidHistory;
+    assert.ok(Array.isArray(history));
+    assert.equal(history[0]?.result, 'SURVIVED');
+    assert.equal(history[0]?.extractionTownId, 'w_forest_village');
 });
 
 test('server-authoritative field scenario gold rewards are lost on failed raids', () => {

@@ -31,6 +31,7 @@ import {
     snapshotPlacedItem,
 } from '../../raid/RaidOutcome';
 import { applyRaidInsurance } from '../../raid/RaidInsurance';
+import { createLocalRaidHistoryEntry } from '../../raid/RaidHistory';
 import { RaidResultUI } from '../../ui/RaidResultUI';
 import { FIRST_SURVIVAL_GOLD_REWARD, FIRST_SURVIVAL_QUEST_ID } from '../../shared/FirstSurvivalReward';
 import type { GameManager } from '../GameManager';
@@ -172,10 +173,6 @@ export class WorldRaidOutcomeController {
         this.context.playerData.currentHubTownId = destination.id;
         this.context.townSession.clearRestStatusesFromParty();
         this.context.townSession.applyRaidInjuries(raidSession.downedCharacterIds);
-        if (!serverRewards) this.context.playerData.save();
-        this.context.party.resetForNewRaid();
-        this.context.resetStoryScenarioStateForRaidEnd();
-        this.context.placePartyAtTown(destination);
 
         const outcome: RaidOutcome = {
             result: 'SURVIVED',
@@ -192,6 +189,13 @@ export class WorldRaidOutcomeController {
             questRewards,
             missionReport,
         };
+        if (!serverRewards) {
+            this.context.playerData.addRaidHistoryEntry(createLocalRaidHistoryEntry(outcome));
+            this.context.playerData.save();
+        }
+        this.context.party.resetForNewRaid();
+        this.context.resetStoryScenarioStateForRaidEnd();
+        this.context.placePartyAtTown(destination);
         this.showRaidResult(outcome, destination);
         this.context.log(formatT('raid.outcome.survivedLog', { town: displayTownName(destination) }));
     }
@@ -260,10 +264,6 @@ export class WorldRaidOutcomeController {
         this.context.playerData.currentHubTownId = returnTown.id;
         this.context.townSession.clearRestStatusesFromParty();
         this.context.townSession.applyRaidInjuries(raidSession.downedCharacterIds);
-        if (!serverAuthoritativeState) this.context.playerData.save();
-        this.context.party.resetForNewRaid();
-        this.context.resetStoryScenarioStateForRaidEnd();
-        this.context.placePartyAtTown(returnTown);
 
         const outcome: RaidOutcome = {
             result,
@@ -288,6 +288,13 @@ export class WorldRaidOutcomeController {
                 ...recoveryNotes,
             ],
         };
+        if (!serverAuthoritativeState) {
+            this.context.playerData.addRaidHistoryEntry(createLocalRaidHistoryEntry(outcome));
+            this.context.playerData.save();
+        }
+        this.context.party.resetForNewRaid();
+        this.context.resetStoryScenarioStateForRaidEnd();
+        this.context.placePartyAtTown(returnTown);
         this.showRaidResult(outcome, returnTown);
         this.context.log(result === 'MIA' ? t('raid.outcome.miaLog') : t('raid.outcome.deadLog'));
         if (recoveryNotes.length > 0) this.context.log(t('raid.outcome.recoveryGranted'));

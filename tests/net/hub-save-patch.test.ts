@@ -50,6 +50,18 @@ test('buildHubSavePatch rejects completedQuestIds in questState', () => {
     );
 });
 
+test('buildHubSavePatch preserves server raid history and rejects client-authored records', () => {
+    const current = createDefaultCharacterSave(authCharacter());
+    current.questState.raidHistory = [{ id: 'server-raid', result: 'SURVIVED' }];
+
+    const patch = buildHubSavePatch({ questState: { gold: 500 } }, current);
+    assert.deepEqual(patch.questState?.raidHistory, current.questState.raidHistory);
+    assert.throws(
+        () => buildHubSavePatch({ questState: { raidHistory: [] } }, current),
+        (error: unknown) => error instanceof HttpError && error.code === 'forbidden_save_field',
+    );
+});
+
 test('buildHubSavePatch floors negative gold to zero', () => {
     const current = createDefaultCharacterSave(authCharacter());
     const patch = buildHubSavePatch({ questState: { gold: -50 } }, current);
