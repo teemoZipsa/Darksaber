@@ -603,14 +603,11 @@ const BRIDGE_DECORATION_CONFIGS: Record<BridgeSpriteId, BridgeDecorationConfig> 
 
 const PROP_DECORATION_CONFIGS: Record<PropSpriteId, PropDecorationConfig> = {
     fallenLog: {
-        widthTiles: 5.25,
-        heightTiles: 2.8,
+        widthTiles: 1.8,
+        heightTiles: 0.96,
         blockedOffsets: [
-            { x: -2, y: -1 },
-            { x: -1, y: -1 },
-            { x: 0, y: -1 },
+            { x: 0, y: 0 },
             { x: 1, y: 0 },
-            { x: 2, y: 0 },
         ],
         occlusionClip: { x: 0, y: 0, width: 1, height: 0.64 },
     },
