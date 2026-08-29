@@ -223,11 +223,24 @@ test('field props stay off routes and landmarks while only their footprints bloc
     const props = getAllDecorations(world).filter(isPropDecoration);
     const allowedTerrainBySprite: Record<PropDecoration['sprite'], readonly TileType[]> = {
         fallenLog: [TileType.GRASS, TileType.FOREST],
-        boulder: [TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND, TileType.SNOW],
+        boulder: [TileType.GRASS, TileType.FOREST],
+        stoneOutcrop: [TileType.STONE],
+        snowBoulders: [TileType.SNOW],
+        sandstoneOutcrop: [TileType.SAND],
+        swampStones: [TileType.POISON_SWAMP],
         ruinedWall: [TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND],
         abandonedWagon: [TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND],
     };
-    const expectedSprites: readonly PropDecoration['sprite'][] = ['fallenLog', 'boulder', 'ruinedWall', 'abandonedWagon'];
+    const expectedSprites: readonly PropDecoration['sprite'][] = [
+        'fallenLog',
+        'boulder',
+        'stoneOutcrop',
+        'snowBoulders',
+        'sandstoneOutcrop',
+        'swampStones',
+        'ruinedWall',
+        'abandonedWagon',
+    ];
 
     assert.ok(props.length > 0);
     for (const sprite of expectedSprites) {

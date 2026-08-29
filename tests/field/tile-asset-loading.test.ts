@@ -56,6 +56,10 @@ test('tile asset startup loads only compact autotile sheets and lazily queues de
         const props = [
             ['fallenLog', '/assets/images/decor/props/fallen_log.png'],
             ['boulder', '/assets/images/decor/props/boulder.png'],
+            ['stoneOutcrop', '/assets/images/decor/props/stone_outcrop.png'],
+            ['snowBoulders', '/assets/images/decor/props/snow_boulders.png'],
+            ['sandstoneOutcrop', '/assets/images/decor/props/sandstone_outcrop.png'],
+            ['swampStones', '/assets/images/decor/props/swamp_stones.png'],
             ['ruinedWall', '/assets/images/decor/props/ruined_wall.png'],
             ['abandonedWagon', '/assets/images/decor/props/abandoned_wagon.png'],
         ] as const;

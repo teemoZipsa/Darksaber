@@ -538,8 +538,16 @@ const NORMAL_TREE_CANOPY_TILES = new Set<TileType>([TileType.GRASS, TileType.FOR
 const SCARY_TREE_CANOPY_TILES = new Set<TileType>([TileType.POISON_SWAMP, TileType.STONE]);
 const FALLEN_LOG_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST]);
 const FALLEN_LOG_SURROUNDING_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE]);
-const BOULDER_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND, TileType.SNOW]);
-const BOULDER_SURROUNDING_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND, TileType.SNOW]);
+const BOULDER_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST]);
+const BOULDER_SURROUNDING_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE]);
+const STONE_OUTCROP_TILES = new Set<TileType>([TileType.STONE]);
+const STONE_OUTCROP_SURROUNDING_TILES = new Set<TileType>([TileType.STONE, TileType.GRASS, TileType.FOREST]);
+const SNOW_BOULDER_TILES = new Set<TileType>([TileType.SNOW]);
+const SNOW_BOULDER_SURROUNDING_TILES = new Set<TileType>([TileType.SNOW, TileType.STONE]);
+const SANDSTONE_OUTCROP_TILES = new Set<TileType>([TileType.SAND]);
+const SANDSTONE_OUTCROP_SURROUNDING_TILES = new Set<TileType>([TileType.SAND, TileType.STONE, TileType.GRASS]);
+const SWAMP_STONE_TILES = new Set<TileType>([TileType.POISON_SWAMP]);
+const SWAMP_STONE_SURROUNDING_TILES = new Set<TileType>([TileType.POISON_SWAMP, TileType.STONE]);
 const RUINED_WALL_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND]);
 const RUINED_WALL_SURROUNDING_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND]);
 const ABANDONED_WAGON_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND]);
@@ -637,6 +645,46 @@ const PROP_DECORATION_CONFIGS: Record<PropSpriteId, PropDecorationConfig> = {
         anchorTiles: BOULDER_TILES,
         surroundingTiles: BOULDER_SURROUNDING_TILES,
     },
+    stoneOutcrop: {
+        widthTiles: 1.75,
+        heightTiles: 1.15,
+        blockedOffsets: [
+            { x: 0, y: 0 },
+        ],
+        occlusionClip: { x: 0, y: 0, width: 1, height: 0.72 },
+        anchorTiles: STONE_OUTCROP_TILES,
+        surroundingTiles: STONE_OUTCROP_SURROUNDING_TILES,
+    },
+    snowBoulders: {
+        widthTiles: 1.55,
+        heightTiles: 1.33,
+        blockedOffsets: [
+            { x: 0, y: 0 },
+        ],
+        occlusionClip: { x: 0, y: 0, width: 1, height: 0.72 },
+        anchorTiles: SNOW_BOULDER_TILES,
+        surroundingTiles: SNOW_BOULDER_SURROUNDING_TILES,
+    },
+    sandstoneOutcrop: {
+        widthTiles: 1.75,
+        heightTiles: 1.14,
+        blockedOffsets: [
+            { x: 0, y: 0 },
+        ],
+        occlusionClip: { x: 0, y: 0, width: 1, height: 0.7 },
+        anchorTiles: SANDSTONE_OUTCROP_TILES,
+        surroundingTiles: SANDSTONE_OUTCROP_SURROUNDING_TILES,
+    },
+    swampStones: {
+        widthTiles: 1.75,
+        heightTiles: 0.82,
+        blockedOffsets: [
+            { x: 0, y: 0 },
+        ],
+        occlusionClip: { x: 0, y: 0, width: 1, height: 0.64 },
+        anchorTiles: SWAMP_STONE_TILES,
+        surroundingTiles: SWAMP_STONE_SURROUNDING_TILES,
+    },
     ruinedWall: {
         widthTiles: 1.8,
         heightTiles: 1.21,
@@ -666,6 +714,10 @@ const PROP_GENERATION_RULES: readonly PropGenerationRule[] = [
     { sprite: 'boulder', chance: 0.055, chanceSalt: 661, anchorSalt: 662 },
     { sprite: 'ruinedWall', chance: 0.025, chanceSalt: 671, anchorSalt: 672 },
     { sprite: 'abandonedWagon', chance: 0.018, chanceSalt: 681, anchorSalt: 682 },
+    { sprite: 'stoneOutcrop', chance: 0.055, chanceSalt: 691, anchorSalt: 692 },
+    { sprite: 'snowBoulders', chance: 0.055, chanceSalt: 701, anchorSalt: 702 },
+    { sprite: 'sandstoneOutcrop', chance: 0.055, chanceSalt: 711, anchorSalt: 712 },
+    { sprite: 'swampStones', chance: 0.055, chanceSalt: 721, anchorSalt: 722 },
 ];
 
 export class WorldMap {
