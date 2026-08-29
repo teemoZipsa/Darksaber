@@ -53,7 +53,7 @@ test('world map large decorations are deterministic and sparse', () => {
     const secondDecorations = getAllDecorations(second);
 
     assert.ok(firstDecorations.length > 0);
-    assert.ok(firstDecorations.length < 300);
+    assert.ok(firstDecorations.length < 700);
     assert.deepEqual(firstDecorations.map(decorationSignature), secondDecorations.map(decorationSignature));
 });
 
@@ -218,15 +218,24 @@ test('tree trunks block movement while canopy-only tiles remain walkable', () =>
     assert.equal(world.isWalkable(canopyTile.x, canopyTile.y), true);
 });
 
-test('fallen logs stay off routes and landmarks while only their trunk footprint blocks movement', () => {
+test('field props stay off routes and landmarks while only their footprints block movement', () => {
     const world = new WorldMap();
     const props = getAllDecorations(world).filter(isPropDecoration);
+    const allowedTerrainBySprite: Record<PropDecoration['sprite'], readonly TileType[]> = {
+        fallenLog: [TileType.GRASS, TileType.FOREST],
+        boulder: [TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND, TileType.SNOW],
+        ruinedWall: [TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND],
+    };
+    const expectedSprites: readonly PropDecoration['sprite'][] = ['fallenLog', 'boulder', 'ruinedWall'];
 
     assert.ok(props.length > 0);
+    for (const sprite of expectedSprites) {
+        assert.ok(props.some((prop) => prop.sprite === sprite), `expected at least one ${sprite}`);
+    }
 
     for (const prop of props) {
-        assert.equal(prop.sprite, 'fallenLog');
-        assert.ok([TileType.GRASS, TileType.FOREST].includes(world.getTileAt(prop.anchorTile.x, prop.anchorTile.y)));
+        const allowedTerrain = allowedTerrainBySprite[prop.sprite];
+        assert.ok(allowedTerrain.includes(world.getTileAt(prop.anchorTile.x, prop.anchorTile.y)));
 
         for (let y = prop.bounds.minY; y <= prop.bounds.maxY; y++) {
             for (let x = prop.bounds.minX; x <= prop.bounds.maxX; x++) {
@@ -238,7 +247,7 @@ test('fallen logs stay off routes and landmarks while only their trunk footprint
         }
 
         for (const tile of prop.blockedTiles) {
-            assert.ok([TileType.GRASS, TileType.FOREST].includes(world.getTileAt(tile.x, tile.y)));
+            assert.ok(allowedTerrain.includes(world.getTileAt(tile.x, tile.y)));
             assert.equal(world.isDecorationBlocked(tile.x, tile.y), true);
             assert.equal(world.isWalkable(tile.x, tile.y), false);
         }

@@ -45,6 +45,8 @@ const DARKSABER_BRIDGE_SPRITES = {
 
 const DARKSABER_PROP_SPRITES = {
     fallenLog: '/assets/images/decor/props/fallen_log.png',
+    boulder: '/assets/images/decor/props/boulder.png',
+    ruinedWall: '/assets/images/decor/props/ruined_wall.png',
 } as const;
 
 type OriginalAutotileSheetId = keyof typeof ORIGINAL_AUTOTILE_SHEETS;

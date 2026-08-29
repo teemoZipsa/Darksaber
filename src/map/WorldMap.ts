@@ -515,11 +515,19 @@ interface PropDecorationConfig {
     heightTiles: number;
     blockedOffsets: readonly TilePoint[];
     occlusionClip: WorldMapDecorationClip;
+    anchorTiles: ReadonlySet<TileType>;
+    surroundingTiles: ReadonlySet<TileType>;
+}
+
+interface PropGenerationRule {
+    sprite: PropSpriteId;
+    chance: number;
+    chanceSalt: number;
+    anchorSalt: number;
 }
 
 const NORMAL_TREE_CHUNK_CHANCE = 0.035;
 const SCARY_TREE_CHUNK_CHANCE = 0.18;
-const FALLEN_LOG_CHUNK_CHANCE = 0.045;
 const GROUND_DETAIL_ATTEMPTS_PER_CHUNK = 32;
 const AMBIENT_SITE_CHUNK_CHANCE = 0.46;
 const AMBIENT_SITE_ROAD_SEARCH_RADIUS = 7;
@@ -530,6 +538,10 @@ const NORMAL_TREE_CANOPY_TILES = new Set<TileType>([TileType.GRASS, TileType.FOR
 const SCARY_TREE_CANOPY_TILES = new Set<TileType>([TileType.POISON_SWAMP, TileType.STONE]);
 const FALLEN_LOG_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST]);
 const FALLEN_LOG_SURROUNDING_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE]);
+const BOULDER_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND, TileType.SNOW]);
+const BOULDER_SURROUNDING_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND, TileType.SNOW]);
+const RUINED_WALL_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND]);
+const RUINED_WALL_SURROUNDING_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND]);
 export const NEUTRAL_BIRD_SPRITE_SRC = '/assets/images/monsters/791R.png';
 const NEUTRAL_BIRD_FRAME_SIZE = 64;
 const NEUTRAL_BIRD_FRAME_COUNT = 3;
@@ -610,8 +622,37 @@ const PROP_DECORATION_CONFIGS: Record<PropSpriteId, PropDecorationConfig> = {
             { x: 1, y: 0 },
         ],
         occlusionClip: { x: 0, y: 0, width: 1, height: 0.64 },
+        anchorTiles: FALLEN_LOG_TILES,
+        surroundingTiles: FALLEN_LOG_SURROUNDING_TILES,
+    },
+    boulder: {
+        widthTiles: 1.35,
+        heightTiles: 1,
+        blockedOffsets: [
+            { x: 0, y: 0 },
+        ],
+        occlusionClip: { x: 0, y: 0, width: 1, height: 0.72 },
+        anchorTiles: BOULDER_TILES,
+        surroundingTiles: BOULDER_SURROUNDING_TILES,
+    },
+    ruinedWall: {
+        widthTiles: 1.8,
+        heightTiles: 1.21,
+        blockedOffsets: [
+            { x: 0, y: 0 },
+            { x: 1, y: 0 },
+        ],
+        occlusionClip: { x: 0, y: 0, width: 1, height: 0.7 },
+        anchorTiles: RUINED_WALL_TILES,
+        surroundingTiles: RUINED_WALL_SURROUNDING_TILES,
     },
 };
+
+const PROP_GENERATION_RULES: readonly PropGenerationRule[] = [
+    { sprite: 'fallenLog', chance: 0.045, chanceSalt: 651, anchorSalt: 652 },
+    { sprite: 'boulder', chance: 0.055, chanceSalt: 661, anchorSalt: 662 },
+    { sprite: 'ruinedWall', chance: 0.025, chanceSalt: 671, anchorSalt: 672 },
+];
 
 export class WorldMap {
     private chunks: Map<string, Chunk> = new Map();
@@ -1022,10 +1063,12 @@ export class WorldMap {
             }
         }
 
-        if (this.hash(chunkX, chunkY, 651) < FALLEN_LOG_CHUNK_CHANCE) {
-            const anchor = this.pickDecorationAnchorTileForTerrain(chunkX, chunkY, 652, FALLEN_LOG_TILES);
+        for (const rule of PROP_GENERATION_RULES) {
+            if (this.hash(chunkX, chunkY, rule.chanceSalt) >= rule.chance) continue;
+            const config = PROP_DECORATION_CONFIGS[rule.sprite];
+            const anchor = this.pickDecorationAnchorTileForTerrain(chunkX, chunkY, rule.anchorSalt, config.anchorTiles);
             if (anchor) {
-                const decoration = this.createPropDecoration('fallenLog', anchor);
+                const decoration = this.createPropDecoration(rule.sprite, anchor);
                 if (this.canPlacePropDecoration(decoration, decorations)) decorations.push(decoration);
             }
         }
@@ -1402,6 +1445,7 @@ export class WorldMap {
         decoration: WorldMapPropDecoration,
         existingDecorations: readonly WorldMapDecoration[]
     ): boolean {
+        const config = PROP_DECORATION_CONFIGS[decoration.sprite];
         const bounds = this.getBoundsTiles();
         if (
             decoration.bounds.minX <= 1 ||
@@ -1418,12 +1462,12 @@ export class WorldMap {
 
         for (let y = decoration.bounds.minY; y <= decoration.bounds.maxY; y++) {
             for (let x = decoration.bounds.minX; x <= decoration.bounds.maxX; x++) {
-                if (!FALLEN_LOG_SURROUNDING_TILES.has(this.getTileAt(x, y))) return false;
+                if (!config.surroundingTiles.has(this.getTileAt(x, y))) return false;
                 if (this.getTownAtTile(x, y) || this.getTempleAtTile(x, y) || this.getDungeonAtTile(x, y)) return false;
             }
         }
 
-        return decoration.blockedTiles.every((tile) => FALLEN_LOG_TILES.has(this.getTileAt(tile.x, tile.y)));
+        return decoration.blockedTiles.every((tile) => config.anchorTiles.has(this.getTileAt(tile.x, tile.y)));
     }
 
     public updateLoadedChunks(worldCenterX: number, worldCenterY: number, viewW?: number, viewH?: number): void {

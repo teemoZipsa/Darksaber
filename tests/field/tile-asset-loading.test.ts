@@ -53,25 +53,32 @@ test('tile asset startup loads only compact autotile sheets and lazily queues de
         );
         assert.equal(requestedSources.filter((src) => src.endsWith('/castle.png')).length, 1);
 
-        assert.equal(TileAssetManager.drawPropSprite(
-            context as unknown as CanvasRenderingContext2D,
-            'fallenLog',
-            0,
-            0,
-            168,
-            90
-        ), false);
-        assert.equal(requestedSources[requestedSources.length - 1], '/assets/images/decor/props/fallen_log.png');
+        const props = [
+            ['fallenLog', '/assets/images/decor/props/fallen_log.png'],
+            ['boulder', '/assets/images/decor/props/boulder.png'],
+            ['ruinedWall', '/assets/images/decor/props/ruined_wall.png'],
+        ] as const;
+        for (const [sprite, source] of props) {
+            assert.equal(TileAssetManager.drawPropSprite(
+                context as unknown as CanvasRenderingContext2D,
+                sprite,
+                0,
+                0,
+                96,
+                64
+            ), false);
+            assert.equal(requestedSources[requestedSources.length - 1], source);
 
-        TileAssetManager.drawPropSprite(
-            context as unknown as CanvasRenderingContext2D,
-            'fallenLog',
-            0,
-            0,
-            168,
-            90
-        );
-        assert.equal(requestedSources.filter((src) => src.endsWith('/fallen_log.png')).length, 1);
+            TileAssetManager.drawPropSprite(
+                context as unknown as CanvasRenderingContext2D,
+                sprite,
+                0,
+                0,
+                96,
+                64
+            );
+            assert.equal(requestedSources.filter((src) => src === source).length, 1);
+        }
     } finally {
         Object.defineProperty(globalThis, 'Image', { configurable: true, value: originalImage });
     }
