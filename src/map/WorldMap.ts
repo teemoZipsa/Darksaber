@@ -1,6 +1,6 @@
 import { Chunk, CHUNK_SIZE, TILE_SIZE } from './Chunk';
 import { TileType, TILE_PROPERTIES } from './Tile';
-import { TileAssetManager, type BridgeSpriteId, type LandmarkSpriteId, type TreeSpriteId } from './TileAssetManager';
+import { TileAssetManager, type BridgeSpriteId, type LandmarkSpriteId, type PropSpriteId, type TreeSpriteId } from './TileAssetManager';
 import { LootObject } from '../entity/LootObject';
 import { ExtractionZone } from '../entity/ExtractionZone';
 import { BiomeMask, BiomeType, MAP_HEIGHT, MAP_WIDTH, TempleInfo, TownInfo, WorldRealm } from './BiomeMask';
@@ -61,7 +61,16 @@ export interface WorldMapBridgeDecoration {
     bounds: WorldMapDecorationBounds;
 }
 
-export type WorldMapDecoration = WorldMapTreeDecoration | WorldMapBridgeDecoration;
+export interface WorldMapPropDecoration {
+    kind: 'prop';
+    sprite: PropSpriteId;
+    anchorTile: TilePoint;
+    blockedTiles: TilePoint[];
+    occlusionClip: WorldMapDecorationClip;
+    bounds: WorldMapDecorationBounds;
+}
+
+export type WorldMapDecoration = WorldMapTreeDecoration | WorldMapBridgeDecoration | WorldMapPropDecoration;
 
 export type WorldMapGroundDetailKind =
     | 'grassTuft'
@@ -501,8 +510,16 @@ interface BridgeDecorationConfig {
     passableOffsets: readonly TilePoint[];
 }
 
+interface PropDecorationConfig {
+    widthTiles: number;
+    heightTiles: number;
+    blockedOffsets: readonly TilePoint[];
+    occlusionClip: WorldMapDecorationClip;
+}
+
 const NORMAL_TREE_CHUNK_CHANCE = 0.035;
 const SCARY_TREE_CHUNK_CHANCE = 0.18;
+const FALLEN_LOG_CHUNK_CHANCE = 0.045;
 const GROUND_DETAIL_ATTEMPTS_PER_CHUNK = 32;
 const AMBIENT_SITE_CHUNK_CHANCE = 0.46;
 const AMBIENT_SITE_ROAD_SEARCH_RADIUS = 7;
@@ -511,6 +528,8 @@ const NORMAL_TREE_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST]);
 const SCARY_TREE_TILES = new Set<TileType>([TileType.POISON_SWAMP]);
 const NORMAL_TREE_CANOPY_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE]);
 const SCARY_TREE_CANOPY_TILES = new Set<TileType>([TileType.POISON_SWAMP, TileType.STONE]);
+const FALLEN_LOG_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST]);
+const FALLEN_LOG_SURROUNDING_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE]);
 export const NEUTRAL_BIRD_SPRITE_SRC = '/assets/images/monsters/791R.png';
 const NEUTRAL_BIRD_FRAME_SIZE = 64;
 const NEUTRAL_BIRD_FRAME_COUNT = 3;
@@ -579,6 +598,21 @@ const BRIDGE_DECORATION_CONFIGS: Record<BridgeSpriteId, BridgeDecorationConfig> 
             { x: 0, y: 1 },
             { x: 0, y: 2 },
         ],
+    },
+};
+
+const PROP_DECORATION_CONFIGS: Record<PropSpriteId, PropDecorationConfig> = {
+    fallenLog: {
+        widthTiles: 5.25,
+        heightTiles: 2.8,
+        blockedOffsets: [
+            { x: -2, y: -1 },
+            { x: -1, y: -1 },
+            { x: 0, y: -1 },
+            { x: 1, y: 0 },
+            { x: 2, y: 0 },
+        ],
+        occlusionClip: { x: 0, y: 0, width: 1, height: 0.64 },
     },
 };
 
@@ -991,6 +1025,14 @@ export class WorldMap {
             }
         }
 
+        if (this.hash(chunkX, chunkY, 651) < FALLEN_LOG_CHUNK_CHANCE) {
+            const anchor = this.pickDecorationAnchorTileForTerrain(chunkX, chunkY, 652, FALLEN_LOG_TILES);
+            if (anchor) {
+                const decoration = this.createPropDecoration('fallenLog', anchor);
+                if (this.canPlacePropDecoration(decoration, decorations)) decorations.push(decoration);
+            }
+        }
+
         return decorations;
     }
 
@@ -1337,6 +1379,56 @@ export class WorldMap {
         return decoration.trunkTiles.every((tile) => trunkTilesAllowed.has(this.getTileAt(tile.x, tile.y)));
     }
 
+    private createPropDecoration(sprite: PropSpriteId, anchorTile: TilePoint): WorldMapPropDecoration {
+        const config = PROP_DECORATION_CONFIGS[sprite];
+        const left = anchorTile.x + 0.5 - config.widthTiles / 2;
+        const top = anchorTile.y + 1 - config.heightTiles;
+        return {
+            kind: 'prop',
+            sprite,
+            anchorTile: { ...anchorTile },
+            blockedTiles: config.blockedOffsets.map((offset) => ({
+                x: anchorTile.x + offset.x,
+                y: anchorTile.y + offset.y,
+            })),
+            occlusionClip: { ...config.occlusionClip },
+            bounds: {
+                minX: Math.floor(left),
+                minY: Math.floor(top),
+                maxX: Math.ceil(left + config.widthTiles),
+                maxY: Math.ceil(top + config.heightTiles),
+            },
+        };
+    }
+
+    private canPlacePropDecoration(
+        decoration: WorldMapPropDecoration,
+        existingDecorations: readonly WorldMapDecoration[]
+    ): boolean {
+        const bounds = this.getBoundsTiles();
+        if (
+            decoration.bounds.minX <= 1 ||
+            decoration.bounds.minY <= 1 ||
+            decoration.bounds.maxX >= bounds.width - 1 ||
+            decoration.bounds.maxY >= bounds.height - 1
+        ) {
+            return false;
+        }
+
+        if (existingDecorations.some((candidate) => this.decorationBoundsOverlap(decoration.bounds, candidate.bounds))) {
+            return false;
+        }
+
+        for (let y = decoration.bounds.minY; y <= decoration.bounds.maxY; y++) {
+            for (let x = decoration.bounds.minX; x <= decoration.bounds.maxX; x++) {
+                if (!FALLEN_LOG_SURROUNDING_TILES.has(this.getTileAt(x, y))) return false;
+                if (this.getTownAtTile(x, y) || this.getTempleAtTile(x, y) || this.getDungeonAtTile(x, y)) return false;
+            }
+        }
+
+        return decoration.blockedTiles.every((tile) => FALLEN_LOG_TILES.has(this.getTileAt(tile.x, tile.y)));
+    }
+
     public updateLoadedChunks(worldCenterX: number, worldCenterY: number, viewW?: number, viewH?: number): void {
         const chunkPixelSize = CHUNK_SIZE * TILE_SIZE;
         const halfViewW = viewW !== undefined ? viewW / 2 : this.preloadChunkMargin * chunkPixelSize;
@@ -1492,6 +1584,7 @@ export class WorldMap {
                 for (const decoration of this.getDecorationChunk(chunkX, chunkY)) {
                     if (!this.decorationIntersectsTileRect(decoration, tx, ty, tx, ty)) continue;
                     if (decoration.kind === 'tree' && decoration.trunkTiles.some((tile) => tile.x === tx && tile.y === ty)) return true;
+                    if (decoration.kind === 'prop' && decoration.blockedTiles.some((tile) => tile.x === tx && tile.y === ty)) return true;
                 }
             }
         }
@@ -1743,8 +1836,10 @@ export class WorldMap {
         for (const decoration of decorations) {
             if (decoration.kind === 'tree') {
                 this.renderTreeDecoration(ctx, decoration, cameraX, cameraY, vw, vh, overlayOnly);
-            } else {
+            } else if (decoration.kind === 'bridge') {
                 this.renderBridgeDecoration(ctx, decoration, cameraX, cameraY, vw, vh, overlayOnly);
+            } else {
+                this.renderPropDecoration(ctx, decoration, cameraX, cameraY, vw, vh, overlayOnly);
             }
         }
     }
@@ -1817,6 +1912,45 @@ export class WorldMap {
         ctx.lineWidth = Math.max(1, TILE_SIZE * 0.08);
         ctx.fillRect(sx, sy + height * 0.18, width, height * 0.64);
         ctx.strokeRect(sx, sy + height * 0.18, width, height * 0.64);
+        ctx.restore();
+    }
+
+    private renderPropDecoration(
+        ctx: CanvasRenderingContext2D,
+        decoration: WorldMapPropDecoration,
+        cameraX: number,
+        cameraY: number,
+        vw: number,
+        vh: number,
+        overlayOnly: boolean
+    ): void {
+        const config = PROP_DECORATION_CONFIGS[decoration.sprite];
+        const width = config.widthTiles * TILE_SIZE;
+        const height = config.heightTiles * TILE_SIZE;
+        const sx = (decoration.anchorTile.x + 0.5) * TILE_SIZE - cameraX - width / 2;
+        const sy = (decoration.anchorTile.y + 1) * TILE_SIZE - cameraY - height;
+
+        if (sx + width < 0 || sx > vw || sy + height < 0 || sy > vh) return;
+
+        const drew = TileAssetManager.drawPropSprite(
+            ctx,
+            decoration.sprite,
+            sx,
+            sy,
+            width,
+            height,
+            overlayOnly ? decoration.occlusionClip : undefined
+        );
+        if (drew || overlayOnly) return;
+
+        ctx.save();
+        ctx.translate(sx + width / 2, sy + height * 0.58);
+        ctx.rotate(0.12);
+        ctx.fillStyle = 'rgba(84, 54, 31, 0.9)';
+        ctx.strokeStyle = 'rgba(35, 23, 15, 0.94)';
+        ctx.lineWidth = Math.max(2, TILE_SIZE * 0.08);
+        ctx.fillRect(-width * 0.46, -height * 0.16, width * 0.92, height * 0.32);
+        ctx.strokeRect(-width * 0.46, -height * 0.16, width * 0.92, height * 0.32);
         ctx.restore();
     }
 
@@ -1927,6 +2061,13 @@ export class WorldMap {
             decoration.bounds.minX <= maxX &&
             decoration.bounds.maxY >= minY &&
             decoration.bounds.minY <= maxY;
+    }
+
+    private decorationBoundsOverlap(a: WorldMapDecorationBounds, b: WorldMapDecorationBounds): boolean {
+        return a.maxX >= b.minX &&
+            a.minX <= b.maxX &&
+            a.maxY >= b.minY &&
+            a.minY <= b.maxY;
     }
 
     private renderTownLandmarks(

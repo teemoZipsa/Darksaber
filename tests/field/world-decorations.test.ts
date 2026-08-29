@@ -16,6 +16,7 @@ class OffscreenCanvasStub {
 
 type TreeDecoration = Extract<WorldMapDecoration, { kind: 'tree' }>;
 type BridgeDecoration = Extract<WorldMapDecoration, { kind: 'bridge' }>;
+type PropDecoration = Extract<WorldMapDecoration, { kind: 'prop' }>;
 
 function getAllDecorations(world: WorldMap): readonly WorldMapDecoration[] {
     const bounds = world.getBoundsTiles();
@@ -24,7 +25,11 @@ function getAllDecorations(world: WorldMap): readonly WorldMapDecoration[] {
 }
 
 function decorationSignature(decoration: WorldMapDecoration): string {
-    const coveredTiles = decoration.kind === 'tree' ? decoration.trunkTiles : decoration.passableTiles;
+    const coveredTiles = decoration.kind === 'tree'
+        ? decoration.trunkTiles
+        : decoration.kind === 'bridge'
+            ? decoration.passableTiles
+            : decoration.blockedTiles;
     const covered = coveredTiles.map((tile) => `${tile.x},${tile.y}`).join('|');
     return `${decoration.kind}:${decoration.sprite}@${decoration.anchorTile.x},${decoration.anchorTile.y}:${covered}`;
 }
@@ -37,14 +42,18 @@ function isBridgeDecoration(decoration: WorldMapDecoration): decoration is Bridg
     return decoration.kind === 'bridge';
 }
 
-test('world map tree decorations are deterministic and sparse', () => {
+function isPropDecoration(decoration: WorldMapDecoration): decoration is PropDecoration {
+    return decoration.kind === 'prop';
+}
+
+test('world map large decorations are deterministic and sparse', () => {
     const first = new WorldMap();
     const second = new WorldMap();
     const firstDecorations = getAllDecorations(first);
     const secondDecorations = getAllDecorations(second);
 
     assert.ok(firstDecorations.length > 0);
-    assert.ok(firstDecorations.length < 140);
+    assert.ok(firstDecorations.length < 300);
     assert.deepEqual(firstDecorations.map(decorationSignature), secondDecorations.map(decorationSignature));
 });
 
@@ -207,6 +216,45 @@ test('tree trunks block movement while canopy-only tiles remain walkable', () =>
     assert.ok(canopyTile);
     assert.equal(world.isDecorationBlocked(canopyTile.x, canopyTile.y), false);
     assert.equal(world.isWalkable(canopyTile.x, canopyTile.y), true);
+});
+
+test('fallen logs stay off routes and landmarks while only their trunk footprint blocks movement', () => {
+    const world = new WorldMap();
+    const props = getAllDecorations(world).filter(isPropDecoration);
+
+    assert.ok(props.length > 0);
+
+    for (const prop of props) {
+        assert.equal(prop.sprite, 'fallenLog');
+        assert.ok([TileType.GRASS, TileType.FOREST].includes(world.getTileAt(prop.anchorTile.x, prop.anchorTile.y)));
+
+        for (let y = prop.bounds.minY; y <= prop.bounds.maxY; y++) {
+            for (let x = prop.bounds.minX; x <= prop.bounds.maxX; x++) {
+                assert.notEqual(world.getTileAt(x, y), TileType.ROAD);
+                assert.equal(world.getTownAtTile(x, y), null);
+                assert.equal(world.getTempleAtTile(x, y), null);
+                assert.equal(world.getDungeonAtTile(x, y), null);
+            }
+        }
+
+        for (const tile of prop.blockedTiles) {
+            assert.ok([TileType.GRASS, TileType.FOREST].includes(world.getTileAt(tile.x, tile.y)));
+            assert.equal(world.isDecorationBlocked(tile.x, tile.y), true);
+            assert.equal(world.isWalkable(tile.x, tile.y), false);
+        }
+
+        const passableTile = (() => {
+            for (let y = prop.bounds.minY; y <= prop.bounds.maxY; y++) {
+                for (let x = prop.bounds.minX; x <= prop.bounds.maxX; x++) {
+                    if (prop.blockedTiles.some((tile) => tile.x === x && tile.y === y)) continue;
+                    if (world.isWalkable(x, y)) return { x, y };
+                }
+            }
+            return null;
+        })();
+        assert.ok(passableTile);
+        assert.equal(world.isDecorationBlocked(passableTile.x, passableTile.y), false);
+    }
 });
 
 test('bridge decorations make road river crossings passable', () => {

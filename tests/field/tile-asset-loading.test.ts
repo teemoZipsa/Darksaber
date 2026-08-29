@@ -52,6 +52,26 @@ test('tile asset startup loads only compact autotile sheets and lazily queues de
             48
         );
         assert.equal(requestedSources.filter((src) => src.endsWith('/castle.png')).length, 1);
+
+        assert.equal(TileAssetManager.drawPropSprite(
+            context as unknown as CanvasRenderingContext2D,
+            'fallenLog',
+            0,
+            0,
+            168,
+            90
+        ), false);
+        assert.equal(requestedSources[requestedSources.length - 1], '/assets/images/decor/props/fallen_log.png');
+
+        TileAssetManager.drawPropSprite(
+            context as unknown as CanvasRenderingContext2D,
+            'fallenLog',
+            0,
+            0,
+            168,
+            90
+        );
+        assert.equal(requestedSources.filter((src) => src.endsWith('/fallen_log.png')).length, 1);
     } finally {
         Object.defineProperty(globalThis, 'Image', { configurable: true, value: originalImage });
     }

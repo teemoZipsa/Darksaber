@@ -43,10 +43,15 @@ const DARKSABER_BRIDGE_SPRITES = {
     woodBridgeVertical: '/assets/images/decor/bridges/wood_bridge_vertical.png',
 } as const;
 
+const DARKSABER_PROP_SPRITES = {
+    fallenLog: '/assets/images/decor/props/fallen_log.png',
+} as const;
+
 type OriginalAutotileSheetId = keyof typeof ORIGINAL_AUTOTILE_SHEETS;
 export type LandmarkSpriteId = keyof typeof DARKSABER_LANDMARK_SPRITES;
 export type TreeSpriteId = keyof typeof DARKSABER_TREE_SPRITES;
 export type BridgeSpriteId = keyof typeof DARKSABER_BRIDGE_SPRITES;
+export type PropSpriteId = keyof typeof DARKSABER_PROP_SPRITES;
 
 interface OriginalAutotileConfig {
     sheet: OriginalAutotileSheetId;
@@ -399,6 +404,36 @@ class TileAssetManagerClass {
         const prevSmoothing = ctx.imageSmoothingEnabled;
         ctx.imageSmoothingEnabled = true;
         ctx.drawImage(img, dx, dy, width, height);
+        ctx.imageSmoothingEnabled = prevSmoothing;
+        return true;
+    }
+
+    public drawPropSprite(
+        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+        spriteId: PropSpriteId,
+        dx: number,
+        dy: number,
+        width: number,
+        height: number,
+        source?: { x: number; y: number; width: number; height: number }
+    ): boolean {
+        const key = `prop:${spriteId}`;
+        const img = this.getSheet(key);
+        if (!img) this.queueImageLoad(key, DARKSABER_PROP_SPRITES[spriteId]);
+        if (!img) return false;
+
+        const srcX = source ? source.x * img.naturalWidth : 0;
+        const srcY = source ? source.y * img.naturalHeight : 0;
+        const srcW = source ? source.width * img.naturalWidth : img.naturalWidth;
+        const srcH = source ? source.height * img.naturalHeight : img.naturalHeight;
+        const destX = source ? dx + width * source.x : dx;
+        const destY = source ? dy + height * source.y : dy;
+        const destW = source ? width * source.width : width;
+        const destH = source ? height * source.height : height;
+
+        const prevSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(img, srcX, srcY, srcW, srcH, destX, destY, destW, destH);
         ctx.imageSmoothingEnabled = prevSmoothing;
         return true;
     }
