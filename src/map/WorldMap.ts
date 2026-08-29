@@ -542,6 +542,8 @@ const BOULDER_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileTy
 const BOULDER_SURROUNDING_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND, TileType.SNOW]);
 const RUINED_WALL_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND]);
 const RUINED_WALL_SURROUNDING_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND]);
+const ABANDONED_WAGON_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND]);
+const ABANDONED_WAGON_SURROUNDING_TILES = new Set<TileType>([TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND]);
 export const NEUTRAL_BIRD_SPRITE_SRC = '/assets/images/monsters/791R.png';
 const NEUTRAL_BIRD_FRAME_SIZE = 64;
 const NEUTRAL_BIRD_FRAME_COUNT = 3;
@@ -646,12 +648,24 @@ const PROP_DECORATION_CONFIGS: Record<PropSpriteId, PropDecorationConfig> = {
         anchorTiles: RUINED_WALL_TILES,
         surroundingTiles: RUINED_WALL_SURROUNDING_TILES,
     },
+    abandonedWagon: {
+        widthTiles: 1.8,
+        heightTiles: 1.2,
+        blockedOffsets: [
+            { x: 0, y: 0 },
+            { x: 1, y: 0 },
+        ],
+        occlusionClip: { x: 0, y: 0, width: 1, height: 0.68 },
+        anchorTiles: ABANDONED_WAGON_TILES,
+        surroundingTiles: ABANDONED_WAGON_SURROUNDING_TILES,
+    },
 };
 
 const PROP_GENERATION_RULES: readonly PropGenerationRule[] = [
     { sprite: 'fallenLog', chance: 0.045, chanceSalt: 651, anchorSalt: 652 },
     { sprite: 'boulder', chance: 0.055, chanceSalt: 661, anchorSalt: 662 },
     { sprite: 'ruinedWall', chance: 0.025, chanceSalt: 671, anchorSalt: 672 },
+    { sprite: 'abandonedWagon', chance: 0.018, chanceSalt: 681, anchorSalt: 682 },
 ];
 
 export class WorldMap {

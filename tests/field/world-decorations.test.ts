@@ -53,7 +53,7 @@ test('world map large decorations are deterministic and sparse', () => {
     const secondDecorations = getAllDecorations(second);
 
     assert.ok(firstDecorations.length > 0);
-    assert.ok(firstDecorations.length < 700);
+    assert.ok(firstDecorations.length < 850);
     assert.deepEqual(firstDecorations.map(decorationSignature), secondDecorations.map(decorationSignature));
 });
 
@@ -225,8 +225,9 @@ test('field props stay off routes and landmarks while only their footprints bloc
         fallenLog: [TileType.GRASS, TileType.FOREST],
         boulder: [TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND, TileType.SNOW],
         ruinedWall: [TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND],
+        abandonedWagon: [TileType.GRASS, TileType.FOREST, TileType.STONE, TileType.SAND],
     };
-    const expectedSprites: readonly PropDecoration['sprite'][] = ['fallenLog', 'boulder', 'ruinedWall'];
+    const expectedSprites: readonly PropDecoration['sprite'][] = ['fallenLog', 'boulder', 'ruinedWall', 'abandonedWagon'];
 
     assert.ok(props.length > 0);
     for (const sprite of expectedSprites) {

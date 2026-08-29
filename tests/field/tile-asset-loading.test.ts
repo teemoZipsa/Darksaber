@@ -57,6 +57,7 @@ test('tile asset startup loads only compact autotile sheets and lazily queues de
             ['fallenLog', '/assets/images/decor/props/fallen_log.png'],
             ['boulder', '/assets/images/decor/props/boulder.png'],
             ['ruinedWall', '/assets/images/decor/props/ruined_wall.png'],
+            ['abandonedWagon', '/assets/images/decor/props/abandoned_wagon.png'],
         ] as const;
         for (const [sprite, source] of props) {
             assert.equal(TileAssetManager.drawPropSprite(
