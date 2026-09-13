@@ -1,7 +1,7 @@
 import { ItemDef, ItemSlot } from '../data/ItemDB';
 import { PlacedItem } from '../inventory/GridInventory';
 
-export type RaidResultType = 'SURVIVED' | 'DEAD' | 'MIA';
+export type RaidResultType = 'SURVIVED' | 'DEAD' | 'MIA' | 'LEFT';
 
 export interface ItemSnapshot {
     id: string;

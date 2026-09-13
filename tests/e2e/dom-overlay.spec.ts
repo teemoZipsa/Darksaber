@@ -588,7 +588,7 @@ test('authenticated network raid survival returns to town and persists the serve
     await characterCard.locator('.auth-character-card__select').click();
 
     await expect(page.locator('#ui-overlay .ds-town')).toBeVisible({ timeout: 20_000 });
-    const deployButton = page.getByRole('button', { name: /출격|Deploy/ });
+    const deployButton = page.getByRole('button', { name: /필드로 나가기|Enter the field/ });
     await page.waitForTimeout(500);
     const townCanvasSamples = await page.locator('#gameCanvas').evaluate((canvas: HTMLCanvasElement) => {
         const context = canvas.getContext('2d');

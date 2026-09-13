@@ -95,7 +95,6 @@ export class PartyManager {
         const active = this.activeParty[this.activeIndex];
         if (active) {
             active.isDead = true;
-            active.exp = 0; // Reset EXP on death
         }
 
         // Find next alive character in the squad

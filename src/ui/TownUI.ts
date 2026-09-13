@@ -105,12 +105,14 @@ export class TownUI {
     public getRumors(): string[] { return this.currentRumors; }
     public getRestFacilityPublic(): RestFacility | null { return this.getCurrentRestFacility(); }
     public isDeployPending(): boolean { return this.deployPending; }
+    public canDeploy(nowMs = getNowMs()): boolean {
+        return nowMs >= this.deployClickGuardUntilMs && !this.deployPending && this.onDeployAction !== null;
+    }
     public getDeployError(): string | null { return this.deployError; }
     public setDeployError(message: string | null): void { this.deployError = message; }
     /** Leave town (mirrors the old canvas deploy button). */
     public requestDeploy(nowMs = getNowMs()): boolean {
-        if (nowMs < this.deployClickGuardUntilMs) return false;
-        if (this.deployPending) return false;
+        if (!this.canDeploy(nowMs)) return false;
         if (this.onDeployAction) {
             this.deployPending = true;
             this.deployError = null;

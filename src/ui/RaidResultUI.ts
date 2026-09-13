@@ -14,6 +14,7 @@ function formatTime(totalSeconds: number): string {
 
 function resultTitle(result: RaidOutcome['result']): string {
     if (result === 'SURVIVED') return t('raid.result.survived');
+    if (result === 'LEFT') return t('field.expedition.return');
     if (result === 'MIA') return t('raid.result.mia');
     return t('raid.result.failed');
 }
@@ -81,7 +82,7 @@ export class RaidResultUI {
         drawParchmentPanel(ctx, px, py, panelW, panelH, { radius: 8, headerH: 88 });
         // result-flavored border accent on top edge
         ctx.save();
-        ctx.strokeStyle = this.outcome.result === 'SURVIVED' ? '#2d6a3d' : '#8a1818';
+        ctx.strokeStyle = this.outcome.result === 'DEAD' ? '#8a1818' : '#7a5410';
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(px + 16, py + 88);

@@ -78,6 +78,8 @@ export interface WorldRenderContext {
 
 interface WorldRenderOptions {
     hideWorldHud?: boolean;
+    domFieldHud?: boolean;
+    hidePassiveActorCard?: boolean;
 }
 
 export class WorldRenderController {
@@ -133,15 +135,21 @@ export class WorldRenderController {
         const compactActionMenuOpen = compactViewport
             && model.actionMenuOpen
             && !fullMapVisible;
+        const compactPickerOpen = compactViewport
+            && (this.context.magicController.isVisible() || this.context.toolController.isVisible());
+        const domCompactHud = options.domFieldHud && width <= 900;
         const hudLayout = WorldFieldRenderer.renderHudPanels(ctx, model, uiW, uiH, {
+            domFieldHud: options.domFieldHud,
             combatLogOnly: options.hideWorldHud,
             compactActionMenu: compactActionMenuOpen,
         });
         if (!options.hideWorldHud && model.storyInterior.active && !compactActionMenuOpen) {
             this.renderStoryInteriorBanner(ctx, model, uiW, hudLayout);
         }
-        const hidesCompactEntityCard = compactActionMenuOpen;
-        if (!options.hideWorldHud && model.selectedDisplayInfo && !hidesCompactEntityCard) {
+        const hidesCompactEntityCard = compactActionMenuOpen || compactPickerOpen;
+        if (domCompactHud) hudLayout.entityInfo.y = Math.max(hudLayout.entityInfo.y, 290 / scale);
+        if (!options.hideWorldHud && model.selectedDisplayInfo && !hidesCompactEntityCard
+            && !(options.hidePassiveActorCard && this.context.selectionController.actorId)) {
             this.context.entityInfoUI.setPosition(hudLayout.entityInfo.x, hudLayout.entityInfo.y);
             if (hudLayout.compact) {
                 this.context.entityInfoUI.renderCompact(
@@ -158,12 +166,18 @@ export class WorldRenderController {
         if (!options.hideWorldHud) {
             this.context.tacticalController.render(ctx);
             this.context.toolController.render(ctx, uiW, uiH);
-            if (!compactActionMenuOpen) {
+            if (!compactActionMenuOpen && !compactPickerOpen) {
                 this.context.minimapUI.render(ctx, uiW, uiH, {
                     gold: model.gold,
                     worldName: model.worldName,
                     terrainLines: model.terrainHoverLines,
-                }, hudLayout.compact ? {
+                }, domCompactHud ? {
+                    compact: true,
+                    x: (width - Math.min(160, Math.max(80, width - 220)) - 12) / scale,
+                    y: 132 / scale,
+                    panelWidth: Math.min(160, Math.max(80, width - 220)) / scale,
+                    mapSize: Math.min(112, Math.max(56, width - 244)) / scale,
+                } : hudLayout.compact ? {
                     compact: true,
                     x: hudLayout.minimap.x,
                     y: hudLayout.minimap.y,

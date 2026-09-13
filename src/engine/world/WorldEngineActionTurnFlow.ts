@@ -8,6 +8,7 @@ export interface WorldEngineActionTurnFlowContext {
     getActivePartyTurnActor: () => FieldActor | null;
     getSpendableActionGauge: () => number;
     getActionMenuIsOpen: () => boolean;
+    shouldReopenActionMenu?: () => boolean;
     openActionMenu: (states: ActionMenuSlotState[]) => void;
     updateActionMenuStates: (states: ActionMenuSlotState[]) => void;
     closeActionMenu: () => void;
@@ -110,6 +111,11 @@ export class WorldEngineActionTurnFlow {
         if (actor.character.isDead || actor.character.stats.hp <= 0) return;
         if (this.context.getRemainingActionPoints() <= 0 && actor.entity.actionGauge >= MIN_FIELD_ACTION_GAUGE_COST) {
             this.context.setRemainingActionPoints(Math.floor(actor.entity.actionGauge));
+        }
+        if (this.context.shouldReopenActionMenu?.() === false) {
+            this.context.selectActor(null);
+            this.context.closeActionMenu();
+            return;
         }
         this.context.selectActor(actor.id);
         this.context.closeTacticalMenu();

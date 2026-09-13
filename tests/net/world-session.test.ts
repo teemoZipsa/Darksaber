@@ -62,6 +62,47 @@ function actor(id: string, overrides: Partial<ActorSnapshot> = {}): ActorSnapsho
     };
 }
 
+test('server exploration continues past the legacy raid limit', () => {
+    const session = new WorldSession();
+    const joined = session.join(joinMessage('central_castle', 'unlimited'), 0);
+    clearEnemiesForTest(session);
+    const player = getPlayerDebugState(session, joined.playerId);
+    player.elapsedSeconds = 1801;
+    session.tick(0);
+    const tick = session.tick(1000);
+    assert.ok(player.elapsedSeconds > 1801);
+    assert.equal(session.getDebugState().players.has(joined.playerId), true);
+    assert.equal(tick.perPlayerMessages.some((entry) => entry.message.type === 'RAID_RESULT'), false);
+});
+
+test('expired reconnect grace preserves earned loot and gold without a first-return bonus', () => {
+    const session = new WorldSession({ ghostGraceMs: 1 });
+    const character = authCharacter('keep-disconnected-loot');
+    const save = createDefaultCharacterSave(character);
+    const joined = session.join(joinMessage('central_castle', character.id), 0, {
+        accountId: character.accountId, characterId: character.id, saveSnapshot: save,
+    });
+    const player = getPlayerDebugState(session, joined.playerId);
+    player.saveSnapshot!.inventory.items.push({
+        itemId: 'short_sword', gridX: 4, gridY: 0, quantity: 1,
+        durability: 17, sockets: ['gem_chipped_ruby'], acquiredInRaid: true,
+    });
+    player.raidGoldReward = 321;
+    session.disconnect(joined.playerId, 0);
+    session.tick(2);
+    const patch = session.createCharacterSavePatch(joined.playerId);
+    const sword = patch?.inventory?.items.find((item) => item.gridX === 4);
+    assert.equal(sword?.itemId, 'short_sword');
+    assert.equal(sword?.durability, 17);
+    assert.deepEqual(sword?.sockets, ['gem_chipped_ruby']);
+    assert.equal(patch?.questState?.gold, Number(save.questState.gold) + 321);
+    assert.equal((patch?.questState?.completedQuestIds as string[]).includes(FIRST_SURVIVAL_QUEST_ID), false);
+    const history = patch?.questState?.raidHistory as Array<Record<string, unknown>>;
+    assert.equal(history[0].lostItems, 0);
+    assert.equal(history[0].securedItems, 1);
+    assert.equal(history[0].goldReward, 321);
+});
+
 function joinMessage(originHubId: string, id: string, resumeToken?: string): WorldJoinMessage {
     return {
         type: 'WORLD_JOIN',
@@ -216,7 +257,7 @@ test('join spawns each player at their origin hub external exit tile', () => {
     assert.deepEqual(forestActor?.tile, forestExit);
 });
 
-test('server town leave only survives at a non-departure town', () => {
+test('server town leave accepts any town and rejects open field arrival', () => {
     const world = new WorldMap();
     const central = world.getTowns().find((town) => town.id === 'central_castle');
     const forest = world.getTowns().find((town) => town.id === 'w_forest_village');
@@ -226,7 +267,7 @@ test('server town leave only survives at a non-departure town', () => {
         {
             id: 'same-town',
             tile: world.getTownSpawnTile(central),
-            expectedResult: 'LEFT',
+            expectedResult: 'SURVIVED',
             expectedExtraction: 'central_castle',
         },
         {
@@ -586,7 +627,7 @@ test('server cursed artifact slows actor ATB and damages on ready turn', () => {
     assert.equal(curseEvent.value, 12);
 });
 
-test('server-authoritative down resets accumulated EXP in the final save patch', () => {
+test('server-authoritative down preserves accumulated EXP in the final save patch', () => {
     const character = authCharacter('downed-exp');
     const save = createDefaultCharacterSave(character);
     const roster = save.rosterSnapshot.characters;
@@ -619,7 +660,7 @@ test('server-authoritative down resets accumulated EXP in the final save patch',
     assert.ok(Array.isArray(patchedRoster));
     const patchedCharacter = patchedRoster.find((entry) => typeof entry === 'object' && entry !== null && 'id' in entry && entry.id === character.id);
     assert.ok(patchedCharacter && typeof patchedCharacter === 'object');
-    assert.equal('exp' in patchedCharacter ? patchedCharacter.exp : undefined, 0);
+    assert.equal('exp' in patchedCharacter ? patchedCharacter.exp : undefined, 25);
     assert.equal('injured' in patchedCharacter ? patchedCharacter.injured : undefined, true);
     const history = patch?.questState?.raidHistory;
     assert.ok(Array.isArray(history));
@@ -1489,7 +1530,7 @@ test('server late story interiors spawn original objective and guard layouts thr
     }
 });
 
-test('server late story boss clears secure original EVENT 99 rewards only after survival through episode 31', () => {
+test('server late story boss clears secure original EVENT 99 rewards during exploration and on return through episode 31', () => {
     const world = new WorldMap();
 
     for (let episode = 23; episode <= 31; episode++) {
@@ -1578,8 +1619,8 @@ test('server late story boss clears secure original EVENT 99 rewards only after 
             dirtyPatch.inventory.items
                 .filter((item) => expectedRewards.includes(item.itemId))
                 .map((item) => item.itemId),
-            [],
-            `episode ${episode} dirty patch excludes EVENT 99 rewards`
+            expectedRewards,
+            `episode ${episode} dirty patch preserves EVENT 99 rewards`
         );
         assert.deepEqual(
             dirtyQuestState.completedQuestIds,
@@ -1613,7 +1654,7 @@ test('server late story boss clears secure original EVENT 99 rewards only after 
     }
 });
 
-test('server late story interior cache rewards persist only after survival through episode 31', () => {
+test('server late story interior cache rewards persist during exploration and on return through episode 31', () => {
     const world = new WorldMap();
 
     for (let episode = 23; episode <= 31; episode++) {
@@ -1730,9 +1771,9 @@ test('server late story interior cache rewards persist only after survival throu
         assert.deepEqual(
             dirtyPatch.inventory.items
                 .filter((item) => expectedRewardIds.includes(item.itemId))
-                .map((item) => item.itemId),
-            [],
-            `episode ${episode} dirty patch excludes cache rewards`
+                .map((item) => item.itemId).sort(),
+            expectedRewardIds.slice().sort(),
+            `episode ${episode} dirty patch preserves cache rewards`
         );
 
         const extractionTown = world.getTowns().find((town) => town.id === 'w_forest_village');
@@ -1754,7 +1795,7 @@ test('server late story interior cache rewards persist only after survival throu
     }
 });
 
-test('server late story interior cache rewards are not persisted on failed raid results', () => {
+test('server late story interior cache rewards are preserved after defeat without completing uncleared objectives', () => {
     const world = new WorldMap();
 
     for (let episode = 23; episode <= 31; episode++) {
@@ -1833,18 +1874,18 @@ test('server late story interior cache rewards are not persisted on failed raid 
             finalPatch.inventory.items
                 .filter((item) => expectedRewardIds.includes(item.itemId))
                 .map((item) => item.itemId),
-            [],
-            `episode ${episode} failed final patch excludes cache rewards`
+            expectedRewardIds,
+            `episode ${episode} final patch preserves cache rewards`
         );
         assert.deepEqual(
             finalQuestState.completedQuestIds,
             completedQuestIds,
-            `episode ${episode} failed final patch excludes raid quest completion`
+            `episode ${episode} uncleared objectives remain incomplete`
         );
     }
 });
 
-test('server late story boss rewards are not persisted on failed raid results', () => {
+test('server late story boss rewards and completed quests are preserved after defeat', () => {
     const world = new WorldMap();
 
     for (let episode = 23; episode <= 31; episode++) {
@@ -1911,18 +1952,18 @@ test('server late story boss rewards are not persisted on failed raid results', 
             finalPatch.inventory.items
                 .filter((item) => expectedRewards.includes(item.itemId))
                 .map((item) => item.itemId),
-            [],
-            `episode ${episode} failed final patch excludes EVENT 99 rewards`
+            expectedRewards,
+            `episode ${episode} final patch preserves EVENT 99 rewards`
         );
         assert.deepEqual(
             finalQuestState.completedQuestIds,
-            completedQuestIds,
+            [...completedQuestIds, scenario.questId],
             `episode ${episode} failed final patch excludes raid quest completion`
         );
     }
 });
 
-test('server late story objectives do not persist when extracting back to the departure town through episode 31', () => {
+test('server late story objectives persist when returning to the departure town through episode 31', () => {
     const world = new WorldMap();
 
     for (let episode = 23; episode <= 31; episode++) {
@@ -1986,7 +2027,7 @@ test('server late story objectives do not persist when extracting back to the de
         const result = leave.replies[0];
         assert.equal(result?.type, 'RAID_RESULT', `episode ${episode} raid result`);
         if (result?.type === 'RAID_RESULT') {
-            assert.equal(result.result, 'LEFT', `episode ${episode} departure town result`);
+            assert.equal(result.result, 'SURVIVED', `episode ${episode} departure town result`);
             assert.equal(result.extractionTownId, 'central_castle', `episode ${episode} extraction town`);
         }
 
@@ -1999,13 +2040,13 @@ test('server late story objectives do not persist when extracting back to the de
             finalPatch.inventory.items
                 .filter((item) => expectedRewards.includes(item.itemId))
                 .map((item) => item.itemId),
-            [],
-            `episode ${episode} departure town final patch excludes EVENT 99 rewards`
+            expectedRewards,
+            `episode ${episode} departure town preserves EVENT 99 rewards`
         );
         assert.deepEqual(
             finalQuestState.completedQuestIds,
-            completedQuestIds,
-            `episode ${episode} departure town final patch excludes raid quest completion`
+            [...completedQuestIds, scenario.questId, FIRST_SURVIVAL_QUEST_ID],
+            `episode ${episode} departure town preserves completed objectives`
         );
     }
 });
@@ -2544,7 +2585,7 @@ test('server-authoritative SCENECLEAR field events complete scenario objectives'
     assert.equal(history[0]?.extractionTownId, 'w_forest_village');
 });
 
-test('server-authoritative field scenario gold rewards are lost on failed raids', () => {
+test('server-authoritative field scenario gold rewards are retained after defeat', () => {
     const session = new WorldSession();
     const world = new WorldMap();
     const completedQuestIds = STORY_SCENARIOS
@@ -2599,10 +2640,10 @@ test('server-authoritative field scenario gold rewards are lost on failed raids'
     assert.ok(leave.replies[0]?.type === 'RAID_RESULT' && leave.replies[0].failure);
     assert.equal(leave.replies[0]?.type === 'RAID_RESULT'
         ? leave.replies[0].failure?.recoveryBackpack
-        : undefined, 3);
+        : undefined, 0);
     const finalPatch = session.createCharacterSavePatch(joined.playerId);
     assert.ok(finalPatch?.questState);
-    assert.equal(finalPatch.questState.gold, 500);
+    assert.equal(finalPatch.questState.gold, 500 + event.rewards!.filter((reward) => reward.type === 'gold').reduce((sum, reward) => sum + reward.amount, 0));
 });
 
 test('server-authoritative field scenario item rewards reject full save storage without completing the event', () => {

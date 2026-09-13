@@ -41,6 +41,8 @@ import { SettingsManager } from '../SettingsManager';
 type WorldPresentationFieldHit = FieldHit<FieldHitParty, Enemy, LootObject>;
 
 export interface WorldEnginePresentationControllerPorts {
+    tryTravel?: (tile: TilePoint) => boolean;
+    stopTravel?: () => boolean;
     canvas: HTMLCanvasElement;
     party: PartyManager;
     playerData: PlayerData;
@@ -94,6 +96,8 @@ export interface WorldEnginePresentationControllers {
 }
 
 export interface WorldEnginePresentationControllerSources {
+    tryTravel?: (tile: TilePoint) => boolean;
+    stopTravel?: () => boolean;
     canvas: HTMLCanvasElement;
     ports: WorldEngineSharedControllerPorts;
     getUiState(): WorldEngineUiState;
@@ -126,6 +130,8 @@ export function createWorldEnginePresentationControllersFromSources(
     const worldControllers = sources.getWorldControllers();
 
     return createWorldEnginePresentationControllers({
+        tryTravel: sources.tryTravel,
+        stopTravel: sources.stopTravel,
         ...sources.ports,
         canvas: sources.canvas,
         entityInfoUI: uiState.entityInfoUI,
@@ -205,6 +211,8 @@ export function createWorldEnginePresentationControllers(
     });
 
     const inputController = new WorldInputController({
+        tryTravel: ports.tryTravel,
+        stopTravel: ports.stopTravel,
         actionMenuUI: ports.actionMenuUI,
         entityInfoUI: ports.entityInfoUI,
         magicController: ports.magicController,

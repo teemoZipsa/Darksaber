@@ -105,7 +105,7 @@ test('active raid recovery patch keeps raid inventory without completing surviva
 
     const interimPatch = saveState.createPatch(player, player.id, 'central_castle');
     assert.ok(interimPatch);
-    assert.equal(interimPatch.inventory?.items.some((item) => item.itemId === 'herb_cheap' && item.gridX === 4), false);
+    assert.equal(interimPatch.inventory?.items.some((item) => item.itemId === 'herb_cheap' && item.gridX === 4), true);
     assert.equal(interimPatch.questState?.gold, 500);
     assert.deepEqual(interimPatch.questState?.completedQuestIds, []);
 
@@ -120,7 +120,7 @@ test('active raid recovery patch keeps raid inventory without completing surviva
     assert.equal(Array.isArray(recoveryPatch.questState?.storyCompanionIds), false);
 });
 
-test('failed final world save patch still drops raid inventory after recovery snapshots', () => {
+test('failed final world save patch preserves raid inventory after recovery snapshots', () => {
     const save = createDefaultCharacterSave(authCharacter('hero-failed-recovery'));
     save.inventory.items.push({
         itemId: 'herb_cheap',
@@ -144,10 +144,10 @@ test('failed final world save patch still drops raid inventory after recovery sn
     saveState.captureFinalPatch(player, 'central_castle', false);
     const finalPatch = saveState.consumeFinalPatch(player.id);
     assert.ok(finalPatch);
-    assert.equal(finalPatch.inventory?.items.some((item) => item.itemId === 'herb_cheap' && item.gridX === 4), false);
+    assert.equal(finalPatch.inventory?.items.some((item) => item.itemId === 'herb_cheap' && item.gridX === 4), true);
 });
 
-test('failed final world save patch authoritatively applies backpack loss, equipment loss, insurance, and recovery', () => {
+test('failed final world save patch preserves the backpack and all party equipment without replacement items', () => {
     const save = createDefaultCharacterSave(authCharacter('hero-failed-authoritative'));
     save.questState = { ...save.questState, raidInsuranceActive: true };
     save.partySnapshot = { activeCharacterIds: ['hero-failed-authoritative', 'companion-a'] };
@@ -181,21 +181,20 @@ test('failed final world save patch authoritatively applies backpack loss, equip
 
     assert.ok(summary);
     assert.ok(finalPatch?.inventory);
-    assert.equal(summary.backpackLost.reduce((total, item) => total + item.quantity, 0), 3);
-    assert.equal(summary.equipmentLost.length, 1);
-    assert.ok(summary.protectedEquipment);
-    assert.equal(summary.recoveryBackpack, 3);
-    assert.ok(summary.recoveryEquipped >= 1);
+    assert.equal(summary.backpackLost.reduce((total, item) => total + item.quantity, 0), 0);
+    assert.equal(summary.equipmentLost.length, 0);
+    assert.equal(summary.protectedEquipment, undefined);
+    assert.equal(summary.recoveryBackpack, 0);
+    assert.equal(summary.recoveryEquipped, 0);
     assert.deepEqual(finalPatch.inventory.items.map((item) => [item.itemId, item.quantity]), [
         ['herb_cheap', 2],
         ['mp_potion', 1],
     ]);
-    assert.equal(finalPatch.questState?.raidInsuranceActive, false);
+    assert.equal(finalPatch.questState?.raidInsuranceActive, true);
     const roster = finalPatch.rosterSnapshot?.characters as Array<Record<string, unknown>>;
     const primary = roster.find((entry) => entry.id === 'hero-failed-authoritative');
     const companion = roster.find((entry) => entry.id === 'companion-a');
-    assert.ok((primary?.equipment as Record<string, unknown>).weapon);
-    assert.ok((primary?.equipment as Record<string, unknown>).body);
+    assert.deepEqual(primary?.equipment, (save.rosterSnapshot.characters as Array<Record<string, unknown>>)[0].equipment);
     assert.ok((companion?.equipment as Record<string, unknown>).weapon);
     assert.ok((companion?.equipment as Record<string, unknown>).body);
 });

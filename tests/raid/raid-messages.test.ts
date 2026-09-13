@@ -11,14 +11,14 @@ test('raid route messages localize town IDs in Korean and English', () => {
         assert.equal(formatTownName('central_castle'), '카오시아');
         assert.equal(
             formatRaidBannerSubtitle('central_castle', { id: 'night_raid' }),
-            '야간 출격  |  카오시아  →  다른 마을 생환',
+            '야간 출격  |  카오시아 주변 탐험 · 어느 마을로든 귀환',
         );
 
         i18n.lang = 'en';
         assert.equal(formatTownName('central_castle'), 'Kaosia');
         assert.equal(
             formatRaidBannerSubtitle('central_castle'),
-            'Kaosia  →  extract to another town',
+            'Explore near Kaosia · Return to any town',
         );
     } finally {
         i18n.lang = previousLanguage;

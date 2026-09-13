@@ -38,7 +38,7 @@ See `docs/monster-balance.md` for the detailed model and tests.
 - `WorldStoryScenarioController` owns story dungeon arrival, local story-interior entry/exit, network scenario entry state, outdoor story field-event presentation, and story objective completion.
 - `WorldNetworkSyncController` owns client-side network snapshot application, network combat event presentation, network loot grants, and pending network move/loot state.
 - `WorldTutorialController` owns intro tutorial state, training map setup/teardown, tutorial action gating, and tutorial HUD rendering.
-- `WorldRaidLifecycleController` owns town entry, network raid deploy/resume, network raid result handling, raid timer expiry, and extraction-town arrival checks.
+- `WorldRaidLifecycleController` owns town entry, network raid deploy/resume, network raid result handling, elapsed exploration time, and arrival at any town (including the departure town).
 - `WorldTempleController` owns fusion temple arrival, fusion callbacks, master-world entry, and mortal-world return flow.
 - `WorldRestingController` owns field resting recovery timers, periodic HP/MP recovery, and damage-based rest interruption.
 - `WorldLootController` owns enemy loot creation, local/network loot opening, inventory loot-secured callbacks, and opened-loot refresh.

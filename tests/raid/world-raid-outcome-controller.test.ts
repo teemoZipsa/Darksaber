@@ -159,7 +159,7 @@ test('raid outcome logs use localized dynamic town and reward item names', () =>
 
         controller.completeSuccess(DESTINATION_TOWN);
 
-        assert.ok(logs.some((line) => line === 'Extracted safely to Forest Village.'));
+        assert.ok(logs.some((line) => line === 'Returned to Forest Village.'));
         assert.ok(getOutcome()?.questRewards?.some((line) => line === 'Item gained: Bomb'));
         assert.equal(getOutcome()?.questRewards?.some((line) => line.includes('폭탄')), false);
     } finally {
@@ -180,7 +180,7 @@ test('completed episode 1 does not grant duplicate story rewards', () => {
     assert.deepEqual(getOutcome()?.questRewards ?? [], []);
 });
 
-test('raid gold rewards are secured only after survival', () => {
+test('raid gold rewards are retained on both return and defeat', () => {
     const survived = createController();
     survived.raidSession.beginRaidFromTown('central_castle');
     survived.raidSession.addRaidGoldReward(300);
@@ -199,9 +199,9 @@ test('raid gold rewards are secured only after survival', () => {
 
     failed.controller.completeFailure('DEAD');
 
-    assert.equal(failed.playerData.gold, 500);
+    assert.equal(failed.playerData.gold, 800);
     assert.equal(failed.raidSession.raidGoldReward, 0);
-    assert.equal(failed.getOutcome()?.goldReward, undefined);
+    assert.equal(failed.getOutcome()?.goldReward, 300);
     assert.equal(failed.playerData.raidHistory[0]?.result, 'DEAD');
 });
 
@@ -237,19 +237,19 @@ test('raid result clears story scenario runtime state before town placement', ()
     assert.deepEqual(failed.calls, ['resetStoryScenarioStateForRaidEnd', 'placePartyAtTown']);
 });
 
-test('Burgos objective does not grant episode 1 reward on raid failure', () => {
+test('Burgos objective retains episode 1 reward on raid failure', () => {
     const { controller, playerData, raidSession, getOutcome } = createController();
     raidSession.beginRaidFromTown('central_castle');
     markBurgosObjectiveComplete(raidSession);
 
     controller.completeFailure('DEAD');
 
-    assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_01_ID), false);
-    assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), false);
-    assert.equal(getOutcome()?.questRewards, undefined);
+    assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_01_ID), true);
+    assert.equal(playerData.hasQuestItem(QUEST_BOMB_ITEM_ID), true);
+    assert.ok(getOutcome()?.questRewards?.length);
 });
 
-test('raid failure grants a basic recovery set instead of leaving the party empty', () => {
+test('raid failure does not generate replacement items on repeated defeats', () => {
     const { controller, raidSession, party, gameManager, getOutcome } = createController();
     const hero = new Character('hero', 'Hero', 'infantry');
     party.addToRoster(hero);
@@ -257,15 +257,45 @@ test('raid failure grants a basic recovery set instead of leaving the party empt
     raidSession.beginRaidFromTown('central_castle');
 
     controller.completeFailure('DEAD');
+    raidSession.beginRaidFromTown('central_castle');
+    controller.completeFailure('DEAD');
 
-    assert.equal(hero.equipment.get('weapon')?.item.id, 'short_sword');
+    assert.equal(hero.equipment.get('weapon')?.item.id, undefined);
     assert.equal(hero.equipment.has('shield'), false);
-    assert.equal(hero.equipment.get('body')?.item.id, 'battle_t1_body');
+    assert.equal(hero.equipment.get('body')?.item.id, undefined);
     assert.deepEqual(
         gameManager.inventory.items.map((placed) => [placed.item.id, placed.quantity]),
-        [['herb_cheap', 2], ['mp_potion', 1]]
+        []
     );
-    assert.ok(getOutcome()?.notes?.some((note) => note.includes('기본 보급품 지급')));
+    assert.deepEqual(getOutcome()?.equipmentLost, []);
+});
+
+test('all local returns preserve stacks, sockets, durability and existing stash contents in place', () => {
+    for (const result of ['SURVIVED', 'DEAD', 'MIA', 'LEFT'] as const) {
+        const { controller, raidSession, gameManager, getOutcome } = createController();
+        const herb = getItemDef('herb_cheap')!;
+        const stashHerbs = gameManager.stash.autoPlace(herb)!;
+        stashHerbs.quantity = 11;
+        const bagHerbs = gameManager.inventory.autoPlace(herb)!;
+        bagHerbs.quantity = 3;
+        bagHerbs.acquiredInRaid = true;
+        const sword = gameManager.inventory.autoPlace(getItemDef('short_sword')!)!;
+        sword.durability = 17;
+        sword.sockets = [getItemDef('gem_chipped_ruby')!];
+        sword.acquiredInRaid = true;
+        raidSession.beginRaidFromTown('central_castle');
+        if (result === 'SURVIVED') controller.completeSuccess(DESTINATION_TOWN);
+        else controller.completeFailure(result);
+        assert.equal(gameManager.stash.items[0], stashHerbs);
+        assert.equal(stashHerbs.quantity, 11);
+        assert.ok(gameManager.inventory.items.includes(bagHerbs));
+        assert.equal(bagHerbs.quantity, 3);
+        assert.equal(sword.durability, 17);
+        assert.equal(sword.sockets[0].id, 'gem_chipped_ruby');
+        assert.equal(sword.acquiredInRaid, false);
+        assert.equal(getOutcome()?.secured.reduce((sum, item) => sum + item.quantity, 0), 4);
+        assert.deepEqual(getOutcome()?.lost, []);
+    }
 });
 
 test('server-authoritative raid failure does not duplicate local loss or recovery items', () => {
@@ -302,13 +332,13 @@ test('server-authoritative raid failure does not duplicate local loss or recover
     assert.equal(hero.equipment.get('weapon')?.item.id, 'short_sword');
     assert.equal(hero.equipment.has('body'), false);
     assert.equal(playerData.raidInsuranceActive, true);
-    assert.deepEqual(getOutcome()?.lost.map((item) => [item.id, item.quantity]), [['herb_cheap', 2]]);
-    assert.deepEqual(getOutcome()?.equipmentLost.map((item) => item.item.id), ['short_sword']);
-    assert.ok(getOutcome()?.notes?.some((note) => note.includes('서버가 출격 배낭과 장비 손실을 확정')));
-    assert.ok(getOutcome()?.notes?.some((note) => note.includes('기본 보급품 지급')));
+    assert.deepEqual(getOutcome()?.lost.map((item) => [item.id, item.quantity]), []);
+    assert.deepEqual(getOutcome()?.equipmentLost.map((item) => item.item.id), []);
+    assert.ok(getOutcome()?.notes?.some((note) => note.includes('보존')));
+
 });
 
-test('raid insurance protects one equipment loss and is consumed on failure', () => {
+test('all equipment is retained regardless of legacy insurance', () => {
     const { controller, playerData, raidSession, party, getOutcome } = createController();
     const hero = new Character('hero', 'Hero', 'infantry');
     const ally = new Character('ally', 'Ally', 'infantry');
@@ -328,9 +358,10 @@ test('raid insurance protects one equipment loss and is consumed on failure', ()
     controller.completeFailure('DEAD');
 
     const outcome = getOutcome();
-    assert.equal(playerData.raidInsuranceActive, false);
-    assert.equal(outcome?.equipmentLost.length, 1);
-    assert.ok(outcome?.notes?.some((note) => note.includes('보험 적용')));
+    assert.equal(playerData.raidInsuranceActive, true);
+    assert.equal(outcome?.equipmentLost.length, 0);
+    assert.equal(hero.equipment.get('weapon')?.item.id, 'short_sword');
+    assert.equal(ally.equipment.get('body')?.item.id, 'battle_t1_body');
 });
 
 test('Burgos field event items are preserved as quest items only after survival', () => {
@@ -363,7 +394,7 @@ test('Burgos result report marks Cain side objective complete when recovered', (
     assert.ok(getOutcome()?.missionReport?.lines.some((line) => line.text.includes('선택 목표 완료')));
 });
 
-test('Burgos field event items are not preserved on raid failure', () => {
+test('Burgos field event items are preserved on raid failure', () => {
     const { controller, playerData, raidSession, getOutcome } = createController();
     raidSession.beginRaidFromTown('central_castle');
     raidSession.setScenarioFlag(BURGOS_CASTLE_DUNGEON_ID, 'burgos_key');
@@ -371,9 +402,9 @@ test('Burgos field event items are not preserved on raid failure', () => {
 
     controller.completeFailure('DEAD');
 
-    assert.equal(playerData.hasQuestItem(BURGOS_KEY_ITEM_ID), false);
-    assert.equal(playerData.hasQuestItem(CAIN_NECKLACE_ITEM_ID), false);
-    assert.equal(getOutcome()?.questRewards, undefined);
+    assert.equal(playerData.hasQuestItem(BURGOS_KEY_ITEM_ID), true);
+    assert.equal(playerData.hasQuestItem(CAIN_NECKLACE_ITEM_ID), true);
+    assert.ok(getOutcome()?.questRewards?.length);
 });
 
 test('episode 2 quest is hidden until episode 1 is completed', () => {
@@ -439,7 +470,7 @@ test('completed episode 2 does not grant duplicate cleric companions', () => {
     assert.deepEqual(getOutcome()?.questRewards ?? [], []);
 });
 
-test('Zamora objective does not grant episode 2 reward on raid failure', () => {
+test('Zamora objective retains episode 2 reward on raid failure', () => {
     const { controller, playerData, raidSession, party, getOutcome } = createController();
     playerData.markCleared(MAIN_QUEST_EPISODE_01_ID);
     raidSession.beginRaidFromTown('central_castle');
@@ -447,10 +478,10 @@ test('Zamora objective does not grant episode 2 reward on raid failure', () => {
 
     controller.completeFailure('DEAD');
 
-    assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_02_ID), false);
-    assert.equal(playerData.hasStoryCompanion(STORY_CLERIC_EP02_ID), false);
-    assert.equal(party.getRoster().some((character) => character.id === STORY_CLERIC_EP02_ID), false);
-    assert.equal(getOutcome()?.questRewards, undefined);
+    assert.equal(playerData.isCleared(MAIN_QUEST_EPISODE_02_ID), true);
+    assert.equal(playerData.hasStoryCompanion(STORY_CLERIC_EP02_ID), true);
+    assert.equal(party.getRoster().some((character) => character.id === STORY_CLERIC_EP02_ID), true);
+    assert.ok(getOutcome()?.questRewards?.length);
 });
 
 test('episode 3 sacred sword falls back to stash when backpack is full', () => {
@@ -509,7 +540,7 @@ test('episode 3 sacred sword blocks quest completion when all reward storage is 
     assert.ok(getOutcome()?.questRewards?.some((line) => line.includes('보상 보관 공간 부족')));
 });
 
-test('episode 31 objective grants final implemented quest completion only after survival', () => {
+test('episode 31 objective grants final implemented quest completion on both return and defeat', () => {
     const { controller, playerData, raidSession, getOutcome } = createController();
     const episode31 = STORY_QUESTS.find((quest) => quest.episode === 31);
     assert.ok(episode31);
@@ -535,8 +566,8 @@ test('episode 31 objective grants final implemented quest completion only after 
 
     failed.controller.completeFailure('DEAD');
 
-    assert.equal(failed.playerData.isCleared(episode31.id), false);
-    assert.equal(failed.getOutcome()?.questRewards, undefined);
+    assert.equal(failed.playerData.isCleared(episode31.id), true);
+    assert.ok(failed.getOutcome()?.questRewards?.length);
 });
 
 test('episode 31 objective cannot bypass story quest prerequisites at raid result', () => {
@@ -587,7 +618,7 @@ test('story quest views show objective complete before extraction through episod
     }
 });
 
-test('story objectives 1 through 31 do not grant completion or rewards on raid failure', () => {
+test('story objectives 1 through 31 retain completion or rewards on raid failure', () => {
     for (const quest of STORY_QUESTS) {
         const { controller, playerData, raidSession, getOutcome } = createController();
         for (const previousQuest of STORY_QUESTS.filter((candidate) => candidate.episode < quest.episode)) {
@@ -604,14 +635,14 @@ test('story objectives 1 through 31 do not grant completion or rewards on raid f
 
         controller.completeFailure('DEAD');
 
-        assert.equal(playerData.isCleared(quest.id), false, `episode ${quest.episode} failed completion`);
+        assert.equal(playerData.isCleared(quest.id), true, `episode ${quest.episode} failed completion`);
         if (quest.reward.type !== 'none') {
-            assert.equal(isStoryRewardOwned(quest.reward, playerData), false, `episode ${quest.episode} failed reward ownership`);
+            assert.equal(isStoryRewardOwned(quest.reward, playerData), true, `episode ${quest.episode} failed reward ownership`);
         }
-        assert.equal(getOutcome()?.questRewards, undefined, `episode ${quest.episode} failed reward lines`);
+        assert.ok(getOutcome()?.questRewards?.length, `episode ${quest.episode} retained reward lines`);
         assert.equal(
             getStoryQuestViews(playerData, null).find((view) => view.quest.id === quest.id)?.status,
-            'active',
+            'completed',
             `episode ${quest.episode} remains active after failure`
         );
 
@@ -619,7 +650,7 @@ test('story objectives 1 through 31 do not grant completion or rewards on raid f
         if (nextQuest) {
             assert.equal(
                 getStoryQuestViews(playerData, null).some((view) => view.quest.id === nextQuest.id),
-                false,
+                true,
                 `episode ${quest.episode} failure does not unlock episode ${nextQuest.episode}`
             );
         }

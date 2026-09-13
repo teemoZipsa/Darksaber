@@ -7,7 +7,9 @@ test('GDD states the current implemented product contract', () => {
     const gdd = readFileSync('docs/GDD.md', 'utf8');
 
     assert.equal(ALL_BASE_CLASS_LINES.length, 12);
-    assert.match(gdd, /As-built baseline.*2026-08-28/);
+    assert.match(gdd, /As-built baseline.*2026-09-13/);
+    assert.match(gdd, /탐험에는 시간 제한이 없다/);
+    assert.match(gdd, /사망·연결 종료·중도 귀환에도 보존/);
     assert.match(gdd, /기본 직업 계열은 12개/);
     assert.match(gdd, /메인 시나리오 1~31화/);
     assert.match(gdd, /최근 출격 20건/);

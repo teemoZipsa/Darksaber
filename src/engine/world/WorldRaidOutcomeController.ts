@@ -3,7 +3,6 @@ import { Character } from '../../character/Character';
 import { getItemDef, type ItemDef } from '../../data/ItemDB';
 import type { PlayerData } from '../../data/PlayerData';
 import { GridInventory, type PlacedItem } from '../../inventory/GridInventory';
-import { getStarterBodyArmorId, STARTER_CONSUMABLE_ITEM_IDS, STARTER_WEAPON_ITEM_ID } from '../../data/StarterKitData';
 import { STORY_SCENARIO_EVENT_SEQUENCES } from '../../data/StoryScenarioEventData';
 import {
     CAIN_NECKLACE_ITEM_ID,
@@ -19,18 +18,14 @@ import { t, formatT, i18n } from '../../i18n/LanguageManager';
 import { formatItemName } from '../../i18n/DisplayNames';
 import type { TownInfo } from '../../map/BiomeMask';
 import {
-    computeRaidFailureLoss,
     mergeSnapshots,
     type HeroRaidStatus,
     type RaidOutcome,
     type RaidOutcomeMissionReport,
     type RaidResultType,
-    type RaidLossPlan,
-    type EquipmentLoss,
-    snapshotItem,
+    type ItemSnapshot,
     snapshotPlacedItem,
 } from '../../raid/RaidOutcome';
-import { applyRaidInsurance } from '../../raid/RaidInsurance';
 import { createLocalRaidHistoryEntry } from '../../raid/RaidHistory';
 import { RaidResultUI } from '../../ui/RaidResultUI';
 import { FIRST_SURVIVAL_GOLD_REWARD, FIRST_SURVIVAL_QUEST_ID } from '../../shared/FirstSurvivalReward';
@@ -79,6 +74,7 @@ export interface CompleteSuccessOptions {
      * first-survival bonus the client no longer credits.
      */
     displayGoldReward?: number;
+    displaySecured?: ItemSnapshot[];
     /**
      * Whether the server granted the one-time first-survival bonus this raid.
      * Used only with {@link serverAuthoritativeRewards} to itemize the bonus on
@@ -90,12 +86,13 @@ export interface CompleteSuccessOptions {
 
 export interface CompleteFailureOptions {
     /**
-     * The world server has already committed the failed raid state and the
-     * client has reloaded it. Do not apply the local-only loss/recovery pass a
-     * second time, or the next hub save will look like free item creation.
+     * The world server has already committed this return and the client has
+     * reloaded it. Display the result without granting the same rewards again.
      */
     serverAuthoritativeState?: boolean;
     serverFailure?: RaidFailureSummary;
+    displayGoldReward?: number;
+    displaySecured?: ItemSnapshot[];
 }
 
 export class WorldRaidOutcomeController {
@@ -137,7 +134,7 @@ export class WorldRaidOutcomeController {
                 ? formatT('bounty.bonusCompleted', { gold: options.bounty.bonusReward })
                 : t('bounty.bonusFailed'));
         }
-        const secured = serverRewards ? this.snapshotRaidLootForDisplay() : this.secureRaidLoot();
+        const secured = serverRewards ? options.displaySecured ?? this.snapshotRaidLootForDisplay() : this.secureRaidLoot();
         const episode1WasCleared = this.context.playerData.isCleared(MAIN_QUEST_EPISODE_01_ID);
         const burgosObjectiveCleared = raidSession.isDungeonCleared(BURGOS_CASTLE_DUNGEON_ID);
         const raidGoldReward = raidSession.consumeRaidGoldReward();
@@ -235,29 +232,14 @@ export class WorldRaidOutcomeController {
 
         const heroStatuses = this.createHeroStatuses();
         const serverAuthoritativeState = options.serverAuthoritativeState === true;
-        const insuranceActive = !serverAuthoritativeState && this.context.playerData.raidInsuranceActive;
-        const insurance = serverAuthoritativeState
-            ? this.mapServerFailure(options.serverFailure)
-            : applyRaidInsurance(
-                computeRaidFailureLoss(this.context.gameManager.inventory.items, this.context.party.getCharacters()),
-                insuranceActive
-            );
-        const loss = insurance.loss;
-        let recoveryNotes: string[] = [];
-        if (!serverAuthoritativeState) {
-            if (insuranceActive) this.context.playerData.raidInsuranceActive = false;
-            this.context.gameManager.inventory.clear();
-            for (const lost of loss.equipmentLost) {
-                const character = this.context.party.getCharacters().find((candidate) => candidate.id === lost.characterId);
-                character?.unequip(lost.slot);
-            }
-            recoveryNotes = this.applyRaidFailureRecoveryKit();
-        } else if (options.serverFailure && (options.serverFailure.recoveryEquipped > 0 || options.serverFailure.recoveryBackpack > 0)) {
-            recoveryNotes = [formatT('raid.outcome.recoveryKit', {
-                equipped: options.serverFailure.recoveryEquipped,
-                backpack: options.serverFailure.recoveryBackpack,
-            })];
-        }
+        const bountyRewards = serverAuthoritativeState ? [] : this.settleLocalBounty();
+        const secured = serverAuthoritativeState ? options.displaySecured ?? this.snapshotRaidLootForDisplay() : this.secureRaidLoot();
+        const questRewards = serverAuthoritativeState ? [] : [
+            ...bountyRewards, ...this.completeScenarioRuntimeQuestItems(), ...this.completeStoryQuestRewards(),
+        ];
+        const earnedGold = raidSession.consumeRaidGoldReward();
+        const goldReward = serverAuthoritativeState ? options.displayGoldReward ?? earnedGold : earnedGold;
+        if (!serverAuthoritativeState && goldReward > 0) this.context.playerData.addGold(goldReward);
 
         const returnTown = this.context.getTownById(raidSession.departureTownId) ?? this.context.getCurrentHubTown();
         raidSession.failBackToTown(returnTown.id);
@@ -272,21 +254,13 @@ export class WorldRaidOutcomeController {
             departureTownId: raidSession.departureTownId,
             extractionTownId: returnTown.id,
             heroStatuses,
-            looted: [],
-            secured: [],
-            lost: mergeSnapshots(loss.backpackLost),
-            equipmentLost: loss.equipmentLost,
-            notes: [
-                result === 'MIA' ? t('raid.outcome.miaNote') : t('raid.outcome.deadNote'),
-                ...(serverAuthoritativeState ? [t('raid.outcome.serverFailureState')] : []),
-                ...(insurance.protectedEquipment
-                    ? [formatT('insurance.protectedNote', {
-                        character: insurance.protectedEquipment.characterName,
-                        item: displayItemName(getItemDef(insurance.protectedEquipment.item.id), insurance.protectedEquipment.item.id),
-                    })]
-                    : insuranceActive ? [t('insurance.noEquipmentProtected')] : []),
-                ...recoveryNotes,
-            ],
+            looted: secured,
+            secured,
+            lost: [],
+            equipmentLost: [],
+            goldReward,
+            questRewards,
+            notes: [t('field.expedition.kept')],
         };
         if (!serverAuthoritativeState) {
             this.context.playerData.addRaidHistoryEntry(createLocalRaidHistoryEntry(outcome));
@@ -296,80 +270,7 @@ export class WorldRaidOutcomeController {
         this.context.resetStoryScenarioStateForRaidEnd();
         this.context.placePartyAtTown(returnTown);
         this.showRaidResult(outcome, returnTown);
-        this.context.log(result === 'MIA' ? t('raid.outcome.miaLog') : t('raid.outcome.deadLog'));
-        if (recoveryNotes.length > 0) this.context.log(t('raid.outcome.recoveryGranted'));
-    }
-
-    private mapServerFailure(summary?: RaidFailureSummary): { loss: RaidLossPlan; protectedEquipment: EquipmentLoss | null } {
-        if (!summary) return { loss: { backpackLost: [], equipmentLost: [] }, protectedEquipment: null };
-        const equipmentLost = summary.equipmentLost.flatMap((entry): EquipmentLoss[] => {
-            const item = getItemDef(entry.itemId);
-            return item ? [{
-                characterId: entry.characterId,
-                characterName: entry.characterName,
-                slot: entry.slot,
-                item: snapshotItem(item, entry.quantity),
-            }] : [];
-        });
-        const protectedEquipment = summary.protectedEquipment
-            ? (() => {
-                const item = getItemDef(summary.protectedEquipment.itemId);
-                return item ? {
-                    characterId: summary.protectedEquipment.characterId,
-                    characterName: summary.protectedEquipment.characterName,
-                    slot: summary.protectedEquipment.slot,
-                    item: snapshotItem(item, summary.protectedEquipment.quantity),
-                } : null;
-            })()
-            : null;
-        return {
-            loss: {
-                backpackLost: summary.backpackLost.flatMap((entry) => {
-                    const item = getItemDef(entry.itemId);
-                    return item ? [snapshotItem(item, entry.quantity)] : [];
-                }),
-                equipmentLost,
-            },
-            protectedEquipment,
-        };
-    }
-
-    private applyRaidFailureRecoveryKit(): string[] {
-        let equippedCount = 0;
-        for (const character of this.context.party.getCharacters()) {
-            equippedCount += this.equipRecoveryItemIfEmpty(character, STARTER_WEAPON_ITEM_ID) ? 1 : 0;
-            equippedCount += this.equipRecoveryItemIfEmpty(character, this.getRecoveryBodyArmorId(character)) ? 1 : 0;
-        }
-
-        let backpackCount = 0;
-        for (const itemId of STARTER_CONSUMABLE_ITEM_IDS) {
-            const item = getItemDef(itemId);
-            if (item && this.context.gameManager.inventory.autoPlace(item)) backpackCount += 1;
-        }
-
-        if (equippedCount === 0 && backpackCount === 0) return [];
-        return [formatT('raid.outcome.recoveryKit', { equipped: equippedCount, backpack: backpackCount })];
-    }
-
-    private equipRecoveryItemIfEmpty(character: Character, itemId: string): boolean {
-        const item = getItemDef(itemId);
-        if (!item || item.slot === 'consumable' || character.equipment.has(item.slot)) return false;
-        character.equip(this.createRecoveryPlacedItem(item));
-        return true;
-    }
-
-    private getRecoveryBodyArmorId(character: Character): string {
-        return getStarterBodyArmorId(character.classLineId);
-    }
-
-    private createRecoveryPlacedItem(item: ItemDef): PlacedItem {
-        return {
-            item,
-            gridX: 0,
-            gridY: 0,
-            durability: item.maxDurability,
-            quantity: 1,
-        };
+        this.context.log(result === 'LEFT' ? t('field.expedition.return') : result === 'MIA' ? t('raid.outcome.miaLog') : t('raid.outcome.deadLog'));
     }
 
     private completeStoryQuestRewards(): string[] {
@@ -537,27 +438,16 @@ export class WorldRaidOutcomeController {
         );
         const secured = mergeSnapshots([...backpackSecured, ...equippedSecured].map(snapshotPlacedItem));
 
-        for (const placed of backpackSecured) {
-            const moved = this.context.gameManager.stash.autoPlace(placed.item);
-            if (moved) {
-                moved.durability = placed.durability;
-                moved.quantity = placed.quantity;
-                moved.sockets = placed.sockets;
-                moved.acquiredInRaid = false;
-                this.context.gameManager.inventory.remove(placed);
-            } else {
-                placed.acquiredInRaid = false;
-            }
-        }
-        for (const placed of equippedSecured) {
+        // Keep items in their existing slots, including stack quantities and sockets.
+        for (const placed of [...backpackSecured, ...equippedSecured]) {
             placed.acquiredInRaid = false;
         }
 
         return secured;
     }
 
-    /** Display-only loot snapshot after server sync; do not move items locally. */
-    private snapshotRaidLootForDisplay() {
+    /** Capture confirmed local loot for the result before server sync clears acquisition flags. */
+    public snapshotRaidLootForDisplay() {
         const backpackSecured = [...this.context.gameManager.inventory.items].filter((placed) => placed.acquiredInRaid);
         const equippedSecured = this.context.party.getCharacters().flatMap((character) =>
             [...character.equipment.values()].filter((placed) => placed.acquiredInRaid)

@@ -264,6 +264,7 @@ export class WorldRaidLifecycleController {
 
     private async finishNetworkRaidResult(result: RaidResultMessage): Promise<void> {
         const goldBeforeSync = this.context.playerData.gold;
+        const displaySecured = this.context.raidOutcomeController.snapshotRaidLootForDisplay();
         const syncResult = await this.context.gameManager.syncHubSaveFromServer();
         this.context.gameManager.setHubFlushEnabled(true);
         if (!syncResult.ok) {
@@ -277,17 +278,17 @@ export class WorldRaidLifecycleController {
             this.context.raidOutcomeController.completeSuccess(town, {
                 serverAuthoritativeRewards: true,
                 displayGoldReward,
+                displaySecured,
                 firstSurvivalBonus: result.firstSurvivalBonusGranted === true,
                 bounty: result.bounty,
             });
-        } else if (result.result === 'DEAD' || result.result === 'MIA') {
+        } else {
             this.context.raidOutcomeController.completeFailure(result.result, {
                 serverAuthoritativeState: syncResult.ok,
                 serverFailure: result.failure,
+                displaySecured,
+                displayGoldReward: syncResult.ok ? Math.max(0, this.context.playerData.gold - goldBeforeSync) : undefined,
             });
-        } else {
-            this.context.raidSession.failBackToTown(this.context.raidSession.currentHubTownId);
-            this.openTown(this.context.getCurrentHubTown());
         }
     }
 
@@ -301,12 +302,18 @@ export class WorldRaidLifecycleController {
     }
 
     private async finishGraceExpiredRaid(): Promise<void> {
+        const goldBeforeSync = this.context.playerData.gold;
+        const displaySecured = this.context.raidOutcomeController.snapshotRaidLootForDisplay();
         const syncResult = await this.context.gameManager.syncHubSaveFromServer();
         this.context.gameManager.setHubFlushEnabled(true);
         if (!syncResult.ok) {
             this.context.log(formatT('mp.hubSaveSyncFailed', { message: syncResult.message ?? syncResult.code ?? 'unknown' }));
         }
-        this.context.raidOutcomeController.completeFailure('MIA');
+        this.context.raidOutcomeController.completeFailure('MIA', {
+            serverAuthoritativeState: syncResult.ok,
+            displaySecured,
+            displayGoldReward: syncResult.ok ? Math.max(0, this.context.playerData.gold - goldBeforeSync) : undefined,
+        });
     }
 
     public closeNetworkRaidClient(sendLeave: boolean, reason: 'town' | 'wipe' | 'manual' = 'manual'): void {

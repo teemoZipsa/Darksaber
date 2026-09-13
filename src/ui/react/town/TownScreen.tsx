@@ -6,7 +6,7 @@
  * React drives it through the store.
  */
 
-import { useEffect, useState, type CSSProperties } from 'react';
+import { type CSSProperties } from 'react';
 import { i18n, t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
@@ -40,14 +40,6 @@ export function TownScreen() {
     const deployPending = store.isTownDeployPending();
     const deployError = store.getTownDeployError();
     const hubSaveError = store.getHubSaveError();
-    const insurancePrice = store.getRaidInsurancePrice();
-    const insured = store.hasRaidInsurance();
-    const [insuranceFeedback, setInsuranceFeedback] = useState('');
-    useEffect(() => {
-        if (!insuranceFeedback) return undefined;
-        const id = window.setTimeout(() => setInsuranceFeedback(''), 2600);
-        return () => window.clearTimeout(id);
-    }, [insuranceFeedback]);
     if (!town) return null;
 
     const facilities = getTownFacilities(town.id);
@@ -69,12 +61,7 @@ export function TownScreen() {
         if (deployPending) return;
         if (store.townDeploy()) AudioManager.playSfx('sfx.deploy');
     };
-    const buyInsurance = () => {
-        if (insured || deployPending) return;
-        const ok = store.buyRaidInsurance();
-        AudioManager.playUi(ok ? 'ui.confirm' : 'ui.cancel');
-        setInsuranceFeedback(ok ? t('insurance.purchased') : t('insurance.noGold'));
-    };
+
 
     return (
         <div
@@ -129,26 +116,11 @@ export function TownScreen() {
                     </div>
                 )}
                 {deployError && <div className="ds-town__deploy-error" role="alert">{deployError}</div>}
-                {insuranceFeedback && (
-                    <div className="ds-town__insurance-feedback" role="status" aria-live="polite">
-                        {insuranceFeedback}
-                    </div>
-                )}
-                <button
-                    type="button"
-                    className={`ds-town__insurance${insured ? ' is-active' : ''}`}
-                    disabled={insured || deployPending}
-                    onClick={buyInsurance}
-                    title={t('insurance.tooltip')}
-                >
-                    ◈ {insured
-                        ? t('insurance.active')
-                        : `${t('insurance.buy')} ${insurancePrice}G`}
-                </button>
+                <span className="ds-town__field-rule">{t('field.expedition.rule')}</span>
                 <button
                     type="button"
                     className="ds-town__deploy"
-                    disabled={deployPending}
+                    disabled={!store.canTownDeploy()}
                     onClick={deploy}
                 >
                     ⚔️ {t(deployPending ? 'town.deploying' : 'town.deploy')}

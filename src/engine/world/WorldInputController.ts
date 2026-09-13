@@ -69,6 +69,8 @@ export interface WorldInputContext {
     getCombatLog: () => string[];
     isCombatPresentationBusy: () => boolean;
     onUnhandledEscape: () => void;
+    tryTravel?: (tile: TilePoint) => boolean;
+    stopTravel?: () => boolean;
 }
 
 export class WorldInputController {
@@ -81,6 +83,8 @@ export class WorldInputController {
     public process(input: InputManager, camera: Camera): void {
         const fieldHudInteractive = this.context.isFieldHudInteractive();
         const compactViewport = this.context.getViewportWidth() < ACTION_MENU_COMPACT_BREAKPOINT;
+        const compactPickerOpen = compactViewport
+            && (this.context.magicController.isVisible() || this.context.toolController.isVisible());
         const compactActionMenuRequested = compactViewport && this.context.actionMenuUI.getIsOpen();
         if (fieldHudInteractive && SettingsManager.isKeybindingJustPressed('world.minimap', input)) {
             if (compactActionMenuRequested) {
@@ -113,6 +117,7 @@ export class WorldInputController {
         if (
             fieldHudInteractive
             && !compactActionMenuRequested
+            && !compactPickerOpen
             && input.mouseJustDown
             && this.context.minimapUI.onClick(input.uiMouseX, input.uiMouseY)
         ) {
@@ -139,7 +144,7 @@ export class WorldInputController {
             return;
         }
 
-        if (fieldHudInteractive && input.mouseJustDown && this.context.selectionController.hasSelection()) {
+        if (fieldHudInteractive && !compactPickerOpen && input.mouseJustDown && this.context.selectionController.hasSelection()) {
             const entityInfoHit = this.context.entityInfoUI.hitTest(input.uiMouseX, input.uiMouseY);
             if (entityInfoHit === 'close') {
                 this.context.selectionController.clear();
@@ -204,6 +209,8 @@ export class WorldInputController {
             return;
         }
 
+        if ((input.justPressed('Escape') || input.mouseRightJustDown || input.justPressed('Space'))
+            && this.context.stopTravel?.()) return;
         if (this.isInputLockedByReservation()) return;
         if (input.justPressed('Space') && this.context.getActivePartyTurnActor()) {
             this.context.dismissActionMenuTurn();
@@ -246,6 +253,10 @@ export class WorldInputController {
 
     private handleFieldClick(tile: TilePoint, input: InputManager, camera: Camera): void {
         const hit = this.context.resolveFieldHitAt(tile);
+
+        if (!this.context.playerActionController.getMode()
+            && hit.kind === 'ground' && this.context.tryTravel?.(tile)) return;
+        if (hit.kind !== 'ground') this.context.stopTravel?.();
 
         if (this.context.actionMenuUI.getIsOpen()) {
             if (this.handleActionMenuSlotClick(input, camera)) return;

@@ -15,16 +15,15 @@ export interface TownArrivalResult {
 }
 
 export function shouldAdvanceRaidTimer(gate: RaidTimerGate): boolean {
-    return gate.raidActive && !gate.townVisible && !gate.resultVisible && !gate.turnCombatActive;
+    return gate.raidActive && !gate.townVisible && !gate.resultVisible;
 }
 
 export function resolveTownArrival(
     townId: string | null | undefined,
-    departureTownId: string | null | undefined,
+    _departureTownId: string | null | undefined,
     raidActive: boolean
 ): TownArrivalResult {
     if (!raidActive || !townId) return { kind: 'none' };
-    if (townId === departureTownId) return { kind: 'departureBlocked', townId };
     return { kind: 'survived', townId };
 }
 

@@ -273,6 +273,10 @@ export class GameManager {
         return this.worldEngine.getRaidSession();
     }
 
+    public getFieldEngine(): WorldEngine | null {
+        return this.state === GameState.WORLD ? this.worldEngine ?? null : null;
+    }
+
     public beginLocalDevRaidFromTown(): boolean {
         if (this.state !== GameState.WORLD || !this.worldEngine) return false;
         return this.worldEngine.beginLocalDevRaidFromCurrentHub();
@@ -843,6 +847,7 @@ export class GameManager {
         AudioManager.playUi('ui.confirm');
         this.pauseMenu.close();
         if (this.state === GameState.WORLD && this.worldEngine) {
+            this.worldEngine.preserveLocalExploration();
             this.worldEngine.closeNetworkRaidClient(true, 'manual');
         }
         this.transitionTo(GameState.TITLE);

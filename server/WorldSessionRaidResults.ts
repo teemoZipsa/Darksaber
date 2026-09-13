@@ -33,7 +33,7 @@ export class WorldSessionRaidResults {
         const player = this.context.players.get(playerId);
         const extractionTownId = this.resolveExtractionTownId(player);
         const finalResult = this.coerceRaidResultForPlayer(result, player);
-        const bounty = player && finalResult === 'SURVIVED'
+        const bounty = player
             ? settleSurvivedBounty(player, this.context.saveState)
             : undefined;
         const message = this.createRaidResultMessage(playerId, finalResult, player, extractionTownId);
@@ -41,7 +41,7 @@ export class WorldSessionRaidResults {
         this.context.log(`raid result player=${playerId} result=${finalResult} kills=${message.kills} elapsed=${message.elapsedSeconds.toFixed(1)}`);
         if (player) {
             const survived = finalResult === 'SURVIVED';
-            let goldReward = 0;
+            let goldReward = player.raidGoldReward;
             if (survived) {
                 message.firstSurvivalBonusGranted = this.context.saveState.grantsFirstSurvivalBonus(player);
                 goldReward = player.raidGoldReward

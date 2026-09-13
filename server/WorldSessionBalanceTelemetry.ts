@@ -49,7 +49,7 @@ export function buildRaidBalanceTelemetry(
         engagementCount: state.engagementCount,
         engagementGapSecondsTotal: state.engagementGapSecondsTotal,
         lootItemsAcquired,
-        lootItemsSecured: result === 'SURVIVED' ? lootItemsAcquired : 0,
+        lootItemsSecured: lootItemsAcquired,
         killsByDangerBand: { ...state.killsByDangerBand },
         deathCause: result === 'DEAD'
             ? player.lastDamageCause ?? 'unknown'

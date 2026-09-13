@@ -711,7 +711,7 @@ test('Zamora local story interior plays original entry flow before Fenris object
     assert.equal(raidSession.isDungeonCleared(ZAMORA_FORTRESS_DUNGEON_ID), true);
     assert.equal(raidSession.hasScenarioFlag(ZAMORA_FORTRESS_DUNGEON_ID, 'princess_rescued'), true);
     assert.ok(harness.logs.includes('공주 구출'));
-    assert.ok(harness.logs.includes('자모라 요새 공주 구출 완료. 다른 마을로 생환하면 2화가 완료됩니다.'));
+    assert.ok(harness.logs.includes('자모라 요새 공주 구출 완료. 마을로 귀환하면 2화가 완료됩니다.'));
 });
 
 test('Etna local story interior maps original guard death events 400 through 470', () => {
@@ -1658,7 +1658,7 @@ test('Burgos boss defeat clears only the dungeon encounter, not raid success', (
     assert.equal(harness.selectionCleared, true);
     assert.equal(harness.turnStateCleared, true);
     assert.equal(raidSuccessShown, false);
-    assert.ok(harness.logs.includes('부르고스성 목표 달성. 다른 마을로 생환하면 1화가 완료됩니다.'));
+    assert.ok(harness.logs.includes('부르고스성 목표 달성. 마을로 귀환하면 1화가 완료됩니다.'));
 });
 
 test('Zamora Fenris defeat clears only the dungeon encounter, not raid success', () => {
@@ -1691,7 +1691,7 @@ test('Zamora Fenris defeat clears only the dungeon encounter, not raid success',
     assert.equal(harness.selectionCleared, true);
     assert.equal(harness.turnStateCleared, true);
     assert.equal(raidSuccessShown, false);
-    assert.ok(harness.logs.includes('자모라 요새 공주 구출 완료. 다른 마을로 생환하면 2화가 완료됩니다.'));
+    assert.ok(harness.logs.includes('자모라 요새 공주 구출 완료. 마을로 귀환하면 2화가 완료됩니다.'));
 });
 
 test('Etna Ganomas defeat plays original sword event and clears only the dungeon encounter', () => {
@@ -1725,7 +1725,7 @@ test('Etna Ganomas defeat plays original sword event and clears only the dungeon
     assert.equal(harness.turnStateCleared, true);
     assert.ok(harness.logs.includes("%S님이 전설의 보검'을 얻었습니다."));
     assert.ok(harness.logs.includes('시나리오 클리어'));
-    assert.ok(harness.logs.includes('에트나 화산 목표 달성. 다른 마을로 생환하면 3화가 완료됩니다.'));
+    assert.ok(harness.logs.includes('에트나 화산 목표 달성. 마을로 귀환하면 3화가 완료됩니다.'));
 });
 
 test('late story boss clear GETITEM rewards are granted on boss defeat', () => {
@@ -2196,7 +2196,7 @@ test('late story presentation steps focus the camera on original event tiles', (
     assert.deepEqual(harness.placedNear, { x: 0, y: 0 });
     assert.deepEqual(harness.cameraFocusTiles[harness.cameraFocusTiles.length - 1], { x: 22, y: 11 });
     assert.ok(harness.logs.includes('마계 해결사의 소굴 입구로 복귀했습니다.'));
-    assert.ok(harness.logs.includes('마계 해결사의 소굴 목표 달성. 다른 마을로 생환하면 31화가 완료됩니다.'));
+    assert.ok(harness.logs.includes('마계 해결사의 소굴 목표 달성. 마을로 귀환하면 31화가 완료됩니다.'));
     assert.ok(harness.cameraFollowed);
 });
 
@@ -2469,7 +2469,7 @@ test('Airship objective completion keeps variant monsters as optional encounters
     assert.equal(harness.fieldEnemies.length, 1);
     assert.equal(harness.selectionCleared, true);
     assert.equal(harness.turnStateCleared, true);
-    assert.ok(harness.logs.includes('비공정 목표 달성. 다른 마을로 생환하면 17화가 완료됩니다.'));
+    assert.ok(harness.logs.includes('비공정 목표 달성. 마을로 귀환하면 17화가 완료됩니다.'));
 });
 
 test('local Ament SCENECLEAR inspect events complete the scenario objective', () => {

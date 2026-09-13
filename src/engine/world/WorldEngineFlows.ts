@@ -76,6 +76,7 @@ export interface WorldEngineUpdateFlowSources {
 }
 
 export interface WorldEngineActionTurnFlowPorts {
+    shouldReopenActionMenu?: () => boolean;
     actionMenuUI: ActionMenuUI;
     tutorialController: WorldTutorialController;
     turnStateController: WorldTurnStateController;
@@ -180,6 +181,7 @@ export function createWorldEngineActionTurnFlow(ports: WorldEngineActionTurnFlow
         getActivePartyTurnActor: () => ports.getActivePartyTurnActor(),
         getSpendableActionGauge: () => ports.getSpendableActionGauge(),
         getActionMenuIsOpen: () => ports.actionMenuUI.getIsOpen(),
+        shouldReopenActionMenu: ports.shouldReopenActionMenu,
         openActionMenu: (states) => ports.actionMenuUI.open(states),
         updateActionMenuStates: (states) => ports.actionMenuUI.updateStates(states),
         closeActionMenu: () => ports.closeActionMenu(),

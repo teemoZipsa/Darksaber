@@ -19,6 +19,7 @@ export class WorldRaidSession {
     public currentHubTownId: string;
     public departureTownId: string;
     public elapsedSeconds = 0;
+    /** Legacy snapshot compatibility only; never used to end exploration. */
     public readonly limitSeconds: number;
     public active = false;
     public kills = 0;
@@ -77,10 +78,7 @@ export class WorldRaidSession {
     public advanceTimer(dt: number, gates: RaidTimerGates): RaidTimerAdvanceResult {
         if (!this.shouldAdvanceTimer(gates)) return { advanced: false, expired: false };
         this.elapsedSeconds += dt;
-        if (this.elapsedSeconds >= this.limitSeconds) {
-            this.elapsedSeconds = this.limitSeconds;
-            return { advanced: true, expired: true };
-        }
+        // Keep elapsed play time for history and timed quest bonuses; exploration never expires.
         return { advanced: true, expired: false };
     }
 

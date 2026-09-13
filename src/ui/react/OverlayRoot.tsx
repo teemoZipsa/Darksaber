@@ -1,8 +1,7 @@
 /**
  * OverlayRoot — top of the React DOM overlay tree.
  *
- * Renders nothing until a DOM-backed panel is open. For the pilot that is the
- * character panel; future panels each add their own open-flag branch here.
+ * Renders the non-modal field HUD during play and the active DOM panels.
  * Uses selectors for open flags so closed overlay branches do not re-render
  * unless a visible flag changes.
  */
@@ -17,6 +16,7 @@ import { CharacterCreation } from './charcreate/CharacterCreation';
 import { InventoryPanel } from './inventory/InventoryPanel';
 import { StoryJournalPanel } from './quest/StoryJournalPanel';
 import { MagicLoadoutPanel } from './magic/MagicLoadoutPanel';
+import { FieldHud } from './field/FieldHud';
 
 export function OverlayRoot() {
     const store = useStore();
@@ -32,6 +32,8 @@ export function OverlayRoot() {
 
     return (
         <>
+            {!charOpen && !pauseOpen && !settingsOpen && !partyOpen && !townOpen && !charCreateOpen
+                && !inventoryOpen && !questJournalOpen && !magicLoadoutOpen && <FieldHud />}
             {charOpen && (
                 <div className="ds-scrim" onClick={() => store.closeCharPanel()}>
                     <CharacterPanel />

@@ -1,7 +1,7 @@
 {
   "name": "darksaber",
   "version": "0.1.0",
-  "description": "Darksaber : Extraction — grid-based SRPG extraction RPG",
+  "description": "Darksaber — field exploration and character growth SRPG",
   "type": "module",
   "scripts": {
     "assets:pixellab": "node scripts/generate-pixellab-sprites.mjs",

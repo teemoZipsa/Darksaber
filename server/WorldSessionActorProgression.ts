@@ -44,7 +44,7 @@ export function awardWorldSessionEnemyExp(input: WorldSessionEnemyExpInput): num
     return expAward;
 }
 
-/** Local raids lose all accumulated EXP when a character is downed. */
+/** Preserve earned progression on defeat, including older saved actor snapshots. */
 export function resetWorldSessionActorExp(
     actor: ServerActor,
     player: ServerPlayer,
@@ -52,7 +52,7 @@ export function resetWorldSessionActorExp(
 ): void {
     const saved = readSavedProgression(player, actor.localActorId);
     if ((actor.exp ?? saved?.exp ?? 0) <= 0) return;
-    actor.exp = 0;
+    actor.exp = actor.exp ?? saved?.exp ?? 0;
     writeSavedProgression(player, actor, false);
     saveState.markDirty(player.id);
 }

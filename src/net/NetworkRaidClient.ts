@@ -320,10 +320,10 @@ export class NetworkRaidClient {
         return intentId;
     }
 
-    public leave(reason: WorldLeaveMessage['reason']): void {
+    public leave(reason: WorldLeaveMessage['reason'], waitForResult = false): void {
         const sent = this.send({ type: 'WORLD_LEAVE', reason });
         this.clearStoredResumeToken(this.joinInput?.characterId);
-        if (reason === 'manual' || !sent) this.close();
+        if ((reason === 'manual' && !waitForResult) || !sent) this.close();
     }
 
     public close(): void {

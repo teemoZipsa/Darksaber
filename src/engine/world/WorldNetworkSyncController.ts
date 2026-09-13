@@ -129,6 +129,8 @@ export class WorldNetworkSyncController {
         };
     }
 
+    public hasPendingMove(): boolean { return this.pendingMoveReopen !== null; }
+
     public addPendingLootPick(intentId: string, placed: PlacedItem, source: { gridX: number; gridY: number }, at: number = Date.now()): void {
         this.pendingLootPicks.set(intentId, { placed, source, at });
     }

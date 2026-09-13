@@ -19,3 +19,7 @@ Server-authoritative hub state (gold, backpack, stash, equipment, market) for au
 Manual smoke: town shop buy → refresh → gold/stash persist → deploy → raid survive → hub matches server.
 
 Network raid smoke: scenario gold field event → survive → gold must not double after result screen → redeploy.
+
+## Field restoration (2026-09-13)
+
+Exploration no longer expires or discards inventory/equipment/EXP on defeat or early return. Acquired items are included in intermediate world save patches. Final return patches preserve earned loot, completed objectives and gold for every result; only an actual town arrival grants the one-time first-return bonus. The result summary is captured before hub sync clears acquisition flags, and a successful reconnect-grace sync must not grant rewards again on the client.

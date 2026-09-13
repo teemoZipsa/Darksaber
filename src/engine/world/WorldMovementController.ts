@@ -60,6 +60,7 @@ export interface WorldMovementContext {
 }
 
 export interface PartyMovementInput {
+    exploring?: boolean;
     dt: number;
     controlled: FieldActor | null;
     activeTurnActorId: string | null;
@@ -93,13 +94,13 @@ export class WorldMovementController {
         const carryAtbMultiplier = this.context.getPartyCarryAtbMultiplier?.() ?? 1;
         const cursedAtbMultiplier = this.context.getPartyCursedAtbMultiplier?.() ?? 1;
         const raidAtbMultiplier = this.context.getPartyRaidAtbMultiplier?.() ?? 1;
-        const combatEngaged = input.activeTurnActorId !== null || this.context.getFieldEnemies().some((entry) => (
+        const combatEngaged = (!input.exploring && input.activeTurnActorId !== null) || this.context.getFieldEnemies().some((entry) => (
             entry.enemy.stats.hp > 0 && entry.enemy.isAggro
         ));
 
         for (const actor of this.context.getPartyActors()) {
             if (actor.character.isDead) continue;
-            actor.entity.setMovementSpeedMultiplier(this.getExplorationMovementSpeedMultiplier(actor, combatEngaged));
+            actor.entity.setMovementSpeedMultiplier(this.getExplorationMovementSpeedMultiplier(actor, combatEngaged) * (input.exploring && !combatEngaged ? 1.8 : 1));
             if (actor.id !== input.activeTurnActorId) {
                 actor.entity.actionGauge = advanceAtb(
                     actor.entity.actionGauge,

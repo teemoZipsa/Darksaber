@@ -86,7 +86,7 @@ test('raid balance telemetry groups engagements, loot, danger, and death cause',
     assert.equal(telemetry.engagementCount, 2);
     assert.equal(telemetry.engagementGapSecondsTotal, 27);
     assert.equal(telemetry.lootItemsAcquired, 3);
-    assert.equal(telemetry.lootItemsSecured, 0);
+    assert.equal(telemetry.lootItemsSecured, 3);
     assert.equal(Object.values(telemetry.killsByDangerBand).reduce((sum, value) => sum + value, 0), 1);
     assert.equal(telemetry.deathCause, 'curse');
 });

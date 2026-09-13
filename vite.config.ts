@@ -22,6 +22,8 @@ export default defineConfig(({ mode }) => {
         host: '127.0.0.1',
         port: 5731,
         strictPort: true,
+        // Runtime saves are atomically replaced by the game server, not client source.
+        watch: { ignored: ['**/server/.runtime/**'] },
         open: process.env.PLAYWRIGHT === '1' ? false : true
     },
     build: {

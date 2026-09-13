@@ -10,6 +10,8 @@ import type { WorldEngineScenarioNetworkControllers } from './WorldEngineScenari
 import type { WorldEngineUiState } from './WorldEngineUiState';
 
 export interface WorldEngineReadyTurnFlowContext {
+    shouldBeginActorTurn?: (actor: FieldActor) => boolean;
+    shouldShowTurnUi?: () => boolean;
     actionControllers: WorldEngineActionControllers;
     combatControllers: WorldEngineCombatControllers;
     fieldState: WorldEngineFieldState;
@@ -41,6 +43,7 @@ export function startWorldEngineNextReadyTurn(context: WorldEngineReadyTurnFlowC
         const actor = context.fieldState.partyActors.find((candidate) => candidate.id === actorId);
         if (actor) {
             if (actor.character.isDead) continue;
+            if (context.shouldBeginActorTurn?.(actor) === false) continue;
             beginWorldEngineActorTurn(context, actor);
             return;
         }
@@ -76,6 +79,11 @@ export function beginWorldEngineActorTurn(context: WorldEngineReadyTurnFlowConte
     context.actionControllers.selectionController.selectActor(actor.id);
     if (!context.combatControllers.turnStartResolver.processActorTurnStart(actor)) {
         context.endActorTurn(actor, 'statusBlocked');
+        return;
+    }
+    if (context.shouldShowTurnUi?.() === false) {
+        context.actionControllers.selectionController.clear();
+        context.closeActionMenu();
         return;
     }
     context.uiState.floatingText.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'READY');

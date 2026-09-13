@@ -13,14 +13,19 @@ import { PartyManager } from '../character/PartyManager';
 import type { Character } from '../character/Character';
 import { GridInventory } from '../inventory/GridInventory';
 import { PlayerData } from '../data/PlayerData';
-import { formatT } from '../i18n/LanguageManager';
-import { formatStoryCompanionName } from '../i18n/DisplayNames';
+import { formatT, t } from '../i18n/LanguageManager';
+import { BOUNTY_PROOF_ITEM_ID, resolveBountyContract } from '../data/BountyContractData';
+import { getMonsterDefinition } from '../data/MonsterCatalog';
+import { formatMonsterName, formatStoryCompanionName } from '../i18n/DisplayNames';
 import type { GameManager } from './GameManager';
 import { WorldMap } from '../map/WorldMap';
 import { TownInfo } from '../map/BiomeMask';
 import { manhattan, type TilePoint } from '../field/FieldPathing';
 import type { FieldActor, FieldEnemy, FieldTurnEndReason } from '../field/FieldTypes';
 import { getEnemyAggroRanges } from '../field/FieldConfig';
+import { FieldTravel } from '../field/FieldTravel';
+import { getWorldActorTerrainStepCost } from './world/WorldAttackTargeting';
+import { getEffectiveStatsForCharacter } from '../combat/StatusEffects';
 import { WorldRaidSession } from './world/WorldRaidSession';
 import { WorldTownSession } from './world/WorldTownSession';
 import type { CombatResult } from './world/WorldCombatController';
@@ -104,6 +109,8 @@ import {
 } from './world/WorldEngineActorQueries';
 import type { CombatFeedbackKind } from './world/CombatFeedback';
 import {
+    getActorTerrainMovementBudget,
+    isEntityMoving,
     syncCharacterMovementToClass,
 } from './world/WorldEngineFieldHelpers';
 import {
@@ -157,6 +164,8 @@ export class WorldEngine {
     private flowState?: WorldEngineFlowState;
     private controllerState?: WorldEngineControllerState;
     private lastFootstepTile: { actorId: string; x: number; y: number } | null = null;
+    private fieldTravel?: FieldTravel;
+    private travelActorId: string | null = null;
 
     constructor(
         canvas: HTMLCanvasElement,
@@ -317,6 +326,8 @@ export class WorldEngine {
 
     private initializePresentationControllers(): void {
         const presentationControllers = createWorldEnginePresentationControllersFromSources({
+            tryTravel: (tile) => this.tryFieldTravel(tile),
+            stopTravel: () => this.stopFieldTravel(),
             canvas: this.canvas,
             ports: this.getSharedControllerPorts(),
             getUiState: () => this.getUiState(),
@@ -355,8 +366,136 @@ export class WorldEngine {
     }
 
     public update(dt: number, input: InputManager, camera: Camera): void {
+        if (this.isNetworkRaid) {
+            const speed = this.fieldTravel?.active && !this.hasFieldThreat() ? 1.8 : 1;
+            for (const actor of this.partyActors) actor.entity.setMovementSpeedMultiplier(speed);
+        }
         this.getUpdateFlow().update(dt, input, camera);
+        this.fieldTravel?.update(dt);
+        if (this.fieldTravel?.active) {
+            this.closeActionMenu();
+            this.actionControllers.selectionController.clear();
+        }
         this.recordLocalMonsterEncounters();
+    }
+
+    public hasFieldThreat(): boolean {
+        return this.fieldEnemies.some(({ enemy }) => enemy.stats.hp > 0 && (
+            enemy.isAggro || this.partyActors.some((actor) => !actor.character.isDead
+                && manhattan({ x: enemy.gridX, y: enemy.gridY }, { x: actor.entity.gridX, y: actor.entity.gridY })
+                    <= getEnemyAggroRanges(enemy.aggroRange).enter + 2)
+        ));
+    }
+
+    private canFieldTravel(): boolean {
+        return this.raidSession.active && !this.isModalOverlayVisible()
+            && !this.raidSession.activeDungeonId
+            && !this.scenarioNetworkControllers.tutorialController.isActive()
+            && !this.scenarioNetworkControllers.storyScenarioController.isPresentationActive()
+            && (!this.isNetworkRaid || Boolean(this.networkRaidClient?.getIsOpen()));
+    }
+
+    public getFieldTravel(): FieldTravel {
+        this.fieldTravel ??= new FieldTravel({
+            canTravel: () => this.canFieldTravel() && this.getControlledActor()?.id === this.travelActorId,
+            hasThreat: () => this.hasFieldThreat(),
+            getActor: () => {
+                const actor = this.getControlledActor();
+                return actor && !actor.character.isDead ? {
+                    id: actor.id, tile: { x: actor.entity.gridX, y: actor.entity.gridY },
+                    movementBudget: getActorTerrainMovementBudget(actor),
+                    ap: actor.id === this.getActivePartyTurnActor()?.id ? this.getSpendableActionGauge() : 0,
+                } : null;
+            },
+            isBusy: () => this.partyActors.some((actor) => actor.path.length > 0 || isEntityMoving(actor.entity))
+                || Boolean(this.turnStateController.getReservedAction())
+                || this.scenarioNetworkControllers.networkSyncController.hasPendingMove()
+                || this.getUiState().fieldFeedback.isCombatPresentationBusy(),
+            isPassable: (query) => this.combatControllers.movementController.isFieldPassable(query),
+            stepCost: (tile) => getWorldActorTerrainStepCost(this.worldMap, this.getControlledActor()!, tile),
+            move: (tile) => {
+                const controller = this.actionControllers.playerActionController;
+                controller.execute('move');
+                if (controller.getMode() !== 'move') return false;
+                controller.handleTargetClick(tile, this.resolveFieldHitAt(tile));
+                const success = controller.getMode() === null;
+                if (!success) controller.clearTargeting();
+                this.closeActionMenu();
+                return success;
+            },
+            wait: () => {
+                const actor = this.getActivePartyTurnActor();
+                if (actor) this.dismissActionMenuTurn();
+            },
+            onStatus: (status) => {
+                this.addCombatLog(t(`field.travel.${status}`));
+                if (status === 'danger') {
+                    this.getUiState().floatingText.spawnStatus(this.player.gridX, this.player.gridY, t('field.travel.contact'));
+                    AudioManager.playUi('ui.error', { volume: 0.6 });
+                }
+            },
+        });
+        return this.fieldTravel;
+    }
+
+    public tryFieldTravel(tile: TilePoint): boolean {
+        this.travelActorId = this.getControlledActor()?.id ?? null;
+        return this.getFieldTravel().start(tile);
+    }
+
+    public stopFieldTravel(): boolean {
+        if (!this.fieldTravel?.active) return false;
+        // An accepted server move finishes its current short leg; no later leg is submitted.
+        this.fieldTravel.stop();
+        return true;
+    }
+
+    public returnToTown(): void {
+        if (!this.raidSession.active || this.isModalOverlayVisible() || this.hasFieldThreat()) return;
+        this.stopFieldTravel();
+        if (this.isNetworkRaid) this.networkRaidClient?.leave('manual', true);
+        else this.raidLifecycleControllers.raidOutcomeController.completeFailure('LEFT');
+    }
+
+    public preserveLocalExploration(): void {
+        if (!this.isNetworkRaid && this.raidSession.active) {
+            this.stopFieldTravel();
+            this.raidLifecycleControllers.raidOutcomeController.completeFailure('LEFT');
+        }
+    }
+
+    public getFieldHudView() {
+        if (!this.raidSession.active || this.isModalOverlayVisible()
+            || this.scenarioNetworkControllers.tutorialController.isActive()
+            || this.worldControllers.minimapUI.isFullMapVisible()) return null;
+        const actor = this.getControlledActor();
+        if (!actor) return null;
+        const character = actor.character;
+        const stats = getEffectiveStatsForCharacter(character);
+        const threat = this.hasFieldThreat();
+        const bounty = resolveBountyContract(this.playerData.activeBountyContractId);
+        const hunt = this.raidSession.bountyHunt;
+        const proof = this.gameManager.inventory.items.some((placed) => placed.item.id === BOUNTY_PROOF_ITEM_ID);
+        const bountyStatus = proof ? t('bounty.proofSecured') : hunt?.targetRevealed
+            ? t('bounty.hunt.lairRevealed') : formatT('bounty.hunt.clues', { found: hunt?.cluesFound ?? 0, total: hunt?.totalClues ?? 2 });
+        return {
+            name: character.name, level: character.level, tierName: character.getTierName(),
+            hp: character.stats.hp, maxHp: stats.maxHp, mp: character.stats.mp, maxMp: stats.maxMp,
+            exp: character.exp, expToNext: character.expToNext,
+            ap: Math.floor(this.getSpendableActionGauge()),
+            elapsed: Math.floor(this.raidSession.elapsedSeconds), kills: this.raidSession.kills,
+            gold: this.playerData.gold,
+            items: this.gameManager.inventory.items.reduce((sum, placed) => sum + placed.quantity, 0),
+            world: this.worldMap.getDisplayName(), threat,
+            bounty: bounty ? `${formatMonsterName(getMonsterDefinition(bounty.monsterId))} · ${bountyStatus}` : null,
+            controlsOpen: this.getUiState().actionMenuUI.getIsOpen()
+                || this.actionControllers.magicController.isActive() || this.actionControllers.toolController.isActive()
+                || this.presentationControllers.tacticalController.isOpen(),
+            interior: Boolean(this.raidSession.activeDungeonId),
+            travel: this.fieldTravel?.status ?? 'idle', travelling: this.fieldTravel?.active ?? false,
+            distance: this.fieldTravel?.destination ? manhattan({ x: actor.entity.gridX, y: actor.entity.gridY }, this.fieldTravel.destination) : 0,
+            canReturn: !threat && (!this.isNetworkRaid || Boolean(this.networkRaidClient?.getIsOpen())),
+        };
     }
 
     private getUpdateFlow(): WorldEngineUpdateFlow {
@@ -389,6 +528,7 @@ export class WorldEngine {
 
     private updatePartyMovement(dt: number): void {
         const partyMovement = this.combatControllers.movementController.updatePartyActors({
+            exploring: this.fieldTravel?.active && !this.hasFieldThreat(),
             dt,
             controlled: this.getFanfareLeaderActor(),
             activeTurnActorId: this.getFlowState().turnStateController.getActiveTurnActorId(),
@@ -498,7 +638,7 @@ export class WorldEngine {
             getFieldActors: () => this.partyActors,
             getFieldEnemies: () => this.fieldEnemies,
             setFieldEnemies: (enemies) => { this.fieldEnemies = enemies; },
-            placePartyNearTown: (town) => this.placePartyNear(this.worldMap.getTownSpawnTile(town)),
+            placePartyNearTown: (town) => this.placePartyNear(this.worldMap.getTownExitTile(town)),
             syncControlledPlayer: () => this.syncControlledPlayer(),
         });
     }
@@ -506,6 +646,8 @@ export class WorldEngine {
     public render(ctx: CanvasRenderingContext2D, camera: Camera, width: number, height: number): void {
         this.presentationControllers.renderController.render(ctx, camera, width, height, {
             hideWorldHud: this.scenarioNetworkControllers.tutorialController.isActive(),
+            domFieldHud: !this.scenarioNetworkControllers.tutorialController.isActive(),
+            hidePassiveActorCard: this.canFieldTravel() && !this.hasFieldThreat() && !this.getUiState().actionMenuUI.getIsOpen(),
         });
         if (this.scenarioNetworkControllers.tutorialController.isActive()) {
             this.scenarioNetworkControllers.tutorialController.renderHud(ctx, width, height);
@@ -560,6 +702,7 @@ export class WorldEngine {
     }
 
     private clearFieldTurnState(): void {
+        this.fieldTravel?.stop('idle');
         clearWorldEngineFieldTurnState({
             actionControllers: this.actionControllers,
             fieldState: this.getFieldState(),
@@ -616,6 +759,7 @@ export class WorldEngine {
     }
 
     private handleNetworkActionRejected(rejection: ActionRejectedMessage): void {
+        if (this.fieldTravel?.active) this.fieldTravel.stop('blocked');
         handleWorldEngineNetworkActionRejected(this.scenarioNetworkControllers, rejection);
     }
 
@@ -659,6 +803,7 @@ export class WorldEngine {
     }
 
     private getPathPreviewTiles(actor: FieldActor | null): TilePoint[] {
+        if (actor?.id === this.travelActorId && this.fieldTravel?.active) return this.fieldTravel.getPath();
         return getWorldPathPreviewTiles(actor, this.scenarioNetworkControllers.networkSyncController);
     }
 
@@ -800,6 +945,7 @@ export class WorldEngine {
     private getActionTurnFlow(): WorldEngineActionTurnFlow {
         const flowState = this.getFlowState();
         flowState.actionTurnFlow ??= createWorldEngineActionTurnFlow({
+            shouldReopenActionMenu: () => !this.canFieldTravel() || this.hasFieldThreat(),
             actionMenuUI: this.getUiState().actionMenuUI,
             tutorialController: this.scenarioNetworkControllers.tutorialController,
             turnStateController: flowState.turnStateController,
@@ -866,6 +1012,8 @@ export class WorldEngine {
 
     private getReadyTurnFlowContext(): WorldEngineReadyTurnFlowContext {
         return {
+            shouldBeginActorTurn: (actor) => !this.canFieldTravel() || this.hasFieldThreat() || actor.id === this.getControlledActor()?.id,
+            shouldShowTurnUi: () => !this.canFieldTravel() || this.hasFieldThreat(),
             actionControllers: this.actionControllers,
             combatControllers: this.combatControllers,
             fieldState: this.getFieldState(),

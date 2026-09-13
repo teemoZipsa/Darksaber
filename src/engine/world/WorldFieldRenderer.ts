@@ -322,7 +322,7 @@ export class WorldFieldRenderer {
         model: WorldRenderModel,
         vw: number,
         vh: number,
-        options: { combatLogOnly?: boolean; compactActionMenu?: boolean } = {}
+        options: { combatLogOnly?: boolean; compactActionMenu?: boolean; domFieldHud?: boolean } = {}
     ): FieldHudLayout {
         // ── HUD layout ─────────────────────────────────────────────
         // LEFT column   : title logo + character status
@@ -350,7 +350,7 @@ export class WorldFieldRenderer {
             return layout;
         }
 
-        if (layout.showTitle) {
+        if (layout.showTitle && !options.domFieldHud) {
             renderGameTitle(ctx, layout.character.x, 12, { scale: 0.7, subtitle: '' });
         }
 
@@ -359,7 +359,7 @@ export class WorldFieldRenderer {
 
         // ── Character status (left column, single panel) ──────────
         const compactRadialFocus = Boolean(options.compactActionMenu);
-        if (model.activeCharacter && !compactRadialFocus) {
+        if (model.activeCharacter && !compactRadialFocus && !options.domFieldHud) {
             const active = model.activeCharacter;
             const effective = getEffectiveStatsForCharacter(active);
             const actionText = model.controlledActor?.id === model.activeTurnActorId && model.remainingActionPoints > 0
@@ -443,7 +443,7 @@ export class WorldFieldRenderer {
             }
         }
 
-        renderRaidBanner(ctx, model, vw);
+        if (!options.domFieldHud) renderRaidBanner(ctx, model, vw);
         renderActionModeHint(ctx, model, vw, vh);
         const compactBottomHudObscured = compactRadialFocus || (
             layout.compact
@@ -908,7 +908,7 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
     const bannerH = layout.height;
     const x = layout.x;
     const y = layout.y;
-    const urgent = model.raid.timerAdvancing;
+    const urgent = false;
 
     ctx.save();
     drawParchmentPanel(ctx, x, y, bannerW, bannerH, { radius: 8, headerH: 0, darksaberFrame: true });
@@ -919,7 +919,7 @@ function renderRaidBanner(ctx: CanvasRenderingContext2D, model: WorldRenderModel
         ctx.fillRect(x + 6, y + 2, bannerW - 12, 2);
     }
 
-    const remaining = Math.max(0, model.raid.limitSeconds - model.raid.elapsedSeconds);
+    const remaining = model.raid.elapsedSeconds;
 
     // Big timer
     ctx.fillStyle = urgent ? '#a01818' : Parchment.textDark;

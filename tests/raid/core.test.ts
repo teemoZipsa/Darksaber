@@ -1070,7 +1070,7 @@ test('WorldMap returns a non-town exit tile with spawn fallback available', () =
     assert.deepEqual(fallback, blocked.getTownSpawnTile(town));
 });
 
-test('raid timer only advances during unblocked field exploration', () => {
+test('elapsed exploration time includes combat and pauses in town', () => {
     assert.equal(shouldAdvanceRaidTimer({
         raidActive: true,
         townVisible: false,
@@ -1083,7 +1083,7 @@ test('raid timer only advances during unblocked field exploration', () => {
         townVisible: false,
         resultVisible: false,
         turnCombatActive: true,
-    }), false);
+    }), true);
 
     assert.equal(shouldAdvanceRaidTimer({
         raidActive: true,
@@ -1093,9 +1093,9 @@ test('raid timer only advances during unblocked field exploration', () => {
     }), false);
 });
 
-test('town arrival blocks departure and survives at any other town', () => {
+test('town arrival accepts the departure town as well as other towns', () => {
     assert.deepEqual(resolveTownArrival('central_castle', 'central_castle', true), {
-        kind: 'departureBlocked',
+        kind: 'survived',
         townId: 'central_castle',
     });
     assert.deepEqual(resolveTownArrival('w_forest_village', 'central_castle', true), {
@@ -1113,13 +1113,13 @@ test('town arrival blocks departure and survives at any other town', () => {
 
 test('network raid leave results share town arrival survival rules', () => {
     assert.equal(resolveRaidLeaveResult('town', 'w_forest_village', 'central_castle', true), 'SURVIVED');
-    assert.equal(resolveRaidLeaveResult('town', 'central_castle', 'central_castle', true), 'LEFT');
+    assert.equal(resolveRaidLeaveResult('town', 'central_castle', 'central_castle', true), 'SURVIVED');
     assert.equal(resolveRaidLeaveResult('town', null, 'central_castle', true), 'LEFT');
     assert.equal(resolveRaidLeaveResult('manual', 'w_forest_village', 'central_castle', true), 'LEFT');
     assert.equal(resolveRaidLeaveResult('wipe', 'w_forest_village', 'central_castle', true), 'DEAD');
 
     assert.equal(coerceRaidResultForTownArrival('SURVIVED', 'w_forest_village', 'central_castle', true), 'SURVIVED');
-    assert.equal(coerceRaidResultForTownArrival('SURVIVED', 'central_castle', 'central_castle', true), 'LEFT');
+    assert.equal(coerceRaidResultForTownArrival('SURVIVED', 'central_castle', 'central_castle', true), 'SURVIVED');
     assert.equal(coerceRaidResultForTownArrival('MIA', 'w_forest_village', 'central_castle', true), 'MIA');
 });
 

@@ -574,3 +574,31 @@ test('private proof loot is removed when its owner expires from the session', ()
         false,
     );
 });
+
+test('collected bounty proof is settled on manual return, defeat and disconnect', () => {
+    for (const reason of ['manual', 'wipe', 'disconnect'] as const) {
+        const session = new WorldSession({ random: () => 0, ghostGraceMs: 1 });
+        const character = authCharacter(`kept-bounty-${reason}`);
+        const save = createDefaultCharacterSave(character);
+        const contract = getBountyOffers('central_castle', 0, 0)[0];
+        save.questState.activeBountyContractId = contract.id;
+        const joined = session.join(joinMessage(character.id), 0, {
+            accountId: character.accountId, characterId: character.id, saveSnapshot: save,
+        });
+        const { grant } = killJoinedBountyTarget(session, joined.playerId, `kept-proof-${reason}`);
+        session.handleMessage(joined.playerId, {
+            type: 'AUTO_LOOT_RESOLVE', lootId: grant.lootId,
+            acceptedCells: [{ gridX: 0, gridY: 0 }],
+        }, 1100);
+        if (reason === 'disconnect') {
+            session.disconnect(joined.playerId, 1100);
+            session.tick(1102);
+        } else {
+            session.handleMessage(joined.playerId, { type: 'WORLD_LEAVE', reason }, 1200);
+        }
+        const patch = session.createCharacterSavePatch(joined.playerId);
+        assert.equal(patch?.questState?.activeBountyContractId, null);
+        assert.equal(patch?.questState?.gold, 500 + contract.rewardGold + contract.bonusGold);
+        assert.equal(patch?.inventory?.items.some((item) => item.itemId === BOUNTY_PROOF_ITEM_ID), false);
+    }
+});

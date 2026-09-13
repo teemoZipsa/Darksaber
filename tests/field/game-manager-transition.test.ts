@@ -16,7 +16,7 @@ interface TransitionHarness {
 
 interface ReturnToTitleHarness extends TransitionHarness {
     pauseMenu: { close(): void };
-    worldEngine: { closeNetworkRaidClient(sendLeave: boolean, reason: 'manual'): void };
+    worldEngine: { preserveLocalExploration(): void; closeNetworkRaidClient(sendLeave: boolean, reason: 'manual'): void };
     pauseReturnToTitle(): void;
 }
 
@@ -62,6 +62,7 @@ test('GameManager closes an active world connection before returning to title', 
     manager.pendingTransition = null;
     manager.pauseMenu = { close: () => { pauseClosed = true; } };
     manager.worldEngine = {
+        preserveLocalExploration: () => {},
         closeNetworkRaidClient: (sendLeave, reason) => { closeCalls.push({ sendLeave, reason }); },
     };
     manager.transitions = {

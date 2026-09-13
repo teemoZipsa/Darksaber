@@ -169,7 +169,6 @@ export class WorldEngineCombatFlow {
         }
 
         actor.character.isDead = true;
-        actor.character.exp = 0;
         this.context.log(formatT('field.log.actorDown', { name: actor.character.name }));
         this.context.spawnStatus(actor.entity.gridX, actor.entity.gridY, 'DOWN');
     }

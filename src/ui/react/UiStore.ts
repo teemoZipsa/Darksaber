@@ -105,6 +105,7 @@ export class UiStore {
             flags,
             `lang:${i18n.lang}`,
             `settings:${SettingsManager.lastUpdated}`,
+            `field:${JSON.stringify(this.getFieldHudView())}`,
             `gold:${this.getGold()}`,
             `party:${this.getActiveIndex()}:${this.getRoster().map((char) => this.characterSignature(char)).join(';')}`,
             openState.town ? `town:${this.townSignature()}` : '',
@@ -121,6 +122,7 @@ export class UiStore {
             town?.id ?? '',
             this.getTownTab(),
             this.isTownDeployPending() ? 'deploying' : '',
+            this.canTownDeploy() ? 'deploy-ready' : '',
             this.getTownDeployError() ?? '',
             this.getHubSaveError() ?? '',
             this.getPendingRestMenuId() ?? '',
@@ -135,6 +137,10 @@ export class UiStore {
             `quests:${this.questSignature()}`,
         ].join('/');
     }
+
+    public getFieldHudView() { return this.gm.getFieldEngine?.()?.getFieldHudView() ?? null; }
+    public stopFieldTravel(): void { this.gm.getFieldEngine()?.stopFieldTravel(); this.tick(); }
+    public returnFromField(): void { this.gm.getFieldEngine()?.returnToTown(); this.tick(); }
 
     private shopSignature(): string {
         const shop = this.shop();
@@ -377,6 +383,7 @@ export class UiStore {
     getTownRumors = (): string[] => this.townUi()?.getRumors() ?? [];
     getRestFacility = () => this.townUi()?.getRestFacilityPublic() ?? null;
     isTownDeployPending = (): boolean => this.townUi()?.isDeployPending() ?? false;
+    canTownDeploy = (): boolean => this.townUi()?.canDeploy?.() ?? false;
     getTownDeployError = (): string | null => this.townUi()?.getDeployError() ?? null;
     getHubSaveError = (): string | null => this.gm.getHubSaveError();
     getPendingRestMenuId = (): string | null => this.townUi()?.getPendingRestMenuId?.() ?? null;
