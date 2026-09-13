@@ -470,6 +470,9 @@ test('local bounty investigates two clues before revealing one elite target', as
 });
 
 test('dev launcher buttons are readable and enter dev modes', async ({ page, isMobile }) => {
+    // This case reloads the full game six times on desktop. Keep each existing
+    // readiness assertion bounded, but allow their cumulative asset-load time.
+    test.setTimeout(60_000);
     await page.goto('/');
     const launcher = page.locator('.dev-launcher');
     await expect(launcher).toBeVisible({ timeout: 20_000 });
