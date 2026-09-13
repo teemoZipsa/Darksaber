@@ -112,6 +112,25 @@ test('Burgos southwest river keeps the actual mixed banks continuous', async ({ 
         }
         const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
         let inventedGrass = 0;
+        const waterAt = (x: number, y: number) => [T.WATER, T.DEEP_WATER].includes(tileAt(originX + x, originY + y));
+        const blueAt = (x: number, y: number) => {
+            const i = (y * canvas.width + x) * 4;
+            return pixels[i + 2] > pixels[i] * 1.1 && pixels[i + 2] >= pixels[i + 1] * 0.85;
+        };
+        let maxBankMismatch = 0;
+        for (let y = 1; y < 21; y++) for (let x = 1; x < 27; x++) {
+            if (!waterAt(x, y)) continue;
+            for (const [dx, dy] of [[1, 0], [0, 1]]) {
+                if (!waterAt(x + dx, y + dy)) continue;
+                let mismatch = 0;
+                for (let k = 0; k < size; k++) {
+                    const px = dx ? (x + 1) * size - 1 : x * size + k;
+                    const py = dy ? (y + 1) * size - 1 : y * size + k;
+                    if (blueAt(px, py) !== blueAt(px + dx, py + dy)) mismatch++;
+                }
+                maxBankMismatch = Math.max(maxBankMismatch, mismatch);
+            }
+        }
         for (let y = 1; y < 21; y++) for (let x = 1; x < 27; x++) {
             if (tileAt(originX + x, originY + y) !== T.WALL) continue;
             if ([-1, 0, 1].some(dy => [-1, 0, 1].some(dx =>
@@ -123,7 +142,7 @@ test('Burgos southwest river keeps the actual mixed banks continuous', async ({ 
         }
         return {
             preview: canvas.toDataURL('image/png').split(',')[1],
-            originX, originY, inventedGrass,
+            originX, originY, inventedGrass, maxBankMismatch,
             transparent: pixels.filter((alpha, i) => i % 4 === 3 && alpha !== 255).length,
             tiles: Array.from({ length: 22 }, (_, y) => Array.from({ length: 28 }, (_, x) => tileAt(originX + x, originY + y))),
         };
@@ -132,4 +151,5 @@ test('Burgos southwest river keeps the actual mixed banks continuous', async ({ 
     await testInfo.attach('burgos-terrain', { body: JSON.stringify({ ...result, preview: undefined }), contentType: 'application/json' });
     expect(result.transparent).toBe(0);
     expect(result.inventedGrass, 'sand and castle walls must not reveal an invented grass underlay').toBe(0);
+    expect(result.maxBankMismatch, 'shared water edges must agree, allowing a few pixels of rock texture variation').toBeLessThanOrEqual(6);
 });

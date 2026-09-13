@@ -1,5 +1,4 @@
 import { Character } from '../../character/Character';
-import { getCharacterExpToNext } from '../../character/CharacterProgression';
 import type { PartyManager } from '../../character/PartyManager';
 import { getItemDef } from '../../data/ItemDB';
 import type { GameManager } from '../GameManager';
@@ -34,7 +33,7 @@ import type {
 import type { CombatFeedbackKind } from './CombatFeedback';
 import type { WorldStoryScenarioController } from './WorldStoryScenarioController';
 import { classifyNetworkActorSnapshots } from './NetworkSnapshotOwnership';
-import { getNetworkEnemyLocalizedNames } from './NetworkSnapshotMapping';
+import { applyNetworkActorSnapshot, getNetworkEnemyLocalizedNames } from './NetworkSnapshotMapping';
 import { AudioManager } from '../AudioManager';
 import { COMBAT_IMPACT_DELAY_SECONDS } from './CombatPresentationTimeline';
 
@@ -213,7 +212,7 @@ export class WorldNetworkSyncController {
             if (!character.isDead && actorSnapshot.isDead) {
                 this.context.recordCharacterDown(character.id);
             }
-            this.applyActorSnapshot(actor, actorSnapshot);
+            applyNetworkActorSnapshot(actor, actorSnapshot);
             nextLocalActors.push(actor);
         }
 
@@ -240,7 +239,7 @@ export class WorldNetworkSyncController {
                 };
                 remotePartyActors.set(actorSnapshot.id, actor);
             }
-            this.applyActorSnapshot(actor, actorSnapshot);
+            applyNetworkActorSnapshot(actor, actorSnapshot);
             nextRemoteActors.push(actor);
         }
         for (const actorId of [...remotePartyActors.keys()]) {
@@ -566,32 +565,6 @@ export class WorldNetworkSyncController {
         if (this.context.getActionMenuIsOpen()) return;
         if (this.context.getPlayerActionMode() !== null) return;
         if (this.context.hasExecutableAction(actor)) this.context.reopenActionMenu(actor);
-    }
-
-    private applyActorSnapshot(actor: FieldActor, snapshot: ActorSnapshot): void {
-        const tierChanged = actor.character.currentTier !== snapshot.currentTier;
-        const displayName = formatStoryCompanionName(
-            snapshot.localActorId ?? actor.character.id,
-            snapshot.name,
-        );
-        actor.id = snapshot.id;
-        actor.character.name = displayName;
-        actor.character.stats = { ...snapshot.stats };
-        actor.character.statuses = snapshot.statuses.map((status) => ({ ...status }));
-        actor.character.isDead = snapshot.isDead;
-        actor.character.currentTier = snapshot.currentTier;
-        actor.character.level = snapshot.level;
-        if (snapshot.exp !== undefined) actor.character.exp = snapshot.exp;
-        if (snapshot.hasEmblem !== undefined) actor.character.hasEmblem = snapshot.hasEmblem;
-        actor.character.expToNext = getCharacterExpToNext(snapshot.classLineId, snapshot.currentTier, snapshot.level);
-        if (tierChanged) actor.character.updatePortrait();
-        actor.entity.gridX = snapshot.tile.x;
-        actor.entity.gridY = snapshot.tile.y;
-        actor.entity.actionGauge = snapshot.actionGauge;
-        actor.entity.facing = snapshot.facing;
-        actor.entity.label = displayName;
-        actor.path = [];
-        actor.queuedIntent = null;
     }
 
     private createLootFromSnapshot(snapshot: LootSnapshot): LootObject {

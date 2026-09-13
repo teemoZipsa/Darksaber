@@ -17,6 +17,7 @@ import { GridInventory, PlacedItem } from './GridInventory';
 import { ItemDef, ItemSlot } from '../data/ItemDB';
 import { Character } from '../character/Character';
 import { formatT, t } from '../i18n/LanguageManager';
+import { getEquipmentRequirementFailure } from './EquipmentRules';
 
 /** Which container a dragged item currently lives in. */
 export type InvGridKind = 'bag' | 'ext';
@@ -149,6 +150,27 @@ export class InventoryUI {
         this.onRaidLootSecured?.(placed, { gridX: source.gridX, gridY: source.gridY });
     }
 
+    /** Read-only placement policy shared with the DOM drop preview. */
+    public canMoveToCell(placed: PlacedItem, source: InvDragSource, targetKind: InvGridKind, gx: number, gy: number): boolean {
+        const target = this.gridOf(targetKind);
+        if (!target) return false;
+        const occupant = target.getAt(gx, gy);
+        const wouldSocket = occupant !== null && occupant !== placed && canSocket(placed.item, occupant);
+        if (this.isRaidPreparationEditingLocked()
+            && (!this.isRaidLootCollection(source, targetKind) || wouldSocket)) return false;
+        if (wouldSocket) return true;
+        const unconfirmed = source.kind === 'grid' && source.grid === 'ext' && this.externalGridIsRaidLoot && targetKind === 'bag';
+        if (occupant && occupant !== placed && !unconfirmed && target.canMergeStacks(placed, occupant)) return true;
+        if (gx < 0 || gy < 0 || gx + placed.item.gridW > target.width || gy + placed.item.gridH > target.height) return false;
+        for (let y = gy; y < gy + placed.item.gridH; y++) {
+            for (let x = gx; x < gx + placed.item.gridW; x++) {
+                const at = target.getAt(x, y);
+                if (at && at !== placed) return false;
+            }
+        }
+        return true;
+    }
+
     /** Drop the dragged item onto a specific cell of a target grid. */
     public moveToCell(placed: PlacedItem, source: InvDragSource, targetKind: InvGridKind, gx: number, gy: number): boolean {
         const target = this.gridOf(targetKind);
@@ -164,6 +186,7 @@ export class InventoryUI {
                 return false;
             }
         }
+        if (!this.canMoveToCell(placed, source, targetKind, gx, gy)) return false;
         if (occupant && occupant !== placed && canSocket(placed.item, occupant)) {
             this.detach(placed, source);
             (occupant.sockets ??= []).push(placed.item);
@@ -204,6 +227,15 @@ export class InventoryUI {
         }
 
         if (!slotAcceptsItem(slot, placed.item.slot)) return false;
+        const requirement = getEquipmentRequirementFailure(placed.item, this.activeChar);
+        if (requirement) {
+            this.setFeedback(requirement === 'level'
+                ? formatT('inventory.feedback.requiredLevel', { level: placed.item.requiredLevel! })
+                : requirement === 'tier'
+                    ? formatT('inventory.feedback.requiredTier', { tier: placed.item.requiredTier! })
+                    : t('inventory.feedback.wrongBranch'));
+            return false;
+        }
 
         this.detach(placed, source);
         if (targetEq && targetEq !== placed && !this.inventory.autoPlaceExisting(targetEq)) {
@@ -285,8 +317,8 @@ export class InventoryUI {
             this.setFeedback(msg);
             return msg;
         }
-        this.inventory.sort();
-        const msg = t('inventory.feedback.sorted');
+        const sorted = this.inventory.sort();
+        const msg = sorted ? t('inventory.feedback.sorted') : t('inventory.feedback.sortUnchanged');
         this.setFeedback(msg);
         return msg;
     }

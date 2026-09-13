@@ -320,7 +320,7 @@ test('buildHubSavePatch moves owned inventory equipment onto a companion without
         ],
     };
     current.inventory.items.push({
-        itemId: 'magic_t1_body',
+        itemId: 'healer_t1_body',
         gridX: 4,
         gridY: 0,
         quantity: 1,
@@ -330,14 +330,14 @@ test('buildHubSavePatch moves owned inventory equipment onto a companion without
     const patch = buildHubSavePatch({
         inventory: {
             ...current.inventory,
-            items: current.inventory.items.filter((item) => item.itemId !== 'magic_t1_body'),
+            items: current.inventory.items.filter((item) => item.itemId !== 'healer_t1_body'),
         },
         rosterSnapshot: {
             characters: [{
                 id: 'companion-1',
                 equipment: {
                     body: {
-                        itemId: 'magic_t1_body',
+                        itemId: 'healer_t1_body',
                         gridX: 0,
                         gridY: 0,
                         quantity: 1,
@@ -350,5 +350,18 @@ test('buildHubSavePatch moves owned inventory equipment onto a companion without
 
     const roster = patch.rosterSnapshot as Record<string, unknown>;
     const companion = (roster.characters as Array<Record<string, unknown>>).find((entry) => entry.id === 'companion-1');
-    assert.equal(((companion?.equipment as Record<string, Record<string, unknown>>).body).itemId, 'magic_t1_body');
+    assert.equal(((companion?.equipment as Record<string, Record<string, unknown>>).body).itemId, 'healer_t1_body');
+});
+
+test('hub saves reject newly equipped high-level gear using trusted progression', () => {
+    const current = createDefaultCharacterSave(authCharacter());
+    const weapon = { itemId: 'orig_story_0620_dragon_killer7', gridX: 0, gridY: 0, quantity: 1, durability: 100 };
+    current.inventory.items.push(weapon);
+    assert.throws(() => buildHubSavePatch({
+        equipment: { weapon },
+        rosterSnapshot: { characters: [{ id: current.characterId, level: 106 }] },
+    }, current), (error: unknown) => error instanceof HttpError && error.code === 'equipment_requirements');
+    // Existing legacy gear is preserved, never deleted by an unrelated save.
+    current.equipment.weapon = weapon;
+    assert.doesNotThrow(() => buildHubSavePatch({ equipment: current.equipment }, current));
 });

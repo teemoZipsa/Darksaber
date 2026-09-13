@@ -470,18 +470,6 @@ class TileAssetManagerClass {
             this.drawTile(ctx, type, dx, dy, size, worldX, worldY);
             return;
         }
-        const img = this.getSheet(`autotile:${config.sheet}`)!;
-        const [n, ne, e, se, s, sw, w, nw] = connections;
-        const cardinal = (n ? 1 : 0) | (e ? 2 : 0) | (s ? 4 : 0) | (w ? 8 : 0);
-        const neighbors = { n, ne, e, se, s, sw, w, nw };
-        const inner = this.getWantedInnerCornerMask(neighbors);
-        const original = config.cellsByMask[cardinal];
-        if (original && (inner === 0 || original.some(cell => this.getCellCornerCutMask(img, cell) === inner))) {
-            // Preserve the full-size original rocks and curves wherever the
-            // recovered set contains the exact shape needed by this bank.
-            this.drawOriginalAutotile(ctx, type, dx, dy, size, neighbors, cardinal, worldX, worldY);
-            return;
-        }
         const mask = connections.reduce((bits, on, i) => bits | (on ? 1 << i : 0), 0);
         const variant = this.hashCell(worldX, worldY, type) % 2;
         const key = `${type}:${mask}:${variant}`;
@@ -489,16 +477,18 @@ class TileAssetManagerClass {
         if (!shore) {
             // Original banks reach beyond half a tile; clipping their quarters
             // loses the rocks, and opposite banks can erase a narrow channel.
-            // Assemble a complete 3x3 patch first, then fit it to one cell.
+            // Use the same 2x2 construction for every coast, including straight
+            // banks: mixing full-size and compact banks breaks shared edges.
+            // Assemble a complete 2x2 patch first, then fit it to one cell.
             // Every source cell now has a supported edge or a single corner.
-            const patch = new OffscreenCanvas(96, 96);
+            const patch = new OffscreenCanvas(64, 64);
             const patchCtx = patch.getContext('2d')!;
             const inside = (x: number, y: number): boolean => {
-                if (x < 0) return connections[y < 0 ? 7 : y > 2 ? 5 : 6];
-                if (x > 2) return connections[y < 0 ? 1 : y > 2 ? 3 : 2];
-                return y < 0 ? connections[0] : y > 2 ? connections[4] : true;
+                if (x < 0) return connections[y < 0 ? 7 : y > 1 ? 5 : 6];
+                if (x > 1) return connections[y < 0 ? 1 : y > 1 ? 3 : 2];
+                return y < 0 ? connections[0] : y > 1 ? connections[4] : true;
             };
-            for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
+            for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) {
                 this.drawAutotile(patchCtx, type, x * 32, y * 32, 32,
                     inside(x, y - 1), inside(x + 1, y - 1), inside(x + 1, y), inside(x + 1, y + 1),
                     inside(x, y + 1), inside(x - 1, y + 1), inside(x - 1, y), inside(x - 1, y - 1),

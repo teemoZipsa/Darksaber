@@ -11,9 +11,9 @@ import { MONSTER_ROW_BY_FACING, MONSTER_SPRITE_PATH } from '../../data/MonsterCa
 import { getItemDef } from '../../data/ItemDB';
 import { STORY_SCENARIOS } from '../../data/StoryScenarioData';
 import { formatMonsterName, formatStoryCompanionName } from '../../i18n/DisplayNames';
+import { syncPartyActorSprite } from './WorldFieldSpawnController';
 
 export function applyNetworkActorSnapshot(actor: FieldActor, snapshot: ActorSnapshot): void {
-    const tierChanged = actor.character.currentTier !== snapshot.currentTier;
     const displayName = formatStoryCompanionName(
         snapshot.localActorId ?? actor.character.id,
         snapshot.name,
@@ -23,12 +23,12 @@ export function applyNetworkActorSnapshot(actor: FieldActor, snapshot: ActorSnap
     actor.character.stats = { ...snapshot.stats };
     actor.character.statuses = snapshot.statuses.map((status) => ({ ...status }));
     actor.character.isDead = snapshot.isDead;
-    actor.character.currentTier = snapshot.currentTier;
+    actor.character.syncClassIdentity(snapshot.classLineId, snapshot.currentTier);
     actor.character.level = snapshot.level;
     if (snapshot.exp !== undefined) actor.character.exp = snapshot.exp;
     if (snapshot.hasEmblem !== undefined) actor.character.hasEmblem = snapshot.hasEmblem;
     actor.character.expToNext = getCharacterExpToNext(snapshot.classLineId, snapshot.currentTier, snapshot.level);
-    if (tierChanged) actor.character.updatePortrait();
+    syncPartyActorSprite(actor.entity, actor.character);
     actor.entity.gridX = snapshot.tile.x;
     actor.entity.gridY = snapshot.tile.y;
     actor.entity.actionGauge = snapshot.actionGauge;

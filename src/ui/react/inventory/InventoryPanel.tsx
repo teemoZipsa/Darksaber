@@ -29,6 +29,7 @@ import { formatT, t } from '../../../i18n/LanguageManager';
 import { SettingsManager } from '../../../engine/SettingsManager';
 import { AudioManager } from '../../../engine/AudioManager';
 import { getCarryAtbPercent, getPartyCarriedWeight } from '../../../inventory/CarryWeight';
+import { getEquipmentRequirementFailure } from '../../../inventory/EquipmentRules';
 import type { PlacedItem } from '../../../inventory/GridInventory';
 import type { GridInventory } from '../../../inventory/GridInventory';
 import {
@@ -90,31 +91,6 @@ const RARITY_CLASS: Record<ItemRarity, string> = {
 
 function itemRarityClass(placed: PlacedItem): string {
     return RARITY_CLASS[placed.item.rarity] ?? RARITY_CLASS.common;
-}
-
-/** Read-only drop validity for a grid cell, ignoring the dragged item's own cells. */
-function canDropAt(grid: GridInventory, placed: PlacedItem, gx: number, gy: number): boolean {
-    const item = placed.item;
-    if (gx < 0 || gy < 0 || gx + item.gridW > grid.width || gy + item.gridH > grid.height) return false;
-    for (let dy = 0; dy < item.gridH; dy++) {
-        for (let dx = 0; dx < item.gridW; dx++) {
-            const occ = grid.getAt(gx + dx, gy + dy);
-            if (occ && occ !== placed) {
-                // A rune/gem dropped onto a socket-capable host is still a valid move.
-                if (!isSocketDrop(item, occ)) return false;
-            }
-        }
-    }
-    return true;
-}
-
-/** Mirrors InventoryUI's socketing rule for hint purposes (read-only). */
-function isSocketDrop(item: PlacedItem['item'], host: PlacedItem): boolean {
-    if (!host.item.maxSockets) return false;
-    const cat = item.itemCategory ?? item.slot;
-    if (cat !== 'rune' && cat !== 'gem') return false;
-    if (!host.item.socketTypes?.includes(cat)) return false;
-    return (host.sockets?.length ?? 0) < host.item.maxSockets;
 }
 
 function placedItemKey(placed: PlacedItem): number {
@@ -353,7 +329,7 @@ export function InventoryPanel({
                 const grid = kind === 'bag' ? inv.getBag() : kind === 'ext' ? inv.getExternalGrid() : null;
                 if (kind && grid) {
                     const { gx, gy } = gridCellFromPoint(gridEl, grid, clientX, clientY, d.offsetX, d.offsetY);
-                    setDropHint({ kind, gx, gy, valid: canDropAt(grid, d.placed, gx, gy) });
+                    setDropHint({ kind, gx, gy, valid: inv.canMoveToCell(d.placed, d.source, kind, gx, gy) });
                     setEquipHint(null);
                     return;
                 }
@@ -361,7 +337,9 @@ export function InventoryPanel({
             const equipEl = target?.closest<HTMLElement>('[data-inv-equip]');
             if (equipEl) {
                 const slot = equipEl.dataset.invEquip as ItemSlot | undefined;
-                setEquipHint(slot && slotAcceptsItem(slot, d.placed.item.slot) ? slot : null);
+                const wearer = inv.getActiveCharacter();
+                setEquipHint(slot && wearer && slotAcceptsItem(slot, d.placed.item.slot)
+                    && !getEquipmentRequirementFailure(d.placed.item, wearer) ? slot : null);
                 setDropHint(null);
                 return;
             }

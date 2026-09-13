@@ -1,4 +1,5 @@
-import { ITEMS } from '../src/data/ItemDB';
+import { ITEMS, getItemDef } from '../src/data/ItemDB';
+import { getEquipmentRequirementFailure } from '../src/inventory/EquipmentRules';
 import {
     applyFacilityCostMultiplier,
     getInjuryTreatmentCostMultiplier,
@@ -87,6 +88,12 @@ export function buildHubSavePatch(
     }
     if (isRecord(patch.rosterSnapshot)) {
         next.rosterSnapshot = mergeClientRosterSnapshot(currentSave.rosterSnapshot, patch.rosterSnapshot);
+    }
+    if (next.equipment) {
+        const roster = currentSave.rosterSnapshot.characters;
+        const owner = Array.isArray(roster)
+            ? roster.find(entry => isRecord(entry) && entry.id === currentSave.characterId) : undefined;
+        assertEquipmentRequirements(next.equipment, currentSave.equipment, isRecord(owner) ? owner : {});
     }
     assertNoFreeHubEconomyGain(next, currentSave);
     return next;
@@ -305,6 +312,8 @@ function mergeClientRosterCharacter(
     }
     if (isRecord(incoming.equipment)) {
         next.equipment = sanitizeEquipment(incoming.equipment);
+        assertEquipmentRequirements(next.equipment as Record<string, unknown>,
+            isRecord(current.equipment) ? current.equipment : {}, current);
     }
     if (typeof incoming.injured === 'boolean') {
         if (incoming.injured && current.injured !== true) {
@@ -313,6 +322,23 @@ function mergeClientRosterCharacter(
         if (!incoming.injured && current.injured === true) delete next.injured;
     }
     return next;
+}
+
+function assertEquipmentRequirements(next: Record<string, unknown>, previous: Record<string, unknown>, character: Record<string, unknown>): void {
+    const owner = readLoadoutOwner(character);
+    const level = typeof character.level === 'number' && Number.isFinite(character.level) ? character.level : 1;
+    for (const [slot, raw] of Object.entries(next)) {
+        if (!isRecord(raw) || typeof raw.itemId !== 'string') continue;
+        const old = previous[slot];
+        // Keep legacy equipment intact, including after promotion resets level.
+        // New placements are checked against server-owned character progression.
+        if (isRecord(old) && old.itemId === raw.itemId) continue;
+        const item = getItemDef(raw.itemId);
+        if (!item || (!item.requiredLevel && !item.requiredTier && !item.branch)) continue;
+        if (!owner || getEquipmentRequirementFailure(item, { ...owner, level })) {
+            throw new HttpError(400, 'equipment_requirements', 'Character does not meet the equipment requirements.');
+        }
+    }
 }
 
 function readNumberRecord(value: Record<string, unknown>): Record<string, number> {

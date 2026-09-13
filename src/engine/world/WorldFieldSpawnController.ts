@@ -71,6 +71,29 @@ function getPartyWalkSprite(classLineId: string, tier: number): PartyWalkSpriteD
     };
 }
 
+const actorSpriteKeys = new WeakMap<Player, string>();
+
+/** Shared by local spawns and snapshots; repeated snapshots must not reload art. */
+export function syncPartyActorSprite(entity: Player, character: Character): void {
+    const key = `${character.classLineId}:${character.currentTier}:${character.getPortraitSrc()}`;
+    if (actorSpriteKeys.get(entity) === key) return;
+    actorSpriteKeys.set(entity, key);
+    if (character.portraitImage && character.portraitLoaded) {
+        entity.image = character.portraitImage;
+        entity.imageLoaded = true;
+    } else {
+        entity.setImage(character.getPortraitSrc());
+    }
+    const sprite = getPartyWalkSprite(character.classLineId, character.currentTier);
+    if (sprite) {
+        entity.setWalkSprite(sprite.src, sprite.frameWidth, sprite.frameHeight, sprite.frameCount,
+            8, sprite.rowByFacing, PARTY_WALK_RENDER_SCALE, sprite.actionRowByFacing, sprite.actionFrameCount);
+    } else {
+        entity.walkSprite = undefined;
+        entity.walkSpriteLoaded = false;
+    }
+}
+
 export class WorldFieldSpawnController {
     private readonly movement: WorldMovementController;
 
@@ -88,26 +111,7 @@ export class WorldFieldSpawnController {
             entity.color = ACTOR_COLORS[index % ACTOR_COLORS.length];
             entity.label = character.name;
             character.updatePortrait();
-            if (character.portraitImage && character.portraitLoaded) {
-                entity.image = character.portraitImage;
-                entity.imageLoaded = true;
-            } else {
-                entity.setImage(character.getPortraitSrc());
-            }
-            const walkSprite = getPartyWalkSprite(character.classLineId, character.currentTier);
-            if (walkSprite) {
-                entity.setWalkSprite(
-                    walkSprite.src,
-                    walkSprite.frameWidth,
-                    walkSprite.frameHeight,
-                    walkSprite.frameCount,
-                    8,
-                    walkSprite.rowByFacing,
-                    PARTY_WALK_RENDER_SCALE,
-                    walkSprite.actionRowByFacing,
-                    walkSprite.actionFrameCount
-                );
-            }
+            syncPartyActorSprite(entity, character);
             return {
                 id: character.id,
                 character,

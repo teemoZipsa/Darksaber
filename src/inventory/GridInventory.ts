@@ -171,37 +171,27 @@ export class GridInventory {
     }
 
     /** Repack items by size and value, consolidating compatible legacy stacks first. */
-    public sort(): void {
-        const items = this.consolidateStacks([...this.items]).sort((a, b) => {
+    public sort(): boolean {
+        // Plan against copies: consolidation changes quantities, and greedy
+        // packing can fail even when the current arrangement fits the bag.
+        const originals = new Map(this.items.map(placed => [{ ...placed }, placed]));
+        const items = this.consolidateStacks([...originals.keys()]).sort((a, b) => {
             const areaDiff = (b.item.gridW * b.item.gridH) - (a.item.gridW * a.item.gridH);
             if (areaDiff !== 0) return areaDiff;
             return b.item.baseValue - a.item.baseValue;
         });
 
-        for (let y = 0; y < this.height; y++) {
-            this.grid[y].fill(null);
-        }
-        this.items = [];
-
+        const staged = new GridInventory(this.width, this.height);
         for (const placed of items) {
-            let didPlace = false;
-            for (let y = 0; y <= this.height - placed.item.gridH && !didPlace; y++) {
-                for (let x = 0; x <= this.width - placed.item.gridW; x++) {
-                    if (this.canPlace(placed.item, x, y)) {
-                        placed.gridX = x;
-                        placed.gridY = y;
-                        for (let dy = 0; dy < placed.item.gridH; dy++) {
-                            for (let dx = 0; dx < placed.item.gridW; dx++) {
-                                this.grid[y + dy][x + dx] = placed;
-                            }
-                        }
-                        this.items.push(placed);
-                        didPlace = true;
-                        break;
-                    }
-                }
-            }
+            if (!staged.autoPlaceExistingWithoutMerge(placed)) return false;
         }
+        this.clear();
+        for (const placed of staged.items) {
+            const original = originals.get(placed)!;
+            original.quantity = placed.quantity;
+            this.placeExisting(original, placed.gridX, placed.gridY);
+        }
+        return true;
     }
 
     private consolidateStacks(items: PlacedItem[]): PlacedItem[] {

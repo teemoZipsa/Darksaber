@@ -588,6 +588,21 @@ test('production snapshot controller localizes server enemies and only authored 
         assert.equal(engine.remotePartyActors.get('remote-companion')?.character.name, 'Cleric');
         assert.equal(engine.remotePartyActors.get('remote-companion')?.entity.label, 'Cleric');
         assert.equal(engine.remotePartyActors.get('remote-user')?.character.name, '홍길동');
+        const remote = engine.remotePartyActors.get('remote-user')!;
+        assert.match(remote.entity.image!.src, /infantry_t1\.png$/);
+        assert.match(remote.entity.walkSprite!.image.src, /infantry_t1_walk\.png$/);
+        const originalSprite = remote.entity.walkSprite;
+        engine.scenarioNetworkControllers.networkSyncController.applySnapshot(snapshot);
+        assert.equal(remote.entity.walkSprite, originalSprite, 'ordinary snapshots must reuse the loaded sprite');
+        const remoteSnapshot = snapshot.partyActors.find(entry => entry.id === 'remote-user')!;
+        remoteSnapshot.currentTier = 7;
+        engine.scenarioNetworkControllers.networkSyncController.applySnapshot(snapshot);
+        assert.match(remote.entity.walkSprite!.image.src, /infantry_t7_walk\.png$/);
+        remoteSnapshot.classLineId = 'master_battle';
+        remoteSnapshot.currentTier = 10;
+        engine.scenarioNetworkControllers.networkSyncController.applySnapshot(snapshot);
+        assert.match(remote.entity.walkSprite!.image.src, /master_battle_t10_walk\.png$/);
+        assert.equal(remote.character.classLineId, 'master_battle');
     } finally {
         i18n.lang = previousLanguage;
     }

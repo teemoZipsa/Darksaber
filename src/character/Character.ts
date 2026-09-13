@@ -93,6 +93,15 @@ export class Character {
         this.applyOriginalClassStats();
     }
 
+    /** Apply authoritative class identity without resetting received stats/EXP. */
+    public syncClassIdentity(classLineId: string, tier: number): void {
+        if (this.classLineId === classLineId && this.currentTier === tier) return;
+        this.classLineId = classLineId;
+        this.classLine = getClassLine(classLineId);
+        this.currentTier = tier;
+        this.updatePortrait();
+    }
+
     constructor(id: string, name: string, classLineId: string) {
         this.id = id;
         this.name = name;
