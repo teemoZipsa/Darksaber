@@ -7,7 +7,7 @@
 
 import { TileType } from './Tile';
 import { TileAssetManager, WATER_ANIMATION_FRAMES, WATER_ANIMATION_FRAME_MS } from './TileAssetManager';
-import { planGroundLayers } from './TerrainTransition';
+import { planGroundLayers, planShoreLayers } from './TerrainTransition';
 
 export const CHUNK_SIZE = 32; // tiles per chunk side
 export const TILE_SIZE = 48;  // pixels per tile (Upgraded to MV/MZ standard)
@@ -148,8 +148,7 @@ export class Chunk {
         }
         this.bufferCtx.globalAlpha = prevAlpha;
 
-        // ── Pass 3: Sea autotile on COASTLINE tiles only ──
-        // Sea autotile has beach edges — only on WATER tiles bordering land
+        // ── Pass 3: Rocky banks over the adjoining land, for both water types ──
         for (let y = 0; y < CHUNK_SIZE; y++) {
             for (let x = 0; x < CHUNK_SIZE; x++) {
                 const tileType = this.tiles[y][x];
@@ -161,32 +160,26 @@ export class Chunk {
                 const worldY = this.chunkY * CHUNK_SIZE + y;
 
                 // Check if this water tile borders any non-water tile
-                const isWaterNeighbor = (nx: number, ny: number) => isWaterType(getGlobalTile(nx, ny));
-                const n_w  = isWaterNeighbor(worldX,     worldY - 1);
-                const ne_w = isWaterNeighbor(worldX + 1, worldY - 1);
-                const e_w  = isWaterNeighbor(worldX + 1, worldY);
-                const se_w = isWaterNeighbor(worldX + 1, worldY + 1);
-                const s_w  = isWaterNeighbor(worldX,     worldY + 1);
-                const sw_w = isWaterNeighbor(worldX - 1, worldY + 1);
-                const w_w  = isWaterNeighbor(worldX - 1, worldY);
-                const nw_w = isWaterNeighbor(worldX - 1, worldY - 1);
+                const neighbors = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]]
+                    .map(([dx, dy]) => getGlobalTile(worldX + dx, worldY + dy));
+                const connections = neighbors.map(isWaterType);
 
                 // Only open water animates. Keep shore artwork and island
                 // corners fixed, including diagonals across chunk boundaries.
-                if (n_w && ne_w && e_w && se_w && s_w && sw_w && w_w && nw_w) {
-                    const blend = [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) =>
-                        getGlobalTile(worldX + dx, worldY + dy) !== tileType);
+                if (connections.every(Boolean)) {
+                    const blend = [0, 2, 4, 6].some(index => neighbors[index] !== tileType);
                     this.animatedWaterTiles.push({ x, y, type: tileType, blend });
                     continue;
                 }
-                if (tileType !== TileType.WATER) continue;
-
-                // Coastline tile: draw Sea autotile with proper neighbor detection
-                TileAssetManager.drawAutotile(
-                    this.bufferCtx, TileType.WATER, px, py, TILE_SIZE,
-                    n_w, ne_w, e_w, se_w, s_w, sw_w, w_w, nw_w,
-                    worldX, worldY
-                );
+                // Shore cells contain transparent LAND outside the rocks. An
+                // opaque water base here leaves blue rectangles beyond them.
+                planShoreLayers(neighbors).forEach((layer, index) => {
+                    if (index === 0) TileAssetManager.drawTile(this.bufferCtx, layer.type, px, py, TILE_SIZE, worldX, worldY);
+                    else TileAssetManager.drawGroundAutotile(this.bufferCtx, layer.type, px, py, TILE_SIZE, layer.connections, worldX, worldY);
+                });
+                // Preserve exact original shapes; compose missing narrow ones.
+                TileAssetManager.drawGroundAutotile(this.bufferCtx, tileType, px, py, TILE_SIZE,
+                    connections, worldX, worldY);
             }
         }
 

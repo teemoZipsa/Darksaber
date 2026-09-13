@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { planGroundLayers } from '../../src/map/TerrainTransition';
-import { TileType as T } from '../../src/map/Tile';
+import { planGroundLayers, planShoreLayers } from '../../src/map/TerrainTransition';
+import { TileType as T, TILE_PROPERTIES } from '../../src/map/Tile';
 
 test('forest crowns sit above adjoining ground without spilling into a road tile', () => {
     for (const ground of [T.GRASS, T.ROAD, T.SAND, T.STONE, T.SNOW]) {
@@ -39,13 +39,31 @@ test('roads continue into town paving without a false border', () => {
     }
 });
 
-test('water, hazards and walls keep their dedicated renderer and silhouette', () => {
-    for (const center of [T.WATER, T.DEEP_WATER, T.LAVA, T.POISON_SWAMP, T.WALL, T.DUNGEON_ENTRANCE]) {
+test('water and hazards keep their dedicated renderer and silhouette', () => {
+    for (const center of [T.WATER, T.DEEP_WATER, T.LAVA, T.POISON_SWAMP]) {
         assert.equal(planGroundLayers(center, Array(8).fill(T.GRASS)), undefined);
     }
     const coast = planGroundLayers(T.SAND, Array(8).fill(T.WATER))!;
     assert.deepEqual(coast.map(layer => layer.type), [T.SAND]);
     assert.ok(coast[0].connections.every(Boolean));
+});
+
+test('castle walls join stone artwork over actual ground without changing collision', () => {
+    for (const center of [T.STONE, T.WALL, T.DUNGEON_ENTRANCE]) {
+        const layers = planGroundLayers(center, [T.SAND, T.SAND, T.WALL, T.STONE, T.STONE, T.WALL, T.WALL, T.SAND])!;
+        assert.deepEqual(layers.map(layer => layer.type), [T.SAND, T.STONE]);
+        assert.deepEqual(layers[1].connections, [false, false, true, true, true, true, true, false]);
+    }
+    assert.equal(TILE_PROPERTIES[T.WALL].walkable, false);
+    assert.equal(TILE_PROPERTIES[T.STONE].walkable, true);
+});
+
+test('shore underlays continue each actual bank without adding grass or trees', () => {
+    assert.deepEqual(planShoreLayers(Array(8).fill(T.WATER)), []);
+    const layers = planShoreLayers([T.SAND, T.SAND, T.WATER, T.DEEP_WATER, T.ROAD, T.WALL, T.WALL, T.SAND]);
+    assert.deepEqual(layers.map(layer => layer.type), [T.SAND, T.ROAD, T.STONE]);
+    assert.deepEqual(layers[2].connections, [false, false, true, true, false, true, true, false]);
+    assert.deepEqual(planShoreLayers([T.FOREST, ...Array(7).fill(T.WATER)]).map(layer => layer.type), [T.GRASS]);
 });
 
 test('a diagonal terrain contact opens only its own corner', () => {

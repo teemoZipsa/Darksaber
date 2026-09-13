@@ -244,15 +244,29 @@ const ORIGINAL_AUTOTILE_CONFIGS: Partial<Record<TileType, OriginalAutotileConfig
     [TileType.WATER]: {
         sheet: 'mdsr0',
         cellsByMask: {
-            3: [139, 140, 169, 170],
-            6: [120, 149, 150],
-            7: [129, 130, 159, 160],
-            9: [143, 144, 173, 174],
-            11: [141, 142, 171, 172],
-            12: [123, 124, 153, 154],
-            13: [133, 134, 163, 164],
-            14: [121, 122, 151, 152],
-            15: [125, 126, 127, 128, 131, 132, 135, 136, 137, 138, 145, 146, 147, 148, 155, 156, 157, 158, 161, 162, 165, 166, 167, 168, 175, 176, 177, 178],
+            3: [139, 140],
+            6: [119, 120],
+            7: [129, 130],
+            9: [143, 144],
+            11: [141, 142],
+            12: [123, 124],
+            13: [133, 134],
+            14: [121, 122],
+            15: [125, 126, 127, 128, 131, 132, 135, 136, 137, 138, 145, 146, 147, 148],
+        },
+    },
+    [TileType.DEEP_WATER]: {
+        sheet: 'mdsr15',
+        cellsByMask: {
+            3: [110, 111],
+            6: [90, 91],
+            7: [100, 101],
+            9: [114, 115],
+            11: [112, 113],
+            12: [94, 95],
+            13: [104, 105],
+            14: [92, 93],
+            15: [96, 97, 98, 99, 102, 103, 106, 107, 108, 109, 116, 117, 118, 119],
         },
     },
 };
@@ -263,6 +277,7 @@ class TileAssetManagerClass {
     private cellCornerCache: Map<string, number> = new Map();
     private cornerCellsCache: Map<string, readonly number[]> = new Map();
     private waterFrameCache = new Map<string, OffscreenCanvas>();
+    private shoreCache = new Map<string, OffscreenCanvas>();
     private snowEdgeCache = new Map<string, OffscreenCanvas>();
     private snowTextureCache = new Map<string, OffscreenCanvas>();
     private forestCornerCache = new Map<string, OffscreenCanvas>();
@@ -345,6 +360,10 @@ class TileAssetManagerClass {
     ): void {
         if (connections.every(Boolean)) {
             this.drawTile(ctx, type, dx, dy, size, worldX, worldY);
+            return;
+        }
+        if (type === TileType.WATER || type === TileType.DEEP_WATER) {
+            this.drawShoreAutotile(ctx, type, dx, dy, size, connections, worldX, worldY);
             return;
         }
         if (type === TileType.SNOW) {
@@ -438,6 +457,63 @@ class TileAssetManagerClass {
             ctx.drawImage(img, cell % 16 * 32 + q.x, Math.floor(cell / 16) * 32 + q.y, 16, 16,
                 dx + q.x / 32 * size, dy + q.y / 32 * size, size / 2, size / 2);
         }
+        ctx.imageSmoothingEnabled = smoothing;
+    }
+
+    private drawShoreAutotile(
+        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+        type: TileType, dx: number, dy: number, size: number,
+        connections: readonly boolean[], worldX: number, worldY: number
+    ): void {
+        const config = ORIGINAL_AUTOTILE_CONFIGS[type]!;
+        if (!this.getSheet(`autotile:${config.sheet}`)) {
+            this.drawTile(ctx, type, dx, dy, size, worldX, worldY);
+            return;
+        }
+        const img = this.getSheet(`autotile:${config.sheet}`)!;
+        const [n, ne, e, se, s, sw, w, nw] = connections;
+        const cardinal = (n ? 1 : 0) | (e ? 2 : 0) | (s ? 4 : 0) | (w ? 8 : 0);
+        const neighbors = { n, ne, e, se, s, sw, w, nw };
+        const inner = this.getWantedInnerCornerMask(neighbors);
+        const original = config.cellsByMask[cardinal];
+        if (original && (inner === 0 || original.some(cell => this.getCellCornerCutMask(img, cell) === inner))) {
+            // Preserve the full-size original rocks and curves wherever the
+            // recovered set contains the exact shape needed by this bank.
+            this.drawOriginalAutotile(ctx, type, dx, dy, size, neighbors, cardinal, worldX, worldY);
+            return;
+        }
+        const mask = connections.reduce((bits, on, i) => bits | (on ? 1 << i : 0), 0);
+        const variant = this.hashCell(worldX, worldY, type) % 2;
+        const key = `${type}:${mask}:${variant}`;
+        let shore = this.shoreCache.get(key);
+        if (!shore) {
+            // Original banks reach beyond half a tile; clipping their quarters
+            // loses the rocks, and opposite banks can erase a narrow channel.
+            // Assemble a complete 3x3 patch first, then fit it to one cell.
+            // Every source cell now has a supported edge or a single corner.
+            const patch = new OffscreenCanvas(96, 96);
+            const patchCtx = patch.getContext('2d')!;
+            const inside = (x: number, y: number): boolean => {
+                if (x < 0) return connections[y < 0 ? 7 : y > 2 ? 5 : 6];
+                if (x > 2) return connections[y < 0 ? 1 : y > 2 ? 3 : 2];
+                return y < 0 ? connections[0] : y > 2 ? connections[4] : true;
+            };
+            for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
+                this.drawAutotile(patchCtx, type, x * 32, y * 32, 32,
+                    inside(x, y - 1), inside(x + 1, y - 1), inside(x + 1, y), inside(x + 1, y + 1),
+                    inside(x, y + 1), inside(x - 1, y + 1), inside(x - 1, y), inside(x - 1, y - 1),
+                    worldX, worldY);
+            }
+            shore = new OffscreenCanvas(32, 32);
+            const shoreCtx = shore.getContext('2d')!;
+            shoreCtx.imageSmoothingEnabled = false;
+            shoreCtx.drawImage(patch, 0, 0, 32, 32);
+            if (this.shoreCache.size >= 256) this.shoreCache.delete(this.shoreCache.keys().next().value!);
+            this.shoreCache.set(key, shore);
+        }
+        const smoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(shore, dx, dy, size, size);
         ctx.imageSmoothingEnabled = smoothing;
     }
 
