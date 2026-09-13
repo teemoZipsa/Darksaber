@@ -141,7 +141,6 @@ export class UiStore {
 
     public getFieldHudView() { return this.gm.getFieldEngine?.()?.getFieldHudView() ?? null; }
     public stopFieldTravel(): void { this.gm.getFieldEngine()?.stopFieldTravel(); this.tick(); }
-    public returnFromField(): void { this.gm.getFieldEngine()?.returnToTown(); this.tick(); }
     public guideToNearbyHunt(): void { this.gm.getFieldEngine()?.guideToNearbyHunt(); this.tick(); }
     public getRaidOutcome() { return this.gm.getFieldEngine?.()?.getRaidOutcome() ?? null; }
     public confirmRaidOutcome(): void { this.gm.getFieldEngine()?.confirmRaidOutcome(); this.tick(); }

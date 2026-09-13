@@ -85,12 +85,17 @@ test('overlapping aliases of one effect produce only one voice', async (context)
     assert.equal(sources.length, 1);
 });
 
-test('effects triggered before audio unlock do not burst out on the first gesture', async (context) => {
+test('effects triggered before audio unlock are discarded before loading', async (context) => {
     context.mock.method(SettingsManager, 'getMuteSFX', () => false);
-    const { manager, runtime, sources, finish } = mixer();
+    const { manager, runtime, sources } = mixer();
+    const loads: string[] = [];
+    runtime.loadBuffer = async (key: string) => { loads.push(key); };
     runtime.ctx.state = 'suspended';
     manager.playSfx('sfx.coin');
-    await finish('sfx.coin');
+    manager.playUi('ui.confirm');
+    runtime.ctx.state = 'running'; // A gesture can happen before the decode resolves.
+    await Promise.resolve();
+    assert.deepEqual(loads, []);
     assert.equal(sources.length, 0);
 });
 

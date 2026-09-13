@@ -345,7 +345,7 @@ export class WorldNetworkSyncController {
     }
 
     public openLoot(grant: LootGrantMessage): void {
-        AudioManager.playSfx('sfx.door', { volume: 0.35 });
+        AudioManager.playUi('ui.open', { volume: 0.5 });
         const grid = this.gridFromSnapshot(grant.gridSnapshot);
         const loot = this.context.getWorldMap().loot.find((entry) => entry.id === grant.lootId);
         this.context.gameManager.inventoryUI.setExternalGrid(

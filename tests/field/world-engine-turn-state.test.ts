@@ -43,6 +43,10 @@ function makeEngineHarness(actor: FieldActor): { engine: any; calls: string[] } 
     engine.partyActors = [actor];
     engine.fieldEnemies = [];
     engine.remotePartyActors = new Map();
+    // These tests isolate actor/turn reconciliation; town settlement has its own harness.
+    engine.raidLifecycleControllers = {
+        raidLifecycleController: { requestNetworkTownArrival: () => false },
+    };
     const storyScenarioController = {
         applyNetworkScenarioSnapshot: () => undefined,
         handleNetworkActionRejected: () => false,

@@ -326,10 +326,9 @@ export class WorldInputController {
             return true;
         }
         this.context.playerActionController.handleTargetClick(tile, hit);
-        AudioManager.playUi(
-            this.context.playerActionController.getMode() === 'move' ? 'ui.error' : 'ui.confirm',
-            { volume: 0.65 }
-        );
+        if (this.context.playerActionController.getMode() === 'move') {
+            AudioManager.playUi('ui.error', { volume: 0.65 });
+        }
         return true;
     }
 

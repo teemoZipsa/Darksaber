@@ -46,7 +46,7 @@ interface CrossfadeOptions {
  */
 const originalSfx = (id: string): string => `/assets/sounds/original/${id}.wav`;
 const SFX_OUTPUT_TRIM = 0.88;
-const UI_OUTPUT_TRIM = 0.9;
+const UI_OUTPUT_TRIM = 0.35;
 
 export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = {
     // UI
@@ -69,7 +69,6 @@ export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = 
     'sfx.coin':        { src: originalSfx('01'), channel: 'sfx' },
     'sfx.equip':       { src: '/assets/sounds/sfx/equip.wav', channel: 'sfx' },
     'sfx.unequip':     { src: '/assets/sounds/sfx/unequip.wav', channel: 'sfx' },
-    'sfx.deploy':      { src: '/assets/sounds/sfx/deploy.wav', channel: 'sfx' },
 
     // Original magic / state effects inferred from gameres_unpacked/set/MagicPtn.atr
     'sfx.magic.fire':        { src: originalSfx('00'), channel: 'sfx' },
@@ -134,7 +133,6 @@ export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = 
     'sfx.book_close': { src: '/assets/sounds/community/book-close.wav', channel: 'sfx' },
     'sfx.complete': { src: '/assets/sounds/community/complete.wav', channel: 'sfx' },
     'sfx.defeat': { src: '/assets/sounds/community/defeat.wav', channel: 'sfx' },
-    'sfx.door':           { src: originalSfx('04'), channel: 'sfx' },
     'sfx.extract_start':  { src: originalSfx('09'), channel: 'sfx' },
     'sfx.extract_done':   { src: originalSfx('01'), channel: 'sfx' },
 
@@ -371,6 +369,9 @@ export class AudioManagerClass {
         const cat = AUDIO_CATALOG[key];
         if (!cat || cat.channel !== channel) return;
         const context = this.ctx;
+        // A later pointer gesture must not release effects requested before
+        // audio was unlocked (for example while entering the first town).
+        if (context?.state !== 'running') return;
 
         const src = this.bufferKey(key);
         const requestedAt = Date.now();

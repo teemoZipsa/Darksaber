@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { walkToTown } from './helpers/walk-to-town';
 
 async function localState(page: Page) {
     return page.evaluate(() => {
@@ -37,7 +38,7 @@ async function moveAndReturn(page: Page) {
     });
     await page.mouse.click(target.x, target.y);
     await expect.poll(async () => (await localState(page)).tile).toEqual(target.tile);
-    await page.getByRole('button', { name: /마을로 귀환|Return to town/ }).click();
+    await walkToTown(page);
     await expect.poll(async () => (await localState(page)).active).toBe(false);
     await page.keyboard.press('Enter');
     await expect(page.locator('.ds-town')).toBeVisible();

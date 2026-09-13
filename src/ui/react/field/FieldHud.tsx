@@ -39,12 +39,10 @@ export function FieldHud() {
                     {state.hunt.target && !state.travelling && <button type="button" className="ds-btn" disabled={state.hunt.target.distance <= 1} onClick={() => store.guideToNearbyHunt()}>{t(state.hunt.target.distance <= 1 ? 'field.hunt.ready' : 'field.hunt.guide')}</button>}
                 </div>}
                 <div className="ds-field-guide__text">
-                    <strong role="status">{state.threat ? formatT('field.expedition.combatAp', { ap: state.ap }) : t(`field.travel.${state.travel}`)}</strong>
+                    {(state.threat || state.travel !== 'idle') && <strong role="status">{state.threat ? formatT('field.expedition.combatAp', { ap: state.ap }) : t(`field.travel.${state.travel}`)}</strong>}
                     <span>{state.travelling ? formatT('field.travel.remaining', { distance: state.distance }) : t(state.threat || state.interior ? 'field.expedition.combatHint' : 'field.expedition.moveHint')}</span>
                 </div>
-                {state.travelling
-                    ? <button type="button" className="ds-btn" onClick={() => store.stopFieldTravel()}>{t('field.travel.stop')}</button>
-                    : <button type="button" className="ds-btn" disabled={!state.canReturn} onClick={() => store.returnFromField()}>{t('field.expedition.return')}</button>}
+                {state.travelling && <button type="button" className="ds-btn" onClick={() => store.stopFieldTravel()}>{t('field.travel.stop')}</button>}
             </section>}
         </div>
     );

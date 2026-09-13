@@ -454,13 +454,6 @@ export class WorldEngine {
         return true;
     }
 
-    public returnToTown(): void {
-        if (!this.raidSession.active || this.isModalOverlayVisible() || this.hasFieldThreat()) return;
-        this.stopFieldTravel();
-        if (this.isNetworkRaid) this.networkRaidClient?.leave('manual', true);
-        else this.raidLifecycleControllers.raidOutcomeController.completeFailure('LEFT');
-    }
-
     public preserveLocalExploration(): void {
         if (!this.isNetworkRaid && this.raidSession.active) {
             this.stopFieldTravel();
@@ -499,7 +492,6 @@ export class WorldEngine {
             travel: !threat && this.fieldTravel?.status === 'danger' ? 'idle' : this.fieldTravel?.status ?? 'idle',
             travelling: this.fieldTravel?.active ?? false,
             distance: this.fieldTravel?.destination ? manhattan({ x: actor.entity.gridX, y: actor.entity.gridY }, this.fieldTravel.destination) : 0,
-            canReturn: !threat && (!this.isNetworkRaid || Boolean(this.networkRaidClient?.getIsOpen())),
             hunt: this.getNearbyHuntView(),
         };
     }
@@ -813,6 +805,9 @@ export class WorldEngine {
     private applyNetworkSnapshot(snapshot: WorldSnapshot): void {
         applyWorldEngineNetworkSnapshot(this.scenarioNetworkControllers, this.raidSession, snapshot);
         this.recordNearbyMonsterEncounters('network', snapshot.serverTime);
+        if (this.raidLifecycleControllers.raidLifecycleController.requestNetworkTownArrival(snapshot)) {
+            this.stopFieldTravel();
+        }
     }
 
     private openNetworkLoot(grant: LootGrantMessage): void {

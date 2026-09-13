@@ -40,7 +40,8 @@ instrument/drum timbres do not reproduce the original General MIDI sound source.
 
 ## Effects
 
-All 20 recovered WAV files have active gameplay aliases. Numbered magic aliases
+Recovered WAV files remain available, but uncertain effects are not forced into
+unrelated actions merely to use every file. Numbered magic aliases
 reuse the previous catalog's `MagicPtn.atr` interpretation. The additional
 gameplay assignments below are inferred; the original data source was not
 available to recheck those labels during this integration.
@@ -51,7 +52,7 @@ available to recheck those labels during this integration.
 | 01 | Loot pickup, purchases and sales |
 | 02 | Ice magic |
 | 03 | Blizzard, metal impact |
-| 04 | Opening loot, entering town (low confidence) |
+| 04 | Unassigned; removed from loot/town entry after reports of metallic navigation sounds |
 | 05 | Thunder magic |
 | 06 | Wind cutter |
 | 07 | Weapon swing / physical hit |
@@ -68,6 +69,9 @@ available to recheck those labels during this integration.
 | 22 | Quick / poison |
 | 24 | Healing magic, recovery item, clinic treatment |
 
+Town/field transitions are silent except for BGM changes. Loot panels use the
+short `ui.open` cue. Successful ground movement adds no confirmation effect;
+footsteps provide feedback. UI channel trim is 0.35 (previously 0.9).
 Existing small UI/equipment WAVs remain in use. Grass, hard-ground and snow
 steps now use community recordings; wet ground keeps its procedural sound.
 Identical effects share a short playback throttle; at most 12 simultaneous

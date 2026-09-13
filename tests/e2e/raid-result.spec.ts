@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
+import { walkToTown } from './helpers/walk-to-town';
 
 async function returnFromField(page: Page) {
     await page.goto('/?devStart=raid&devLocal=1');
     await expect(page.getByTestId('field-hud')).toBeVisible({ timeout: 20_000 });
-    await page.getByRole('button', { name: /마을로 귀환|Return to town/ }).click();
-    await expect(page.getByTestId('raid-result')).toBeVisible();
+    await walkToTown(page);
 }
 
 test('real collected loot is readable in the result and touch confirmation opens town without duplicate rewards', async ({ page, isMobile }, testInfo) => {
@@ -13,7 +13,7 @@ test('real collected loot is readable in the result and touch confirmation opens
     await page.goto('/?devStart=raid&devScenario=loot&devLocal=1');
     await page.getByRole('button', { name: /전부 가져가기|Take all/i }).click();
     await page.getByRole('button', { name: /닫기|Close/, exact: true }).click();
-    await page.getByRole('button', { name: /마을로 귀환|Return to town/ }).click();
+    await walkToTown(page);
     const result = page.getByTestId('raid-result');
     await expect(result).toBeVisible();
     await expect(result.locator('.ds-result__items li')).toHaveCount(2);

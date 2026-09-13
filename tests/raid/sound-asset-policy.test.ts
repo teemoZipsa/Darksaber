@@ -49,18 +49,25 @@ test('unused water recording stays optional because wet footsteps are procedural
     }
 });
 
-test('all music files exist, original episode MIDIs are preserved and every numbered effect is used', () => {
-    const used = new Set([...policy.requiredKeys].map((key) => policy.catalog.get(key)));
+test('all music and recovered effects exist without forcing unknown effects into unrelated interactions', () => {
     for (const [key, src] of policy.catalog) {
         if (key.startsWith('bgm.')) {
             assert.ok(existsSync(join(rootDir, 'public', src)), key);
         }
         if (key.startsWith('bgm.story.') || key.startsWith('bgm.tutorial.')) assert.ok(src.endsWith('.mid'), key);
-        if (key.startsWith('sfx.original.')) assert.ok(used.has(src), `unconnected original ${src}`);
+        if (key.startsWith('sfx.original.')) assert.ok(existsSync(join(rootDir, 'public', src)), key);
     }
     for (const key of ['bgm.title', 'bgm.world', 'bgm.town', 'bgm.raid', 'bgm.boss']) {
         assert.ok(policy.requiredKeys.has(key), key);
     }
+});
+
+test('menu and scene interactions do not use ambiguous recovered or deploy effects', () => {
+    assert.equal(policy.requiredKeys.has('sfx.door'), false);
+    assert.equal(policy.requiredKeys.has('sfx.deploy'), false);
+    const original04 = '/assets/sounds/original/04.wav';
+    for (const key of policy.requiredKeys) assert.notEqual(policy.catalog.get(key), original04, key);
+    for (const [key, src] of policy.catalog) if (key.startsWith('ui.')) assert.ok(src.startsWith('/assets/sounds/ui/'), key);
 });
 
 test('every bundled community sound has a used hook, unchanged hash and source license', () => {

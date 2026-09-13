@@ -4,6 +4,7 @@ import { Character } from '../../src/character/Character';
 import { Player } from '../../src/entity/Player';
 import type { FieldActor, FieldHitParty } from '../../src/field/FieldTypes';
 import { WorldInputController, type WorldInputContext } from '../../src/engine/world/WorldInputController';
+import { AudioManager } from '../../src/engine/AudioManager';
 
 class ImageStub {
     public src = '';
@@ -482,7 +483,9 @@ test('Space explicitly ends the active party turn as wait', () => {
     assert.ok(!calls.includes('closeActionMenu'));
 });
 
-test('clicking valid ground with an active party turn executes movement directly', () => {
+test('clicking valid ground executes movement without an extra confirmation sound', (t) => {
+    const sounds: string[] = [];
+    t.mock.method(AudioManager, 'playUi', (key: string) => sounds.push(key));
     const actor = makeActor('hero');
     const calls: string[] = [];
     const context = makeContext(actor, calls);
@@ -502,7 +505,10 @@ test('clicking valid ground with an active party turn executes movement directly
             calls.push(`execute:${action}`);
             mode = action === 'move' ? 'move' : null;
         },
-        handleTargetClick: (tile: { x: number; y: number }) => calls.push(`target:${tile.x},${tile.y}`),
+        handleTargetClick: (tile: { x: number; y: number }) => {
+            calls.push(`target:${tile.x},${tile.y}`);
+            mode = null;
+        },
     } as any;
     const controller = new WorldInputController(context);
 
@@ -512,6 +518,7 @@ test('clicking valid ground with an active party turn executes movement directly
     });
 
     assert.deepEqual(calls, ['execute:move', 'target:3,0']);
+    assert.deepEqual(sounds, []);
     assert.ok(!calls.includes('closeActionMenu'));
     assert.ok(!calls.includes('dismissActionMenuTurn'));
 });

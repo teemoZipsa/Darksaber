@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { walkToTown } from './helpers/walk-to-town';
 
 // Share this isolated test account across viewports without exceeding the real
 // signup limiter. Every online case must finish its session before the next one.
@@ -78,8 +79,7 @@ test('safe field travel crosses multiple movement budgets from one pointer order
     await expect.poll(async () => (await debug(page)).hud?.travelling).toBe(true);
     await expect.poll(async () => (await debug(page)), { timeout: 30_000 }).toMatchObject({ tile: fixture.destination });
     await expect.poll(async () => (await debug(page)).hud?.travel).toBe('arrived');
-    await expect(page.getByRole('button', { name: /마을로 귀환|Return to town/ })).toBeEnabled();
-    await page.getByRole('button', { name: /마을로 귀환|Return to town/ }).click();
+    await walkToTown(page);
     await expect.poll(async () => (await debug(page)).active).toBe(false);
     await page.keyboard.press('Enter');
     await expect(page.locator('.ds-town')).toBeVisible();
@@ -133,15 +133,16 @@ test('online travel uses server moves and return preserves the save before redep
     await expect.poll(async () => (await debug(page)).tile, { timeout: 30_000 }).toEqual(destination);
     await expect.poll(async () => (await debug(page)).hud?.travel).toBe('arrived');
     await page.screenshot({ path: testInfo.outputPath('field-exploration.png') });
-    await page.getByRole('button', { name: /마을로 귀환|Return to town/ }).click();
+    await walkToTown(page);
     await expect.poll(async () => (await debug(page)).active).toBe(false);
     await page.keyboard.press('Enter');
     await expect(page.locator('.ds-town')).toBeVisible();
     const after = await readSave();
     expect(after.inventory).toEqual(before.inventory);
     expect(after.equipment).toEqual(before.equipment);
-    expect(after.questState.gold).toBe(before.questState.gold);
-    expect(after.questState.raidHistory[0]).toMatchObject({ result: 'LEFT', lostItems: 0, equipmentLost: 0 });
+    const goldReward = await page.evaluate(() => (window as any).__gm.playerData.raidHistory[0].goldReward);
+    expect(after.questState.gold).toBe(before.questState.gold + goldReward);
+    expect(after.questState.raidHistory[0]).toMatchObject({ result: 'SURVIVED', lostItems: 0, equipmentLost: 0 });
     await page.getByRole('button', { name: /필드로 나가기|Enter the field/ }).click();
     await expect(page.getByTestId('field-hud')).toBeVisible();
     await page.waitForFunction(() => (window as unknown as { __gm: any }).__gm.worldEngine.isNetworkRaidActive());

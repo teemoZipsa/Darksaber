@@ -111,7 +111,7 @@ export class WorldLootController {
         }
         this.context.selectionController.selectLoot(loot.id);
         this.context.log(formatT('field.log.lootSearch', { source: sourceLabel }));
-        AudioManager.playSfx('sfx.door', { volume: 0.35 });
+        AudioManager.playUi('ui.open', { volume: 0.5 });
         this.context.clearControlledPath();
         const actor = this.context.getControlledActor();
         if (actor) actor.queuedIntent = null;

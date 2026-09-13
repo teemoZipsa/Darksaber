@@ -8,7 +8,6 @@ import type { TownInfo } from '../../map/BiomeMask';
 import type { WorldMap } from '../../map/WorldMap';
 import { resolveTownArrival } from '../../raid/RaidRules';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
-import { AudioManager } from '../AudioManager';
 import type { GameManager, HubFlushResult } from '../GameManager';
 import type { Player } from '../../entity/Player';
 import { AuthApiError } from '../../net/AuthClient';
@@ -91,6 +90,7 @@ export interface WorldRaidLifecycleContext {
 
 export class WorldRaidLifecycleController {
     private readonly context: WorldRaidLifecycleContext;
+    private townArrivalRequested = false;
 
     constructor(context: WorldRaidLifecycleContext) {
         this.context = context;
@@ -105,7 +105,6 @@ export class WorldRaidLifecycleController {
             this.context.setNetworkPlayerId(null);
         }
         this.context.closeFieldOverlays();
-        AudioManager.playSfx('sfx.door', { volume: 0.3 });
         this.context.setPhase('town');
         this.context.raidSession.enterTown(town.id);
         this.context.townSession.show(town);
@@ -262,6 +261,26 @@ export class WorldRaidLifecycleController {
         void this.finishNetworkRaidResult(result);
     }
 
+    /** A server snapshot, not a predicted sprite position, confirms arrival.
+     * Settlement still belongs to the server's WORLD_LEAVE town validation. */
+    public requestNetworkTownArrival(snapshot: WorldSnapshot): boolean {
+        if (this.townArrivalRequested) return true;
+        if (!this.context.isNetworkRaid() || !this.context.raidSession.active
+            || !snapshot.raidTimer.active || snapshot.scenario?.activeDungeonId) return false;
+        const playerId = this.context.getNetworkPlayerId();
+        if (!playerId) return false;
+        // Use the same leading actor that the server uses to validate town entry.
+        const leader = snapshot.partyActors.find((actor) => actor.ownerPlayerId === playerId);
+        if (!leader || leader.isDead || leader.isGhost) return false;
+        const town = this.context.getWorldMap().getTownAtTile(leader.tile.x, leader.tile.y);
+        const client = this.context.getNetworkRaidClient();
+        if (!town || !client?.getIsOpen()) return false;
+        this.townArrivalRequested = true;
+        this.context.closeFieldOverlays();
+        client.leave('town', true);
+        return true;
+    }
+
     private async finishNetworkRaidResult(result: RaidResultMessage): Promise<void> {
         const goldBeforeSync = this.context.playerData.gold;
         const displaySecured = this.context.raidOutcomeController.snapshotRaidLootForDisplay();
@@ -317,6 +336,7 @@ export class WorldRaidLifecycleController {
     }
 
     public closeNetworkRaidClient(sendLeave: boolean, reason: 'town' | 'wipe' | 'manual' = 'manual'): void {
+        this.townArrivalRequested = false;
         this.context.networkSyncController.clearPendingState();
         this.context.storyScenarioController.resetNetworkState();
         this.context.clearRemotePartyActors();
@@ -445,6 +465,7 @@ export class WorldRaidLifecycleController {
                 this.context.setNetworkWasReconnecting(false);
                 break;
             case 'reconnecting':
+                this.townArrivalRequested = false;
                 this.context.setNetworkWasReconnecting(true);
                 this.context.log(formatNetworkStatusLog(status));
                 break;
