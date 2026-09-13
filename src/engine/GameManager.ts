@@ -295,18 +295,22 @@ export class GameManager {
     }
 
     public closeQuestJournal(): void {
+        if (this.questJournalOpen) AudioManager.playSfx('sfx.book_close', { volume: 0.35 });
         this.questJournalOpen = false;
     }
 
     private toggleQuestJournal(): void {
         if (!this.worldEngine?.isQuestJournalAvailable()) return;
-        if (!this.questJournalOpen) {
-            if (this.inventoryUI.isVisible()) this.inventoryUI.toggle();
-            if (this.charUI.isVisible()) this.charUI.toggle();
-            if (this.partyUI.isVisible()) this.partyUI.toggle();
-            this.magicLoadoutOpen = false;
+        if (this.questJournalOpen) {
+            this.closeQuestJournal();
+            return;
         }
-        this.questJournalOpen = !this.questJournalOpen;
+        if (this.inventoryUI.isVisible()) this.inventoryUI.toggle();
+        if (this.charUI.isVisible()) this.charUI.toggle();
+        if (this.partyUI.isVisible()) this.partyUI.toggle();
+        this.magicLoadoutOpen = false;
+        this.questJournalOpen = true;
+        AudioManager.playSfx('sfx.book_open', { volume: 0.35 });
     }
 
     // ─── Magic loadout panel (DOM overlay, K key) ─────────────────

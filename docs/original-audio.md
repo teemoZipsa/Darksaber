@@ -3,6 +3,11 @@
 The game uses the existing files in `public/assets/sounds/original` and
 `public/assets/sounds/bgm`. No recovered files were edited or replaced.
 
+Supplementary CC0 audio now fills regional music, footsteps and interaction
+roles. See [community audio sources and assignments](../public/assets/sounds/community/README.md).
+The table below records the initial recovered-track arrangement; the community
+mapping adds distinct village, port, desert and non-story mine music.
+
 ## Music
 
 There are 21 MIDI files but only seven byte-distinct tracks. The groups below
@@ -63,7 +68,8 @@ available to recheck those labels during this integration.
 | 22 | Quick / poison |
 | 24 | Healing magic, recovery item, clinic treatment |
 
-Existing small UI/equipment WAVs and procedural footsteps remain in use.
+Existing small UI/equipment WAVs remain in use. Grass, hard-ground and snow
+steps now use community recordings; wet ground keeps its procedural sound.
 Identical effects share a short playback throttle; at most 12 simultaneous
 one-shot voices play. Stale effects and effects triggered while the browser
 audio context is suspended are discarded. BGM and effects follow existing

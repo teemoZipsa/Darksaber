@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import { createHash } from 'node:crypto';
 import {
     buildRequiredSoundPaths,
     collectRequiredSoundKeys,
@@ -40,24 +41,41 @@ test('core combat and UI hooks are required', () => {
     }
 });
 
-test('unused recorded footsteps stay optional', () => {
+test('unused water recording stays optional because wet footsteps are procedural', () => {
     for (const src of [
-        '/assets/sounds/world/footstep_grass.ogg',
+        '/assets/sounds/world/footstep_water.ogg',
     ]) {
         assert.ok(isOptionalSoundAsset(src, policy), `expected optional sound ${src}`);
     }
 });
 
-test('every music key resolves to a recovered MIDI and every numbered effect is used', () => {
+test('all music files exist, original episode MIDIs are preserved and every numbered effect is used', () => {
     const used = new Set([...policy.requiredKeys].map((key) => policy.catalog.get(key)));
     for (const [key, src] of policy.catalog) {
         if (key.startsWith('bgm.')) {
-            assert.ok(src.endsWith('.mid'), key);
             assert.ok(existsSync(join(rootDir, 'public', src)), key);
         }
+        if (key.startsWith('bgm.story.') || key.startsWith('bgm.tutorial.')) assert.ok(src.endsWith('.mid'), key);
         if (key.startsWith('sfx.original.')) assert.ok(used.has(src), `unconnected original ${src}`);
     }
     for (const key of ['bgm.title', 'bgm.world', 'bgm.town', 'bgm.raid', 'bgm.boss']) {
         assert.ok(policy.requiredKeys.has(key), key);
     }
+});
+
+test('every bundled community sound has a used hook, unchanged hash and source license', () => {
+    const folder = join(rootDir, 'public/assets/sounds/community');
+    const manifest = JSON.parse(readFileSync(join(folder, 'manifest.json'), 'utf8'));
+    const used = new Set([...policy.requiredKeys].map((key) => policy.catalog.get(key)));
+    assert.equal(manifest.license, 'CC0-1.0');
+    const files = new Set<string>();
+    for (const asset of manifest.assets) {
+        assert.ok(used.has(`/assets/sounds/community/${asset.file}`), `unused sound: ${asset.file}`);
+        assert.equal(createHash('sha256').update(readFileSync(join(folder, asset.file))).digest('hex'), asset.sha256);
+        const source = manifest.sources[asset.source];
+        assert.match(source.page, /^https:\/\//);
+        assert.match(readFileSync(join(folder, source.licenseFile), 'utf8'), /CC0/);
+        files.add(asset.file);
+    }
+    for (const path of used) if (path?.includes('/community/')) assert.ok(files.has(path.split('/').pop()!));
 });

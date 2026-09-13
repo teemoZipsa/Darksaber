@@ -1,5 +1,6 @@
 import type { PartyManager } from '../../character/PartyManager';
 import { Character } from '../../character/Character';
+import { AudioManager } from '../AudioManager';
 import { getItemDef, type ItemDef } from '../../data/ItemDB';
 import type { PlayerData } from '../../data/PlayerData';
 import { GridInventory, type PlacedItem } from '../../inventory/GridInventory';
@@ -408,6 +409,11 @@ export class WorldRaidOutcomeController {
     }
 
     private showRaidResult(outcome: RaidOutcome, nextTown: TownInfo): void {
+        if (outcome.result === 'DEAD' || outcome.result === 'MIA') {
+            AudioManager.playSfx('sfx.defeat', { volume: 0.4 });
+        } else if (outcome.kills > 0 || (outcome.questRewards?.length ?? 0) > 0) {
+            AudioManager.playSfx('sfx.complete', { volume: 0.4 });
+        }
         this.context.setPhase('lobby');
         this.context.raidSession.setPendingTownAfterResult(nextTown.id);
         this.context.townSession.hide();

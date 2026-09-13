@@ -1,0 +1,240 @@
+{
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "retrieved": "2026-09-13",
+  "scope": "Only the files in this folder; recovered original game assets have separate provenance.",
+  "sources": {
+    "impact": {
+      "author": "Kenney",
+      "title": "Impact Sounds",
+      "page": "https://kenney.nl/assets/impact-sounds",
+      "download": "https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip",
+      "archiveSha256": "029d734af1582474edf3a694d1b0cebc97c1c152f2f39fa34d4c2bafc5de77f8",
+      "licenseFile": "LICENSE-impact.txt"
+    },
+    "rpg": {
+      "author": "Kenney",
+      "title": "RPG Audio",
+      "page": "https://kenney.nl/assets/rpg-audio",
+      "download": "https://kenney.nl/media/pages/assets/rpg-audio/8e99002d76-1677590336/kenney_rpg-audio.zip",
+      "archiveSha256": "6dbeaf8544da958d8f2adcb4a4a4b76c1ade34a05f8ab9edccd327da7375f38b",
+      "licenseFile": "LICENSE-rpg.txt"
+    },
+    "jingles": {
+      "author": "Kenney",
+      "title": "Music Jingles",
+      "page": "https://kenney.nl/assets/music-jingles",
+      "download": "https://kenney.nl/media/pages/assets/music-jingles/f37e530b9e-1677590399/kenney_music-jingles.zip",
+      "archiveSha256": "b729ba57959bd58793d2c5cafa348aaf2655d354f3da35ec4729e03ec77197b8",
+      "licenseFile": "LICENSE-jingles.txt"
+    },
+    "towns": {
+      "author": "Juhani Junkala / SubspaceAudio",
+      "title": "JRPG Pack 2 Towns",
+      "page": "https://opengameart.org/content/jrpg-pack-2-towns",
+      "download": "https://opengameart.org/sites/default/files/JRPG%20Music%20Pack%20%232%20%5BTowns%5D%20by%20Juhani%20Junkala.zip",
+      "archiveSha256": "b56785b248ad0faf629a5981eed7ec507b738abf87230e19ae0dba2f4eb466f8",
+      "licenseFile": "LICENSE-towns.txt"
+    },
+    "exploration": {
+      "author": "Juhani Junkala / SubspaceAudio",
+      "title": "JRPG Pack 1 Exploration",
+      "page": "https://opengameart.org/content/jrpg-pack-1-exploration",
+      "download": "https://opengameart.org/sites/default/files/JRPG%20Music%20Pack%20%231%20%5BExploration%5D%20by%20Juhani%20Junkala.zip",
+      "archiveSha256": "115a36ca3e076e8e4bd6617a205f2b8834ea7bf250f2ba39613a7f1f1834d60a",
+      "licenseFile": "LICENSE-exploration.txt"
+    }
+  },
+  "assets": [
+    {
+      "file": "step-grass-1.wav",
+      "source": "impact",
+      "originalFile": "Audio/footstep_grass_000.ogg",
+      "sourceSha256": "9d49497777405d78d7cf7f2888e28277f3a23192300cfd1d79d54876b20f479f",
+      "sha256": "be283f07c46226881d12610ae6ea8be3a75aeef20b51aa9eabafeff874f96f92",
+      "purpose": "grass footstep variation",
+      "durationSeconds": 0.775,
+      "processing": "22050 Hz, 1 channel(s), static gain -9.9272 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "step-grass-2.wav",
+      "source": "impact",
+      "originalFile": "Audio/footstep_grass_001.ogg",
+      "sourceSha256": "fb28781bd22b2eefdc14077f1adf5c94d7fe9c3a130194633b55f3e0d39d9f04",
+      "sha256": "55fee030d9f8bbdaf0907bb33be1eae57e7fd0009e93f1fb37eaad006be850bc",
+      "purpose": "grass footstep variation",
+      "durationSeconds": 0.671,
+      "processing": "22050 Hz, 1 channel(s), static gain -9.5332 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "step-grass-3.wav",
+      "source": "impact",
+      "originalFile": "Audio/footstep_grass_002.ogg",
+      "sourceSha256": "73a520139f5be716a403bfe9c80e0e94d1e61d8e9de04a354b336392164b53dc",
+      "sha256": "4e70e1b46009aee98ef362d5ba9f9e5eeb293f3f267415771e299f9cccf2ee56",
+      "purpose": "grass footstep variation",
+      "durationSeconds": 0.69,
+      "processing": "22050 Hz, 1 channel(s), static gain -9.9551 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "step-concrete-1.wav",
+      "source": "impact",
+      "originalFile": "Audio/footstep_concrete_000.ogg",
+      "sourceSha256": "d7267e183067757c92c169de2a379abea592cfca6b39bb2e8feea15221ad79fe",
+      "sha256": "ddeb7ba10a311bfaed38e8c8011e5572ef0a3c8a945f928526c7081069df9843",
+      "purpose": "concrete footstep variation",
+      "durationSeconds": 0.103,
+      "processing": "22050 Hz, 1 channel(s), static gain -10.0832 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "step-concrete-2.wav",
+      "source": "impact",
+      "originalFile": "Audio/footstep_concrete_001.ogg",
+      "sourceSha256": "507a75eb19b897087855a3be3cf11a12d7fa37d143ad535eeebe0b8031c7325d",
+      "sha256": "03ad563bcb76de4c86971bfb54c20e8bda7e277b13576435c32ab1f715bceb9e",
+      "purpose": "concrete footstep variation",
+      "durationSeconds": 0.105,
+      "processing": "22050 Hz, 1 channel(s), static gain -9.7066 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "step-concrete-3.wav",
+      "source": "impact",
+      "originalFile": "Audio/footstep_concrete_002.ogg",
+      "sourceSha256": "b21fa546d74941196b25da8a20b7010abd8c05c4fcf93545d1f344e66a664e13",
+      "sha256": "aecb45cd676673b57e19662f61d0f4990d75b3059c9a01295d2af0d6d08905d2",
+      "purpose": "concrete footstep variation",
+      "durationSeconds": 0.11,
+      "processing": "22050 Hz, 1 channel(s), static gain -9.9856 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "step-snow-1.wav",
+      "source": "impact",
+      "originalFile": "Audio/footstep_snow_000.ogg",
+      "sourceSha256": "c05fa4a9dc9a7aabc04996466fb589537e49af76de9998d8f9e6270ec92dcef7",
+      "sha256": "1ee8fb54940bf73deda264374e1df662f290459982fb1dc453f2b40532aa01af",
+      "purpose": "snow footstep variation",
+      "durationSeconds": 0.371,
+      "processing": "22050 Hz, 1 channel(s), static gain -10.0668 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "step-snow-2.wav",
+      "source": "impact",
+      "originalFile": "Audio/footstep_snow_001.ogg",
+      "sourceSha256": "980fb9a1c9227aed7995067b0357f373053337f2416316db8ea0438418542fb4",
+      "sha256": "209cd37a4583d928109c95212b043d87cf0d7e1dd57a084ea22424b4ecaa34fc",
+      "purpose": "snow footstep variation",
+      "durationSeconds": 0.371,
+      "processing": "22050 Hz, 1 channel(s), static gain -9.9929 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "step-snow-3.wav",
+      "source": "impact",
+      "originalFile": "Audio/footstep_snow_002.ogg",
+      "sourceSha256": "db52bafdc66304f3b999f2c29227826c65993916e630ac2ffbca17d07b263178",
+      "sha256": "89fb707cfdb598ddb2444532cca0863c030759f647f3e6f1b6de3cfa6867eef5",
+      "purpose": "snow footstep variation",
+      "durationSeconds": 0.371,
+      "processing": "22050 Hz, 1 channel(s), static gain -10.0029 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "repair.wav",
+      "source": "impact",
+      "originalFile": "Audio/impactMetal_medium_000.ogg",
+      "sourceSha256": "a96f879fec0864a8938e0c745b6996a6c5679c16a234ce31a01cc995e8401003",
+      "sha256": "303d7f6b407acfe14bb41d81158bb8ee1fb5edcc1ccbb68918de35ca4218f3e3",
+      "purpose": "Blacksmith repair",
+      "durationSeconds": 0.269,
+      "processing": "22050 Hz, 1 channel(s), static gain -9.8128 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "unsocket.wav",
+      "source": "rpg",
+      "originalFile": "Audio/metalClick.ogg",
+      "sourceSha256": "9851a69d0c613e13bceef08060ecc4148f098ef487927cbebe270d642398a3b3",
+      "sha256": "b74bba9a4958e5cf27721480f0ff13993d057f2045e0fd3786c5490439ba310f",
+      "purpose": "Blacksmith gem removal",
+      "durationSeconds": 0.446,
+      "processing": "22050 Hz, 1 channel(s), static gain -0.4241 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "book-open.wav",
+      "source": "rpg",
+      "originalFile": "Audio/bookOpen.ogg",
+      "sourceSha256": "953390534377222bee89ac8cd9e60a58fdc037c71a4d7c18c43cd647c7f34ba8",
+      "sha256": "e25520225b89064fb64e513efec656302c814918d3bfb98010768ad94a603a51",
+      "purpose": "Open journal",
+      "durationSeconds": 0.151,
+      "processing": "22050 Hz, 1 channel(s), static gain 3.3264 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "book-close.wav",
+      "source": "rpg",
+      "originalFile": "Audio/bookClose.ogg",
+      "sourceSha256": "81e976532565f4372abd14e83d2684195fa548d0a28d345de221e56052454f32",
+      "sha256": "995c612645bef41d9d25feb466232c48c9ff914ef2d2be83600eb7e0600b85d2",
+      "purpose": "Close journal",
+      "durationSeconds": 0.231,
+      "processing": "22050 Hz, 1 channel(s), static gain -11.0312 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "complete.wav",
+      "source": "jingles",
+      "originalFile": "Audio/Pizzicato jingles/jingles_PIZZI10.ogg",
+      "sourceSha256": "baf50beffc4cc2dbb92c9d596a22732a8b5249c7648b681c0df6d0af6c561478",
+      "sha256": "d2dfeeafb795c286a829377648384c78d36d32df593c5ce1fccf1ec07d6937b4",
+      "purpose": "Reward/completion rising pizzicato cue",
+      "durationSeconds": 0.797,
+      "processing": "22050 Hz, 1 channel(s), static gain -6.4209 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "defeat.wav",
+      "source": "jingles",
+      "originalFile": "Audio/Pizzicato jingles/jingles_PIZZI01.ogg",
+      "sourceSha256": "3f8f2534a297d19386c233a7ee4fa8737cc40870dd206010263760e1983dde46",
+      "sha256": "fd584f0f5b9302bbf9f19f6ef5a3aea76db22c6bae06fe12b0698f35d008ef39",
+      "purpose": "Defeat descending pizzicato cue",
+      "durationSeconds": 1.002,
+      "processing": "22050 Hz, 1 channel(s), static gain -5.9178 dB; 16-bit PCM WAV"
+    },
+    {
+      "file": "village.ogg",
+      "source": "towns",
+      "originalFile": "Town1 - Home Town.ogg",
+      "sourceSha256": "21dfdcc43e1f097020c2c8b5fce5e47790a3fd9b496d903f37304cc5440a6be4",
+      "sha256": "f334bb82b4ac7fa003541475ecb6ec3fdbb72eeb0c8f3fd7903b214b78889da8",
+      "purpose": "Forest village and southern refuge",
+      "durationSeconds": 90.0,
+      "processing": "44100 Hz, 2 channel(s), static gain -12.1719 dB; Vorbis q4, preserved full loop duration"
+    },
+    {
+      "file": "port.ogg",
+      "source": "towns",
+      "originalFile": "Town3 - Sunshine Coast.ogg",
+      "sourceSha256": "5d45d84b53677fd72d0bb99c38db239f843401c001193bfad222af7647935f8f",
+      "sha256": "13dc50f12262e97a704aa128895e4e2a20f5e00d45f2492bbe3781d55aaf40c2",
+      "purpose": "Coastal towns",
+      "durationSeconds": 112.34,
+      "processing": "44100 Hz, 2 channel(s), static gain -14.6700 dB; Vorbis q4, preserved full loop duration"
+    },
+    {
+      "file": "desert.ogg",
+      "source": "towns",
+      "originalFile": "Town4 - Bazaar.ogg",
+      "sourceSha256": "ebf4ff0e370e28544f516005404762c02911e526fa5ce61ab371ba8465c8c560",
+      "sha256": "8e28b65723f337a0e80aa1ab03c83d38253ceecf4cd2011ab9f44b2ec8cead59",
+      "purpose": "Desert outpost and sand terrain",
+      "durationSeconds": 110.345,
+      "processing": "44100 Hz, 2 channel(s), static gain -14.0285 dB; Vorbis q4, preserved full loop duration"
+    },
+    {
+      "file": "mines.ogg",
+      "source": "exploration",
+      "originalFile": "Exploration3 - Tha'el Mines.ogg",
+      "sourceSha256": "87fc1d74a526f41df865f9bd794e785e84208adb4ff7592507a34b5afd725fdd",
+      "sha256": "d2b16c8d6407cde8f6ab474a2717e6610761c82cb5973b27f56126e9c027c997",
+      "purpose": "Non-story mines and ruins",
+      "durationSeconds": 60.0,
+      "processing": "44100 Hz, 2 channel(s), static gain -14.3851 dB; Vorbis q4, preserved full loop duration"
+    }
+  ]
+}

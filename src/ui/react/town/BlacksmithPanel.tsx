@@ -27,14 +27,16 @@ export function BlacksmithPanel() {
         if (entry.repairCost <= 0) return;
         const ok = store.blacksmithRepair(entry);
         setFeedback(ok ? t('blacksmith.repaired') : t('blacksmith.noGold'));
-        AudioManager.playUi(ok ? 'ui.confirm' : 'ui.cancel');
+        if (ok) AudioManager.playSfx('sfx.repair', { volume: 0.5 });
+        else AudioManager.playUi('ui.cancel');
     };
 
     const extract = (entry: BlacksmithEntry) => {
         if (entry.unsocketCost <= 0) return;
         const ok = store.blacksmithUnsocket(entry);
         setFeedback(ok ? t('blacksmith.extracted') : t('blacksmith.extractFailed'));
-        AudioManager.playUi(ok ? 'ui.confirm' : 'ui.cancel');
+        if (ok) AudioManager.playSfx('sfx.unsocket', { volume: 0.45 });
+        else AudioManager.playUi('ui.cancel');
     };
 
     const panelStyle = { width: 'min(860px, 94vw)', '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;

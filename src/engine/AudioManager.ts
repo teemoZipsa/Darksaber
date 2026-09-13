@@ -13,7 +13,7 @@
 
 import { SettingsManager } from './SettingsManager';
 import { renderMidiToAudioBuffer } from './MidiSynth';
-import type { FieldFootstepSurface } from '../field/FieldFootsteps';
+import { getRecordedFootstepKey, type FieldFootstepSurface } from '../field/FieldFootsteps';
 
 type Channel = 'bgm' | 'sfx' | 'ui';
 
@@ -118,14 +118,32 @@ export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = 
     'sfx.original.24': { src: originalSfx('24'), channel: 'sfx' },
 
     // World
-    'sfx.footstep_grass': { src: '/assets/sounds/world/footstep_grass.ogg', channel: 'sfx' },
-    'sfx.footstep_stone': { src: '/assets/sounds/world/footstep_stone.ogg', channel: 'sfx' },
+    'sfx.footstep_grass': { src: '/assets/sounds/community/step-grass-1.wav', channel: 'sfx' },
+    'sfx.footstep_grass_2': { src: '/assets/sounds/community/step-grass-2.wav', channel: 'sfx' },
+    'sfx.footstep_grass_3': { src: '/assets/sounds/community/step-grass-3.wav', channel: 'sfx' },
+    'sfx.footstep_stone': { src: '/assets/sounds/community/step-concrete-1.wav', channel: 'sfx' },
+    'sfx.footstep_stone_2': { src: '/assets/sounds/community/step-concrete-2.wav', channel: 'sfx' },
+    'sfx.footstep_stone_3': { src: '/assets/sounds/community/step-concrete-3.wav', channel: 'sfx' },
+    'sfx.footstep_snow': { src: '/assets/sounds/community/step-snow-1.wav', channel: 'sfx' },
+    'sfx.footstep_snow_2': { src: '/assets/sounds/community/step-snow-2.wav', channel: 'sfx' },
+    'sfx.footstep_snow_3': { src: '/assets/sounds/community/step-snow-3.wav', channel: 'sfx' },
     'sfx.footstep_water': { src: '/assets/sounds/world/footstep_water.ogg', channel: 'sfx' },
+    'sfx.repair': { src: '/assets/sounds/community/repair.wav', channel: 'sfx' },
+    'sfx.unsocket': { src: '/assets/sounds/community/unsocket.wav', channel: 'sfx' },
+    'sfx.book_open': { src: '/assets/sounds/community/book-open.wav', channel: 'sfx' },
+    'sfx.book_close': { src: '/assets/sounds/community/book-close.wav', channel: 'sfx' },
+    'sfx.complete': { src: '/assets/sounds/community/complete.wav', channel: 'sfx' },
+    'sfx.defeat': { src: '/assets/sounds/community/defeat.wav', channel: 'sfx' },
     'sfx.door':           { src: originalSfx('04'), channel: 'sfx' },
     'sfx.extract_start':  { src: originalSfx('09'), channel: 'sfx' },
     'sfx.extract_done':   { src: originalSfx('01'), channel: 'sfx' },
 
     // Music
+    'bgm.town.village': { src: '/assets/sounds/community/village.ogg', channel: 'bgm' },
+    'bgm.town.port': { src: '/assets/sounds/community/port.ogg', channel: 'bgm' },
+    'bgm.town.market': { src: '/assets/sounds/community/desert.ogg', channel: 'bgm' },
+    'bgm.desert': { src: '/assets/sounds/community/desert.ogg', channel: 'bgm' },
+    'bgm.mines': { src: '/assets/sounds/community/mines.ogg', channel: 'bgm' },
     'bgm.title':   { src: '/assets/sounds/bgm/story/01.mid',   channel: 'bgm' },
     'bgm.world':   { src: '/assets/sounds/bgm/story/04.mid',   channel: 'bgm' },
     'bgm.town':    { src: '/assets/sounds/bgm/tutorial/Sh-Fil2.mid',    channel: 'bgm' },
@@ -186,6 +204,7 @@ export class AudioManagerClass {
     private unlockListening = false;
     private lastOneShot = new Map<string, number>();
     private activeOneShots = 0;
+    private footstepIndex = 0;
     private unlock = (): void => {
         if (this.ensureContext() && this.ctx?.state === 'suspended') {
             void this.ctx.resume().catch(() => undefined);
@@ -246,25 +265,25 @@ export class AudioManagerClass {
     }
 
     /**
-     * Lightweight procedural field step. It remains available even when the
-     * optional recorded footstep assets are not installed.
+     * Alternate quiet recorded steps; wet ground retains its procedural splash.
      */
     public playFootstep(surface: FieldFootstepSurface): void {
         if (!this.ensureContext() || SettingsManager.getMuteSFX()) return;
         const ctx = this.ctx!;
         if (ctx.state !== 'running') return;
-        const profile = surface === 'hard'
-            ? { duration: 0.028, frequency: 1450, gain: 0.075, filter: 'bandpass' as BiquadFilterType }
-            : surface === 'wet'
-                ? { duration: 0.075, frequency: 720, gain: 0.065, filter: 'lowpass' as BiquadFilterType }
-                : { duration: 0.05, frequency: 520, gain: 0.055, filter: 'lowpass' as BiquadFilterType };
+        const key = getRecordedFootstepKey(surface, this.footstepIndex++);
+        if (key) {
+            this.playSfx(key, { volume: 0.22, rate: 0.06 });
+            return;
+        }
+        const profile = { duration: 0.075, frequency: 720, gain: 0.065 };
         const frameCount = Math.max(1, Math.floor(ctx.sampleRate * profile.duration));
         const buffer = ctx.createBuffer(1, frameCount, ctx.sampleRate);
         const samples = buffer.getChannelData(0);
 
         for (let i = 0; i < frameCount; i++) {
             const progress = i / frameCount;
-            const envelope = Math.pow(1 - progress, surface === 'wet' ? 1.5 : 2.4);
+            const envelope = Math.pow(1 - progress, 1.5);
             samples[i] = (Math.random() * 2 - 1) * envelope;
         }
 
@@ -273,9 +292,9 @@ export class AudioManagerClass {
         const gain = ctx.createGain();
         source.buffer = buffer;
         source.playbackRate.value = 0.94 + Math.random() * 0.12;
-        filter.type = profile.filter;
+        filter.type = 'lowpass';
         filter.frequency.value = profile.frequency * (0.9 + Math.random() * 0.2);
-        filter.Q.value = surface === 'hard' ? 0.9 : 0.5;
+        filter.Q.value = 0.5;
         gain.gain.value = profile.gain;
         source.connect(filter);
         filter.connect(gain);

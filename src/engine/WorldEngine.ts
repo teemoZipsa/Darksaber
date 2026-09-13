@@ -7,6 +7,7 @@ import { Camera } from './Camera';
 import { InputManager } from './InputManager';
 import { SettingsManager } from './SettingsManager';
 import { AudioManager } from './AudioManager';
+import { getTownMusicKey } from './GameMusic';
 import { TileType } from '../map/Tile';
 import { getStoryQuestByDungeonId } from '../data/StoryQuestData';
 import { Player } from '../entity/Player';
@@ -703,7 +704,7 @@ export class WorldEngine {
         const outcome = this.getRaidOutcome();
         if (outcome) return outcome.result === 'DEAD' || outcome.result === 'MIA' ? 'bgm.gameover' : 'bgm.victory';
         if (this.scenarioNetworkControllers.tutorialController.isActive()) return 'bgm.tutorial.training';
-        if (this.townSession.isVisible()) return 'bgm.town';
+        if (this.townSession.isVisible()) return getTownMusicKey(this.getCurrentHubTown().id);
         const dungeonId = this.raidSession.activeDungeonId;
         const storyKey = dungeonId ? getStoryQuestByDungeonId(dungeonId)?.bgmKey : undefined;
         if (storyKey) return storyKey;
@@ -715,7 +716,9 @@ export class WorldEngine {
             return bossNearby ? 'bgm.boss' : 'bgm.raid';
         }
         const tile = this.worldMap.getTileAt(actor.entity.gridX, actor.entity.gridY);
-        if (dungeonId || tile === TileType.POISON_SWAMP || tile === TileType.LAVA) return 'bgm.cave';
+        if (dungeonId) return 'bgm.mines';
+        if (tile === TileType.POISON_SWAMP || tile === TileType.LAVA) return 'bgm.cave';
+        if (tile === TileType.SAND) return 'bgm.desert';
         if (tile === TileType.FOREST || tile === TileType.SNOW) return 'bgm.forest';
         return 'bgm.world';
     }
