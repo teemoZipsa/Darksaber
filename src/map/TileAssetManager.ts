@@ -83,6 +83,8 @@ interface OriginalTileConfig {
 
 const ORIGINAL_AUTOTILE_COLS = 16;
 const ORIGINAL_AUTOTILE_CELL_SIZE = 32;
+export const WATER_ANIMATION_FRAMES = 12;
+export const WATER_ANIMATION_FRAME_MS = 160;
 const ORIGINAL_TILE_CONFIGS: Partial<Record<TileType, OriginalTileConfig>> = {
     [TileType.GRASS]: { sheet: 'mdsr0', cells: [302, 303, 304] },
     // 145/146 are transparent diagonal coast pieces, not water variations.
@@ -255,6 +257,7 @@ class TileAssetManagerClass {
     private loadPromises: Promise<void>[] = [];
     private cellCornerCache: Map<string, number> = new Map();
     private cornerCellsCache: Map<string, readonly number[]> = new Map();
+    private waterFrameCache = new Map<string, OffscreenCanvas>();
 
     public init(): Promise<void[]> {
         // The compact original autotile sheets are the primary terrain source.
@@ -318,6 +321,57 @@ class TileAssetManagerClass {
         const mask = (n ? 1 : 0) | (e ? 2 : 0) | (s ? 4 : 0) | (w ? 8 : 0);
         if (this.drawOriginalAutotile(ctx, type, dx, dy, size, { n, ne, e, se, s, sw, w, nw }, mask, worldX, worldY)) return true;
         return this.drawTile(ctx, type, dx, dy, size);
+    }
+
+    /** Small shared frames made only from the original opaque water cells. */
+    public drawAnimatedWater(
+        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+        type: TileType,
+        dx: number,
+        dy: number,
+        size: number,
+        worldX: number,
+        worldY: number,
+        frame: number
+    ): void {
+        const config = ORIGINAL_TILE_CONFIGS[type];
+        const img = config && this.getSheet(`autotile:${config.sheet}`);
+        if ((type !== TileType.WATER && type !== TileType.DEEP_WATER) || !config || !img) {
+            this.drawTile(ctx, type, dx, dy, size, worldX, worldY);
+            return;
+        }
+        const phase = ((frame % WATER_ANIMATION_FRAMES) + WATER_ANIMATION_FRAMES) % WATER_ANIMATION_FRAMES;
+        const variant = this.hashCell(worldX, worldY, type) % config.cells.length;
+        const key = `${type}:${variant}:${phase}`;
+        let surface = this.waterFrameCache.get(key);
+        if (!surface) {
+            const pixels = ORIGINAL_AUTOTILE_CELL_SIZE;
+            const source = new OffscreenCanvas(pixels, pixels);
+            const sourceCtx = source.getContext('2d')!;
+            this.drawOriginalCell(sourceCtx, img, config.cells[variant], 0, 0, pixels);
+            const angle = phase / WATER_ANIMATION_FRAMES * Math.PI * 2;
+            // Ease between the two original ripple patterns without flashing.
+            sourceCtx.globalAlpha = (1 - Math.cos(angle)) / 2;
+            this.drawOriginalCell(sourceCtx, img, config.cells[(variant + 1) % config.cells.length], 0, 0, pixels);
+
+            surface = new OffscreenCanvas(pixels, pixels);
+            const surfaceCtx = surface.getContext('2d')!;
+            surfaceCtx.imageSmoothingEnabled = false;
+            // A travelling one-pixel ripple; wrap within this water cell so
+            // adjacent atlas cells (rocks/transparency) can never leak in.
+            for (let row = 0; row < pixels; row += 4) {
+                const rowAngle = row / pixels * Math.PI * 2;
+                const shift = Math.round((Math.sin(angle + rowAngle) - Math.sin(rowAngle)) / 2);
+                surfaceCtx.drawImage(source, 0, row, pixels, 4, shift, row, pixels, 4);
+                if (shift > 0) surfaceCtx.drawImage(source, pixels - shift, row, shift, 4, 0, row, shift, 4);
+                if (shift < 0) surfaceCtx.drawImage(source, 0, row, -shift, 4, pixels + shift, row, -shift, 4);
+            }
+            this.waterFrameCache.set(key, surface);
+        }
+        const previousSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(surface, dx, dy, size, size);
+        ctx.imageSmoothingEnabled = previousSmoothing;
     }
 
     public drawWorldBSprite(

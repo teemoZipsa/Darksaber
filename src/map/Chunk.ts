@@ -2,11 +2,11 @@
  * Chunk — a fixed-size tile matrix.
  * Each chunk pre-renders its tiles to an offscreen canvas for performance.
  * On first render or when dirty, tiles are drawn once to the buffer.
- * Subsequent frames simply blit the buffer to the main canvas.
+ * Subsequent frames blit the buffer; only open water is refreshed at 6.25 fps.
  */
 
 import { TileType } from './Tile';
-import { TileAssetManager } from './TileAssetManager';
+import { TileAssetManager, WATER_ANIMATION_FRAMES, WATER_ANIMATION_FRAME_MS } from './TileAssetManager';
 
 export const CHUNK_SIZE = 32; // tiles per chunk side
 export const TILE_SIZE = 48;  // pixels per tile (Upgraded to MV/MZ standard)
@@ -19,6 +19,8 @@ export class Chunk {
     private buffer: OffscreenCanvas;
     private bufferCtx: OffscreenCanvasRenderingContext2D;
     private dirty: boolean = true;
+    private waterFrame = 0;
+    private animatedWaterTiles: { x: number; y: number; type: TileType; blend: boolean }[] = [];
 
     constructor(chunkX: number, chunkY: number, tiles: TileType[][]) {
         this.chunkX = chunkX;
@@ -51,11 +53,18 @@ export class Chunk {
         screenX: number,
         screenY: number,
         getGlobalTile: (x: number, y: number) => TileType,
-        renderScale: number = 1
+        renderScale: number = 1,
+        animationTimeMs: number = 0
     ): void {
         if (this.dirty) {
             this.renderToBuffer(getGlobalTile);
             this.dirty = false;
+            this.waterFrame = 0;
+        }
+        const frame = Math.floor(Math.max(0, animationTimeMs) / WATER_ANIMATION_FRAME_MS) % WATER_ANIMATION_FRAMES;
+        if (frame !== this.waterFrame) {
+            this.renderWaterFrame(frame);
+            this.waterFrame = frame;
         }
 
         const scale = Math.max(0.001, renderScale);
@@ -73,6 +82,7 @@ export class Chunk {
     }
 
     private renderToBuffer(getGlobalTile: (x: number, y: number) => TileType): void {
+        this.animatedWaterTiles = [];
         // Helper: is this a water-family tile?
         const isWaterType = (t: TileType) => t === TileType.WATER || t === TileType.DEEP_WATER;
 
@@ -136,7 +146,7 @@ export class Chunk {
         for (let y = 0; y < CHUNK_SIZE; y++) {
             for (let x = 0; x < CHUNK_SIZE; x++) {
                 const tileType = this.tiles[y][x];
-                if (tileType !== TileType.WATER) continue;
+                if (!isWaterType(tileType)) continue;
 
                 const px = x * TILE_SIZE;
                 const py = y * TILE_SIZE;
@@ -154,8 +164,15 @@ export class Chunk {
                 const w_w  = isWaterNeighbor(worldX - 1, worldY);
                 const nw_w = isWaterNeighbor(worldX - 1, worldY - 1);
 
-                // If ALL 8 neighbors are water → interior tile → skip
-                if (n_w && ne_w && e_w && se_w && s_w && sw_w && w_w && nw_w) continue;
+                // Only open water animates. Keep shore artwork and island
+                // corners fixed, including diagonals across chunk boundaries.
+                if (n_w && ne_w && e_w && se_w && s_w && sw_w && w_w && nw_w) {
+                    const blend = [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) =>
+                        getGlobalTile(worldX + dx, worldY + dy) !== tileType);
+                    this.animatedWaterTiles.push({ x, y, type: tileType, blend });
+                    continue;
+                }
+                if (tileType !== TileType.WATER) continue;
 
                 // Coastline tile: draw Sea autotile with proper neighbor detection
                 TileAssetManager.drawAutotile(
@@ -196,6 +213,25 @@ export class Chunk {
             }
         }
 
+        this.sealBufferEdges();
+    }
+
+    private renderWaterFrame(frame: number): void {
+        if (this.animatedWaterTiles.length === 0) return;
+        const ctx = this.bufferCtx;
+        const previousAlpha = ctx.globalAlpha;
+        for (const { x, y, type, blend } of this.animatedWaterTiles) {
+            const worldX = this.chunkX * CHUNK_SIZE + x;
+            const worldY = this.chunkY * CHUNK_SIZE + y;
+            ctx.globalAlpha = 1;
+            TileAssetManager.drawAnimatedWater(ctx, type, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, worldX, worldY, frame);
+            if (blend) {
+                const other = type === TileType.WATER ? TileType.DEEP_WATER : TileType.WATER;
+                ctx.globalAlpha = type === TileType.WATER ? 0.35 : 0.4;
+                TileAssetManager.drawAnimatedWater(ctx, other, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, worldX, worldY, frame);
+            }
+        }
+        ctx.globalAlpha = previousAlpha;
         this.sealBufferEdges();
     }
 
