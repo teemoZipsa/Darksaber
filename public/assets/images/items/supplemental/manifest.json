@@ -1,0 +1,96 @@
+{
+  "cellSize": 32,
+  "icons": [
+    {
+      "name": "repair-kit",
+      "col": 0,
+      "row": 0,
+      "file": "supplemental/repair-kit.png",
+      "sha256": "0c78a1015836a812507a4e3c29a2398365640b192eb10cc8471cd501aa842957"
+    },
+    {
+      "name": "forest-resin",
+      "col": 1,
+      "row": 0,
+      "file": "supplemental/forest-resin.png",
+      "sha256": "9f0f70c1fd6c82b8ec6ef28e4dc8332f7041100daf8b9f457fb009425e3890d3"
+    },
+    {
+      "name": "mooncap-mushroom",
+      "col": 2,
+      "row": 0,
+      "file": "supplemental/mooncap-mushroom.png",
+      "sha256": "30bc07b1cbdc7bbca8d4c4c5447a798c2fa378d23344cde1326b43dfce61d1bf"
+    },
+    {
+      "name": "sea-salt",
+      "col": 3,
+      "row": 0,
+      "file": "supplemental/sea-salt.png",
+      "sha256": "7ff8ed597743a20dcf1164ac5ae1abc96a4900d4662976a2e84baffd6f87676f"
+    },
+    {
+      "name": "desert-spice",
+      "col": 4,
+      "row": 0,
+      "file": "supplemental/desert-spice.png",
+      "sha256": "1bf7ef83aa6f442e60394442a00274e2483b03d19b6e0bea400b6dae0e6da546"
+    },
+    {
+      "name": "imported-silk",
+      "col": 5,
+      "row": 0,
+      "file": "supplemental/imported-silk.png",
+      "sha256": "1705f304197b729e98169893a7526039b8505c4b615c1d10ec155f7a73496d33"
+    },
+    {
+      "name": "incense",
+      "col": 6,
+      "row": 0,
+      "file": "supplemental/incense.png",
+      "sha256": "b761eef488aa19697aad03742290a8d5e0b652f344ba55c569976046d870ce5a"
+    },
+    {
+      "name": "blood-reliquary",
+      "col": 7,
+      "row": 0,
+      "file": "supplemental/blood-reliquary.png",
+      "sha256": "193de4df4aa3830bcd7fe4e97d91151b29a84ca403bb067fb7525efe2bc7cc0b"
+    },
+    {
+      "name": "shadow-amber",
+      "col": 8,
+      "row": 0,
+      "file": "supplemental/shadow-amber.png",
+      "sha256": "e303a48de885b6d3cafb5be002526a0edea0c90c21bdd3cd498a9b9a1334660f"
+    },
+    {
+      "name": "oil-can",
+      "col": 9,
+      "row": 0,
+      "file": "supplemental/oil-can.png",
+      "sha256": "4477009fa291f694e5473c6f57fe9cd3b1f6b7c6a4b9539d6489b1d34406c3cd"
+    },
+    {
+      "name": "oil-lamp",
+      "col": 10,
+      "row": 0,
+      "file": "supplemental/oil-lamp.png",
+      "sha256": "5a3fd796b6c8ac5889829a9636c53a625c762d6854af4cee78413bde1939b796"
+    },
+    {
+      "name": "sword-manual",
+      "col": 11,
+      "row": 0,
+      "file": "supplemental/sword-manual.png",
+      "sha256": "227c82bf4852e6c39c94b7ae5580913da3b7470d64bda0a28b18f40f16b58410"
+    },
+    {
+      "name": "rune-stone",
+      "col": 12,
+      "row": 0,
+      "file": "supplemental/rune-stone.png",
+      "sha256": "ae00c1cb50ea42a72831f76e0be0da03a95496cecf92d99ce65573ee894fed1f"
+    }
+  ]
+}

@@ -12,3 +12,4 @@ server/.runtime/
 .vercel
 .pixellab/
 .runtime/free-audio/
+.runtime/item-icons/

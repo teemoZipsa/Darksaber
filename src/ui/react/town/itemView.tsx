@@ -4,10 +4,10 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { CSSProperties, FocusEvent, MouseEvent, PointerEvent, ReactNode } from 'react';
 import type { ItemDef, ItemRarity, ItemSlot } from '../../../data/ItemDB';
+import { ITEM_ICON_SHEETS } from '../../../data/ItemArtwork';
 import type { PlacedItem } from '../../../inventory/GridInventory';
 import { i18n, t } from '../../../i18n/LanguageManager';
 
-const ITEM_SPRITE_SHEET = '/assets/images/items/darksaber_items.png';
 const ITEM_CELL_SIZE = 32;
 
 export function itemName(item: ItemDef): string {
@@ -105,7 +105,7 @@ function itemTypeLabel(item: ItemDef): string {
 export function ItemGlyph({ item, className = '' }: { item: ItemDef; className?: string }) {
     if (item.iconSprite) {
         const style: CSSProperties = {
-            backgroundImage: `url(${ITEM_SPRITE_SHEET})`,
+            backgroundImage: `url(${ITEM_ICON_SHEETS[item.iconSprite.sheet ?? 'items']})`,
             backgroundPosition: `-${item.iconSprite.col * ITEM_CELL_SIZE}px -${item.iconSprite.row * ITEM_CELL_SIZE}px`,
         };
         return <span className={`ds-item-glyph is-sprite ${className}`.trim()} style={style} aria-hidden />;

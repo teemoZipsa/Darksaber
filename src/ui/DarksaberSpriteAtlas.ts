@@ -1,4 +1,6 @@
-export type DarksaberSheetId = 'board' | 'fx2' | 'fx' | 'micon' | 'items';
+import { ITEM_ICON_SHEETS } from '../data/ItemArtwork';
+
+export type DarksaberSheetId = 'board' | 'fx2' | 'fx' | 'micon' | 'items' | 'supplementalItems';
 
 export interface SpriteRect {
     sheet: DarksaberSheetId;
@@ -50,7 +52,7 @@ const SHEET_SOURCES: Record<DarksaberSheetId, string> = {
     fx2: '/assets/images/ui/darksaber_fx2.png',
     fx: '/assets/images/ui/darksaber_fx.png',
     micon: '/assets/images/ui/darksaber_micon.png',
-    items: '/assets/images/items/darksaber_items.png',
+    ...ITEM_ICON_SHEETS,
 };
 
 const DAMAGE_GLYPHS = '1234567890+-';
@@ -154,12 +156,13 @@ class DarksaberSpriteAtlasClass {
         x: number,
         y: number,
         size: number,
-        options: DrawSpriteOptions = {}
+        options: DrawSpriteOptions = {},
+        sheet: 'items' | 'supplementalItems' = 'items'
     ): boolean {
         return this.drawSprite(
             ctx,
             {
-                sheet: 'items',
+                sheet,
                 x: col * ITEM_CELL_SIZE,
                 y: row * ITEM_CELL_SIZE,
                 w: ITEM_CELL_SIZE,

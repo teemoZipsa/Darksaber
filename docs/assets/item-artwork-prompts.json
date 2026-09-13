@@ -1,0 +1,100 @@
+{
+  "date": "2026-09-13",
+  "mode": "built-in image_gen",
+  "reference": "Original Darksaber atlas; unchanged 32px cells, nearest-neighbor enlarged for style reference.",
+  "export": "RGB magenta color key (direct alpha generations produced baked checkerboards). Imported into 32x32 transparent PNG; nearest-neighbor fit to 26px, centered 3px margin, 32-color palette, no dithering.",
+  "assets": [
+    {
+      "id": "repair-kit",
+      "col": 0,
+      "row": 0,
+      "sourceFile": "exec-d2863dea-1d7d-46eb-ae91-a3ec95a9c5b8.png",
+      "prompt": "Edit the repair-kit sprite: replace EVERY white or gray checkerboard pixel in the background with one completely flat uniform hot magenta color RGB(255,0,255), hex #FF00FF. NO checkerboard. No texture, no gradients, no shadows on the backdrop. Do not change the brown leather repair tool pouch, hammer, whetstone or their stepped pixel-art silhouette at all. This will be imported as a color-keyed game sprite. The background needs to be perfectly uniform magenta right up to the hard object edges. Keep the subject centered with clear margin.",
+      "creationPrompt": "Use case: stylized-concept. Create ONE game inventory sprite: a medieval equipment repair kit, a small rolled brown leather tool pouch containing a short steel hammer and a whetstone. Image 1 is STYLE REFERENCE ONLY, a sheet of original Darksaber 32x32 game items shown enlarged: match its very low pixel count, earthy brown leather, muted steel with pale tiny highlights, one-pixel dark contour and sharply stepped pixel edges. Draw the repair kit as a single readable compact object, slight three-quarter view. STRICT target is a 32 by 32 pixel sprite enlarged with nearest-neighbor to a square PNG, not detailed illustration: object occupies about 26 by 26 logical pixels, centered with 3 logical pixels clear padding. Genuine transparent RGBA background, including holes between tools. No background rectangle, checkerboard, shadow plane, text, letters, badge, border, UI frame, labels, glow, or extra item variants. Use about 12-18 flat pixel colors; no antialiasing or soft gradients. Only the one repair-kit sprite."
+    },
+    {
+      "id": "forest-resin",
+      "col": 1,
+      "row": 0,
+      "sourceFile": "exec-c700f920-96bb-49cf-8156-fce21e35c0b8.png",
+      "prompt": "Use case: stylized-concept. Create ONE original game inventory sprite matching the attached STYLE REFERENCE ONLY (original Darksaber 32x32 pixel items enlarged). Subject: one irregular golden amber tree-resin lump, with a tiny dark brown bark flake attached; warm honey brown, not a cut jewel. Authentic low-resolution 1990s Korean PC RPG pixel art: about 26 by 26 logical pixels inside a 32 by 32 square, with a 3-pixel clear margin. Enlarge the tiny sprite with nearest-neighbor for delivery. Slight three-quarter view, centered, a clear readable silhouette, restrained 12-18 earthy palette colors, one-pixel very dark contour, tiny pale highlights from upper left. Very simple details, hard stepped pixel blocks only, NO smooth illustration or antialiasing. Background for sprite import: completely flat pure HOT MAGENTA #FF00FF, color-keyed game-sprite background, absolutely no checkerboard or transparency simulation. No frame, border, panel, label, letters, watermark, surrounding props, floor, cast shadow, gradients or texture in the magenta. Only ONE subject, not a sprite sheet or variants."
+    },
+    {
+      "id": "mooncap-mushroom",
+      "col": 2,
+      "row": 0,
+      "sourceFile": "exec-08a88c88-b297-497a-bba5-a6dfd2822cbe.png",
+      "prompt": "Use case: stylized-concept. Create ONE original game inventory sprite matching the attached STYLE REFERENCE ONLY (original Darksaber 32x32 pixel items enlarged). Subject: one squat mooncap mushroom, a blue violet round cap with two small ivory spots and a thick pale tan stem; faint pale cap highlight but no glow. Authentic low-resolution 1990s Korean PC RPG pixel art: about 26 by 26 logical pixels inside a 32 by 32 square, with a 3-pixel clear margin. Enlarge the tiny sprite with nearest-neighbor for delivery. Slight three-quarter view, centered, a clear readable silhouette, restrained 12-18 earthy palette colors, one-pixel very dark contour, tiny pale highlights from upper left. Very simple details, hard stepped pixel blocks only, NO smooth illustration or antialiasing. Background for sprite import: completely flat pure HOT MAGENTA #FF00FF, color-keyed game-sprite background, absolutely no checkerboard or transparency simulation. No frame, border, panel, label, letters, watermark, surrounding props, floor, cast shadow, gradients or texture in the magenta. Only ONE subject, not a sprite sheet or variants."
+    },
+    {
+      "id": "sea-salt",
+      "col": 3,
+      "row": 0,
+      "sourceFile": "exec-31ca10c8-e86d-41ef-a85f-56e72c7807c3.png",
+      "prompt": "Use case: stylized-concept. Create ONE original game inventory sprite matching the attached STYLE REFERENCE ONLY (original Darksaber 32x32 pixel items enlarged). Subject: one small open off-white linen sack filled with coarse white sea salt, a plain tan cord tied around its neck; no spilling pile. Authentic low-resolution 1990s Korean PC RPG pixel art: about 26 by 26 logical pixels inside a 32 by 32 square, with a 3-pixel clear margin. Enlarge the tiny sprite with nearest-neighbor for delivery. Slight three-quarter view, centered, a clear readable silhouette, restrained 12-18 earthy palette colors, one-pixel very dark contour, tiny pale highlights from upper left. Very simple details, hard stepped pixel blocks only, NO smooth illustration or antialiasing. Background for sprite import: completely flat pure HOT MAGENTA #FF00FF, color-keyed game-sprite background, absolutely no checkerboard or transparency simulation. No frame, border, panel, label, letters, watermark, surrounding props, floor, cast shadow, gradients or texture in the magenta. Only ONE subject, not a sprite sheet or variants."
+    },
+    {
+      "id": "desert-spice",
+      "col": 4,
+      "row": 0,
+      "sourceFile": "exec-2a0ad735-4aed-4f62-86b8-46548673c955.png",
+      "prompt": "Use case: stylized-concept. Create ONE original game inventory sprite matching the attached STYLE REFERENCE ONLY (original Darksaber 32x32 pixel items enlarged). Subject: one small open tan cloth spice pouch showing rust-red ground spice at the top, a folded neck and a dark brown cord. Authentic low-resolution 1990s Korean PC RPG pixel art: about 26 by 26 logical pixels inside a 32 by 32 square, with a 3-pixel clear margin. Enlarge the tiny sprite with nearest-neighbor for delivery. Slight three-quarter view, centered, a clear readable silhouette, restrained 12-18 earthy palette colors, one-pixel very dark contour, tiny pale highlights from upper left. Very simple details, hard stepped pixel blocks only, NO smooth illustration or antialiasing. Background for sprite import: completely flat pure HOT MAGENTA #FF00FF, color-keyed game-sprite background, absolutely no checkerboard or transparency simulation. No frame, border, panel, label, letters, watermark, surrounding props, floor, cast shadow, gradients or texture in the magenta. Only ONE subject, not a sprite sheet or variants."
+    },
+    {
+      "id": "imported-silk",
+      "col": 5,
+      "row": 0,
+      "sourceFile": "exec-a8c27b03-3dd1-486e-8b88-cb71cf6da3ed.png",
+      "prompt": "Use case: stylized-concept. Create ONE original game inventory sprite matching the attached STYLE REFERENCE ONLY (original Darksaber 32x32 pixel items enlarged). Subject: one folded roll of deep teal silk cloth, tied with a single narrow muted gold ribbon, compact oblong fabric bundle with visible squared folded layers. Authentic low-resolution 1990s Korean PC RPG pixel art: about 26 by 26 logical pixels inside a 32 by 32 square, with a 3-pixel clear margin. Enlarge the tiny sprite with nearest-neighbor for delivery. Slight three-quarter view, centered, a clear readable silhouette, restrained 12-18 earthy palette colors, one-pixel very dark contour, tiny pale highlights from upper left. Very simple details, hard stepped pixel blocks only, NO smooth illustration or antialiasing. Background for sprite import: completely flat pure HOT MAGENTA #FF00FF, color-keyed game-sprite background, absolutely no checkerboard or transparency simulation. No frame, border, panel, label, letters, watermark, surrounding props, floor, cast shadow, gradients or texture in the magenta. Only ONE subject, not a sprite sheet or variants."
+    },
+    {
+      "id": "incense",
+      "col": 6,
+      "row": 0,
+      "sourceFile": "exec-b5354cd3-c503-42e0-aecf-14451fc03de2.png",
+      "prompt": "Use case: stylized-concept. Create ONE original game inventory sprite matching the attached STYLE REFERENCE ONLY (original Darksaber 32x32 pixel items enlarged). Subject: one compact bundle of three slender brown incense sticks wrapped at the middle with a plain ivory paper band and red thread; unlit, no smoke. Authentic low-resolution 1990s Korean PC RPG pixel art: about 26 by 26 logical pixels inside a 32 by 32 square, with a 3-pixel clear margin. Enlarge the tiny sprite with nearest-neighbor for delivery. Slight three-quarter view, centered, a clear readable silhouette, restrained 12-18 earthy palette colors, one-pixel very dark contour, tiny pale highlights from upper left. Very simple details, hard stepped pixel blocks only, NO smooth illustration or antialiasing. Background for sprite import: completely flat pure HOT MAGENTA #FF00FF, color-keyed game-sprite background, absolutely no checkerboard or transparency simulation. No frame, border, panel, label, letters, watermark, surrounding props, floor, cast shadow, gradients or texture in the magenta. Only ONE subject, not a sprite sheet or variants."
+    },
+    {
+      "id": "blood-reliquary",
+      "col": 7,
+      "row": 0,
+      "sourceFile": "exec-3f274e0d-c90c-4045-8237-d52755b80b2d.png",
+      "prompt": "Use case: stylized-concept. Create ONE original game inventory sprite matching the attached STYLE REFERENCE ONLY (original Darksaber 32x32 pixel items enlarged). Subject: one small closed dark bronze reliquary casket with a deep crimson inset stone and metal corner bands, compact low rectangular chest, no skull, no gore. Authentic low-resolution 1990s Korean PC RPG pixel art: about 26 by 26 logical pixels inside a 32 by 32 square, with a 3-pixel clear margin. Enlarge the tiny sprite with nearest-neighbor for delivery. Slight three-quarter view, centered, a clear readable silhouette, restrained 12-18 earthy palette colors, one-pixel very dark contour, tiny pale highlights from upper left. Very simple details, hard stepped pixel blocks only, NO smooth illustration or antialiasing. Background for sprite import: completely flat pure HOT MAGENTA #FF00FF, color-keyed game-sprite background, absolutely no checkerboard or transparency simulation. No frame, border, panel, label, letters, watermark, surrounding props, floor, cast shadow, gradients or texture in the magenta. Only ONE subject, not a sprite sheet or variants."
+    },
+    {
+      "id": "shadow-amber",
+      "col": 8,
+      "row": 0,
+      "sourceFile": "exec-32ba71d7-05d8-4591-8ba0-5e3682034401.png",
+      "prompt": "Use case: stylized-concept. Create ONE original game inventory sprite matching the attached STYLE REFERENCE ONLY (original Darksaber 32x32 pixel items enlarged). Subject: one irregular dark reddish amber stone with a deep violet inclusion inside and small warm copper highlights; not a cut jewel, no glow. Authentic low-resolution 1990s Korean PC RPG pixel art: about 26 by 26 logical pixels inside a 32 by 32 square, with a 3-pixel clear margin. Enlarge the tiny sprite with nearest-neighbor for delivery. Slight three-quarter view, centered, a clear readable silhouette, restrained 12-18 earthy palette colors, one-pixel very dark contour, tiny pale highlights from upper left. Very simple details, hard stepped pixel blocks only, NO smooth illustration or antialiasing. Background for sprite import: completely flat pure HOT MAGENTA #FF00FF, color-keyed game-sprite background, absolutely no checkerboard or transparency simulation. No frame, border, panel, label, letters, watermark, surrounding props, floor, cast shadow, gradients or texture in the magenta. Only ONE subject, not a sprite sheet or variants."
+    },
+    {
+      "id": "oil-can",
+      "col": 9,
+      "row": 0,
+      "sourceFile": "exec-9c6941ab-2f69-43f8-9d87-230c4052ae0e.png",
+      "prompt": "Use case: stylized-concept. Create ONE original game inventory sprite matching the attached STYLE REFERENCE ONLY (original Darksaber 32x32 pixel items enlarged). Subject: one squat old pewter oil can, rounded body, small arched handle and short curved spout, brown cork at the top; medieval hand oiler, not a modern gasoline jerrycan. Authentic low-resolution 1990s Korean PC RPG pixel art: about 26 by 26 logical pixels inside a 32 by 32 square, with a 3-pixel clear margin. Enlarge the tiny sprite with nearest-neighbor for delivery. Slight three-quarter view, centered, a clear readable silhouette, restrained 12-18 earthy palette colors, one-pixel very dark contour, tiny pale highlights from upper left. Very simple details, hard stepped pixel blocks only, NO smooth illustration or antialiasing. Background for sprite import: completely flat pure HOT MAGENTA #FF00FF, color-keyed game-sprite background, absolutely no checkerboard or transparency simulation. No frame, border, panel, label, letters, watermark, surrounding props, floor, cast shadow, gradients or texture in the magenta. Only ONE subject, not a sprite sheet or variants."
+    },
+    {
+      "id": "oil-lamp",
+      "col": 10,
+      "row": 0,
+      "sourceFile": "exec-685cc203-6a85-4ed7-b9c6-07e7ca1cd684.png",
+      "prompt": "Use case: stylized-concept. Create ONE original game inventory sprite matching the attached STYLE REFERENCE ONLY (original Darksaber 32x32 pixel items enlarged). Subject: one small bronze shallow oil lamp, a pointed spout with a single tiny warm yellow flame and small loop handle, antique household lamp. Authentic low-resolution 1990s Korean PC RPG pixel art: about 26 by 26 logical pixels inside a 32 by 32 square, with a 3-pixel clear margin. Enlarge the tiny sprite with nearest-neighbor for delivery. Slight three-quarter view, centered, a clear readable silhouette, restrained 12-18 earthy palette colors, one-pixel very dark contour, tiny pale highlights from upper left. Very simple details, hard stepped pixel blocks only, NO smooth illustration or antialiasing. Background for sprite import: completely flat pure HOT MAGENTA #FF00FF, color-keyed game-sprite background, absolutely no checkerboard or transparency simulation. No frame, border, panel, label, letters, watermark, surrounding props, floor, cast shadow, gradients or texture in the magenta. Only ONE subject, not a sprite sheet or variants."
+    },
+    {
+      "id": "sword-manual",
+      "col": 11,
+      "row": 0,
+      "sourceFile": "exec-1ab3f2bb-f5bc-43c5-9626-18e85fad6aeb.png",
+      "prompt": "Use case: stylized-concept. Create ONE original game inventory sprite matching the attached STYLE REFERENCE ONLY (original Darksaber 32x32 pixel items enlarged). Subject: one closed small worn dark brown leather book of swordsmanship, visible cream page edge and simple small diagonal silver sword emblem on cover, NO words or letters. Authentic low-resolution 1990s Korean PC RPG pixel art: about 26 by 26 logical pixels inside a 32 by 32 square, with a 3-pixel clear margin. Enlarge the tiny sprite with nearest-neighbor for delivery. Slight three-quarter view, centered, a clear readable silhouette, restrained 12-18 earthy palette colors, one-pixel very dark contour, tiny pale highlights from upper left. Very simple details, hard stepped pixel blocks only, NO smooth illustration or antialiasing. Background for sprite import: completely flat pure HOT MAGENTA #FF00FF, color-keyed game-sprite background, absolutely no checkerboard or transparency simulation. No frame, border, panel, label, letters, watermark, surrounding props, floor, cast shadow, gradients or texture in the magenta. Only ONE subject, not a sprite sheet or variants."
+    },
+    {
+      "id": "rune-stone",
+      "col": 12,
+      "row": 0,
+      "sourceFile": "exec-8c9c30ab-d336-41c5-8ca7-fd4fa8274a06.png",
+      "prompt": "Use case: stylized-concept. One tiny 32x32 pixel art inventory item for a fantasy adventure game: a rounded weathered tan stone pebble with a simple carved CIRCULAR SPIRAL decoration. This is a magic crafting stone. The only carved mark is an ordinary curved spiral, no angular runes, no religious symbols, no text or letters. Style reference image shows original Darksaber item sprites enlarged: match their earthy palette, very low resolution, small bright edge highlights and dark stepped outline. Center the stone with 3 logical pixels padding; enlarge the tiny sprite by nearest-neighbor for delivery. About 16 colors, no smooth gradients or surrounding props. Use a completely flat solid pure #FF00FF magenta background as a game sprite export key, no checkerboard, no shadows, no frame or badge."
+    }
+  ]
+}

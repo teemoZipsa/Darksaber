@@ -7,6 +7,7 @@ import type { MasterBranch } from './ClassTree';
 import { ORIGINAL_LATE_STORY_REWARD_ITEMS } from './OriginalLateStoryItems';
 import { ORIGINAL_SHOP_ITEMS } from './OriginalShopItems';
 import type { CharacterStats } from './Stats';
+import { getSupplementaryItemArtwork } from './ItemArtwork';
 
 export type ItemSlot = 'weapon' | 'shield' | 'head' | 'body' | 'boots' | 'accessory' | 'accessory2' | 'consumable' | 'material' | 'rune' | 'gem';
 export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legend' | 'unique';
@@ -16,6 +17,7 @@ export type SocketInsertKind = 'rune' | 'gem';
 export interface ItemIconSprite {
     col: number;
     row: number;
+    sheet?: 'items' | 'supplementalItems';
 }
 
 export interface ItemDef {
@@ -26,7 +28,7 @@ export interface ItemDef {
     gridW: number;    // width in inventory cells
     gridH: number;    // height in inventory cells
     color: string;    // display color in inventory
-    icon: string;     // emoji/text icon
+    icon: string;     // last-resort glyph if sprite assets cannot load
     iconSprite?: ItemIconSprite; // 32x32 cell in the original item atlas
     maxDurability: number;
     maxStack: number;
@@ -111,6 +113,7 @@ export function normalizeItemDef(item: RawItemDef): ItemDef {
     const maxSockets = item.maxSockets ?? inferMaxSockets(item, rarity);
     return {
         ...item,
+        iconSprite: item.iconSprite ?? getSupplementaryItemArtwork(item.id),
         rarity,
         weight: inferWeight(item),
         baseValue: inferBaseValue(item),

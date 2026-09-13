@@ -32,7 +32,7 @@ export function drawItemIcon(
     const rendered = sprite
         ? DarksaberSpriteAtlas.drawItemCell(ctx, sprite.col, sprite.row, dx, dy, size, {
             smoothing: options.smoothing ?? false,
-        })
+        }, sprite.sheet)
         : false;
 
     if (!rendered) {
