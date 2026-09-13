@@ -201,6 +201,10 @@ export class Entity {
         return { x, y };
     }
 
+    public hasActiveCombatMotion(): boolean {
+        return this.actionMotion !== null || this.hitReaction !== null;
+    }
+
     public holdDefeatedPresentation(): void {
         this.defeatedPresentationHeld = true;
     }

@@ -176,19 +176,25 @@ test('entity procedural attack and hit reactions work without an action sprite',
     const attacker = new Entity('attacker', 0, 0, '#fff');
     attacker.facing = 'right';
 
+    assert.equal(attacker.hasActiveCombatMotion(), false);
     assert.equal(attacker.playActionMotion('attack', 0.34, 10), false);
+    assert.equal(attacker.hasActiveCombatMotion(), true);
     attacker.update(0.05);
     assert.ok(attacker.getCombatMotionOffset().x < 0);
     attacker.update(0.08);
     assert.ok(attacker.getCombatMotionOffset().x > 0);
     attacker.update(0.3);
     assert.deepEqual(attacker.getCombatMotionOffset(), { x: 0, y: 0 });
+    assert.equal(attacker.hasActiveCombatMotion(), false);
 
     const target = new Entity('target', 1, 0, '#fff');
     target.playHitReaction(0, 0, 0.18, 0.1);
+    assert.equal(target.hasActiveCombatMotion(), true);
     target.update(0.09);
     assert.ok(target.getCombatMotionOffset().x > 0.09);
     assert.equal(target.getCombatMotionOffset().y, 0);
+    target.update(0.1);
+    assert.equal(target.hasActiveCombatMotion(), false);
 });
 
 test('loot objects retain overflow items and sanitize grid sizes', () => {

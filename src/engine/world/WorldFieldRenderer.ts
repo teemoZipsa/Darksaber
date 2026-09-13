@@ -16,6 +16,7 @@ import { DarksaberSpriteAtlas } from '../../ui/DarksaberSpriteAtlas';
 import { formatT, t } from '../../i18n/LanguageManager';
 import { SettingsManager } from '../SettingsManager';
 import { getFieldHudLayout, type FieldHudLayout } from './FieldHudLayout';
+import { getFieldIdleYOffset } from './FieldIdleMotion';
 
 const PARTY_ACTOR_IMAGE_RENDER_SCALE = 1.12;
 const ZERO_MOTION_OFFSET = { x: 0, y: 0 };
@@ -168,14 +169,19 @@ export class WorldFieldRenderer {
     }
 
     public static renderPartyActors(ctx: CanvasRenderingContext2D, model: WorldRenderModel, camX: number, camY: number): void {
+        const motionReduced = SettingsManager.getMotionReduce();
         for (const actor of model.partyActors) {
             const entity = actor.entity;
             if (actor.character.isDead && !entity.isDefeatedPresentationHeld()) continue;
-            const motion = SettingsManager.getMotionReduce() ? ZERO_MOTION_OFFSET : entity.getCombatMotionOffset();
+            const motion = motionReduced ? ZERO_MOTION_OFFSET : entity.getCombatMotionOffset();
             const px = (entity.pixelX + motion.x) * TILE_SIZE - camX;
             const py = (entity.pixelY + motion.y) * TILE_SIZE - camY;
 
-            const walkSpriteRendered = renderWalkSprite(ctx, entity, model.worldTime, px, py, { drawIdle: true });
+            const walkSpriteRendered = renderWalkSprite(ctx, entity, model.worldTime, px, py, {
+                drawIdle: true,
+                animateIdle: !motionReduced && !actor.character.isDead && !entity.hasActiveCombatMotion(),
+                idlePhaseKey: actor.id,
+            });
             if (!walkSpriteRendered && entity.image && entity.imageLoaded) {
                 drawScaledTileImage(ctx, entity.image, px, py, PARTY_ACTOR_IMAGE_RENDER_SCALE);
             } else if (!walkSpriteRendered) {
@@ -206,12 +212,16 @@ export class WorldFieldRenderer {
     }
 
     public static renderTutorialActors(ctx: CanvasRenderingContext2D, model: WorldRenderModel, camX: number, camY: number): void {
+        const motionReduced = SettingsManager.getMotionReduce();
         for (const entity of model.tutorialActors) {
-            const motion = SettingsManager.getMotionReduce() ? ZERO_MOTION_OFFSET : entity.getCombatMotionOffset();
+            const motion = motionReduced ? ZERO_MOTION_OFFSET : entity.getCombatMotionOffset();
             const px = (entity.pixelX + motion.x) * TILE_SIZE - camX;
             const py = (entity.pixelY + motion.y) * TILE_SIZE - camY;
 
-            const walkSpriteRendered = renderWalkSprite(ctx, entity, model.worldTime, px, py, { drawIdle: true });
+            const walkSpriteRendered = renderWalkSprite(ctx, entity, model.worldTime, px, py, {
+                drawIdle: true,
+                animateIdle: !motionReduced && !entity.hasActiveCombatMotion(),
+            });
             if (!walkSpriteRendered && entity.image && entity.imageLoaded) {
                 drawScaledTileImage(ctx, entity.image, px, py, PARTY_ACTOR_IMAGE_RENDER_SCALE);
             } else if (!walkSpriteRendered) {
@@ -538,6 +548,8 @@ function eliteAffixGlyph(affix: WorldRenderModel['fieldEnemies'][number]['enemy'
 interface WalkSpriteRenderOptions {
     drawIdle?: boolean;
     idleFrame?: number;
+    animateIdle?: boolean;
+    idlePhaseKey?: string;
 }
 
 function renderWalkSprite(
@@ -564,10 +576,13 @@ function renderWalkSprite(
         frame = actionFrame.frame;
         row = actionFrame.row;
     }
+    const idleYOffset = !moving && !actionFrame && options.animateIdle
+        ? getFieldIdleYOffset(worldTime, options.idlePhaseKey ?? entity.id)
+        : 0;
     const dw = TILE_SIZE * sprite.renderScale;
     const dh = TILE_SIZE * sprite.renderScale;
     const dx = px + (TILE_SIZE - dw) / 2;
-    const dy = py + (TILE_SIZE - dh) / 2;
+    const dy = py + (TILE_SIZE - dh) / 2 + idleYOffset;
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(
