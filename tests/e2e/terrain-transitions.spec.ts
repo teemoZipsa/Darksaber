@@ -15,6 +15,9 @@ test('terrain boundaries blend with their actual neighbors without grass seams',
             import(moduleUrls.assets), import(moduleUrls.chunk), import(moduleUrls.tile),
         ]);
         await TileAssetManager.init();
+        const preload = new OffscreenCanvas(32, 32).getContext('2d')!;
+        TileAssetManager.drawTile(preload, TileType.SNOW, 0, 0, 32);
+        await TileAssetManager.init();
         const pairs = [
             [TileType.GRASS, TileType.ROAD], [TileType.SAND, TileType.ROAD],
             [TileType.SAND, TileType.STONE], [TileType.STONE, TileType.SNOW],

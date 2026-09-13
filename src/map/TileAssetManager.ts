@@ -95,7 +95,8 @@ const ORIGINAL_TILE_CONFIGS: Partial<Record<TileType, OriginalTileConfig>> = {
     // Base fills (including deep-water blends) need fully opaque water cells.
     [TileType.WATER]: { sheet: 'mdsr0', cells: [131, 132] },
     [TileType.DEEP_WATER]: { sheet: 'mdsr15', cells: [102, 103] },
-    [TileType.SNOW]: { sheet: 'mdsr0', cells: [448, 452] },
+    // 448/452 are blue fragments on white, not a snow ground texture.
+    // Snow uses the dedicated texture below until an original snow set is verified.
     [TileType.POISON_SWAMP]: { sheet: 'mdsr15', cells: [243, 244, 245] },
     [TileType.LAVA]: { sheet: 'mdsr15Lava', cells: [243, 244, 245] },
     [TileType.TOWN]: { sheet: 'mdsr0', cells: [33, 34, 38, 39] },
@@ -263,6 +264,10 @@ class TileAssetManagerClass {
     private cornerCellsCache: Map<string, readonly number[]> = new Map();
     private waterFrameCache = new Map<string, OffscreenCanvas>();
     private snowEdgeCache = new Map<string, OffscreenCanvas>();
+    private snowTextureCache = new Map<string, OffscreenCanvas>();
+    private terrainRevision = 0;
+
+    public getTerrainRevision(): number { return this.terrainRevision; }
 
     public init(): Promise<void[]> {
         // The compact original autotile sheets are the primary terrain source.
@@ -274,15 +279,18 @@ class TileAssetManagerClass {
     }
 
     private queueTilesetLoad(sheetName: string): void {
-        this.queueImageLoad(sheetName, `/assets/images/tilesets/${sheetName}`);
+        this.queueImageLoad(sheetName, `/assets/images/tilesets/${sheetName}`, () => {
+            this.terrainRevision++;
+            this.snowEdgeCache.clear();
+        });
     }
 
-    private queueImageLoad(key: string, src: string): void {
+    private queueImageLoad(key: string, src: string, onReady?: () => void): void {
         if (this.images.has(key)) return;
 
         const img = new Image();
         const promise = new Promise<void>((resolve) => {
-            img.onload = () => resolve();
+            img.onload = () => { onReady?.(); resolve(); };
             img.onerror = () => {
                 console.warn(`Image unavailable, using fallback rendering: ${src}`);
                 resolve();
@@ -303,7 +311,7 @@ class TileAssetManagerClass {
         _worldY: number = 0
     ): boolean {
         if (this.drawOriginalTile(ctx, type, dx, dy, size, _worldX, _worldY)) return true;
-        return this.drawTerrainTexture(ctx, type, dx, dy, size) || this.drawFallback(ctx, type, dx, dy, size);
+        return this.drawTerrainTexture(ctx, type, dx, dy, size, _worldX, _worldY) || this.drawFallback(ctx, type, dx, dy, size);
     }
 
     public drawAutotile(
@@ -343,7 +351,7 @@ class TileAssetManagerClass {
             // Reuse the original irregular ground edge as an alpha mask. Snow
             // has full cells but no edge set of its own in this recovered atlas.
             const variant = this.hashCell(worldX, worldY, type) % 6;
-            const key = `${mask}:${variant}`;
+            const key = `${mask}:${variant}:${((worldX % 8) + 8) % 8}:${((worldY % 8) + 8) % 8}`;
             let edge = this.snowEdgeCache.get(key);
             if (!edge) {
                 edge = new OffscreenCanvas(32, 32);
@@ -595,7 +603,9 @@ class TileAssetManagerClass {
         type: TileType,
         dx: number,
         dy: number,
-        size: number
+        size: number,
+        worldX: number,
+        worldY: number
     ): boolean {
         const texturePath = DARKSABER_TERRAIN_TEXTURES[type];
         if (!texturePath) return false;
@@ -604,6 +614,26 @@ class TileAssetManagerClass {
         if (!img) return false;
 
         const prevSmoothing = ctx.imageSmoothingEnabled;
+        if (type === TileType.SNOW) {
+            // Sample one continuous 8x8-tile patch, instead of repeating the
+            // entire painted image on every cell. Rasterize to native 32px dots.
+            const column = ((worldX % 8) + 8) % 8;
+            const row = ((worldY % 8) + 8) % 8;
+            const key = `${column}:${row}`;
+            let tile = this.snowTextureCache.get(key);
+            if (!tile) {
+                tile = new OffscreenCanvas(32, 32);
+                const tileCtx = tile.getContext('2d')!;
+                tileCtx.imageSmoothingEnabled = false;
+                const sw = img.naturalWidth / 8, sh = img.naturalHeight / 8;
+                tileCtx.drawImage(img, column * sw, row * sh, sw, sh, 0, 0, 32, 32);
+                this.snowTextureCache.set(key, tile);
+            }
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(tile, dx, dy, size, size);
+            ctx.imageSmoothingEnabled = prevSmoothing;
+            return true;
+        }
         ctx.imageSmoothingEnabled = true;
         ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, dx, dy, size, size);
         ctx.imageSmoothingEnabled = prevSmoothing;

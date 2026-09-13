@@ -21,6 +21,7 @@ export class Chunk {
     private bufferCtx: OffscreenCanvasRenderingContext2D;
     private dirty: boolean = true;
     private waterFrame = 0;
+    private terrainRevision = -1;
     private animatedWaterTiles: { x: number; y: number; type: TileType; blend: boolean }[] = [];
 
     constructor(chunkX: number, chunkY: number, tiles: TileType[][]) {
@@ -57,10 +58,15 @@ export class Chunk {
         renderScale: number = 1,
         animationTimeMs: number = 0
     ): void {
+        // A lazy terrain texture can finish after the first cached render.
+        // Refresh once when it arrives, including any cached snow edge masks.
+        const revision = TileAssetManager.getTerrainRevision();
+        if (this.terrainRevision !== revision) this.dirty = true;
         if (this.dirty) {
             this.renderToBuffer(getGlobalTile);
             this.dirty = false;
             this.waterFrame = 0;
+            this.terrainRevision = revision;
         }
         const frame = Math.floor(Math.max(0, animationTimeMs) / WATER_ANIMATION_FRAME_MS) % WATER_ANIMATION_FRAMES;
         if (frame !== this.waterFrame) {
