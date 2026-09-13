@@ -3,6 +3,7 @@ import type { WorldMapLandmark } from '../map/WorldMap';
 import { formatT, t } from '../i18n/LanguageManager';
 import { drawParchmentPanel, Parchment, UI } from './UITheme';
 import type { BountyHuntSnapshot } from '../net/WorldProtocol';
+import { drawFieldPanel } from './FieldPanelSkin';
 
 interface MinimapEntity {
     gridX: number;
@@ -42,6 +43,7 @@ export interface MinimapFooter {
 
 /** Optional placement and sizing overrides for the in-field mini map only. */
 export interface MinimapMiniRenderOptions {
+    forged?: boolean;
     compact?: boolean;
     x?: number;
     y?: number;
@@ -362,7 +364,8 @@ export class MinimapUI {
         const player = this.config.getPlayerPos();
 
         ctx.save();
-        drawParchmentPanel(ctx, this.panelX, this.panelY, panelWidth, panelH, {
+        if (options.forged) drawFieldPanel(ctx, this.panelX, this.panelY, panelWidth, panelH);
+        else drawParchmentPanel(ctx, this.panelX, this.panelY, panelWidth, panelH, {
             radius: 8,
             headerH: HEADER_H,
             compact,
@@ -370,7 +373,7 @@ export class MinimapUI {
         });
 
         // Header label
-        ctx.fillStyle = Parchment.textDark;
+        ctx.fillStyle = options.forged ? '#d2bd88' : Parchment.textDark;
         ctx.font = `bold ${compact ? 12 : 13}px ${UI.fontPrimary}`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
@@ -378,7 +381,7 @@ export class MinimapUI {
 
         // Header right hint
         if (!compact) {
-            ctx.fillStyle = Parchment.textMid;
+            ctx.fillStyle = options.forged ? '#aa9f87' : Parchment.textMid;
             ctx.font = `11px ${UI.fontPrimary}`;
             ctx.textAlign = 'right';
             ctx.fillText(t('minimap.cycle'), this.panelX + panelWidth - 14, this.panelY + HEADER_H / 2);
@@ -495,7 +498,7 @@ export class MinimapUI {
         let footerY = mapY + mapSize + (compact ? COMPACT_FOOTER_GAP : 14);
 
         if (compact) {
-            ctx.fillStyle = Parchment.textMid;
+            ctx.fillStyle = options.forged ? '#aa9f87' : Parchment.textMid;
             ctx.font = `11px ${UI.fontPrimary}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';

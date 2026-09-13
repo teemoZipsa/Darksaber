@@ -2767,50 +2767,81 @@ html[data-ds-motion="reduce"] #auth-overlay * {
 #ui-overlay .ds-field-hud { position: absolute; inset: 0; color: var(--ds-text); font-family: inherit; pointer-events: none; }
 #ui-overlay .ds-field-hero, #ui-overlay .ds-field-expedition, #ui-overlay .ds-field-guide {
  position: absolute; background: linear-gradient(130deg, rgba(26,20,16,.97), rgba(15,13,10,.94));
- border: 1px solid var(--ds-border-shadow); box-shadow: 0 6px 28px #0008, inset 0 0 0 3px #c8a36d0a; border-radius: 3px;
+ border: 1px solid transparent; box-shadow: 0 6px 22px #0006; border-radius: 3px; isolation: isolate;
 }
-#ui-overlay .ds-field-hero { top: 20px; left: 20px; width: 250px; padding: 14px 16px; }
-#ui-overlay .ds-field-hero__eyebrow { color: var(--ds-accent); font-size: 12px; font-weight: 800; letter-spacing: 2px; }
-#ui-overlay .ds-field-hero__eyebrow span { color: var(--ds-text-muted); letter-spacing: 0; float: right; font-size: 10px; }
-#ui-overlay .ds-field-hero__name { display: flex; justify-content: space-between; gap: 8px; font-size: 19px; font-weight: 700; margin-top: 12px; }
+#ui-overlay .ds-field-hero::before, #ui-overlay .ds-field-expedition::before, #ui-overlay .ds-field-guide::before {
+ content: ''; position: absolute; inset: -3px; z-index: -1; pointer-events: none;
+ border: 22px solid transparent; border-image: url('/assets/ui/field-forged/panel.png') 160 fill / 22px / 0 stretch;
+}
+#ui-overlay .ds-field-hero { top: 16px; left: 16px; width: 270px; padding: 14px 18px; }
+#ui-overlay .ds-field-hero__identity { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+#ui-overlay .ds-field-crest { width: 48px; height: 56px; object-fit: contain; flex-shrink: 0; }
+#ui-overlay .ds-field-hero__identity-text { min-width: 0; flex: 1; }
+#ui-overlay .ds-field-hero__eyebrow { color: var(--ds-text-muted); font-size: 9px; letter-spacing: 2px; margin-bottom: 4px; }
+#ui-overlay .ds-field-hero__name { display: flex; justify-content: space-between; gap: 8px; font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
 #ui-overlay .ds-field-hero__name span { color: var(--ds-accent); font-size: 13px; }
-#ui-overlay .ds-field-hero__class { color: var(--ds-text-muted); font-size: 11px; margin: 3px 0 12px; }
+#ui-overlay .ds-field-hero__class { color: var(--ds-text-muted); font-size: 11px; margin: 3px 0 0; }
 #ui-overlay .ds-field-resource { display: grid; grid-template-columns: 24px 1fr 65px; gap: 8px; align-items: center; margin: 7px 0; font-size: 10px; }
 #ui-overlay .ds-field-resource b { font-variant-numeric: tabular-nums; text-align: right; font-size: 11px; }
 #ui-overlay .ds-field-resource meter { width: 100%; height: 9px; }
 #ui-overlay .ds-field-resource meter::-webkit-meter-bar { background: #080706; border: none; border-radius: 1px; }
-#ui-overlay .ds-field-hp::-webkit-meter-optimum-value { background: #9ca77c; }
-#ui-overlay .ds-field-mp::-webkit-meter-optimum-value { background: #7194b1; }
+#ui-overlay .ds-field-hp::-webkit-meter-optimum-value { background: linear-gradient(90deg, #56705b, #acbd86); }
+#ui-overlay .ds-field-mp::-webkit-meter-optimum-value { background: linear-gradient(90deg, #35566e, #91b5c4); }
 #ui-overlay .ds-field-hero__progress { display: flex; justify-content: space-between; color: var(--ds-text-muted); font-size: 10px; margin-top: 12px; }
 #ui-overlay .ds-field-hero progress { width: 100%; height: 3px; display: block; margin-top: 5px; }
 #ui-overlay .ds-field-hero progress::-webkit-progress-bar { background: #080706; }
 #ui-overlay .ds-field-hero progress::-webkit-progress-value { background: var(--ds-accent); }
-#ui-overlay .ds-field-expedition { top: 20px; left: 50%; transform: translateX(-50%); width: min(420px, calc(100% - 650px)); padding: 14px 18px; }
+#ui-overlay .ds-field-expedition { top: 16px; left: 52%; transform: translateX(-50%); width: min(380px, calc(100% - 570px)); padding: 14px 18px; }
 #ui-overlay .ds-field-expedition__heading { display: flex; justify-content: space-between; gap: 12px; color: var(--ds-text-muted); font-size: 11px; }
 #ui-overlay .ds-field-mode { color: var(--ds-accent); font-size: 16px; font-weight: 700; }
-#ui-overlay .ds-field-expedition__stats { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; margin-top: 14px; font-variant-numeric: tabular-nums; }
+#ui-overlay .ds-field-expedition__stats { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; margin-top: 10px; font-variant-numeric: tabular-nums; color: var(--ds-text-muted); }
 #ui-overlay .ds-field-expedition__stats time { margin-left: auto; color: var(--ds-text-muted); }
 #ui-overlay .ds-field-expedition__rule { font-size: 11px; color: var(--ds-text-muted); margin-top: 12px; border-top: 1px solid var(--ds-hairline); padding-top: 10px; }
-#ui-overlay .ds-field-guide { bottom: 38px; left: 50%; transform: translateX(-50%); width: min(500px, calc(100% - 40px)); padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; }
+#ui-overlay .ds-field-guide { bottom: 38px; left: 50%; transform: translateX(-50%); width: min(560px, calc(100% - 40px)); padding: 16px 20px; display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; }
 #ui-overlay .ds-field-hunt { flex: 0 0 100%; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--ds-hairline); padding-bottom: 12px; }
 #ui-overlay .ds-field-hunt__text { flex: 1; min-width: 0; }
+#ui-overlay .ds-field-hunt__steps { display: flex; flex-direction: column; gap: 4px; }
+#ui-overlay .ds-field-hunt__steps span { width: 18px; height: 18px; display: grid; place-items: center; border: 1px solid #5a503b; color: #9a907a; font-size: 10px; }
+#ui-overlay .ds-field-hunt__steps .is-current { border-color: var(--ds-accent); color: var(--ds-accent); background: #c8a36d16; }
+#ui-overlay .ds-field-hunt__steps .is-complete { color: #b8c29e; border-color: #717c58; }
 #ui-overlay .ds-field-hunt__heading { display: flex; justify-content: space-between; color: var(--ds-text-muted); font-size: 10px; margin-bottom: 6px; }
 #ui-overlay .ds-field-hunt__text > span:last-child { display: block; color: var(--ds-text-muted); font-size: 10px; line-height: 1.5; margin-top: 5px; }
 #ui-overlay .ds-field-guide__text { flex: 1; min-width: 0; }
 #ui-overlay .ds-field-guide strong { color: var(--ds-accent); display: block; font-size: 13px; }
 #ui-overlay .ds-field-guide__text > span { color: var(--ds-text-muted); display: block; font-size: 11px; margin-top: 5px; line-height: 1.5; }
-#ui-overlay .ds-field-guide button { pointer-events: auto; white-space: nowrap; min-height: 40px; padding: 8px 14px; }
-#ui-overlay .ds-field-hud .is-danger { border-color: var(--ds-danger); }
+#ui-overlay .ds-field-guide button { pointer-events: auto; white-space: nowrap; min-height: 44px; padding: 8px 14px; }
+#ui-overlay .ds-field-hunt button { border-color: #b29a65; background: linear-gradient(#6c5934, #332b1c); color: #f7e6b6; }
+#ui-overlay .ds-field-hud .is-danger { box-shadow: 0 6px 22px #0006, inset 0 0 26px #ab27312a; }
 #ui-overlay .ds-field-hud .is-danger .ds-field-mode, #ui-overlay .ds-field-hud .is-danger strong { color: var(--ds-danger); }
 #ui-overlay .ds-town__field-rule { color: var(--ds-text-muted); font-size: 12px; margin-right: 16px; }
 @media (max-width: 900px) {
- #ui-overlay .ds-field-hero { top: 132px; left: 12px; width: 190px; padding: 10px 12px; }
- #ui-overlay .ds-field-expedition { top: 12px; width: calc(100% - 24px); padding: 10px 12px; }
+ #ui-overlay .ds-field-hero { top: 12px; left: 12px; width: min(340px, calc(100% - 154px)); padding: 12px 14px; }
+ #ui-overlay .ds-field-expedition { top: 188px; left: 50%; width: calc(100% - 24px); padding: 10px 14px; }
+ #ui-overlay .ds-field-hero__identity { gap: 8px; margin-bottom: 6px; }
+ #ui-overlay .ds-field-crest { width: 32px; height: 42px; }
+ #ui-overlay .ds-field-hero__name span { white-space: nowrap; font-size: 11px; }
+ #ui-overlay .ds-field-resource { gap: 5px; grid-template-columns: 18px 1fr 60px; }
+ #ui-overlay .ds-field-hero__progress { margin-top: 7px; }
  #ui-overlay .ds-field-expedition__stats { margin-top: 8px; }
  #ui-overlay .ds-field-expedition__rule { margin-top: 8px; padding-top: 6px; }
  #ui-overlay .ds-field-hero__eyebrow { display: none; }
- #ui-overlay .ds-field-hero__name { margin-top: 0; font-size: 16px; }
- #ui-overlay .ds-field-guide { bottom: 30px; width: calc(100% - 24px); gap: 10px; padding: 10px 12px; }
+ #ui-overlay .ds-field-hero__name { margin-top: 0; font-size: 14px; }
+ #ui-overlay .ds-field-guide { bottom: 30px; width: calc(100% - 24px); gap: 10px; padding: 14px 16px; }
  #ui-overlay .ds-field-guide button { padding: 7px 10px; }
  #ui-overlay .ds-town__field-rule { max-width: 180px; }
+}
+@media (max-width: 380px) {
+ #ui-overlay .ds-field-crest { display: none; }
+ #ui-overlay .ds-field-hunt { flex-wrap: wrap; }
+ #ui-overlay .ds-field-hunt button { width: 100%; }
+}
+@media (max-height: 600px) and (max-width: 900px) {
+ #ui-overlay .ds-field-hero { padding: 9px 12px; }
+ #ui-overlay .ds-field-expedition__stats { display: none; }
+ #ui-overlay .ds-field-hunt__steps { flex-direction: row; }
+ #ui-overlay .ds-field-guide__text > span { display: none; }
+ #ui-overlay .is-menu-open .ds-field-expedition { display: none; }
+ #ui-overlay .is-menu-open .ds-field-hero__progress, #ui-overlay .is-menu-open .ds-field-hero progress { display: none; }
+ #ui-overlay .is-menu-open .ds-field-crest, #ui-overlay .is-menu-open .ds-field-hero__class { display: none; }
+ #ui-overlay .is-menu-open .ds-field-hero__identity { margin-bottom: 2px; }
 }

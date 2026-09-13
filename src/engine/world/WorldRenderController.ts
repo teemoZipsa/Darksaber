@@ -173,12 +173,13 @@ export class WorldRenderController {
                     gold: model.gold,
                     worldName: model.worldName,
                     terrainLines: model.terrainHoverLines,
-                }, domCompactHud ? {
+                }, options.domFieldHud ? {
+                    forged: true,
                     compact: true,
-                    x: (width - Math.min(160, Math.max(80, width - 220)) - 12) / scale,
-                    y: 132 / scale,
-                    panelWidth: Math.min(160, Math.max(80, width - 220)) / scale,
-                    mapSize: Math.min(112, Math.max(56, width - 244)) / scale,
+                    x: (width - (domCompactHud ? 118 : 164) - 12) / scale,
+                    y: 12 / scale,
+                    panelWidth: (domCompactHud ? 118 : 164) / scale,
+                    mapSize: (domCompactHud ? 78 : 120) / scale,
                 } : hudLayout.compact ? {
                     compact: true,
                     x: hudLayout.minimap.x,

@@ -11,6 +11,7 @@ import { DarksaberSpriteAtlas, MICON_CELL_SIZE } from './DarksaberSpriteAtlas';
 import { UI, Parchment } from './UITheme';
 import { SettingsManager, type KeybindingId } from '../engine/SettingsManager';
 import { AudioManager } from '../engine/AudioManager';
+import { drawFieldPanel } from './FieldPanelSkin';
 
 const ACTION_ICON_ANIMATION_ROWS = 5;
 const ACTION_ICON_ANIMATION_MS = 280;
@@ -18,8 +19,8 @@ export const ACTION_MENU_COMPACT_BREAKPOINT = 520;
 
 const COMPACT_RADIAL_MARGIN = 8;
 const COMPACT_RADIAL_GAP = 10;
-const COMPACT_RADIAL_SLOT_MAX_WIDTH = 100;
-const COMPACT_RADIAL_SLOT_MAX_HEIGHT = 72;
+const COMPACT_RADIAL_SLOT_MAX_WIDTH = 88;
+const COMPACT_RADIAL_SLOT_MAX_HEIGHT = 68;
 
 export type ActionType = 'tool' | 'attack' | 'rest' | 'defend' | 'magic' | 'move' | 'open' | 'fanfare';
 export type ReadyCursorType = 'move' | 'attack';
@@ -348,6 +349,8 @@ export class ActionMenuUI {
             const isHighlighted = enabled && Boolean(state.highlighted);
             const r = this.iconRadius;
 
+            drawFieldPanel(ctx, ix - 23, iy - 23, 46, 46, 9);
+
             if (isHighlighted) {
                 this.drawSlotTutorialFocus(ctx, ix, iy, r);
             }
@@ -369,7 +372,7 @@ export class ActionMenuUI {
                 ctx.lineWidth = 4;
                 ctx.strokeStyle = 'rgba(0, 0, 0, 0.82)';
                 ctx.strokeText(label, ix, iy + r + 12);
-                ctx.fillStyle = enabled ? '#ffe3a0' : '#f0a0a8';
+                ctx.fillStyle = enabled ? '#ffe3a0' : '#aaa596';
                 ctx.fillText(label, ix, iy + r + 12);
                 ctx.textAlign = 'start';
                 ctx.textBaseline = 'alphabetic';
@@ -602,10 +605,10 @@ export class ActionMenuUI {
 
         ctx.save();
         ctx.fillStyle = disabled
-            ? 'rgba(36, 17, 20, 0.96)'
+            ? 'rgba(24, 24, 23, 0.96)'
             : hovered ? 'rgba(53, 40, 18, 0.98)' : 'rgba(25, 19, 12, 0.96)';
         ctx.strokeStyle = disabled
-            ? 'rgba(228, 63, 90, 0.82)'
+            ? 'rgba(116, 111, 96, 0.65)'
             : highlighted ? '#f0c050' : 'rgba(194, 146, 62, 0.82)';
         ctx.lineWidth = highlighted ? 2 : 1;
         ctx.shadowColor = 'rgba(0, 0, 0, 0.72)';
@@ -614,6 +617,15 @@ export class ActionMenuUI {
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.stroke();
+        drawFieldPanel(ctx, bounds.x, bounds.y, bounds.width, bounds.height, 12);
+        if (!enabled) {
+            ctx.fillStyle = '#11151270';
+            ctx.fillRect(bounds.x + 4, bounds.y + 4, bounds.width - 8, bounds.height - 8);
+        }
+        if (hovered || highlighted) {
+            ctx.strokeStyle = '#d6bb78';
+            ctx.strokeRect(bounds.x + 2, bounds.y + 2, bounds.width - 4, bounds.height - 4);
+        }
 
         slot.iconDraw(ctx, iconX, iconY, Math.max(6, Math.min(8, bounds.height / 9)), enabled);
         this.drawCompactHotkeyBadge(ctx, slot.type, bounds.x + 9, bounds.y + 9, enabled);
@@ -621,7 +633,7 @@ export class ActionMenuUI {
         ctx.font = `bold ${labelFontSize}px ${UI.fontPrimary}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = enabled ? '#ffe3a0' : disabled ? '#f0a0a8' : '#9c8c70';
+        ctx.fillStyle = enabled ? '#eee1bc' : '#aaa596';
         ctx.fillText(
             this.fitCompactText(ctx, this.getSlotLabel(slot), innerWidth),
             iconX,
@@ -640,7 +652,7 @@ export class ActionMenuUI {
 
         if (disabled && state.disabledReason) {
             ctx.font = `bold ${detailFontSize}px ${UI.fontPrimary}`;
-            ctx.fillStyle = '#ffd6d6';
+            ctx.fillStyle = '#b7b3a4';
             const reasonLines = this.wrapCompactText(ctx, state.disabledReason, innerWidth, 2);
             reasonLines.forEach((line, index) => {
                 ctx.fillText(line, iconX, detailY + index * detailLineHeight);
@@ -817,7 +829,7 @@ export class ActionMenuUI {
         const x = ix - size / 2;
         const y = iy - size / 2;
         const corner = 10;
-        const color = enabled ? Parchment.borderGold : 'rgba(228, 63, 90, 0.72)';
+        const color = enabled ? Parchment.borderGold : 'rgba(150, 143, 125, 0.72)';
 
         ctx.save();
         ctx.shadowColor = color;

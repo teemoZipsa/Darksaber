@@ -94,8 +94,12 @@ export class WorldInputController {
             return;
         }
 
-        if (fieldHudInteractive && this.context.minimapUI.handleInput(input)) return;
         const fullMapVisible = this.context.minimapUI.isFullMapVisible?.() ?? false;
+        if (fieldHudInteractive && fullMapVisible && input.justPressed('Escape')) {
+            this.context.minimapUI.closeFullMap();
+            return;
+        }
+        if (fieldHudInteractive && this.context.minimapUI.handleInput(input)) return;
         if (fieldHudInteractive && fullMapVisible) return;
 
         if (!compactViewport && (this.context.actionMenuUI.usesCompactLayout?.() ?? false)) {
