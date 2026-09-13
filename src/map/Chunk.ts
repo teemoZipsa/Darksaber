@@ -7,6 +7,7 @@
 
 import { TileType } from './Tile';
 import { TileAssetManager, WATER_ANIMATION_FRAMES, WATER_ANIMATION_FRAME_MS } from './TileAssetManager';
+import { planGroundLayers } from './TerrainTransition';
 
 export const CHUNK_SIZE = 32; // tiles per chunk side
 export const TILE_SIZE = 48;  // pixels per tile (Upgraded to MV/MZ standard)
@@ -194,6 +195,17 @@ export class Chunk {
                 const py = y * TILE_SIZE;
                 const worldX = this.chunkX * CHUNK_SIZE + x;
                 const worldY = this.chunkY * CHUNK_SIZE + y;
+
+                const neighborTypes = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]]
+                    .map(([dx, dy]) => getGlobalTile(worldX + dx, worldY + dy));
+                const layers = planGroundLayers(tileType, neighborTypes);
+                if (layers) {
+                    layers.forEach((layer, index) => {
+                        if (index === 0) TileAssetManager.drawTile(this.bufferCtx, layer.type, px, py, TILE_SIZE, worldX, worldY);
+                        else TileAssetManager.drawGroundAutotile(this.bufferCtx, layer.type, px, py, TILE_SIZE, layer.connections, worldX, worldY);
+                    });
+                    continue;
+                }
 
                 const isSame = (nx: number, ny: number) => getGlobalTile(nx, ny) === tileType;
                 const n  = isSame(worldX,     worldY - 1);

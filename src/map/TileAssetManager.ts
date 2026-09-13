@@ -87,6 +87,10 @@ export const WATER_ANIMATION_FRAMES = 12;
 export const WATER_ANIMATION_FRAME_MS = 160;
 const ORIGINAL_TILE_CONFIGS: Partial<Record<TileType, OriginalTileConfig>> = {
     [TileType.GRASS]: { sheet: 'mdsr0', cells: [302, 303, 304] },
+    [TileType.FOREST]: { sheet: 'mdsr0', cells: [3, 4, 6, 9] },
+    [TileType.SAND]: { sheet: 'mdsr0', cells: [92, 93, 94] },
+    [TileType.ROAD]: { sheet: 'mdsr0', cells: [33, 34] },
+    [TileType.STONE]: { sheet: 'mdsr15', cells: [18, 19, 20] },
     // 145/146 are transparent diagonal coast pieces, not water variations.
     // Base fills (including deep-water blends) need fully opaque water cells.
     [TileType.WATER]: { sheet: 'mdsr0', cells: [131, 132] },
@@ -103,15 +107,15 @@ const ORIGINAL_AUTOTILE_CONFIGS: Partial<Record<TileType, OriginalAutotileConfig
     [TileType.GRASS]: {
         sheet: 'mdsr0',
         cellsByMask: {
-            3: [279, 314, 315, 316],
+            3: [314, 315, 316],
             6: [284, 285, 286],
-            7: [274, 299, 300, 301],
-            9: [281],
-            11: [280, 317, 318, 319],
-            12: [271, 290, 291, 292],
-            13: [276, 305, 306, 307],
-            14: [270, 287, 288, 289],
-            15: [272, 273, 275, 277, 278, 282, 283, 293, 294, 295, 296, 297, 298, 302, 303, 304, 308, 309, 310, 311, 312, 313],
+            7: [299, 300, 301],
+            9: [320, 321, 322],
+            11: [317, 318, 319],
+            12: [290, 291, 292],
+            13: [305, 306, 307],
+            14: [287, 288, 289],
+            15: [293, 294, 295, 296, 297, 298, 302, 303, 304, 308, 309, 310, 311, 312, 313, 323, 324, 325, 326, 327, 328],
         },
     },
     [TileType.FOREST]: {
@@ -121,18 +125,18 @@ const ORIGINAL_AUTOTILE_CONFIGS: Partial<Record<TileType, OriginalAutotileConfig
             6: [0],
             7: [5, 7],
             9: [12],
-            11: [10],
+            11: [11],
             12: [2],
-            13: [12],
+            13: [8],
             14: [1],
-            15: [3, 4, 6, 8, 9],
+            15: [3, 4, 6, 9],
         },
     },
     [TileType.SAND]: {
         sheet: 'mdsr0',
         cellsByMask: {
             3: [104, 105, 106],
-            6: [74, 75, 76, 119],
+            6: [74, 75, 76],
             7: [89, 90, 91],
             9: [110, 111, 112],
             11: [107, 108, 109],
@@ -258,6 +262,7 @@ class TileAssetManagerClass {
     private cellCornerCache: Map<string, number> = new Map();
     private cornerCellsCache: Map<string, readonly number[]> = new Map();
     private waterFrameCache = new Map<string, OffscreenCanvas>();
+    private snowEdgeCache = new Map<string, OffscreenCanvas>();
 
     public init(): Promise<void[]> {
         // The compact original autotile sheets are the primary terrain source.
@@ -321,6 +326,90 @@ class TileAssetManagerClass {
         const mask = (n ? 1 : 0) | (e ? 2 : 0) | (s ? 4 : 0) | (w ? 8 : 0);
         if (this.drawOriginalAutotile(ctx, type, dx, dy, size, { n, ne, e, se, s, sw, w, nw }, mask, worldX, worldY)) return true;
         return this.drawTile(ctx, type, dx, dy, size);
+    }
+
+    /** Compose four original quarters, covering narrow paths and all corners. */
+    public drawGroundAutotile(
+        ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+        type: TileType, dx: number, dy: number, size: number,
+        connections: readonly boolean[], worldX: number, worldY: number
+    ): void {
+        if (connections.every(Boolean)) {
+            this.drawTile(ctx, type, dx, dy, size, worldX, worldY);
+            return;
+        }
+        if (type === TileType.SNOW) {
+            const mask = connections.reduce((bits, on, index) => bits | (on ? 1 << index : 0), 0);
+            // Reuse the original irregular ground edge as an alpha mask. Snow
+            // has full cells but no edge set of its own in this recovered atlas.
+            const variant = this.hashCell(worldX, worldY, type) % 6;
+            const key = `${mask}:${variant}`;
+            let edge = this.snowEdgeCache.get(key);
+            if (!edge) {
+                edge = new OffscreenCanvas(32, 32);
+                const edgeCtx = edge.getContext('2d')!;
+                this.drawGroundAutotile(edgeCtx, TileType.GRASS, 0, 0, 32, connections, variant, 0);
+                edgeCtx.globalCompositeOperation = 'source-in';
+                this.drawTile(edgeCtx, type, 0, 0, 32, worldX, worldY);
+                if (this.snowEdgeCache.size >= 256) this.snowEdgeCache.delete(this.snowEdgeCache.keys().next().value!);
+                this.snowEdgeCache.set(key, edge);
+            }
+            const smoothing = ctx.imageSmoothingEnabled;
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(edge, dx, dy, size, size);
+            ctx.imageSmoothingEnabled = smoothing;
+            return;
+        }
+        const config = ORIGINAL_AUTOTILE_CONFIGS[type];
+        const img = config && this.getSheet(`autotile:${config.sheet}`);
+        const base = ORIGINAL_TILE_CONFIGS[type];
+        if (!config || !img || !base) {
+            this.drawTile(ctx, type, dx, dy, size, worldX, worldY);
+            return;
+        }
+        const hash = this.hashCell(worldX, worldY, type);
+        // Each quadrant needs only its two sides and diagonal: outer corner,
+        // straight edge, inner corner, or solid. Never guess a nearby mask.
+        const quadrants = [
+            { x: 0, y: 0, a: 0, b: 6, diagonal: 7, outer: 6, edgeA: 14, edgeB: 7, cut: 1 },
+            { x: 16, y: 0, a: 0, b: 2, diagonal: 1, outer: 12, edgeA: 14, edgeB: 13, cut: 2 },
+            { x: 16, y: 16, a: 4, b: 2, diagonal: 3, outer: 9, edgeA: 11, edgeB: 13, cut: 4 },
+            { x: 0, y: 16, a: 4, b: 6, diagonal: 5, outer: 3, edgeA: 11, edgeB: 7, cut: 8 },
+        ];
+        const smoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = false;
+        // Original diagonal cuts can extend past the half-cell. Keep a small
+        // textured core and connected arms underneath them so opposing cuts
+        // cannot erase a one-tile road or split a junction into four islands.
+        const baseCell = base.cells[hash % base.cells.length];
+        const baseX = baseCell % 16 * 32, baseY = Math.floor(baseCell / 16) * 32;
+        const core: number[][] = [];
+        // Add an arm only when neither adjacent quadrant provides a solid
+        // connection. A blanket cross would flatten ordinary ragged borders.
+        if (connections[0] && !(connections[6] && connections[7]) && !(connections[2] && connections[1])) core.push([12, 0, 8, 12]);
+        if (connections[2] && !(connections[0] && connections[1]) && !(connections[4] && connections[3])) core.push([20, 12, 12, 8]);
+        if (connections[4] && !(connections[2] && connections[3]) && !(connections[6] && connections[5])) core.push([12, 20, 8, 12]);
+        if (connections[6] && !(connections[4] && connections[5]) && !(connections[0] && connections[7])) core.push([0, 12, 12, 8]);
+        if (core.length || ![0, 2, 4, 6].some(i => connections[i])) core.push([12, 12, 8, 8]);
+        for (const [x, y, width, height] of core) {
+            ctx.drawImage(img, baseX + x, baseY + y, width, height,
+                dx + x / 32 * size, dy + y / 32 * size, width / 32 * size, height / 32 * size);
+        }
+        for (const q of quadrants) {
+            const a = connections[q.a], b = connections[q.b];
+            let cells = base.cells;
+            if (!a || !b) cells = config.cellsByMask[!a && !b ? q.outer : !a ? q.edgeA : q.edgeB] ?? cells;
+            else if (!connections[q.diagonal]) {
+                const candidates = config.cellsByMask[15] ?? [];
+                const exact = candidates.filter(cell => this.getCellCornerCutMask(img, cell) === q.cut);
+                const partial = candidates.filter(cell => (this.getCellCornerCutMask(img, cell) & q.cut) !== 0);
+                cells = exact.length ? exact : partial.length ? partial : cells;
+            }
+            const cell = cells[hash % cells.length];
+            ctx.drawImage(img, cell % 16 * 32 + q.x, Math.floor(cell / 16) * 32 + q.y, 16, 16,
+                dx + q.x / 32 * size, dy + q.y / 32 * size, size / 2, size / 2);
+        }
+        ctx.imageSmoothingEnabled = smoothing;
     }
 
     /** Small shared frames made only from the original opaque water cells. */
