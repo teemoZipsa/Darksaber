@@ -247,6 +247,7 @@ export class GameManager {
             inventory: this.isWorldInventoryOpen(),
             journal: this.questJournalOpen,
             magic: this.magicLoadoutOpen,
+            result: Boolean(this.getFieldEngine()?.getRaidOutcome()),
         };
     }
 
@@ -959,6 +960,8 @@ export class GameManager {
                 break;
 
             case GameState.WORLD:
+                // The result dialog owns input until the player continues into town.
+                if (this.getFieldEngine()?.getRaidOutcome()) break;
                 // Settings is now a React DOM overlay; handle ESC-to-close, freeze world.
                 if (this.settingsUI.isVisible()) {
                     if (this.input.justPressed('Escape')) this.closeSettingsMenu();

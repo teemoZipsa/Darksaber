@@ -15,6 +15,7 @@ export const OVERLAY_PANELS = [
     { id: 'inventory', signature: 'inventory', blocksWorld: true },
     { id: 'journal', signature: 'journal', blocksWorld: true },
     { id: 'magic', signature: 'magic', blocksWorld: true },
+    { id: 'result', signature: 'result', blocksWorld: true },
 ] as const;
 
 export type OverlayPanelId = typeof OVERLAY_PANELS[number]['id'];

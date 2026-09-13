@@ -592,6 +592,7 @@ test('authenticated network raid survival returns to town and persists the serve
 
     await expect(page.locator('#ui-overlay .ds-town')).toBeVisible({ timeout: 20_000 });
     const deployButton = page.getByRole('button', { name: /필드로 나가기|Enter the field/ });
+    await expect(page.locator('.dev-launcher')).toBeHidden();
     await page.waitForTimeout(500);
     const townCanvasSamples = await page.locator('#gameCanvas').evaluate((canvas: HTMLCanvasElement) => {
         const context = canvas.getContext('2d');
@@ -671,6 +672,7 @@ test('authenticated network raid survival returns to town and persists the serve
 
     await page.keyboard.press('Enter');
     await expect(page.locator('#ui-overlay .ds-town')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.dev-launcher')).toBeHidden();
     await page.locator('#ui-overlay .ds-town__tab').filter({ hasText: /퀘스트|Quest/ }).click();
     await page.getByRole('tab', { name: /출격 기록|Raid Log/ }).click();
     const recordedRaid = page.locator('#ui-overlay .ds-raid-history__entry').first();

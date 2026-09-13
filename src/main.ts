@@ -51,7 +51,7 @@ function init(): void {
         });
     } else {
         mountAuthGate(manager);
-        mountDevLauncher();
+        mountDevLauncher(manager, uiStore);
     }
 
     // DEV-only debug handle — lets tooling drive/inspect the game in a headless
@@ -208,7 +208,7 @@ function scheduleDevRaidScenario(manager: GameManager, scenario: DevRaidScenario
     window.setTimeout(attempt, 450);
 }
 
-function mountDevLauncher(): void {
+function mountDevLauncher(manager: GameManager, uiStore: ReturnType<typeof mountUiOverlay>): void {
     if (!import.meta.env.DEV) return;
     const root = document.createElement('details');
     root.className = 'dev-launcher';
@@ -244,6 +244,11 @@ function mountDevLauncher(): void {
         </details>
     `;
     document.body.appendChild(root);
+    // Normal account entry stays on this page. Remove the launcher from pointer
+    // and keyboard navigation while the world (including town/results) is open.
+    const syncVisibility = () => { root.hidden = manager.getFieldEngine() !== null; };
+    uiStore.subscribe(syncVisibility);
+    syncVisibility();
 }
 
 async function loginOrRegisterDevAccount(client: AuthClient): Promise<AuthSessionResponse> {

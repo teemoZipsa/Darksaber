@@ -219,7 +219,6 @@ export class WorldRenderController {
         }
         if (this.context.townSession.isVisible()) this.context.townSession.render(ctx, uiW, uiH);
         if (this.context.fusionTempleUI.isVisible()) this.context.fusionTempleUI.render(ctx, uiW, uiH);
-        if (this.context.raidOutcomeController.isVisible()) this.context.raidOutcomeController.render(ctx, uiW, uiH);
         ctx.restore();
     }
 

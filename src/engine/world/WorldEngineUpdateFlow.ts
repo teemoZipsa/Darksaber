@@ -5,7 +5,6 @@ export interface WorldEngineUpdateFlowContext {
     advanceWorldTime: (dt: number) => void;
     syncTown: () => void;
     isRaidOutcomeVisible: () => boolean;
-    updateRaidOutcomeInput: (input: InputManager) => void;
     isFusionTempleVisible: () => boolean;
     updateFusionTempleInput: (input: InputManager) => void;
     isTownVisible: () => boolean;
@@ -47,7 +46,6 @@ export class WorldEngineUpdateFlow {
         this.context.syncTown();
 
         if (this.context.isRaidOutcomeVisible()) {
-            this.context.updateRaidOutcomeInput(input);
             this.context.followPlayerCamera(camera, dt);
             return;
         }

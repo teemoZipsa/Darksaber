@@ -17,6 +17,7 @@ import { InventoryPanel } from './inventory/InventoryPanel';
 import { StoryJournalPanel } from './quest/StoryJournalPanel';
 import { MagicLoadoutPanel } from './magic/MagicLoadoutPanel';
 import { FieldHud } from './field/FieldHud';
+import { RaidResultPanel } from './result/RaidResultPanel';
 
 export function OverlayRoot() {
     const store = useStore();
@@ -29,6 +30,9 @@ export function OverlayRoot() {
     const inventoryOpen = useUiSelector((s) => s.isOverlayOpen('inventory'));
     const questJournalOpen = useUiSelector((s) => s.isOverlayOpen('journal'));
     const magicLoadoutOpen = useUiSelector((s) => s.isOverlayOpen('magic'));
+    const resultOpen = useUiSelector((s) => s.isOverlayOpen('result'));
+
+    if (resultOpen) return <RaidResultPanel />;
 
     return (
         <>

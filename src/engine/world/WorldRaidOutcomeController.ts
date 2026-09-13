@@ -30,7 +30,6 @@ import { createLocalRaidHistoryEntry } from '../../raid/RaidHistory';
 import { RaidResultUI } from '../../ui/RaidResultUI';
 import { FIRST_SURVIVAL_GOLD_REWARD, FIRST_SURVIVAL_QUEST_ID } from '../../shared/FirstSurvivalReward';
 import type { GameManager } from '../GameManager';
-import type { InputManager } from '../InputManager';
 import type { WorldPhase, WorldRaidSession } from './WorldRaidSession';
 import type { WorldTownSession } from './WorldTownSession';
 import type { RaidFailureSummary } from '../../net/WorldProtocol';
@@ -108,12 +107,12 @@ export class WorldRaidOutcomeController {
         return this.raidResultUI.isVisible();
     }
 
-    public updateInput(input: InputManager): void {
-        this.raidResultUI.updateInput(input);
+    public getOutcome(): RaidOutcome | null {
+        return this.raidResultUI.getOutcome();
     }
 
-    public render(ctx: CanvasRenderingContext2D, width: number, height: number): void {
-        this.raidResultUI.render(ctx, width, height);
+    public confirm(): void {
+        this.raidResultUI.confirm();
     }
 
     public close(): void {

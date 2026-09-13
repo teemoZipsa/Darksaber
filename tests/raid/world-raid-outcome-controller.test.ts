@@ -86,13 +86,12 @@ function createController() {
         getCurrentHubTown: () => DESTINATION_TOWN,
         resetStoryScenarioStateForRaidEnd: () => { calls.push('resetStoryScenarioStateForRaidEnd'); },
         placePartyAtTown: (_town: TownInfo) => { calls.push('placePartyAtTown'); },
-        openTown: (_town: TownInfo) => undefined,
+        openTown: (town: TownInfo) => { calls.push(`openTown:${town.id}`); },
         setPhase: () => undefined,
         log: (message: string) => { logs.push(message); },
     };
     const controller = new WorldRaidOutcomeController(context);
-    const getOutcome = (): RaidOutcome | null =>
-        (controller as unknown as { raidResultUI: { outcome: RaidOutcome | null } }).raidResultUI.outcome;
+    const getOutcome = (): RaidOutcome | null => controller.getOutcome();
 
     return { controller, playerData, raidSession, party, gameManager, getOutcome, calls, logs, persistenceCalls };
 }
@@ -113,6 +112,22 @@ test('local raid outcomes apply injuries before saving', () => {
             result,
         );
     }
+});
+
+test('confirming a displayed result opens its pending town once without settling rewards again', () => {
+    const { controller, raidSession, playerData, calls } = createController();
+    raidSession.beginRaidFromTown('central_castle');
+    controller.completeSuccess(DESTINATION_TOWN);
+    const gold = playerData.gold;
+    const historyCount = playerData.raidHistory.length;
+    assert.equal(controller.isVisible(), true);
+    controller.confirm();
+    controller.confirm();
+    assert.equal(controller.getOutcome(), null);
+    assert.equal(controller.isVisible(), false);
+    assert.deepEqual(calls.filter((call) => call.startsWith('openTown:')), [`openTown:${DESTINATION_TOWN.id}`]);
+    assert.equal(playerData.gold, gold);
+    assert.equal(playerData.raidHistory.length, historyCount);
 });
 
 test('server-authoritative outcomes reapply injury state for display without resaving it', () => {

@@ -100,7 +100,6 @@ export function createWorldEngineUpdateFlow(ports: WorldEngineUpdateFlowPorts): 
         advanceWorldTime: (dt) => ports.advanceWorldTime(dt),
         syncTown: () => ports.townSession.sync(),
         isRaidOutcomeVisible: () => ports.raidOutcomeController.isVisible(),
-        updateRaidOutcomeInput: (input) => ports.raidOutcomeController.updateInput(input),
         isFusionTempleVisible: () => ports.fusionTempleUI.isVisible(),
         updateFusionTempleInput: (input) => ports.fusionTempleUI.updateInput(input),
         isTownVisible: () => ports.townSession.isVisible(),

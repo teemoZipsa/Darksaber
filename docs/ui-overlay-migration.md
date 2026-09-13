@@ -53,10 +53,16 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
 
 ## 남은 독립 Canvas 차단형 패널
 
-- `src/ui/RaidResultUI.ts`: 생환·사망·실종·중도 복귀 결과를 표시하는 레이드 결과 패널. React 결과 패널로 이전하고 최근 출격 기록과 동일한 결과 용어를 사용한다.
+탐험 결과는 `src/ui/react/result/RaidResultPanel.tsx`로 이전했다. `RaidResultUI`는 결과 상태와 한 번만 실행되는 확인 콜백을 보관한다. `WorldRaidOutcomeController.getOutcome()` → `WorldEngine` → `UiStore` 경로로 표시하며, `result` 오버레이가 열려 있는 동안 게임 입력을 차단한다. 기존 보상 정산·저장 로직은 그대로 사용한다.
+
+결과창은 어두운 필드 프레임, 안전 여백, 한 개의 본문 스크롤과 고정 확인 버튼을 사용한다. 620px 이하에서는 보상과 파티를 세로로 배치하고 UI 배율을 반영해 화면 안에 맞춘다. Enter·Space·Escape·바깥 클릭은 마을로 계속하기와 같으며, Tab 포커스는 창 안에서 순환한다. 보상·퀘스트 문장을 개수로 잘라내지 않는다.
+
+일반 계정 로그인 뒤에도 남아 마을 탭을 가리던 개발자 메뉴는 `UiStore` 변경 구독으로 월드 진입 시 숨기며, 타이틀로 돌아오면 다시 표시한다.
+
+남은 이전 대상:
 - `src/ui/FusionTempleUI.ts`: 합체 후보·비용·확인 흐름을 표시하는 신전 패널. React dialog로 이전하고 키보드/터치 포커스 계약을 적용한다.
 
-두 패널을 이전한 뒤에도 적 체력바·플로팅 데미지·전술 마커·방사형 액션 메뉴처럼 월드/카메라 좌표에 붙는 HUD는 Canvas에 유지한다. 우선순위와 완료 조건은 `docs/roadmap.md`를 따른다.
+적 체력바·플로팅 데미지·전술 마커·방사형 액션 메뉴처럼 월드/카메라 좌표에 붙는 HUD는 Canvas에 유지한다. 우선순위와 완료 조건은 `docs/roadmap.md`를 따른다.
 
 ## 완료된 최종 수동 검증
 - **전리품 end-to-end** — `devStart=raid&devScenario=loot`는 로컬 필드에서 실제 전리품 그리드와 배낭을 사용한다. 2026-09-13 가짜 네트워크 클라이언트를 제거했다. 회수는 상태 문자열 대신 외부 그리드 감소·배낭 증가·수량 보존으로 검증하고, 회수 후 이동·귀환·재진입도 확인한다.

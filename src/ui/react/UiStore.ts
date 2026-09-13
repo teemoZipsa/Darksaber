@@ -112,6 +112,7 @@ export class UiStore {
             openState.inventory ? `worldInv:${this.inventorySignature(this.getWorldInventory())}` : '',
             openState.journal ? `quests:${this.questSignature()}` : '',
             openState.magic ? `magic:${this.magicSignature()}` : '',
+            openState.result ? `result:${JSON.stringify(this.getRaidOutcome())}` : '',
         ].join('|');
     }
 
@@ -142,6 +143,8 @@ export class UiStore {
     public stopFieldTravel(): void { this.gm.getFieldEngine()?.stopFieldTravel(); this.tick(); }
     public returnFromField(): void { this.gm.getFieldEngine()?.returnToTown(); this.tick(); }
     public guideToNearbyHunt(): void { this.gm.getFieldEngine()?.guideToNearbyHunt(); this.tick(); }
+    public getRaidOutcome() { return this.gm.getFieldEngine?.()?.getRaidOutcome() ?? null; }
+    public confirmRaidOutcome(): void { this.gm.getFieldEngine()?.confirmRaidOutcome(); this.tick(); }
 
     private shopSignature(): string {
         const shop = this.shop();

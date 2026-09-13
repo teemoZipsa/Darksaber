@@ -48,7 +48,7 @@
 
 ### 3. 차단형 UI 마무리
 
-- `RaidResultUI`를 React DOM 결과 패널로 이전한다.
+- 완료: `RaidResultUI`는 상태만 유지하고 React `RaidResultPanel`이 보상·파티·목표를 스크롤과 터치·키보드 조작으로 표시한다.
 - `FusionTempleUI`를 React DOM 합체/확인 흐름으로 이전한다.
 - 포커스 순환, ESC/바깥 클릭, 320~390px와 UI 120%, 모션 감소를 기존 패널 계약과 맞춘다.
 - 월드 좌표 HUD와 방사형 행동 메뉴는 Canvas에 유지한다.

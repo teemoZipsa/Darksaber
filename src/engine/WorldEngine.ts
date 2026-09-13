@@ -631,6 +631,9 @@ export class WorldEngine {
 
     public getRaidSession(): WorldRaidSession { return this.raidSession; }
 
+    public getRaidOutcome() { return this.raidLifecycleControllers.raidOutcomeController.getOutcome(); }
+    public confirmRaidOutcome(): void { this.raidLifecycleControllers.raidOutcomeController.confirm(); }
+
     /**
      * Covers the full raid lifecycle, including the short authoritative-save
      * finalization window after the network connection flag has been cleared.
