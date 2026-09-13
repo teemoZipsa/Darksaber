@@ -59,7 +59,7 @@ index.html: #game-container > (canvas#gameCanvas, div#ui-overlay)
 두 패널을 이전한 뒤에도 적 체력바·플로팅 데미지·전술 마커·방사형 액션 메뉴처럼 월드/카메라 좌표에 붙는 HUD는 Canvas에 유지한다. 우선순위와 완료 조건은 `docs/roadmap.md`를 따른다.
 
 ## 완료된 최종 수동 검증
-- **레이드 전리품 end-to-end** — `devStart=raid&devScenario=loot` 실제 레이드 화면에서 DOM 전리품 패널을 열고 Browser 포인터 드래그로 전리품을 배낭에 드롭. 외부 전리품 1→0, 배낭 4→5, DEV 상태 `picked:dev_raid_loot:0,0` 확인.
+- **전리품 end-to-end** — `devStart=raid&devScenario=loot`는 로컬 필드에서 실제 전리품 그리드와 배낭을 사용한다. 2026-09-13 가짜 네트워크 클라이언트를 제거했다. 회수는 상태 문자열 대신 외부 그리드 감소·배낭 증가·수량 보존으로 검증하고, 회수 후 이동·귀환·재진입도 확인한다.
 - **실제 레이드 화면 어그로** — `devStart=raid&devScenario=aggro` 실제 레이드 화면에서 어그로 적의 추격 후 강제 인접 공격 로그/상태 배지 확인.
 - **시나리오 직접 진입** — Chrome headless에서 `devStart=raid&devScenario=story31`로 `StoryInteriorMap`/`demon_fixers_den` 진입, DEV 상태 `story31 / interior-ready`, 보스 1명(마계 해결사 `{22,11}`), 경비 보스 오인 0개, 입장 로그 확인. 같은 DEV 경로는 구현된 스토리 시나리오 전체를 지원하며, 필드/비공정 시나리오는 월드맵 목표 상태로 바로 시작한다.
 

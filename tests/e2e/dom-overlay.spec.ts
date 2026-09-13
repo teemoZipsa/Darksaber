@@ -474,6 +474,7 @@ test('dev launcher buttons are readable and enter dev modes', async ({ page, isM
     const launcher = page.locator('.dev-launcher');
     await expect(launcher).toBeVisible({ timeout: 20_000 });
 
+    await page.locator('.dev-launcher__tests > summary').click();
     const metrics = await page.locator('.dev-launcher a').evaluateAll((links) => links.slice(0, 8).map((link) => {
         const rect = link.getBoundingClientRect();
         const style = window.getComputedStyle(link);
@@ -492,12 +493,14 @@ test('dev launcher buttons are readable and enter dev modes', async ({ page, isM
         expect(metric.width).toBeGreaterThan(metric.height);
     }
 
-    await page.locator('.dev-launcher a[href="/?devStart=town"]').click();
+    await expectFitsViewport(page, launcher);
+    await page.locator('.dev-launcher a[href="/?devStart=town&devLocal=1"]').click();
     await expect(page.locator('#ui-overlay .ds-town')).toBeVisible({ timeout: 20_000 });
 
     if (!isMobile) {
         await page.goto('/');
-        await page.locator('.dev-launcher a[href="/?devStart=raid&devScenario=loot"]').click();
+        await page.locator('.dev-launcher__tests > summary').click();
+        await page.locator('.dev-launcher a[href="/?devStart=raid&devScenario=loot&devLocal=1"]').click();
         await expect(page.locator('#ui-overlay [data-inv-grid="ext"] .inv-item').first()).toBeVisible({ timeout: 25_000 });
     }
 
@@ -913,18 +916,21 @@ test('dev raid loot can be transferred into the backpack with pointer input', as
         await page.mouse.up();
     }
 
-    await expect(page.locator('.dev-scenario-status')).toContainText(/picked:dev_raid_loot:\d+,\d+/);
-    await expect(page.locator('#ui-overlay [data-inv-grid="ext"] .inv-item')).toHaveCount(0);
+    // Local collection leaves the remaining item in the chest instead of hiding it
+    // while waiting for an acknowledgement from the former fake network client.
+    await expect(page.locator('#ui-overlay [data-inv-grid="ext"] .inv-item')).toHaveCount(before.external.count - 1);
     await expect.poll(() => getRaidLootModelDebug(page)).toMatchObject({
         inventoryVisible: true,
         externalRaidLoot: true,
-        external: { count: 0, quantity: 0, itemIds: [] },
-        worldLoot: { count: 0, quantity: 0, itemIds: [] },
+        external: { count: before.external.count - 1 },
+        worldLoot: { count: before.external.count - 1 },
     });
 
     const after = await getRaidLootModelDebug(page);
-    expect(after.bag.quantity).toBe(before.bag.quantity + before.external.quantity);
-    expect(after.status).toMatch(/picked:dev_raid_loot:\d+,\d+/);
+    expect(after.bag.quantity + after.external.quantity).toBe(before.bag.quantity + before.external.quantity);
+    expect(after.bag.quantity).toBeGreaterThan(before.bag.quantity);
+    expect(after.worldLoot).toEqual(after.external);
+    expect(await page.evaluate(() => (window as unknown as { __gm: any }).__gm.worldEngine.isNetworkRaidActive())).toBe(false);
 });
 
 test('dev raid combat UX supports attack, magic, tool, defend, rest, and fanfare inputs', async ({ page, isMobile }) => {

@@ -648,7 +648,13 @@ export class WorldEngine {
         this.addCombatLog(message);
     }
 
-    public beginLocalDevRaidFromCurrentHub(): boolean {
+    public beginLocalDevRaidFromCurrentHub(requestedRealm?: WorldRealmId): boolean {
+        if (!import.meta.env.DEV) return false;
+        this.scenarioNetworkControllers.tutorialController.clearForNetworkRaid();
+        this.closeNetworkRaidClient(true);
+        if (requestedRealm && this.worldMap.getRealm() !== requestedRealm) this.worldMap.setRealm(requestedRealm);
+        this.playerData.beginMonsterCodexRaid();
+        this.worldMap.loot = [];
         return beginWorldEngineLocalDevRaidFromCurrentHub({
             actionControllers: this.actionControllers,
             networkState: this.getNetworkState(),
@@ -714,6 +720,10 @@ export class WorldEngine {
     }
 
     private async beginRaidFromCurrentHub(requestedRealm?: WorldRealmId): Promise<void> {
+        if (this.gameManager.isLocalDevSession()) {
+            this.beginLocalDevRaidFromCurrentHub(requestedRealm);
+            return;
+        }
         this.playerData.beginMonsterCodexRaid();
         return this.raidLifecycleControllers.raidLifecycleController.beginRaidFromCurrentHub(requestedRealm);
     }

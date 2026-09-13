@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { GameManager } from '../../src/engine/GameManager';
+import type { LootObject } from '../../src/entity/LootObject';
 import { STORY_SCENARIOS } from '../../src/data/StoryScenarioData';
 import {
     applyDevRaidScenario,
@@ -200,7 +202,7 @@ function createManagerHarness() {
         partyActors: [actor],
         fieldEnemies,
         worldMap: {
-            loot: [] as Array<{ id: string; inventory: unknown }>,
+            loot: [] as LootObject[],
             isWalkable: () => true,
             getDungeons: () => STORY_SCENARIOS
                 .map((scenario) => ({
@@ -292,19 +294,34 @@ test('dev town launcher forwards each implemented story scenario to the open URL
     assert.equal(helper.normalizeDevModeArg(null), 'town');
     assert.equal(helper.normalizeDevModeArg('tutorial'), 'tutorial');
     assert.equal(helper.buildDevOpenPath('tutorial', 'loot'), '/?devStart=tutorial');
-    assert.equal(helper.buildDevOpenPath('raid', 'aggro'), '/?devStart=raid&devScenario=aggro');
-    assert.equal(helper.buildDevOpenPath('raid', 'loot'), '/?devStart=raid&devScenario=loot');
-    assert.equal(helper.buildDevOpenPath('raid', 'combat'), '/?devStart=raid&devScenario=combat');
+    assert.equal(helper.buildDevOpenPath('town'), '/?devStart=town&devLocal=1');
+    assert.equal(helper.buildDevOpenPath('raid', 'aggro'), '/?devStart=raid&devScenario=aggro&devLocal=1');
+    assert.equal(helper.buildDevOpenPath('raid', 'loot'), '/?devStart=raid&devScenario=loot&devLocal=1');
+    assert.equal(helper.buildDevOpenPath('raid', 'combat'), '/?devStart=raid&devScenario=combat&devLocal=1');
     for (const episode of DEV_STORY_EPISODES) {
         assert.equal(helper.normalizeDevScenarioArg(`story${episode}`), `story${episode}`);
         assert.equal(
             helper.buildDevOpenPath('raid', `story${episode}`),
-            `/?devStart=raid&devScenario=story${episode}`,
+            `/?devStart=raid&devScenario=story${episode}&devLocal=1`,
             `episode ${episode} open path`
         );
     }
     assert.equal(helper.normalizeDevScenarioArg('story32'), null);
-    assert.equal(helper.buildDevOpenPath('raid', 'story32'), '/?devStart=raid');
+    assert.equal(helper.buildDevOpenPath('raid', 'story32'), '/?devStart=raid&devLocal=1');
+});
+
+test('dev launcher starts the installed Vite CLI through Node without a Windows command shell or backend', async () => {
+    const helper = await import(pathToFileURL(resolve('scripts/dev-town.mjs')).href) as {
+        getDevLaunchCommands: (mode: string, scenario?: string) => Array<{ label: string; args: string[] }>;
+    };
+    const commands = helper.getDevLaunchCommands('raid', 'loot');
+    assert.equal(commands.length, 1);
+    assert.equal(commands[0].label, 'vite');
+    assert.equal(commands[0].args[commands[0].args.length - 1], '/?devStart=raid&devScenario=loot&devLocal=1');
+    const result = spawnSync(process.execPath, [commands[0].args[0], '--version'], { shell: false, encoding: 'utf8' });
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /vite\//i);
 });
 
 test('WorldEngine close hook delegates to the raid lifecycle controller', () => {
@@ -394,25 +411,25 @@ test('dev story scenarios launch local starts through episode 31', () => {
     });
 });
 
-test('dev loot scenario enables the raid loot client path without getNetworkRaidState', () => {
+test('dev loot scenario keeps real local movement and inventory paths without a fake network client', () => {
     const { actor, inventory, manager, selected, world } = createManagerHarness();
 
     assert.equal(applyDevRaidScenario(manager, 'loot'), true);
 
     assert.equal(world.currentPhase, 'raid');
-    assert.equal(world.isNetworkRaid, true);
-    assert.ok(world.networkRaidClient);
+    assert.equal(world.isNetworkRaid, false);
+    assert.equal(world.networkRaidClient, null);
     assert.deepEqual(world.partyActors, [actor]);
     assert.equal(world.fieldEnemies.length, 0);
     assert.equal(world.clearFieldTurnStateCalls, 1);
     assert.equal(world.worldMap.loot.length, 1);
     assert.equal(world.worldMap.loot[0].id, 'dev_raid_loot');
+    assert.deepEqual(world.worldMap.loot[0].inventory.items.map((placed) => placed.item.id).sort(), ['herb_common', 'short_sword']);
+    assert.deepEqual(world.worldMap.loot[0].overflowItems, []);
     assert.equal(selected.lootId, 'dev_raid_loot');
     assert.deepEqual(inventory.externalOptions, { isRaidLoot: true });
     assert.equal(inventory.toggleCalls, 1);
 
-    const client = world.networkRaidClient as { sendLootPickup: (lootId: string, gridX: number, gridY: number) => string };
-    assert.match(client.sendLootPickup('dev_raid_loot', 0, 0), /^dev-loot-/);
 });
 
 test('dev combat scenario creates a local browser combat fixture with party, tool, magic, and active turn', () => {

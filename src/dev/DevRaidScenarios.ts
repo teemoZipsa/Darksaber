@@ -176,8 +176,6 @@ function applyDevAggroScenario(world: DevWorldEngine, actor: DevFieldActor): voi
 }
 
 function applyDevLootScenario(manager: GameManager, world: DevWorldEngine, actor: DevFieldActor): void {
-    world.networkRaidClient = createDevLootClient();
-    world.isNetworkRaid = true;
     world.partyActors = [actor];
 
     const actorTile = findWalkableTile(world, { x: actor.entity.gridX, y: actor.entity.gridY });
@@ -197,7 +195,7 @@ function applyDevLootScenario(manager: GameManager, world: DevWorldEngine, actor
         sourceLabel: t('dev.scenario.lootTitle'),
         kind: 'chest',
         gridW: 5,
-        gridH: 2,
+        gridH: 3,
     });
     world.worldMap.loot = [loot];
     world.actionControllers.selectionController.selectLoot(loot.id);
@@ -341,21 +339,6 @@ function setDevActiveTurn(world: DevWorldEngine, actorId: string, actionPoints: 
     world.turnStateController?.setRemainingActionPoints?.(actionPoints);
 }
 
-function createDevLootClient(): unknown {
-    let counter = 0;
-    return {
-        getIsOpen: () => true,
-        sendLootPickup: (lootId: string, gridX: number, gridY: number) => {
-            const intentId = `dev-loot-${Date.now()}-${++counter}`;
-            setDevScenarioStatus('loot', `picked:${lootId}:${gridX},${gridY}`);
-            return intentId;
-        },
-        sendIntent: () => `dev-intent-${Date.now()}-${++counter}`,
-        close: () => undefined,
-        leave: () => undefined,
-    };
-}
-
 function setDevEntityTile(entity: DevEntity, tile: DevTile): void {
     entity.setGridPosition?.(tile.x, tile.y, true);
     entity.gridX = tile.x;
@@ -424,6 +407,6 @@ function getOrCreateDevScenarioStatus(): HTMLDivElement {
     if (existing) return existing;
     const root = document.createElement('div');
     root.className = 'dev-scenario-status';
-    document.body.appendChild(root);
+    (document.querySelector('.dev-session') ?? document.body).appendChild(root);
     return root;
 }

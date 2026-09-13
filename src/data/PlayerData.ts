@@ -100,6 +100,11 @@ export class PlayerData {
     private hubPersistCallback: (() => void) | null = null;
     private readonly codexEncounteredEnemyIds = new Set<string>();
     private readonly codexDefeatedEnemyIds = new Set<string>();
+    private readonly persistLocally: boolean;
+
+    constructor(options: { persistLocally?: boolean } = {}) {
+        this.persistLocally = options.persistLocally !== false;
+    }
 
     public setAuthenticatedSession(active: boolean): void {
         this.authenticatedSession = active;
@@ -198,6 +203,7 @@ export class PlayerData {
             this.hubPersistCallback?.();
             return;
         }
+        if (!this.persistLocally) return;
         const lastSaved = new Date().toISOString();
         const characterSave = this.toCharacterSave(lastSaved, Math.max(1, this.localSaveRevision + 1));
         const runtimePatch = this.characterSaveProvider?.();
@@ -217,7 +223,7 @@ export class PlayerData {
     }
 
     public load(): void {
-        if (this.authenticatedSession) return;
+        if (this.authenticatedSession || !this.persistLocally) return;
         try {
             const raw = localStorage.getItem(SAVE_KEY);
             if (!raw) return;

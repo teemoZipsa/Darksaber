@@ -26,6 +26,8 @@
 
 ## 현재 후속 점검
 
+- [x] 개발자 진입 복구: 로컬 마을↔필드 재진입, 전리품 테스트 가짜 서버 제거·단검 수납 크기 수정, 테스트 저장 격리, 로컬·상황별·서버 메뉴 구분, Windows 실행 명령 및 데스크톱·모바일 검증. `npm test` 906 통과·1 스킵, 브라우저 30개 경로, typecheck·lint·build 통과.
+
 - [x] 필드 프레임 내부 여백·정렬 수정: 상태창 공통 26px 안전 여백, 긴 이름·큰 숫자 대응, 미니맵·전투 버튼 장식과 글자 분리, 한글·영문 실제 텍스트 경계 검증.
 
 - [x] 필드 UI 아트·가독성 개선: 생성한 투명 PNG 프레임·문장 적용, 상태창·미니맵 스타일 통일, 전투 메뉴 크기와 비활성 색상 조정, 작은 화면 겹침 및 지도 Escape 닫기 검증.
@@ -276,7 +278,7 @@
 - 타입체크: `npm run typecheck` (반드시 통과).
 - DOM 오버레이 브라우저 스모크: `npm run test:e2e` (새 환경은 먼저 `npx playwright install chromium`).
 - 개발 서버: `npm run dev` → http://127.0.0.1:5731 (프리뷰 도구는 `.claude/launch.json`의 5742).
-- 개발자 바로 시작: `npm run dev:town`, `npm run dev:raid`, `npm run dev:raid:aggro`, `npm run dev:raid:loot`, `npm run dev:raid:story -- storyNN`, `npm run dev:tutorial`. 직접 진입 URL은 `/?devStart=raid&devScenario=storyNN` 형식이며, 지원 에피소드는 `story-scenarios.json` 데이터에서 결정된다.
+- 개발자 바로 시작: `npm run dev:town`, `npm run dev:raid`, `npm run dev:raid:aggro`, `npm run dev:raid:loot`, `npm run dev:raid:story -- storyNN`, `npm run dev:tutorial`. Vite만 실행하고 저장하지 않는 로컬 캐릭터로 진입한다. `/?devStart=raid&devScenario=storyNN`도 항상 로컬이며, 지원 에피소드는 `story-scenarios.json` 데이터에서 결정된다. 서버 검증은 `npm run server` 실행 후 시작 화면의 서버 접속 테스트를 사용한다.
 - 테스트: `npm test`.
 
 ## 알려진 함정

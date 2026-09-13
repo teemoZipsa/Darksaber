@@ -94,6 +94,7 @@ export class GameManager {
     private startIntroTutorialOnWorldInit = false;
     private pendingTransition: { next: GameState; prepare: (() => void) | undefined } | null = null;
     private networkAuthContext: { accessToken: string; characterId: string } | null = null;
+    private localDevSession = false;
     private authClient: AuthClient | null = null;
     private networkSaveRevision = 0;
     private hubFlushEnabled = true;
@@ -278,8 +279,12 @@ export class GameManager {
     }
 
     public beginLocalDevRaidFromTown(): boolean {
-        if (this.state !== GameState.WORLD || !this.worldEngine) return false;
+        if (!this.isLocalDevSession() || this.state !== GameState.WORLD || !this.worldEngine) return false;
         return this.worldEngine.beginLocalDevRaidFromCurrentHub();
+    }
+
+    public isLocalDevSession(): boolean {
+        return Boolean(import.meta.env?.DEV) && this.localDevSession;
     }
 
     public isQuestJournalOpen(): boolean {
@@ -593,13 +598,15 @@ export class GameManager {
         gender: string = 'M',
         options: { startIntroTutorial?: boolean } = {}
     ): void {
+        if (!import.meta.env?.DEV) return;
+        this.localDevSession = true;
         this.resetHubSaveQueue();
         this.networkAuthContext = null;
         this.authClient = null;
         this.networkSaveRevision = 0;
         this.hubFlushEnabled = true;
         this.hubSaveQueue?.setPaused(false);
-        this.playerData = new PlayerData();
+        this.playerData = new PlayerData({ persistLocally: false });
         this.playerData.setAuthenticatedSession(false);
         this.playerData.setHubPersistCallback(null);
         this.playerData.setCharacterSaveProvider(null);
@@ -627,6 +634,7 @@ export class GameManager {
     }
 
     public enterAuthenticatedCharacter(session: AuthenticatedCharacterSession): void {
+        this.localDevSession = false;
         this.resetHubSaveQueue();
         this.hubFlushEnabled = true;
         this.hubSaveQueue?.setPaused(false);
