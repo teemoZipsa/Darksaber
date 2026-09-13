@@ -27,6 +27,7 @@ import { PauseMenuUI } from '../ui/PauseMenuUI';
 import { SettingsUI } from '../ui/SettingsUI';
 import { HitStop } from './world/HitStop';
 import { AudioManager } from './AudioManager';
+import { GameMusic } from './GameMusic';
 import type { UiStore } from '../ui/react/UiStore';
 import { hasBlockingOverlay, type OverlayOpenState } from '../ui/react/OverlayRegistry';
 import type { WorldTownSession } from './world/WorldTownSession';
@@ -53,6 +54,7 @@ export interface AuthenticatedCharacterSession {
 }
 
 export class GameManager {
+    private readonly music = new GameMusic();
     private static readonly MAX_PIXEL_RATIO = 2;
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D;
@@ -898,6 +900,7 @@ export class GameManager {
         this.transitions.update(timestamp);
         this.flushPendingTransition();
         this.update(dt);
+        this.music.update(this.getFieldEngine()?.getMusicKey() ?? 'bgm.title', timestamp);
         this.render();
         this.input.endFrame();
         // Drive the React DOM overlay: one notification per frame so it reflects

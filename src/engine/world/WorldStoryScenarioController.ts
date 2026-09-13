@@ -48,7 +48,6 @@ import type {
     ScenarioFieldEventResultMessage,
     ScenarioFieldEventRewardResult,
 } from '../../net/WorldProtocol';
-import { AudioManager } from '../AudioManager';
 import type { WorldRaidSession } from './WorldRaidSession';
 import { applyBountyEliteBaseline } from '../../field/EliteAffixes';
 
@@ -707,7 +706,7 @@ export class WorldStoryScenarioController {
         this.context.setFieldEnemies(this.createScenarioEnemies(scenario, entranceTile));
         this.syncActiveWorldScenarioMarkers();
         this.context.followCameraToPlayer();
-        this.playStoryQuestBgm(dungeon.id);
+
         this.playStoryScenarioSequence(dungeon.id, 'entry');
         this.context.log(t(storyQuest.enterLogKey));
 
@@ -737,7 +736,7 @@ export class WorldStoryScenarioController {
         this.context.setFieldEnemies(this.createScenarioEnemies(scenario, layout.playerStart, layout));
 
         this.context.followCameraToPlayer();
-        this.playStoryQuestBgm(dungeon.id);
+
         this.playStoryScenarioSequence(dungeon.id, 'entry');
         this.context.log(formatT('story.interior.enterLog', { dungeon: displayDungeonName(dungeon) }));
         this.context.log(t(storyQuest.enterLogKey));
@@ -919,7 +918,7 @@ export class WorldStoryScenarioController {
             this.networkScenarioEnteredDungeonIds.add(dungeonId);
             const storyQuest = getStoryQuestByDungeonId(dungeonId);
             if (storyQuest) this.context.log(t(storyQuest.enterLogKey));
-            this.playStoryQuestBgm(dungeonId);
+
             this.playStoryScenarioSequence(dungeonId, 'entry');
             const scenario = getStoryScenarioByDungeonId(dungeonId);
             if (scenario && isStoryInteriorDungeon(dungeonId)) {
@@ -1046,11 +1045,6 @@ export class WorldStoryScenarioController {
     private playStoryScenarioSequence(dungeonId: string, phase: 'entry' | 'bossDefeat', onComplete?: () => void): void {
         const sequence = getStoryScenarioEventSequence(dungeonId);
         this.startStoryScenarioPresentation(this.getScenarioPresentationSteps(dungeonId, sequence?.[phase] ?? []), onComplete);
-    }
-
-    private playStoryQuestBgm(dungeonId: string): void {
-        const storyQuest = getStoryQuestByDungeonId(dungeonId);
-        if (storyQuest?.bgmKey) AudioManager.playBgm(storyQuest.bgmKey, { fadeMs: 600 });
     }
 
     private fieldEventKey(dungeonId: string, eventId: string): string {

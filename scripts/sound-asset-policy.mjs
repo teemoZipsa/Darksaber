@@ -60,7 +60,7 @@ export function collectSkillCastSfxKeys(rootDir) {
   const fnMatch = content.match(/function getSkillCastSfx[\s\S]*?^}/m);
   if (!fnMatch) return keys;
 
-  const returnRegex = /return\s+'([^']+)'/g;
+  const returnRegex = /['"](sfx\.[^'"]+)['"]/g;
   let match;
   while ((match = returnRegex.exec(fnMatch[0])) !== null) keys.add(match[1]);
   return keys;
@@ -98,6 +98,10 @@ export function collectRequiredSoundKeys(rootDir) {
   for (const file of walkFiles(srcDir)) {
     const content = fs.readFileSync(file, 'utf8');
     for (const key of extractSoundKeysFromPlayCalls(content)) keys.add(key);
+    // Scene-based music is selected by return values, then played by GameMusic.
+    if (path.basename(file) !== 'AudioManager.ts') {
+      for (const match of content.matchAll(/['"](bgm\.[^'"]+)['"]/g)) keys.add(match[1]);
+    }
   }
 
   for (const key of collectSkillCastSfxKeys(rootDir)) keys.add(key);

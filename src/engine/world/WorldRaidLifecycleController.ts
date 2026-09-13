@@ -105,7 +105,7 @@ export class WorldRaidLifecycleController {
             this.context.setNetworkPlayerId(null);
         }
         this.context.closeFieldOverlays();
-        AudioManager.stopBgm(600);
+        AudioManager.playSfx('sfx.door', { volume: 0.3 });
         this.context.setPhase('town');
         this.context.raidSession.enterTown(town.id);
         this.context.townSession.show(town);

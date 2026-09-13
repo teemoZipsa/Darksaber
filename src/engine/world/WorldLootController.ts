@@ -14,6 +14,7 @@ import type { WorldNetworkSyncController } from './WorldNetworkSyncController';
 import type { WorldSelectionController } from './WorldSelectionController';
 import type { WorldStoryScenarioController } from './WorldStoryScenarioController';
 import { BOUNTY_PROOF_ITEM_ID } from '../../data/BountyContractData';
+import { AudioManager } from '../AudioManager';
 
 export interface WorldLootContext {
     gameManager: GameManager;
@@ -35,6 +36,7 @@ export class WorldLootController {
     constructor(context: WorldLootContext) {
         this.context = context;
         this.context.gameManager.inventoryUI.onRaidLootSecured = (placed, source) => {
+            if (!this.context.isNetworkRaid()) AudioManager.playSfx('sfx.loot_pickup', { volume: 0.45 });
             const client = this.context.getNetworkRaidClient();
             const lootId = this.context.selectionController.lootId;
             if (!this.context.isNetworkRaid() || !client || !source || !lootId) return;
@@ -68,6 +70,7 @@ export class WorldLootController {
                 }
             }
             if (acquiredNames.length > 0) {
+                AudioManager.playSfx('sfx.loot_pickup', { volume: 0.45 });
                 this.context.log(`${enemy.name} ${t('raid.autoLoot')}: ${acquiredNames.join(', ')}`);
             }
             if (failedItems.length === 0) return;
@@ -108,6 +111,7 @@ export class WorldLootController {
         }
         this.context.selectionController.selectLoot(loot.id);
         this.context.log(formatT('field.log.lootSearch', { source: sourceLabel }));
+        AudioManager.playSfx('sfx.door', { volume: 0.35 });
         this.context.clearControlledPath();
         const actor = this.context.getControlledActor();
         if (actor) actor.queuedIntent = null;

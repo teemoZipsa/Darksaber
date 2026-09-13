@@ -2,12 +2,10 @@
  * AudioManager — WebAudio-based mixer with three logical channels:
  *   bgm  : background music (cross-fades, looped)
  *   sfx  : world / combat sound effects (overlapping playback)
- *   ui   : UI clicks / hovers (highest priority, low-latency)
+ *   ui   : UI clicks / hovers
  *
- * The manager is **graceful**: if no audio files exist on disk yet, every
- * call becomes a no-op and logs at most one warning per missing asset. This
- * lets game code wire up sound hooks now and have them activate the moment
- * the artist drops files into the catalogue paths below.
+ * Recovered WAV effects and MIDI music share decoded buffers by source.
+ * Missing optional assets are skipped with one warning per file.
  *
  * The manager auto-subscribes to SettingsManager so mute toggles and volume
  * slider changes take effect immediately.
@@ -25,6 +23,7 @@ interface BufferEntry {
     settled: boolean;
     /** True if the asset is missing — we warn once and never retry. */
     missing: boolean;
+    loading?: Promise<void>;
 }
 
 interface PlayOptions {
@@ -127,13 +126,15 @@ export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = 
     'sfx.extract_done':   { src: originalSfx('01'), channel: 'sfx' },
 
     // Music
-    'bgm.title':   { src: '/assets/sounds/bgm/title.ogg',   channel: 'bgm' },
-    'bgm.world':   { src: '/assets/sounds/bgm/world.ogg',   channel: 'bgm' },
-    'bgm.town':    { src: '/assets/sounds/bgm/town.ogg',    channel: 'bgm' },
-    'bgm.raid':    { src: '/assets/sounds/bgm/raid.ogg',    channel: 'bgm' },
-    'bgm.boss':    { src: '/assets/sounds/bgm/boss.ogg',    channel: 'bgm' },
-    'bgm.victory': { src: '/assets/sounds/bgm/victory.ogg', channel: 'bgm' },
-    'bgm.gameover':{ src: '/assets/sounds/bgm/gameover.ogg',channel: 'bgm' },
+    'bgm.title':   { src: '/assets/sounds/bgm/story/01.mid',   channel: 'bgm' },
+    'bgm.world':   { src: '/assets/sounds/bgm/story/04.mid',   channel: 'bgm' },
+    'bgm.town':    { src: '/assets/sounds/bgm/tutorial/Sh-Fil2.mid',    channel: 'bgm' },
+    'bgm.raid':    { src: '/assets/sounds/bgm/story/02.mid',    channel: 'bgm' },
+    'bgm.boss':    { src: '/assets/sounds/bgm/story/09.mid',    channel: 'bgm' },
+    'bgm.victory': { src: '/assets/sounds/bgm/story/05.mid', channel: 'bgm' },
+    'bgm.gameover':{ src: '/assets/sounds/bgm/story/03.mid',channel: 'bgm' },
+    'bgm.forest': { src: '/assets/sounds/bgm/story/05.mid', channel: 'bgm' },
+    'bgm.cave': { src: '/assets/sounds/bgm/story/03.mid', channel: 'bgm' },
     'bgm.tutorial.training': { src: '/assets/sounds/bgm/tutorial/Sh-Fil2.mid', channel: 'bgm' },
     'bgm.story.episode01': { src: '/assets/sounds/bgm/story/01.mid', channel: 'bgm' },
     'bgm.story.episode02': { src: '/assets/sounds/bgm/story/02.mid', channel: 'bgm' },
@@ -169,7 +170,7 @@ export const AUDIO_CATALOG: Record<string, { src: string; channel: Channel }> = 
     'bgm.story.episode31': { src: '/assets/sounds/bgm/story/20.mid', channel: 'bgm' },
 };
 
-class AudioManagerClass {
+export class AudioManagerClass {
     private ctx: AudioContext | null = null;
     private bgmGain: GainNode | null = null;
     private sfxGain: GainNode | null = null;
@@ -180,14 +181,27 @@ class AudioManagerClass {
     private currentBgmGain: GainNode | null = null;
     private settingsUnsub: (() => void) | null = null;
     private warnedMissing = new Set<string>();
+    private requestedBgmKey: string | null = null;
+    private bgmRequest = 0;
+    private unlockListening = false;
+    private lastOneShot = new Map<string, number>();
+    private activeOneShots = 0;
+    private unlock = (): void => {
+        if (this.ensureContext() && this.ctx?.state === 'suspended') {
+            void this.ctx.resume().catch(() => undefined);
+        }
+    };
 
     /**
-     * Lazily creates the AudioContext on first user interaction. Browsers
-     * block AudioContext.create() until the user has gestured, so we don't
-     * eagerly call this at boot — instead `ensureContext` is called by the
-     * first playSfx/playBgm/playUi call.
+     * Playback requests create the context lazily. Browsers may leave it
+     * suspended until a real pointer or keyboard gesture resumes it.
      */
     public init(): void {
+        if (!this.unlockListening && typeof document !== 'undefined') {
+            document.addEventListener('pointerdown', this.unlock, true);
+            document.addEventListener('keydown', this.unlock, true);
+            this.unlockListening = true;
+        }
         // Subscribe so volume changes propagate immediately, even before the
         // AudioContext is created.
         if (!this.settingsUnsub) {
@@ -196,11 +210,19 @@ class AudioManagerClass {
     }
 
     public dispose(): void {
+        if (this.unlockListening) {
+            document.removeEventListener('pointerdown', this.unlock, true);
+            document.removeEventListener('keydown', this.unlock, true);
+            this.unlockListening = false;
+        }
         if (this.settingsUnsub) {
             this.settingsUnsub();
             this.settingsUnsub = null;
         }
-        this.stopBgm();
+        this.stopBgm(0);
+        this.buffers.clear();
+        this.lastOneShot.clear();
+        this.activeOneShots = 0;
         if (this.ctx) {
             void this.ctx.close().catch(() => undefined);
             this.ctx = null;
@@ -230,6 +252,7 @@ class AudioManagerClass {
     public playFootstep(surface: FieldFootstepSurface): void {
         if (!this.ensureContext() || SettingsManager.getMuteSFX()) return;
         const ctx = this.ctx!;
+        if (ctx.state !== 'running') return;
         const profile = surface === 'hard'
             ? { duration: 0.028, frequency: 1450, gain: 0.075, filter: 'bandpass' as BiquadFilterType }
             : surface === 'wet'
@@ -257,6 +280,7 @@ class AudioManagerClass {
         source.connect(filter);
         filter.connect(gain);
         gain.connect(this.sfxGain!);
+        source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };
         source.start();
     }
 
@@ -265,42 +289,34 @@ class AudioManagerClass {
      * track is a no-op.
      */
     public playBgm(key: string, options: CrossfadeOptions = {}): void {
-        if (this.currentBgmKey === key) return;
-        if (!this.ensureContext()) return;
-
+        if (AUDIO_CATALOG[key]?.channel !== 'bgm' || !this.ensureContext()) return;
+        if (this.requestedBgmKey === key) return;
+        this.requestedBgmKey = key;
+        const request = ++this.bgmRequest;
+        const src = this.bufferKey(key);
+        // Aliases of the same recovered track should keep playing seamlessly.
+        if (this.currentBgmKey && this.bufferKey(this.currentBgmKey) === src) {
+            this.currentBgmKey = key;
+            return;
+        }
         void this.loadBuffer(key).then(() => {
-            if (this.currentBgmKey === key) return;
-            const entry = this.buffers.get(key);
-            if (!entry || !entry.buffer) return;
-            const ctx = this.ctx!;
-            const fadeMs = options.fadeMs ?? 600;
-            const fadeSec = fadeMs / 1000;
-            const targetVol = (options.volume ?? 1) * (SettingsManager.getMuteBGM() ? 0 : 1);
-
-            // Fade-out previous
-            if (this.currentBgmSource && this.currentBgmGain) {
-                const prevGain = this.currentBgmGain;
-                const prevSource = this.currentBgmSource;
-                prevGain.gain.cancelScheduledValues(ctx.currentTime);
-                prevGain.gain.setValueAtTime(prevGain.gain.value, ctx.currentTime);
-                prevGain.gain.linearRampToValueAtTime(0, ctx.currentTime + fadeSec);
-                window.setTimeout(() => {
-                    try { prevSource.stop(); } catch { /* already stopped */ }
-                }, fadeMs + 50);
-            }
-
-            // Fade-in next
+            if (request !== this.bgmRequest || !this.ctx) return;
+            const entry = this.buffers.get(src);
+            if (!entry?.buffer) return;
+            const ctx = this.ctx;
+            const fadeMs = Math.max(0, options.fadeMs ?? 600);
+            this.fadeOutBgm(fadeMs);
             const gain = ctx.createGain();
             gain.gain.setValueAtTime(0, ctx.currentTime);
-            gain.gain.linearRampToValueAtTime(targetVol, ctx.currentTime + fadeSec);
+            // Muting belongs to the channel gain so unmuting restores playback.
+            gain.gain.linearRampToValueAtTime(options.volume ?? 1, ctx.currentTime + fadeMs / 1000);
             gain.connect(this.bgmGain!);
-
             const source = ctx.createBufferSource();
             source.buffer = entry.buffer;
             source.loop = true;
             source.connect(gain);
+            source.onended = () => { source.disconnect(); gain.disconnect(); };
             source.start();
-
             this.currentBgmKey = key;
             this.currentBgmSource = source;
             this.currentBgmGain = gain;
@@ -308,16 +324,20 @@ class AudioManagerClass {
     }
 
     public stopBgm(fadeMs: number = 300): void {
-        if (!this.ctx || !this.currentBgmSource || !this.currentBgmGain) return;
-        const fadeSec = Math.max(0, fadeMs) / 1000;
-        const prevGain = this.currentBgmGain;
-        const prevSource = this.currentBgmSource;
-        prevGain.gain.cancelScheduledValues(this.ctx.currentTime);
-        prevGain.gain.setValueAtTime(prevGain.gain.value, this.ctx.currentTime);
-        prevGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + fadeSec);
-        window.setTimeout(() => {
-            try { prevSource.stop(); } catch { /* already stopped */ }
-        }, fadeMs + 50);
+        ++this.bgmRequest; // Also invalidate music that is still decoding.
+        this.requestedBgmKey = null;
+        this.fadeOutBgm(Math.max(0, fadeMs));
+    }
+
+    private fadeOutBgm(fadeMs: number): void {
+        if (this.ctx && this.currentBgmSource && this.currentBgmGain) {
+            const now = this.ctx.currentTime;
+            const gain = this.currentBgmGain;
+            gain.gain.cancelScheduledValues(now);
+            gain.gain.setValueAtTime(gain.gain.value, now);
+            gain.gain.linearRampToValueAtTime(0, now + fadeMs / 1000);
+            try { this.currentBgmSource.stop(now + fadeMs / 1000 + 0.02); } catch { /* already stopped */ }
+        }
         this.currentBgmKey = null;
         this.currentBgmSource = null;
         this.currentBgmGain = null;
@@ -331,9 +351,17 @@ class AudioManagerClass {
         if (channel === 'ui' && SettingsManager.getMuteSFX()) return;  // UI sounds tied to SFX mute for simplicity
         const cat = AUDIO_CATALOG[key];
         if (!cat || cat.channel !== channel) return;
+        const context = this.ctx;
 
+        const src = this.bufferKey(key);
+        const requestedAt = Date.now();
+        const lastPlayed = this.lastOneShot.get(src);
+        if (lastPlayed !== undefined && requestedAt - lastPlayed < (channel === 'ui' ? 70 : 90)) return;
+        this.lastOneShot.set(src, requestedAt);
         void this.loadBuffer(key).then(() => {
-            const entry = this.buffers.get(key);
+            if (!this.ctx || this.ctx !== context || this.ctx.state !== 'running'
+                || SettingsManager.getMuteSFX() || Date.now() - requestedAt > 750 || this.activeOneShots >= 12) return;
+            const entry = this.buffers.get(src);
             if (!entry || !entry.buffer) return;
             const ctx = this.ctx!;
             const dest = channel === 'ui' ? this.uiGain! : this.sfxGain!;
@@ -346,14 +374,22 @@ class AudioManagerClass {
                 node.playbackRate.value = Math.max(0.25, 1 + jitter);
             }
 
+            let voiceGain: GainNode | null = null;
             if ((options.volume ?? 1) !== 1) {
                 const g = ctx.createGain();
+                voiceGain = g;
                 g.gain.value = options.volume ?? 1;
                 node.connect(g);
                 g.connect(dest);
             } else {
                 node.connect(dest);
             }
+            this.activeOneShots++;
+            node.onended = () => {
+                if (this.ctx === ctx) this.activeOneShots = Math.max(0, this.activeOneShots - 1);
+                node.disconnect();
+                voiceGain?.disconnect();
+            };
             node.start();
         });
     }
@@ -391,47 +427,49 @@ class AudioManagerClass {
         this.uiGain.gain.setValueAtTime(ui, t);
     }
 
-    private async loadBuffer(key: string): Promise<void> {
-        const existing = this.buffers.get(key);
-        if (existing && existing.settled) return;
-        if (existing && !existing.settled) {
-            // Another loadBuffer is already in flight — let it finish first.
-            await new Promise<void>((resolve) => {
-                const check = () => {
-                    const e = this.buffers.get(key);
-                    if (e?.settled) resolve();
-                    else window.setTimeout(check, 30);
-                };
-                check();
-            });
-            return;
-        }
-        const cat = AUDIO_CATALOG[key];
-        if (!cat) return;
-        const entry: BufferEntry = { buffer: null, settled: false, missing: false };
-        this.buffers.set(key, entry);
-        if (!this.ensureContext()) {
-            entry.settled = true;
-            entry.missing = true;
-            return;
-        }
+    private bufferKey(key: string): string {
+        const src = AUDIO_CATALOG[key]?.src ?? key;
+        // These groups are byte-identical SHA-256 matches in the recovered files.
+        const match = src.match(/\/story\/(\d+)\.mid$/);
+        if (!match) return src;
+        const canonical: Record<number, string> = {
+            11: '01', 7: '02', 12: '02', 17: '02', 18: '02',
+            8: '03', 13: '03', 6: '04', 14: '04', 16: '04',
+            10: '05', 15: '05', 20: '05', 19: '09',
+        };
+        return canonical[Number(match[1])]
+            ? src.replace(/\d+\.mid$/, canonical[Number(match[1])] + '.mid')
+            : src;
+    }
 
-        try {
-            const response = await fetch(cat.src);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const arr = await response.arrayBuffer();
-            entry.buffer = this.isMidiSource(cat.src)
-                ? await renderMidiToAudioBuffer(this.ctx!, arr)
-                : await this.ctx!.decodeAudioData(arr);
-        } catch {
-            entry.missing = true;
-            if (!this.warnedMissing.has(key)) {
-                this.warnedMissing.add(key);
-                console.warn(`[AudioManager] '${key}' not available at ${cat.src} — silenced.`);
+    private async loadBuffer(key: string): Promise<void> {
+        const cat = AUDIO_CATALOG[key];
+        if (!cat || !this.ensureContext()) return;
+        const src = this.bufferKey(key);
+        const existing = this.buffers.get(src);
+        if (existing) return existing.loading;
+        const context = this.ctx!;
+        const entry: BufferEntry = { buffer: null, settled: false, missing: false };
+        this.buffers.set(src, entry);
+        entry.loading = (async () => {
+            try {
+                const response = await fetch(src);
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                const arr = await response.arrayBuffer();
+                entry.buffer = this.isMidiSource(src)
+                    ? await renderMidiToAudioBuffer(context, arr)
+                    : await context.decodeAudioData(arr);
+            } catch {
+                entry.missing = true;
+                if (!this.warnedMissing.has(src)) {
+                    this.warnedMissing.add(src);
+                    console.warn('[AudioManager] Unable to load ' + src);
+                }
+            } finally {
+                entry.settled = true;
             }
-        } finally {
-            entry.settled = true;
-        }
+        })();
+        return entry.loading;
     }
 
     private isMidiSource(src: string): boolean {

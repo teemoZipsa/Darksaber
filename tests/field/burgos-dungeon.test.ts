@@ -44,6 +44,7 @@ import { Enemy } from '../../src/entity/Enemy';
 import { LootObject } from '../../src/entity/LootObject';
 import { Player } from '../../src/entity/Player';
 import { AudioManager } from '../../src/engine/AudioManager';
+import { GameMusic } from '../../src/engine/GameMusic';
 import { WorldRaidSession } from '../../src/engine/world/WorldRaidSession';
 import { WorldLootController } from '../../src/engine/world/WorldLootController';
 import { WorldSelectionController } from '../../src/engine/world/WorldSelectionController';
@@ -1827,6 +1828,16 @@ test('late story boss clear rewards match original EVENT 99 item sources through
     }
 });
 
+function createStoryMusicUpdate(raidSession: WorldRaidSession): () => void {
+    const engine = createWorldEnginePrototypeHarness<any>();
+    engine.raidSession = raidSession;
+    engine.getRaidOutcome = () => null;
+    engine.scenarioNetworkControllers = { tutorialController: { isActive: () => false } };
+    engine.townSession = { isVisible: () => false };
+    const music = new GameMusic();
+    return () => music.update(engine.getMusicKey(), 0);
+}
+
 test('late story local interiors start playable story bgm keys through episode 31', () => {
     const originalPlayBgm = AudioManager.playBgm.bind(AudioManager);
     const playedBgmKeys: string[] = [];
@@ -1847,6 +1858,7 @@ test('late story local interiors start playable story bgm keys through episode 3
             assert.ok(quest, `missing episode ${episode} quest`);
 
             harness.controller.startLocalStoryInteriorDungeon(dungeon, quest);
+            createStoryMusicUpdate(raidSession)();
 
             assert.deepEqual(playedBgmKeys, [quest.bgmKey], `episode ${episode} local bgm`);
         }
@@ -1873,16 +1885,19 @@ test('late story network snapshots start story bgm once on entry through episode
             const quest = getStoryQuestByDungeonId(scenario.dungeonId);
             assert.ok(quest, `missing episode ${episode} quest`);
 
+            const updateMusic = createStoryMusicUpdate(raidSession);
             harness.controller.applyNetworkScenarioSnapshot({
                 enteredDungeonIds: [scenario.dungeonId],
                 activeDungeonId: scenario.dungeonId,
                 completedDungeonIds: [],
             });
+            updateMusic();
             harness.controller.applyNetworkScenarioSnapshot({
                 enteredDungeonIds: [scenario.dungeonId],
                 activeDungeonId: scenario.dungeonId,
                 completedDungeonIds: [],
             });
+            updateMusic();
 
             assert.deepEqual(playedBgmKeys, [quest.bgmKey], `episode ${episode} network bgm`);
             assert.ok(harness.worldMap instanceof StoryInteriorMap, `episode ${episode} interior map`);

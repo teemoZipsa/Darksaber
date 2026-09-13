@@ -346,7 +346,6 @@ test('dynamic UI translation key calls are reviewed by the guard allowlist', () 
         "src/map/StoryInteriorMap.ts: t(prop.labelKey)",
         "src/map/StoryInteriorMap.ts: t(room.nameKey)",
         "src/map/WorldMap.ts: t(marker.labelKey)",
-        "src/ui/ActionMenuUI.ts: t(slot.labelKey)",
         "src/ui/TacticalContextMenuUI.ts: t(this.items[i].labelKey)",
         "src/ui/TownUI.ts: t(key)",
         "src/ui/react/auth/AuthGate.tsx: t(config.labelKey)",

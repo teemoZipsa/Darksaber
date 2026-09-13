@@ -56,6 +56,7 @@ export function RestPanel({ showMenus = true, showTreatment = true }: RestPanelP
         const ok = store.restTreat();
         setFeedback(ok ? t('rest.treated') : t('rest.noGold'));
         AudioManager.playUi(ok ? 'ui.confirm' : 'ui.cancel');
+        if (ok) AudioManager.playSfx('sfx.heal', { volume: 0.5 });
     };
 
     const panelStyle = { width: 'min(780px, 92vw)', '--ds-scale': SettingsManager.getUIScale() } as CSSProperties;

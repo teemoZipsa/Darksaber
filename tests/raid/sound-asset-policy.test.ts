@@ -40,12 +40,24 @@ test('core combat and UI hooks are required', () => {
     }
 });
 
-test('unused BGM and footstep hooks stay optional', () => {
+test('unused recorded footsteps stay optional', () => {
     for (const src of [
-        '/assets/sounds/bgm/title.ogg',
-        '/assets/sounds/bgm/world.ogg',
         '/assets/sounds/world/footstep_grass.ogg',
     ]) {
         assert.ok(isOptionalSoundAsset(src, policy), `expected optional sound ${src}`);
+    }
+});
+
+test('every music key resolves to a recovered MIDI and every numbered effect is used', () => {
+    const used = new Set([...policy.requiredKeys].map((key) => policy.catalog.get(key)));
+    for (const [key, src] of policy.catalog) {
+        if (key.startsWith('bgm.')) {
+            assert.ok(src.endsWith('.mid'), key);
+            assert.ok(existsSync(join(rootDir, 'public', src)), key);
+        }
+        if (key.startsWith('sfx.original.')) assert.ok(used.has(src), `unconnected original ${src}`);
+    }
+    for (const key of ['bgm.title', 'bgm.world', 'bgm.town', 'bgm.raid', 'bgm.boss']) {
+        assert.ok(policy.requiredKeys.has(key), key);
     }
 });

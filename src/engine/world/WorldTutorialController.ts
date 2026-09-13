@@ -11,7 +11,6 @@ import type { AttackTargetFailure } from '../../field/FieldTargeting';
 import { TutorialTrainingMap } from '../../map/TutorialTrainingMap';
 import type { TownInfo } from '../../map/BiomeMask';
 import type { WorldMap } from '../../map/WorldMap';
-import { AudioManager } from '../AudioManager';
 import { SettingsManager } from '../SettingsManager';
 import type { InputManager } from '../InputManager';
 import type { Camera } from '../Camera';
@@ -186,7 +185,7 @@ export class WorldTutorialController {
         this.context.selectActor(actor.id);
         this.context.openActionMenu(this.getActionMenuStates(actor));
         this.context.snapCameraToActor(actor);
-        AudioManager.playBgm('bgm.tutorial.training', { fadeMs: 400 });
+
         this.context.log(t('tutorial.world.startLog'));
         this.context.log(t('tutorial.world.step.move.log'));
     }

@@ -7,6 +7,8 @@ import { Camera } from './Camera';
 import { InputManager } from './InputManager';
 import { SettingsManager } from './SettingsManager';
 import { AudioManager } from './AudioManager';
+import { TileType } from '../map/Tile';
+import { getStoryQuestByDungeonId } from '../data/StoryQuestData';
 import { Player } from '../entity/Player';
 import { Enemy } from '../entity/Enemy';
 import { PartyManager } from '../character/PartyManager';
@@ -695,6 +697,27 @@ export class WorldEngine {
 
     public startIntroTutorial(): void {
         this.scenarioNetworkControllers.tutorialController.start();
+    }
+
+    public getMusicKey(): string {
+        const outcome = this.getRaidOutcome();
+        if (outcome) return outcome.result === 'DEAD' || outcome.result === 'MIA' ? 'bgm.gameover' : 'bgm.victory';
+        if (this.scenarioNetworkControllers.tutorialController.isActive()) return 'bgm.tutorial.training';
+        if (this.townSession.isVisible()) return 'bgm.town';
+        const dungeonId = this.raidSession.activeDungeonId;
+        const storyKey = dungeonId ? getStoryQuestByDungeonId(dungeonId)?.bgmKey : undefined;
+        if (storyKey) return storyKey;
+        const actor = this.getControlledActor();
+        if (!actor) return 'bgm.world';
+        if (this.hasFieldThreat()) {
+            const bossNearby = this.fieldEnemies.some(({ enemy }) => enemy.isBoss && enemy.stats.hp > 0
+                && Math.abs(enemy.gridX - actor.entity.gridX) + Math.abs(enemy.gridY - actor.entity.gridY) <= 12);
+            return bossNearby ? 'bgm.boss' : 'bgm.raid';
+        }
+        const tile = this.worldMap.getTileAt(actor.entity.gridX, actor.entity.gridY);
+        if (dungeonId || tile === TileType.POISON_SWAMP || tile === TileType.LAVA) return 'bgm.cave';
+        if (tile === TileType.FOREST || tile === TileType.SNOW) return 'bgm.forest';
+        return 'bgm.world';
     }
 
     private spawnPartyAtCurrentHub(): void {

@@ -1,4 +1,5 @@
 import { isMasterClassLineId } from '../../data/ClassTree';
+import { AudioManager } from '../AudioManager';
 import type { Character } from '../../character/Character';
 import { Enemy } from '../../entity/Enemy';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
@@ -140,6 +141,7 @@ export class WorldEngineCombatFlow {
             : formatT('field.log.enemyDefeated', { enemy: enemy.name }));
         if (canGainExp) {
             const expResult = actor.character.gainExp(exp);
+            if (expResult.leveledUp) AudioManager.playSfx('sfx.levelup', { volume: 0.6 });
             if (expResult.promoted && expResult.newTierName) {
                 this.context.log(formatT('field.log.actorPromoted', { name: actor.character.name, tier: expResult.newTierName }));
             }

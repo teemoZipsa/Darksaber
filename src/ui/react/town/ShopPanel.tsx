@@ -66,7 +66,8 @@ export function ShopPanel() {
         const entry = pendingBuy;
         setPendingBuy(null);
         const ok = store.shopBuy(entry);
-        AudioManager.playUi(ok ? 'ui.confirm' : 'ui.cancel');
+        if (ok) AudioManager.playSfx('sfx.coin', { volume: 0.45 });
+        else AudioManager.playUi('ui.cancel');
         if (ok) setFeedback(t('shop.purchased'));
         else setFeedback(t('shop.backpackFull'));
     };
@@ -75,7 +76,8 @@ export function ShopPanel() {
         if (!pendingSell) return;
         const ok = store.shopSell(pendingSell);
         setPendingSell(null);
-        AudioManager.playUi(ok ? 'ui.confirm' : 'ui.cancel');
+        if (ok) AudioManager.playSfx('sfx.coin', { volume: 0.45 });
+        else AudioManager.playUi('ui.cancel');
         if (ok) setFeedback(t('shop.soldItem'));
     };
 

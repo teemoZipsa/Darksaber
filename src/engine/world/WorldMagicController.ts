@@ -570,7 +570,11 @@ export class WorldMagicController {
     }
 }
 
-function getSkillCastSfx(skill: Skill): string {
+export function getSkillCastSfx(skill: Skill): string {
+    if (skill.id === 'og_blizzard') return 'sfx.magic.ice_burst';
+    if (skill.id === 'og_meteor') return 'sfx.magic.atomic_wave';
+    if (skill.id === 'og_quick' || skill.id === 'og_poison') return 'sfx.magic.quick_poison';
+    if (skill.id === 'og_resist' || skill.id === 'og_antiresist') return 'sfx.magic.resist';
     if (skill.type === 'heal') return 'sfx.magic.heal';
 
     if (skill.type === 'buff') {

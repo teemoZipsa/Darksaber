@@ -345,6 +345,7 @@ export class WorldNetworkSyncController {
     }
 
     public openLoot(grant: LootGrantMessage): void {
+        AudioManager.playSfx('sfx.door', { volume: 0.35 });
         const grid = this.gridFromSnapshot(grant.gridSnapshot);
         const loot = this.context.getWorldMap().loot.find((entry) => entry.id === grant.lootId);
         this.context.gameManager.inventoryUI.setExternalGrid(
@@ -379,6 +380,7 @@ export class WorldNetworkSyncController {
         this.context.getNetworkRaidClient()?.sendAutoLootResolve(grant.lootId, acceptedCells);
         const sourceName = formatStoredEnemyName(grant.sourceName);
         if (acquiredNames.length > 0) {
+            AudioManager.playSfx('sfx.loot_pickup', { volume: 0.45 });
             this.context.log(`${sourceName} ${t('raid.autoLoot')}: ${acquiredNames.join(', ')}`);
         }
         if (blocked) this.context.log(`${sourceName}: ${t('raid.autoLootFull')}`);
@@ -477,6 +479,9 @@ export class WorldNetworkSyncController {
         }
 
         this.schedulePresentation(impactDelay, () => {
+            if (event.kind === 'heal') AudioManager.playSfx('sfx.heal', { volume: 0.55 });
+            else if (event.kind === 'miss') AudioManager.playSfx('sfx.miss', { volume: 0.45 });
+            else if (event.kind === 'status') AudioManager.playSfx('sfx.magic.status', { volume: 0.4 });
             const attackSource = attack?.from;
             if (attackSource && event.kind !== 'miss' && (event.value ?? 0) > 0) {
                 targetEnemy?.playHitReaction(attackSource.x, attackSource.y);

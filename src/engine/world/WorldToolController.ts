@@ -1,4 +1,5 @@
 import { TOOL_ACTION_GAUGE_COST } from '../../field/FieldActionEconomy';
+import { AudioManager } from '../AudioManager';
 import {
     isCombatRecoveryItem,
     previewCombatItemRecovery,
@@ -184,6 +185,7 @@ export class WorldToolController {
             this.sink.spawnStatus(actor.entity.gridX, actor.entity.gridY, `MP+${preview.effectiveMp}`);
         }
         this.sink.spawnHealEffect(actor.entity.gridX, actor.entity.gridY);
+        AudioManager.playSfx('sfx.heal', { volume: 0.55 });
         this.sink.log(formatT('field.log.toolUsed', {
             item: formatItemName(candidate.placed.item),
             hp: preview.effectiveHp,
