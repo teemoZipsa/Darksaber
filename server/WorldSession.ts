@@ -437,6 +437,7 @@ export class WorldSession {
             raidModifier,
             findNearbyWalkableTile: (tile, actorId) => this.findNearbyWalkableTile(tile, actorId),
         });
+        this.fieldNests.seedHuntingGrounds(now);
         this.players.set(playerId, player);
         for (const actor of actors) this.actors.set(actor.id, actor);
 

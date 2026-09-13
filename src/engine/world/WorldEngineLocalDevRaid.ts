@@ -10,6 +10,10 @@ import type { WorldEngineScenarioNetworkControllers } from './WorldEngineScenari
 import type { WorldRaidSession } from './WorldRaidSession';
 import type { WorldTownSession } from './WorldTownSession';
 import type { PlayerData } from '../../data/PlayerData';
+import { getKaosiaHuntingGrounds, huntingEnemyPrefix } from '../../field/KaosiaHuntingGrounds';
+import { getMonsterDefinition } from '../../data/MonsterCatalog';
+import { Enemy } from '../../entity/Enemy';
+import { applyMonsterSprite } from './NetworkSnapshotMapping';
 
 export interface WorldEngineLocalDevRaidPorts {
     actionControllers: WorldEngineActionControllers;
@@ -58,6 +62,15 @@ export function beginWorldEngineLocalDevRaidFromCurrentHub(ports: WorldEngineLoc
     scenarioNetworkControllers.storyScenarioController.resetVisitState();
     scenarioNetworkControllers.storyScenarioController.resetNetworkState();
     ports.placePartyNearTown(town);
+    ports.setFieldEnemies(getKaosiaHuntingGrounds(worldMap).flatMap((ground) => ground.members.map((member, index) => {
+        const definition = getMonsterDefinition(member.monsterId);
+        const enemy = new Enemy(`${huntingEnemyPrefix(ground.id)}${index}`, member.tile.x, member.tile.y,
+            definition.name, ground.level, definition.color, definition.role, definition.id);
+        enemy.aggroRange = definition.aggroRange;
+        enemy.setLocalizedNames(definition.name, definition.nameEn);
+        applyMonsterSprite(enemy, definition.id);
+        return { enemy, home: { ...member.tile }, path: [] };
+    })));
     scenarioNetworkControllers.storyScenarioController.beginLocalBountyHunt();
     const controlled = ports.getControlledActor();
     ports.syncControlledPlayer();

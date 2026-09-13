@@ -141,6 +141,7 @@ export class UiStore {
     public getFieldHudView() { return this.gm.getFieldEngine?.()?.getFieldHudView() ?? null; }
     public stopFieldTravel(): void { this.gm.getFieldEngine()?.stopFieldTravel(); this.tick(); }
     public returnFromField(): void { this.gm.getFieldEngine()?.returnToTown(); this.tick(); }
+    public guideToNearbyHunt(): void { this.gm.getFieldEngine()?.guideToNearbyHunt(); this.tick(); }
 
     private shopSignature(): string {
         const shop = this.shop();

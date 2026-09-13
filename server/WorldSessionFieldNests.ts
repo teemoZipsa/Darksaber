@@ -7,6 +7,7 @@ import {
 } from '../src/field/SpawnResolver';
 import { Enemy } from '../src/entity/Enemy';
 import { getMonsterDefinition } from '../src/data/MonsterCatalog';
+import { getKaosiaHuntingGrounds, huntingEnemyPrefix, huntingNestKey } from '../src/field/KaosiaHuntingGrounds';
 import type { WorldMap } from '../src/map/WorldMap';
 import type { TilePoint } from '../src/field/FieldPathing';
 import {
@@ -77,6 +78,7 @@ export class WorldSessionFieldNests {
     }
 
     public refreshFieldNests(now: number): void {
+        this.seedHuntingGrounds(now);
         const visited = new Set<string>();
         for (const player of this.context.players.values()) {
             if (!player.active || player.ghost) continue;
@@ -90,6 +92,36 @@ export class WorldSessionFieldNests {
                 this.tuning.roamRadiusChunks,
                 this.tuning.refreshMaxEnemies,
             );
+        }
+    }
+
+    /** Called before registering a new arrival. Existing players still protect
+     * their view; cleared grounds use the same cooldown and distant respawn rule. */
+    public seedHuntingGrounds(now: number): void {
+        for (const ground of getKaosiaHuntingGrounds(this.context.worldMap)) {
+            const key = huntingNestKey(ground.id);
+            const state = this.context.nestStates.get(key);
+            if (state) {
+                this.retainLiveNestEnemies(state);
+                if (state.monsterIds.length || (state.cleared && now < state.respawnAt)) continue;
+            }
+            if (hasActiveActorWithin(this.context.players.values(), this.context.actors, ground.center, FIELD_NEST_CENTER_SAFE_DISTANCE)) continue;
+            const ids: string[] = [];
+            for (const member of ground.members) {
+                const ordinal = this.context.nextEnemyId();
+                const id = `${huntingEnemyPrefix(ground.id)}${ordinal}`;
+                const definition = getMonsterDefinition(member.monsterId);
+                const enemy = new Enemy(id, member.tile.x, member.tile.y, definition.name,
+                    ground.level, definition.color, definition.role, definition.id);
+                enemy.aggroRange = definition.aggroRange;
+                this.context.enemies.set(id, { enemy, monsterId: definition.id, nestKey: key,
+                    home: { ...member.tile }, wanderSeed: (ordinal + 1) * 7919 });
+                ids.push(id);
+            }
+            const next = { chunkKey: key, nestId: key,
+                centerTile: { ...ground.center }, monsterIds: ids, cleared: false, respawnAt: 0 };
+            if (state) Object.assign(state, next);
+            else this.context.nestStates.set(key, next);
         }
     }
 

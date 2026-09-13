@@ -5,6 +5,16 @@ export type TranslationTable = Record<Language, Record<string, string>>;
 export const I18N_STRINGS: TranslationTable = {
     ko: {
         "field.expedition.title": "필드 탐험",
+        "field.hunt.title": "카오시아 근교 사냥",
+        "field.hunt.gate": "성문 앞 초원",
+        "field.hunt.thicket": "길가 수풀",
+        "field.hunt.outer": "바깥 공터",
+        "field.hunt.target": "{name} · Lv.{level} · 남은 적 {count}",
+        "field.hunt.distance": "안내 지점까지 {distance}칸 · 접근 후 적을 선택해 전투",
+        "field.hunt.guide": "사냥터 길 안내",
+        "field.hunt.ready": "전투 준비",
+        "field.hunt.cleared": "근교 사냥터가 잠잠해졌습니다",
+        "field.hunt.returnHint": "마을에서 회복하고 장비를 정비하거나, 더 먼 곳을 탐험하세요.",
         "field.expedition.subtitle": "필드 모험",
         "field.expedition.character": "캐릭터 상태",
         "field.expedition.level": "Lv. {level}",
@@ -2241,6 +2251,16 @@ export const I18N_STRINGS: TranslationTable = {
 
     en: {
         "field.expedition.title": "Field exploration",
+        "field.hunt.title": "Hunting near Kaosia",
+        "field.hunt.gate": "Gate meadow",
+        "field.hunt.thicket": "Roadside thicket",
+        "field.hunt.outer": "Outer clearing",
+        "field.hunt.target": "{name} · Lv.{level} · {count} enemies left",
+        "field.hunt.distance": "{distance} tiles to the marker · Select an enemy to fight",
+        "field.hunt.guide": "Guide to hunt",
+        "field.hunt.ready": "Prepare to fight",
+        "field.hunt.cleared": "The nearby hunting grounds are quiet",
+        "field.hunt.returnHint": "Recover and prepare your gear in town, or explore further afield.",
         "field.expedition.subtitle": "FIELD ADVENTURE",
         "field.expedition.character": "Character status",
         "field.expedition.level": "Lv. {level}",

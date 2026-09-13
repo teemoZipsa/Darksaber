@@ -4,6 +4,7 @@ import {
     type StoryInteriorLayout,
 } from '../src/data/StoryInteriorData';
 import type { FieldPassableQuery, TilePoint } from '../src/field/FieldPathing';
+import { canTraverseTownTile } from '../src/field/TownTravel';
 import { hasLineOfSight } from '../src/field/LineOfSight';
 import {
     isTerrainLineOfSightBlocking,
@@ -34,6 +35,8 @@ export function isWorldSessionFieldPassableForOwner(
     const queryOwnerPlayerId = ownerPlayerId ?? getWorldSessionEntityOwnerPlayerId(context, query.actorId);
     const queryScenarioPlayerId = ownerPlayerId ?? getWorldSessionScenarioOwnerPlayerId(context, query.actorId);
     const queryIsPlayerActor = query.actorId ? context.actors.has(query.actorId) : false;
+    if (queryIsPlayerActor && !context.players.get(queryOwnerPlayerId ?? '')?.activeDungeonId
+        && !canTraverseTownTile(query, (x, y) => context.worldMap.getTownAtTile(x, y))) return false;
     const terrainOwnerPlayerId = queryScenarioPlayerId
         ?? (queryIsPlayerActor ? queryOwnerPlayerId : undefined);
     const tile = getWorldSessionServerTileAt(context, query, terrainOwnerPlayerId);

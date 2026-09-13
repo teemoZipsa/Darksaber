@@ -24,6 +24,14 @@ export function FieldHud() {
                 <div className="ds-field-expedition__rule">{state.bounty ?? t('field.expedition.rule')}</div>
             </section>
             {!state.controlsOpen && <section className={`ds-field-guide${state.threat ? ' is-danger' : ''}`} aria-label={t('field.expedition.controls')}>
+                {state.hunt && !state.threat && <div className="ds-field-hunt" data-testid="field-hunt">
+                    <div className="ds-field-hunt__text">
+                        <span className="ds-field-hunt__heading">{t('field.hunt.title')} <span>{state.hunt.cleared} / {state.hunt.total}</span></span>
+                        <strong>{state.hunt.target ? formatT('field.hunt.target', { name: state.hunt.target.name, level: state.hunt.target.level, count: state.hunt.target.remaining }) : t('field.hunt.cleared')}</strong>
+                        <span>{state.hunt.target ? formatT('field.hunt.distance', { distance: state.hunt.target.distance }) : t('field.hunt.returnHint')}</span>
+                    </div>
+                    {state.hunt.target && !state.travelling && <button type="button" className="ds-btn" disabled={state.hunt.target.distance <= 1} onClick={() => store.guideToNearbyHunt()}>{t(state.hunt.target.distance <= 1 ? 'field.hunt.ready' : 'field.hunt.guide')}</button>}
+                </div>}
                 <div className="ds-field-guide__text">
                     <strong role="status">{state.threat ? formatT('field.expedition.combatAp', { ap: state.ap }) : t(`field.travel.${state.travel}`)}</strong>
                     <span>{state.travelling ? formatT('field.travel.remaining', { distance: state.distance }) : t(state.threat || state.interior ? 'field.expedition.combatHint' : 'field.expedition.moveHint')}</span>

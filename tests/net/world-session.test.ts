@@ -3136,14 +3136,14 @@ test('server generates nest content around roaming players', () => {
     assert.equal(firstSpawned.stats.atk, expected.stats.atk);
 });
 
-test('server never forces field nests into protected town or ocean chunks', () => {
+test('server never forces random field nests into protected town or ocean chunks', () => {
     const session = new WorldSession();
     session.join(joinMessage('central_castle', 'hero-a'), 0);
     session.tick(1_000);
 
     const worldMap = new WorldMap();
     const activeNests = [...getWorldSessionDebugState(session).nestStates.values()]
-        .filter((state) => state.monsterIds.length > 0);
+        .filter((state) => state.monsterIds.length > 0 && !state.chunkKey.startsWith('mortal:hunt:'));
     assert.ok(activeNests.length > 0, 'departure seeding should still create distant field nests');
     for (const state of activeNests) {
         const biome = worldMap.getBiomeAtChunk(

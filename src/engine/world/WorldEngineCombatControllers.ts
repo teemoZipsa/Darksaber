@@ -1,4 +1,5 @@
 import type { PartyManager } from '../../character/PartyManager';
+import { canTraverseTownTile } from '../../field/TownTravel';
 import type { PlayerData } from '../../data/PlayerData';
 import type { Enemy } from '../../entity/Enemy';
 import type { FieldActor, FieldEnemy } from '../../field/FieldTypes';
@@ -201,6 +202,8 @@ export function createWorldEngineCombatControllers(
         getFieldEnemies: () => ports.getFieldEnemies(),
         getTileAt: (x, y) => ports.getWorldMap().getTileAt(x, y),
         isGroundWalkable: (x, y) => ports.getWorldMap().isWalkable(x, y),
+        canTraverseTile: (query) => Boolean(ports.raidSession.activeDungeonId)
+            || canTraverseTownTile(query, (x, y) => ports.getWorldMap().getTownAtTile(x, y)),
         getTerrainTraitsForActorId: (actorId) => getWorldTerrainTraitsForActorId(ports.getPartyActors(), actorId),
         getPartyCarryAtbMultiplier: () => getCarryAtbMultiplier(
             getPartyCarriedWeight(ports.gameManager.inventory.items, ports.party.getCharacters())

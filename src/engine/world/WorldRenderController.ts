@@ -77,6 +77,7 @@ export interface WorldRenderContext {
 }
 
 interface WorldRenderOptions {
+    huntTarget?: { tile: { x: number; y: number }; name: string };
     hideWorldHud?: boolean;
     domFieldHud?: boolean;
     hidePassiveActorCard?: boolean;
@@ -111,6 +112,7 @@ export class WorldRenderController {
         WorldFieldRenderer.renderActionTiles(ctx, model, camX, camY);
         WorldFieldRenderer.renderMagicTargetTiles(ctx, model, camX, camY);
         WorldFieldRenderer.renderPathPreview(ctx, model, camX, camY);
+        if (options.huntTarget) WorldFieldRenderer.renderHuntMarker(ctx, options.huntTarget, camX, camY);
         WorldFieldRenderer.renderTacticalMarkers(ctx, model, camX, camY);
         WorldFieldRenderer.renderSelectedLoot(ctx, model, camX, camY);
         WorldFieldRenderer.renderEnemies(ctx, model, camX, camY);

@@ -24,6 +24,7 @@ import { manhattan, type TilePoint } from '../field/FieldPathing';
 import type { FieldActor, FieldEnemy, FieldTurnEndReason } from '../field/FieldTypes';
 import { getEnemyAggroRanges } from '../field/FieldConfig';
 import { FieldTravel } from '../field/FieldTravel';
+import { getKaosiaHuntingGrounds, huntingEnemyPrefix, KAOSIA_HUNT_TOWN } from '../field/KaosiaHuntingGrounds';
 import { getWorldActorTerrainStepCost } from './world/WorldAttackTargeting';
 import { getEffectiveStatsForCharacter } from '../combat/StatusEffects';
 import { WorldRaidSession } from './world/WorldRaidSession';
@@ -492,10 +493,38 @@ export class WorldEngine {
                 || this.actionControllers.magicController.isActive() || this.actionControllers.toolController.isActive()
                 || this.presentationControllers.tacticalController.isOpen(),
             interior: Boolean(this.raidSession.activeDungeonId),
-            travel: this.fieldTravel?.status ?? 'idle', travelling: this.fieldTravel?.active ?? false,
+            travel: !threat && this.fieldTravel?.status === 'danger' ? 'idle' : this.fieldTravel?.status ?? 'idle',
+            travelling: this.fieldTravel?.active ?? false,
             distance: this.fieldTravel?.destination ? manhattan({ x: actor.entity.gridX, y: actor.entity.gridY }, this.fieldTravel.destination) : 0,
             canReturn: !threat && (!this.isNetworkRaid || Boolean(this.networkRaidClient?.getIsOpen())),
+            hunt: this.getNearbyHuntView(),
         };
+    }
+
+    public getNearbyHuntView() {
+        if (!this.raidSession.active || this.raidSession.departureTownId !== KAOSIA_HUNT_TOWN
+            || this.raidSession.activeDungeonId || this.playerData.activeBountyContractId
+            || this.scenarioNetworkControllers.tutorialController.isActive()) return null;
+        const actor = this.getControlledActor();
+        const town = this.worldMap.getTowns().find((entry) => entry.id === KAOSIA_HUNT_TOWN);
+        if (!actor || !town) return null;
+        const tile = { x: actor.entity.gridX, y: actor.entity.gridY };
+        if (manhattan(tile, this.worldMap.getTownExitTile(town)) > 110) return null;
+        const grounds = getKaosiaHuntingGrounds(this.worldMap);
+        if (!grounds.length) return null;
+        const remaining = grounds.map((ground) => ({ ground, count: this.fieldEnemies.filter(({ enemy }) =>
+            enemy.stats.hp > 0 && enemy.id.startsWith(huntingEnemyPrefix(ground.id))).length }));
+        const next = remaining.find((entry) => entry.count > 0);
+        return {
+            cleared: remaining.filter((entry) => entry.count === 0).length, total: grounds.length,
+            target: next ? { tile: next.ground.approach, name: t(`field.hunt.${next.ground.id}`),
+                level: next.ground.level, remaining: next.count, distance: manhattan(tile, next.ground.approach) } : null,
+        };
+    }
+
+    public guideToNearbyHunt(): void {
+        const target = this.getNearbyHuntView()?.target;
+        if (target && !this.hasFieldThreat()) this.tryFieldTravel(target.tile);
     }
 
     private getUpdateFlow(): WorldEngineUpdateFlow {
@@ -648,6 +677,7 @@ export class WorldEngine {
             hideWorldHud: this.scenarioNetworkControllers.tutorialController.isActive(),
             domFieldHud: !this.scenarioNetworkControllers.tutorialController.isActive(),
             hidePassiveActorCard: this.canFieldTravel() && !this.hasFieldThreat() && !this.getUiState().actionMenuUI.getIsOpen(),
+            huntTarget: this.getNearbyHuntView()?.target ?? undefined,
         });
         if (this.scenarioNetworkControllers.tutorialController.isActive()) {
             this.scenarioNetworkControllers.tutorialController.renderHud(ctx, width, height);

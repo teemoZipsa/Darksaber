@@ -52,6 +52,7 @@ export interface WorldMovementContext {
     getFieldEnemies: () => FieldEnemy[];
     getTileAt: (x: number, y: number) => TileType;
     isGroundWalkable?: (x: number, y: number) => boolean;
+    canTraverseTile?: (query: FieldPassableQuery) => boolean;
     getTerrainTraitsForActorId: (actorId?: string) => TerrainActorTraits;
     getPartyCarryAtbMultiplier?: () => number;
     getPartyCursedAtbMultiplier?: () => number;
@@ -283,6 +284,7 @@ export class WorldMovementController {
     }
 
     public isFieldPassable(query: FieldPassableQuery): boolean {
+        if (this.context.canTraverseTile?.(query) === false) return false;
         const tile = this.context.getTileAt(query.x, query.y);
         if (!isTerrainPassable(tile, this.context.getTerrainTraitsForActorId(query.actorId))) return false;
         if (this.context.isGroundWalkable && TILE_PROPERTIES[tile]?.walkable && !this.context.isGroundWalkable(query.x, query.y)) return false;

@@ -2791,7 +2791,11 @@ html[data-ds-motion="reduce"] #auth-overlay * {
 #ui-overlay .ds-field-expedition__stats { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; margin-top: 14px; font-variant-numeric: tabular-nums; }
 #ui-overlay .ds-field-expedition__stats time { margin-left: auto; color: var(--ds-text-muted); }
 #ui-overlay .ds-field-expedition__rule { font-size: 11px; color: var(--ds-text-muted); margin-top: 12px; border-top: 1px solid var(--ds-hairline); padding-top: 10px; }
-#ui-overlay .ds-field-guide { bottom: 38px; left: 50%; transform: translateX(-50%); width: min(500px, calc(100% - 40px)); padding: 12px 16px; display: flex; gap: 18px; align-items: center; }
+#ui-overlay .ds-field-guide { bottom: 38px; left: 50%; transform: translateX(-50%); width: min(500px, calc(100% - 40px)); padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; }
+#ui-overlay .ds-field-hunt { flex: 0 0 100%; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--ds-hairline); padding-bottom: 12px; }
+#ui-overlay .ds-field-hunt__text { flex: 1; min-width: 0; }
+#ui-overlay .ds-field-hunt__heading { display: flex; justify-content: space-between; color: var(--ds-text-muted); font-size: 10px; margin-bottom: 6px; }
+#ui-overlay .ds-field-hunt__text > span:last-child { display: block; color: var(--ds-text-muted); font-size: 10px; line-height: 1.5; margin-top: 5px; }
 #ui-overlay .ds-field-guide__text { flex: 1; min-width: 0; }
 #ui-overlay .ds-field-guide strong { color: var(--ds-accent); display: block; font-size: 13px; }
 #ui-overlay .ds-field-guide__text > span { color: var(--ds-text-muted); display: block; font-size: 11px; margin-top: 5px; line-height: 1.5; }

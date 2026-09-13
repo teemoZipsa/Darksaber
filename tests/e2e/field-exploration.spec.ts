@@ -1,5 +1,18 @@
 import { expect, test, type Page } from '@playwright/test';
 
+// Share this isolated test account across viewports without exceeding the real
+// signup limiter. Every online case must finish its session before the next one.
+const FIELD_TEST_ACCOUNT = 'field-exploration-e2e';
+test.afterEach(async ({ page }) => {
+    const leaving = await page.evaluate(() => {
+        const engine = (window as unknown as { __gm?: any }).__gm?.worldEngine;
+        if (!engine?.isNetworkRaidActive() || !engine.getRaidSession().active) return false;
+        engine.networkRaidClient.leave('manual', true);
+        return true;
+    }).catch(() => false);
+    if (leaving) await expect.poll(async () => (await debug(page)).active).toBe(false);
+});
+
 async function debug(page: Page) {
     return page.evaluate(() => {
         const gm = (window as unknown as { __gm: any }).__gm;
@@ -8,6 +21,31 @@ async function debug(page: Page) {
         return { tile: { x: actor.entity.gridX, y: actor.entity.gridY }, travel: { status: engine.getFieldTravel().status, destination: engine.getFieldTravel().destination }, logs: engine.fieldFeedback.combatLog.slice(-8), hud: engine.getFieldHudView(), active: engine.getRaidSession().active };
     });
 }
+
+test('nearby hunting guidance reaches the first encounter without an accidental town return', async ({ page, isMobile }, testInfo) => {
+    test.setTimeout(60_000);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(`/?devStart=raid&devAccount=${FIELD_TEST_ACCOUNT}`);
+    await expect(page.getByTestId('field-hunt')).toContainText(/성문 앞 초원|Gate meadow/, { timeout: 20_000 });
+    await page.waitForFunction(() => (window as unknown as { __gm: any }).__gm.worldEngine.isNetworkRaidActive());
+    const before = await debug(page);
+    const guide = page.getByRole('button', { name: /사냥터 길 안내|Guide to hunt/ });
+    if (isMobile) await guide.tap(); else await guide.click();
+    await expect.poll(async () => (await debug(page)).hud?.travelling).toBe(true);
+    await expect.poll(async () => {
+        const state = await debug(page);
+        return state.active && ['danger', 'arrived'].includes(state.hud?.travel);
+    }, { timeout: 30_000 }).toBe(true);
+    const after = await debug(page);
+    expect(after.tile.y).toBeGreaterThan(before.tile.y + 10);
+    expect(after.hud?.hp).toBe(after.hud?.maxHp);
+    expect(after.hud?.hunt.target.name).toMatch(/성문 앞 초원|Gate meadow/);
+    expect(after.hud?.hunt.target.distance).toBeLessThanOrEqual(4);
+    expect(after.hud?.kills).toBe(0);
+    await page.screenshot({ path: testInfo.outputPath('hunting-arrival.png') });
+    expect(errors).toEqual([]);
+});
 
 test('safe field travel crosses multiple movement budgets from one pointer order and can return home', async ({ page }) => {
     test.setTimeout(60_000);
@@ -73,7 +111,7 @@ test('online travel uses server moves and return preserves the save before redep
     test.setTimeout(60_000);
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto(`/?devStart=raid&devAccount=explore_${testInfo.project.name}_${Date.now()}`);
+    await page.goto(`/?devStart=raid&devAccount=${FIELD_TEST_ACCOUNT}`);
     await expect(page.getByTestId('field-hud')).toBeVisible({ timeout: 20_000 });
     await page.waitForFunction(() => (window as unknown as { __gm: any }).__gm.worldEngine.isNetworkRaidActive());
     const auth = await page.evaluate(() => (window as unknown as { __gm: any }).__gm.getNetworkAuthContext());

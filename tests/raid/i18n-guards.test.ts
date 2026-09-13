@@ -15,6 +15,7 @@ import { STORY_SCENARIO_EVENT_SEQUENCES, type StoryScenarioEventStep } from '../
 import { TOWN_FACILITY_META } from '../../src/data/TownFacilityData';
 import { STATUS_KINDS } from '../../src/combat/StatusEffects';
 import { FIELD_TRAVEL_STATUSES } from '../../src/field/FieldTravel';
+import { KAOSIA_HUNT_IDS } from '../../src/field/KaosiaHuntingGrounds';
 import { FIELD_TURN_END_REASONS } from '../../src/field/FieldTypes';
 import { getTerrainEntryHazards } from '../../src/field/TerrainRules';
 import { EQUIP_SLOT_LIST } from '../../src/inventory/InventoryUI';
@@ -213,6 +214,7 @@ function collectDataDrivenUiKeys(): Set<string> {
         add(`status.${kind}.desc`);
     }
     for (const status of FIELD_TRAVEL_STATUSES) add(`field.travel.${status}`);
+    for (const id of KAOSIA_HUNT_IDS) add(`field.hunt.${id}`);
     for (const reason of FIELD_TURN_END_REASONS) add(`field.log.reason.${reason}`);
     for (const modifier of RAID_MODIFIERS) {
         add(`raid.modifier.${modifier}.name`);
@@ -280,6 +282,7 @@ test('template-composed UI translation key families are covered by the data-driv
         'codex.habitat.${}',
         'codex.role.${}',
         'codex.role.${}.desc',
+        'field.hunt.${}',
         'field.log.reason.${}',
         'field.travel.${}',
         'inv.${}',
@@ -355,6 +358,7 @@ test('dynamic UI translation key calls are reviewed by the guard allowlist', () 
         "src/ui/react/character/StatGrid.tsx: t(k)",
         "src/ui/react/charcreate/CharacterCreation.tsx: t(cfg.labelKey)",
         "src/ui/react/charcreate/CharacterCreation.tsx: t(row.labelKey)",
+        "src/ui/react/field/FieldHud.tsx: t(state.hunt.target.distance <= 1 ? 'field.hunt.ready' : 'field.hunt.guide')",
         "src/ui/react/field/FieldHud.tsx: t(state.threat ? 'field.expedition.combat' : 'field.expedition.explore')",
         "src/ui/react/field/FieldHud.tsx: t(state.threat || state.interior ? 'field.expedition.combatHint' : 'field.expedition.moveHint')",
         "src/ui/react/inventory/InventoryPanel.tsx: t(labelKey)",

@@ -21,6 +21,28 @@ const PARTY_ACTOR_IMAGE_RENDER_SCALE = 1.12;
 const ZERO_MOTION_OFFSET = { x: 0, y: 0 };
 
 export class WorldFieldRenderer {
+    public static renderHuntMarker(ctx: CanvasRenderingContext2D, target: { tile: { x: number; y: number }; name: string }, camX: number, camY: number): void {
+        const x = (target.tile.x + .5) * TILE_SIZE - camX;
+        const y = (target.tile.y + .5) * TILE_SIZE - camY;
+        ctx.save();
+        ctx.strokeStyle = '#f0c050';
+        ctx.fillStyle = '#17130fe8';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(x, y + 8, 18, 7, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, y + 6); ctx.lineTo(x, y - 26); ctx.lineTo(x + 18, y - 19); ctx.lineTo(x, y - 12);
+        ctx.stroke();
+        ctx.font = `bold 12px ${UI.fontPrimary}`;
+        const width = ctx.measureText(target.name).width + 20;
+        ctx.fillRect(x - width / 2, y - 50, width, 20);
+        ctx.fillStyle = '#f0c050';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(target.name, x, y - 40);
+        ctx.restore();
+    }
+
     public static renderPathPreview(ctx: CanvasRenderingContext2D, model: WorldRenderModel, camX: number, camY: number): void {
         const targetPreview = model.moveTargetPreview;
         if (targetPreview && targetPreview.tiles.length > 0 && model.controlledActor) {

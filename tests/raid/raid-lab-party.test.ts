@@ -284,11 +284,15 @@ test('phase 4b swept seed 4 leaves legally on max_actions', () => {
     assert.deepEqual(result.invariantViolations, []);
 });
 
-test('phase 4b swept seed 611 preserves curse death hazard', () => {
+test('authored starter hunts let swept seed 611 keep earned loot on a deterministic return', () => {
+    // The nearby encounters now trigger this policy's return before it reaches
+    // the distant reliquary. Seed 852 still covers curse death in determinism tests.
     const first = runSwept(611);
     const second = runSwept(611);
-    assert.equal(first.result, 'DEAD');
-    assert.equal(first.telemetry.deathCause, 'curse');
+    assert.equal(first.result, 'LEFT');
+    assert.ok(first.telemetry.killsByDangerBand.starter >= 3);
+    assert.ok(first.telemetry.lootItemsAcquired > 0);
+    assert.equal(first.telemetry.lootItemsSecured, first.telemetry.lootItemsAcquired);
     assert.deepEqual(first.invariantViolations, []);
     assert.equal(first.digest, second.digest);
 });
