@@ -349,7 +349,7 @@ export class ActionMenuUI {
             const isHighlighted = enabled && Boolean(state.highlighted);
             const r = this.iconRadius;
 
-            drawFieldPanel(ctx, ix - 23, iy - 23, 46, 46, 9);
+            drawFieldPanel(ctx, ix - 23, iy - 23, 46, 46, 6);
 
             if (isHighlighted) {
                 this.drawSlotTutorialFocus(ctx, ix, iy, r);
@@ -593,13 +593,13 @@ export class ActionMenuUI {
         highlighted: boolean
     ): void {
         const disabled = !state.enabled;
-        const innerWidth = Math.max(1, bounds.width - 8);
+        const innerWidth = Math.max(1, bounds.width - 16);
         const iconX = bounds.x + bounds.width / 2;
-        const iconY = bounds.y + bounds.height * 0.18;
+        const iconY = bounds.y + bounds.height * 0.235;
         const labelY = bounds.y + bounds.height * 0.41;
         const costY = bounds.y + bounds.height * 0.56;
-        const detailY = bounds.y + bounds.height * 0.73;
-        const detailLineHeight = Math.max(7, Math.min(10, bounds.height * 0.14));
+        const detailY = bounds.y + bounds.height * 0.68;
+        const detailLineHeight = Math.max(7, Math.min(8, bounds.height * 0.12));
         const labelFontSize = Math.max(7, Math.min(9, bounds.height / 8));
         const detailFontSize = Math.max(6, Math.min(8, bounds.height / 9));
 
@@ -617,7 +617,7 @@ export class ActionMenuUI {
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.stroke();
-        drawFieldPanel(ctx, bounds.x, bounds.y, bounds.width, bounds.height, 12);
+        drawFieldPanel(ctx, bounds.x, bounds.y, bounds.width, bounds.height, 6);
         if (!enabled) {
             ctx.fillStyle = '#11151270';
             ctx.fillRect(bounds.x + 4, bounds.y + 4, bounds.width - 8, bounds.height - 8);
@@ -627,8 +627,8 @@ export class ActionMenuUI {
             ctx.strokeRect(bounds.x + 2, bounds.y + 2, bounds.width - 4, bounds.height - 4);
         }
 
-        slot.iconDraw(ctx, iconX, iconY, Math.max(6, Math.min(8, bounds.height / 9)), enabled);
-        this.drawCompactHotkeyBadge(ctx, slot.type, bounds.x + 9, bounds.y + 9, enabled);
+        slot.iconDraw(ctx, iconX, iconY, 6, enabled);
+        this.drawCompactHotkeyBadge(ctx, slot.type, bounds.x + 14, bounds.y + 14, enabled);
 
         ctx.font = `bold ${labelFontSize}px ${UI.fontPrimary}`;
         ctx.textAlign = 'center';
@@ -855,8 +855,8 @@ export class ActionMenuUI {
 
     private drawHotkeyLabel(ctx: CanvasRenderingContext2D, type: ActionType, ix: number, iy: number, r: number, enabled: boolean): void {
         const label = SettingsManager.getKeyLabel(SettingsManager.getKeybinding(ACTION_KEYBINDING_IDS[type]));
-        const badgeX = ix - r * 0.58;
-        const badgeY = iy - r * 0.58;
+        const badgeX = ix - r * 0.35;
+        const badgeY = iy - r * 0.35;
 
         ctx.save();
         ctx.font = `bold 9px ${UI.fontPrimary}`;

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('forged field HUD keeps the map, status and hunting controls separate at narrow and wide sizes', async ({ page, isMobile }, testInfo) => {
     test.setTimeout(60_000);
-    const sizes = isMobile ? [{ width: 320, height: 568 }, { width: 390, height: 844 }]
+    const sizes = isMobile ? [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 516, height: 960 }]
         : [{ width: 960, height: 640 }, { width: 1280, height: 720 }];
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -36,6 +36,7 @@ test('forged field HUD keeps the map, status and hunting controls separate at na
             }
         }
         await page.screenshot({ path: testInfo.outputPath(`field-skin-${size.width}.png`) });
+        await page.locator('.ds-field-expedition').screenshot({ path: testInfo.outputPath(`field-status-${size.width}.png`) });
         // The compact map still owns its pointer region after its visual relocation.
         await page.mouse.click(map.x + map.width / 2, map.y + map.height / 2);
         await expect(page.getByTestId('field-hud')).toBeHidden();
@@ -58,3 +59,55 @@ test('forged field HUD keeps the map, status and hunting controls separate at na
     }
     expect(errors).toEqual([]);
 });
+
+for (const language of ['ko', 'en']) {
+    test(`field text respects ornament insets and column alignment in ${language}`, async ({ page, isMobile }, testInfo) => {
+        await page.addInitScript((lang) => {
+            localStorage.setItem('setting_language', lang);
+            localStorage.setItem('setting_uiScale', '1.2');
+        }, language);
+        for (const width of isMobile ? [320, 516] : [960, 1280]) {
+            await page.setViewportSize({ width, height: 844 });
+            await page.goto('/?devStart=raid&devLocal=1');
+            await expect(page.getByTestId('field-hunt')).toBeVisible();
+            // Exercise real rendering with a long name and multi-digit resources.
+            await page.evaluate(() => {
+                const engine = (window as unknown as { __gm: any }).__gm.worldEngine;
+                const read = engine.getFieldHudView.bind(engine);
+                engine.getFieldHudView = () => {
+                    const value = read();
+                    return value && { ...value, name: '카오시아의방랑기사 Wandering Knight', level: 99,
+                        hp: 1234, maxHp: 5678, gold: 1234567890, elapsed: 44523, exp: 123456, expToNext: 789012 };
+                };
+            });
+            await expect(page.locator('.ds-field-hero__level')).toContainText('99');
+            const violations = await page.locator('.ds-field-hero, .ds-field-expedition, .ds-field-guide').evaluateAll((panels) => {
+                const failures: string[] = [];
+                for (const panel of panels) {
+                    const bounds = panel.getBoundingClientRect();
+                    const walker = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT);
+                    let node: Node | null;
+                    while ((node = walker.nextNode())) {
+                        if (!node.textContent?.trim() || node.parentElement?.closest('.ds-field-hero__title')) continue;
+                        const range = document.createRange();
+                        range.selectNodeContents(node);
+                        for (const box of range.getClientRects()) {
+                            if (!box.width || !box.height) continue;
+                            if (box.left < bounds.left + 24 || box.right > bounds.right - 24
+                                || box.top < bounds.top + 24 || box.bottom > bounds.bottom - 24) failures.push(`${panel.className}: ${node.textContent}`);
+                        }
+                    }
+                }
+                return failures;
+            });
+            expect(violations).toEqual([]);
+            const heading = await page.locator('.ds-field-mode').boundingBox();
+            const stats = await page.locator('.ds-field-expedition__stats > span').first().boundingBox();
+            const world = await page.locator('.ds-field-expedition__heading > span').last().boundingBox();
+            const clock = await page.locator('.ds-field-expedition time').boundingBox();
+            expect(heading!.x).toBeCloseTo(stats!.x, 0);
+            expect(world!.x + world!.width).toBeCloseTo(clock!.x + clock!.width, 0);
+            await page.screenshot({ path: testInfo.outputPath(`field-text-${language}-${width}.png`) });
+        }
+    });
+}

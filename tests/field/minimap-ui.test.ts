@@ -19,9 +19,11 @@ function createCanvasContextRecorder(): {
     ctx: CanvasRenderingContext2D;
     fillRects: FillRectCall[];
     texts: string[];
+    textPositions: Array<{ text: string; x: number; y: number; font: string }>;
 } {
     const fillRects: FillRectCall[] = [];
     const texts: string[] = [];
+    const textPositions: Array<{ text: string; x: number; y: number; font: string }> = [];
     let activeFillStyle: unknown = '';
     const ctx = {
         get fillStyle() {
@@ -53,8 +55,9 @@ function createCanvasContextRecorder(): {
         fillRect(x: number, y: number, width: number, height: number) {
             fillRects.push({ x, y, width, height, fillStyle: activeFillStyle });
         },
-        fillText(text: string) {
+        fillText(text: string, x: number, y: number) {
             texts.push(text);
+            textPositions.push({ text, x, y, font: ctx.font });
         },
         measureText(text: string) {
             return { width: text.length * 6 };
@@ -64,8 +67,27 @@ function createCanvasContextRecorder(): {
         }),
     } as unknown as CanvasRenderingContext2D;
 
-    return { ctx, fillRects, texts };
+    return { ctx, fillRects, texts, textPositions };
 }
+
+test('forged minimap keeps its map and text clear of the decorative frame', () => {
+    const minimap = new MinimapUI({
+        getTile: () => TileType.GRASS, getPlayerPos: () => ({ x: 1197, y: 1439 }),
+        getBounds: () => ({ width: 0, height: 0 }), getLandmarks: () => [],
+        getEnemies: () => [], getExtractionZones: () => [], getLoot: () => [],
+    });
+    const { ctx, fillRects, textPositions } = createCanvasContextRecorder();
+    minimap.render(ctx, 320, 568, undefined, { forged: true, compact: true, x: 190, y: 12, panelWidth: 98, mapSize: 65 });
+    const panel = minimap.getLastPanelRect()!;
+    const map = fillRects.find((entry) => entry.fillStyle === '#1a140c')!;
+    assert.ok(map.x >= panel.x + 16 && map.x + map.width <= panel.x + panel.width - 16);
+    for (const text of textPositions) {
+        const fontHeight = Number(text.font.match(/([\d.]+)px/)?.[1] ?? 0);
+        assert.ok(text.y - fontHeight / 2 >= panel.y + 16);
+        assert.ok(text.y + fontHeight / 2 <= panel.y + panel.height - 16);
+    }
+    assert.ok(textPositions.some((entry) => entry.text === formatT('minimap.coordsCompact', { x: 1197, y: 1439 })));
+});
 
 test('compact minimap honors caller geometry and renders only a coordinate footer', () => {
     const player = { x: 10, y: 20 };

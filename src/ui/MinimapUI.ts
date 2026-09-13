@@ -341,7 +341,8 @@ export class MinimapUI {
         this.lastMiniWasCompact = compact;
         const panelWidth = Math.max(96, Math.round(options.panelWidth ?? (compact ? COMPACT_PANEL_W : PANEL_W)));
         const requestedMapSize = Math.round(options.mapSize ?? (compact ? COMPACT_MAP_SIZE : MAP_SIZE));
-        const mapSize = Math.max(48, Math.min(requestedMapSize, panelWidth - 16));
+        const contentInset = options.forged ? 16 : 8;
+        const mapSize = Math.max(48, Math.min(requestedMapSize, panelWidth - contentInset * 2));
         const footerMaxW = panelWidth - 28;
         const terrainRows = !compact && footer
             ? this.buildMiniTerrainRows(ctx, footer.terrainLines, footerMaxW)
@@ -349,7 +350,7 @@ export class MinimapUI {
         const footerH = FOOTER_INFO_H
             + (terrainRows.length > 0 ? 8 + terrainRows.length * FOOTER_TERRAIN_LINE_H : 0);
         const panelH = compact
-            ? getCompactMinimapPanelHeight(mapSize)
+            ? options.forged ? mapSize + 74 : getCompactMinimapPanelHeight(mapSize)
             : HEADER_H + 8 + mapSize + 10 + footerH + FRAME_PAD;
         const mapGap = compact ? COMPACT_MAP_GAP : 8;
 
@@ -359,12 +360,12 @@ export class MinimapUI {
         this.currentHeight = panelH;
 
         const mapX = this.panelX + Math.floor((panelWidth - mapSize) / 2);
-        const mapY = this.panelY + HEADER_H + mapGap;
+        const mapY = this.panelY + (options.forged ? 38 : HEADER_H + mapGap);
         const tilePx = mapSize / (VIEW_RANGE * 2);
         const player = this.config.getPlayerPos();
 
         ctx.save();
-        if (options.forged) drawFieldPanel(ctx, this.panelX, this.panelY, panelWidth, panelH);
+        if (options.forged) drawFieldPanel(ctx, this.panelX, this.panelY, panelWidth, panelH, 10);
         else drawParchmentPanel(ctx, this.panelX, this.panelY, panelWidth, panelH, {
             radius: 8,
             headerH: HEADER_H,
@@ -377,7 +378,8 @@ export class MinimapUI {
         ctx.font = `bold ${compact ? 12 : 13}px ${UI.fontPrimary}`;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
-        ctx.fillText(t('minimap.title.mini'), this.panelX + 14, this.panelY + HEADER_H / 2);
+        ctx.fillText(t('minimap.title.mini'), this.panelX + (options.forged ? contentInset : 14),
+            this.panelY + (options.forged ? 22 : HEADER_H / 2));
 
         // Header right hint
         if (!compact) {
@@ -504,10 +506,10 @@ export class MinimapUI {
             ctx.textBaseline = 'middle';
             this.fillClampedText(
                 ctx,
-                formatT('minimap.coords', { x: player.x, y: player.y }),
+                options.forged ? formatT('minimap.coordsCompact', { x: player.x, y: player.y }) : formatT('minimap.coords', { x: player.x, y: player.y }),
                 this.panelX + panelWidth / 2,
-                footerY + COMPACT_FOOTER_H / 2,
-                panelWidth - 20,
+                footerY + (options.forged ? 6 : COMPACT_FOOTER_H / 2),
+                panelWidth - (options.forged ? contentInset * 2 : 20),
             );
         } else if (footer) {
             ctx.textAlign = 'left';

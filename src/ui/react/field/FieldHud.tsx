@@ -14,7 +14,7 @@ export function FieldHud() {
                     <img className="ds-field-crest" src="/assets/ui/field-forged/crest.png" alt="" aria-hidden="true" />
                     <div className="ds-field-hero__identity-text">
                         <div className="ds-field-hero__eyebrow">{t('field.expedition.subtitle')}</div>
-                        <div className="ds-field-hero__name">{state.name}<span>{formatT('field.expedition.level', { level: state.level })}</span></div>
+                        <div className="ds-field-hero__name"><span className="ds-field-hero__title" title={state.name}>{state.name}</span><span className="ds-field-hero__level">{formatT('field.expedition.level', { level: state.level })}</span></div>
                         <div className="ds-field-hero__class">{state.tierName}</div>
                     </div>
                 </div>

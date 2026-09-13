@@ -2,7 +2,7 @@
 
 Built with the built-in image_gen tool. The original generated PNGs are copied into this directory without flattening or replacing their alpha. Both are 1254 × 1254 RGBA.
 
-- `panel.png`: nine-slice leather and metal panel; source slice 160 px, UI border 12–22 px. Used by the React field HUD, Canvas minimap and action menu. Canvas keeps a dark fallback while loading.
+- `panel.png`: nine-slice leather and metal panel; source slice 160 px. DOM border 22 px / content inset 26 px; minimap border 10 px / inset 16 px; action border 6 px / text inset at least 8 px. Used by the React field HUD, Canvas minimap and action menu. Canvas keeps a dark fallback while loading.
 - `crest.png`: decorative sword/shield crest in the character HUD. Empty alt text; it conveys no unique gameplay information.
 
 Gameplay labels, resources, translated text, focus, hit testing and progress remain code-driven. The classic eight-action radial layout and existing game sprites remain.

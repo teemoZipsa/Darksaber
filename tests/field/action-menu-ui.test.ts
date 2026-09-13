@@ -367,6 +367,15 @@ test('compact radial menu always renders names and costs and uses its visible sl
                 height: slot.height,
             };
             assert.deepEqual(menu.getCompactChipBounds(slot.type), expectedBounds);
+            for (const call of textCalls.filter((entry) => entry.x >= slot.x && entry.x <= slot.x + slot.width
+                && entry.y >= slot.y && entry.y <= slot.y + slot.height)) {
+                const textWidth = ctx.measureText(call.text).width;
+                const fontHeight = Number(call.font.match(/([\d.]+)px/)?.[1] ?? 0);
+                assert.ok(call.x - textWidth / 2 >= slot.x + 8, `${slot.type}: text clears left ornament`);
+                assert.ok(call.x + textWidth / 2 <= slot.x + slot.width - 8, `${slot.type}: text clears right ornament`);
+                assert.ok(call.y - fontHeight / 2 >= slot.y + 8, `${slot.type}: text clears top ornament`);
+                assert.ok(call.y + fontHeight / 2 <= slot.y + slot.height - 8, `${slot.type}: text clears bottom ornament`);
+            }
             assert.ok(
                 textCalls.some((call) => call.text === t(labelKeys[slot.type])),
                 `${slot.type} label was not rendered`
