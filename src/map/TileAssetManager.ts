@@ -85,7 +85,9 @@ const ORIGINAL_AUTOTILE_COLS = 16;
 const ORIGINAL_AUTOTILE_CELL_SIZE = 32;
 const ORIGINAL_TILE_CONFIGS: Partial<Record<TileType, OriginalTileConfig>> = {
     [TileType.GRASS]: { sheet: 'mdsr0', cells: [302, 303, 304] },
-    [TileType.WATER]: { sheet: 'mdsr0', cells: [131, 132, 145, 146] },
+    // 145/146 are transparent diagonal coast pieces, not water variations.
+    // Base fills (including deep-water blends) need fully opaque water cells.
+    [TileType.WATER]: { sheet: 'mdsr0', cells: [131, 132] },
     [TileType.DEEP_WATER]: { sheet: 'mdsr15', cells: [102, 103] },
     [TileType.SNOW]: { sheet: 'mdsr0', cells: [448, 452] },
     [TileType.POISON_SWAMP]: { sheet: 'mdsr15', cells: [243, 244, 245] },
