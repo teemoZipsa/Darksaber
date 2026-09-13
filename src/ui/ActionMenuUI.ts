@@ -8,19 +8,15 @@ import { TILE_SIZE } from '../map/Chunk';
 import { t } from '../i18n/LanguageManager';
 import { ACTION_ICON_CELLS } from './DarksaberIconRegistry';
 import { DarksaberSpriteAtlas, MICON_CELL_SIZE } from './DarksaberSpriteAtlas';
-import { UI, Parchment } from './UITheme';
-import { SettingsManager, type KeybindingId } from '../engine/SettingsManager';
+import { UI } from './UITheme';
 import { AudioManager } from '../engine/AudioManager';
-import { drawFieldPanel } from './FieldPanelSkin';
 
 const ACTION_ICON_ANIMATION_ROWS = 5;
 const ACTION_ICON_ANIMATION_MS = 280;
 export const ACTION_MENU_COMPACT_BREAKPOINT = 520;
 
 const COMPACT_RADIAL_MARGIN = 8;
-const COMPACT_RADIAL_GAP = 10;
-const COMPACT_RADIAL_SLOT_MAX_WIDTH = 88;
-const COMPACT_RADIAL_SLOT_MAX_HEIGHT = 68;
+const COMPACT_RADIAL_SLOT_SIZE = TILE_SIZE;
 
 export type ActionType = 'tool' | 'attack' | 'rest' | 'defend' | 'magic' | 'move' | 'open' | 'fanfare';
 export type ReadyCursorType = 'move' | 'attack';
@@ -39,17 +35,6 @@ const COMPACT_ACTION_GRID: readonly {
     { type: 'fanfare', column: 1, row: 2 },
     { type: 'open', column: 2, row: 2 },
 ];
-
-const ACTION_KEYBINDING_IDS: Record<ActionType, KeybindingId> = {
-    move: 'action.move',
-    tool: 'action.tool',
-    attack: 'action.attack',
-    magic: 'action.magic',
-    defend: 'action.defend',
-    rest: 'action.rest',
-    fanfare: 'action.fanfare',
-    open: 'action.open',
-};
 
 export interface ActionMenuSlotState {
     type: ActionType;
@@ -88,17 +73,18 @@ export function getCompactActionMenuLayout(
     viewHeight: number,
     actorCenterX: number = viewWidth / 2,
     actorCenterY: number = viewHeight / 2,
+    worldToUiScale: number = 1,
 ): ActionMenuCompactLayout {
     const safeWidth = Math.max(1, viewWidth);
     const safeHeight = Math.max(1, viewHeight);
     const margin = Math.min(COMPACT_RADIAL_MARGIN, safeWidth / 10, safeHeight / 10);
-    const gap = Math.min(COMPACT_RADIAL_GAP, safeWidth / 30, safeHeight / 30);
+    const gap = 0;
     const slotWidth = Math.min(
-        COMPACT_RADIAL_SLOT_MAX_WIDTH,
+        COMPACT_RADIAL_SLOT_SIZE * worldToUiScale,
         Math.max(1, (safeWidth - margin * 2 - gap * 2) / 3),
     );
     const slotHeight = Math.min(
-        COMPACT_RADIAL_SLOT_MAX_HEIGHT,
+        COMPACT_RADIAL_SLOT_SIZE * worldToUiScale,
         Math.max(1, (safeHeight - margin * 2 - gap * 2) / 3),
     );
     const panelWidth = slotWidth * 3 + gap * 2;
@@ -150,7 +136,6 @@ export function normalizeLegacyActionType(action: string): ActionType | null {
 
 interface ActionSlot {
     type: ActionType;
-    labelKey: string;
     gridX: number;
     gridY: number;
     iconDraw: (ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, ready: boolean) => void;
@@ -202,14 +187,14 @@ export class ActionMenuUI {
 
     constructor() {
         this.slots = [
-            { type: 'move',    labelKey: 'action.label.move',    gridX: -1, gridY: -1, iconDraw: this.drawMoveIcon },
-            { type: 'tool',    labelKey: 'action.label.tool',    gridX: 0,  gridY: -1, iconDraw: this.drawToolIcon },
-            { type: 'attack',  labelKey: 'action.label.attack',  gridX: 1,  gridY: -1, iconDraw: this.drawAttackIcon },
-            { type: 'magic',   labelKey: 'action.label.magic',   gridX: -1, gridY: 0,  iconDraw: this.drawMagicIcon },
-            { type: 'defend',  labelKey: 'action.label.defend',  gridX: 1,  gridY: 0,  iconDraw: this.drawDefendIcon },
-            { type: 'rest',    labelKey: 'action.label.rest',    gridX: -1, gridY: 1,  iconDraw: this.drawRestIcon },
-            { type: 'fanfare', labelKey: 'action.label.fanfare', gridX: 0,  gridY: 1,  iconDraw: this.drawFanfareIcon },
-            { type: 'open',    labelKey: 'action.label.open',    gridX: 1,  gridY: 1,  iconDraw: this.drawOpenIcon },
+            { type: 'move',    gridX: -1, gridY: -1, iconDraw: this.drawMoveIcon },
+            { type: 'tool',    gridX: 0,  gridY: -1, iconDraw: this.drawToolIcon },
+            { type: 'attack',  gridX: 1,  gridY: -1, iconDraw: this.drawAttackIcon },
+            { type: 'magic',   gridX: -1, gridY: 0,  iconDraw: this.drawMagicIcon },
+            { type: 'defend',  gridX: 1,  gridY: 0,  iconDraw: this.drawDefendIcon },
+            { type: 'rest',    gridX: -1, gridY: 1,  iconDraw: this.drawRestIcon },
+            { type: 'fanfare', gridX: 0,  gridY: 1,  iconDraw: this.drawFanfareIcon },
+            { type: 'open',    gridX: 1,  gridY: 1,  iconDraw: this.drawOpenIcon },
         ];
         this.setDefaultSlotStates();
     }
@@ -340,44 +325,10 @@ export class ActionMenuUI {
 
         ctx.save();
 
-        // Draw each slot
         for (const slot of this.slots) {
-            const state = this.getSlotState(slot.type);
-            const enabled = isReady && state.enabled;
-            const { x: ix, y: iy } = this.getSlotPosition(slot);
-            const isHovered = this.hoveredSlot === slot.type;
-            const isHighlighted = enabled && Boolean(state.highlighted);
-            const r = this.iconRadius;
-
-            if (isHighlighted) {
-                this.drawSlotTutorialFocus(ctx, ix, iy, r);
-            }
-
-            if (isHovered) {
-                this.drawSlotFocus(ctx, ix, iy, r, enabled);
-            }
-
-            // Draw icon
-            slot.iconDraw(ctx, ix, iy, r * 0.62, enabled);
-            this.drawHotkeyLabel(ctx, slot.type, ix, iy, r, enabled);
-
-            if (isHovered || isHighlighted) {
-                const slotLabel = this.getSlotLabel(slot);
-                const label = isHighlighted ? state.emphasisLabel ?? slotLabel : slotLabel;
-                ctx.font = `bold 13px ${UI.fontPrimary}`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.lineWidth = 4;
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.82)';
-                ctx.strokeText(label, ix, iy + r + 12);
-                ctx.fillStyle = enabled ? '#ffe3a0' : '#aaa596';
-                ctx.fillText(label, ix, iy + r + 12);
-                ctx.textAlign = 'start';
-                ctx.textBaseline = 'alphabetic';
-            }
+            const { x, y } = this.getSlotPosition(slot);
+            this.drawSlotIcon(ctx, slot, x, y, this.iconRadius, isReady);
         }
-
-        this.renderHoveredDisabledReason(ctx);
 
         ctx.restore();
     }
@@ -388,7 +339,8 @@ export class ActionMenuUI {
         viewportHeight: number,
         actorCenterX: number,
         actorCenterY: number,
-        isReady: boolean
+        isReady: boolean,
+        worldToUiScale: number = 1,
     ): void {
         if (!this.isOpen) {
             this.clearCompactLayout();
@@ -400,6 +352,7 @@ export class ActionMenuUI {
             viewportHeight,
             actorCenterX,
             actorCenterY,
+            worldToUiScale,
         );
         this.compactLayoutActive = true;
         this.compactPanelBounds = { ...layout.panel };
@@ -414,21 +367,17 @@ export class ActionMenuUI {
         }
 
         ctx.save();
-        this.drawCompactRadialFrame(ctx, layout, actorCenterX, actorCenterY);
 
         for (const bounds of layout.slots) {
             const slot = this.slots.find((candidate) => candidate.type === bounds.type);
             if (!slot) continue;
-            const state = this.getSlotState(slot.type);
-            const enabled = isReady && state.enabled;
-            this.drawCompactSlot(
+            this.drawSlotIcon(
                 ctx,
                 slot,
-                state,
-                bounds,
-                enabled,
-                this.hoveredSlot === slot.type,
-                enabled && Boolean(state.highlighted)
+                bounds.x + bounds.width / 2,
+                bounds.y + bounds.height / 2,
+                Math.min(bounds.width, bounds.height) / 2,
+                isReady,
             );
         }
         ctx.restore();
@@ -581,204 +530,26 @@ export class ActionMenuUI {
         );
     }
 
-    private drawCompactSlot(
+    // Both viewport layouts draw only the original sprites. Hit areas stay
+    // tile-sized and invisible; hover/tutorial feedback follows the icon alpha.
+    private drawSlotIcon(
         ctx: CanvasRenderingContext2D,
         slot: ActionSlot,
-        state: ActionMenuSlotState,
-        bounds: ActionMenuCompactChipBounds,
-        enabled: boolean,
-        hovered: boolean,
-        highlighted: boolean
-    ): void {
-        const disabled = !state.enabled;
-        const innerWidth = Math.max(1, bounds.width - 16);
-        const iconX = bounds.x + bounds.width / 2;
-        const iconY = bounds.y + bounds.height * 0.235;
-        const labelY = bounds.y + bounds.height * 0.41;
-        const costY = bounds.y + bounds.height * 0.56;
-        const detailY = bounds.y + bounds.height * 0.68;
-        const detailLineHeight = Math.max(7, Math.min(8, bounds.height * 0.12));
-        const labelFontSize = Math.max(7, Math.min(9, bounds.height / 8));
-        const detailFontSize = Math.max(6, Math.min(8, bounds.height / 9));
-
-        ctx.save();
-        ctx.fillStyle = disabled
-            ? 'rgba(24, 24, 23, 0.96)'
-            : hovered ? 'rgba(53, 40, 18, 0.98)' : 'rgba(25, 19, 12, 0.96)';
-        ctx.strokeStyle = disabled
-            ? 'rgba(116, 111, 96, 0.65)'
-            : highlighted ? '#f0c050' : 'rgba(194, 146, 62, 0.82)';
-        ctx.lineWidth = highlighted ? 2 : 1;
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.72)';
-        ctx.shadowBlur = 5;
-        this.traceCompactPetal(ctx, bounds);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.stroke();
-        drawFieldPanel(ctx, bounds.x, bounds.y, bounds.width, bounds.height, 6);
-        if (!enabled) {
-            ctx.fillStyle = '#11151270';
-            ctx.fillRect(bounds.x + 4, bounds.y + 4, bounds.width - 8, bounds.height - 8);
-        }
-        if (hovered || highlighted) {
-            ctx.strokeStyle = '#d6bb78';
-            ctx.strokeRect(bounds.x + 2, bounds.y + 2, bounds.width - 4, bounds.height - 4);
-        }
-
-        slot.iconDraw(ctx, iconX, iconY, 6, enabled);
-        this.drawCompactHotkeyBadge(ctx, slot.type, bounds.x + 14, bounds.y + 14, enabled);
-
-        ctx.font = `bold ${labelFontSize}px ${UI.fontPrimary}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = enabled ? '#eee1bc' : '#aaa596';
-        ctx.fillText(
-            this.fitCompactText(ctx, this.getSlotLabel(slot), innerWidth),
-            iconX,
-            labelY
-        );
-
-        ctx.font = `bold ${detailFontSize}px ${UI.fontPrimary}`;
-        ctx.fillStyle = enabled ? '#d4a050' : '#9c8c70';
-        if (state.costLabel) {
-            ctx.fillText(
-                this.fitCompactText(ctx, state.costLabel, innerWidth),
-                iconX,
-                costY
-            );
-        }
-
-        if (disabled && state.disabledReason) {
-            ctx.font = `bold ${detailFontSize}px ${UI.fontPrimary}`;
-            ctx.fillStyle = '#b7b3a4';
-            const reasonLines = this.wrapCompactText(ctx, state.disabledReason, innerWidth, 2);
-            reasonLines.forEach((line, index) => {
-                ctx.fillText(line, iconX, detailY + index * detailLineHeight);
-            });
-        } else if (state.emphasisLabel) {
-            ctx.font = `bold ${detailFontSize}px ${UI.fontPrimary}`;
-            ctx.fillStyle = '#f0c050';
-            ctx.fillText(
-                this.fitCompactText(ctx, state.emphasisLabel, innerWidth),
-                iconX,
-                detailY
-            );
-        }
-        ctx.restore();
-    }
-
-    private drawCompactRadialFrame(
-        ctx: CanvasRenderingContext2D,
-        layout: ActionMenuCompactLayout,
-        actorCenterX: number,
-        actorCenterY: number,
-    ): void {
-        const centerX = layout.center.x + layout.center.width / 2;
-        const centerY = layout.center.y + layout.center.height / 2;
-        const actorX = Number.isFinite(actorCenterX) ? actorCenterX : centerX;
-        const actorY = Number.isFinite(actorCenterY) ? actorCenterY : centerY;
-
-        ctx.save();
-        ctx.strokeStyle = 'rgba(194, 146, 62, 0.48)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        for (const bounds of layout.slots) {
-            ctx.moveTo(centerX, centerY);
-            ctx.lineTo(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
-        }
-        ctx.stroke();
-
-        const anchorDistance = Math.hypot(actorX - centerX, actorY - centerY);
-        if (anchorDistance > 2) {
-            ctx.strokeStyle = 'rgba(240, 192, 80, 0.68)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(actorX, actorY);
-            ctx.lineTo(centerX, centerY);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.arc(actorX, actorY, 7, 0, Math.PI * 2);
-            ctx.stroke();
-        }
-
-        const ringRadius = Math.max(
-            9,
-            Math.min(layout.center.width, layout.center.height) * 0.31,
-        );
-        ctx.strokeStyle = Parchment.borderGold;
-        ctx.lineWidth = 1.5;
-        ctx.shadowColor = 'rgba(240, 192, 80, 0.55)';
-        ctx.shadowBlur = 5;
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = 'rgba(240, 192, 80, 0.38)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, ringRadius + 4, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-    }
-
-    private traceCompactPetal(
-        ctx: CanvasRenderingContext2D,
-        bounds: ActionMenuCompactChipBounds,
-    ): void {
-        const cut = Math.max(4, Math.min(9, bounds.width * 0.09, bounds.height * 0.14));
-        const x = bounds.x;
-        const y = bounds.y;
-        const right = x + bounds.width;
-        const bottom = y + bounds.height;
-        ctx.beginPath();
-        ctx.moveTo(x + cut, y);
-        ctx.lineTo(right - cut, y);
-        ctx.lineTo(right, y + cut);
-        ctx.lineTo(right, bottom - cut);
-        ctx.lineTo(right - cut, bottom);
-        ctx.lineTo(x + cut, bottom);
-        ctx.lineTo(x, bottom - cut);
-        ctx.lineTo(x, y + cut);
-        ctx.closePath();
-    }
-
-    private fitCompactText(
-        ctx: CanvasRenderingContext2D,
-        text: string,
-        maxWidth: number
-    ): string {
-        if (ctx.measureText(text).width <= maxWidth) return text;
-        let fitted = text;
-        while (fitted && ctx.measureText(`${fitted}…`).width > maxWidth) {
-            fitted = fitted.slice(0, -1);
-        }
-        return `${fitted.trimEnd()}…`;
-    }
-
-    private getSlotLabel(slot: ActionSlot): string {
-        return t(slot.labelKey);
-    }
-
-    private drawCompactHotkeyBadge(
-        ctx: CanvasRenderingContext2D,
-        type: ActionType,
         x: number,
         y: number,
-        enabled: boolean
+        radius: number,
+        isReady: boolean,
     ): void {
-        const label = SettingsManager.getKeyLabel(SettingsManager.getKeybinding(ACTION_KEYBINDING_IDS[type]));
+        const state = this.getSlotState(slot.type);
+        const enabled = isReady && state.enabled;
         ctx.save();
-        ctx.font = `bold 8px ${UI.fontPrimary}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const width = Math.max(12, ctx.measureText(label).width + 5);
-        ctx.fillStyle = 'rgba(8, 7, 6, 0.9)';
-        ctx.strokeStyle = enabled ? '#d4a050' : '#6f6048';
-        ctx.lineWidth = 1;
-        ctx.fillRect(x - width / 2, y - 5, width, 10);
-        ctx.strokeRect(x - width / 2, y - 5, width, 10);
-        ctx.fillStyle = enabled ? '#f0c050' : '#9c8c70';
-        ctx.fillText(label, x, y + 0.5);
+        if (enabled && (this.hoveredSlot === slot.type || state.highlighted)) {
+            ctx.shadowColor = '#f0c050';
+            ctx.shadowBlur = state.highlighted
+                ? 5 + (Math.sin(ActionMenuUI.getAnimationTime() / 150) + 1) * 3
+                : 5;
+        }
+        slot.iconDraw(ctx, x, y, radius * 0.62, enabled);
         ctx.restore();
     }
 
@@ -787,136 +558,6 @@ export class ActionMenuUI {
         this.compactLayoutActive = false;
         this.compactPanelBounds = null;
         this.compactChipBounds.clear();
-    }
-
-    private wrapCompactText(
-        ctx: CanvasRenderingContext2D,
-        text: string,
-        maxWidth: number,
-        maxLines: number
-    ): string[] {
-        const characters = Array.from(text);
-        const lines: string[] = [];
-        let current = '';
-
-        for (const character of characters) {
-            const candidate = current + character;
-            if (current && ctx.measureText(candidate).width > maxWidth) {
-                lines.push(current.trim());
-                current = character.trimStart();
-                if (lines.length === maxLines) break;
-            } else {
-                current = candidate;
-            }
-        }
-
-        if (lines.length < maxLines && current) lines.push(current.trim());
-        const consumed = lines.join('').replace(/ /g, '').length;
-        const sourceLength = text.replace(/ /g, '').length;
-        if (consumed < sourceLength && lines.length > 0) {
-            const lastIndex = lines.length - 1;
-            let last = lines[lastIndex] ?? '';
-            while (last && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1);
-            lines[lastIndex] = `${last}…`;
-        }
-        return lines;
-    }
-
-    private drawSlotFocus(ctx: CanvasRenderingContext2D, ix: number, iy: number, r: number, enabled: boolean): void {
-        const size = r * 1.65;
-        const x = ix - size / 2;
-        const y = iy - size / 2;
-        const corner = 10;
-        const color = enabled ? Parchment.borderGold : 'rgba(150, 143, 125, 0.72)';
-
-        ctx.save();
-        ctx.shadowColor = color;
-        ctx.shadowBlur = enabled ? 8 : 5;
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x, y + corner);
-        ctx.lineTo(x, y);
-        ctx.lineTo(x + corner, y);
-        ctx.moveTo(x + size - corner, y);
-        ctx.lineTo(x + size, y);
-        ctx.lineTo(x + size, y + corner);
-        ctx.moveTo(x + size, y + size - corner);
-        ctx.lineTo(x + size, y + size);
-        ctx.lineTo(x + size - corner, y + size);
-        ctx.moveTo(x + corner, y + size);
-        ctx.lineTo(x, y + size);
-        ctx.lineTo(x, y + size - corner);
-        ctx.stroke();
-        ctx.restore();
-    }
-
-    private drawHotkeyLabel(ctx: CanvasRenderingContext2D, type: ActionType, ix: number, iy: number, r: number, enabled: boolean): void {
-        const label = SettingsManager.getKeyLabel(SettingsManager.getKeybinding(ACTION_KEYBINDING_IDS[type]));
-        const badgeX = ix - r * 0.35;
-        const badgeY = iy - r * 0.35;
-
-        ctx.save();
-        ctx.font = `bold 9px ${UI.fontPrimary}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const w = Math.max(12, ctx.measureText(label).width + 6);
-        const h = 12;
-        ctx.fillStyle = enabled ? 'rgba(20, 14, 8, 0.86)' : 'rgba(12, 12, 12, 0.72)';
-        ctx.strokeStyle = enabled ? '#d4a050' : '#6f6048';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.rect(badgeX - w / 2, badgeY - h / 2, w, h);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = enabled ? '#f0c050' : '#9c8c70';
-        ctx.fillText(label, badgeX, badgeY + 0.5);
-        ctx.restore();
-    }
-
-    private drawSlotTutorialFocus(ctx: CanvasRenderingContext2D, ix: number, iy: number, r: number): void {
-        const pulse = (Math.sin(ActionMenuUI.getAnimationTime() / 150) + 1) / 2;
-        const outer = r * (1.95 + pulse * 0.18);
-
-        ctx.save();
-        ctx.shadowColor = '#f0c050';
-        ctx.shadowBlur = 18 + pulse * 10;
-        ctx.strokeStyle = '#f0c050';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(ix, iy, outer, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = `rgba(240, 192, 80, ${0.13 + pulse * 0.08})`;
-        ctx.beginPath();
-        ctx.arc(ix, iy, outer - 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-    }
-
-    private renderHoveredDisabledReason(ctx: CanvasRenderingContext2D): void {
-        if (!this.hoveredSlot) return;
-        const state = this.getSlotState(this.hoveredSlot);
-        if (state.enabled || !state.disabledReason) return;
-
-        ctx.font = `bold 11px ${UI.fontPrimary}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const text = state.disabledReason;
-        const w = Math.min(210, ctx.measureText(text).width + 18);
-        const x = this.centerX - w / 2;
-        const y = this.centerY + TILE_SIZE * 2 + 10;
-
-        ctx.fillStyle = 'rgba(18, 12, 12, 0.88)';
-        ctx.fillRect(x, y, w, 24);
-        ctx.strokeStyle = 'rgba(228, 63, 90, 0.72)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, w, 24);
-        ctx.fillStyle = '#ffd6d6';
-        ctx.fillText(text, this.centerX, y + 12);
-        ctx.textAlign = 'start';
-        ctx.textBaseline = 'alphabetic';
     }
 
     private static drawActionIconCell(

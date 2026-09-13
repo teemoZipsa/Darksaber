@@ -8,6 +8,7 @@ import {
 } from '../../src/ui/ActionMenuUI';
 import { FieldMagicMenu, type FieldMagicSlot } from '../../src/ui/FieldMagicMenu';
 import { ACTION_ICON_CELLS } from '../../src/ui/DarksaberIconRegistry';
+import { DarksaberSpriteAtlas } from '../../src/ui/DarksaberSpriteAtlas';
 import { getSkill } from '../../src/data/SkillDB';
 import { TILE_SIZE } from '../../src/map/Chunk';
 import { AudioManager } from '../../src/engine/AudioManager';
@@ -36,8 +37,10 @@ interface TextCall {
 function createCanvasContextRecorder(): {
     ctx: CanvasRenderingContext2D;
     textCalls: TextCall[];
+    paintCalls: string[];
 } {
     const textCalls: TextCall[] = [];
+    const paintCalls: string[] = [];
     const state: Record<string, unknown> = {
         fillStyle: '',
         font: '',
@@ -67,14 +70,18 @@ function createCanvasContextRecorder(): {
         get(object, property, receiver) {
             if (Reflect.has(object, property)) return Reflect.get(object, property, receiver);
             if (typeof property === 'string' && property in state) return state[property];
-            return () => undefined;
+            return () => {
+                if (['fill', 'fillRect', 'stroke', 'strokeRect', 'drawImage'].includes(String(property))) {
+                    paintCalls.push(String(property));
+                }
+            };
         },
         set(object, property, value, receiver) {
             if (typeof property === 'string') state[property] = value;
             return Reflect.set(object, property, value, receiver);
         },
     });
-    return { ctx, textCalls };
+    return { ctx, textCalls, paintCalls };
 }
 
 function buildActionStates(disabledReason?: string): ActionMenuSlotState[] {
@@ -320,200 +327,97 @@ test('compact radial menu clamps near every viewport edge without changing slot 
     }
 });
 
-test('compact radial menu always renders names and costs and uses its visible slots as hitboxes', () => {
+test('both action layouts show only original icons and preserve disabled click feedback', (context) => {
+    let iconCount = 0;
+    context.mock.method(DarksaberSpriteAtlas, 'drawSprite', () => { iconCount++; return true; });
     const previousLanguage = i18n.lang;
-    i18n.setLanguage('ko');
     try {
-        const viewWidth = Math.floor(390 / 1.2);
-        const viewHeight = Math.floor(844 / 1.2);
-        const actorCenter = { x: viewWidth / 2, y: viewHeight / 2 };
-        const disabledReason = '집결할 파티원이 없습니다.';
-        const states = buildActionStates(disabledReason);
-        const menu = new ActionMenuUI();
-        const { ctx, textCalls } = createCanvasContextRecorder();
-        menu.open(states);
-
-        menu.renderCompact(
-            ctx,
-            viewWidth,
-            viewHeight,
-            actorCenter.x,
-            actorCenter.y,
-            true
-        );
-
-        assert.equal(menu.usesCompactLayout(), true);
-        const layout = getCompactActionMenuLayout(
-            viewWidth,
-            viewHeight,
-            actorCenter.x,
-            actorCenter.y
-        );
-        const labelKeys: Record<ActionMenuSlotState['type'], string> = {
-            move: 'action.label.move',
-            tool: 'action.label.tool',
-            attack: 'action.label.attack',
-            magic: 'action.label.magic',
-            defend: 'action.label.defend',
-            rest: 'action.label.rest',
-            fanfare: 'action.label.fanfare',
-            open: 'action.label.open',
-        };
-        for (const [index, slot] of layout.slots.entries()) {
-            const expectedBounds = {
-                x: slot.x,
-                y: slot.y,
-                width: slot.width,
-                height: slot.height,
-            };
-            assert.deepEqual(menu.getCompactChipBounds(slot.type), expectedBounds);
-            for (const call of textCalls.filter((entry) => entry.x >= slot.x && entry.x <= slot.x + slot.width
-                && entry.y >= slot.y && entry.y <= slot.y + slot.height)) {
-                const textWidth = ctx.measureText(call.text).width;
-                const fontHeight = Number(call.font.match(/([\d.]+)px/)?.[1] ?? 0);
-                assert.ok(call.x - textWidth / 2 >= slot.x + 8, `${slot.type}: text clears left ornament`);
-                assert.ok(call.x + textWidth / 2 <= slot.x + slot.width - 8, `${slot.type}: text clears right ornament`);
-                assert.ok(call.y - fontHeight / 2 >= slot.y + 8, `${slot.type}: text clears top ornament`);
-                assert.ok(call.y + fontHeight / 2 <= slot.y + slot.height - 8, `${slot.type}: text clears bottom ornament`);
+        for (const language of ['ko', 'en'] as Language[]) {
+            i18n.setLanguage(language);
+            for (const compact of [false, true]) {
+                const reason = t('field.action.fanfareNoFollowers');
+                const menu = new ActionMenuUI();
+                menu.open(buildActionStates(reason).map((state) => ({ ...state, highlighted: state.type === 'move' })));
+                const { ctx, textCalls, paintCalls } = createCanvasContextRecorder();
+                const render = () => compact
+                    ? menu.renderCompact(ctx, 320, 568, 160, 284, true)
+                    : menu.render(ctx, 136, 260, true);
+                iconCount = 0;
+                render();
+                assert.equal(iconCount, 8);
+                assert.equal(menu.usesCompactLayout(), compact);
+                const layout = getCompactActionMenuLayout(320, 568, 160, 284);
+                for (const slot of layout.slots) {
+                    assert.equal(slot.width, TILE_SIZE);
+                    assert.equal(slot.height, TILE_SIZE);
+                    const point = rectCenter(slot);
+                    const result = menu.onClick(point.x, point.y);
+                    assert.equal(result?.type, slot.type);
+                    assert.equal(result?.enabled, slot.type !== 'fanfare');
+                    if (slot.type === 'fanfare') assert.equal(result?.disabledReason, reason);
+                    menu.onMouseMove(point.x, point.y);
+                    render();
+                }
+                assert.deepEqual(textCalls, [], 'no badges, labels, costs or disabled text around the actor');
+                assert.deepEqual(paintCalls, [], 'no card backgrounds, frames, spokes or focus rings');
+                assert.equal(menu.onClick(160, 284), null, 'the actor center is not an action');
+                assert.equal(menu.onClick(layout.panel.x - 1, layout.panel.y - 1), null);
             }
-            assert.ok(
-                textCalls.some((call) => call.text === t(labelKeys[slot.type])),
-                `${slot.type} label was not rendered`
-            );
-            assert.ok(
-                textCalls.some((call) => call.text === `C${index}`),
-                `${slot.type} cost was not rendered`
-            );
-
-            const point = rectCenter(slot);
-            const result = menu.onClick(point.x, point.y);
-            assert.equal(result?.type, slot.type);
-            assert.equal(result?.enabled, states[index].enabled);
-            assert.equal(result?.disabledReason, states[index].disabledReason);
         }
-
-        const centerHole = rectCenter(layout.center);
-        assert.equal(menu.hitTestCompactPanel(centerHole.x, centerHole.y), true);
-        assert.equal(menu.onClick(centerHole.x, centerHole.y), null);
-        assert.equal(menu.hitTestCompactPanel(layout.panel.x - 1, layout.panel.y - 1), false);
     } finally {
         i18n.setLanguage(previousLanguage);
     }
 });
 
-test('compact radial disabled reasons remain visible without hover in Korean and English', () => {
-    const previousLanguage = i18n.lang;
-    const cases: Array<{ language: Language; reason: string }> = [
-        {
-            language: 'ko',
-            reason: '집결할 파티원이 없습니다.',
-        },
-        {
-            language: 'en',
-            reason: 'No ally can rally.',
-        },
-    ];
+test('resizing from compact to desktop clears stale touch bounds and preserves icon hit targets', () => {
+    const menu = new ActionMenuUI();
+    const { ctx } = createCanvasContextRecorder();
+    menu.open(buildActionStates());
+    menu.renderCompact(ctx, 325, 703, 162.5, 351.5, true);
+    const staleCompactPoint = menu.getCompactChipBounds('fanfare');
+    assert.ok(staleCompactPoint);
+    menu.render(ctx, 616, 336, true);
+    assert.equal(menu.usesCompactLayout(), false);
+    for (const type of ACTION_ORDER) assert.equal(menu.getCompactChipBounds(type), null);
+    const oldPoint = rectCenter(staleCompactPoint);
+    assert.equal(menu.onClick(oldPoint.x, oldPoint.y), null);
+    assert.equal(menu.onClick(640 + TILE_SIZE, 360 - TILE_SIZE)?.type, 'attack');
+});
 
-    try {
-        for (const scenario of cases) {
-            i18n.setLanguage(scenario.language);
+test('compact icons remain on the same world tiles across UI scale and camera zoom', () => {
+    for (const uiScale of [0.8, 1, 1.2]) {
+        for (const zoom of [0.75, 1, 1.5]) {
+            const actor = { x: 258, y: 480 };
             const menu = new ActionMenuUI();
-            const { ctx, textCalls } = createCanvasContextRecorder();
-            menu.open(buildActionStates(scenario.reason));
-            const viewWidth = Math.floor(320 / 1.2);
-            const viewHeight = Math.floor(568 / 1.2);
-            menu.renderCompact(
-                ctx,
-                viewWidth,
-                viewHeight,
-                viewWidth / 2,
-                viewHeight / 2,
-                true
-            );
-
-            const bounds = menu.getCompactChipBounds('fanfare');
-            assert.ok(bounds);
-            const normalizedReason = scenario.reason.replace(/\s/g, '');
-            const reasonCalls = textCalls.filter((call) => {
-                const normalizedCall = call.text.replace(/…/g, '').replace(/\s/g, '');
-                return normalizedCall.length >= 2
-                    && (
-                        normalizedReason.includes(normalizedCall)
-                        || normalizedCall.includes(normalizedReason)
-                    );
-            });
-
-            assert.ok(reasonCalls.length >= 1, `${scenario.language} disabled reason`);
-            const renderedReason = reasonCalls
-                .map((call) => call.text.replace(/…/g, ''))
-                .join('')
-                .replace(/\s/g, '');
-            assert.ok(
-                normalizedReason.startsWith(renderedReason)
-                || renderedReason.startsWith(normalizedReason)
-            );
-            for (const call of reasonCalls) {
-                assert.ok(call.x >= bounds.x);
-                assert.ok(call.y >= bounds.y);
-                assert.ok(call.x <= bounds.x + bounds.width);
-                assert.ok(call.y <= bounds.y + bounds.height);
-                const measuredWidth = Array.from(call.text).length * 6;
-                assert.ok(measuredWidth <= bounds.width - 8);
-            }
+            const { ctx } = createCanvasContextRecorder();
+            menu.open(buildActionStates());
+            menu.renderCompact(ctx, 516 / uiScale, 960 / uiScale,
+                actor.x / uiScale, actor.y / uiScale, true, zoom / uiScale);
+            const move = menu.getCompactChipBounds('move');
+            assert.ok(move);
+            const center = rectCenter(move);
+            assert.ok(Math.abs(center.x * uiScale - (actor.x - TILE_SIZE * zoom)) < 1e-8);
+            assert.ok(Math.abs(center.y * uiScale - (actor.y - TILE_SIZE * zoom)) < 1e-8);
+            assert.ok(Math.abs(move.width * uiScale - TILE_SIZE * zoom) < 1e-8);
+            assert.equal(menu.onClick((actor.x - TILE_SIZE * zoom) / uiScale,
+                (actor.y - TILE_SIZE * zoom) / uiScale)?.type, 'move');
         }
-    } finally {
-        i18n.setLanguage(previousLanguage);
     }
 });
 
-test('desktop action menu keeps radial geometry and clears compact-only hitboxes and text', () => {
-    const previousLanguage = i18n.lang;
-    i18n.setLanguage('en');
-    try {
-        const menu = new ActionMenuUI();
-        const states = buildActionStates().map((state) => state.type === 'attack'
-            ? { ...state, enabled: false, disabledReason: 'No attackable enemy' }
-            : state
-        );
-        const compactContext = createCanvasContextRecorder();
-        menu.open(states);
-        menu.renderCompact(compactContext.ctx, 325, 703, 162.5, 351.5, true);
-        const staleCompactPoint = menu.getCompactChipBounds('fanfare');
-        assert.ok(staleCompactPoint);
-
-        const desktopContext = createCanvasContextRecorder();
-        menu.render(desktopContext.ctx, 616, 336, true);
-
-        assert.equal(menu.usesCompactLayout(), false);
-        for (const type of ACTION_ORDER) assert.equal(menu.getCompactChipBounds(type), null);
-        assert.equal(
-            menu.onClick(
-                staleCompactPoint.x + staleCompactPoint.width / 2,
-                staleCompactPoint.y + staleCompactPoint.height / 2
-            ),
-            null
-        );
-        assert.equal(desktopContext.textCalls.some((call) => call.text.includes('C')), false);
-        assert.equal(desktopContext.textCalls.some((call) => call.text === 'No attackable enemy'), false);
-
-        const runtime = menu as unknown as {
-            slots: Array<{ type: ActionMenuSlotState['type'] }>;
-            getSlotPosition(slot: { type: ActionMenuSlotState['type'] }): { x: number; y: number };
-        };
-        const attackSlot = runtime.slots.find((slot) => slot.type === 'attack');
-        assert.ok(attackSlot);
-        assert.deepEqual(runtime.getSlotPosition(attackSlot), {
-            x: 640 + TILE_SIZE,
-            y: 360 - TILE_SIZE,
-        });
-        menu.onMouseMove(640 + TILE_SIZE, 360 - TILE_SIZE);
-        const hoveredContext = createCanvasContextRecorder();
-        menu.render(hoveredContext.ctx, 616, 336, true);
-        assert.ok(hoveredContext.textCalls.some((call) => call.text === 'Attack'));
-        assert.ok(hoveredContext.textCalls.some((call) => call.text === 'No attackable enemy'));
-    } finally {
-        i18n.setLanguage(previousLanguage);
-    }
+test('magic selection shows only original icons until an icon is hovered', (context) => {
+    let iconCount = 0;
+    context.mock.method(DarksaberSpriteAtlas, 'drawSprite', () => { iconCount++; return true; });
+    const skill = getSkill('inf_t1');
+    assert.ok(skill);
+    const menu = new FieldMagicMenu();
+    menu.show([{ skill, level: 1, enabled: true }]);
+    const { ctx, textCalls, paintCalls } = createCanvasContextRecorder();
+    menu.render(ctx, 136, 260);
+    assert.equal(iconCount, 1);
+    assert.deepEqual(textCalls, []);
+    assert.deepEqual(paintCalls, []);
+    assert.deepEqual(menu.onClick(160 - TILE_SIZE, 284 - TILE_SIZE), { kind: 'select', index: 0 });
 });
 
 test('inspect action no longer uses the computer icon cell', () => {

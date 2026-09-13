@@ -1,7 +1,10 @@
 # AGENTS.md — Codex / agent instructions
 
 This is a TypeScript + Vite canvas game. UI is being migrated from canvas-drawn
-panels to a **React DOM overlay** in a "full-dark Darkest Dungeon" style.
+panels to a **React DOM overlay**. Visual direction is **original Darksaber first**:
+preserve original pixel sprites, compact layouts and transparent field controls.
+The existing dark DOM theme is a fallback for information panels, not a mandate
+to add cards, frames or badges to original game elements.
 **Read `docs/ui-overlay-migration.md` first** — it has the architecture, the
 per-panel migration recipe, and known gotchas.
 

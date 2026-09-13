@@ -42,19 +42,33 @@ test('forged field HUD keeps the map, status and hunting controls separate at na
         await expect(page.getByTestId('field-hud')).toBeHidden();
         await page.keyboard.press('Escape');
         await expect(page.getByTestId('field-hud')).toBeVisible();
-        if (size.width === 320) {
+        if (size.width <= 516) {
             await page.getByRole('button', { name: /사냥터 길 안내|Guide to hunt/ }).click();
             await expect(page.locator('.ds-field-hud.is-menu-open')).toBeVisible({ timeout: 30_000 });
             const hero = await page.locator('.ds-field-hero').boundingBox();
-            const slots = await page.evaluate(() => {
-                const menu = (window as unknown as { __gm: any }).__gm.worldEngine.getUiState().actionMenuUI;
-                return ['move', 'tool', 'attack', 'magic', 'defend', 'rest', 'fanfare', 'open'].map((type) => menu.getCompactChipBounds(type));
+            const geometry = await page.evaluate(() => {
+                const gm = (window as unknown as { __gm: any }).__gm;
+                const engine = gm.worldEngine;
+                const menu = engine.getUiState().actionMenuUI;
+                const camera = gm.camera;
+                const actor = engine.getControlledActor().entity;
+                return {
+                    slots: ['move', 'tool', 'attack', 'magic', 'defend', 'rest', 'fanfare', 'open'].map((type) => menu.getCompactChipBounds(type)),
+                    actorX: ((actor.pixelX + 0.5) * 48 - camera.x) * camera.zoom,
+                    actorY: ((actor.pixelY + 0.5) * 48 - camera.y) * camera.zoom,
+                    tileSize: 48 * camera.zoom,
+                };
             });
-            for (const slot of slots) {
+            const offsets = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+            for (const [index, slot] of geometry.slots.entries()) {
                 expect(slot).not.toBeNull();
+                expect(slot.width * 1.2).toBeCloseTo(geometry.tileSize, 5);
+                expect(slot.height * 1.2).toBeCloseTo(geometry.tileSize, 5);
+                expect((slot.x + slot.width / 2) * 1.2).toBeCloseTo(geometry.actorX + offsets[index][0] * geometry.tileSize, 1);
+                expect((slot.y + slot.height / 2) * 1.2).toBeCloseTo(geometry.actorY + offsets[index][1] * geometry.tileSize, 1);
                 expect(slot.y * 1.2).toBeGreaterThanOrEqual(hero!.y + hero!.height);
             }
-            await page.screenshot({ path: testInfo.outputPath('field-skin-combat-320.png') });
+            await page.screenshot({ path: testInfo.outputPath(`field-skin-combat-${size.width}.png`) });
         }
     }
     expect(errors).toEqual([]);

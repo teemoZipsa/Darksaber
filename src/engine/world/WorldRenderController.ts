@@ -112,7 +112,9 @@ export class WorldRenderController {
         WorldFieldRenderer.renderActionTiles(ctx, model, camX, camY);
         WorldFieldRenderer.renderMagicTargetTiles(ctx, model, camX, camY);
         WorldFieldRenderer.renderPathPreview(ctx, model, camX, camY);
-        if (options.huntTarget) WorldFieldRenderer.renderHuntMarker(ctx, options.huntTarget, camX, camY);
+        if (options.huntTarget && !model.actionMenuOpen && !this.context.magicController.isVisible()) {
+            WorldFieldRenderer.renderHuntMarker(ctx, options.huntTarget, camX, camY);
+        }
         WorldFieldRenderer.renderTacticalMarkers(ctx, model, camX, camY);
         WorldFieldRenderer.renderSelectedLoot(ctx, model, camX, camY);
         WorldFieldRenderer.renderEnemies(ctx, model, camX, camY);
@@ -213,6 +215,7 @@ export class WorldRenderController {
                 uiH,
                 actorCenterX,
                 actorCenterY,
+                camera.zoom / scale,
             );
         } else if (fullMapVisible) {
             this.context.actionMenuUI.clearCompactLayout();
@@ -440,6 +443,7 @@ export class WorldRenderController {
         viewportHeight: number,
         actorCenterX: number,
         actorCenterY: number,
+        worldToUiScale: number,
     ): void {
         const actor = this.context.getControlledActor();
         if (
@@ -464,6 +468,7 @@ export class WorldRenderController {
             actorCenterX,
             actorCenterY,
             ready,
+            worldToUiScale,
         );
     }
 }
