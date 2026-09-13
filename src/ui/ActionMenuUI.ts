@@ -349,8 +349,6 @@ export class ActionMenuUI {
             const isHighlighted = enabled && Boolean(state.highlighted);
             const r = this.iconRadius;
 
-            drawFieldPanel(ctx, ix - 23, iy - 23, 46, 46, 6);
-
             if (isHighlighted) {
                 this.drawSlotTutorialFocus(ctx, ix, iy, r);
             }
