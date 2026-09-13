@@ -124,11 +124,11 @@ const ORIGINAL_AUTOTILE_CONFIGS: Partial<Record<TileType, OriginalAutotileConfig
         cellsByMask: {
             3: [10],
             6: [0],
-            7: [5, 7],
+            7: [5],
             9: [12],
             11: [11],
             12: [2],
-            13: [8],
+            13: [7],
             14: [1],
             15: [3, 4, 6, 9],
         },
@@ -265,6 +265,7 @@ class TileAssetManagerClass {
     private waterFrameCache = new Map<string, OffscreenCanvas>();
     private snowEdgeCache = new Map<string, OffscreenCanvas>();
     private snowTextureCache = new Map<string, OffscreenCanvas>();
+    private forestCornerCache = new Map<string, OffscreenCanvas>();
     private terrainRevision = 0;
 
     public getTerrainRevision(): number { return this.terrainRevision; }
@@ -376,6 +377,18 @@ class TileAssetManagerClass {
             return;
         }
         const hash = this.hashCell(worldX, worldY, type);
+        if (type === TileType.FOREST) {
+            const cardinalMask = [0, 2, 4, 6].reduce((mask, index, bit) => mask | (connections[index] ? 1 << bit : 0), 0);
+            const hasInnerCorner = [1, 3, 5, 7].some(index =>
+                !connections[index] && connections[index - 1] && connections[(index + 1) % 8]);
+            const cells = config.cellsByMask[cardinalMask];
+            if (cells && !hasInnerCorner) {
+                // Tree crowns span more than half a cell. Preserve the whole
+                // original silhouette on ordinary edges and outer corners.
+                this.drawOriginalCell(ctx, img, cells[hash % cells.length], dx, dy, size);
+                return;
+            }
+        }
         // Each quadrant needs only its two sides and diagonal: outer corner,
         // straight edge, inner corner, or solid. Never guess a nearby mask.
         const quadrants = [
@@ -408,6 +421,14 @@ class TileAssetManagerClass {
             let cells = base.cells;
             if (!a || !b) cells = config.cellsByMask[!a && !b ? q.outer : !a ? q.edgeA : q.edgeB] ?? cells;
             else if (!connections[q.diagonal]) {
+                if (type === TileType.FOREST) {
+                    // The recovered forest set has no recessed corners. Cut
+                    // its foliage with an original ground corner's alpha.
+                    const corner = this.getForestInnerCorner(img, baseCell, q.cut);
+                    ctx.drawImage(corner, q.x, q.y, 16, 16,
+                        dx + q.x / 32 * size, dy + q.y / 32 * size, size / 2, size / 2);
+                    continue;
+                }
                 const candidates = config.cellsByMask[15] ?? [];
                 const exact = candidates.filter(cell => this.getCellCornerCutMask(img, cell) === q.cut);
                 const partial = candidates.filter(cell => (this.getCellCornerCutMask(img, cell) & q.cut) !== 0);
@@ -418,6 +439,25 @@ class TileAssetManagerClass {
                 dx + q.x / 32 * size, dy + q.y / 32 * size, size / 2, size / 2);
         }
         ctx.imageSmoothingEnabled = smoothing;
+    }
+
+    private getForestInnerCorner(img: HTMLImageElement, baseCell: number, cut: number): OffscreenCanvas {
+        const key = `${baseCell}:${cut}`;
+        let corner = this.forestCornerCache.get(key);
+        if (!corner) {
+            corner = new OffscreenCanvas(32, 32);
+            const ctx = corner.getContext('2d')!;
+            this.drawOriginalCell(ctx, img, baseCell, 0, 0, 32);
+            const maskCell = ORIGINAL_AUTOTILE_CONFIGS[TileType.GRASS]!.cellsByMask[15]!
+                .find(cell => this.getCellCornerCutMask(img, cell) === cut);
+            if (maskCell !== undefined) {
+                ctx.globalCompositeOperation = 'destination-in';
+                this.drawOriginalCell(ctx, img, maskCell, 0, 0, 32);
+            }
+            // Four foliage variants × four corners; no per-chunk surfaces.
+            this.forestCornerCache.set(key, corner);
+        }
+        return corner;
     }
 
     /** Small shared frames made only from the original opaque water cells. */

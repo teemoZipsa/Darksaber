@@ -61,7 +61,7 @@ test('terrain boundaries blend with their actual neighbors without grass seams',
         const connectionFailures: string[] = [];
         const tile = new OffscreenCanvas(32, 32);
         const tileCtx = tile.getContext('2d')!;
-        for (const type of [TileType.GRASS, TileType.ROAD, TileType.SAND, TileType.STONE, TileType.SNOW]) {
+        for (const type of [TileType.GRASS, TileType.FOREST, TileType.ROAD, TileType.SAND, TileType.STONE, TileType.SNOW]) {
             for (let mask = 0; mask < 256; mask++) {
                 const connections = Array.from({ length: 8 }, (_, i) => (mask & (1 << i)) !== 0);
                 tileCtx.clearRect(0, 0, 32, 32);

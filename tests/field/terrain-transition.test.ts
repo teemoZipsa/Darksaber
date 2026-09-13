@@ -3,6 +3,16 @@ import test from 'node:test';
 import { planGroundLayers } from '../../src/map/TerrainTransition';
 import { TileType as T } from '../../src/map/Tile';
 
+test('forest crowns sit above adjoining ground without spilling into a road tile', () => {
+    for (const ground of [T.GRASS, T.ROAD, T.SAND, T.STONE, T.SNOW]) {
+        const forest = planGroundLayers(T.FOREST, [T.FOREST, T.FOREST, ground, ground, ground, ground, ground, T.FOREST])!;
+        assert.deepEqual(forest.map(layer => layer.type), [ground, T.FOREST]);
+        assert.deepEqual(forest[1].connections, [true, true, false, false, false, false, false, true]);
+        const path = planGroundLayers(ground, Array(8).fill(T.FOREST))!;
+        assert.deepEqual(path.map(layer => layer.type), [ground]);
+    }
+});
+
 test('sand and stone meet without an invented grass underlay on either side', () => {
     const sand = planGroundLayers(T.SAND, [T.SAND, T.STONE, T.STONE, T.STONE, T.SAND, T.SAND, T.SAND, T.SAND])!;
     const stone = planGroundLayers(T.STONE, [T.STONE, T.STONE, T.STONE, T.STONE, T.STONE, T.SAND, T.SAND, T.SAND])!;

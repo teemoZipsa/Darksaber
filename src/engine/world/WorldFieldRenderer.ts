@@ -183,27 +183,25 @@ export class WorldFieldRenderer {
                 ctx.fillRect(px + 5, py + 5, TILE_SIZE - 10, TILE_SIZE - 10);
             }
 
-            if (actor === model.controlledActor) {
+            // One frame per actor: imminent danger, explicit selection, then
+            // control. The AP gauge already communicates readiness.
+            if (hasIncomingEnemyIntent(model, actor.id)) {
+                renderIncomingIntentFrame(ctx, px, py, model.worldTime);
+            } else if (model.selectedActorId === actor.id) {
+                ctx.strokeStyle = '#ffdd55';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(px + 1, py + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+            } else if (actor === model.controlledActor) {
                 ctx.strokeStyle = '#52f6ff';
                 ctx.lineWidth = 3;
                 ctx.strokeRect(px + 3, py + 3, TILE_SIZE - 6, TILE_SIZE - 6);
             }
 
-            if (model.selectedActorId === actor.id) {
-                ctx.strokeStyle = '#ffdd55';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(px + 1, py + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-            }
-
-            if (hasIncomingEnemyIntent(model, actor.id)) renderIncomingIntentFrame(ctx, px, py, model.worldTime);
             renderIntentBadge(ctx, px, py, getFieldIntentBadge(actor.queuedIntent));
 
             renderGauge(ctx, px + 4, py - 7, TILE_SIZE - 8, actor.entity.actionGauge / 100, '#39ff88');
             const effective = getEffectiveStatsForCharacter(actor.character);
             renderHpBar(ctx, px + 4, py + TILE_SIZE + 3, TILE_SIZE - 8, actor.character.stats.hp, effective.maxHp);
-            if (actor.entity.actionGauge >= 100 || actor.id === model.activeTurnActorId) {
-                renderReadyRing(ctx, model.worldTime, px, py, '#5fffd0');
-            }
         }
     }
 
@@ -262,9 +260,6 @@ export class WorldFieldRenderer {
 
             renderGauge(ctx, px + 5, py - 7, TILE_SIZE - 10, enemy.actionGauge / 100, '#ffb84d');
             renderHpBar(ctx, px + 5, py + TILE_SIZE + 3, TILE_SIZE - 10, enemy.stats.hp, enemy.stats.maxHp);
-            if (enemy.actionGauge >= 100 || enemy.id === model.activeTurnActorId) {
-                renderReadyRing(ctx, model.worldTime, px, py, enemy.isBoss ? '#ff4ea3' : '#ffb84d');
-            }
         }
     }
 
@@ -684,6 +679,7 @@ function renderIntentBadge(ctx: CanvasRenderingContext2D, px: number, py: number
     ctx.fillStyle = badge.fill;
     ctx.strokeStyle = badge.stroke;
     ctx.lineWidth = 1;
+    ctx.beginPath();
     ctx.roundRect(x, y, w, h, 4);
     ctx.fill();
     ctx.stroke();
@@ -834,17 +830,6 @@ function renderMagicTargetIcon(ctx: CanvasRenderingContext2D, skill: Skill, px: 
     ctx.fillStyle = '#ffe6ff';
     ctx.fillText(skill.icon, cx, cy + 1);
     ctx.restore();
-}
-
-function renderReadyRing(ctx: CanvasRenderingContext2D, worldTime: number, px: number, py: number, color: string): void {
-    const pulse = 0.5 + 0.5 * Math.sin(worldTime * 7);
-    ctx.strokeStyle = color;
-    ctx.globalAlpha = 0.45 + pulse * 0.35;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(px + TILE_SIZE / 2, py + TILE_SIZE / 2, TILE_SIZE * (0.48 + pulse * 0.07), 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
 }
 
 function renderGauge(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, pct: number, color: string): void {
